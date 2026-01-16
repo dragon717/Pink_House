@@ -15,7 +15,8 @@ final class ClothingTests: XCTestCase {
 
     override func setUpWithError() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        modelContainer = try ModelContainer(for: Clothing.self, configurations: config)
+        let schema = Schema([Clothing.self, Brand.self, Tag.self])
+        modelContainer = try ModelContainer(for: schema, configurations: config)
         modelContext = modelContainer.mainContext
     }
 

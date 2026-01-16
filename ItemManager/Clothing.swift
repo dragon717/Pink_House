@@ -21,7 +21,7 @@ final class Clothing {
     @Attribute(.unique) var id: UUID = UUID()
     // 基础信息
     var name: String = ""
-    var brand: String = ""
+    // var brand: String = "" // Deprecated
     var types: String = "" // 逗号分隔，如 JSK,OP
     var colors: String = "" // 逗号分隔
     var sizes: String = "" // 逗号分隔
@@ -48,8 +48,11 @@ final class Clothing {
     @Relationship(deleteRule: .nullify)
     var tags: [Tag]? = []
     
+    @Relationship(deleteRule: .nullify)
+    var brand: Brand?
+    
     init(name: String = "",
-         brand: String = "",
+         brand: Brand? = nil,
          types: String = "",
          colors: String = "",
          sizes: String = "",

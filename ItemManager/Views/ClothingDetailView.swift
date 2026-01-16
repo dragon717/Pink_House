@@ -17,7 +17,8 @@ struct ClothingDetailView: View {
     
     // Form States
     @State private var name: String = ""
-    @State private var brand: String = ""
+    @State private var selectedBrand: Brand?
+    @State private var showingBrandSheet = false
     @State private var types: String = ""
     @State private var colors: String = ""
     @State private var sizes: String = ""
@@ -56,7 +57,38 @@ struct ClothingDetailView: View {
                     ImagePickerGrid(imagePaths: $imagePaths)
                     
                     RoundedTextField(title: "裙子名称", placeholder: "请输入裙子名称", text: $name, isRequired: true)
-                    RoundedTextField(title: "品牌名称", placeholder: "请输入品牌名称", text: $brand)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("品牌名称")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        
+                        Button(action: { showingBrandSheet = true }) {
+                            HStack {
+                                if let brand = selectedBrand {
+                                    Circle()
+                                        .fill(Color(hex: brand.colorHex))
+                                        .frame(width: 12, height: 12)
+                                    Text(brand.name)
+                                        .foregroundStyle(.primary)
+                                } else {
+                                    Text("请选择品牌")
+                                        .foregroundStyle(.secondary.opacity(0.5))
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding()
+                            .background(Color(uiColor: .secondarySystemBackground))
+                            .cornerRadius(12)
+                        }
+                    }
+                    .sheet(isPresented: $showingBrandSheet) {
+                        BrandSelectionView(selectedBrand: $selectedBrand)
+                    }
+                    
                     RoundedTextField(title: "类型 (逗号分隔，如: JSK,OP,SK)", placeholder: "例如: JSK,OP", text: $types)
                     RoundedTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors)
                     RoundedTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes)
@@ -182,7 +214,7 @@ struct ClothingDetailView: View {
         .onAppear {
             if let c = clothing {
                 name = c.name
-                brand = c.brand
+                selectedBrand = c.brand
                 types = c.types
                 colors = c.colors
                 sizes = c.sizes
@@ -205,7 +237,7 @@ struct ClothingDetailView: View {
             // Update
             AppLogger.info("Updating clothing: \(c.id)")
             c.name = name
-            c.brand = brand
+            c.brand = selectedBrand
             c.types = types
             c.colors = colors
             c.sizes = sizes
@@ -225,7 +257,7 @@ struct ClothingDetailView: View {
             AppLogger.info("Creating new clothing: \(name)")
             let newClothing = Clothing(
                 name: name,
-                brand: brand,
+                brand: selectedBrand,
                 types: types,
                 colors: colors,
                 sizes: sizes,

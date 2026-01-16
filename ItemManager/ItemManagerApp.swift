@@ -14,6 +14,7 @@ struct ItemManagerApp: App {
         let schema = Schema([
                     Item.self,
                     Clothing.self,
+                    Brand.self,
                     Tag.self,
                     StoredImage.self,
                 ])
