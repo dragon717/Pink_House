@@ -15,8 +15,10 @@ struct ClothingListView: View {
     @Query(sort: \Tag.name) private var tags: [Tag]
     
     @State private var searchText = ""
-    @State private var selectedTag: Tag?
+    @State private var selectedTagIDs: Set<UUID> = []
     @State private var showingAddSheet = false
+    @State private var itemToDelete: Clothing?
+    @State private var showingDeleteAlert = false
     
     var filteredClothings: [Clothing] {
         clothings.filter { clothing in
@@ -25,10 +27,11 @@ struct ClothingListView: View {
                 clothing.types.localizedCaseInsensitiveContains(searchText)
             
             let matchesTag: Bool
-            if let targetTag = selectedTag {
-                matchesTag = clothing.tags?.contains(where: { $0.id == targetTag.id }) ?? false
-            } else {
+            if selectedTagIDs.isEmpty {
                 matchesTag = true
+            } else {
+                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
+                matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
             }
             
             return matchesSearch && matchesTag
@@ -55,28 +58,39 @@ struct ClothingListView: View {
                 .scrollContentBackground(.hidden)
                 .searchable(text: $searchText, prompt: "搜索名称或款式")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Menu {
-                            Button("全部标签", action: { selectedTag = nil })
-                            ForEach(tags) { tag in
-                                Button(action: { selectedTag = tag }) {
-                                    Label {
-                                        Text(tag.name)
-                                    } icon: {
-                                        Image(systemName: "circle.fill")
-                                            .foregroundStyle(Color(hex: tag.colorHex))
+                    ToolbarItem(placement: .primaryAction) {
+                        HStack {
+                            Menu {
+                                Button(action: { selectedTagIDs.removeAll() }) {
+                                    if selectedTagIDs.isEmpty {
+                                        Text("全部")
+                                    } else {
+                                        Label("全部", systemImage: "xmark.circle")
                                     }
                                 }
+                                
+                                ForEach(tags) { tag in
+                                    Button(action: { toggleTag(tag) }) {
+                                        if selectedTagIDs.contains(tag.id) {
+                                            Label(tag.name, systemImage: "checkmark")
+                                        } else {
+                                            Label {
+                                                Text(tag.name)
+                                            } icon: {
+                                                Image(systemName: "circle.fill")
+                                                    .foregroundStyle(Color(hex: tag.colorHex))
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
+                                    .symbolVariant(!selectedTagIDs.isEmpty ? .fill : .none)
                             }
-                        } label: {
-                            Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
-                                .symbolVariant(selectedTag != nil ? .fill : .none)
-                        }
-                    }
-                    
-                    ToolbarItem(placement: .primaryAction) {
-                        Button(action: { showingAddSheet = true }) {
-                            Label("新增", systemImage: "plus")
+                            
+                            Button(action: { showingAddSheet = true }) {
+                                Label("新增", systemImage: "plus")
+                            }
                         }
                     }
                 }
@@ -95,13 +109,31 @@ struct ClothingListView: View {
                 ClothingDetailView(clothing: nil)
             }
         }
+        .alert("确认删除", isPresented: $showingDeleteAlert) {
+            Button("取消", role: .cancel) { itemToDelete = nil }
+            Button("删除", role: .destructive) {
+                if let item = itemToDelete {
+                    modelContext.delete(item)
+                }
+                itemToDelete = nil
+            }
+        } message: {
+            Text("确定要删除这件裙子吗？此操作无法撤销。")
+        }
+    }
+    
+    private func toggleTag(_ tag: Tag) {
+        if selectedTagIDs.contains(tag.id) {
+            selectedTagIDs.remove(tag.id)
+        } else {
+            selectedTagIDs.insert(tag.id)
+        }
     }
     
     private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(filteredClothings[index])
-            }
+        if let index = offsets.first {
+            itemToDelete = filteredClothings[index]
+            showingDeleteAlert = true
         }
     }
 }
