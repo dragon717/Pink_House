@@ -93,6 +93,9 @@ struct ClothingListView: View {
                                                 Text(tag.name)
                                                 if selectedTagIDs.contains(tag.id) {
                                                     Image(systemName: "checkmark")
+                                                } else {
+                                                    Image(systemName: "circle.fill")
+                                                        .foregroundStyle(Color(hex: tag.colorHex))
                                                 }
                                             }
                                         }
@@ -120,6 +123,9 @@ struct ClothingListView: View {
                                                 Text(brand.name)
                                                 if selectedBrandIDs.contains(brand.id) {
                                                     Image(systemName: "checkmark")
+                                                } else {
+                                                    Image(systemName: "circle.fill")
+                                                        .foregroundStyle(Color(hex: brand.colorHex))
                                                 }
                                             }
                                         }
@@ -150,7 +156,7 @@ struct ClothingListView: View {
         }
         .sheet(isPresented: $showingAddSheet) {
             NavigationStack {
-                ClothingDetailView(clothing: nil)
+                ClothingEditView(clothing: nil)
             }
         }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
