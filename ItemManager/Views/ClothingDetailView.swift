@@ -191,7 +191,6 @@ struct ClothingDetailView: View {
             }
         }
         .padding(.horizontal)
-        .padding(.top, 60) // Safe area approximation
     }
     
     private var mainInfoCard: some View {
@@ -203,7 +202,7 @@ struct ClothingDetailView: View {
                 Spacer()
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.right.circle.fill")
-                    Text("原裙") // This could be dynamic based on status
+                    Text("追根溯源") // This could be dynamic based on status
                 }
                 .font(.caption)
                 .foregroundStyle(.white)
