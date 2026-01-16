@@ -36,9 +36,19 @@ struct ClothingListView: View {
     
     var filteredClothings: [Clothing] {
         clothings.filter { clothing in
-            let matchesSearch = searchText.isEmpty || 
-                clothing.name.localizedCaseInsensitiveContains(searchText) ||
-                clothing.types.localizedCaseInsensitiveContains(searchText)
+            let matchesSearch: Bool
+            if searchText.isEmpty {
+                matchesSearch = true
+            } else {
+                // Optimization: Check simple string properties first
+                matchesSearch = clothing.name.localizedCaseInsensitiveContains(searchText) ||
+                    clothing.types.localizedCaseInsensitiveContains(searchText) ||
+                    clothing.colors.localizedCaseInsensitiveContains(searchText) ||
+                    clothing.sizes.localizedCaseInsensitiveContains(searchText) ||
+                    clothing.accessories.localizedCaseInsensitiveContains(searchText) ||
+                    (clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                    (clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false)
+            }
             
             let matchesTag: Bool
             if selectedTagIDs.isEmpty {
@@ -95,7 +105,7 @@ struct ClothingListView: View {
                     .onDelete(perform: deleteItems)
                 }
                 .scrollContentBackground(.hidden)
-                .searchable(text: $searchText, prompt: "搜索名称或款式")
+                .searchable(text: $searchText, prompt: "搜索名称、品牌、标签、属性...")
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         HStack(spacing: 12) {
