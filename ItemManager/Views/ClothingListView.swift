@@ -29,7 +29,9 @@ struct ClothingListView: View {
     // Helper to extract unique values from comma-separated strings
     private func getAllValues(for keyPath: KeyPath<Clothing, String>) -> [String] {
         let allString = clothings.map { $0[keyPath: keyPath] }.joined(separator: ",")
-        return Array(Set(allString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })).sorted()
+        // Replace Chinese comma with English comma before splitting
+        let normalizedString = allString.replacingOccurrences(of: "，", with: ",")
+        return Array(Set(normalizedString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })).sorted()
     }
     
     var filteredClothings: [Clothing] {
@@ -57,13 +59,19 @@ struct ClothingListView: View {
                 }
             }
             
-            let matchesType: Bool = selectedTypes.isEmpty || !selectedTypes.isDisjoint(with: Set(clothing.types.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }))
+            // Helper for splitting strings with support for both English and Chinese commas
+            func splitValues(_ string: String) -> Set<String> {
+                let normalized = string.replacingOccurrences(of: "，", with: ",")
+                return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+            }
             
-            let matchesColor: Bool = selectedColors.isEmpty || !selectedColors.isDisjoint(with: Set(clothing.colors.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }))
+            let matchesType: Bool = selectedTypes.isEmpty || !selectedTypes.isDisjoint(with: splitValues(clothing.types))
             
-            let matchesSize: Bool = selectedSizes.isEmpty || !selectedSizes.isDisjoint(with: Set(clothing.sizes.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }))
+            let matchesColor: Bool = selectedColors.isEmpty || !selectedColors.isDisjoint(with: splitValues(clothing.colors))
             
-            let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: Set(clothing.accessories.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }))
+            let matchesSize: Bool = selectedSizes.isEmpty || !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
+            
+            let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             
             return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesAccessory
         }
