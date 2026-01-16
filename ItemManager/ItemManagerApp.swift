@@ -12,10 +12,11 @@ import SwiftData
 struct ItemManagerApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
-            Clothing.self,
-            Tag.self,
-        ])
+                    Item.self,
+                    Clothing.self,
+                    Tag.self,
+                    StoredImage.self,
+                ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {

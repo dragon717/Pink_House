@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>少女心愿</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>需要访问您的相册以选择裙子图片</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

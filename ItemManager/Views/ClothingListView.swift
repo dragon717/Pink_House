@@ -7,13 +7,15 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 struct ClothingListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Clothing.createdAt, order: .reverse) private var clothings: [Clothing]
+    @Query(sort: \Tag.name) private var tags: [Tag]
     
     @State private var searchText = ""
-    @State private var selectedStatus: ClothingStatus?
+    @State private var selectedTag: Tag?
     @State private var showingAddSheet = false
     
     var filteredClothings: [Clothing] {
@@ -22,9 +24,14 @@ struct ClothingListView: View {
                 clothing.name.localizedCaseInsensitiveContains(searchText) ||
                 clothing.types.localizedCaseInsensitiveContains(searchText)
             
-            let matchesStatus = selectedStatus == nil || clothing.status == selectedStatus
+            let matchesTag: Bool
+            if let targetTag = selectedTag {
+                matchesTag = clothing.tags?.contains(where: { $0.id == targetTag.id }) ?? false
+            } else {
+                matchesTag = true
+            }
             
-            return matchesSearch && matchesStatus
+            return matchesSearch && matchesTag
         }
     }
     
@@ -50,13 +57,20 @@ struct ClothingListView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Menu {
-                            Button("全部", action: { selectedStatus = nil })
-                            ForEach(ClothingStatus.allCases) { status in
-                                Button(status.rawValue, action: { selectedStatus = status })
+                            Button("全部标签", action: { selectedTag = nil })
+                            ForEach(tags) { tag in
+                                Button(action: { selectedTag = tag }) {
+                                    Label {
+                                        Text(tag.name)
+                                    } icon: {
+                                        Image(systemName: "circle.fill")
+                                            .foregroundStyle(Color(hex: tag.colorHex))
+                                    }
+                                }
                             }
                         } label: {
                             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
-                                .symbolVariant(selectedStatus != nil ? .fill : .none)
+                                .symbolVariant(selectedTag != nil ? .fill : .none)
                         }
                     }
                     
@@ -67,7 +81,7 @@ struct ClothingListView: View {
                     }
                 }
             }
-            .navigationTitle("少女心愿")
+            .navigationTitle("少女衣柜")
         } detail: {
             ZStack {
                 LiquidBackground()
@@ -98,19 +112,23 @@ struct ClothingRow: View {
     var body: some View {
         GlassCard {
             HStack(spacing: 16) {
-                // Thumbnail Placeholder
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 60, height: 60)
-                    .overlay {
-                        if let firstPath = clothing.imagePaths.first {
-                            // In real app, load image from path
-                            Image(systemName: "photo")
-                        } else {
+                // Thumbnail
+                if let firstPath = clothing.imagePaths.first,
+                   let image = ImageManager.shared.loadImage(fileName: firstPath) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 60, height: 60)
+                        .overlay {
                             Image(systemName: "tshirt")
                                 .foregroundStyle(.pink.opacity(0.5))
                         }
-                    }
+                }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(clothing.name)
@@ -126,10 +144,21 @@ struct ClothingRow: View {
                                 .background(Color.pink.opacity(0.1))
                                 .cornerRadius(8)
                         }
-                        
-                        Text(clothing.status.rawValue)
-                            .font(.caption)
-                            .foregroundStyle(clothing.status == .onShelf ? .green : .gray)
+                    }
+                    
+                    if let tags = clothing.tags, !tags.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(tags.prefix(3)) { tag in
+                                Text("#\(tag.name)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if tags.count > 3 {
+                                Text("...")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
                 

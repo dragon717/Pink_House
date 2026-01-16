@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 struct ClothingDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -26,6 +27,7 @@ struct ClothingDetailView: View {
     
     // Tag States
     @State private var showingAddTagSheet = false
+    @State private var selectedTags: [Tag] = []
     
     // Price States
     @State private var priceTotal: Double = 0.0
@@ -72,15 +74,38 @@ struct ClothingDetailView: View {
                 
                 // MARK: - 标签分类
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("标签分类")
-                        .font(.headline)
+                    HStack {
+                        Text("标签分类")
+                            .font(.headline)
+                        Spacer()
+                        Button(action: { showingAddTagSheet = true }) {
+                            Label("管理标签", systemImage: "tag")
+                                .font(.subheadline)
+                        }
+                    }
                     
-                    Button(action: { showingAddTagSheet = true }) {
-                        Label("新建标签", systemImage: "plus")
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color(uiColor: .secondarySystemBackground))
-                            .cornerRadius(20)
+                    if !selectedTags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack {
+                                ForEach(selectedTags) { tag in
+                                    HStack {
+                                        Circle()
+                                            .fill(Color(hex: tag.colorHex))
+                                            .frame(width: 8, height: 8)
+                                        Text(tag.name)
+                                            .font(.subheadline)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color(hex: tag.colorHex).opacity(0.2))
+                                    .cornerRadius(16)
+                                }
+                            }
+                        }
+                    } else {
+                        Text("暂无标签")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                     
                     Text("可选择多个标签分类，帮助你更好地管理衣橱")
@@ -91,6 +116,9 @@ struct ClothingDetailView: View {
                 .padding()
                 .background(Color.white)
                 .cornerRadius(16)
+                .sheet(isPresented: $showingAddTagSheet) {
+                    TagSelectionView(selectedTags: $selectedTags)
+                }
                 
                 // MARK: - 价格信息
                 VStack(alignment: .leading, spacing: 16) {
@@ -133,7 +161,15 @@ struct ClothingDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("取消") { dismiss() }
+                Button("取消") {
+                    // 如果是新建状态且用户取消，需要清理已上传的图片
+                    if !isEditing {
+                        for path in imagePaths {
+                            ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+                        }
+                    }
+                    dismiss()
+                }
             }
             
             ToolbarItem(placement: .confirmationAction) {
@@ -159,6 +195,7 @@ struct ClothingDetailView: View {
                 accessoriesPrice = NSDecimalNumber(decimal: c.accessoriesPrice).doubleValue
                 purchaseDate = c.purchaseDate
                 note = c.note
+                selectedTags = c.tags ?? []
             }
         }
     }
@@ -181,6 +218,7 @@ struct ClothingDetailView: View {
             c.accessoriesPrice = Decimal(accessoriesPrice)
             c.purchaseDate = purchaseDate
             c.note = note
+            c.tags = selectedTags
             c.updatedAt = Date()
         } else {
             // Create
@@ -201,6 +239,7 @@ struct ClothingDetailView: View {
                 purchaseDate: purchaseDate,
                 note: note
             )
+            newClothing.tags = selectedTags
             modelContext.insert(newClothing)
         }
         dismiss()
