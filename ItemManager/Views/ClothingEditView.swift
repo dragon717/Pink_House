@@ -17,8 +17,7 @@ struct ClothingEditView: View {
     
     // Form States
     @State private var name: String = ""
-    @State private var selectedBrand: Brand?
-    @State private var showingBrandSheet = false
+    @State private var brandName: String = ""
     @State private var types: String = ""
     @State private var colors: String = ""
     @State private var sizes: String = ""
@@ -58,36 +57,7 @@ struct ClothingEditView: View {
                     
                     RoundedTextField(title: "裙子名称", placeholder: "请输入裙子名称", text: $name, isRequired: true)
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("品牌名称")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        
-                        Button(action: { showingBrandSheet = true }) {
-                            HStack {
-                                if let brand = selectedBrand {
-                                    Circle()
-                                        .fill(Color(hex: brand.colorHex))
-                                        .frame(width: 12, height: 12)
-                                    Text(brand.name)
-                                        .foregroundStyle(.primary)
-                                } else {
-                                    Text("请选择品牌")
-                                        .foregroundStyle(.secondary.opacity(0.5))
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding()
-                            .background(Color(uiColor: .secondarySystemBackground))
-                            .cornerRadius(12)
-                        }
-                    }
-                    .sheet(isPresented: $showingBrandSheet) {
-                        BrandSelectionView(selectedBrand: $selectedBrand)
-                    }
+                    RoundedTextField(title: "品牌名称", placeholder: "请输入品牌名称", text: $brandName)
                     
                     RoundedTextField(title: "类型 (逗号分隔，如: JSK,OP,SK)", placeholder: "例如: JSK,OP", text: $types)
                     RoundedTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors)
@@ -214,7 +184,7 @@ struct ClothingEditView: View {
         .onAppear {
             if let c = clothing {
                 name = c.name
-                selectedBrand = c.brand
+                brandName = c.brand?.name ?? ""
                 types = c.types
                 colors = c.colors
                 sizes = c.sizes
@@ -232,16 +202,56 @@ struct ClothingEditView: View {
         }
     }
     
+    private func normalizeTags(_ input: String) -> String {
+        let components = input.replacingOccurrences(of: "，", with: ",")
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return components.joined(separator: ",")
+    }
+    
+    private func getOrCreateBrand(name: String) -> Brand? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return nil }
+        
+        let descriptor = FetchDescriptor<Brand>(
+            predicate: #Predicate { $0.name == trimmedName }
+        )
+        
+        do {
+            let brands = try modelContext.fetch(descriptor)
+            if let existingBrand = brands.first {
+                return existingBrand
+            } else {
+                let newBrand = Brand(name: trimmedName)
+                modelContext.insert(newBrand)
+                return newBrand
+            }
+        } catch {
+            AppLogger.error("Failed to fetch brand: \(error)")
+            // Fallback: create new
+            let newBrand = Brand(name: trimmedName)
+            modelContext.insert(newBrand)
+            return newBrand
+        }
+    }
+    
     private func save() {
+        let finalBrand = getOrCreateBrand(name: brandName)
+        let finalTypes = normalizeTags(types)
+        let finalColors = normalizeTags(colors)
+        let finalSizes = normalizeTags(sizes)
+        let finalAccessories = normalizeTags(accessories)
+        
         if let c = clothing {
             // Update
             AppLogger.info("Updating clothing: \(c.id)")
             c.name = name
-            c.brand = selectedBrand
-            c.types = types
-            c.colors = colors
-            c.sizes = sizes
-            c.accessories = accessories
+            c.brand = finalBrand
+            c.types = finalTypes
+            c.colors = finalColors
+            c.sizes = finalSizes
+            c.accessories = finalAccessories
             c.imagePaths = imagePaths
             c.isShared = isShared
             c.price = Decimal(priceTotal)
@@ -257,11 +267,11 @@ struct ClothingEditView: View {
             AppLogger.info("Creating new clothing: \(name)")
             let newClothing = Clothing(
                 name: name,
-                brand: selectedBrand,
-                types: types,
-                colors: colors,
-                sizes: sizes,
-                accessories: accessories,
+                brand: finalBrand,
+                types: finalTypes,
+                colors: finalColors,
+                sizes: finalSizes,
+                accessories: finalAccessories,
                 imagePaths: imagePaths,
                 isShared: isShared,
                 price: Decimal(priceTotal),
