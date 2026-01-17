@@ -40,6 +40,7 @@ struct ClothingEditView: View {
     @State private var depositDate: Date = Date()
     @State private var isDepositPlan: Bool = false
     @State private var finalPaymentDate: Date = Date()
+    @State private var finalPaymentEndDate: Date = Date()
     @State private var note: String = ""
     
     init(clothing: Clothing?) {
@@ -166,10 +167,13 @@ struct ClothingEditView: View {
                                 DatePicker("定金日期", selection: $depositDate, displayedComponents: .date)
                                     .environment(\.locale, Locale(identifier: "zh_CN"))
                                 
-                                DatePicker("预估尾款时间", selection: $finalPaymentDate, displayedComponents: .date)
+                                DatePicker("预估尾款时间 (开始)", selection: $finalPaymentDate, displayedComponents: .date)
                                     .environment(\.locale, Locale(identifier: "zh_CN"))
                                 
-                                Text("设置预估尾款时间，方便在定尾计划中统计和提醒")
+                                DatePicker("预估尾款时间 (结束)", selection: $finalPaymentEndDate, displayedComponents: .date)
+                                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                                
+                                Text("设置预估尾款时间范围，方便在定尾计划中统计和提醒")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -234,6 +238,7 @@ struct ClothingEditView: View {
                 depositDate = c.depositDate ?? Date()
                 isDepositPlan = c.isDepositPlan
                 finalPaymentDate = c.finalPaymentDate ?? Date()
+                finalPaymentEndDate = c.finalPaymentEndDate ?? (c.finalPaymentDate ?? Date())
                 note = c.note
                 selectedTags = c.tags ?? []
             }
@@ -300,6 +305,7 @@ struct ClothingEditView: View {
             c.depositDate = depositDate
             c.isDepositPlan = isDepositPlan
             c.finalPaymentDate = finalPaymentDate
+            c.finalPaymentEndDate = finalPaymentEndDate
             c.note = note
             c.tags = selectedTags
             c.updatedAt = Date()
@@ -323,6 +329,7 @@ struct ClothingEditView: View {
                 depositDate: depositDate,
                 isDepositPlan: isDepositPlan,
                 finalPaymentDate: finalPaymentDate,
+                finalPaymentEndDate: finalPaymentEndDate,
                 note: note
             )
             newClothing.tags = selectedTags

@@ -39,7 +39,8 @@ final class Clothing {
     var purchaseDate: Date = Date()
     var depositDate: Date? = nil // 定金日期
     var isDepositPlan: Bool = false // 是否加入定尾计划
-    var finalPaymentDate: Date? = nil // 预估尾款时间
+    var finalPaymentDate: Date? = nil // 预估尾款时间（开始）
+    var finalPaymentEndDate: Date? = nil // 预估尾款时间（结束）
     var note: String = ""
     
     // 系统信息
@@ -70,6 +71,7 @@ final class Clothing {
          depositDate: Date? = nil,
          isDepositPlan: Bool = false,
          finalPaymentDate: Date? = nil,
+         finalPaymentEndDate: Date? = nil,
          note: String = "",
          stock: Int = 1,
          status: ClothingStatus = .onShelf) {
@@ -90,6 +92,7 @@ final class Clothing {
         self.depositDate = depositDate
         self.isDepositPlan = isDepositPlan
         self.finalPaymentDate = finalPaymentDate
+        self.finalPaymentEndDate = finalPaymentEndDate
         self.note = note
         self.stock = stock
         self.status = status
