@@ -162,6 +162,7 @@ struct ClothingListView: View {
                                         if selectedTagIDs.contains(tag.id) {
                                             selectedTagIDs.remove(tag.id)
                                         } else {
+                                            selectedTagIDs.removeAll()
                                             selectedTagIDs.insert(tag.id)
                                         }
                                     } label: {
@@ -174,7 +175,8 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label(selectedTagIDs.isEmpty ? "标签" : "标签 (\(selectedTagIDs.count))", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
+                                let selectedTagName = selectedTagIDs.first.flatMap { id in tags.first(where: { $0.id == id })?.name }
+                                Label(selectedTagName ?? "标签", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
                             }
                             
                             Menu {
@@ -189,6 +191,7 @@ struct ClothingListView: View {
                                         if selectedBrandIDs.contains(brand.id) {
                                             selectedBrandIDs.remove(brand.id)
                                         } else {
+                                            selectedBrandIDs.removeAll()
                                             selectedBrandIDs.insert(brand.id)
                                         }
                                     } label: {
@@ -201,7 +204,8 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label(selectedBrandIDs.isEmpty ? "品牌" : "品牌 (\(selectedBrandIDs.count))", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
+                                let selectedBrandName = selectedBrandIDs.first.flatMap { id in brands.first(where: { $0.id == id })?.name }
+                                Label(selectedBrandName ?? "品牌", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
                             }
                             
                             // Types Filter
@@ -217,6 +221,7 @@ struct ClothingListView: View {
                                         if selectedTypes.contains(type) {
                                             selectedTypes.remove(type)
                                         } else {
+                                            selectedTypes.removeAll()
                                             selectedTypes.insert(type)
                                         }
                                     } label: {
@@ -229,7 +234,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label(selectedTypes.isEmpty ? "类型" : "类型 (\(selectedTypes.count))", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
+                                Label(selectedTypes.first ?? "类型", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
                             }
                             
                             // Colors Filter
@@ -245,6 +250,7 @@ struct ClothingListView: View {
                                         if selectedColors.contains(color) {
                                             selectedColors.remove(color)
                                         } else {
+                                            selectedColors.removeAll()
                                             selectedColors.insert(color)
                                         }
                                     } label: {
@@ -257,7 +263,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label(selectedColors.isEmpty ? "颜色" : "颜色 (\(selectedColors.count))", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
+                                Label(selectedColors.first ?? "颜色", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
                             }
                             
                             // Sizes Filter
@@ -273,6 +279,7 @@ struct ClothingListView: View {
                                         if selectedSizes.contains(size) {
                                             selectedSizes.remove(size)
                                         } else {
+                                            selectedSizes.removeAll()
                                             selectedSizes.insert(size)
                                         }
                                     } label: {
@@ -285,7 +292,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label(selectedSizes.isEmpty ? "尺码" : "尺码 (\(selectedSizes.count))", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
+                                Label(selectedSizes.first ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
                             }
                             
                             // Accessories Filter
@@ -301,6 +308,7 @@ struct ClothingListView: View {
                                         if selectedAccessories.contains(accessory) {
                                             selectedAccessories.remove(accessory)
                                         } else {
+                                            selectedAccessories.removeAll()
                                             selectedAccessories.insert(accessory)
                                         }
                                     } label: {
@@ -313,7 +321,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label(selectedAccessories.isEmpty ? "小物" : "小物 (\(selectedAccessories.count))", systemImage: "sparkles")
+                                Label(selectedAccessories.first ?? "小物", systemImage: "sparkles")
                             }
                         } label: {
                             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
