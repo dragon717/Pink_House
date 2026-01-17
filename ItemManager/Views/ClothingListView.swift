@@ -11,6 +11,7 @@ import Foundation
 
 struct ClothingListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Clothing.createdAt, order: .reverse) private var clothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
@@ -88,206 +89,25 @@ struct ClothingListView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                LiquidBackground()
-                
-                List {
-                    ForEach(filteredClothings) { clothing in
-                        NavigationLink {
-                            ClothingDetailView(clothing: clothing)
-                        } label: {
-                            ClothingRow(clothing: clothing)
-                        }
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                    }
-                    .onDelete(perform: deleteItems)
+        Group {
+            if horizontalSizeClass == .compact {
+                NavigationStack {
+                    content
+                        .navigationTitle("少女衣柜")
                 }
-                .scrollContentBackground(.hidden)
-                .searchable(text: $searchText, prompt: "搜索名称、品牌、标签、属性...")
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        HStack(spacing: 12) {
-                            Menu {
-                                Menu {
-                                    Button(role: .destructive) {
-                                        selectedTagIDs.removeAll()
-                                    } label: {
-                                        Label("清除筛选", systemImage: "xmark.circle")
-                                    }
-                                    
-                                    ForEach(tags) { tag in
-                                        Button {
-                                            if selectedTagIDs.contains(tag.id) {
-                                                selectedTagIDs.remove(tag.id)
-                                            } else {
-                                                selectedTagIDs.insert(tag.id)
-                                            }
-                                        } label: {
-                                            HStack {
-                                                Text(tag.name)
-                                                if selectedTagIDs.contains(tag.id) {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Label("全部标签", systemImage: "tag")
-                                }
-                                
-                                Menu {
-                                    Button(role: .destructive) {
-                                        selectedBrandIDs.removeAll()
-                                    } label: {
-                                        Label("清除筛选", systemImage: "xmark.circle")
-                                    }
-                                    
-                                    ForEach(brands) { brand in
-                                        Button {
-                                            if selectedBrandIDs.contains(brand.id) {
-                                                selectedBrandIDs.remove(brand.id)
-                                            } else {
-                                                selectedBrandIDs.insert(brand.id)
-                                            }
-                                        } label: {
-                                            HStack {
-                                                Text(brand.name)
-                                                if selectedBrandIDs.contains(brand.id) {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Label("全部品牌", systemImage: "bag")
-                                }
-                                
-                                // Types Filter
-                                Menu {
-                                    Button(role: .destructive) {
-                                        selectedTypes.removeAll()
-                                    } label: {
-                                        Label("清除筛选", systemImage: "xmark.circle")
-                                    }
-                                    
-                                    ForEach(getAllValues(for: \.types), id: \.self) { type in
-                                        Button {
-                                            if selectedTypes.contains(type) {
-                                                selectedTypes.remove(type)
-                                            } else {
-                                                selectedTypes.insert(type)
-                                            }
-                                        } label: {
-                                            HStack {
-                                                Text(type)
-                                                if selectedTypes.contains(type) {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Label("全部类型", systemImage: "tshirt")
-                                }
-                                
-                                // Colors Filter
-                                Menu {
-                                    Button(role: .destructive) {
-                                        selectedColors.removeAll()
-                                    } label: {
-                                        Label("清除筛选", systemImage: "xmark.circle")
-                                    }
-                                    
-                                    ForEach(getAllValues(for: \.colors), id: \.self) { color in
-                                        Button {
-                                            if selectedColors.contains(color) {
-                                                selectedColors.remove(color)
-                                            } else {
-                                                selectedColors.insert(color)
-                                            }
-                                        } label: {
-                                            HStack {
-                                                Text(color)
-                                                if selectedColors.contains(color) {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Label("全部颜色", systemImage: "paintpalette")
-                                }
-                                
-                                // Sizes Filter
-                                Menu {
-                                    Button(role: .destructive) {
-                                        selectedSizes.removeAll()
-                                    } label: {
-                                        Label("清除筛选", systemImage: "xmark.circle")
-                                    }
-                                    
-                                    ForEach(getAllValues(for: \.sizes), id: \.self) { size in
-                                        Button {
-                                            if selectedSizes.contains(size) {
-                                                selectedSizes.remove(size)
-                                            } else {
-                                                selectedSizes.insert(size)
-                                            }
-                                        } label: {
-                                            HStack {
-                                                Text(size)
-                                                if selectedSizes.contains(size) {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Label("全部尺码", systemImage: "ruler")
-                                }
-                                
-                                // Accessories Filter
-                                Menu {
-                                    Button(role: .destructive) {
-                                        selectedAccessories.removeAll()
-                                    } label: {
-                                        Label("清除筛选", systemImage: "xmark.circle")
-                                    }
-                                    
-                                    ForEach(getAllValues(for: \.accessories), id: \.self) { accessory in
-                                        Button {
-                                            if selectedAccessories.contains(accessory) {
-                                                selectedAccessories.remove(accessory)
-                                            } else {
-                                                selectedAccessories.insert(accessory)
-                                            }
-                                        } label: {
-                                            HStack {
-                                                Text(accessory)
-                                                if selectedAccessories.contains(accessory) {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Label("全部小物", systemImage: "sparkles")
-                                }
-                            } label: {
-                                Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
-                                    .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
-                            }
-                            
-                            Button(action: { showingAddSheet = true }) {
-                                Label("新增", systemImage: "plus")
-                            }
-                        }
+            } else {
+                NavigationSplitView {
+                    content
+                        .navigationTitle("少女衣柜")
+                } detail: {
+                    ZStack {
+                        LiquidBackground()
+                        Text("请选择一件裙子")
+                            .foregroundStyle(.secondary)
+                            .font(.title2)
                     }
                 }
             }
-            .navigationTitle("少女衣柜")
         }
         .sheet(isPresented: $showingAddSheet) {
             NavigationStack {
@@ -304,6 +124,208 @@ struct ClothingListView: View {
             }
         } message: {
             Text("确定要删除这件裙子吗？此操作无法撤销。")
+        }
+    }
+    
+    @ViewBuilder
+    private var content: some View {
+        ZStack {
+            LiquidBackground()
+            
+            List {
+                ForEach(filteredClothings) { clothing in
+                    NavigationLink {
+                        ClothingDetailView(clothing: clothing)
+                    } label: {
+                        ClothingRow(clothing: clothing)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+                .onDelete(perform: deleteItems)
+            }
+            .scrollContentBackground(.hidden)
+            .searchable(text: $searchText, prompt: "搜索名称、品牌、标签、属性...")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    HStack(spacing: 12) {
+                        Menu {
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedTagIDs.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(tags) { tag in
+                                    Button {
+                                        if selectedTagIDs.contains(tag.id) {
+                                            selectedTagIDs.remove(tag.id)
+                                        } else {
+                                            selectedTagIDs.insert(tag.id)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(tag.name)
+                                            if selectedTagIDs.contains(tag.id) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("全部标签", systemImage: "tag")
+                            }
+                            
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedBrandIDs.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(brands) { brand in
+                                    Button {
+                                        if selectedBrandIDs.contains(brand.id) {
+                                            selectedBrandIDs.remove(brand.id)
+                                        } else {
+                                            selectedBrandIDs.insert(brand.id)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(brand.name)
+                                            if selectedBrandIDs.contains(brand.id) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("全部品牌", systemImage: "bag")
+                            }
+                            
+                            // Types Filter
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedTypes.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(getAllValues(for: \.types), id: \.self) { type in
+                                    Button {
+                                        if selectedTypes.contains(type) {
+                                            selectedTypes.remove(type)
+                                        } else {
+                                            selectedTypes.insert(type)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(type)
+                                            if selectedTypes.contains(type) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("全部类型", systemImage: "tshirt")
+                            }
+                            
+                            // Colors Filter
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedColors.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(getAllValues(for: \.colors), id: \.self) { color in
+                                    Button {
+                                        if selectedColors.contains(color) {
+                                            selectedColors.remove(color)
+                                        } else {
+                                            selectedColors.insert(color)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(color)
+                                            if selectedColors.contains(color) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("全部颜色", systemImage: "paintpalette")
+                            }
+                            
+                            // Sizes Filter
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedSizes.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(getAllValues(for: \.sizes), id: \.self) { size in
+                                    Button {
+                                        if selectedSizes.contains(size) {
+                                            selectedSizes.remove(size)
+                                        } else {
+                                            selectedSizes.insert(size)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(size)
+                                            if selectedSizes.contains(size) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("全部尺码", systemImage: "ruler")
+                            }
+                            
+                            // Accessories Filter
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedAccessories.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(getAllValues(for: \.accessories), id: \.self) { accessory in
+                                    Button {
+                                        if selectedAccessories.contains(accessory) {
+                                            selectedAccessories.remove(accessory)
+                                        } else {
+                                            selectedAccessories.insert(accessory)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(accessory)
+                                            if selectedAccessories.contains(accessory) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("全部小物", systemImage: "sparkles")
+                            }
+                        } label: {
+                            Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
+                                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+                        }
+                        
+                        Button(action: { showingAddSheet = true }) {
+                            Label("新增", systemImage: "plus")
+                        }
+                    }
+                }
+            }
         }
     }
     
