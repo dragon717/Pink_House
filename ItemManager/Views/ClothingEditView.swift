@@ -73,7 +73,7 @@ struct ClothingEditView: View {
                     
                     AutoCompleteTextField(title: "衣长 (如: 90cm, 100cm)", placeholder: "例如: 90cm", text: $length, field: .size) // 使用 size 的建议或者新建一个 field
                     
-                    AutoCompleteTextField(title: "状态", placeholder: "例如: 全新, 95新", text: $condition, field: .condition)
+                    AutoCompleteTextField(title: "状态（如: 全新, 95新）", placeholder: "例如: 全新", text: $condition, field: .condition)
                     
                     AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
                         // 使用 SuggestionManager 中稳健的内存过滤方法

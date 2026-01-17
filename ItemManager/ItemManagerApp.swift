@@ -50,7 +50,7 @@ struct ItemManagerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ClothingListView()
+            MainTabView()
         }
         .modelContainer(sharedModelContainer)
     }
