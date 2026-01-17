@@ -8,6 +8,7 @@ struct AutoCompleteTextField: View {
     @Binding var text: String
     var field: SuggestionField
     var isRequired: Bool = false
+    var externalSearch: ((String) async -> [String])? = nil // 新增外部搜索回调
     
     @State private var suggestions: [String] = []
     @State private var showSuggestions: Bool = false

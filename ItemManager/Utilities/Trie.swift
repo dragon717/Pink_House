@@ -29,7 +29,7 @@ class Trie {
         currentNode.frequency += 1
     }
     
-    func search(prefix: String, limit: Int = 8) -> [String] {
+    func search(prefix: String, limit: Int = 20) -> [String] {
         guard !prefix.isEmpty else { return [] }
         
         var currentNode = root
@@ -40,10 +40,14 @@ class Trie {
             currentNode = child
         }
         
-        return findWords(node: currentNode, limit: limit)
+        // 收集所有匹配项，不限制递归深度，只在最后限制数量
+        let allMatches = findAllWords(node: currentNode)
+        
+        // 排序并截取
+        return allMatches.sorted { $0.count < $1.count }.prefix(limit).map { String($0) }
     }
     
-    private func findWords(node: TrieNode, limit: Int) -> [String] {
+    private func findAllWords(node: TrieNode) -> [String] {
         var results: [String] = []
         
         if node.isTerminating, let word = node.originalWord {
@@ -51,12 +55,10 @@ class Trie {
         }
         
         for (_, childNode) in node.children {
-            let childResults = findWords(node: childNode, limit: limit)
-            results.append(contentsOf: childResults)
+            results.append(contentsOf: findAllWords(node: childNode))
         }
         
-        // 简单的排序策略：按长度排序
-        return results.sorted { $0.count < $1.count }.prefix(limit).map { String($0) }
+        return results
     }
     
     // 清空

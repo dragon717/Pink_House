@@ -79,7 +79,15 @@ class SuggestionManager {
             }
             
             for clothing in clothings {
-                if !clothing.name.isEmpty { names.insert(clothing.name) }
+                if !clothing.name.isEmpty { 
+                    names.insert(clothing.name)
+                    
+                    // 特殊逻辑：如果类型包含"小物"，则该物品名称也加入小物索引
+                    if clothing.types.contains("小物") {
+                        print("SuggestionManager: Found accessory item '\(clothing.name)' (type: \(clothing.types))")
+                        accessories.insert(clothing.name)
+                    }
+                }
                 
                 // 处理逗号分隔的字段
                 parseTags(clothing.types, into: &types)
@@ -87,6 +95,8 @@ class SuggestionManager {
                 parseTags(clothing.sizes, into: &sizes)
                 parseTags(clothing.accessories, into: &accessories)
             }
+            
+            print("SuggestionManager: Total accessories loaded: \(accessories.count)")
             
             // 4. 后台构建 Trie
             queue.async { [weak self] in
@@ -150,8 +160,54 @@ class SuggestionManager {
         }
     }
     
+    // 专门用于搜索类型含"小物"的商品
+    @MainActor
+    func searchAccessories(query: String, modelContext: ModelContext) -> [String] {
+        // 1. 先从 Trie 中搜索 (这里包含了 tag 和 类型含小物的商品名)
+        let trieResults = getSuggestions(for: .accessory, query: query)
+        print("SuggestionManager: Trie results for '\(query)': \(trieResults)")
+        
+        // 2. 再从数据库搜索 (作为兜底)
+        let descriptor = FetchDescriptor<Clothing>(
+            predicate: #Predicate { $0.types.contains("小物") }
+        )
+        
+        var dbResults: [String] = []
+        do {
+            let candidates = try modelContext.fetch(descriptor)
+            dbResults = candidates.filter { clothing in
+                return clothing.name.localizedStandardContains(query)
+            }.map { $0.name }
+            print("SuggestionManager: DB results for '\(query)': \(dbResults)")
+        } catch {
+            print("SuggestionManager: searchAccessories failed: \(error)")
+        }
+        
+        // 3. 合并去重
+        var finalResults = trieResults
+        for item in dbResults {
+            if !finalResults.contains(item) {
+                finalResults.append(item)
+            }
+        }
+        
+        return Array(finalResults.prefix(20))
+    }
+    
     // 更新单个条目 (当用户保存新数据时调用)
     func addData(field: SuggestionField, value: String) {
+        // 如果是类型字段，检查是否包含"小物"，如果是，需要联动更新
+        // 但这里 addData 接口目前只接收单个字段。
+        // 为了支持联动，我们需要更丰富的上下文，或者调用方显式处理。
+        // 考虑到接口兼容性，我们暂时只处理基础更新。
+        // 如果需要联动更新（比如保存时），建议扩展这个方法或者调用方多调一次。
+        // 
+        // 修正：实际上 ClothingEditView 保存时会分别调用 addData。
+        // 但是 ClothingEditView 调用 addData(field: .type, value: types) 时，我们无法得知此时的 name 是什么。
+        // 所以单纯修改 addData 比较困难。
+        // 更好的方式是：ClothingEditView 在保存时，如果检测到 types 包含 "小物"，
+        // 则显式调用 SuggestionManager.shared.addData(field: .accessory, value: name)
+        
         queue.async { [weak self] in
             guard let self = self else { return }
             // 处理逗号分隔
@@ -166,8 +222,15 @@ class SuggestionManager {
             } else {
                 self.tries[field]?.insert(value)
             }
-            // 清除相关缓存
-            // 简单起见，可以不清空或者只清空特定前缀，这里暂不处理缓存失效，依靠 LRU 淘汰
+        }
+    }
+    
+    // 提供一个特殊方法用于处理"类型含小物"的情况
+    func addAccessoryNameIfTypeContainsAccessory(name: String, types: String) {
+        if types.contains("小物") {
+            queue.async { [weak self] in
+                self?.tries[.accessory]?.insert(name)
+            }
         }
     }
 }

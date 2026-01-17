@@ -63,13 +63,16 @@ struct ClothingEditView: View {
                     
                     AutoCompleteTextField(title: "品牌名称", placeholder: "请输入品牌名称", text: $brandName, field: .brand)
                     
-                    AutoCompleteTextField(title: "类型 (逗号分隔，如: JSK,OP,SK)", placeholder: "例如: JSK,OP", text: $types, field: .type)
+                    AutoCompleteTextField(title: "类型 (逗号分隔，如: JSK,OP,SK,小物)", placeholder: "例如: JSK,OP", text: $types, field: .type)
                     
                     AutoCompleteTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
                     
                     AutoCompleteTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes, field: .size)
                     
-                    AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory)
+                    AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
+                        // 使用 SuggestionManager 中稳健的内存过滤方法
+                        return await SuggestionManager.shared.searchAccessories(query: query, modelContext: modelContext)
+                    })
                     
                     Toggle("同步到裙子社区", isOn: $isShared)
                         .padding(.top, 8)
@@ -224,6 +227,7 @@ struct ClothingEditView: View {
             }
         }
         .onAppear {
+            print("ClothingEditView: onAppear triggered")
             // 加载自动补全数据
             SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
             
@@ -291,6 +295,17 @@ struct ClothingEditView: View {
         let finalColors = normalizeTags(colors)
         let finalSizes = normalizeTags(sizes)
         let finalAccessories = normalizeTags(accessories)
+        
+        // 更新自动补全索引
+        SuggestionManager.shared.addData(field: .name, value: name)
+        SuggestionManager.shared.addData(field: .brand, value: brandName)
+        SuggestionManager.shared.addData(field: .type, value: finalTypes)
+        SuggestionManager.shared.addData(field: .color, value: finalColors)
+        SuggestionManager.shared.addData(field: .size, value: finalSizes)
+        SuggestionManager.shared.addData(field: .accessory, value: finalAccessories)
+        
+        // 特殊逻辑：如果类型包含"小物"，则该物品名称也加入小物索引
+        SuggestionManager.shared.addAccessoryNameIfTypeContainsAccessory(name: name, types: finalTypes)
         
         if let c = clothing {
             // Update
