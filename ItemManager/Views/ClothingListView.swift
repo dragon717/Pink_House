@@ -321,7 +321,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label(selectedAccessories.first ?? "小物", systemImage: "sparkles")
+                                Label(selectedAccessories.first ?? "小物", systemImage: selectedAccessories.isEmpty ? "crown" : "crown.fill")
                             }
                         } label: {
                             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
