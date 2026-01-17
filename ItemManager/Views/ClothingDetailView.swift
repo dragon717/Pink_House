@@ -14,6 +14,7 @@ struct ClothingDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
+    @State private var showingConfirmPaymentAlert = false
     @State private var currentImageIndex = 0
     
     var body: some View {
@@ -48,6 +49,24 @@ struct ClothingDetailView: View {
                         purchaseInfoCard
                             .padding(.horizontal)
                             .offset(y: -40)
+                        
+                        // MARK: - Pay Balance Button
+                        if clothing.isDepositPlan {
+                            Button {
+                                showingConfirmPaymentAlert = true
+                            } label: {
+                                Text("已付尾款")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.pink)
+                                    .cornerRadius(16)
+                            }
+                            .padding(.horizontal)
+                            .offset(y: -40)
+                            .shadow(color: .pink.opacity(0.3), radius: 8, x: 0, y: 4)
+                        }
                         
                         // Bottom Padding for FAB
                         Color.clear.frame(height: 80)
@@ -98,6 +117,28 @@ struct ClothingDetailView: View {
         } message: {
             Text("确定要删除这件裙子吗？此操作无法撤销。")
         }
+        .alert("确认已付尾款", isPresented: $showingConfirmPaymentAlert) {
+            Button("取消", role: .cancel) { }
+            Button("确认", role: .none) {
+                confirmPayment()
+            }
+        } message: {
+            Text("确认后将移除定尾计划，并清空定金和预估尾款时间信息。")
+        }
+    }
+    
+    private func confirmPayment() {
+        // Calculate total price if currently 0
+        if clothing.price == 0 {
+            clothing.price = clothing.deposit + clothing.balance + clothing.accessoriesPrice
+        }
+        
+        clothing.isDepositPlan = false
+        clothing.depositDate = nil
+        clothing.finalPaymentDate = nil
+        clothing.finalPaymentEndDate = nil
+        // Try to save context (though it autosaves usually)
+        try? modelContext.save()
     }
     
     // MARK: - Subviews
@@ -305,7 +346,7 @@ struct ClothingDetailView: View {
             InfoRow(label: "裙子总价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
             
             HStack {
-                Label("总价", systemImage: "star.circle.fill")
+                Label("总价（裙子+小物）", systemImage: "star.circle.fill")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
