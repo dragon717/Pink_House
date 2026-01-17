@@ -17,69 +17,73 @@ struct ClothingDetailView: View {
     @State private var currentImageIndex = 0
     
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(uiColor: .systemGroupedBackground)
-                .ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 16) {
-                    // MARK: - Image Carousel
-                    imageCarousel
-                    
-                    // MARK: - Main Info Card
-                    mainInfoCard
-                        .padding(.horizontal)
-                        .offset(y: -40) // Overlap the image slightly
-                    
-                    // MARK: - Detail Info
-                    detailInfoCard
-                        .padding(.horizontal)
-                        .offset(y: -40)
-                    
-                    // MARK: - Price Info
-                    priceInfoCard
-                        .padding(.horizontal)
-                        .offset(y: -40)
-                    
-                    // MARK: - Purchase Info
-                    purchaseInfoCard
-                        .padding(.horizontal)
-                        .offset(y: -40)
-                    
-                    // Bottom Padding for FAB
-                    Color.clear.frame(height: 80)
-                }
-            }
-            .ignoresSafeArea(edges: .top)
-            
-            // MARK: - Custom Navigation Bar
-            customNavBar
-            
-            // MARK: - FAB
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button {
-                        // Action for Community/Square
-                    } label: {
-                        VStack(spacing: 2) {
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.title2)
-                            Text("社区")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Circle().fill(Color.black.opacity(0.6)))
-                        .shadow(radius: 4)
+        GeometryReader { geometry in
+            ZStack(alignment: .top) {
+                Color(uiColor: .systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // MARK: - Image Carousel
+                        // Adjust height based on orientation (portrait vs landscape)
+                        let carouselHeight = geometry.size.height > geometry.size.width ? 400.0 : geometry.size.height * 0.7
+                        imageCarousel(height: carouselHeight)
+                        
+                        // MARK: - Main Info Card
+                        mainInfoCard
+                            .padding(.horizontal)
+                            .offset(y: -40) // Overlap the image slightly
+                        
+                        // MARK: - Detail Info
+                        detailInfoCard
+                            .padding(.horizontal)
+                            .offset(y: -40)
+                        
+                        // MARK: - Price Info
+                        priceInfoCard
+                            .padding(.horizontal)
+                            .offset(y: -40)
+                        
+                        // MARK: - Purchase Info
+                        purchaseInfoCard
+                            .padding(.horizontal)
+                            .offset(y: -40)
+                        
+                        // Bottom Padding for FAB
+                        Color.clear.frame(height: 80)
                     }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 20)
+                }
+                .ignoresSafeArea(edges: .top)
+                
+                // MARK: - Custom Navigation Bar
+                customNavBar
+                
+                // MARK: - FAB
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            // Action for Community/Square
+                        } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: "bubble.left.and.bubble.right")
+                                    .font(.title2)
+                                Text("社区")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.white)
+                            .frame(width: 60, height: 60)
+                            .background(Circle().fill(Color.black.opacity(0.6)))
+                            .shadow(radius: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20)
+                    }
                 }
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingEditSheet) {
             NavigationStack {
                 ClothingEditView(clothing: clothing)
@@ -98,7 +102,7 @@ struct ClothingDetailView: View {
     
     // MARK: - Subviews
     
-    private var imageCarousel: some View {
+    private func imageCarousel(height: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $currentImageIndex) {
                 if clothing.imagePaths.isEmpty {
@@ -128,7 +132,7 @@ struct ClothingDetailView: View {
                 }
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-            .frame(height: 400)
+            .frame(height: height)
             
             // Page Indicator Overlay
             if !clothing.imagePaths.isEmpty {

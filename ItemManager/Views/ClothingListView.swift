@@ -88,7 +88,7 @@ struct ClothingListView: View {
     }
     
     var body: some View {
-        NavigationSplitView {
+        NavigationStack {
             ZStack {
                 LiquidBackground()
                 
@@ -288,13 +288,6 @@ struct ClothingListView: View {
                 }
             }
             .navigationTitle("少女衣柜")
-        } detail: {
-            ZStack {
-                LiquidBackground()
-                Text("请选择一件裙子")
-                    .foregroundStyle(.secondary)
-                    .font(.title2)
-            }
         }
         .sheet(isPresented: $showingAddSheet) {
             NavigationStack {
