@@ -329,6 +329,8 @@ struct ClothingDetailView: View {
             InfoRow(label: "类型", value: clothing.types.isEmpty ? "未填写" : clothing.types)
             InfoRow(label: "颜色", value: clothing.colors.isEmpty ? "未填写" : clothing.colors)
             InfoRow(label: "尺码", value: clothing.sizes.isEmpty ? "未填写" : clothing.sizes)
+            InfoRow(label: "衣长", value: clothing.length.isEmpty ? "未填写" : clothing.length)
+            InfoRow(label: "状态", value: clothing.condition)
             InfoRow(label: "小物", value: clothing.accessories.isEmpty ? "无" : clothing.accessories)
         }
         .padding()
@@ -449,6 +451,8 @@ struct InfoRow: View {
         case "类型": return "tshirt"
         case "颜色": return "paintpalette"
         case "尺码": return "ruler"
+        case "衣长": return "arrow.up.and.down"
+        case "状态": return "star.circle"
         case "小物": return "sparkles"
         case "裙子总价": return "tag"
         case "购买日期": return "calendar"

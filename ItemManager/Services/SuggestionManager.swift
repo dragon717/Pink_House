@@ -10,6 +10,7 @@ enum SuggestionField: String, CaseIterable {
     case color
     case size
     case accessory
+    case condition
 }
 
 class SuggestionManager {
@@ -43,6 +44,9 @@ class SuggestionManager {
         // 常见小物
         let accessories = ["KC", "发带", "BNT", "扁帽", "发卡", "边夹", "手袖", "腕饰", "项链", "戒指", "胸针", "包", "袜子", "过膝袜", "连裤袜", "手套", "遮阳伞", "扇子"]
         
+        // 常见状态
+        let conditions = ["全新", "仅试穿", "99新", "95新", "9成新", "有瑕疵", "战斗成色"]
+        
         queue.async { [weak self] in
             guard let self = self else { return }
             for brand in brands { self.tries[.brand]?.insert(brand) }
@@ -50,6 +54,7 @@ class SuggestionManager {
             for color in colors { self.tries[.color]?.insert(color) }
             for size in sizes { self.tries[.size]?.insert(size) }
             for accessory in accessories { self.tries[.accessory]?.insert(accessory) }
+            for condition in conditions { self.tries[.condition]?.insert(condition) }
         }
     }
     
@@ -70,6 +75,7 @@ class SuggestionManager {
             var colors = Set<String>()
             var sizes = Set<String>()
             var accessories = Set<String>()
+            var conditions = Set<String>()
             var brandNames = Set<String>()
             
             for brand in brands {
@@ -94,6 +100,10 @@ class SuggestionManager {
                 parseTags(clothing.colors, into: &colors)
                 parseTags(clothing.sizes, into: &sizes)
                 parseTags(clothing.accessories, into: &accessories)
+                
+                if !clothing.condition.isEmpty {
+                    conditions.insert(clothing.condition)
+                }
             }
             
             print("SuggestionManager: Total accessories loaded: \(accessories.count)")
@@ -108,6 +118,7 @@ class SuggestionManager {
                 self.updateTrie(for: .color, with: colors)
                 self.updateTrie(for: .size, with: sizes)
                 self.updateTrie(for: .accessory, with: accessories)
+                self.updateTrie(for: .condition, with: conditions)
                 
                 print("Suggestion index build completed")
             }

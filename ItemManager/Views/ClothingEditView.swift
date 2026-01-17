@@ -21,6 +21,8 @@ struct ClothingEditView: View {
     @State private var types: String = ""
     @State private var colors: String = ""
     @State private var sizes: String = ""
+    @State private var length: String = ""
+    @State private var condition: String = "全新"
     @State private var accessories: String = ""
     @State private var imagePaths: [String] = []
     @State private var isShared: Bool = false
@@ -68,6 +70,10 @@ struct ClothingEditView: View {
                     AutoCompleteTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
                     
                     AutoCompleteTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes, field: .size)
+                    
+                    AutoCompleteTextField(title: "衣长 (如: 90cm, 100cm)", placeholder: "例如: 90cm", text: $length, field: .size) // 使用 size 的建议或者新建一个 field
+                    
+                    AutoCompleteTextField(title: "状态", placeholder: "例如: 全新, 95新", text: $condition, field: .condition)
                     
                     AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
                         // 使用 SuggestionManager 中稳健的内存过滤方法
@@ -237,6 +243,8 @@ struct ClothingEditView: View {
                 types = c.types
                 colors = c.colors
                 sizes = c.sizes
+                length = c.length
+                condition = c.condition
                 accessories = c.accessories
                 imagePaths = c.imagePaths
                 isShared = c.isShared
@@ -303,6 +311,7 @@ struct ClothingEditView: View {
         SuggestionManager.shared.addData(field: .color, value: finalColors)
         SuggestionManager.shared.addData(field: .size, value: finalSizes)
         SuggestionManager.shared.addData(field: .accessory, value: finalAccessories)
+        SuggestionManager.shared.addData(field: .condition, value: condition)
         
         // 特殊逻辑：如果类型包含"小物"，则该物品名称也加入小物索引
         SuggestionManager.shared.addAccessoryNameIfTypeContainsAccessory(name: name, types: finalTypes)
@@ -315,6 +324,8 @@ struct ClothingEditView: View {
             c.types = finalTypes
             c.colors = finalColors
             c.sizes = finalSizes
+            c.length = length
+            c.condition = condition
             c.accessories = finalAccessories
             c.imagePaths = imagePaths
             c.isShared = isShared
@@ -339,6 +350,8 @@ struct ClothingEditView: View {
                 types: finalTypes,
                 colors: finalColors,
                 sizes: finalSizes,
+                length: length,
+                condition: condition,
                 accessories: finalAccessories,
                 imagePaths: imagePaths,
                 isShared: isShared,

@@ -25,6 +25,8 @@ final class Clothing {
     var types: String = "" // 逗号分隔，如 JSK,OP
     var colors: String = "" // 逗号分隔
     var sizes: String = "" // 逗号分隔
+    var length: String = "" // 长度
+    var condition: String = "全新" // 状态：全新/非全新
     var accessories: String = "" // 逗号分隔，小物
     var imagePaths: [String] = [] // 图片路径列表
     var isShared: Bool = false // 同步到裙子广场
@@ -60,6 +62,8 @@ final class Clothing {
          types: String = "",
          colors: String = "",
          sizes: String = "",
+         length: String = "",
+         condition: String = "全新",
          accessories: String = "",
          imagePaths: [String] = [],
          isShared: Bool = false,
@@ -81,6 +85,8 @@ final class Clothing {
         self.types = types
         self.colors = colors
         self.sizes = sizes
+        self.length = length
+        self.condition = condition
         self.accessories = accessories
         self.imagePaths = imagePaths
         self.isShared = isShared

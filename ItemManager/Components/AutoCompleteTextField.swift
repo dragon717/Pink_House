@@ -134,7 +134,7 @@ struct AutoCompleteTextField: View {
     }
     
     private func getCurrentToken(from text: String) -> String {
-        if field == .name || field == .brand {
+        if field == .name || field == .brand || field == .condition {
             return text.trimmingCharacters(in: .whitespacesAndNewlines)
         } else {
             // 取最后一个逗号后的部分
@@ -146,7 +146,7 @@ struct AutoCompleteTextField: View {
     }
     
     private func selectSuggestion(_ suggestion: String) {
-        if field == .name || field == .brand {
+        if field == .name || field == .brand || field == .condition {
             text = suggestion
         } else {
             // 多值字段
