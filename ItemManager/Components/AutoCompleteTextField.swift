@@ -130,12 +130,21 @@ struct AutoCompleteTextField: View {
             try? await Task.sleep(nanoseconds: 100 * 1_000_000) // 缩短防抖时间以便测试
             if Task.isCancelled { return }
             
+            // 如果在搜索过程中失去了焦点，直接返回
+            // 注意：isFocused 是 @FocusState，不能直接在 Task 中安全访问，需要回到 MainActor
+            
             let results = SuggestionManager.shared.getSuggestions(for: field, query: currentToken)
             print("AutoComplete: results for '\(currentToken)': \(results)")
             
             await MainActor.run {
-                self.suggestions = results
-                self.showSuggestions = !results.isEmpty
+                // 再次检查焦点状态，确保只有获得焦点时才显示建议
+                if self.isFocused {
+                    self.suggestions = results
+                    self.showSuggestions = !results.isEmpty
+                } else {
+                    self.suggestions = []
+                    self.showSuggestions = false
+                }
             }
         }
     }
