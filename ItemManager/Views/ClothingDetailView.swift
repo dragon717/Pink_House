@@ -68,6 +68,17 @@ struct ClothingDetailView: View {
                             .shadow(color: .pink.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
                         
+                        // MARK: - Metadata Info (Created/Updated)
+                        VStack(spacing: 4) {
+                            Text("添加时间: \(clothing.createdAt.formatted(date: .numeric, time: .shortened))")
+                            Text("修改时间: \(clothing.updatedAt.formatted(date: .numeric, time: .shortened))")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 20)
+                        .offset(y: -20)
+                        
                         // Bottom Padding for FAB
                         Color.clear.frame(height: 80)
                     }
