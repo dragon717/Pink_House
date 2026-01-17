@@ -59,14 +59,17 @@ struct ClothingEditView: View {
                     
                     ImagePickerGrid(imagePaths: $imagePaths)
                     
-                    RoundedTextField(title: "裙子名称", placeholder: "请输入裙子名称", text: $name, isRequired: true)
+                    AutoCompleteTextField(title: "裙子名称", placeholder: "请输入裙子名称", text: $name, field: .name, isRequired: true)
                     
-                    RoundedTextField(title: "品牌名称", placeholder: "请输入品牌名称", text: $brandName)
+                    AutoCompleteTextField(title: "品牌名称", placeholder: "请输入品牌名称", text: $brandName, field: .brand)
                     
-                    RoundedTextField(title: "类型 (逗号分隔，如: JSK,OP,SK)", placeholder: "例如: JSK,OP", text: $types)
-                    RoundedTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors)
-                    RoundedTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes)
-                    RoundedTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories)
+                    AutoCompleteTextField(title: "类型 (逗号分隔，如: JSK,OP,SK)", placeholder: "例如: JSK,OP", text: $types, field: .type)
+                    
+                    AutoCompleteTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
+                    
+                    AutoCompleteTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes, field: .size)
+                    
+                    AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory)
                     
                     Toggle("同步到裙子社区", isOn: $isShared)
                         .padding(.top, 8)
@@ -221,6 +224,9 @@ struct ClothingEditView: View {
             }
         }
         .onAppear {
+            // 加载自动补全数据
+            SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
+            
             if let c = clothing {
                 name = c.name
                 brandName = c.brand?.name ?? ""
