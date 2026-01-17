@@ -337,7 +337,7 @@ struct ClothingDetailView: View {
                     InfoRow(label: "定金日期", value: depositDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
                 }
                 if let finalPaymentDate = clothing.finalPaymentDate {
-                    InfoRow(label: "预估尾款", value: finalPaymentDate.formatted(.dateTime.year().month().locale(Locale(identifier: "zh_CN"))))
+                    InfoRow(label: "预估尾款", value: finalPaymentDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
                 }
             }
             
