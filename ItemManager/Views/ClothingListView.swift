@@ -174,7 +174,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("全部标签", systemImage: "tag")
+                                Label("标签", systemImage: "tag")
                             }
                             
                             Menu {
@@ -201,7 +201,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("全部品牌", systemImage: "bag")
+                                Label("品牌", systemImage: "bag")
                             }
                             
                             // Types Filter
@@ -229,7 +229,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("全部类型", systemImage: "tshirt")
+                                Label("类型", systemImage: "tshirt")
                             }
                             
                             // Colors Filter
@@ -257,7 +257,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("全部颜色", systemImage: "paintpalette")
+                                Label("颜色", systemImage: "paintpalette")
                             }
                             
                             // Sizes Filter
@@ -285,7 +285,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("全部尺码", systemImage: "ruler")
+                                Label("尺码", systemImage: "ruler")
                             }
                             
                             // Accessories Filter
@@ -313,7 +313,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("全部小物", systemImage: "sparkles")
+                                Label("小物", systemImage: "sparkles")
                             }
                         } label: {
                             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
