@@ -352,21 +352,35 @@ struct ClothingRow: View {
         GlassCard {
             HStack(spacing: 16) {
                 // Thumbnail
-                if let firstPath = clothing.imagePaths.first,
-                   let image = ImageManager.shared.loadImage(fileName: firstPath) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 60, height: 60)
-                        .overlay {
-                            Image(systemName: "tshirt")
-                                .foregroundStyle(.pink.opacity(0.5))
-                        }
+                ZStack {
+                    if let firstPath = clothing.imagePaths.first,
+                       let image = ImageManager.shared.loadImage(fileName: firstPath) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 60, height: 60)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 60, height: 60)
+                            .overlay {
+                                Image(systemName: "tshirt")
+                                    .foregroundStyle(.pink.opacity(0.5))
+                            }
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if clothing.isDepositPlan {
+                        Text("定尾")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.pink)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .offset(x: 4, y: -4)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -382,21 +396,6 @@ struct ClothingRow: View {
                                 .padding(.vertical, 2)
                                 .background(Color.pink.opacity(0.1))
                                 .cornerRadius(8)
-                        }
-                        
-                        if clothing.isDepositPlan {
-                            HStack(spacing: 2) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption2)
-                                Text("定尾计划")
-                                    .font(.caption2)
-                                    .bold()
-                            }
-                            .foregroundStyle(.pink)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.pink.opacity(0.1))
-                            .cornerRadius(8)
                         }
                     }
                     
