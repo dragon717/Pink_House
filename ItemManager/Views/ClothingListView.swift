@@ -174,7 +174,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("标签", systemImage: "tag")
+                                Label(selectedTagIDs.isEmpty ? "标签" : "标签 (\(selectedTagIDs.count))", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
                             }
                             
                             Menu {
@@ -201,7 +201,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("品牌", systemImage: "bag")
+                                Label(selectedBrandIDs.isEmpty ? "品牌" : "品牌 (\(selectedBrandIDs.count))", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
                             }
                             
                             // Types Filter
@@ -229,7 +229,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("类型", systemImage: "tshirt")
+                                Label(selectedTypes.isEmpty ? "类型" : "类型 (\(selectedTypes.count))", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
                             }
                             
                             // Colors Filter
@@ -257,7 +257,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("颜色", systemImage: "paintpalette")
+                                Label(selectedColors.isEmpty ? "颜色" : "颜色 (\(selectedColors.count))", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
                             }
                             
                             // Sizes Filter
@@ -285,7 +285,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("尺码", systemImage: "ruler")
+                                Label(selectedSizes.isEmpty ? "尺码" : "尺码 (\(selectedSizes.count))", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
                             }
                             
                             // Accessories Filter
@@ -313,7 +313,7 @@ struct ClothingListView: View {
                                     }
                                 }
                             } label: {
-                                Label("小物", systemImage: "sparkles")
+                                Label(selectedAccessories.isEmpty ? "小物" : "小物 (\(selectedAccessories.count))", systemImage: "sparkles")
                             }
                         } label: {
                             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")

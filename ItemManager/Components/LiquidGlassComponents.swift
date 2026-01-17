@@ -11,7 +11,7 @@ import SwiftUI
 struct LiquidBackground: View {
     var body: some View {
         ZStack {
-            Color(hex: "F2F2F7") // System grouped background
+            Color(uiColor: .systemGroupedBackground) // System grouped background
                 .ignoresSafeArea()
             
             // Orb 1

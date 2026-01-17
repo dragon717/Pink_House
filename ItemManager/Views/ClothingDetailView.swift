@@ -274,7 +274,7 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -291,7 +291,7 @@ struct ClothingDetailView: View {
             InfoRow(label: "小物", value: clothing.accessories.isEmpty ? "无" : clothing.accessories)
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -319,7 +319,7 @@ struct ClothingDetailView: View {
             .cornerRadius(12)
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -359,7 +359,7 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }

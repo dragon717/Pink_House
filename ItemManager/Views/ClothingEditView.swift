@@ -74,7 +74,7 @@ struct ClothingEditView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding()
-                .background(Color.white)
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
                 .cornerRadius(16)
                 
                 // MARK: - 标签分类
@@ -119,7 +119,7 @@ struct ClothingEditView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
-                .background(Color.white)
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
                 .cornerRadius(16)
                 .sheet(isPresented: $showingAddTagSheet) {
                     TagSelectionView(selectedTags: $selectedTags)
@@ -136,7 +136,7 @@ struct ClothingEditView: View {
                     PriceRow(title: "小物总价", value: $accessoriesPrice)
                 }
                 .padding()
-                .background(Color.white)
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
                 .cornerRadius(16)
                 
                 // MARK: - 购买信息
@@ -188,7 +188,7 @@ struct ClothingEditView: View {
                     }
                 }
                 .padding()
-                .background(Color.white)
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
                 .cornerRadius(16)
             }
             .padding()
