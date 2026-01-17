@@ -383,6 +383,21 @@ struct ClothingRow: View {
                                 .background(Color.pink.opacity(0.1))
                                 .cornerRadius(8)
                         }
+                        
+                        if clothing.isDepositPlan {
+                            HStack(spacing: 2) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                Text("定尾计划")
+                                    .font(.caption2)
+                                    .bold()
+                            }
+                            .foregroundStyle(.pink)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.pink.opacity(0.1))
+                            .cornerRadius(8)
+                        }
                     }
                     
                     if let tags = clothing.tags, !tags.isEmpty {
@@ -404,9 +419,16 @@ struct ClothingRow: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("¥\(clothing.price, format: .number.precision(.fractionLength(2)))")
-                        .font(.subheadline)
-                        .bold()
+                    if clothing.isDepositPlan {
+                        Text("尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(2)))")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundStyle(.pink)
+                    } else {
+                        Text("¥\(clothing.price, format: .number.precision(.fractionLength(2)))")
+                            .font(.subheadline)
+                            .bold()
+                    }
                     
                     if clothing.stock > 0 {
                         Text("库存: \(clothing.stock)")
