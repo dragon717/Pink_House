@@ -237,8 +237,8 @@ struct ClothingDetailView: View {
             
             Divider()
             
-            if let brand = clothing.brand {
-                HStack {
+            HStack {
+                if let brand = clothing.brand {
                     Circle()
                         .fill(Color(hex: brand.colorHex))
                         .frame(width: 24, height: 24)
@@ -249,12 +249,28 @@ struct ClothingDetailView: View {
                         )
                     Text(brand.name)
                         .font(.subheadline)
-                    Spacer()
+                } else {
+                    Text("暂无品牌信息")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-            } else {
-                Text("暂无品牌信息")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                
+                if clothing.isDepositPlan {
+                    HStack(spacing: 2) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                        Text("定尾计划")
+                            .font(.caption)
+                            .bold()
+                    }
+                    .foregroundStyle(.pink)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.pink.opacity(0.1))
+                    .cornerRadius(12)
+                }
+                
+                Spacer()
             }
         }
         .padding()
@@ -314,7 +330,16 @@ struct ClothingDetailView: View {
                 .font(.headline)
                 .foregroundStyle(.brown)
             
-            InfoRow(label: "购买日期", value: clothing.purchaseDate.formatted(date: .long, time: .omitted))
+            InfoRow(label: "购买日期", value: clothing.purchaseDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
+            
+            if clothing.isDepositPlan {
+                if let depositDate = clothing.depositDate {
+                    InfoRow(label: "定金日期", value: depositDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
+                }
+                if let finalPaymentDate = clothing.finalPaymentDate {
+                    InfoRow(label: "预估尾款", value: finalPaymentDate.formatted(.dateTime.year().month().locale(Locale(identifier: "zh_CN"))))
+                }
+            }
             
             let duration = Calendar.current.dateComponents([.day], from: clothing.purchaseDate, to: Date()).day ?? 0
             InfoRow(label: "拥有时长", value: "\(duration)天")
@@ -371,6 +396,8 @@ struct InfoRow: View {
         case "小物": return "sparkles"
         case "裙子总价": return "tag"
         case "购买日期": return "calendar"
+        case "定金日期": return "calendar.badge.clock"
+        case "预估尾款": return "hourglass"
         case "拥有时长": return "clock"
         case "尾款金额": return "creditcard"
         default: return "circle"

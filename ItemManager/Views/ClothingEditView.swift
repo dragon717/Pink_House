@@ -37,6 +37,9 @@ struct ClothingEditView: View {
     
     // Purchase States
     @State private var purchaseDate: Date = Date()
+    @State private var depositDate: Date = Date()
+    @State private var isDepositPlan: Bool = false
+    @State private var finalPaymentDate: Date = Date()
     @State private var note: String = ""
     
     init(clothing: Clothing?) {
@@ -142,6 +145,38 @@ struct ClothingEditView: View {
                         .font(.headline)
                     
                     DatePicker("购买日期", selection: $purchaseDate, displayedComponents: .date)
+                        .environment(\.locale, Locale(identifier: "zh_CN"))
+                    
+                    Divider()
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("加入定尾计划", isOn: $isDepositPlan)
+                            .tint(.green)
+                        
+                        Text("① 无限量创建定尾计划")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Text("勾选后，该裙子将显示在定尾计划中")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        if isDepositPlan {
+                            VStack(alignment: .leading, spacing: 8) {
+                                DatePicker("定金日期", selection: $depositDate, displayedComponents: .date)
+                                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                                
+                                DatePicker("预估尾款时间", selection: $finalPaymentDate, displayedComponents: .date)
+                                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                                
+                                Text("设置预估尾款时间，方便在定尾计划中统计和提醒")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    
+                    Divider()
                     
                     VStack(alignment: .leading) {
                         Text("备注")
@@ -196,6 +231,9 @@ struct ClothingEditView: View {
                 balance = NSDecimalNumber(decimal: c.balance).doubleValue
                 accessoriesPrice = NSDecimalNumber(decimal: c.accessoriesPrice).doubleValue
                 purchaseDate = c.purchaseDate
+                depositDate = c.depositDate ?? Date()
+                isDepositPlan = c.isDepositPlan
+                finalPaymentDate = c.finalPaymentDate ?? Date()
                 note = c.note
                 selectedTags = c.tags ?? []
             }
@@ -259,6 +297,9 @@ struct ClothingEditView: View {
             c.balance = Decimal(balance)
             c.accessoriesPrice = Decimal(accessoriesPrice)
             c.purchaseDate = purchaseDate
+            c.depositDate = depositDate
+            c.isDepositPlan = isDepositPlan
+            c.finalPaymentDate = finalPaymentDate
             c.note = note
             c.tags = selectedTags
             c.updatedAt = Date()
@@ -279,6 +320,9 @@ struct ClothingEditView: View {
                 balance: Decimal(balance),
                 accessoriesPrice: Decimal(accessoriesPrice),
                 purchaseDate: purchaseDate,
+                depositDate: depositDate,
+                isDepositPlan: isDepositPlan,
+                finalPaymentDate: finalPaymentDate,
                 note: note
             )
             newClothing.tags = selectedTags
