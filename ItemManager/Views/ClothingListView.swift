@@ -22,6 +22,8 @@ struct ClothingListView: View {
     @State private var selectedTypes: Set<String> = []
     @State private var selectedColors: Set<String> = []
     @State private var selectedSizes: Set<String> = []
+    @State private var selectedLengths: Set<String> = []
+    @State private var selectedConditions: Set<String> = []
     @State private var selectedAccessories: Set<String> = []
     @State private var showingAddSheet = false
     @State private var itemToDelete: Clothing?
@@ -46,6 +48,8 @@ struct ClothingListView: View {
                     clothing.types.localizedCaseInsensitiveContains(searchText) ||
                     clothing.colors.localizedCaseInsensitiveContains(searchText) ||
                     clothing.sizes.localizedCaseInsensitiveContains(searchText) ||
+                    clothing.length.localizedCaseInsensitiveContains(searchText) ||
+                    clothing.condition.localizedCaseInsensitiveContains(searchText) ||
                     clothing.accessories.localizedCaseInsensitiveContains(searchText) ||
                     (clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false) ||
                     (clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false)
@@ -82,9 +86,13 @@ struct ClothingListView: View {
             
             let matchesSize: Bool = selectedSizes.isEmpty || !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
             
+            let matchesLength: Bool = selectedLengths.isEmpty || !selectedLengths.isDisjoint(with: splitValues(clothing.length))
+            
+            let matchesCondition: Bool = selectedConditions.isEmpty || !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            
             let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesAccessory
+            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
         }
     }
     
@@ -295,6 +303,64 @@ struct ClothingListView: View {
                                 Label(selectedSizes.first ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
                             }
                             
+                            // Lengths Filter
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedLengths.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(getAllValues(for: \.length), id: \.self) { length in
+                                    Button {
+                                        if selectedLengths.contains(length) {
+                                            selectedLengths.remove(length)
+                                        } else {
+                                            selectedLengths.removeAll()
+                                            selectedLengths.insert(length)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(length)
+                                            if selectedLengths.contains(length) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label(selectedLengths.first ?? "衣长", systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
+                            }
+                            
+                            // Conditions Filter
+                            Menu {
+                                Button(role: .destructive) {
+                                    selectedConditions.removeAll()
+                                } label: {
+                                    Label("清除筛选", systemImage: "xmark.circle")
+                                }
+                                
+                                ForEach(getAllValues(for: \.condition), id: \.self) { condition in
+                                    Button {
+                                        if selectedConditions.contains(condition) {
+                                            selectedConditions.remove(condition)
+                                        } else {
+                                            selectedConditions.removeAll()
+                                            selectedConditions.insert(condition)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(condition)
+                                            if selectedConditions.contains(condition) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label(selectedConditions.first ?? "状态", systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
+                            }
+                            
                             // Accessories Filter
                             Menu {
                                 Button(role: .destructive) {
@@ -325,7 +391,7 @@ struct ClothingListView: View {
                             }
                         } label: {
                             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
-                                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+                                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
                         }
                         
                         Button(action: { showingAddSheet = true }) {

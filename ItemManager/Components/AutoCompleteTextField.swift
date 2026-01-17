@@ -38,7 +38,14 @@ struct AutoCompleteTextField: View {
                     TextField(placeholder, text: $text)
                         .focused($isFocused)
                         .padding()
-                        .background(Color(uiColor: .secondarySystemBackground))
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(isFocused ? Color(uiColor: .secondarySystemBackground) : Color(uiColor: .tertiarySystemFill))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isFocused ? Color.accentColor : Color.clear, lineWidth: 1)
+                        )
                         .cornerRadius(12)
                         .onChange(of: text) { _, newValue in
                             performSearch(query: newValue)
