@@ -116,9 +116,9 @@ struct WardrobeStatsView: View {
                         Image(systemName: "chart.bar.fill")
                         Text("查看详细统计")
                         Spacer()
-                        Image(systemName: "lock.fill")
+                        Image(systemName: "heart.fill")
                             .font(.caption)
-                        Text("会员专属")
+                        Text("少女专属")
                             .font(.caption)
                     }
                     .padding()
