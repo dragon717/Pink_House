@@ -491,11 +491,10 @@ struct ClothingListView: View {
                     }
                 }
             } label: {
-                Label(selectedAccessories.first ?? "小物", systemImage: selectedAccessories.isEmpty ? "crown" : "crown.fill")
+                Label(selectedAccessories.first ?? "小物", systemImage: selectedAccessories.isEmpty ? "sparkles" : "sparkles.rectangle.stack.fill")
             }
         } label: {
             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
-                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
         }
     }
     
@@ -507,143 +506,4 @@ struct ClothingListView: View {
     }
 }
 
-struct ClothingRow: View {
-    let clothing: Clothing
-    
-    var body: some View {
-        GlassCard {
-            HStack(spacing: 16) {
-                // Thumbnail
-                ZStack {
-                    if let firstPath = clothing.imagePaths.first,
-                       let image = ImageManager.shared.loadImage(fileName: firstPath) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 60, height: 60)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        CutePlaceholderView(iconSize: 24)
-                            .frame(width: 60, height: 60)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                }
-                .overlay(alignment: .topTrailing) {
-                    if clothing.isDepositPlan {
-                        Text("定尾")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color.pink)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .offset(x: 4, y: -4)
-                    }
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(clothing.name)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    
-                    HStack {
-                        if !clothing.types.isEmpty {
-                            Text(clothing.types)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(Color.pink.opacity(0.1))
-                                .cornerRadius(8)
-                        }
-                    }
-                    
-                    if let tags = clothing.tags, !tags.isEmpty {
-                        HStack(spacing: 4) {
-                            ForEach(tags.prefix(3)) { tag in
-                                Text("#\(tag.name)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if tags.count > 3 {
-                                Text("...")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    if clothing.isDepositPlan {
-                        Text("尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(2)))")
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundStyle(.pink)
-                    } else {
-                        Text("¥\(clothing.price, format: .number.precision(.fractionLength(2)))")
-                            .font(.subheadline)
-                            .bold()
-                    }
-                    
-                    if clothing.stock > 0 {
-                        Text("库存: \(clothing.stock)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
 
-struct ClothingRowBrief: View {
-    let clothing: Clothing
-    
-    var body: some View {
-        GlassCard {
-            HStack(spacing: 12) {
-                // Thumbnail (Smaller)
-                if let firstPath = clothing.imagePaths.first,
-                   let image = ImageManager.shared.loadImage(fileName: firstPath) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    CutePlaceholderView(iconSize: 16)
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                
-                Text(clothing.name)
-                    .font(.body)
-                    .lineLimit(1)
-                
-                Spacer()
-                
-                if let brand = clothing.brand {
-                    Text(brand.name)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                
-                if clothing.isDepositPlan {
-                    Text("尾:¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
-                        .font(.subheadline)
-                        .bold()
-                        .foregroundStyle(.pink)
-                } else {
-                    Text("¥\(clothing.price, format: .number.precision(.fractionLength(0)))")
-                        .font(.subheadline)
-                        .bold()
-                }
-            }
-        }
-        .padding(.vertical, 2)
-    }
-}
