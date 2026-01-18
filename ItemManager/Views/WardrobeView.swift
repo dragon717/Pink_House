@@ -13,9 +13,37 @@ struct WardrobeView: View {
     @Query private var clothings: [Clothing]
     @State private var showStats = true
     
-    init(searchText: Binding<String>, sortOption: SortOption) {
+    // Filter properties
+    let selectedTagIDs: Set<UUID>
+    let selectedBrandIDs: Set<UUID>
+    let selectedTypes: Set<String>
+    let selectedColors: Set<String>
+    let selectedSizes: Set<String>
+    let selectedLengths: Set<String>
+    let selectedConditions: Set<String>
+    let selectedAccessories: Set<String>
+    
+    init(searchText: Binding<String>, 
+         sortOption: SortOption,
+         selectedTagIDs: Set<UUID>,
+         selectedBrandIDs: Set<UUID>,
+         selectedTypes: Set<String>,
+         selectedColors: Set<String>,
+         selectedSizes: Set<String>,
+         selectedLengths: Set<String>,
+         selectedConditions: Set<String>,
+         selectedAccessories: Set<String>) {
         _searchText = searchText
         _clothings = Query(sort: sortOption.sortDescriptors)
+        
+        self.selectedTagIDs = selectedTagIDs
+        self.selectedBrandIDs = selectedBrandIDs
+        self.selectedTypes = selectedTypes
+        self.selectedColors = selectedColors
+        self.selectedSizes = selectedSizes
+        self.selectedLengths = selectedLengths
+        self.selectedConditions = selectedConditions
+        self.selectedAccessories = selectedAccessories
     }
     
     // Grid layout
@@ -25,14 +53,54 @@ struct WardrobeView: View {
     ]
     
     var filteredClothings: [Clothing] {
-        if searchText.isEmpty {
-            return clothings
-        } else {
-            return clothings.filter { clothing in
-                clothing.name.localizedCaseInsensitiveContains(searchText) ||
+        clothings.filter { clothing in
+            let matchesSearch: Bool
+            if searchText.isEmpty {
+                matchesSearch = true
+            } else {
+                matchesSearch = clothing.name.localizedCaseInsensitiveContains(searchText) ||
                 (clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false)
             }
+            
+            let matchesTag: Bool
+            if selectedTagIDs.isEmpty {
+                matchesTag = true
+            } else {
+                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
+                matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
+            }
+            
+            let matchesBrand: Bool
+            if selectedBrandIDs.isEmpty {
+                matchesBrand = true
+            } else {
+                if let brand = clothing.brand {
+                    matchesBrand = selectedBrandIDs.contains(brand.id)
+                } else {
+                    matchesBrand = false
+                }
+            }
+            
+            let matchesType: Bool = selectedTypes.isEmpty || !selectedTypes.isDisjoint(with: splitValues(clothing.types))
+            
+            let matchesColor: Bool = selectedColors.isEmpty || !selectedColors.isDisjoint(with: splitValues(clothing.colors))
+            
+            let matchesSize: Bool = selectedSizes.isEmpty || !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
+            
+            let matchesLength: Bool = selectedLengths.isEmpty || !selectedLengths.isDisjoint(with: splitValues(clothing.length))
+            
+            let matchesCondition: Bool = selectedConditions.isEmpty || !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            
+            let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
+            
+            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
         }
+    }
+    
+    // Helper for splitting strings with support for both English and Chinese commas
+    func splitValues(_ string: String) -> Set<String> {
+        let normalized = string.replacingOccurrences(of: "，", with: ",")
+        return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
     }
     
     var body: some View {
@@ -57,7 +125,7 @@ struct WardrobeView: View {
                 .padding(.horizontal)
                 
                 if showStats {
-                    WardrobeStatsView(clothings: clothings)
+                    WardrobeStatsView(clothings: filteredClothings)
                         .padding(.horizontal)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }

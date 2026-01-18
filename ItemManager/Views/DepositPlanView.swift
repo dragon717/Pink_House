@@ -15,20 +15,88 @@ struct DepositPlanView: View {
     @State private var selectedYear: Int = 2026
     @State private var showStats = true
     
-    init(searchText: Binding<String>, sortOption: SortOption) {
+    // Filter properties
+    let selectedTagIDs: Set<UUID>
+    let selectedBrandIDs: Set<UUID>
+    let selectedTypes: Set<String>
+    let selectedColors: Set<String>
+    let selectedSizes: Set<String>
+    let selectedLengths: Set<String>
+    let selectedConditions: Set<String>
+    let selectedAccessories: Set<String>
+    
+    init(searchText: Binding<String>, 
+         sortOption: SortOption,
+         selectedTagIDs: Set<UUID>,
+         selectedBrandIDs: Set<UUID>,
+         selectedTypes: Set<String>,
+         selectedColors: Set<String>,
+         selectedSizes: Set<String>,
+         selectedLengths: Set<String>,
+         selectedConditions: Set<String>,
+         selectedAccessories: Set<String>) {
         _searchText = searchText
         let filter = #Predicate<Clothing> { $0.isDepositPlan == true }
         _depositClothings = Query(filter: filter, sort: sortOption.sortDescriptors)
+        
+        self.selectedTagIDs = selectedTagIDs
+        self.selectedBrandIDs = selectedBrandIDs
+        self.selectedTypes = selectedTypes
+        self.selectedColors = selectedColors
+        self.selectedSizes = selectedSizes
+        self.selectedLengths = selectedLengths
+        self.selectedConditions = selectedConditions
+        self.selectedAccessories = selectedAccessories
+    }
+    
+    // Helper for splitting strings with support for both English and Chinese commas
+    func splitValues(_ string: String) -> Set<String> {
+        let normalized = string.replacingOccurrences(of: "，", with: ",")
+        return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
     }
     
     var filteredClothings: [Clothing] {
-        if searchText.isEmpty {
-            return depositClothings
-        } else {
-            return depositClothings.filter { clothing in
-                clothing.name.localizedCaseInsensitiveContains(searchText) ||
+        depositClothings.filter { clothing in
+            let matchesSearch: Bool
+            if searchText.isEmpty {
+                matchesSearch = true
+            } else {
+                matchesSearch = clothing.name.localizedCaseInsensitiveContains(searchText) ||
                 (clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false)
             }
+            
+            let matchesTag: Bool
+            if selectedTagIDs.isEmpty {
+                matchesTag = true
+            } else {
+                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
+                matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
+            }
+            
+            let matchesBrand: Bool
+            if selectedBrandIDs.isEmpty {
+                matchesBrand = true
+            } else {
+                if let brand = clothing.brand {
+                    matchesBrand = selectedBrandIDs.contains(brand.id)
+                } else {
+                    matchesBrand = false
+                }
+            }
+            
+            let matchesType: Bool = selectedTypes.isEmpty || !selectedTypes.isDisjoint(with: splitValues(clothing.types))
+            
+            let matchesColor: Bool = selectedColors.isEmpty || !selectedColors.isDisjoint(with: splitValues(clothing.colors))
+            
+            let matchesSize: Bool = selectedSizes.isEmpty || !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
+            
+            let matchesLength: Bool = selectedLengths.isEmpty || !selectedLengths.isDisjoint(with: splitValues(clothing.length))
+            
+            let matchesCondition: Bool = selectedConditions.isEmpty || !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            
+            let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
+            
+            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
         }
     }
     
@@ -54,7 +122,7 @@ struct DepositPlanView: View {
                 .padding(.horizontal)
                 
                 if showStats {
-                    DepositStatsView(clothings: depositClothings)
+                    DepositStatsView(clothings: filteredClothings)
                         .padding(.horizontal)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
