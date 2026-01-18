@@ -49,9 +49,15 @@ struct ClothingCard: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 
-                Text("¥\(NSDecimalNumber(decimal: clothing.price).stringValue)")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(hex: "8D6E63")) // Brownish
+                if clothing.isDepositPlan {
+                    Text("尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(2)))")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.pink)
+                } else {
+                    Text("¥\(clothing.price, format: .number.precision(.fractionLength(2)))")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color(hex: "8D6E63")) // Brownish
+                }
             }
             .padding(.horizontal, 4)
             .padding(.bottom, 8)
