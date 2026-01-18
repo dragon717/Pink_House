@@ -238,7 +238,7 @@ struct TimelineRow: View {
     
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy/MM/dd HH:mm"
+        formatter.dateFormat = "yyyy/MM/dd"
         return formatter.string(from: date)
     }
 }
