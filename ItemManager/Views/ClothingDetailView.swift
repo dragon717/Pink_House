@@ -136,6 +136,15 @@ struct ClothingDetailView: View {
         } message: {
             Text("确认后将移除定尾计划，并清空定金和预估尾款时间信息。")
         }
+        .onAppear {
+            // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
+            if clothing.deposit > 0 || clothing.balance > 0 {
+                let newTotal = clothing.deposit + clothing.balance
+                if clothing.price != newTotal {
+                    clothing.price = newTotal
+                }
+            }
+        }
     }
     
     private func confirmPayment() {

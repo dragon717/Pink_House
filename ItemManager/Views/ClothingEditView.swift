@@ -248,9 +248,11 @@ struct ClothingEditView: View {
                 accessories = c.accessories
                 imagePaths = c.imagePaths
                 isShared = c.isShared
-                priceTotal = NSDecimalNumber(decimal: c.price).doubleValue
-                deposit = NSDecimalNumber(decimal: c.deposit).doubleValue
-                balance = NSDecimalNumber(decimal: c.balance).doubleValue
+                let depositVal = NSDecimalNumber(decimal: c.deposit).doubleValue
+                let balanceVal = NSDecimalNumber(decimal: c.balance).doubleValue
+                deposit = depositVal
+                balance = balanceVal
+                
                 accessoriesPrice = NSDecimalNumber(decimal: c.accessoriesPrice).doubleValue
                 purchaseDate = c.purchaseDate
                 depositDate = c.depositDate ?? Date()
@@ -260,11 +262,25 @@ struct ClothingEditView: View {
                 note = c.note
                 selectedTags = c.tags ?? []
                 
-                // 加载时，如果定金和尾款 存在，则自动校正总价
-                if deposit > 0 || balance > 0 {
-                    priceTotal = deposit + balance
+                // 加载时，如果定金和尾款都存在，则自动校正总价
+                if depositVal > 0 && balanceVal > 0 {
+                    priceTotal = depositVal + balanceVal
+                } else {
+                    priceTotal = NSDecimalNumber(decimal: c.price).doubleValue
                 }
             }
+        }
+        .onChange(of: deposit) { oldValue, newValue in
+            updateTotalPrice()
+        }
+        .onChange(of: balance) { oldValue, newValue in
+            updateTotalPrice()
+        }
+    }
+    
+    private func updateTotalPrice() {
+        if deposit > 0 && balance > 0 {
+            priceTotal = deposit + balance
         }
     }
     
@@ -303,8 +319,8 @@ struct ClothingEditView: View {
     }
     
     private func save() {
-        // 若定金和尾款 存在，则自动校正总价
-        if deposit > 0 || balance > 0 {
+        // 若定金和尾款都存在，则自动校正总价
+        if deposit > 0 && balance > 0 {
             priceTotal = deposit + balance
         }
         
