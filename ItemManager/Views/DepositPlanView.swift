@@ -157,7 +157,12 @@ struct DepositPlanView: View {
             // List
             LazyVStack(spacing: 16) {
                 ForEach(filteredClothings) { clothing in
-                    DepositItemRow(clothing: clothing)
+                    NavigationLink {
+                        ClothingDetailView(clothing: clothing)
+                    } label: {
+                        DepositItemRow(clothing: clothing)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal)
@@ -312,12 +317,12 @@ struct MonthSelectorView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
-                            .background(isSelected ? Color.brown : Color.white)
+                            .background(isSelected ? Color.brown : Color(uiColor: .secondarySystemGroupedBackground))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.brown.opacity(0.1), lineWidth: isSelected ? 0 : 1)
+                                    .stroke(Color.primary.opacity(0.1), lineWidth: isSelected ? 0 : 1)
                             )
                         }
                     }

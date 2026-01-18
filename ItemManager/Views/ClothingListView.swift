@@ -523,13 +523,9 @@ struct ClothingRow: View {
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     } else {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.2))
+                        CutePlaceholderView(iconSize: 24)
                             .frame(width: 60, height: 60)
-                            .overlay {
-                                Image(systemName: "tshirt")
-                                    .foregroundStyle(.pink.opacity(0.5))
-                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 .overlay(alignment: .topTrailing) {
@@ -618,14 +614,9 @@ struct ClothingRowBrief: View {
                         .frame(width: 40, height: 40)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.2))
+                    CutePlaceholderView(iconSize: 16)
                         .frame(width: 40, height: 40)
-                        .overlay {
-                             Image(systemName: "tshirt")
-                                 .font(.caption)
-                                 .foregroundStyle(.pink.opacity(0.5))
-                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 
                 Text(clothing.name)

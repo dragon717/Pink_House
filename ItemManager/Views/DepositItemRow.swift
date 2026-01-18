@@ -6,10 +6,14 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct DepositItemRow: View {
+    @Environment(\.modelContext) private var modelContext
     let clothing: Clothing
     @State private var isExpanded: Bool = false
+    @State private var showEditNoteAlert: Bool = false
+    @State private var editingNote: String = ""
     
     var body: some View {
         GlassCard {
@@ -25,14 +29,9 @@ struct DepositItemRow: View {
                             .frame(width: 80, height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
+                        CutePlaceholderView(iconSize: 24)
                             .frame(width: 80, height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundStyle(.secondary)
-                            )
                     }
                     
                     // Basic Info
@@ -72,10 +71,21 @@ struct DepositItemRow: View {
                 
                 // Timeline Section
                 VStack(spacing: 12) {
-                    // Purchase/Deposit Info
-                    TimelineRow(title: "定金", date: clothing.depositDate, trailing: "距离开始: 2天") // "2 days left" is hardcoded as logic is complex
+                    if isExpanded {
+                        // Phase 1: Purchase
+                        TimelineRow(title: "下单", date: clothing.purchaseDate)
+                    }
+                    
+                    // Phase 2: Deposit (Always shown or shown as part of list)
+                    // If collapsed, we only show Deposit. If expanded, we show it in order.
+                    // Actually, the screenshot shows "Deposit" at the top even when collapsed.
+                    // So we keep "Deposit" always visible, but maybe its position implies order?
+                    // Let's stick to the screenshot: "Deposit" is the main row.
+                    
+                    TimelineRow(title: "定金", date: clothing.depositDate, trailing: getDepositTimeStatus())
                     
                     if isExpanded {
+                        // Phase 3: Final Payment
                         TimelineRow(title: "尾款", date: clothing.finalPaymentDate)
                     }
                     
@@ -118,11 +128,12 @@ struct DepositItemRow: View {
                     Spacer()
                     
                     Button {
-                        // Action
+                        editingNote = clothing.note
+                        showEditNoteAlert = true
                     } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: "bell.badge")
-                            Text("备忘")
+                            Image(systemName: "square.and.pencil")
+                            Text("修改备注")
                         }
                         .font(.caption)
                         .padding(.horizontal, 12)
@@ -130,6 +141,14 @@ struct DepositItemRow: View {
                         .background(Color(hex: "5D4037"))
                         .foregroundStyle(.white)
                         .clipShape(Capsule())
+                    }
+                    .alert("修改备注", isPresented: $showEditNoteAlert) {
+                        TextField("请输入备注", text: $editingNote)
+                        Button("取消", role: .cancel) { }
+                        Button("保存") {
+                            clothing.note = editingNote
+                            try? modelContext.save()
+                        }
                     }
                 }
             }
@@ -141,6 +160,31 @@ struct DepositItemRow: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy年M月"
         return formatter.string(from: date)
+    }
+    
+    private func getDepositTimeStatus() -> String? {
+        guard let date = clothing.depositDate else { return nil }
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Calculate days between now and target date
+        let components = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date))
+        
+        if let days = components.day {
+            if days > 0 {
+                return "距离开始: \(days)天"
+            } else if days == 0 {
+                // Check if it's future time today or past time today
+                if date > now {
+                    return "即将开始"
+                } else {
+                    return "已开始: 今天"
+                }
+            } else {
+                return "已开始: \(abs(days))天"
+            }
+        }
+        return nil
     }
 }
 

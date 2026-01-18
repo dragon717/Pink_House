@@ -25,14 +25,9 @@ struct ClothingCard: View {
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
+                    CutePlaceholderView()
                         .aspectRatio(1, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundStyle(.secondary)
-                        )
                 }
                 
                 if clothing.isDepositPlan {
@@ -81,16 +76,33 @@ struct ClothingThumbnail: View {
                     .aspectRatio(1, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
+                CutePlaceholderView(iconSize: 14)
                     .aspectRatio(1, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    )
             }
+        }
+    }
+}
+
+struct CutePlaceholderView: View {
+    var iconSize: CGFloat = 30
+    
+    var body: some View {
+        ZStack {
+            // Background adapted for dark mode
+            Color(uiColor: .secondarySystemBackground)
+            
+            // Cute gradient
+            LinearGradient(
+                colors: [Color.pink.opacity(0.1), Color.purple.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            // Cute icon
+            Image(systemName: "heart.fill")
+                .font(.system(size: iconSize))
+                .foregroundStyle(.pink.opacity(0.3))
         }
     }
 }
