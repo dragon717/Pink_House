@@ -16,15 +16,18 @@ struct ClothingCard: View {
             ZStack(alignment: .topTrailing) {
                 if let imagePath = clothing.imagePaths.first,
                    let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(height: 180)
+                    Color.clear
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay(
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.2))
-                        .frame(height: 180)
+                        .aspectRatio(1, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(
                             Image(systemName: "photo")
