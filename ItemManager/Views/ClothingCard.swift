@@ -267,8 +267,10 @@ struct AttributePill: View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.caption2)
-            Text(text)
+            Text(text.replacingOccurrences(of: "\n", with: " "))
                 .font(.caption2)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
