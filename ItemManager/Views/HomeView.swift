@@ -70,6 +70,29 @@ struct HomeView: View {
     // For Deposit Plan View
     @State private var depositSearchText = ""
     
+    // View Layout Management
+    enum ViewLayout: String, CaseIterable, Identifiable {
+        case listBrief = "单行简略"
+        case listDetailed = "单行详细"
+        case grid2 = "双列"
+        case grid3 = "三列"
+        case grid6 = "六列"
+        
+        var id: String { rawValue }
+        
+        var icon: String {
+            switch self {
+            case .listBrief: return "list.bullet"
+            case .listDetailed: return "list.bullet.rectangle.portrait"
+            case .grid2: return "square.grid.2x2"
+            case .grid3: return "square.grid.3x3"
+            case .grid6: return "square.grid.3x2"
+            }
+        }
+    }
+    
+    @State private var viewLayout: ViewLayout = .grid2
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
@@ -83,6 +106,7 @@ struct HomeView: View {
                         WardrobeView(
                             searchText: $wardrobeSearchText,
                             sortOption: sortOption,
+                            viewLayout: viewLayout,
                             selectedTagIDs: selectedTagIDs,
                             selectedBrandIDs: selectedBrandIDs,
                             selectedTypes: selectedTypes,
@@ -457,11 +481,21 @@ struct HomeView: View {
     
     private var displayButton: some View {
         Menu {
-            Button {} label: { Label("隐藏统计", systemImage: "chart.bar") }
-            Button {} label: { Label("切换视图", systemImage: "square.grid.2x2") }
+            Picker("布局", selection: $viewLayout) {
+                ForEach(ViewLayout.allCases) { layout in
+                    Label(layout.rawValue, systemImage: layout.icon)
+                        .tag(layout)
+                }
+            }
+            
+            Button {
+                // Toggle stats logic if needed, or keep separate
+            } label: {
+                 Label("显示统计", systemImage: "chart.bar")
+            }
         } label: {
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 14))
+            Image(systemName: viewLayout.icon)
+                .font(.system(size: 16))
                 .foregroundStyle(.primary)
         }
     }

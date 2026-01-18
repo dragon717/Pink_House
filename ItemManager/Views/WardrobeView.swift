@@ -13,6 +13,9 @@ struct WardrobeView: View {
     @Query private var clothings: [Clothing]
     @State private var showStats = true
     
+    // Layout
+    let viewLayout: HomeView.ViewLayout
+    
     // Filter properties
     let selectedTagIDs: Set<UUID>
     let selectedBrandIDs: Set<UUID>
@@ -25,6 +28,7 @@ struct WardrobeView: View {
     
     init(searchText: Binding<String>, 
          sortOption: SortOption,
+         viewLayout: HomeView.ViewLayout,
          selectedTagIDs: Set<UUID>,
          selectedBrandIDs: Set<UUID>,
          selectedTypes: Set<String>,
@@ -35,6 +39,7 @@ struct WardrobeView: View {
          selectedAccessories: Set<String>) {
         _searchText = searchText
         _clothings = Query(sort: sortOption.sortDescriptors)
+        self.viewLayout = viewLayout
         
         self.selectedTagIDs = selectedTagIDs
         self.selectedBrandIDs = selectedBrandIDs
@@ -47,10 +52,25 @@ struct WardrobeView: View {
     }
     
     // Grid layout
-    private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
-    ]
+    private var gridColumns: [GridItem] {
+        let count: Int
+        let spacing: CGFloat
+        switch viewLayout {
+        case .grid2: 
+            count = 2
+            spacing = 16
+        case .grid3: 
+            count = 3
+            spacing = 16
+        case .grid6: 
+            count = 6
+            spacing = 2
+        default: 
+            count = 1
+            spacing = 16
+        }
+        return Array(repeating: GridItem(.flexible(), spacing: spacing), count: count)
+    }
     
     var filteredClothings: [Clothing] {
         clothings.filter { clothing in
@@ -131,18 +151,56 @@ struct WardrobeView: View {
                 }
             }
             
-            // Grid
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(filteredClothings) { clothing in
-                    NavigationLink {
-                        ClothingDetailView(clothing: clothing)
-                    } label: {
-                        ClothingCard(clothing: clothing)
+            // Content
+            switch viewLayout {
+            case .listBrief, .listDetailed:
+                LazyVStack(spacing: 0) {
+                    ForEach(filteredClothings) { clothing in
+                        NavigationLink {
+                            ClothingDetailView(clothing: clothing)
+                        } label: {
+                            if viewLayout == .listBrief {
+                                ClothingRowBrief(clothing: clothing)
+                                    .padding(.horizontal)
+                            } else {
+                                ClothingRow(clothing: clothing)
+                                    .padding(.horizontal)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Divider()
+                            .padding(.leading)
                     }
                 }
+                .padding(.bottom, 100)
+                
+            case .grid2, .grid3:
+                LazyVGrid(columns: gridColumns, spacing: 16) {
+                    ForEach(filteredClothings) { clothing in
+                        NavigationLink {
+                            ClothingDetailView(clothing: clothing)
+                        } label: {
+                            ClothingCard(clothing: clothing)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 100)
+                
+            case .grid6:
+                LazyVGrid(columns: gridColumns, spacing: 2) {
+                    ForEach(filteredClothings) { clothing in
+                        NavigationLink {
+                            ClothingDetailView(clothing: clothing)
+                        } label: {
+                            ClothingThumbnail(clothing: clothing)
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+                .padding(.bottom, 100) // Bottom padding for scrolling
             }
-            .padding(.horizontal)
-            .padding(.bottom, 100) // Bottom padding for scrolling
         }
         .padding(.top, 10)
     }

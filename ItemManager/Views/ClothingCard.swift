@@ -63,3 +63,31 @@ struct ClothingCard: View {
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
+
+struct ClothingThumbnail: View {
+    let clothing: Clothing
+    
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if let imagePath = clothing.imagePaths.first,
+               let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    )
+            }
+        }
+    }
+}
