@@ -12,7 +12,8 @@ struct DepositPlanView: View {
     @Binding var searchText: String
     @Query private var depositClothings: [Clothing]
     
-    @State private var selectedYear: Int = 2026
+    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
+    @State private var selectedMonths: Set<Int> = []
     @State private var showStats = true
     
     // Filter properties
@@ -96,7 +97,28 @@ struct DepositPlanView: View {
             
             let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
+            // Time Filter
+            let matchesTime: Bool
+            if let date = clothing.finalPaymentDate {
+                let calendar = Calendar.current
+                let year = calendar.component(.year, from: date)
+                let month = calendar.component(.month, from: date)
+                
+                if year != selectedYear {
+                    matchesTime = false
+                } else {
+                    if selectedMonths.isEmpty {
+                        matchesTime = true
+                    } else {
+                        matchesTime = selectedMonths.contains(month)
+                    }
+                }
+            } else {
+                // If no date is set, show it only if we're not filtering by specific months
+                matchesTime = false 
+            }
+            
+            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesTime
         }
     }
     
@@ -129,7 +151,7 @@ struct DepositPlanView: View {
             }
             
             // Month Selector
-            MonthSelectorView(year: $selectedYear)
+            MonthSelectorView(year: $selectedYear, selectedMonths: $selectedMonths, clothings: depositClothings)
                 .padding(.horizontal)
             
             // List
@@ -194,10 +216,27 @@ struct DepositStatsView: View {
 
 struct MonthSelectorView: View {
     @Binding var year: Int
+    @Binding var selectedMonths: Set<Int>
+    let clothings: [Clothing] // Pass in all deposit clothings to calculate monthly stats
     @State private var expanded: Bool = true
     
     let months = Array(1...12)
     let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
+    
+    // Calculate stats for a specific month
+    private func statsForMonth(_ month: Int) -> (count: Int, amount: Decimal) {
+        let calendar = Calendar.current
+        let monthlyClothings = clothings.filter { clothing in
+            guard let date = clothing.finalPaymentDate else { return false }
+            let y = calendar.component(.year, from: date)
+            let m = calendar.component(.month, from: date)
+            return y == year && m == month
+        }
+        
+        let count = monthlyClothings.count
+        let amount = monthlyClothings.reduce(0) { $0 + $1.balance }
+        return (count, amount)
+    }
     
     var body: some View {
         VStack(spacing: 16) {
@@ -243,19 +282,44 @@ struct MonthSelectorView: View {
                 // Month Grid
                 LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(months, id: \.self) { month in
-                        VStack {
-                            Text("\(month)月")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("-")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        let stats = statsForMonth(month)
+                        let isSelected = selectedMonths.contains(month)
+                        
+                        Button {
+                            if isSelected {
+                                selectedMonths.remove(month)
+                            } else {
+                                selectedMonths.insert(month)
+                            }
+                        } label: {
+                            VStack(spacing: 4) {
+                                Text("\(month)月")
+                                    .font(.caption)
+                                    .fontWeight(isSelected ? .bold : .regular)
+                                    .foregroundStyle(isSelected ? .white : .primary)
+                                
+                                if stats.count > 0 {
+                                    Text("¥\(NSDecimalNumber(decimal: stats.amount).stringValue)")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(isSelected ? .white.opacity(0.9) : .orange)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                } else {
+                                    Text("-")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(isSelected ? .white.opacity(0.6) : .secondary.opacity(0.3))
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(isSelected ? Color.brown : Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.brown.opacity(0.1), lineWidth: isSelected ? 0 : 1)
+                            )
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: .black.opacity(0.02), radius: 2, x: 0, y: 1)
                     }
                 }
             }
