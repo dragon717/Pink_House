@@ -191,13 +191,8 @@ struct HomeView: View {
         Menu {
             Picker("排序", selection: $sortOption) {
                 ForEach(SortOption.allCases) { option in
-                    HStack {
-                        if option == sortOption {
-                            Image(systemName: "checkmark")
-                        }
-                        Text(option.rawValue)
-                    }
-                    .tag(option)
+                    Text(option.rawValue)
+                        .tag(option)
                 }
             }
         } label: {
