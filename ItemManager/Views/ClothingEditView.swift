@@ -259,6 +259,11 @@ struct ClothingEditView: View {
                 finalPaymentEndDate = c.finalPaymentEndDate ?? (c.finalPaymentDate ?? Date())
                 note = c.note
                 selectedTags = c.tags ?? []
+                
+                // 加载时，如果定金和尾款 存在，则自动校正总价
+                if deposit > 0 || balance > 0 {
+                    priceTotal = deposit + balance
+                }
             }
         }
     }
@@ -298,6 +303,11 @@ struct ClothingEditView: View {
     }
     
     private func save() {
+        // 若定金和尾款 存在，则自动校正总价
+        if deposit > 0 || balance > 0 {
+            priceTotal = deposit + balance
+        }
+        
         let finalBrand = getOrCreateBrand(name: brandName)
         let finalTypes = normalizeTags(types)
         let finalColors = normalizeTags(colors)

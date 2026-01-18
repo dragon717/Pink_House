@@ -487,12 +487,6 @@ struct HomeView: View {
                         .tag(layout)
                 }
             }
-            
-            Button {
-                // Toggle stats logic if needed, or keep separate
-            } label: {
-                 Label("显示统计", systemImage: "chart.bar")
-            }
         } label: {
             Image(systemName: viewLayout.icon)
                 .font(.system(size: 16))
