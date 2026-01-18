@@ -10,10 +10,16 @@ import SwiftData
 
 struct DepositPlanView: View {
     @Binding var searchText: String
-    @Query(filter: #Predicate<Clothing> { $0.isDepositPlan == true }, sort: \Clothing.createdAt, order: .reverse) private var depositClothings: [Clothing]
+    @Query private var depositClothings: [Clothing]
     
     @State private var selectedYear: Int = 2026
     @State private var showStats = true
+    
+    init(searchText: Binding<String>, sortOption: SortOption) {
+        _searchText = searchText
+        let filter = #Predicate<Clothing> { $0.isDepositPlan == true }
+        _depositClothings = Query(filter: filter, sort: sortOption.sortDescriptors)
+    }
     
     var filteredClothings: [Clothing] {
         if searchText.isEmpty {

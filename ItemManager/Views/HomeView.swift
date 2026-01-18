@@ -8,6 +8,37 @@
 import SwiftUI
 import SwiftData
 
+enum SortOption: String, CaseIterable, Identifiable {
+    case createdAtDesc = "添加时间从晚到早"
+    case priceAsc = "价格从低到高"
+    case priceDesc = "价格从高到低"
+    case purchaseDateAsc = "购买时间从早到晚"
+    case purchaseDateDesc = "购买时间从晚到早"
+    case nameAsc = "名称从A到Z"
+    case nameDesc = "名称从Z到A"
+    
+    var id: String { rawValue }
+    
+    var sortDescriptors: [SortDescriptor<Clothing>] {
+        switch self {
+        case .createdAtDesc:
+            return [SortDescriptor(\Clothing.createdAt, order: .reverse)]
+        case .priceAsc:
+            return [SortDescriptor(\Clothing.price, order: .forward)]
+        case .priceDesc:
+            return [SortDescriptor(\Clothing.price, order: .reverse)]
+        case .purchaseDateAsc:
+            return [SortDescriptor(\Clothing.purchaseDate, order: .forward)]
+        case .purchaseDateDesc:
+            return [SortDescriptor(\Clothing.purchaseDate, order: .reverse)]
+        case .nameAsc:
+            return [SortDescriptor(\Clothing.name, order: .forward)]
+        case .nameDesc:
+            return [SortDescriptor(\Clothing.name, order: .reverse)]
+        }
+    }
+}
+
 enum HomeTab {
     case wardrobe
     case depositPlan
@@ -16,6 +47,7 @@ enum HomeTab {
 struct HomeView: View {
     @State private var selectedTab: HomeTab = .wardrobe
     @State private var showingAddSheet = false
+    @State private var sortOption: SortOption = .createdAtDesc
     
     // For Wardrobe View
     @State private var wardrobeSearchText = ""
@@ -33,9 +65,9 @@ struct HomeView: View {
                 // Content
                 ScrollView {
                     if selectedTab == .wardrobe {
-                        WardrobeView(searchText: $wardrobeSearchText)
+                        WardrobeView(searchText: $wardrobeSearchText, sortOption: sortOption)
                     } else {
-                        DepositPlanView(searchText: $depositSearchText)
+                        DepositPlanView(searchText: $depositSearchText, sortOption: sortOption)
                     }
                 }
                 .scrollIndicators(.hidden)
@@ -120,9 +152,16 @@ struct HomeView: View {
     // Extracted buttons for reuse
     private var sortButton: some View {
         Menu {
-            Picker("排序", selection: .constant(0)) {
-                Text("按时间").tag(0)
-                Text("按价格").tag(1)
+            Picker("排序", selection: $sortOption) {
+                ForEach(SortOption.allCases) { option in
+                    HStack {
+                        if option == sortOption {
+                            Image(systemName: "checkmark")
+                        }
+                        Text(option.rawValue)
+                    }
+                    .tag(option)
+                }
             }
         } label: {
             if let _ =  Optional(true) {

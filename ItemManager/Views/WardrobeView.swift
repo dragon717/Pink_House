@@ -10,8 +10,13 @@ import SwiftData
 
 struct WardrobeView: View {
     @Binding var searchText: String
-    @Query(sort: \Clothing.createdAt, order: .reverse) private var clothings: [Clothing]
+    @Query private var clothings: [Clothing]
     @State private var showStats = true
+    
+    init(searchText: Binding<String>, sortOption: SortOption) {
+        _searchText = searchText
+        _clothings = Query(sort: sortOption.sortDescriptors)
+    }
     
     // Grid layout
     private let columns = [
