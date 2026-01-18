@@ -8,12 +8,21 @@
 import SwiftUI
 import SwiftData
 
+enum DepositViewMode {
+    case monthly
+    case series
+}
+
 struct DepositPlanView: View {
     @Binding var searchText: String
     @Query private var depositClothings: [Clothing]
     
+    @State private var viewMode: DepositViewMode = .monthly
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var selectedMonths: Set<Int> = []
+    @State private var selectedSeries: Set<String> = []
+    @State private var seriesList: [SeriesInfo] = []
+    @State private var isAnalyzing: Bool = false
     @State private var showStats = true
     
     // Filter properties
@@ -97,33 +106,69 @@ struct DepositPlanView: View {
             
             let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             
-            // Time Filter
-            let matchesTime: Bool
-            if let date = clothing.finalPaymentDate {
-                let calendar = Calendar.current
-                let year = calendar.component(.year, from: date)
-                let month = calendar.component(.month, from: date)
-                
-                if year != selectedYear {
-                    matchesTime = false
-                } else {
-                    if selectedMonths.isEmpty {
-                        matchesTime = true
+            // Time Filter / Series Filter
+            let matchesTimeOrSeries: Bool
+            
+            if viewMode == .monthly {
+                if let date = clothing.finalPaymentDate {
+                    let calendar = Calendar.current
+                    let year = calendar.component(.year, from: date)
+                    let month = calendar.component(.month, from: date)
+                    
+                    if year != selectedYear {
+                        matchesTimeOrSeries = false
                     } else {
-                        matchesTime = selectedMonths.contains(month)
+                        if selectedMonths.isEmpty {
+                            matchesTimeOrSeries = true
+                        } else {
+                            matchesTimeOrSeries = selectedMonths.contains(month)
+                        }
                     }
+                } else {
+                    // If no date is set, show it only if we're not filtering by specific months
+                    matchesTimeOrSeries = false
                 }
             } else {
-                // If no date is set, show it only if we're not filtering by specific months
-                matchesTime = false 
+                // Series Mode
+                if selectedSeries.isEmpty {
+                    matchesTimeOrSeries = true
+                } else {
+                    matchesTimeOrSeries = selectedSeries.contains { seriesName in
+                        clothing.name.localizedCaseInsensitiveContains(seriesName)
+                    }
+                }
             }
             
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesTime
+            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesTimeOrSeries
         }
     }
     
     var body: some View {
         VStack(spacing: 20) {
+            // View Mode Switcher
+            Picker("视图模式", selection: $viewMode) {
+                Text("按月视图").tag(DepositViewMode.monthly)
+                Text("按系列视图").tag(DepositViewMode.series)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .onChange(of: viewMode) { oldValue, newValue in
+                if newValue == .series && seriesList.isEmpty {
+                    analyzeSeries()
+                }
+            }
+            .task {
+                // Initial analysis if needed, or wait for switch
+                if viewMode == .series && seriesList.isEmpty {
+                    analyzeSeries()
+                }
+            }
+            .onChange(of: depositClothings) { oldValue, newValue in
+                if viewMode == .series {
+                    analyzeSeries()
+                }
+            }
+            
             // Stats Section
             VStack(spacing: 8) {
                 HStack {
@@ -150,9 +195,14 @@ struct DepositPlanView: View {
                 }
             }
             
-            // Month Selector
-            MonthSelectorView(year: $selectedYear, selectedMonths: $selectedMonths, clothings: depositClothings)
-                .padding(.horizontal)
+            // Selector Area
+            if viewMode == .monthly {
+                MonthSelectorView(year: $selectedYear, selectedMonths: $selectedMonths, clothings: depositClothings)
+                    .padding(.horizontal)
+            } else {
+                SeriesSelectorView(selectedSeries: $selectedSeries, seriesList: seriesList, isAnalyzing: isAnalyzing)
+                    .padding(.horizontal)
+            }
             
             // List
             LazyVStack(spacing: 16) {
@@ -169,6 +219,17 @@ struct DepositPlanView: View {
             .padding(.bottom, 100)
         }
         .padding(.top, 10)
+    }
+    
+    private func analyzeSeries() {
+        isAnalyzing = true
+        Task {
+            let series = await SeriesAnalyzer.shared.analyzeSeries(from: depositClothings)
+            await MainActor.run {
+                self.seriesList = series
+                self.isAnalyzing = false
+            }
+        }
     }
 }
 
@@ -294,7 +355,7 @@ struct MonthSelectorView: View {
                             if isSelected {
                                 selectedMonths.remove(month)
                             } else {
-                                selectedMonths.insert(month)
+                                selectedMonths = [month]
                             }
                         } label: {
                             VStack(spacing: 4) {
@@ -326,6 +387,106 @@ struct MonthSelectorView: View {
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+struct SeriesSelectorView: View {
+    @Binding var selectedSeries: Set<String>
+    let seriesList: [SeriesInfo]
+    let isAnalyzing: Bool
+    @State private var expanded: Bool = true
+    
+    // Adaptive grid columns
+    let columns = [GridItem(.adaptive(minimum: 100), spacing: 10)]
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header
+            Button {
+                withAnimation {
+                    expanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("按系列预估尾款")
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    
+                    if isAnalyzing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.leading, 8)
+                    }
+                    
+                    Spacer()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            if expanded {
+                if seriesList.isEmpty {
+                    if isAnalyzing {
+                        Text("正在分析系列...")
+                            .foregroundStyle(.secondary)
+                            .padding()
+                    } else {
+                        Text("暂无系列数据")
+                            .foregroundStyle(.secondary)
+                            .padding()
+                    }
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            ForEach(seriesList) { series in
+                                let isSelected = selectedSeries.contains(series.name)
+                                
+                                Button {
+                                    if isSelected {
+                                        selectedSeries.remove(series.name)
+                                    } else {
+                                        selectedSeries = [series.name]
+                                    }
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text(series.name)
+                                                .font(.caption)
+                                                .fontWeight(isSelected ? .bold : .medium)
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Text("\(series.count)")
+                                                .font(.system(size: 9))
+                                                .padding(4)
+                                                .background(Color.black.opacity(0.1))
+                                                .clipShape(Circle())
+                                        }
+                                        .foregroundStyle(isSelected ? .white : .primary)
+                                        
+                                        Text("¥\(NSDecimalNumber(decimal: series.totalBalance).stringValue)")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(isSelected ? .white.opacity(0.9) : (series.totalBalance > 0 ? .orange : .secondary.opacity(0.7)))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.8)
+                                    }
+                                    .padding(8)
+                                    .background(isSelected ? Color.brown : Color(uiColor: .secondarySystemGroupedBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.primary.opacity(0.1), lineWidth: isSelected ? 0 : 1)
+                                    )
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(maxHeight: 300) // Limit height to avoid taking too much space
                 }
             }
         }
