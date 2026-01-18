@@ -52,8 +52,8 @@ struct ClothingCard: View {
                     .foregroundStyle(.primary)
                 
                 if clothing.isDepositPlan {
-                    Text("尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(2)))")
-                        .font(.system(size: 14, weight: .bold))
+                    Text("定金: ¥\(clothing.deposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.pink)
                 } else {
                     Text("¥\(clothing.price, format: .number.precision(.fractionLength(2)))")
@@ -187,8 +187,8 @@ struct ClothingRow: View {
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     if clothing.isDepositPlan {
-                        Text("尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(2)))")
-                            .font(.subheadline)
+                        Text("定金: ¥\(clothing.deposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
+                            .font(.caption)
                             .bold()
                             .foregroundStyle(.pink)
                     } else {
@@ -243,8 +243,8 @@ struct ClothingRowBrief: View {
                 }
                 
                 if clothing.isDepositPlan {
-                    Text("尾:¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
-                        .font(.subheadline)
+                    Text("定¥\(clothing.deposit, format: .number.precision(.fractionLength(0)))+尾¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
+                        .font(.caption)
                         .bold()
                         .foregroundStyle(.pink)
                 } else {

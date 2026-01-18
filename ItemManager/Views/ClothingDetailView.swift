@@ -365,6 +365,11 @@ struct ClothingDetailView: View {
                 .font(.headline)
                 .foregroundStyle(.brown)
             
+            if clothing.isDepositPlan {
+                InfoRow(label: "定金", value: "¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0))))")
+                InfoRow(label: "尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+            }
+            
             InfoRow(label: "裙子总价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
             
             HStack {

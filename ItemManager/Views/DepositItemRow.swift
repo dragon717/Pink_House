@@ -50,6 +50,11 @@ struct DepositItemRow: View {
                             .foregroundStyle(.secondary)
                         }
                         
+                        Text("定¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(.pink)
+                        
                         // Tags
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 6) {
