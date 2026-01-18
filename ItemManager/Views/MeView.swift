@@ -1,7 +1,13 @@
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MeView: View {
+    @Environment(\.modelContext) private var modelContext
+    @State private var isImporting = false
+    @State private var showingImportAlert = false
+    @State private var importMessage = ""
+    
     var body: some View {
         NavigationStack {
             List {
@@ -97,8 +103,75 @@ struct MeView: View {
                 } header: {
                     Label("功能设置", systemImage: "gearshape")
                 }
+                
+                // Section 4: Data Management
+                Section {
+                    Button {
+                        isImporting = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "square.and.arrow.down")
+                                .foregroundStyle(.blue)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("导入其他App备份")
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                Text("支持导入 .backup 格式文件")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                } header: {
+                    Label("数据管理", systemImage: "externaldrive")
+                }
             }
             .navigationTitle("我的")
+            .fileImporter(
+                isPresented: $isImporting,
+                allowedContentTypes: [.data], // 允许所有数据类型，或者自定义类型
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    
+                    Task {
+                        // 在 Task 内部获取权限，确保覆盖整个异步操作
+                        guard url.startAccessingSecurityScopedResource() else {
+                            importMessage = "无法访问文件，请检查权限"
+                            showingImportAlert = true
+                            return
+                        }
+                        
+                        defer { url.stopAccessingSecurityScopedResource() }
+                        
+                        do {
+                            let result = try await ImportManager.shared.importBackup(from: url, context: modelContext)
+                            importMessage = "导入完成\n成功: \(result.successCount)\n失败: \(result.failCount)"
+                            if !result.errors.isEmpty {
+                                importMessage += "\n\n错误详情:\n" + result.errors.prefix(3).joined(separator: "\n")
+                            }
+                        } catch {
+                            importMessage = "导入失败: \(error.localizedDescription)"
+                        }
+                        showingImportAlert = true
+                    }
+                    
+                case .failure(let error):
+                    importMessage = "选择文件失败: \(error.localizedDescription)"
+                    showingImportAlert = true
+                }
+            }
+            .alert("导入结果", isPresented: $showingImportAlert) {
+                Button("确定", role: .cancel) { }
+            } message: {
+                Text(importMessage)
+            }
         }
     }
 }
