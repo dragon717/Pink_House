@@ -147,38 +147,21 @@ struct MeView: View {
                         }
                         .padding(.vertical, 2)
                     }
-                    NavigationLink(destination: WidgetBackgroundSettingsView()) {
+                    NavigationLink(destination: WidgetSettingsView()) {
                         HStack(spacing: 12) {
-                            Image(systemName: "photo.artframe")
+                            Image(systemName: "rectangle.3.group")
                                 .foregroundStyle(.brown)
                                 .font(.body)
                                 .frame(width: 24)
                             
                             VStack(alignment: .leading) {
-                                Text("小组件背景")
+                                Text("小组件设置")
                                     .font(.body)
                                     .outlined()
-                                Text("自定义桌面小组件背景图")
+                                Text("自定义背景与添加教程")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .outlined()
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                    NavigationLink(destination: WidgetTutorialView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "sparkles.rectangle.stack")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("添加桌面小组件")
-                                    .font(.body)
-                                Text("查看添加教程与配置说明")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
                             }
                         }
                         .padding(.vertical, 2)
