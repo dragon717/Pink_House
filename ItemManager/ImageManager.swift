@@ -99,6 +99,24 @@ class ImageManager {
         }
     }
     
+    /// 增加图片引用计数 (用于复制条目时)
+    func incrementRefCount(fileName: String, context: ModelContext) {
+        let descriptor = FetchDescriptor<StoredImage>(predicate: #Predicate { $0.fileName == fileName })
+        
+        do {
+            let results = try context.fetch(descriptor)
+            if let storedImage = results.first {
+                storedImage.refCount += 1
+                storedImage.updatedAt = Date()
+                AppLogger.info("Incremented refCount for \(fileName) to \(storedImage.refCount)")
+            } else {
+                AppLogger.info("WARNING: Attempted to increment refCount for non-existent image: \(fileName)")
+            }
+        } catch {
+            AppLogger.error("Failed to increment refCount: \(error)")
+        }
+    }
+    
     /// 获取图片
     func loadImage(fileName: String) -> UIImage? {
         let fileURL = imagesDirectory.appendingPathComponent(fileName)

@@ -287,7 +287,7 @@ struct ClothingEditView: View {
     private func normalizeTags(_ input: String) -> String {
         let components = input.replacingOccurrences(of: "，", with: ",")
             .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
             .filter { !$0.isEmpty }
         return components.joined(separator: ",")
     }
@@ -329,6 +329,8 @@ struct ClothingEditView: View {
         let finalColors = normalizeTags(colors)
         let finalSizes = normalizeTags(sizes)
         let finalAccessories = normalizeTags(accessories)
+        let finalLength = length.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let finalCondition = condition.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         
         // 更新自动补全索引
         SuggestionManager.shared.addData(field: .name, value: name)
@@ -337,7 +339,7 @@ struct ClothingEditView: View {
         SuggestionManager.shared.addData(field: .color, value: finalColors)
         SuggestionManager.shared.addData(field: .size, value: finalSizes)
         SuggestionManager.shared.addData(field: .accessory, value: finalAccessories)
-        SuggestionManager.shared.addData(field: .condition, value: condition)
+        SuggestionManager.shared.addData(field: .condition, value: finalCondition)
         
         // 特殊逻辑：如果类型包含"小物"，则该物品名称也加入小物索引
         SuggestionManager.shared.addAccessoryNameIfTypeContainsAccessory(name: name, types: finalTypes)
@@ -350,8 +352,8 @@ struct ClothingEditView: View {
             c.types = finalTypes
             c.colors = finalColors
             c.sizes = finalSizes
-            c.length = length
-            c.condition = condition
+            c.length = finalLength
+            c.condition = finalCondition
             c.accessories = finalAccessories
             c.imagePaths = imagePaths
             c.isShared = isShared
@@ -376,8 +378,8 @@ struct ClothingEditView: View {
                 types: finalTypes,
                 colors: finalColors,
                 sizes: finalSizes,
-                length: length,
-                condition: condition,
+                length: finalLength,
+                condition: finalCondition,
                 accessories: finalAccessories,
                 imagePaths: imagePaths,
                 isShared: isShared,

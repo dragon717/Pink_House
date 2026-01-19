@@ -170,8 +170,37 @@ struct ClothingListView: View {
                             }
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
+                            .contentShape(Rectangle()) // 增加点击热区
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    itemToDelete = clothing
+                                    showingDeleteAlert = true
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                                
+                                Button {
+                                    duplicateItem(clothing)
+                                } label: {
+                                    Label("复制", systemImage: "doc.on.doc")
+                                }
+                                .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button {
+                                    duplicateItem(clothing)
+                                } label: {
+                                    Label("复制", systemImage: "doc.on.doc")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    itemToDelete = clothing
+                                    showingDeleteAlert = true
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            }
                         }
-                        .onDelete(perform: deleteItems)
                     }
                     .listStyle(.plain)
                     
@@ -243,10 +272,38 @@ struct ClothingListView: View {
         }
     }
     
-    private func deleteItems(offsets: IndexSet) {
-        if let index = offsets.first {
-            itemToDelete = filteredClothings[index]
-            showingDeleteAlert = true
+    private func duplicateItem(_ item: Clothing) {
+        // Increment image ref counts
+        for path in item.imagePaths {
+            ImageManager.shared.incrementRefCount(fileName: path, context: modelContext)
         }
+        
+        let newItem = Clothing(
+            name: item.name + " (副本)",
+            brand: item.brand,
+            types: item.types,
+            colors: item.colors,
+            sizes: item.sizes,
+            length: item.length,
+            condition: item.condition,
+            accessories: item.accessories,
+            imagePaths: item.imagePaths,
+            isShared: item.isShared,
+            price: item.price,
+            deposit: item.deposit,
+            balance: item.balance,
+            accessoriesPrice: item.accessoriesPrice,
+            purchaseDate: item.purchaseDate,
+            depositDate: item.depositDate,
+            isDepositPlan: item.isDepositPlan,
+            finalPaymentDate: item.finalPaymentDate,
+            finalPaymentEndDate: item.finalPaymentEndDate,
+            note: item.note,
+            stock: item.stock,
+            status: item.status
+        )
+        newItem.tags = item.tags
+        
+        modelContext.insert(newItem)
     }
 }
