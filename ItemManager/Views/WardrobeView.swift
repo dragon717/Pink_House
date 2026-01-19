@@ -125,27 +125,6 @@ struct WardrobeView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            // Search Bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("搜索名称、品牌...", text: $searchText)
-                    .submitLabel(.search)
-                
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(10)
-            .background(Material.regular)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .padding(.horizontal)
-
             // Stats Section
             VStack(spacing: 8) {
                 HStack {

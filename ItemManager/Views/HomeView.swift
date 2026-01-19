@@ -142,7 +142,21 @@ struct HomeView: View {
                     actionButtons
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .searchable(
+                text: Binding(
+                    get: { selectedTab == .wardrobe ? wardrobeSearchText : depositSearchText },
+                    set: { newValue in
+                        if selectedTab == .wardrobe {
+                            wardrobeSearchText = newValue
+                        } else {
+                            depositSearchText = newValue
+                        }
+                    }
+                ),
+                placement: .automatic,
+                prompt: "搜索名称、品牌、标签、属性..."
+            )
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {
                     ClothingEditView(clothing: nil)
