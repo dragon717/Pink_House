@@ -153,18 +153,18 @@ struct MeView: View {
                         }
                         .padding(.vertical, 2)
                     }
-                    NavigationLink(destination: WidgetSettingsView()) {
+                    NavigationLink(destination: WidgetTutorialView()) {
                         HStack(spacing: 12) {
-                            Image(systemName: "square.grid.2x2")
+                            Image(systemName: "sparkles.rectangle.stack")
                                 .foregroundStyle(.brown)
                                 .font(.body)
                                 .frame(width: 24)
                             
                             VStack(alignment: .leading) {
-                                Text("小组件设置")
+                                Text("添加桌面小组件")
                                     .font(.body)
                                     .outlined()
-                                Text("桌面小组件配置")
+                                Text("查看添加教程与配置说明")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .outlined()

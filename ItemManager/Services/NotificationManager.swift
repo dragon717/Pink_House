@@ -8,10 +8,19 @@
 import UserNotifications
 import SwiftUI
 
-class NotificationManager {
+class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationManager()
     
-    private init() {}
+    private override init() {
+        super.init()
+        UNUserNotificationCenter.current().delegate = self
+    }
+    
+    // MARK: - UNUserNotificationCenterDelegate
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // 在前台也显示通知 (Banner, Sound, Badge)
+        completionHandler([.banner, .sound, .badge])
+    }
     
     // MARK: - Settings Keys
     struct Keys {

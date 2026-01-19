@@ -83,7 +83,7 @@ class SeriesAnalyzer {
         }.value
     }
     
-    private func generateCandidates(from text: String) -> Set<String> {
+    func generateCandidates(from text: String) -> Set<String> {
         var candidates: Set<String> = []
         
         // Sanitize text: remove special characters (brackets, etc.)

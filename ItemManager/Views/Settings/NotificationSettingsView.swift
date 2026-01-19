@@ -15,6 +15,7 @@ struct NotificationSettingsView: View {
     
     @State private var notificationTime: Date = Date()
     @State private var showPermissionAlert = false
+    @State private var showTestScheduledAlert = false
     
     @Query(filter: #Predicate<Clothing> { $0.isDepositPlan == true }) private var depositPlans: [Clothing]
     
@@ -55,13 +56,14 @@ struct NotificationSettingsView: View {
                 }
             }
             
-            Section {
-                Button("发送测试通知 (5秒后)") {
-                    sendTestNotification()
-                }
-            } header: {
-                Text("调试")
-            }
+            // 测试结束，注释以便下次测试
+            // Section {
+            //     Button("发送测试通知 (5秒后)") {
+            //         sendTestNotification()
+            //     }
+            // } header: {
+            //     Text("调试")
+            // }
         }
         .navigationTitle("通知设置")
         .navigationBarTitleDisplayMode(.inline)
@@ -86,6 +88,11 @@ struct NotificationSettingsView: View {
             }
         } message: {
             Text("请在设置中允许 App 发送通知，以便接收补款提醒。")
+        }
+        .alert("测试通知已发送", isPresented: $showTestScheduledAlert) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text("请等待约 5 秒钟，通知将送达。\n如果在前台，您应该能看到顶部横幅。")
         }
     }
     
@@ -140,6 +147,10 @@ struct NotificationSettingsView: View {
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
                 
                 try? await UNUserNotificationCenter.current().add(request)
+                
+                await MainActor.run {
+                    showTestScheduledAlert = true
+                }
             } else {
                 showPermissionAlert = true
             }
