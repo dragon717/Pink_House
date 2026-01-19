@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct MeView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     @State private var isImporting = false
     @State private var showingImportAlert = false
     @State private var importMessage = ""
@@ -95,7 +96,23 @@ struct MeView: View {
                 
                 // Section 3: Feature Settings
                 Section {
-                    SettingsRow(icon: "slider.horizontal.3", title: "通用设置", subtitle: "语言、主题等")
+                    NavigationLink(destination: GeneralSettingsView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "slider.horizontal.3")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("通用设置")
+                                    .font(.body)
+                                Text("语言、主题等")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
                     SettingsRow(icon: "bell", title: "通知设置", subtitle: "管理通知提醒")
                     SettingsRow(icon: "lock", title: "隐私设置", subtitle: "数据与隐私")
                     SettingsRow(icon: "square.grid.2x2", title: "小组件设置", subtitle: "桌面小组件配置")
@@ -145,6 +162,16 @@ struct MeView: View {
 //                } header: {
 //                    Label("数据管理", systemImage: "externaldrive")
 //                }
+            }
+            .scrollContentBackground(.hidden)
+            .background {
+                ZStack {
+                    themeManager.backgroundColor
+                    if themeManager.isBlurEnabled {
+                        Rectangle().foregroundStyle(.ultraThinMaterial)
+                    }
+                }
+                .ignoresSafeArea()
             }
             .navigationTitle("我的")
             .fileImporter(

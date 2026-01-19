@@ -10,6 +10,8 @@ import SwiftData
 
 @main
 struct ItemManagerApp: App {
+    @State private var themeManager = ThemeManager.shared
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
                     Item.self,
@@ -51,6 +53,7 @@ struct ItemManagerApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
+                .environment(themeManager)
         }
         .modelContainer(sharedModelContainer)
     }
