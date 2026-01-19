@@ -104,31 +104,31 @@ struct MeView: View {
                     Label("功能设置", systemImage: "gearshape")
                 }
                 
-                // Section 4: Data Management
-                Section {
-                    Button {
-                        isImporting = true
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "square.and.arrow.down")
-                                .foregroundStyle(.blue)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("导入其他App备份")
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                Text("支持导入 .backup 格式文件")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                } header: {
-                    Label("数据管理", systemImage: "externaldrive")
-                }
+                // Section 4: Data Management (临时用)
+//                Section {
+//                    Button {
+//                        isImporting = true
+//                    } label: {
+//                        HStack(spacing: 12) {
+//                            Image(systemName: "square.and.arrow.down")
+//                                .foregroundStyle(.blue)
+//                                .font(.body)
+//                                .frame(width: 24)
+//                            
+//                            VStack(alignment: .leading) {
+//                                Text("导入其他App备份")
+//                                    .font(.body)
+//                                    .foregroundStyle(.primary)
+//                                Text("支持导入 .backup 格式文件")
+//                                    .font(.caption)
+//                                    .foregroundStyle(.secondary)
+//                            }
+//                        }
+//                        .padding(.vertical, 2)
+//                    }
+//                } header: {
+//                    Label("数据管理", systemImage: "externaldrive")
+//                }
             }
             .navigationTitle("我的")
             .fileImporter(
