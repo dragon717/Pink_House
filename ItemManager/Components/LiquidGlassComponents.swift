@@ -39,6 +39,7 @@ struct SmartBackgroundImage: View {
 // MARK: - Liquid Background
 struct LiquidBackground: View {
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         ZStack {
@@ -48,6 +49,12 @@ struct LiquidBackground: View {
             
             if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
                 SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
+                
+                // Dark Mode Overlay
+                if colorScheme == .dark {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                }
             } else {
                 // 2. Decorative Orbs (Only for solid color background)
                 // These add depth to the solid color
@@ -102,6 +109,29 @@ struct GlassCard<Content: View>: View {
                 .padding()
         }
         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+    }
+}
+
+// MARK: - Text Enhancements
+struct OutlinedText: ViewModifier {
+    @Environment(ThemeManager.self) private var themeManager
+    var color: Color = .white
+    var width: CGFloat = 1.0
+    
+    func body(content: Content) -> some View {
+        if themeManager.backgroundStyle == .image {
+            content
+                .shadow(color: .black, radius: 1, x: 0, y: 0)
+                .shadow(color: .black, radius: 1, x: 0, y: 0) // Double shadow for stronger effect
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func outlined() -> some View {
+        modifier(OutlinedText())
     }
 }
 

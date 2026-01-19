@@ -106,9 +106,11 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("通用设置")
                                     .font(.body)
+                                    .outlined()
                                 Text("语言、主题等")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .outlined()
                             }
                         }
                         .padding(.vertical, 2)
@@ -126,15 +128,18 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("标签设置")
                                     .font(.body)
+                                    .outlined()
                                 Text("管理衣橱标签/品牌/类型等")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .outlined()
                             }
                         }
                         .padding(.vertical, 2)
                     }
                 } header: {
                     Label("功能设置", systemImage: "gearshape")
+                        .outlined()
                 }
                 
                 // Section 4: Data Management (临时用)
@@ -229,9 +234,11 @@ struct SettingsRow: View {
                 VStack(alignment: .leading) {
                     Text(title)
                         .font(.body)
+                        .outlined()
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .outlined()
                 }
             }
             .padding(.vertical, 2)
