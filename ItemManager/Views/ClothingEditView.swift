@@ -379,6 +379,7 @@ struct ClothingEditView: View {
             c.finalPaymentDate = finalPaymentDate
             c.finalPaymentEndDate = finalPaymentEndDate
             c.note = note
+            c.stock = stock
             c.tags = selectedTags
             c.updatedAt = Date()
         } else {
