@@ -42,27 +42,33 @@ struct LiquidBackground: View {
     
     var body: some View {
         ZStack {
+            // 1. Base Layer (Color or Image)
             themeManager.backgroundColor
                 .ignoresSafeArea()
             
             if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
                 SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
-            }
-            
-            if themeManager.isBlurEnabled {
-                // Orb 1
+            } else {
+                // 2. Decorative Orbs (Only for solid color background)
+                // These add depth to the solid color
                 Circle()
                     .fill(Color.pink.opacity(0.3))
                     .frame(width: 300, height: 300)
                     .blur(radius: 60)
                     .offset(x: -100, y: -200)
                 
-                // Orb 2
                 Circle()
                     .fill(Color.blue.opacity(0.2))
                     .frame(width: 250, height: 250)
                     .blur(radius: 60)
                     .offset(x: 100, y: 150)
+            }
+            
+            // 3. Blur Layer (Material Overlay)
+            if themeManager.isBlurEnabled {
+                Rectangle()
+                    .foregroundStyle(.ultraThinMaterial)
+                    .ignoresSafeArea()
             }
         }
     }

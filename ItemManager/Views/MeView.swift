@@ -165,18 +165,7 @@ struct MeView: View {
             }
             .scrollContentBackground(.hidden)
             .background {
-                ZStack {
-                    themeManager.backgroundColor
-                        .ignoresSafeArea()
-                    
-                    if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
-                        SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
-                    }
-                    
-                    if themeManager.isBlurEnabled {
-                        Rectangle().foregroundStyle(.ultraThinMaterial).ignoresSafeArea()
-                    }
-                }
+                LiquidBackground()
             }
             .navigationTitle("我的")
             .fileImporter(
