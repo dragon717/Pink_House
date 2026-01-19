@@ -156,21 +156,64 @@ struct ClothingListView: View {
             
             Group {
                 switch viewLayout {
-                case .listBrief, .listDetailed:
+                case .listBrief:
                     List {
                         ForEach(filteredClothings) { clothing in
                             NavigationLink {
                                 ClothingDetailView(clothing: clothing)
                             } label: {
-                                if viewLayout == .listBrief {
-                                    ClothingRowBrief(clothing: clothing)
-                                } else {
-                                    ClothingRow(clothing: clothing)
-                                }
+                                ClothingRowBrief(clothing: clothing)
+                                    .padding(.vertical, 4)
                             }
                             .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    itemToDelete = clothing
+                                    showingDeleteAlert = true
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                                
+                                Button {
+                                    duplicateItem(clothing)
+                                } label: {
+                                    Label("复制", systemImage: "doc.on.doc")
+                                }
+                                .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button {
+                                    duplicateItem(clothing)
+                                } label: {
+                                    Label("复制", systemImage: "doc.on.doc")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    itemToDelete = clothing
+                                    showingDeleteAlert = true
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    
+                case .listDetailed:
+                    List {
+                        ForEach(filteredClothings) { clothing in
+                            Group {
+                                ClothingRow(clothing: clothing)
+                            }
+                            .background(
+                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                    EmptyView()
+                                }
+                                .opacity(0)
+                            )
+                            .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
-                            .contentShape(Rectangle()) // 增加点击热区
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     itemToDelete = clothing

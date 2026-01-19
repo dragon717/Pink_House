@@ -161,6 +161,43 @@ struct ClothingDetailView: View {
         try? modelContext.save()
     }
     
+    private func duplicateClothing() {
+        let newClothing = Clothing(
+            name: clothing.name,
+            brand: clothing.brand,
+            types: clothing.types,
+            colors: clothing.colors,
+            sizes: clothing.sizes,
+            length: clothing.length,
+            condition: clothing.condition,
+            accessories: clothing.accessories,
+            imagePaths: clothing.imagePaths,
+            isShared: clothing.isShared,
+            price: clothing.price,
+            deposit: clothing.deposit,
+            balance: clothing.balance,
+            accessoriesPrice: clothing.accessoriesPrice,
+            purchaseDate: clothing.purchaseDate,
+            depositDate: clothing.depositDate,
+            isDepositPlan: clothing.isDepositPlan,
+            finalPaymentDate: clothing.finalPaymentDate,
+            finalPaymentEndDate: clothing.finalPaymentEndDate,
+            note: clothing.note,
+            stock: clothing.stock,
+            status: clothing.status
+        )
+        
+        newClothing.tags = clothing.tags
+        
+        // Increment reference count for images
+        for imagePath in clothing.imagePaths {
+            ImageManager.shared.incrementRefCount(fileName: imagePath, context: modelContext)
+        }
+        
+        modelContext.insert(newClothing)
+        dismiss()
+    }
+    
     // MARK: - Subviews
     
     private func imageCarousel(height: CGFloat) -> some View {
@@ -239,6 +276,12 @@ struct ClothingDetailView: View {
                     showingEditSheet = true
                 } label: {
                     Label("编辑", systemImage: "pencil")
+                }
+                
+                Button {
+                    duplicateClothing()
+                } label: {
+                    Label("复制", systemImage: "doc.on.doc")
                 }
                 
                 Button(role: .destructive) {
