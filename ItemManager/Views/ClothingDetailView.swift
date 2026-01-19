@@ -413,14 +413,23 @@ struct ClothingDetailView: View {
                 InfoRow(label: "尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
             }
             
-            InfoRow(label: "裙子总价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
+            InfoRow(label: "裙子单价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
+            
+            if clothing.stock > 1 {
+                InfoRow(label: "库存数量", value: "\(clothing.stock)")
+                InfoRow(label: "裙子总价", value: "¥\((clothing.price * Decimal(clothing.stock)).formatted(.number.precision(.fractionLength(0))))")
+            }
             
             HStack {
-                Label("总价（裙子+小物）", systemImage: "star.circle.fill")
+                Label("合计金额", systemImage: "star.circle.fill")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("¥\((clothing.price + clothing.accessoriesPrice).formatted(.number.precision(.fractionLength(0))))")
+                
+                let totalUnit = clothing.price + clothing.accessoriesPrice
+                let totalAll = totalUnit * Decimal(clothing.stock)
+                
+                Text("¥\(totalAll.formatted(.number.precision(.fractionLength(0))))")
                     .font(.title3)
                     .bold()
                     .foregroundStyle(.brown)
@@ -428,6 +437,13 @@ struct ClothingDetailView: View {
             .padding(12)
             .background(Color(uiColor: .secondarySystemBackground))
             .cornerRadius(12)
+            
+            if clothing.stock > 1 {
+                Text("包含 \(clothing.stock) 件库存，单套价值 ¥\((clothing.price + clothing.accessoriesPrice).formatted(.number.precision(.fractionLength(0))))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+            }
         }
         .padding()
         .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -522,7 +538,8 @@ struct InfoRow: View {
         case "衣长": return "arrow.up.and.down"
         case "状态": return "star.circle"
         case "小物": return "sparkles"
-        case "裙子总价": return "tag"
+        case "裙子总价", "裙子单价": return "tag"
+        case "库存数量": return "number.circle"
         case "购买日期": return "calendar"
         case "定金日期": return "calendar.badge.clock"
         case "预估尾款": return "hourglass"

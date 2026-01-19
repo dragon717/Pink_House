@@ -209,16 +209,20 @@ struct WardrobeView: View {
 struct WardrobeStatsView: View {
     let clothings: [Clothing]
     
-    var totalCount: Int {
+    var styleCount: Int {
         clothings.count
     }
     
+    var totalCount: Int {
+        clothings.reduce(0) { $0 + $1.stock }
+    }
+    
     var dressValue: Decimal {
-        clothings.reduce(0) { $0 + $1.price }
+        clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
     }
     
     var totalValue: Decimal {
-        clothings.reduce(0) { $0 + $1.price + $1.accessoriesPrice }
+        clothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
     }
     
     var body: some View {
@@ -226,7 +230,7 @@ struct WardrobeStatsView: View {
             VStack(spacing: 16) {
                 // Main Stats
                 HStack(spacing: 0) {
-                    statItem(title: "总裙子数", value: "\(totalCount)")
+                    statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
                     
                     Divider()
                         .frame(height: 30)

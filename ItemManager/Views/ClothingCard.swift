@@ -42,6 +42,23 @@ struct ClothingCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .padding(8)
                 }
+                
+                if clothing.stock > 1 {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Text("x\(clothing.stock)")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.6))
+                                .foregroundStyle(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .padding(8)
+                        }
+                    }
+                }
             }
             
             // Info Area
@@ -52,11 +69,14 @@ struct ClothingCard: View {
                     .foregroundStyle(.primary)
                 
                 if clothing.isDepositPlan {
-                    Text("定金: ¥\(clothing.deposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
+                    let totalDeposit = clothing.deposit * Decimal(clothing.stock)
+                    let totalBalance = clothing.balance * Decimal(clothing.stock)
+                    Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.pink)
                 } else {
-                    Text("¥\(clothing.price, format: .number.precision(.fractionLength(2)))")
+                    let totalPrice = clothing.price * Decimal(clothing.stock)
+                    Text("¥\(totalPrice, format: .number.precision(.fractionLength(2)))")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color(hex: "8D6E63")) // Brownish
                 }
@@ -189,17 +209,20 @@ struct ClothingRow: View {
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     if clothing.isDepositPlan {
-                        Text("定金: ¥\(clothing.deposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
+                        let totalDeposit = clothing.deposit * Decimal(clothing.stock)
+                        let totalBalance = clothing.balance * Decimal(clothing.stock)
+                        Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
                             .bold()
                             .foregroundStyle(.pink)
                     } else {
-                        Text("¥\(clothing.price, format: .number.precision(.fractionLength(2)))")
+                        let totalPrice = clothing.price * Decimal(clothing.stock)
+                        Text("¥\(totalPrice, format: .number.precision(.fractionLength(2)))")
                             .font(.subheadline)
                             .bold()
                     }
                     
-                    if clothing.stock > 0 {
+                    if clothing.stock > 1 {
                         Text("库存: \(clothing.stock)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -245,12 +268,15 @@ struct ClothingRowBrief: View {
                 }
                 
                 if clothing.isDepositPlan {
-                    Text("定¥\(clothing.deposit, format: .number.precision(.fractionLength(0)))+尾¥\(clothing.balance, format: .number.precision(.fractionLength(0)))")
+                    let totalDeposit = clothing.deposit * Decimal(clothing.stock)
+                    let totalBalance = clothing.balance * Decimal(clothing.stock)
+                    Text("定¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                         .font(.caption)
                         .bold()
                         .foregroundStyle(.pink)
                 } else {
-                    Text("¥\(clothing.price, format: .number.precision(.fractionLength(0)))")
+                    let totalPrice = clothing.price * Decimal(clothing.stock)
+                    Text("¥\(totalPrice, format: .number.precision(.fractionLength(0)))")
                         .font(.subheadline)
                         .bold()
                 }

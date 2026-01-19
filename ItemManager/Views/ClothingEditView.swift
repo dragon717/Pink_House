@@ -36,6 +36,7 @@ struct ClothingEditView: View {
     @State private var deposit: Double = 0.0
     @State private var balance: Double = 0.0
     @State private var accessoriesPrice: Double = 0.0
+    @State private var stock: Int = 1
     
     // Purchase States
     @State private var purchaseDate: Date = Date()
@@ -143,10 +144,20 @@ struct ClothingEditView: View {
                     Text("价格信息")
                         .font(.headline)
                     
-                    PriceRow(title: "裙子总价", value: $priceTotal)
+                    PriceRow(title: "裙子单价", value: $priceTotal)
                     PriceRow(title: "定金", value: $deposit)
                     PriceRow(title: "尾款", value: $balance)
                     PriceRow(title: "小物总价", value: $accessoriesPrice)
+                    
+                    HStack {
+                        Text("库存数量")
+                        Spacer()
+                        Stepper("", value: $stock, in: 1...999)
+                            .labelsHidden()
+                        Text("\(stock)")
+                            .font(.body.monospacedDigit())
+                            .frame(minWidth: 40, alignment: .trailing)
+                    }
                 }
                 .padding()
                 .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -254,6 +265,7 @@ struct ClothingEditView: View {
                 balance = balanceVal
                 
                 accessoriesPrice = NSDecimalNumber(decimal: c.accessoriesPrice).doubleValue
+                stock = c.stock
                 purchaseDate = c.purchaseDate
                 depositDate = c.depositDate ?? Date()
                 isDepositPlan = c.isDepositPlan
@@ -392,7 +404,8 @@ struct ClothingEditView: View {
                 isDepositPlan: isDepositPlan,
                 finalPaymentDate: finalPaymentDate,
                 finalPaymentEndDate: finalPaymentEndDate,
-                note: note
+                note: note,
+                stock: stock
             )
             newClothing.tags = selectedTags
             modelContext.insert(newClothing)
@@ -417,3 +430,4 @@ struct PriceRow: View {
         }
     }
 }
+
