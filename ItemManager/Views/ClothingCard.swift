@@ -77,11 +77,13 @@ struct ClothingThumbnail: View {
         ZStack(alignment: .bottomTrailing) {
             if let imagePath = clothing.imagePaths.first,
                let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(minWidth: 0, maxWidth: .infinity)
+                Color.clear
                     .aspectRatio(1, contentMode: .fit)
+                    .overlay(
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 CutePlaceholderView(iconSize: 14)
