@@ -99,7 +99,23 @@ struct MeView: View {
                     SettingsRow(icon: "bell", title: "通知设置", subtitle: "管理通知提醒")
                     SettingsRow(icon: "lock", title: "隐私设置", subtitle: "数据与隐私")
                     SettingsRow(icon: "square.grid.2x2", title: "小组件设置", subtitle: "桌面小组件配置")
-                    SettingsRow(icon: "tag", title: "标签设置", subtitle: "管理衣橱标签分类")
+                    NavigationLink(destination: DataManagementView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "tag")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("标签设置")
+                                    .font(.body)
+                                Text("管理衣橱标签/品牌/类型等")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
                 } header: {
                     Label("功能设置", systemImage: "gearshape")
                 }
