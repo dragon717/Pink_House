@@ -12,86 +12,86 @@ struct MeView: View {
         NavigationStack {
             List {
                 // Section 1: Account Info
-                Section {
-                    HStack(spacing: 15) {
-                        Image(systemName: "smiley")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 60, height: 60)
-                            .foregroundStyle(.gray)
-                            .padding(10)
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(Circle())
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("用户 6948")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                            Text("189****6948")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.gray)
-                            .font(.caption)
-                    }
-                    .padding(.vertical, 4)
-                    
-                    NavigationLink(destination: Text("退出登录")) {
-                        HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .foregroundStyle(.brown)
-                                .frame(width: 24)
-                            Text("退出登录")
-                        }
-                    }
-                    
-                    NavigationLink(destination: Text("注销账户")) {
-                        HStack {
-                            Image(systemName: "person.crop.circle.badge.xmark")
-                                .foregroundStyle(.red)
-                                .frame(width: 24)
-                            Text("注销账户")
-                                .foregroundStyle(.red)
-                        }
-                    }
-                } header: {
-                    Text("账户信息")
-                }
+//                Section {
+//                    HStack(spacing: 15) {
+//                        Image(systemName: "smiley")
+//                            .resizable()
+//                            .scaledToFit()
+//                            .frame(width: 60, height: 60)
+//                            .foregroundStyle(.gray)
+//                            .padding(10)
+//                            .background(Color.gray.opacity(0.1))
+//                            .clipShape(Circle())
+//                        
+//                        VStack(alignment: .leading, spacing: 4) {
+//                            Text("用户 6948")
+//                                .font(.title3)
+//                                .fontWeight(.bold)
+//                            Text("189****6948")
+//                                .font(.subheadline)
+//                                .foregroundStyle(.secondary)
+//                        }
+//                        
+//                        Spacer()
+//                        
+//                        Image(systemName: "chevron.right")
+//                            .foregroundStyle(.gray)
+//                            .font(.caption)
+//                    }
+//                    .padding(.vertical, 4)
+//                    
+//                    NavigationLink(destination: Text("退出登录")) {
+//                        HStack {
+//                            Image(systemName: "rectangle.portrait.and.arrow.right")
+//                                .foregroundStyle(.brown)
+//                                .frame(width: 24)
+//                            Text("退出登录")
+//                        }
+//                    }
+//                    
+//                    NavigationLink(destination: Text("注销账户")) {
+//                        HStack {
+//                            Image(systemName: "person.crop.circle.badge.xmark")
+//                                .foregroundStyle(.red)
+//                                .frame(width: 24)
+//                            Text("注销账户")
+//                                .foregroundStyle(.red)
+//                        }
+//                    }
+//                } header: {
+//                    Text("账户信息")
+//                }
                 
                 // Section 2: Membership
-                Section {
-                    NavigationLink(destination: Text("开通会员")) {
-                        HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundStyle(.brown)
-                                .font(.title2)
-                                .frame(width: 40, height: 40)
-                                .background(Color.brown.opacity(0.1))
-                                .clipShape(Circle())
+                // Section {
+                //     NavigationLink(destination: Text("开通会员")) {
+                //         HStack {
+                //             Image(systemName: "crown.fill")
+                //                 .foregroundStyle(.brown)
+                //                 .font(.title2)
+                //                 .frame(width: 40, height: 40)
+                //                 .background(Color.brown.opacity(0.1))
+                //                 .clipShape(Circle())
                             
-                            VStack(alignment: .leading) {
-                                Text("开通会员")
-                                    .font(.headline)
-                                    .foregroundStyle(.brown)
-                                Text("解锁全部高级功能")
-                                    .font(.caption)
-                                    .foregroundStyle(.gray)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-                .listRowBackground(
-                    LinearGradient(
-                        colors: [Color.white, Color.pink.opacity(0.05)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                //             VStack(alignment: .leading) {
+                //                 Text("开通会员")
+                //                     .font(.headline)
+                //                     .foregroundStyle(.brown)
+                //                 Text("解锁全部高级功能")
+                //                     .font(.caption)
+                //                     .foregroundStyle(.gray)
+                //             }
+                //         }
+                //         .padding(.vertical, 4)
+                //     }
+                // }
+                // .listRowBackground(
+                //     LinearGradient(
+                //         colors: [Color.white, Color.pink.opacity(0.05)],
+                //         startPoint: .leading,
+                //         endPoint: .trailing
+                //     )
+                // )
                 
                 // Section 3: Feature Settings
                 Section {
