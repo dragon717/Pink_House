@@ -142,8 +142,7 @@ struct HomeView: View {
                     actionButtons
                 }
             }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {
                     ClothingEditView(clothing: nil)
