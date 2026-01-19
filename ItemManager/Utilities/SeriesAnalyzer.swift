@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import NaturalLanguage
 
 struct SeriesInfo: Identifiable, Hashable {
     let id = UUID()
@@ -18,19 +17,8 @@ struct SeriesInfo: Identifiable, Hashable {
 class SeriesAnalyzer {
     static let shared = SeriesAnalyzer()
     
-    private let stopWords: Set<String> = [
-        "裙子", "连衣裙", "OP", "JSK", "SK", "衬衫", "内搭", "外套", "大衣", "斗篷",
-        "现货", "定金", "尾款", "预约", "再贩", "掉落", "跑单", "转单",
-        "全新", "二手", "仅试穿", "试穿", "洗", "下水",
-        "尺码", "颜色", "均码", "大小", "长款", "短款",
-        "正品", "日牌", "国牌", "LO", "Lolita", "洛丽塔", "洋装",
-        "kc", "小物", "发带", "边夹", "帽子", "袜子", "手袖", "手套", "包包",
-        "S", "M", "L", "XL", "XXL", "XS",
-        "的", "了", "和", "与", "是", "在", // Common particles
-        "full", "set", "fullset"
-    ]
-    
-    // Asynchronous analysis to avoid blocking the main thread
+    // Simplified strategy: Prefix based (First 2-4 characters)
+    // As requested: "不用 关键字原则了，直接用前缀（前2-4字 同前缀）即为一个系列，那也就不用屏蔽字了"
     func analyzeSeries(from clothings: [Clothing]) async -> [SeriesInfo] {
         return await Task.detached(priority: .userInitiated) {
             var candidateCounts: [String: Int] = [:]
@@ -65,11 +53,13 @@ class SeriesAnalyzer {
                 let ids = candidateClothingIDs[candidate]!
                 
                 // Redundancy Check:
-                // If this candidate is a substring of an already added series,
+                // If this candidate is a prefix of an already added series,
                 // AND it covers the exact same set of items, then it's redundant.
                 // e.g. "Pink House" (10 items) vs "Pink" (10 items) -> Keep "Pink House", skip "Pink"
                 var isRedundant = false
                 for existing in seriesList {
+                    // Check if existing series name starts with this candidate (since we are using prefixes)
+                    // Or more generally, if existing name contains this candidate
                     if existing.name.localizedCaseInsensitiveContains(candidate) {
                         if let existingIDs = candidateClothingIDs[existing.name], existingIDs == ids {
                             isRedundant = true
@@ -96,35 +86,21 @@ class SeriesAnalyzer {
     private func generateCandidates(from text: String) -> Set<String> {
         var candidates: Set<String> = []
         
-        // Strategy 1: NLP Tokenization (Word based)
-        // Good for extracting clear words like "Angelic Pretty", "Baby"
-        let tagger = NLTagger(tagSchemes: [.tokenType])
-        tagger.string = text
-        let range = text.startIndex..<text.endIndex
-        let options: NLTagger.Options = [.omitPunctuation, .omitWhitespace, .joinNames]
+        // Sanitize text: remove special characters (brackets, etc.)
+        // As requested: "如 【chi】 和 chi 和 [chi] 都算成一个系列， 系列名是 chi （去掉特殊符号）"
+        let sanitized = sanitize(text)
         
-        tagger.enumerateTags(in: range, unit: .word, scheme: .tokenType, options: options) { _, tokenRange in
-            let word = String(text[tokenRange]).trimmingCharacters(in: .whitespaces)
-            if isValidCandidate(word) {
-                candidates.insert(word)
-            }
-            return true
-        }
+        // Take first 2, 3, 4 characters as candidates
+        let chars = Array(sanitized)
+        let lengths = [2, 3, 4]
         
-        // Strategy 2: N-gram generation (Character based)
-        // Essential for Chinese names where "夏日" might be part of "夏日梦情" and NLP fails to split it
-        // We generate substrings of length 2 to 6
-        let chars = Array(text)
-        if chars.count >= 2 {
-            let maxLen = min(6, chars.count)
-            for length in 2...maxLen {
-                for i in 0...(chars.count - length) {
-                    let substring = String(chars[i..<(i+length)])
-                    // Optimization: Only add if it doesn't start/end with whitespace (though we trimmed chars above, the substring might span words)
-                    let trimmed = substring.trimmingCharacters(in: .whitespaces)
-                    if trimmed.count == substring.count && isValidCandidate(trimmed) {
-                        candidates.insert(trimmed)
-                    }
+        for len in lengths {
+            if chars.count >= len {
+                let prefix = String(chars.prefix(len)).trimmingCharacters(in: .whitespacesAndNewlines)
+                // Relaxed check: we use the sanitized prefix even if trimming changed its length slightly,
+                // as long as it's not empty.
+                if !prefix.isEmpty {
+                   candidates.insert(prefix)
                 }
             }
         }
@@ -132,21 +108,13 @@ class SeriesAnalyzer {
         return candidates
     }
     
-    private func isValidCandidate(_ word: String) -> Bool {
-        // Basic filtering
-        guard word.count >= 2 else { return false }
-        
-        // Should not be a number
-        if word.isNumber { return false }
-        
-        // Should not be in stop words
-        if stopWords.contains(word.lowercased()) { return false }
-        
-        // Should not contain only special characters or numbers
-        // (Simplified check: at least one letter or unicode char)
-        // For now, assume if it passed above, it's okay-ish.
-        
-        return true
+    private func sanitize(_ text: String) -> String {
+        // Remove brackets and common special symbols that might wrap the series name
+        // Keep alphanumeric, spaces, and basic punctuation that might be part of name (like dash?)
+        // Actually, user wants to remove "special symbols".
+        // Let's remove brackets: []【】(){}<>《》
+        let charactersToRemove = CharacterSet(charactersIn: "[]【】(){}<>《》")
+        return text.components(separatedBy: charactersToRemove).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
