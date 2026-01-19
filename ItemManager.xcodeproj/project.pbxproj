@@ -83,6 +83,7 @@
 				Clothing.swift,
 				Item.swift,
 				Services/SharedPersistence.swift,
+				Services/WidgetBackgroundManager.swift,
 				Tag.swift,
 				Utilities/SeriesAnalyzer.swift,
 				Utilities/SharedTypes.swift,

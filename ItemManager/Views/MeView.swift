@@ -147,6 +147,25 @@ struct MeView: View {
                         }
                         .padding(.vertical, 2)
                     }
+                    NavigationLink(destination: WidgetBackgroundSettingsView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "photo.artframe")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("小组件背景")
+                                    .font(.body)
+                                    .outlined()
+                                Text("自定义桌面小组件背景图")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .outlined()
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
                     NavigationLink(destination: WidgetTutorialView()) {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles.rectangle.stack")
