@@ -115,14 +115,21 @@ struct GlassCard<Content: View>: View {
 // MARK: - Text Enhancements
 struct OutlinedText: ViewModifier {
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     var color: Color = .white
     var width: CGFloat = 1.0
     
     func body(content: Content) -> some View {
         if themeManager.backgroundStyle == .image {
-            content
-                .shadow(color: .black, radius: 1, x: 0, y: 0)
-                .shadow(color: .black, radius: 1, x: 0, y: 0) // Double shadow for stronger effect
+            if colorScheme == .dark {
+                content
+                    .shadow(color: .black, radius: 1, x: 0, y: 0)
+                    .shadow(color: .black, radius: 1, x: 0, y: 0) // Double shadow for stronger effect
+            } else {
+                content
+                    .shadow(color: .white, radius: 1, x: 0, y: 0)
+                    .shadow(color: .white, radius: 1, x: 0, y: 0)
+            }
         } else {
             content
         }

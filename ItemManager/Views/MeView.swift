@@ -106,11 +106,9 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("通用设置")
                                     .font(.body)
-                                    .outlined()
                                 Text("语言、主题等")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                    .outlined()
                             }
                         }
                         .padding(.vertical, 2)
@@ -125,11 +123,9 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("通知设置")
                                     .font(.body)
-                                    .outlined()
                                 Text("管理通知提醒")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                    .outlined()
                             }
                         }
                         .padding(.vertical, 2)
@@ -144,11 +140,9 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("隐私设置")
                                     .font(.body)
-                                    .outlined()
                                 Text("数据与隐私")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                    .outlined()
                             }
                         }
                         .padding(.vertical, 2)
@@ -163,11 +157,9 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("添加桌面小组件")
                                     .font(.body)
-                                    .outlined()
                                 Text("查看添加教程与配置说明")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                    .outlined()
                             }
                         }
                         .padding(.vertical, 2)
@@ -182,11 +174,9 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("标签设置")
                                     .font(.body)
-                                    .outlined()
                                 Text("管理衣橱标签/品牌/类型等")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                    .outlined()
                             }
                         }
                         .padding(.vertical, 2)
@@ -288,11 +278,9 @@ struct SettingsRow: View {
                 VStack(alignment: .leading) {
                     Text(title)
                         .font(.body)
-                        .outlined()
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .outlined()
                 }
             }
             .padding(.vertical, 2)
