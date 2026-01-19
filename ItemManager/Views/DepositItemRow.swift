@@ -50,10 +50,25 @@ struct DepositItemRow: View {
                             .foregroundStyle(.secondary)
                         }
                         
-                        Text("定¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
-                            .font(.caption)
-                            .bold()
-                            .foregroundStyle(.pink)
+                        if clothing.stock > 1 {
+                            let totalDeposit = clothing.deposit * Decimal(clothing.stock)
+                            let totalBalance = clothing.balance * Decimal(clothing.stock)
+                            Text("定¥\(totalDeposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(.pink)
+                        } else {
+                            Text("定¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(.pink)
+                        }
+                        
+                        if clothing.stock > 1 {
+                            Text("库存: \(clothing.stock)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         
                         // Tags
                         ScrollView(.horizontal, showsIndicators: false) {

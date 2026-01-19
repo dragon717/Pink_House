@@ -32,7 +32,7 @@ class SeriesAnalyzer {
                 
                 for candidate in candidates {
                     candidateCounts[candidate, default: 0] += 1
-                    candidateBalances[candidate, default: 0] += clothing.balance
+                    candidateBalances[candidate, default: 0] += (clothing.balance * Decimal(clothing.stock))
                     candidateClothingIDs[candidate, default: []].insert(clothing.id)
                 }
             }

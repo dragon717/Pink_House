@@ -236,22 +236,26 @@ struct DepositPlanView: View {
 struct DepositStatsView: View {
     let clothings: [Clothing]
     
-    var totalCount: Int {
+    var styleCount: Int {
         clothings.count
     }
     
+    var totalCount: Int {
+        clothings.reduce(0) { $0 + $1.stock }
+    }
+    
     var paidDeposit: Decimal {
-        clothings.reduce(0) { $0 + $1.deposit }
+        clothings.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
     }
     
     var pendingBalance: Decimal {
-        clothings.reduce(0) { $0 + $1.balance }
+        clothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
     }
     
     var body: some View {
         GlassCard {
             HStack(spacing: 0) {
-                statItem(title: "总裙子数", value: "\(totalCount)")
+                statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
                 
                 Divider()
                     .frame(height: 30)
@@ -300,7 +304,7 @@ struct MonthSelectorView: View {
         }
         
         let count = monthlyClothings.count
-        let amount = monthlyClothings.reduce(0) { $0 + $1.balance }
+        let amount = monthlyClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
         return (count, amount)
     }
     
