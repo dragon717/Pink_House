@@ -167,11 +167,16 @@ struct MeView: View {
             .background {
                 ZStack {
                     themeManager.backgroundColor
+                        .ignoresSafeArea()
+                    
+                    if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
+                        SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
+                    }
+                    
                     if themeManager.isBlurEnabled {
-                        Rectangle().foregroundStyle(.ultraThinMaterial)
+                        Rectangle().foregroundStyle(.ultraThinMaterial).ignoresSafeArea()
                     }
                 }
-                .ignoresSafeArea()
             }
             .navigationTitle("我的")
             .fileImporter(

@@ -7,6 +7,35 @@
 
 import SwiftUI
 
+// MARK: - Smart Background Image
+struct SmartBackgroundImage: View {
+    let image: UIImage
+    let opacity: Double
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let screenSize = geometry.size
+            let imageSize = image.size
+            
+            // 如果图片尺寸小于屏幕尺寸，则平铺 (Tile)
+            // 否则，缩放填充并居中 (ScaledToFill)
+            if imageSize.width < screenSize.width || imageSize.height < screenSize.height {
+                Image(uiImage: image)
+                    .resizable(resizingMode: .tile)
+                    .opacity(opacity)
+            } else {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: screenSize.width, height: screenSize.height, alignment: .center)
+                    .clipped()
+                    .opacity(opacity)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
 // MARK: - Liquid Background
 struct LiquidBackground: View {
     @Environment(ThemeManager.self) private var themeManager
@@ -15,6 +44,10 @@ struct LiquidBackground: View {
         ZStack {
             themeManager.backgroundColor
                 .ignoresSafeArea()
+            
+            if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
+                SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
+            }
             
             if themeManager.isBlurEnabled {
                 // Orb 1
