@@ -140,6 +140,7 @@ struct ClothingListView: View {
             Button("取消", role: .cancel) { itemToDelete = nil }
             Button("删除", role: .destructive) {
                 if let item = itemToDelete {
+                    NotificationManager.shared.cancelNotification(for: item)
                     modelContext.delete(item)
                 }
                 itemToDelete = nil
@@ -348,5 +349,8 @@ struct ClothingListView: View {
         newItem.tags = item.tags
         
         modelContext.insert(newItem)
+        
+        // Schedule notification for the copy
+        NotificationManager.shared.scheduleNotification(for: newItem)
     }
 }

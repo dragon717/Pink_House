@@ -122,6 +122,7 @@ struct ClothingDetailView: View {
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
+                NotificationManager.shared.cancelNotification(for: clothing)
                 modelContext.delete(clothing)
                 dismiss()
             }
@@ -148,6 +149,9 @@ struct ClothingDetailView: View {
     }
     
     private func confirmPayment() {
+        // Cancel notification since it's no longer a deposit plan
+        NotificationManager.shared.cancelNotification(for: clothing)
+        
         // Calculate total price if currently 0
         if clothing.price == 0 {
             clothing.price = clothing.deposit + clothing.balance + clothing.accessoriesPrice
@@ -195,6 +199,10 @@ struct ClothingDetailView: View {
         }
         
         modelContext.insert(newClothing)
+        
+        // Schedule notification for the copy
+        NotificationManager.shared.scheduleNotification(for: newClothing)
+        
         dismiss()
     }
     

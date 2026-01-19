@@ -382,6 +382,9 @@ struct ClothingEditView: View {
             c.stock = stock
             c.tags = selectedTags
             c.updatedAt = Date()
+            
+            // Update notification
+            NotificationManager.shared.scheduleNotification(for: c)
         } else {
             // Create
             AppLogger.info("Creating new clothing: \(name)")
@@ -410,6 +413,9 @@ struct ClothingEditView: View {
             )
             newClothing.tags = selectedTags
             modelContext.insert(newClothing)
+            
+            // Schedule notification
+            NotificationManager.shared.scheduleNotification(for: newClothing)
         }
         dismiss()
     }

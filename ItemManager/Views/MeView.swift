@@ -115,9 +115,63 @@ struct MeView: View {
                         }
                         .padding(.vertical, 2)
                     }
-                    SettingsRow(icon: "bell", title: "通知设置", subtitle: "管理通知提醒")
-                    SettingsRow(icon: "lock", title: "隐私设置", subtitle: "数据与隐私")
-                    SettingsRow(icon: "square.grid.2x2", title: "小组件设置", subtitle: "桌面小组件配置")
+                    NavigationLink(destination: NotificationSettingsView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "bell")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("通知设置")
+                                    .font(.body)
+                                    .outlined()
+                                Text("管理通知提醒")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .outlined()
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    NavigationLink(destination: PrivacySettingsView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lock")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("隐私设置")
+                                    .font(.body)
+                                    .outlined()
+                                Text("数据与隐私")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .outlined()
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    NavigationLink(destination: WidgetSettingsView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "square.grid.2x2")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("小组件设置")
+                                    .font(.body)
+                                    .outlined()
+                                Text("桌面小组件配置")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .outlined()
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
                     NavigationLink(destination: DataManagementView()) {
                         HStack(spacing: 12) {
                             Image(systemName: "tag")
