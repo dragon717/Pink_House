@@ -34,7 +34,10 @@ struct ItemManagerApp: App {
                     SharedPersistence.shared.syncWidgetData()
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
-                    if newPhase == .background || newPhase == .inactive {
+                    if newPhase == .active {
+                        // Sync when app becomes active to ensure widget has latest data
+                        SharedPersistence.shared.syncWidgetData()
+                    } else if newPhase == .background || newPhase == .inactive {
                         // Sync when app goes to background so widget is up to date
                         SharedPersistence.shared.syncWidgetData()
                     }

@@ -37,17 +37,30 @@ struct WidgetEntryView: View {
                     .overlay(colorScheme == .dark ? Color.black.opacity(0.4) : Color.white.opacity(0.1))
                 } else {
                     if colorScheme == .dark {
-                        Color.black.opacity(0.6) // Dark mode base
-                            .background(.ultraThinMaterial) // Blur effect
-                            .overlay(
-                                // Add a subtle pink tint for dark mode to match "Pink House" theme
-                                Color.pink.opacity(0.1)
+                        // Dark mode: Slightly Dimmed Sakura Pink
+                        // Use the same pink base but overlay a very light black to dim it just enough
+                        // without losing the pink hue.
+                        ZStack {
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.96, blue: 0.96),
+                                    Color(red: 1.0, green: 0.92, blue: 0.94)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
+                            Color.black.opacity(0.2) // 20% dimming
+                        }
                     } else {
-                        // Light mode: Sakura Pink with Gaussian Blur look
-                        // Combining a soft pink color with ultraThinMaterial
-                        Color(red: 1.0, green: 0.92, blue: 0.95, opacity: 0.7) // Sakura Pink
-                            .background(.ultraThinMaterial)
+                        // Light mode: Default Sakura Pink Gradient
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.96, blue: 0.96),
+                                Color(red: 1.0, green: 0.92, blue: 0.94)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     }
                 }
             }
@@ -68,24 +81,26 @@ struct SmallWidgetView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(.clear)
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.4), lineWidth: 1)
-                    .background(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.3 : 0.6), lineWidth: 1)
+                    .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
                 
                 VStack(spacing: 8) {
                     HStack(spacing: 0) {
                         VStack(spacing: 2) {
                             Text("总件数/款")
                                 .font(.system(size: 10))
-                                .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                                .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                             Text("\(entry.totalCount)/\(entry.totalStyleCount)")
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                                .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
                         }
                         
                         Spacer()
                         
                         Rectangle()
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
                             .frame(width: 1, height: 20)
                         
                         Spacer()
@@ -93,31 +108,38 @@ struct SmallWidgetView: View {
                         VStack(spacing: 2) {
                             Text("裙子价值")
                                 .font(.system(size: 10))
-                                .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                                .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                             Text("¥\(entry.totalPrice.formatted(.number.notation(.compactName)))")
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundStyle(.orange)
+                                .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                         }
                     }
                     
-                    Divider().background(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
+                    Divider().background(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
                     
                     HStack {
                         Image(systemName: "chart.bar.fill")
                             .foregroundStyle(.orange)
+                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("查看详细统计")
                             .font(.caption)
                             .foregroundStyle(.orange)
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                         Spacer()
                         // Debug Time
                         Text(entry.date, style: .time)
                             .font(.caption2)
-                            .foregroundStyle(.secondary.opacity(0.5))
+                            .foregroundStyle(.secondary.opacity(0.8))
+                            .shadow(color: .white.opacity(0.5), radius: 1, x: 0, y: 0)
                         Image(systemName: "heart.fill")
                             .foregroundStyle(Color.pink)
+                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("少女专属")
                             .font(.caption)
                             .foregroundStyle(Color.pink)
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                     }
                 }
                 .padding(12)
@@ -136,48 +158,54 @@ struct MediumWidgetView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(.clear)
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.4), lineWidth: 1)
-                    .background(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.3 : 0.6), lineWidth: 1)
+                    .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
                 
                 HStack(spacing: 0) {
                     // Item 1
                     VStack(spacing: 4) {
                         Text("总件数/款")
                         .font(.system(size: 10))
-                        .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("\(entry.depositCount)/\(entry.depositStyleCount)")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
                         .frame(width: 1, height: 20)
                     
                     // Item 2
                     VStack(spacing: 4) {
                         Text("已付定金")
                         .font(.system(size: 10))
-                        .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(.orange)
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
                         .frame(width: 1, height: 20)
                     
                     // Item 3
                     VStack(spacing: 4) {
                         Text("待付尾款")
                             .font(.system(size: 10))
-                            .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("¥\(entry.totalBalance.formatted(.number.notation(.compactName)))")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -193,14 +221,17 @@ struct MediumWidgetView: View {
                     ForEach(recentMonths, id: \.id) { data in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white.opacity(0.7))
+                                .fill(colorScheme == .dark ? Color(white: 0.2).opacity(0.6) : Color.white.opacity(0.4))
+                                .background(.ultraThinMaterial.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
                             VStack(spacing: 4) {
                                 Text("\(data.month)月")
                                     .font(.caption)
                                     .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                                    .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                                 Text(data.totalBalance > 0 ? "¥\(data.totalBalance.formatted(.number.notation(.compactName)))" : "-")
                                     .font(.caption2)
-                                    .foregroundStyle(data.totalBalance > 0 ? .orange : .secondary.opacity(0.5))
+                                    .foregroundStyle(data.totalBalance > 0 ? .orange : .secondary.opacity(0.8))
+                                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                             }
                         }
                     }
@@ -209,13 +240,14 @@ struct MediumWidgetView: View {
                     ForEach(Array(entry.seriesStats.prefix(4))) { series in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white.opacity(0.7))
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.4))
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Text(series.name)
                                         .font(.system(size: 10, weight: .medium))
                                         .lineLimit(1)
                                         .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                                     Spacer()
                                     Text("\(series.count)")
                                         .font(.caption2)
@@ -226,6 +258,7 @@ struct MediumWidgetView: View {
                                 Text("¥\(series.totalBalance)")
                                     .font(.caption2)
                                     .foregroundStyle(.orange)
+                                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                             }
                             .padding(8)
                         }
@@ -257,48 +290,54 @@ struct LargeWidgetView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(.clear)
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.4), lineWidth: 1)
-                    .background(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.3 : 0.6), lineWidth: 1)
+                    .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
                 
                 HStack(spacing: 0) {
                     VStack(spacing: 4) {
                         Text("总件数/款")
                             .font(.caption)
-                            .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("\(entry.depositCount)/\(entry.depositStyleCount)")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
                         .frame(width: 1, height: 30)
                     
                     VStack(spacing: 4) {
                         Text("已付定金")
                             .font(.caption)
-                            .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(.orange)
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
                         .frame(width: 1, height: 30)
                     
                     VStack(spacing: 4) {
                         Text("待付尾款")
                             .font(.caption)
-                            .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
+                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
+                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                         Text("¥\(entry.totalBalance.formatted(.number.notation(.compactName)))")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -310,12 +349,14 @@ struct LargeWidgetView: View {
             HStack {
                 Text(entry.statsType == .month ? "按月预估尾款" : "按系列预估尾款")
                     .font(.caption)
-                    .foregroundStyle(.blue.opacity(0.8))
+                    .foregroundStyle(Color.blue.opacity(0.8))
+                    .shadow(color: .white.opacity(0.5), radius: 1, x: 0, y: 0)
                 Spacer()
                 Text(String(Calendar.current.component(.year, from: Date())) + "年")
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                    .shadow(color: .white.opacity(0.5), radius: 1, x: 0, y: 0)
             }
             .padding(.horizontal, 4)
             
@@ -327,21 +368,25 @@ struct LargeWidgetView: View {
                     ForEach(yearData, id: \.id) { data in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white.opacity(0.7))
+                                .fill(colorScheme == .dark ? Color(white: 0.2).opacity(0.6) : Color.white.opacity(0.4))
+                                .background(.ultraThinMaterial.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
                                 .frame(height: 60)
                             
                             VStack(spacing: 2) {
                                 Text("\(data.month)月")
                                     .font(.system(size: 12))
                                     .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                                    .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                                 if data.totalBalance > 0 {
                                     Text("¥\(data.totalBalance.formatted(.number.notation(.compactName)))")
                                         .font(.system(size: 10))
                                         .foregroundStyle(.orange)
+                                        .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                                 } else {
                                     Text("-")
                                         .font(.system(size: 10))
-                                        .foregroundStyle(.secondary.opacity(0.3))
+                                        .foregroundStyle(.secondary.opacity(0.5))
+                                        .shadow(color: .white.opacity(0.3), radius: 1, x: 0, y: 0)
                                 }
                             }
                         }
@@ -351,7 +396,7 @@ struct LargeWidgetView: View {
                     ForEach(Array(entry.seriesStats.prefix(12))) { series in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white.opacity(0.7))
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.4))
                                 .frame(height: 60)
                             
                             VStack(alignment: .leading, spacing: 2) {
@@ -360,15 +405,17 @@ struct LargeWidgetView: View {
                                         .font(.system(size: 10))
                                         .lineLimit(1)
                                         .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                                     Spacer()
                                     Text("\(series.count)")
                                         .font(.system(size: 9))
                                         .padding(3)
-                                        .background(Circle().fill(Color.gray.opacity(0.1)))
+                                        .background(Circle().fill(Color.gray.opacity(0.2)))
                                 }
                                 Text("¥\(series.totalBalance)")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.orange)
+                                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
                             }
                             .padding(6)
                         }
