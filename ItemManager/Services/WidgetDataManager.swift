@@ -33,7 +33,9 @@ struct WidgetMonthInfo: Codable, Identifiable {
 
 struct WidgetData: Codable {
     let totalCount: Int
+    let totalStyleCount: Int // 新增：总款数
     let depositCount: Int // 新增：定尾计划总件数
+    let depositStyleCount: Int // 新增：定尾计划总款数
     let totalPrice: Decimal
     let totalDeposit: Decimal
     let totalBalance: Decimal
@@ -44,7 +46,9 @@ struct WidgetData: Codable {
     
     static let empty = WidgetData(
         totalCount: 0,
+        totalStyleCount: 0,
         depositCount: 0,
+        depositStyleCount: 0,
         totalPrice: 0,
         totalDeposit: 0,
         totalBalance: 0,

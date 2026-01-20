@@ -77,7 +77,7 @@ struct SmallWidgetView: View {
                             Text("总件数/款")
                                 .font(.system(size: 10))
                                 .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
-                            Text("\(entry.totalCount)/\(entry.seriesStats.count)")
+                            Text("\(entry.totalCount)/\(entry.totalStyleCount)")
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundStyle(colorScheme == .dark ? .white : .primary)
                         }
@@ -145,7 +145,7 @@ struct MediumWidgetView: View {
                         Text("总件数/款")
                         .font(.system(size: 10))
                         .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
-                        Text("\(entry.depositCount)/\(entry.seriesStats.count)")
+                        Text("\(entry.depositCount)/\(entry.depositStyleCount)")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
                     }
@@ -265,7 +265,7 @@ struct LargeWidgetView: View {
                         Text("总件数/款")
                             .font(.caption)
                             .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
-                        Text("\(entry.depositCount)/\(entry.seriesStats.count)")
+                        Text("\(entry.depositCount)/\(entry.depositStyleCount)")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
