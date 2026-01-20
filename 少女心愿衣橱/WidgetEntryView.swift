@@ -7,11 +7,15 @@
 
 import SwiftUI
 import WidgetKit
+import os
 
 struct WidgetEntryView: View {
     var entry: Provider.Entry
     @Environment(\.widgetFamily) var family
     @Environment(\.colorScheme) var colorScheme
+    
+    // 创建一个专门用于 Widget 的 Logger
+    private let logger = Logger(subsystem: "group.bugod.ItemManager", category: "WidgetEntryView")
 
     var body: some View {
         // 使用 ZStack 确保布局层级清晰
@@ -36,31 +40,105 @@ struct WidgetEntryView: View {
                     .aspectRatio(contentMode: .fill)
                     .overlay(colorScheme == .dark ? Color.black.opacity(0.4) : Color.white.opacity(0.1))
                 } else {
-                    if colorScheme == .dark {
-                        // Dark mode: Night Sakura (Deep Muted Pink)
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.35, green: 0.2, blue: 0.25),
-                                Color(red: 0.45, green: 0.25, blue: 0.3)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    } else {
-                        // Light mode: Default Sakura Pink Gradient (Matches App Preview)
-                        LinearGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.96, blue: 0.96),
-                                Color(red: 1.0, green: 0.92, blue: 0.94)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    }
+                    // 统一使用梦幻粉白背景，不再区分亮暗模式
+                    // 这样可以避免系统误判模式导致背景变黑，同时也符合“少女心”全天候粉嫩的主题
+                    DreamyBackgroundView(date: entry.date)
                 }
             }
         }
         .widgetURL(URL(string: "itemmanager://stats"))
+        .onChange(of: colorScheme) { _, newScheme in
+            let mode = newScheme == .dark ? "暗黑模式" : "亮色模式"
+            logger.info("Widget检测到模式变化 (onChange): \(mode)")
+        }
+        .onAppear {
+            let mode = colorScheme == .dark ? "暗黑模式" : "亮色模式"
+            logger.info("Widget视图已加载 (onAppear): \(mode)")
+        }
+    }
+}
+
+// MARK: - Background Components
+
+struct DreamyBackgroundView: View {
+    let date: Date
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // 1. 基础粉色渐变底色 (加深粉色，减少白色)
+                LinearGradient(
+                    colors: [
+                        Color(red: 1.0, green: 0.88, blue: 0.92), // 较深的樱花粉
+                        Color(red: 1.0, green: 0.80, blue: 0.88)  // 偏紫的粉色
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                
+                // 2. 动态旋转的极光光晕 (基于时间变化角度)
+                // 使用 date.timeIntervalSince1970 产生变化，模拟“律动”
+                let timeFactor = date.timeIntervalSince1970
+                
+                // 光斑 A: 亮粉色 (提亮)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.92, blue: 0.96, opacity: 0.5),
+                                Color(red: 1.0, green: 0.92, blue: 0.96, opacity: 0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geometry.size.width * 0.8
+                        )
+                    )
+                    .frame(width: geometry.size.width * 1.5, height: geometry.size.width * 1.5)
+                    .offset(
+                        x: cos(timeFactor / 3600) * 30, // 随时间缓慢移动
+                        y: sin(timeFactor / 3600) * 30
+                    )
+                
+                // 光斑 B: 深粉色 (增加饱和度)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.70, blue: 0.80, opacity: 0.4),
+                                Color(red: 1.0, green: 0.70, blue: 0.80, opacity: 0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geometry.size.width * 0.5
+                        )
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.width)
+                    .offset(
+                        x: -cos(timeFactor / 1800) * 50,
+                        y: -sin(timeFactor / 1800) * 50
+                    )
+                
+                // 光斑 C: 梦幻紫 (增加层次)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 0.90, green: 0.70, blue: 0.90, opacity: 0.3),
+                                Color(red: 0.90, green: 0.70, blue: 0.90, opacity: 0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geometry.size.width * 0.6
+                        )
+                    )
+                    .frame(width: geometry.size.width * 1.2, height: geometry.size.width * 1.2)
+                    .position(x: geometry.size.width, y: geometry.size.height)
+                
+                // 3. 叠加一层暖色滤镜，统一色调，避免过白
+                Color(red: 1.0, green: 0.60, blue: 0.75, opacity: 0.1)
+                    .blendMode(.overlay)
+            }
+        }
     }
 }
 
@@ -128,10 +206,6 @@ struct SmallWidgetView: View {
                             .shadow(color: .black, radius: 0, x: 0.5, y: 0.5)
                         OutlinedText(text: "查看详细统计", size: 10, weight: .medium, color: .orange)
                         Spacer()
-                        // Debug Time
-                        Text(entry.date, style: .time)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary.opacity(0.5))
                         Image(systemName: "heart.fill")
                             .foregroundStyle(Color.pink)
                             .shadow(color: .black, radius: 0, x: 0.5, y: 0.5)

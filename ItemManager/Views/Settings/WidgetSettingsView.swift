@@ -30,20 +30,14 @@ struct WidgetSettingsView: View {
                     } else {
                         // Default preview
                         ZStack {
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.0, green: 0.96, blue: 0.96),
-                                    Color(red: 1.0, green: 0.92, blue: 0.94)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                            // 使用与 Widget 一致的梦幻背景
+                            DreamyBackgroundPreview()
                             
                             VStack(spacing: 8) {
-                                Image(systemName: "photo")
+                                Image(systemName: "sparkles")
                                     .font(.largeTitle)
                                     .foregroundStyle(.pink.opacity(0.5))
-                                Text("当前使用默认樱花粉背景")
+                                Text("当前使用梦幻粉白动态背景")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -64,7 +58,7 @@ struct WidgetSettingsView: View {
                 PhotosPicker(selection: $selectedItem, matching: .images) {
                     HStack {
                         Image(systemName: "photo.badge.plus")
-                            .foregroundStyle(.pink)
+                        .foregroundStyle(.pink)
                         Text("从相册选择新背景")
                     }
                 }
@@ -169,6 +163,90 @@ struct WidgetSettingsView: View {
         } else {
             self.selectedImage = nil
             self.isDefault = true
+        }
+    }
+}
+
+// MARK: - Components
+
+// App 端预览用的梦幻背景 (复制自 Widget 代码以解耦 Target)
+struct DreamyBackgroundPreview: View {
+    @State private var timeFactor: Double = 0
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // 1. 基础粉色渐变底色
+                LinearGradient(
+                    colors: [
+                        Color(red: 1.0, green: 0.88, blue: 0.92), // 较深的樱花粉
+                        Color(red: 1.0, green: 0.80, blue: 0.88)  // 偏紫的粉色
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                
+                // 光斑 A: 亮粉色 (提亮)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.92, blue: 0.96, opacity: 0.5),
+                                Color(red: 1.0, green: 0.92, blue: 0.96, opacity: 0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geometry.size.width * 0.8
+                        )
+                    )
+                    .frame(width: geometry.size.width * 1.5, height: geometry.size.width * 1.5)
+                    .offset(
+                        x: cos(timeFactor / 3600) * 30,
+                        y: sin(timeFactor / 3600) * 30
+                    )
+                
+                // 光斑 B: 深粉色 (增加饱和度)
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.70, blue: 0.80, opacity: 0.4),
+                                Color(red: 1.0, green: 0.70, blue: 0.80, opacity: 0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geometry.size.width * 0.5
+                        )
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.width)
+                    .offset(
+                        x: -cos(timeFactor / 1800) * 50,
+                        y: -sin(timeFactor / 1800) * 50
+                    )
+                
+                // 光斑 C: 梦幻紫
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 0.90, green: 0.70, blue: 0.90, opacity: 0.3),
+                                Color(red: 0.90, green: 0.70, blue: 0.90, opacity: 0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: geometry.size.width * 0.6
+                        )
+                    )
+                    .frame(width: geometry.size.width * 1.2, height: geometry.size.width * 1.2)
+                    .position(x: geometry.size.width, y: geometry.size.height)
+                
+                // 3. 叠加暖色滤镜
+                Color(red: 1.0, green: 0.60, blue: 0.75, opacity: 0.1)
+                    .blendMode(.overlay)
+            }
+        }
+        .onAppear {
+            timeFactor = Date().timeIntervalSince1970
         }
     }
 }
