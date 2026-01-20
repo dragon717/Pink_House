@@ -144,81 +144,84 @@ struct DepositPlanView: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            // View Mode Switcher
-            Picker("视图模式", selection: $viewMode) {
-                Text("按月视图").tag(DepositViewMode.monthly)
-                Text("按系列视图").tag(DepositViewMode.series)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .onChange(of: viewMode) { oldValue, newValue in
-                if newValue == .series && seriesList.isEmpty {
-                    analyzeSeries()
+        ScrollView {
+            VStack(spacing: 20) {
+                // View Mode Switcher
+                Picker("视图模式", selection: $viewMode) {
+                    Text("按月视图").tag(DepositViewMode.monthly)
+                    Text("按系列视图").tag(DepositViewMode.series)
                 }
-            }
-            .task {
-                // Initial analysis if needed, or wait for switch
-                if viewMode == .series && seriesList.isEmpty {
-                    analyzeSeries()
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .onChange(of: viewMode) { oldValue, newValue in
+                    if newValue == .series && seriesList.isEmpty {
+                        analyzeSeries()
+                    }
                 }
-            }
-            .onChange(of: depositClothings) { oldValue, newValue in
-                if viewMode == .series {
-                    analyzeSeries()
+                .task {
+                    // Initial analysis if needed, or wait for switch
+                    if viewMode == .series && seriesList.isEmpty {
+                        analyzeSeries()
+                    }
                 }
-            }
-            
-            // Stats Section
-            VStack(spacing: 8) {
-                HStack {
-                    Spacer()
-                    Button {
-                        withAnimation {
-                            showStats.toggle()
+                .onChange(of: depositClothings) { oldValue, newValue in
+                    if viewMode == .series {
+                        analyzeSeries()
+                    }
+                }
+                
+                // Stats Section
+                VStack(spacing: 8) {
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation {
+                                showStats.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(showStats ? "隐藏统计" : "显示统计")
+                                Image(systemName: showStats ? "chevron.up" : "chevron.down")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(showStats ? "隐藏统计" : "显示统计")
-                            Image(systemName: showStats ? "chevron.up" : "chevron.down")
+                    }
+                    .padding(.horizontal)
+                    
+                    if showStats {
+                        DepositStatsView(clothings: filteredClothings)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
+                
+                // Selector Area
+                if viewMode == .monthly {
+                    MonthSelectorView(year: $selectedYear, selectedMonths: $selectedMonths, clothings: depositClothings)
+                        .padding(.horizontal)
+                } else {
+                    SeriesSelectorView(selectedSeries: $selectedSeries, seriesList: seriesList, isAnalyzing: isAnalyzing)
+                        .padding(.horizontal)
+                }
+                
+                // List
+                LazyVStack(spacing: 16) {
+                    ForEach(filteredClothings) { clothing in
+                        NavigationLink {
+                            ClothingDetailView(clothing: clothing)
+                        } label: {
+                            DepositItemRow(clothing: clothing)
                         }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal)
-                
-                if showStats {
-                    DepositStatsView(clothings: filteredClothings)
-                        .padding(.horizontal)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
+                .padding(.bottom, 100)
             }
-            
-            // Selector Area
-            if viewMode == .monthly {
-                MonthSelectorView(year: $selectedYear, selectedMonths: $selectedMonths, clothings: depositClothings)
-                    .padding(.horizontal)
-            } else {
-                SeriesSelectorView(selectedSeries: $selectedSeries, seriesList: seriesList, isAnalyzing: isAnalyzing)
-                    .padding(.horizontal)
-            }
-            
-            // List
-            LazyVStack(spacing: 16) {
-                ForEach(filteredClothings) { clothing in
-                    NavigationLink {
-                        ClothingDetailView(clothing: clothing)
-                    } label: {
-                        DepositItemRow(clothing: clothing)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 100)
+            .padding(.top, 10)
         }
-        .padding(.top, 10)
+        .scrollIndicators(.hidden)
     }
     
     private func analyzeSeries() {

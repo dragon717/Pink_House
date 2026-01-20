@@ -23,19 +23,16 @@ struct ItemManagerApp: App {
             MainTabView()
                 .environment(themeManager)
                 .onAppear {
-                    // Check App Group
                     if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
                         print("App Group Container URL: \(url.path)")
                     } else {
                         print("CRITICAL ERROR: App Group Container NOT FOUND. Check Entitlements.")
                     }
-                    
-                    // Sync widget data on launch
+
                     SharedPersistence.shared.syncWidgetData()
                 }
-                .onChange(of: scenePhase) { oldPhase, newPhase in
+                .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .background || newPhase == .inactive {
-                        // Sync when app goes to background so widget is up to date
                         SharedPersistence.shared.syncWidgetData()
                     }
                 }

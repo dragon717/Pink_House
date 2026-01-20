@@ -7,16 +7,12 @@
 
 import SwiftUI
 import WidgetKit
-import os
 
 struct WidgetEntryView: View {
     var entry: Provider.Entry
     @Environment(\.widgetFamily) var family
     @Environment(\.colorScheme) var colorScheme
     
-    // 创建一个专门用于 Widget 的 Logger
-    private let logger = Logger(subsystem: "group.bugod.ItemManager", category: "WidgetEntryView")
-
     var body: some View {
         // 使用 ZStack 确保布局层级清晰
         // 实际上 iOS 17 的 containerBackground 会自动处理背景裁剪和适配（包括 StandBy）
@@ -47,14 +43,6 @@ struct WidgetEntryView: View {
             }
         }
         .widgetURL(URL(string: "itemmanager://stats"))
-        .onChange(of: colorScheme) { _, newScheme in
-            let mode = newScheme == .dark ? "暗黑模式" : "亮色模式"
-            logger.info("Widget检测到模式变化 (onChange): \(mode)")
-        }
-        .onAppear {
-            let mode = colorScheme == .dark ? "暗黑模式" : "亮色模式"
-            logger.info("Widget视图已加载 (onAppear): \(mode)")
-        }
     }
 }
 

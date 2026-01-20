@@ -100,4 +100,5 @@ class WidgetDataManager {
             return .empty
         }
     }
+
 }
