@@ -124,85 +124,103 @@ struct WardrobeView: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Stats Section
-            VStack(spacing: 8) {
-                HStack {
-                    Spacer()
-                    Button {
-                        withAnimation {
-                            showStats.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(showStats ? "隐藏统计" : "显示统计")
-                            Image(systemName: showStats ? "chevron.up" : "chevron.down")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal)
-                
-                if showStats {
-                    WardrobeStatsView(clothings: filteredClothings)
-                        .padding(.horizontal)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            
-            // Content
+        Group {
             switch viewLayout {
             case .listBrief, .listDetailed:
-                LazyVStack(spacing: 0) {
+                List {
+                    Section {
+                        statsSection
+                            .padding(.top, 10)
+                            .padding(.bottom, 8)
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    
                     ForEach(filteredClothings) { clothing in
-                        NavigationLink {
-                            ClothingDetailView(clothing: clothing)
-                        } label: {
-                            if viewLayout == .listBrief {
-                                ClothingRowBrief(clothing: clothing)
-                                    .padding(.horizontal)
-                            } else {
-                                ClothingRow(clothing: clothing)
-                                    .padding(.horizontal)
+                        ZStack {
+                            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                EmptyView()
+                            }
+                            .opacity(0)
+                            
+                            VStack(spacing: 0) {
+                                if viewLayout == .listBrief {
+                                    ClothingRowBrief(clothing: clothing)
+                                } else {
+                                    ClothingRow(clothing: clothing)
+                                }
+                                
+                                Divider()
+                                    .padding(.leading)
                             }
                         }
-                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+                    
+                    // Bottom padding
+                    Color.clear.frame(height: 100)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                
+            case .grid2, .grid3, .grid6:
+                ScrollView {
+                    VStack(spacing: 20) {
+                        statsSection
                         
-                        Divider()
-                            .padding(.leading)
-                    }
-                }
-                .padding(.bottom, 100)
-                
-            case .grid2, .grid3:
-                LazyVGrid(columns: gridColumns, spacing: 16) {
-                    ForEach(filteredClothings) { clothing in
-                        NavigationLink {
-                            ClothingDetailView(clothing: clothing)
-                        } label: {
-                            ClothingCard(clothing: clothing)
+                        LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
+                            ForEach(filteredClothings) { clothing in
+                                NavigationLink {
+                                    ClothingDetailView(clothing: clothing)
+                                } label: {
+                                    if viewLayout == .grid6 {
+                                        ClothingThumbnail(clothing: clothing)
+                                    } else {
+                                        ClothingCard(clothing: clothing)
+                                    }
+                                }
+                            }
                         }
+                        .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+                        .padding(.bottom, 100)
                     }
+                    .padding(.top, 10)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 100)
-                
-            case .grid6:
-                LazyVGrid(columns: gridColumns, spacing: 2) {
-                    ForEach(filteredClothings) { clothing in
-                        NavigationLink {
-                            ClothingDetailView(clothing: clothing)
-                        } label: {
-                            ClothingThumbnail(clothing: clothing)
-                        }
-                    }
-                }
-                .padding(.horizontal, 2)
-                .padding(.bottom, 100) // Bottom padding for scrolling
             }
         }
-        .padding(.top, 10)
+    }
+    
+    private var statsSection: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Spacer()
+                Button {
+                    withAnimation {
+                        showStats.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(showStats ? "隐藏统计" : "显示统计")
+                        Image(systemName: showStats ? "chevron.up" : "chevron.down")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            
+            if showStats {
+                WardrobeStatsView(clothings: filteredClothings)
+                    .padding(.horizontal)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
     }
 }
 

@@ -101,37 +101,34 @@ struct HomeView: View {
                     .ignoresSafeArea()
                 
                 // Content
-                ScrollView {
-                    if selectedTab == .wardrobe {
-                        WardrobeView(
-                            searchText: $wardrobeSearchText,
-                            sortOption: sortOption,
-                            viewLayout: viewLayout,
-                            selectedTagIDs: selectedTagIDs,
-                            selectedBrandIDs: selectedBrandIDs,
-                            selectedTypes: selectedTypes,
-                            selectedColors: selectedColors,
-                            selectedSizes: selectedSizes,
-                            selectedLengths: selectedLengths,
-                            selectedConditions: selectedConditions,
-                            selectedAccessories: selectedAccessories
-                        )
-                    } else {
-                        DepositPlanView(
-                            searchText: $depositSearchText,
-                            sortOption: sortOption,
-                            selectedTagIDs: selectedTagIDs,
-                            selectedBrandIDs: selectedBrandIDs,
-                            selectedTypes: selectedTypes,
-                            selectedColors: selectedColors,
-                            selectedSizes: selectedSizes,
-                            selectedLengths: selectedLengths,
-                            selectedConditions: selectedConditions,
-                            selectedAccessories: selectedAccessories
-                        )
-                    }
+                if selectedTab == .wardrobe {
+                    WardrobeView(
+                        searchText: $wardrobeSearchText,
+                        sortOption: sortOption,
+                        viewLayout: viewLayout,
+                        selectedTagIDs: selectedTagIDs,
+                        selectedBrandIDs: selectedBrandIDs,
+                        selectedTypes: selectedTypes,
+                        selectedColors: selectedColors,
+                        selectedSizes: selectedSizes,
+                        selectedLengths: selectedLengths,
+                        selectedConditions: selectedConditions,
+                        selectedAccessories: selectedAccessories
+                    )
+                } else {
+                    DepositPlanView(
+                        searchText: $depositSearchText,
+                        sortOption: sortOption,
+                        selectedTagIDs: selectedTagIDs,
+                        selectedBrandIDs: selectedBrandIDs,
+                        selectedTypes: selectedTypes,
+                        selectedColors: selectedColors,
+                        selectedSizes: selectedSizes,
+                        selectedLengths: selectedLengths,
+                        selectedConditions: selectedConditions,
+                        selectedAccessories: selectedAccessories
+                    )
                 }
-                .scrollIndicators(.hidden)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
