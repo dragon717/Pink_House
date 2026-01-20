@@ -11,6 +11,7 @@ import SwiftData
 @main
 struct ItemManagerApp: App {
     @State private var themeManager = ThemeManager.shared
+    @Environment(\.scenePhase) private var scenePhase
     
     init() {
         // Ensure NotificationManager is initialized to set the delegate
@@ -31,6 +32,12 @@ struct ItemManagerApp: App {
                     
                     // Sync widget data on launch
                     SharedPersistence.shared.syncWidgetData()
+                }
+                .onChange(of: scenePhase) { oldPhase, newPhase in
+                    if newPhase == .background || newPhase == .inactive {
+                        // Sync when app goes to background so widget is up to date
+                        SharedPersistence.shared.syncWidgetData()
+                    }
                 }
         }
         .modelContainer(SharedPersistence.shared.sharedModelContainer)

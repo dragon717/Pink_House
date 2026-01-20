@@ -109,6 +109,10 @@ struct SmallWidgetView: View {
                             .font(.caption)
                             .foregroundStyle(.orange)
                         Spacer()
+                        // Debug Time
+                        Text(entry.date, style: .time)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary.opacity(0.5))
                         Image(systemName: "heart.fill")
                             .foregroundStyle(Color.pink)
                         Text("少女专属")
@@ -308,7 +312,7 @@ struct LargeWidgetView: View {
                     .font(.caption)
                     .foregroundStyle(.blue.opacity(0.8))
                 Spacer()
-                Text("2026年") // 动态年份需优化
+                Text(String(Calendar.current.component(.year, from: Date())) + "年")
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundStyle(colorScheme == .dark ? .white : .primary)

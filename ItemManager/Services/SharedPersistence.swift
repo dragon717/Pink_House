@@ -48,10 +48,24 @@ class SharedPersistence {
             let totalPrice = clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
             
             // Calculate Deposit and Balance for active plans
-            let depositPlans = clothings.filter { $0.isDepositPlan }
+            // Note: App default view filters by current year. Widget should match this to be less confusing.
+            let calendar = Calendar.current
+            let currentYear = calendar.component(.year, from: Date())
+            
+            let depositPlans = clothings.filter { clothing in
+                guard clothing.isDepositPlan else { return false }
+                // Filter by current year if finalPaymentDate exists
+                if let paymentDate = clothing.finalPaymentDate {
+                    let year = calendar.component(.year, from: paymentDate)
+                    return year == currentYear
+                }
+                return false
+            }
+            
             let depositCount = depositPlans.reduce(0) { $0 + $1.stock }
-            let totalDeposit = depositPlans.reduce(0) { $0 + $1.deposit }
-            let totalBalance = depositPlans.reduce(0) { $0 + $1.balance }
+            // Note: Use stock count for price calculation
+            let totalDeposit = depositPlans.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
+            let totalBalance = depositPlans.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
             
             // 3. Recent Items
             let recentItems = clothings.prefix(5).map { clothing in
@@ -80,30 +94,26 @@ class SharedPersistence {
                 }
                 
                 // 5. Month Stats
-                let calendar = Calendar.current
-                let now = Date()
                 var monthStats: [WidgetMonthInfo] = []
                 
-                // Generate for last 12 months (or future 12 months? App shows 2026, implying future)
-                // App logic seems to focus on current year in the selector, but for widget usually we want upcoming payments
-                // Based on "MonthSelectorView", it filters by selectedYear.
-                // For Widget, let's show upcoming 12 months starting from current month.
+                // Generate for current year (1-12) to match App's year view
+                // Since we already filtered depositPlans by currentYear, we can just iterate months of currentYear
                 
-                for i in 0..<12 {
-                    if let date = calendar.date(byAdding: .month, value: i, to: now) {
-                        let year = calendar.component(.year, from: date)
-                        let month = calendar.component(.month, from: date)
-                        
-                        let monthlyItems = depositPlans.filter { clothing in
-                            guard let paymentDate = clothing.finalPaymentDate else { return false }
-                            return calendar.isDate(paymentDate, equalTo: date, toGranularity: .month)
-                        }
-                        
-                        let count = monthlyItems.count
-                        let totalBalance = monthlyItems.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
-                        
-                        monthStats.append(WidgetMonthInfo(month: month, year: year, count: count, totalBalance: totalBalance))
+                for month in 1...12 {
+                    // Construct a date for this month/year for display purposes
+                    // We need to find items in depositPlans that match this month
+                    
+                    let monthlyItems = depositPlans.filter { clothing in
+                        guard let paymentDate = clothing.finalPaymentDate else { return false }
+                        let itemMonth = calendar.component(.month, from: paymentDate)
+                        let itemYear = calendar.component(.year, from: paymentDate)
+                        return itemMonth == month && itemYear == currentYear
                     }
+                    
+                    let count = monthlyItems.count
+                    let totalBalance = monthlyItems.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+                    
+                    monthStats.append(WidgetMonthInfo(month: month, year: currentYear, count: count, totalBalance: totalBalance))
                 }
                 
                 // 6. Save and Reload
