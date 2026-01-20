@@ -37,22 +37,17 @@ struct WidgetEntryView: View {
                     .overlay(colorScheme == .dark ? Color.black.opacity(0.4) : Color.white.opacity(0.1))
                 } else {
                     if colorScheme == .dark {
-                        // Dark mode: Slightly Dimmed Sakura Pink
-                        // Use the same pink base but overlay a very light black to dim it just enough
-                        // without losing the pink hue.
-                        ZStack {
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.0, green: 0.96, blue: 0.96),
-                                    Color(red: 1.0, green: 0.92, blue: 0.94)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            Color.black.opacity(0.2) // 20% dimming
-                        }
+                        // Dark mode: Night Sakura (Deep Muted Pink)
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.35, green: 0.2, blue: 0.25),
+                                Color(red: 0.45, green: 0.25, blue: 0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     } else {
-                        // Light mode: Default Sakura Pink Gradient
+                        // Light mode: Default Sakura Pink Gradient (Matches App Preview)
                         LinearGradient(
                             colors: [
                                 Color(red: 1.0, green: 0.96, blue: 0.96),
@@ -71,75 +66,76 @@ struct WidgetEntryView: View {
 
 // MARK: - Components
 
+struct OutlinedText: View {
+    let text: String
+    var size: CGFloat
+    var weight: Font.Weight = .bold
+    var color: Color = .white
+    var outlineColor: Color = .black
+    
+    var body: some View {
+        Text(text)
+            .font(.system(size: size, weight: weight, design: .rounded))
+            .foregroundStyle(color)
+            .shadow(color: outlineColor, radius: 0, x: 1, y: 1)
+            .shadow(color: outlineColor, radius: 0, x: -1, y: -1)
+            .shadow(color: outlineColor, radius: 0, x: 1, y: -1)
+            .shadow(color: outlineColor, radius: 0, x: -1, y: 1)
+    }
+}
+
 struct SmallWidgetView: View {
     let entry: Provider.Entry
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         VStack(spacing: 0) {
-            // 毛玻璃卡片
+            // 卡片容器
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(.clear)
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.3 : 0.6), lineWidth: 1)
-                    .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
+                    .fill(Color.clear) // 透明底
+                    .stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8), // 亮色: 乳白边框; 暗色: 微弱边框
+                        lineWidth: 1.5
+                    )
                 
                 VStack(spacing: 8) {
                     HStack(spacing: 0) {
                         VStack(spacing: 2) {
-                            Text("总件数/款")
-                                .font(.system(size: 10))
-                                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                                .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                            Text("\(entry.totalCount)/\(entry.totalStyleCount)")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                                .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
+                            OutlinedText(text: "总件数/款", size: 10, weight: .regular)
+                            OutlinedText(text: "\(entry.totalCount)/\(entry.totalStyleCount)", size: 16)
                         }
                         
                         Spacer()
                         
                         Rectangle()
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
                             .frame(width: 1, height: 20)
                         
                         Spacer()
                         
                         VStack(spacing: 2) {
-                            Text("裙子价值")
-                                .font(.system(size: 10))
-                                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                                .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                            Text("¥\(entry.totalPrice.formatted(.number.notation(.compactName)))")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundStyle(.orange)
-                                .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                            OutlinedText(text: "裙子价值", size: 10, weight: .regular)
+                            OutlinedText(text: "¥\(entry.totalPrice.formatted(.number.notation(.compactName)))", size: 16, color: .orange)
                         }
                     }
                     
-                    Divider().background(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
+                    Divider().background(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
                     
                     HStack {
                         Image(systemName: "chart.bar.fill")
                             .foregroundStyle(.orange)
-                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("查看详细统计")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                            .shadow(color: .black, radius: 0, x: 0.5, y: 0.5)
+                        OutlinedText(text: "查看详细统计", size: 10, weight: .medium, color: .orange)
                         Spacer()
                         // Debug Time
                         Text(entry.date, style: .time)
                             .font(.caption2)
-                            .foregroundStyle(.secondary.opacity(0.8))
-                            .shadow(color: .white.opacity(0.5), radius: 1, x: 0, y: 0)
+                            .foregroundStyle(.secondary.opacity(0.5))
                         Image(systemName: "heart.fill")
                             .foregroundStyle(Color.pink)
-                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("少女专属")
-                            .font(.caption)
-                            .foregroundStyle(Color.pink)
-                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                            .shadow(color: .black, radius: 0, x: 0.5, y: 0.5)
+                        OutlinedText(text: "少女专属", size: 10, weight: .medium, color: .pink)
                     }
                 }
                 .padding(12)
@@ -154,58 +150,42 @@ struct MediumWidgetView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // 顶部汇总条 (毛玻璃)
+            // 顶部汇总条 (卡片容器)
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(.clear)
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.3 : 0.6), lineWidth: 1)
-                    .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
+                    .fill(Color.clear) // 透明底
+                    .stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
+                        lineWidth: 1.5
+                    )
                 
                 HStack(spacing: 0) {
                     // Item 1
                     VStack(spacing: 4) {
-                        Text("总件数/款")
-                        .font(.system(size: 10))
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("\(entry.depositCount)/\(entry.depositStyleCount)")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
+                        OutlinedText(text: "总件数/款", size: 10, weight: .regular)
+                        OutlinedText(text: "\(entry.depositCount)/\(entry.depositStyleCount)", size: 16)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
                         .frame(width: 1, height: 20)
                     
                     // Item 2
                     VStack(spacing: 4) {
-                        Text("已付定金")
-                        .font(.system(size: 10))
-                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(.orange)
-                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                        OutlinedText(text: "已付定金", size: 10, weight: .regular)
+                        OutlinedText(text: "¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 16, color: .orange)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
                         .frame(width: 1, height: 20)
                     
                     // Item 3
                     VStack(spacing: 4) {
-                        Text("待付尾款")
-                            .font(.system(size: 10))
-                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("¥\(entry.totalBalance.formatted(.number.notation(.compactName)))")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
+                        OutlinedText(text: "待付尾款", size: 10, weight: .regular)
+                        OutlinedText(text: "¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 16)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -221,17 +201,20 @@ struct MediumWidgetView: View {
                     ForEach(recentMonths, id: \.id) { data in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color(white: 0.2).opacity(0.6) : Color.white.opacity(0.4))
-                                .background(.ultraThinMaterial.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+                                .fill(Color.clear)
+                                .stroke(
+                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
+                                    lineWidth: 1
+                                )
                             VStack(spacing: 4) {
-                                Text("\(data.month)月")
-                                    .font(.caption)
-                                    .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                                    .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                                Text(data.totalBalance > 0 ? "¥\(data.totalBalance.formatted(.number.notation(.compactName)))" : "-")
-                                    .font(.caption2)
-                                    .foregroundStyle(data.totalBalance > 0 ? .orange : .secondary.opacity(0.8))
-                                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                                OutlinedText(text: "\(data.month)月", size: 12, weight: .regular)
+                                if data.totalBalance > 0 {
+                                    OutlinedText(text: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))", size: 10, color: .orange)
+                                } else {
+                                    Text("-")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary.opacity(0.5))
+                                }
                             }
                         }
                     }
@@ -240,25 +223,21 @@ struct MediumWidgetView: View {
                     ForEach(Array(entry.seriesStats.prefix(4))) { series in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.4))
+                                .fill(Color.clear)
+                                .stroke(
+                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
+                                    lineWidth: 1
+                                )
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
-                                    Text(series.name)
-                                        .font(.system(size: 10, weight: .medium))
+                                    OutlinedText(text: series.name, size: 10, weight: .medium)
                                         .lineLimit(1)
-                                        .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                                     Spacer()
-                                    Text("\(series.count)")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                    OutlinedText(text: "\(series.count)", size: 10, weight: .regular, color: .secondary)
                                         .padding(4)
                                         .background(Circle().fill(Color.gray.opacity(0.2)))
                                 }
-                                Text("¥\(series.totalBalance)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                                OutlinedText(text: "¥\(series.totalBalance)", size: 10, color: .orange)
                             }
                             .padding(8)
                         }
@@ -289,55 +268,36 @@ struct LargeWidgetView: View {
             // 顶部汇总条 (复用 Medium 样式，增加高度)
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(.clear)
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.3 : 0.6), lineWidth: 1)
-                    .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
+                    .fill(Color.clear) // 透明底
+                    .stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
+                        lineWidth: 1.5
+                    )
                 
                 HStack(spacing: 0) {
                     VStack(spacing: 4) {
-                        Text("总件数/款")
-                            .font(.caption)
-                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("\(entry.depositCount)/\(entry.depositStyleCount)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
+                        OutlinedText(text: "总件数/款", size: 12, weight: .regular)
+                        OutlinedText(text: "\(entry.depositCount)/\(entry.depositStyleCount)", size: 22)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
                         .frame(width: 1, height: 30)
                     
                     VStack(spacing: 4) {
-                        Text("已付定金")
-                            .font(.caption)
-                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.orange)
-                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                        OutlinedText(text: "已付定金", size: 12, weight: .regular)
+                        OutlinedText(text: "¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 22, color: .orange)
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.4) : Color.black.opacity(0.2))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
                         .frame(width: 1, height: 30)
                     
                     VStack(spacing: 4) {
-                        Text("待付尾款")
-                            .font(.caption)
-                            .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : Color.primary.opacity(0.8))
-                            .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
-                        Text("¥\(entry.totalBalance.formatted(.number.notation(.compactName)))")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 0)
+                        OutlinedText(text: "待付尾款", size: 12, weight: .regular)
+                        OutlinedText(text: "¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 22)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -347,16 +307,9 @@ struct LargeWidgetView: View {
             
             // Grid Title
             HStack {
-                Text(entry.statsType == .month ? "按月预估尾款" : "按系列预估尾款")
-                    .font(.caption)
-                    .foregroundStyle(Color.blue.opacity(0.8))
-                    .shadow(color: .white.opacity(0.5), radius: 1, x: 0, y: 0)
+                OutlinedText(text: entry.statsType == .month ? "按月预估尾款" : "按系列预估尾款", size: 12, weight: .medium, color: .blue.opacity(0.8))
                 Spacer()
-                Text(String(Calendar.current.component(.year, from: Date())) + "年")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                    .shadow(color: .white.opacity(0.5), radius: 1, x: 0, y: 0)
+                OutlinedText(text: String(Calendar.current.component(.year, from: Date())) + "年", size: 12, weight: .bold)
             }
             .padding(.horizontal, 4)
             
@@ -368,25 +321,21 @@ struct LargeWidgetView: View {
                     ForEach(yearData, id: \.id) { data in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color(white: 0.2).opacity(0.6) : Color.white.opacity(0.4))
-                                .background(.ultraThinMaterial.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+                                .fill(Color.clear)
+                                .stroke(
+                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
+                                    lineWidth: 1
+                                )
                                 .frame(height: 60)
                             
                             VStack(spacing: 2) {
-                                Text("\(data.month)月")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                                    .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
+                                OutlinedText(text: "\(data.month)月", size: 12, weight: .regular)
                                 if data.totalBalance > 0 {
-                                    Text("¥\(data.totalBalance.formatted(.number.notation(.compactName)))")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.orange)
-                                        .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                                    OutlinedText(text: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))", size: 10, color: .orange)
                                 } else {
                                     Text("-")
                                         .font(.system(size: 10))
-                                        .foregroundStyle(.secondary.opacity(0.5))
-                                        .shadow(color: .white.opacity(0.3), radius: 1, x: 0, y: 0)
+                                        .foregroundStyle(.secondary.opacity(0.3))
                                 }
                             }
                         }
@@ -396,26 +345,23 @@ struct LargeWidgetView: View {
                     ForEach(Array(entry.seriesStats.prefix(12))) { series in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.4))
+                                .fill(Color.clear)
+                                .stroke(
+                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
+                                    lineWidth: 1
+                                )
                                 .frame(height: 60)
                             
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack {
-                                    Text(series.name)
-                                        .font(.system(size: 10))
+                                    OutlinedText(text: series.name, size: 10, weight: .medium)
                                         .lineLimit(1)
-                                        .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                                        .shadow(color: .black.opacity(0.2), radius: 1, x: 0, y: 0)
                                     Spacer()
-                                    Text("\(series.count)")
-                                        .font(.system(size: 9))
+                                    OutlinedText(text: "\(series.count)", size: 9, weight: .regular, color: .secondary)
                                         .padding(3)
-                                        .background(Circle().fill(Color.gray.opacity(0.2)))
+                                        .background(Circle().fill(Color.gray.opacity(0.1)))
                                 }
-                                Text("¥\(series.totalBalance)")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.orange)
-                                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 0)
+                                OutlinedText(text: "¥\(series.totalBalance)", size: 10, color: .orange)
                             }
                             .padding(6)
                         }
