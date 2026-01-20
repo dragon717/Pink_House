@@ -245,6 +245,9 @@ class ImportManager {
         // 保存上下文
         try context.save()
         
+        // Sync widget data
+        SharedPersistence.shared.syncWidgetData()
+        
         return result
     }
 }

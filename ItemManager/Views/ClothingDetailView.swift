@@ -124,6 +124,7 @@ struct ClothingDetailView: View {
             Button("删除", role: .destructive) {
                 NotificationManager.shared.cancelNotification(for: clothing)
                 modelContext.delete(clothing)
+                SharedPersistence.shared.syncWidgetData()
                 dismiss()
             }
         } message: {
@@ -163,6 +164,7 @@ struct ClothingDetailView: View {
         clothing.finalPaymentEndDate = nil
         // Try to save context (though it autosaves usually)
         try? modelContext.save()
+        SharedPersistence.shared.syncWidgetData()
     }
     
     private func duplicateClothing() {
@@ -202,6 +204,8 @@ struct ClothingDetailView: View {
         
         // Schedule notification for the copy
         NotificationManager.shared.scheduleNotification(for: newClothing)
+        
+        SharedPersistence.shared.syncWidgetData()
         
         dismiss()
     }

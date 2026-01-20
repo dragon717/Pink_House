@@ -15,7 +15,7 @@ class WidgetBackgroundManager {
     
     // Computed property to get the file URL in the App Group container
     private var imageURL: URL? {
-        guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: SharedPersistence.appGroupIdentifier) else {
+        guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) else {
             print("WidgetBackgroundManager: Could not find App Group container.")
             return nil
         }

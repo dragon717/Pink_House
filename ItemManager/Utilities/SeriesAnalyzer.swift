@@ -14,19 +14,31 @@ struct SeriesInfo: Identifiable, Hashable {
     let totalBalance: Decimal
 }
 
+struct SeriesInput: Sendable {
+    let id: UUID
+    let name: String
+    let balance: Decimal
+    let stock: Int
+}
+
 class SeriesAnalyzer {
     static let shared = SeriesAnalyzer()
     
     // Simplified strategy: Prefix based (First 2-4 characters)
     // As requested: "不用 关键字原则了，直接用前缀（前2-4字 同前缀）即为一个系列，那也就不用屏蔽字了"
     func analyzeSeries(from clothings: [Clothing]) async -> [SeriesInfo] {
+        // Convert to Sendable structs to safely pass to detached task
+        let inputs = clothings.map { 
+            SeriesInput(id: $0.id, name: $0.name, balance: $0.balance, stock: $0.stock) 
+        }
+        
         return await Task.detached(priority: .userInitiated) {
             var candidateCounts: [String: Int] = [:]
             var candidateBalances: [String: Decimal] = [:]
             var candidateClothingIDs: [String: Set<UUID>] = [:]
             
             // 1. Generate candidates from each clothing name
-            for clothing in clothings {
+            for clothing in inputs {
                 let name = clothing.name
                 let candidates = self.generateCandidates(from: name)
                 

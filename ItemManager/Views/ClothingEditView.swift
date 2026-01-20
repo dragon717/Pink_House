@@ -417,6 +417,15 @@ struct ClothingEditView: View {
             // Schedule notification
             NotificationManager.shared.scheduleNotification(for: newClothing)
         }
+        
+        // Save context and sync widget
+        do {
+            try modelContext.save()
+            SharedPersistence.shared.syncWidgetData()
+        } catch {
+            AppLogger.error("Failed to save context: \(error)")
+        }
+        
         dismiss()
     }
 }

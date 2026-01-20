@@ -32,9 +32,9 @@ struct WidgetEntryView: View {
             ZStack {
                 if let customImage = WidgetBackgroundManager.shared.loadImage() {
                     Image(uiImage: customImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .overlay(colorScheme == .dark ? Color.black.opacity(0.4) : Color.white.opacity(0.1))
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .overlay(colorScheme == .dark ? Color.black.opacity(0.4) : Color.white.opacity(0.1))
                 } else {
                     if colorScheme == .dark {
                         Color.black.opacity(0.6) // Dark mode base
@@ -183,12 +183,12 @@ struct MediumWidgetView: View {
                 if entry.statsType == .month {
                     // 显示最近 4 个月
                     let recentMonths = getRecentMonthsData(count: 4)
-                    ForEach(recentMonths, id: \.month) { data in
+                    ForEach(recentMonths, id: \.id) { data in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white.opacity(0.7))
                             VStack(spacing: 4) {
-                                Text(data.month)
+                                Text("\(data.month)月")
                                     .font(.caption)
                                     .foregroundStyle(colorScheme == .dark ? .white : .primary)
                                 Text(data.count > 0 ? "¥\(data.count * 100)" : "-") // 模拟金额
@@ -228,23 +228,8 @@ struct MediumWidgetView: View {
         }
     }
     
-    struct MonthData {
-        let month: String
-        let count: Int
-    }
-    
-    private func getRecentMonthsData(count: Int) -> [MonthData] {
-        let calendar = Calendar.current
-        var result: [MonthData] = []
-        
-        for i in 0..<count {
-            if let date = calendar.date(byAdding: .month, value: -i, to: Date()) {
-                let monthStr = date.formatted(.dateTime.month(.defaultDigits).locale(Locale(identifier: "zh_CN"))) + "月"
-                let count = entry.clothings.filter { calendar.isDate($0.purchaseDate, equalTo: date, toGranularity: .month) }.count
-                result.append(MonthData(month: monthStr, count: count))
-            }
-        }
-        return result.reversed()
+    private func getRecentMonthsData(count: Int) -> [WidgetMonthInfo] {
+        return Array(entry.monthStats.prefix(count)).reversed()
     }
 }
 
@@ -332,14 +317,14 @@ struct LargeWidgetView: View {
                 if entry.statsType == .month {
                     // 显示 12 个月
                     let yearData = getRecentMonthsData(count: 12)
-                    ForEach(yearData, id: \.month) { data in
+                    ForEach(yearData, id: \.id) { data in
                         ZStack {
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(colorScheme == .dark ? Color(white: 0.2) : Color.white.opacity(0.7))
                                 .frame(height: 60)
                             
                             VStack(spacing: 2) {
-                                Text(data.month)
+                                Text("\(data.month)月")
                                     .font(.system(size: 12))
                                     .foregroundStyle(colorScheme == .dark ? .white : .primary)
                                 if data.count > 0 {
@@ -387,21 +372,8 @@ struct LargeWidgetView: View {
         }
     }
     
-    struct MonthData {
-        let month: String
-        let count: Int
-    }
-    
-    private func getRecentMonthsData(count: Int) -> [MonthData] {
-        let calendar = Calendar.current
-        var result: [MonthData] = []
-        // 生成今年1-12月的数据（或者最近12个月）
-        // 这里为了匹配截图效果，生成固定12个月
-        for i in 1...12 {
-            let monthStr = "\(i)月"
-            result.append(MonthData(month: monthStr, count: Int.random(in: 0...5))) // 模拟数据，实际需从 clothings 统计
-        }
-        return result
+    private func getRecentMonthsData(count: Int) -> [WidgetMonthInfo] {
+        return Array(entry.monthStats.prefix(count)).reversed()
     }
 }
 
@@ -411,8 +383,8 @@ struct EmptyStateView: View {
     var body: some View {
         VStack {
             Image(systemName: "square.dashed")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
+            .font(.largeTitle)
+            .foregroundStyle(.secondary)
             Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)

@@ -142,6 +142,8 @@ struct ClothingListView: View {
                 if let item = itemToDelete {
                     NotificationManager.shared.cancelNotification(for: item)
                     modelContext.delete(item)
+                    // Sync widget
+                    SharedPersistence.shared.syncWidgetData()
                 }
                 itemToDelete = nil
             }
@@ -352,5 +354,8 @@ struct ClothingListView: View {
         
         // Schedule notification for the copy
         NotificationManager.shared.scheduleNotification(for: newItem)
+        
+        // Sync widget
+        SharedPersistence.shared.syncWidgetData()
     }
 }
