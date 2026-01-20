@@ -49,6 +49,7 @@ class SharedPersistence {
             
             // Calculate Deposit and Balance for active plans
             let depositPlans = clothings.filter { $0.isDepositPlan }
+            let depositCount = depositPlans.reduce(0) { $0 + $1.stock }
             let totalDeposit = depositPlans.reduce(0) { $0 + $1.deposit }
             let totalBalance = depositPlans.reduce(0) { $0 + $1.balance }
             
@@ -72,7 +73,8 @@ class SharedPersistence {
             // Actually SeriesAnalyzer.analyzeSeries is async.
             
             Task {
-                let seriesStats = await SeriesAnalyzer.shared.analyzeSeries(from: clothings)
+                // Use depositPlans for stats as requested by user (Widget mainly tracks deposit plans)
+                let seriesStats = await SeriesAnalyzer.shared.analyzeSeries(from: depositPlans)
                 let widgetSeries = seriesStats.map { info in
                     WidgetSeriesInfo(name: info.name, count: info.count, totalBalance: info.totalBalance)
                 }
@@ -92,7 +94,7 @@ class SharedPersistence {
                         let year = calendar.component(.year, from: date)
                         let month = calendar.component(.month, from: date)
                         
-                        let monthlyItems = clothings.filter { clothing in
+                        let monthlyItems = depositPlans.filter { clothing in
                             guard let paymentDate = clothing.finalPaymentDate else { return false }
                             return calendar.isDate(paymentDate, equalTo: date, toGranularity: .month)
                         }
@@ -107,6 +109,7 @@ class SharedPersistence {
                 // 6. Save and Reload
                 let widgetData = WidgetData(
                     totalCount: totalCount,
+                    depositCount: depositCount,
                     totalPrice: totalPrice,
                     totalDeposit: totalDeposit,
                     totalBalance: totalBalance,

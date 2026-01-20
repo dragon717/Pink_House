@@ -18,6 +18,7 @@ struct SimpleEntry: TimelineEntry {
     
     // New Fields for High Information Density
     let totalCount: Int
+    let depositCount: Int
     let totalPrice: Decimal
     let totalDeposit: Decimal
     let totalBalance: Decimal
@@ -34,6 +35,7 @@ struct Provider: AppIntentTimelineProvider {
             seriesStats: [],
             monthStats: [],
             totalCount: 0,
+            depositCount: 0,
             totalPrice: 0,
             totalDeposit: 0,
             totalBalance: 0,
@@ -76,6 +78,7 @@ struct Provider: AppIntentTimelineProvider {
             seriesStats: data.seriesStats,
             monthStats: data.monthStats,
             totalCount: data.totalCount,
+            depositCount: data.depositCount,
             totalPrice: data.totalPrice,
             totalDeposit: data.totalDeposit,
             totalBalance: data.totalBalance,

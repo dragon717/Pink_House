@@ -33,6 +33,7 @@ struct WidgetMonthInfo: Codable, Identifiable {
 
 struct WidgetData: Codable {
     let totalCount: Int
+    let depositCount: Int // 新增：定尾计划总件数
     let totalPrice: Decimal
     let totalDeposit: Decimal
     let totalBalance: Decimal
@@ -43,6 +44,7 @@ struct WidgetData: Codable {
     
     static let empty = WidgetData(
         totalCount: 0,
+        depositCount: 0,
         totalPrice: 0,
         totalDeposit: 0,
         totalBalance: 0,
@@ -55,7 +57,7 @@ struct WidgetData: Codable {
 
 class WidgetDataManager {
     static let shared = WidgetDataManager()
-    static let appGroupIdentifier = "group.bugod.ItemManager"
+    static let appGroupIdentifier = "group.bugod.ItemManager.Widget2"
     private let filename = "widget_data.json"
     
     private var fileURL: URL? {
