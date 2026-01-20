@@ -47,6 +47,11 @@ class SharedPersistence {
             let totalCount = clothings.reduce(0) { $0 + $1.stock }
             let totalPrice = clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
             
+            // Calculate Deposit and Balance for active plans
+            let depositPlans = clothings.filter { $0.isDepositPlan }
+            let totalDeposit = depositPlans.reduce(0) { $0 + $1.deposit }
+            let totalBalance = depositPlans.reduce(0) { $0 + $1.balance }
+            
             // 3. Recent Items
             let recentItems = clothings.prefix(5).map { clothing in
                 WidgetClothing(
@@ -77,17 +82,25 @@ class SharedPersistence {
                 let now = Date()
                 var monthStats: [WidgetMonthInfo] = []
                 
-                // Generate for last 12 months
+                // Generate for last 12 months (or future 12 months? App shows 2026, implying future)
+                // App logic seems to focus on current year in the selector, but for widget usually we want upcoming payments
+                // Based on "MonthSelectorView", it filters by selectedYear.
+                // For Widget, let's show upcoming 12 months starting from current month.
+                
                 for i in 0..<12 {
-                    if let date = calendar.date(byAdding: .month, value: -i, to: now) {
+                    if let date = calendar.date(byAdding: .month, value: i, to: now) {
                         let year = calendar.component(.year, from: date)
                         let month = calendar.component(.month, from: date)
                         
-                        let count = clothings.filter { 
-                            calendar.isDate($0.purchaseDate, equalTo: date, toGranularity: .month) 
-                        }.count
+                        let monthlyItems = clothings.filter { clothing in
+                            guard let paymentDate = clothing.finalPaymentDate else { return false }
+                            return calendar.isDate(paymentDate, equalTo: date, toGranularity: .month)
+                        }
                         
-                        monthStats.append(WidgetMonthInfo(month: month, year: year, count: count, totalBalance: 0))
+                        let count = monthlyItems.count
+                        let totalBalance = monthlyItems.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+                        
+                        monthStats.append(WidgetMonthInfo(month: month, year: year, count: count, totalBalance: totalBalance))
                     }
                 }
                 
@@ -95,6 +108,8 @@ class SharedPersistence {
                 let widgetData = WidgetData(
                     totalCount: totalCount,
                     totalPrice: totalPrice,
+                    totalDeposit: totalDeposit,
+                    totalBalance: totalBalance,
                     seriesStats: widgetSeries,
                     monthStats: monthStats,
                     recentClothings: Array(recentItems),

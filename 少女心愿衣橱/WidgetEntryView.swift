@@ -39,6 +39,10 @@ struct WidgetEntryView: View {
                     if colorScheme == .dark {
                         Color.black.opacity(0.6) // Dark mode base
                             .background(.ultraThinMaterial) // Blur effect
+                            .overlay(
+                                // Add a subtle pink tint for dark mode to match "Pink House" theme
+                                Color.pink.opacity(0.1)
+                            )
                     } else {
                         // Light mode: Sakura Pink with Gaussian Blur look
                         // Combining a soft pink color with ultraThinMaterial
@@ -152,8 +156,7 @@ struct MediumWidgetView: View {
                         Text("已付定金")
                         .font(.system(size: 10))
                         .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
-                        // 假设定金数据，这里暂用 totalPrice 模拟，实际应从 entry 传入
-                        Text("¥\(entry.totalPrice.formatted(.number.notation(.compactName)))")
+                        Text("¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(.orange)
                     }
@@ -168,7 +171,7 @@ struct MediumWidgetView: View {
                         Text("待付尾款")
                             .font(.system(size: 10))
                             .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
-                        Text("¥0") // 暂无数据
+                        Text("¥\(entry.totalBalance.formatted(.number.notation(.compactName)))")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
                     }
@@ -191,9 +194,9 @@ struct MediumWidgetView: View {
                                 Text("\(data.month)月")
                                     .font(.caption)
                                     .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                                Text(data.count > 0 ? "¥\(data.count * 100)" : "-") // 模拟金额
+                                Text(data.totalBalance > 0 ? "¥\(data.totalBalance.formatted(.number.notation(.compactName)))" : "-")
                                     .font(.caption2)
-                                    .foregroundStyle(data.count > 0 ? .orange : .secondary.opacity(0.5))
+                                    .foregroundStyle(data.totalBalance > 0 ? .orange : .secondary.opacity(0.5))
                             }
                         }
                     }
@@ -229,7 +232,7 @@ struct MediumWidgetView: View {
     }
     
     private func getRecentMonthsData(count: Int) -> [WidgetMonthInfo] {
-        return Array(entry.monthStats.prefix(count)).reversed()
+        return Array(entry.monthStats.prefix(count))
     }
 }
 
@@ -273,7 +276,7 @@ struct LargeWidgetView: View {
                         Text("已付定金")
                             .font(.caption)
                             .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
-                        Text("¥\(entry.totalPrice.formatted(.number.notation(.compactName)))")
+                        Text("¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(.orange)
@@ -288,7 +291,7 @@ struct LargeWidgetView: View {
                         Text("待付尾款")
                             .font(.caption)
                             .foregroundStyle(colorScheme == .dark ? Color.secondary : Color.primary.opacity(0.7))
-                        Text("¥0")
+                        Text("¥\(entry.totalBalance.formatted(.number.notation(.compactName)))")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(colorScheme == .dark ? .white : .primary)
@@ -327,8 +330,8 @@ struct LargeWidgetView: View {
                                 Text("\(data.month)月")
                                     .font(.system(size: 12))
                                     .foregroundStyle(colorScheme == .dark ? .white : .primary)
-                                if data.count > 0 {
-                                    Text("¥\(data.count * 100)")
+                                if data.totalBalance > 0 {
+                                    Text("¥\(data.totalBalance.formatted(.number.notation(.compactName)))")
                                         .font(.system(size: 10))
                                         .foregroundStyle(.orange)
                                 } else {
@@ -373,7 +376,7 @@ struct LargeWidgetView: View {
     }
     
     private func getRecentMonthsData(count: Int) -> [WidgetMonthInfo] {
-        return Array(entry.monthStats.prefix(count)).reversed()
+        return Array(entry.monthStats.prefix(count))
     }
 }
 

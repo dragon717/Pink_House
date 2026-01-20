@@ -34,6 +34,8 @@ struct WidgetMonthInfo: Codable, Identifiable {
 struct WidgetData: Codable {
     let totalCount: Int
     let totalPrice: Decimal
+    let totalDeposit: Decimal
+    let totalBalance: Decimal
     let seriesStats: [WidgetSeriesInfo]
     let monthStats: [WidgetMonthInfo]
     let recentClothings: [WidgetClothing]
@@ -42,6 +44,8 @@ struct WidgetData: Codable {
     static let empty = WidgetData(
         totalCount: 0,
         totalPrice: 0,
+        totalDeposit: 0,
+        totalBalance: 0,
         seriesStats: [],
         monthStats: [],
         recentClothings: [],
@@ -52,26 +56,42 @@ struct WidgetData: Codable {
 class WidgetDataManager {
     static let shared = WidgetDataManager()
     static let appGroupIdentifier = "group.bugod.ItemManager"
-    static let dataKey = "widget_data"
+    private let filename = "widget_data.json"
     
-    private var userDefaults: UserDefaults? {
-        UserDefaults(suiteName: Self.appGroupIdentifier)
+    private var fileURL: URL? {
+        guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier) else {
+            print("WidgetDataManager: Could not find App Group container for ID: \(Self.appGroupIdentifier)")
+            return nil
+        }
+        return container.appendingPathComponent(filename)
     }
     
     func save(data: WidgetData) {
-        if let encoded = try? JSONEncoder().encode(data) {
-            userDefaults?.set(encoded, forKey: Self.dataKey)
-            print("WidgetDataManager: Saved data to App Group \(Self.appGroupIdentifier)")
-        } else {
-            print("WidgetDataManager: Failed to encode data")
+        guard let url = fileURL else { return }
+        
+        do {
+            let encoded = try JSONEncoder().encode(data)
+            try encoded.write(to: url, options: .atomic)
+            print("WidgetDataManager: Successfully saved data to \(url.path)")
+        } catch {
+            print("WidgetDataManager: Failed to save data - \(error)")
         }
     }
     
     func load() -> WidgetData {
-        guard let data = userDefaults?.data(forKey: Self.dataKey),
-              let decoded = try? JSONDecoder().decode(WidgetData.self, from: data) else {
+        guard let url = fileURL else {
+            print("WidgetDataManager: No file URL available")
             return .empty
         }
-        return decoded
+        
+        do {
+            let data = try Data(contentsOf: url)
+            let decoded = try JSONDecoder().decode(WidgetData.self, from: data)
+            print("WidgetDataManager: Successfully loaded data from \(url.path)")
+            return decoded
+        } catch {
+            print("WidgetDataManager: Failed to load data (or file doesn't exist) - \(error)")
+            return .empty
+        }
     }
 }

@@ -21,6 +21,17 @@ struct ItemManagerApp: App {
         WindowGroup {
             MainTabView()
                 .environment(themeManager)
+                .onAppear {
+                    // Check App Group
+                    if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
+                        print("App Group Container URL: \(url.path)")
+                    } else {
+                        print("CRITICAL ERROR: App Group Container NOT FOUND. Check Entitlements.")
+                    }
+                    
+                    // Sync widget data on launch
+                    SharedPersistence.shared.syncWidgetData()
+                }
         }
         .modelContainer(SharedPersistence.shared.sharedModelContainer)
     }
