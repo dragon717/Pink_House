@@ -239,20 +239,35 @@ struct DepositPlanView: View {
 struct DepositStatsView: View {
     let clothings: [Clothing]
     
+    // Deduplicated clothings based on name, deposit, balance, stock
+    private var uniqueClothings: [Clothing] {
+        var seenKeys: Set<String> = []
+        var result: [Clothing] = []
+        
+        for clothing in clothings {
+            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)|\(clothing.stock)"
+            if !seenKeys.contains(key) {
+                seenKeys.insert(key)
+                result.append(clothing)
+            }
+        }
+        return result
+    }
+    
     var styleCount: Int {
-        clothings.count
+        uniqueClothings.count
     }
     
     var totalCount: Int {
-        clothings.reduce(0) { $0 + $1.stock }
+        uniqueClothings.reduce(0) { $0 + $1.stock }
     }
     
     var paidDeposit: Decimal {
-        clothings.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
+        uniqueClothings.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
     }
     
     var pendingBalance: Decimal {
-        clothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+        uniqueClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
     }
     
     var body: some View {
@@ -306,8 +321,20 @@ struct MonthSelectorView: View {
             return y == year && m == month
         }
         
-        let count = monthlyClothings.count
-        let amount = monthlyClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+        // Deduplicate
+        var seenKeys: Set<String> = []
+        var uniqueMonthlyClothings: [Clothing] = []
+        
+        for clothing in monthlyClothings {
+            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)|\(clothing.stock)"
+            if !seenKeys.contains(key) {
+                seenKeys.insert(key)
+                uniqueMonthlyClothings.append(clothing)
+            }
+        }
+        
+        let count = uniqueMonthlyClothings.count
+        let amount = uniqueMonthlyClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
         return (count, amount)
     }
     

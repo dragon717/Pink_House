@@ -46,7 +46,7 @@ struct WidgetEntryView: View {
     }
 }
 
-// MARK: - Background Components
+// MARK: - Components
 
 struct DreamyBackgroundView: View {
     let date: Date
@@ -156,53 +156,38 @@ struct SmallWidgetView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 卡片容器
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.clear) // 透明底
-                    .stroke(
-                        colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8), // 亮色: 乳白边框; 暗色: 微弱边框
-                        lineWidth: 1.5
-                    )
-                
-                VStack(spacing: 8) {
-                    HStack(spacing: 0) {
-                        VStack(spacing: 2) {
-                            OutlinedText(text: "总件数/款", size: 10, weight: .regular)
-                            OutlinedText(text: "\(entry.totalCount)/\(entry.totalStyleCount)", size: 16)
-                        }
-                        
-                        Spacer()
-                        
-                        Rectangle()
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
-                            .frame(width: 1, height: 20)
-                        
-                        Spacer()
-                        
-                        VStack(spacing: 2) {
-                            OutlinedText(text: "裙子价值", size: 10, weight: .regular)
-                            OutlinedText(text: "¥\(entry.totalPrice.formatted(.number.notation(.compactName)))", size: 16, color: .orange)
-                        }
-                    }
-                    
-                    Divider().background(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
-                    
-                    HStack {
-                        Image(systemName: "chart.bar.fill")
-                            .foregroundStyle(.orange)
-                            .shadow(color: .black, radius: 0, x: 0.5, y: 0.5)
-                        OutlinedText(text: "查看详细统计", size: 10, weight: .medium, color: .orange)
-                        Spacer()
-                        Image(systemName: "heart.fill")
-                            .foregroundStyle(Color.pink)
-                            .shadow(color: .black, radius: 0, x: 0.5, y: 0.5)
-                        OutlinedText(text: "少女专属", size: 10, weight: .medium, color: .pink)
-                    }
+            // Header
+            HStack {
+                OutlinedText(text: "本月", size: 12, weight: .bold)
+                Spacer()
+            }
+            .padding(.bottom, 4)
+            
+            // Content
+            // Find current month data
+            let currentMonth = Calendar.current.component(.month, from: Date())
+            let monthData = entry.monthStats.first(where: { $0.month == currentMonth })
+            
+            VStack(spacing: 4) {
+                Spacer()
+                VStack(spacing: 0) {
+                    OutlinedText(text: "\(monthData?.count ?? 0)", size: 28, weight: .heavy)
+                    OutlinedText(text: "款待付", size: 10, weight: .medium, color: .white.opacity(0.8))
                 }
-                .padding(12)
+                
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(height: 1)
+                    .padding(.vertical, 4)
+                
+                VStack(spacing: 0) {
+                    OutlinedText(text: "¥\((monthData?.totalBalance ?? 0).formatted(.number.notation(.compactName)))", size: 16, weight: .bold, color: .orange)
+                    OutlinedText(text: "尾款", size: 10, weight: .medium, color: .orange.opacity(0.8))
+                }
+                Spacer()
             }
         }
+        .padding(12)
     }
 }
 
@@ -211,106 +196,44 @@ struct MediumWidgetView: View {
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        VStack(spacing: 12) {
-            // 顶部汇总条 (卡片容器)
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.clear) // 透明底
-                    .stroke(
-                        colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
-                        lineWidth: 1.5
-                    )
-                
-                HStack(spacing: 0) {
-                    // Item 1
-                    VStack(spacing: 4) {
-                        OutlinedText(text: "总件数/款", size: 10, weight: .regular)
-                        OutlinedText(text: "\(entry.depositCount)/\(entry.depositStyleCount)", size: 16)
+        VStack(spacing: 10) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Image(systemName: "calendar")
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                        let currentYear = Calendar.current.component(.year, from: Date())
+                        OutlinedText(text: "\(currentYear)年月度定尾计划", size: 14, weight: .bold)
                     }
-                    .frame(maxWidth: .infinity)
-                    
-                    Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
-                        .frame(width: 1, height: 20)
-                    
-                    // Item 2
-                    VStack(spacing: 4) {
-                        OutlinedText(text: "已付定金", size: 10, weight: .regular)
-                        OutlinedText(text: "¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 16, color: .orange)
-                    }
-                    .frame(maxWidth: .infinity)
-                    
-                    Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
-                        .frame(width: 1, height: 20)
-                    
-                    // Item 3
-                    VStack(spacing: 4) {
-                        OutlinedText(text: "待付尾款", size: 10, weight: .regular)
-                        OutlinedText(text: "¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 16)
-                    }
-                    .frame(maxWidth: .infinity)
+                    OutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName))) · 总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 10, weight: .regular, color: .white.opacity(0.9))
                 }
-                .padding(.vertical, 12)
+                Spacer()
             }
-            .frame(height: 70)
             
-            // 底部 Grid (按月/按系列)
+            // Content Grid
             HStack(spacing: 8) {
-                if entry.statsType == .month {
-                    // 显示最近 4 个月
-                    let recentMonths = getRecentMonthsData(count: 4)
-                    ForEach(recentMonths, id: \.id) { data in
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.clear)
-                                .stroke(
-                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
-                                    lineWidth: 1
-                                )
-                            VStack(spacing: 4) {
-                                OutlinedText(text: "\(data.month)月", size: 12, weight: .regular)
-                                if data.totalBalance > 0 {
-                                    OutlinedText(text: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))", size: 10, color: .orange)
-                                } else {
-                                    Text("-")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary.opacity(0.5))
-                                }
-                            }
-                        }
-                    }
+                // Show next 4 active months (months with balance > 0) or recent months
+                // Logic: Show current month + next 3 months
+                let currentMonth = Calendar.current.component(.month, from: Date())
+                let displayMonths = entry.monthStats.filter { $0.month >= currentMonth }.prefix(4)
+                
+                if displayMonths.isEmpty {
+                    EmptyStateView(text: "本年暂无更多计划")
                 } else {
-                    // 显示 Top 4 系列
-                    ForEach(Array(entry.seriesStats.prefix(4))) { series in
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.clear)
-                                .stroke(
-                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
-                                    lineWidth: 1
-                                )
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    OutlinedText(text: series.name, size: 10, weight: .medium)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    OutlinedText(text: "\(series.count)", size: 10, weight: .regular, color: .secondary)
-                                        .padding(4)
-                                        .background(Circle().fill(Color.gray.opacity(0.2)))
-                                }
-                                OutlinedText(text: "¥\(series.totalBalance)", size: 10, color: .orange)
-                            }
-                            .padding(8)
-                        }
+                    ForEach(displayMonths, id: \.id) { data in
+                        StatCard(
+                            title: "\(data.month)月",
+                            value: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))",
+                            subValue: "\(data.count)款",
+                            highlight: data.month == currentMonth
+                        )
                     }
                 }
             }
         }
-    }
-    
-    private func getRecentMonthsData(count: Int) -> [WidgetMonthInfo] {
-        return Array(entry.monthStats.prefix(count))
+        .padding(16)
     }
 }
 
@@ -321,121 +244,90 @@ struct LargeWidgetView: View {
     let columns = [
         GridItem(.flexible()),
         GridItem(.flexible()),
-        GridItem(.flexible()),
         GridItem(.flexible())
     ]
     
     var body: some View {
-        VStack(spacing: 12) {
-            // 顶部汇总条 (复用 Medium 样式，增加高度)
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.clear) // 透明底
-                    .stroke(
-                        colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
-                        lineWidth: 1.5
-                    )
-                
-                HStack(spacing: 0) {
-                    VStack(spacing: 4) {
-                        OutlinedText(text: "总件数/款", size: 12, weight: .regular)
-                        OutlinedText(text: "\(entry.depositCount)/\(entry.depositStyleCount)", size: 22)
-                    }
-                    .frame(maxWidth: .infinity)
-                    
-                    Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
-                        .frame(width: 1, height: 30)
-                    
-                    VStack(spacing: 4) {
-                        OutlinedText(text: "已付定金", size: 12, weight: .regular)
-                        OutlinedText(text: "¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 22, color: .orange)
-                    }
-                    .frame(maxWidth: .infinity)
-                    
-                    Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1))
-                        .frame(width: 1, height: 30)
-                    
-                    VStack(spacing: 4) {
-                        OutlinedText(text: "待付尾款", size: 12, weight: .regular)
-                        OutlinedText(text: "¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 22)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(.vertical, 16)
-            }
-            .frame(height: 90)
-            
-            // Grid Title
+        VStack(spacing: 16) {
+            // Header
             HStack {
-                OutlinedText(text: entry.statsType == .month ? "按月预估尾款" : "按系列预估尾款", size: 12, weight: .medium, color: .blue.opacity(0.8))
-                Spacer()
-                OutlinedText(text: String(Calendar.current.component(.year, from: Date())) + "年", size: 12, weight: .bold)
-            }
-            .padding(.horizontal, 4)
-            
-            // Full Grid
-            LazyVGrid(columns: columns, spacing: 10) {
-                if entry.statsType == .month {
-                    // 显示 12 个月
-                    let yearData = getRecentMonthsData(count: 12)
-                    ForEach(yearData, id: \.id) { data in
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.clear)
-                                .stroke(
-                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
-                                    lineWidth: 1
-                                )
-                                .frame(height: 60)
-                            
-                            VStack(spacing: 2) {
-                                OutlinedText(text: "\(data.month)月", size: 12, weight: .regular)
-                                if data.totalBalance > 0 {
-                                    OutlinedText(text: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))", size: 10, color: .orange)
-                                } else {
-                                    Text("-")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary.opacity(0.3))
-                                }
-                            }
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Image(systemName: "calendar")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                        let currentYear = Calendar.current.component(.year, from: Date())
+                        OutlinedText(text: "\(currentYear)年度定尾计划表", size: 20, weight: .heavy)
+                    }
+                    
+                    HStack(spacing: 12) {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.pink).frame(width: 6, height: 6)
+                            OutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 12)
+                        }
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.orange).frame(width: 6, height: 6)
+                            OutlinedText(text: "总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 12)
                         }
                     }
+                }
+                Spacer()
+            }
+            
+            // Content
+            LazyVGrid(columns: columns, spacing: 12) {
+                // Show all months with data
+                let months = entry.monthStats.filter { $0.count > 0 || $0.totalBalance > 0 }
+                if months.isEmpty {
+                    EmptyStateView(text: "暂无数据")
                 } else {
-                    // 显示 Top 12 系列
-                    ForEach(Array(entry.seriesStats.prefix(12))) { series in
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.clear)
-                                .stroke(
-                                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.8),
-                                    lineWidth: 1
-                                )
-                                .frame(height: 60)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    OutlinedText(text: series.name, size: 10, weight: .medium)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    OutlinedText(text: "\(series.count)", size: 9, weight: .regular, color: .secondary)
-                                        .padding(3)
-                                        .background(Circle().fill(Color.gray.opacity(0.1)))
-                                }
-                                OutlinedText(text: "¥\(series.totalBalance)", size: 10, color: .orange)
-                            }
-                            .padding(6)
-                        }
+                    ForEach(months.prefix(12), id: \.id) { data in
+                        StatCard(
+                            title: "\(data.month)月",
+                            value: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))",
+                            subValue: "定金 ¥\(data.totalDeposit.formatted(.number.notation(.compactName)))",
+                            highlight: Calendar.current.component(.month, from: Date()) == data.month
+                        )
                     }
                 }
             }
             Spacer()
         }
+        .padding(16)
     }
+}
+
+struct StatCard: View {
+    let title: String
+    let value: String
+    let subValue: String
+    let highlight: Bool
+    @Environment(\.colorScheme) var colorScheme
     
-    private func getRecentMonthsData(count: Int) -> [WidgetMonthInfo] {
-        return Array(entry.monthStats.prefix(count))
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(highlight ? Color.white.opacity(0.2) : Color.clear)
+                .stroke(
+                    colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.5),
+                    lineWidth: 1
+                )
+            
+            VStack(spacing: 4) {
+                OutlinedText(text: title, size: 12, weight: .bold)
+                    .lineLimit(1)
+                
+                OutlinedText(text: value, size: 14, weight: .heavy, color: .orange)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                
+                OutlinedText(text: subValue, size: 10, weight: .medium, color: .white.opacity(0.8))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(8)
+        }
+        .frame(height: 60)
     }
 }
 

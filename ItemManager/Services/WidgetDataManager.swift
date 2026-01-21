@@ -21,6 +21,7 @@ struct WidgetSeriesInfo: Codable, Identifiable {
     let name: String
     let count: Int
     let totalBalance: Decimal
+    let totalDeposit: Decimal
 }
 
 struct WidgetMonthInfo: Codable, Identifiable {
@@ -29,6 +30,7 @@ struct WidgetMonthInfo: Codable, Identifiable {
     let year: Int
     let count: Int
     let totalBalance: Decimal
+    let totalDeposit: Decimal
 }
 
 struct WidgetData: Codable {
@@ -63,13 +65,27 @@ class WidgetDataManager {
     static let shared = WidgetDataManager()
     static let appGroupIdentifier = "group.bugod.ItemManager"
     private let filename = "widget_data.json"
+    private let imagesDirectoryName = "WidgetImages"
+    
+    private var containerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier)
+    }
     
     private var fileURL: URL? {
-        guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier) else {
-            print("WidgetDataManager: Could not find App Group container for ID: \(Self.appGroupIdentifier)")
-            return nil
+        containerURL?.appendingPathComponent(filename)
+    }
+    
+    var widgetImagesDirectory: URL? {
+        guard let container = containerURL else { return nil }
+        let dir = container.appendingPathComponent(imagesDirectoryName)
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
-        return container.appendingPathComponent(filename)
+        return dir
+    }
+    
+    func imageURL(for path: String) -> URL? {
+        return widgetImagesDirectory?.appendingPathComponent(path)
     }
     
     func save(data: WidgetData) {

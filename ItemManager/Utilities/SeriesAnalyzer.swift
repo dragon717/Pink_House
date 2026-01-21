@@ -12,12 +12,14 @@ struct SeriesInfo: Identifiable, Hashable {
     let name: String
     let count: Int
     let totalBalance: Decimal
+    let totalDeposit: Decimal
 }
 
 struct SeriesInput: Sendable {
     let id: UUID
     let name: String
     let balance: Decimal
+    let deposit: Decimal
     let stock: Int
 }
 
@@ -29,22 +31,40 @@ class SeriesAnalyzer {
     func analyzeSeries(from clothings: [Clothing]) async -> [SeriesInfo] {
         // Convert to Sendable structs to safely pass to detached task
         let inputs = clothings.map { 
-            SeriesInput(id: $0.id, name: $0.name, balance: $0.balance, stock: $0.stock) 
+            SeriesInput(id: $0.id, name: $0.name, balance: $0.balance, deposit: $0.deposit, stock: $0.stock) 
         }
         
         return await Task.detached(priority: .userInitiated) {
+            // Deduplicate inputs: Keep only unique combinations of name, deposit, balance, and stock
+            var seenKeys: Set<String> = []
+            var uniqueInputs: [SeriesInput] = []
+            
+            for input in inputs {
+                // Create a unique key for the clothing
+                // Using a combination of name and financial/stock details
+                let key = "\(input.name)|\(input.deposit)|\(input.balance)|\(input.stock)"
+                
+                if !seenKeys.contains(key) {
+                    seenKeys.insert(key)
+                    uniqueInputs.append(input)
+                }
+            }
+            
             var candidateCounts: [String: Int] = [:]
             var candidateBalances: [String: Decimal] = [:]
+            var candidateDeposits: [String: Decimal] = [:]
             var candidateClothingIDs: [String: Set<UUID>] = [:]
             
             // 1. Generate candidates from each clothing name
-            for clothing in inputs {
+            for clothing in uniqueInputs {
                 let name = clothing.name
                 let candidates = self.generateCandidates(from: name)
                 
                 for candidate in candidates {
                     candidateCounts[candidate, default: 0] += 1
-                    candidateBalances[candidate, default: 0] += (clothing.balance * Decimal(clothing.stock))
+                    let stock = Decimal(clothing.stock)
+                    candidateBalances[candidate, default: 0] += (clothing.balance * stock)
+                    candidateDeposits[candidate, default: 0] += (clothing.deposit * stock)
                     candidateClothingIDs[candidate, default: []].insert(clothing.id)
                 }
             }
@@ -81,7 +101,12 @@ class SeriesAnalyzer {
                 }
                 
                 if !isRedundant {
-                    seriesList.append(SeriesInfo(name: candidate, count: count, totalBalance: candidateBalances[candidate] ?? 0))
+                    seriesList.append(SeriesInfo(
+                        name: candidate, 
+                        count: count, 
+                        totalBalance: candidateBalances[candidate] ?? 0,
+                        totalDeposit: candidateDeposits[candidate] ?? 0
+                    ))
                 }
             }
             

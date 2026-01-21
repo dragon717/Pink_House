@@ -15,9 +15,3 @@ enum WidgetSize: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
-enum StatsType: String, CaseIterable, Identifiable {
-    case month = "按月份"
-    case series = "按系列"
-    
-    var id: String { self.rawValue }
-}

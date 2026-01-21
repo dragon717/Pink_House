@@ -69,16 +69,8 @@ class SharedPersistence {
             let totalDeposit = depositPlans.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
             let totalBalance = depositPlans.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
             
-            // 3. Recent Items
-            let recentItems = clothings.prefix(5).map { clothing in
-                WidgetClothing(
-                    id: clothing.id,
-                    name: clothing.name,
-                    price: clothing.price,
-                    stock: clothing.stock,
-                    imagePath: clothing.imagePaths.first
-                )
-            }
+            // 3. Recent Items & Image Processing
+            let recentItems = processWidgetImages(clothings)
             
             // 4. Series Stats & Save
             // SeriesAnalyzer might be slow, so we do it async but we need to capture clothings
@@ -89,12 +81,6 @@ class SharedPersistence {
             // Actually SeriesAnalyzer.analyzeSeries is async.
             
             Task {
-                // Use depositPlans for stats as requested by user (Widget mainly tracks deposit plans)
-                let seriesStats = await SeriesAnalyzer.shared.analyzeSeries(from: depositPlans)
-                let widgetSeries = seriesStats.map { info in
-                    WidgetSeriesInfo(name: info.name, count: info.count, totalBalance: info.totalBalance)
-                }
-                
                 // 5. Month Stats
                 var monthStats: [WidgetMonthInfo] = []
                 
@@ -114,8 +100,15 @@ class SharedPersistence {
                     
                     let count = monthlyItems.count
                     let totalBalance = monthlyItems.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+                    let totalDeposit = monthlyItems.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
                     
-                    monthStats.append(WidgetMonthInfo(month: month, year: currentYear, count: count, totalBalance: totalBalance))
+                    monthStats.append(WidgetMonthInfo(
+                        month: month, 
+                        year: currentYear, 
+                        count: count, 
+                        totalBalance: totalBalance,
+                        totalDeposit: totalDeposit
+                    ))
                 }
                 
                 // 6. Save and Reload
@@ -127,9 +120,9 @@ class SharedPersistence {
                     totalPrice: totalPrice,
                     totalDeposit: totalDeposit,
                     totalBalance: totalBalance,
-                    seriesStats: widgetSeries,
+                    seriesStats: [], // No longer calculating series stats for widget
                     monthStats: monthStats,
-                    recentClothings: Array(recentItems),
+                    recentClothings: recentItems,
                     lastUpdated: Date()
                 )
                 
@@ -141,5 +134,69 @@ class SharedPersistence {
         } catch {
             print("SharedPersistence: Failed to fetch data for widget sync: \(error)")
         }
+    }
+    
+    private func processWidgetImages(_ clothings: [Clothing]) -> [WidgetClothing] {
+        // Take top 5 recent items
+        let recent = clothings.prefix(5)
+        var widgetClothings: [WidgetClothing] = []
+        
+        let fileManager = FileManager.default
+        // Assuming images are stored in Documents/Images as per ImageManager
+        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Images"),
+              let widgetImagesDir = WidgetDataManager.shared.widgetImagesDirectory else {
+            return recent.map { 
+                WidgetClothing(id: $0.id, name: $0.name, price: $0.price, stock: $0.stock, imagePath: nil) 
+            }
+        }
+        
+        for clothing in recent {
+            var widgetImagePath: String? = nil
+            
+            if let originalPath = clothing.imagePaths.first {
+                let sourceURL = documentsPath.appendingPathComponent(originalPath)
+                let destFileName = "thumb_\(originalPath)"
+                let destURL = widgetImagesDir.appendingPathComponent(destFileName)
+                
+                // Compress and Copy if not exists or if source is newer (simplified: just check existence)
+                if !fileManager.fileExists(atPath: destURL.path) {
+                    if let image = UIImage(contentsOfFile: sourceURL.path) {
+                        // Compress to max 300px width/height and low quality to save memory
+                        let size = image.size
+                        let maxDimension: CGFloat = 300
+                        var newSize = size
+                        if size.width > maxDimension || size.height > maxDimension {
+                            let ratio = size.width / size.height
+                            if size.width > size.height {
+                                newSize = CGSize(width: maxDimension, height: maxDimension / ratio)
+                            } else {
+                                newSize = CGSize(width: maxDimension * ratio, height: maxDimension)
+                            }
+                        }
+                        
+                        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+                        image.draw(in: CGRect(origin: .zero, size: newSize))
+                        let newImage = UIGraphicsGetImageFromCurrentImageContext()
+                        UIGraphicsEndImageContext()
+                        
+                        if let data = newImage?.jpegData(compressionQuality: 0.5) {
+                            try? data.write(to: destURL)
+                            widgetImagePath = destFileName
+                        }
+                    }
+                } else {
+                    widgetImagePath = destFileName
+                }
+            }
+            
+            widgetClothings.append(WidgetClothing(
+                id: clothing.id,
+                name: clothing.name,
+                price: clothing.price,
+                stock: clothing.stock,
+                imagePath: widgetImagePath
+            ))
+        }
+        return widgetClothings
     }
 }

@@ -12,8 +12,6 @@ import SwiftData
 struct SimpleEntry: TimelineEntry {
     let date: Date
     let size: WidgetSize
-    let statsType: StatsType
-    let seriesStats: [WidgetSeriesInfo]
     let monthStats: [WidgetMonthInfo]
     
     // New Fields for High Information Density
@@ -33,8 +31,6 @@ struct Provider: AppIntentTimelineProvider {
         SimpleEntry(
             date: Date(), 
             size: .small, 
-            statsType: .month, 
-            seriesStats: [],
             monthStats: [],
             totalCount: 0,
             totalStyleCount: 0,
@@ -64,22 +60,12 @@ struct Provider: AppIntentTimelineProvider {
     
     @MainActor
     private func createEntry(with configuration: ConfigurationAppIntent? = nil) -> SimpleEntry {
-        // 从配置中获取统计类型，默认为 month
-        let statsType: StatsType
-        if let config = configuration {
-            statsType = (config.statsType == .series) ? .series : .month
-        } else {
-            statsType = .month
-        }
-        
         // 从共享容器中 Load 数据
         let data = WidgetDataManager.shared.load()
         
         return SimpleEntry(
             date: Date(),
             size: .small, // 尺寸参数不再重要，视图会根据 family 自适应
-            statsType: statsType,
-            seriesStats: data.seriesStats,
             monthStats: data.monthStats,
             totalCount: data.totalCount,
             totalStyleCount: data.totalStyleCount,
