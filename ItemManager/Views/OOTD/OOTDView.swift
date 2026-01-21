@@ -13,39 +13,44 @@ struct OOTDView: View {
     @State private var isProcessing = false
     @State private var processingMessage = ""
     @State private var showingBatchConfirmation = false
+    @State private var isListExpanded = false
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                if let outfit = currentOutfit {
-                    OOTDCanvasView(outfit: outfit)
-                } else {
-                    ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
-                }
-                
-                VStack {
-                    Spacer()
-                    OOTDCutoutListView(
-                        onSelect: { cutout in
-                            addToOutfit(cutout)
-                        },
-                        onAddPhoto: {
-                            isImagePickerPresented = true
-                        }
-                    )
-                    .frame(height: 200) // Adjust height as needed
-                }
-                
-                if isProcessing {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
+            GeometryReader { geometry in
+                ZStack {
+                    if let outfit = currentOutfit {
+                        OOTDCanvasView(outfit: outfit)
+                    } else {
+                        ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+                    }
+                    
                     VStack {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                        Text(processingMessage)
-                            .foregroundColor(.white)
-                            .padding(.top)
+                        Spacer()
+                        OOTDCutoutListView(
+                            isExpanded: $isListExpanded,
+                            onSelect: { cutout in
+                                addToOutfit(cutout)
+                            },
+                            onAddPhoto: {
+                                isImagePickerPresented = true
+                            }
+                        )
+                        .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+                    }
+                    
+                    if isProcessing {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                        VStack {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+                            Text(processingMessage)
+                                .foregroundColor(.white)
+                                .padding(.top)
+                        }
                     }
                 }
             }

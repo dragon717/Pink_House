@@ -6,10 +6,9 @@ struct OOTDCutoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CutoutItem.timestamp, order: .reverse) private var cutouts: [CutoutItem]
     
+    @Binding var isExpanded: Bool
     var onSelect: (CutoutItem) -> Void
     var onAddPhoto: () -> Void
-    
-    @State private var isExpanded: Bool = false
     
     var body: some View {
         VStack(spacing: 0) {
