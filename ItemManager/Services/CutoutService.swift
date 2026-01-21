@@ -20,8 +20,11 @@ class CutoutService {
     
     /// 核心流程：识别主体 -> 抠图 -> 加白边 -> 保存
     func processImage(image: UIImage, category: String, context: ModelContext) async throws -> CutoutItem {
+        // 0. Normalize Orientation (Fix rotation issue)
+        let normalizedImage = normalizeOrientation(image)
+        
         // 1. 识别并抠图
-        let (cutoutImage, confidence) = try await liftSubject(from: image)
+        let (cutoutImage, confidence) = try await liftSubject(from: normalizedImage)
         
         guard confidence >= 0.9 else {
             throw CutoutError.lowConfidence
@@ -145,5 +148,15 @@ class CutoutService {
     private func computeHash(data: Data) -> String {
         // Simple hash helper
         return String(data.count) // Placeholder, should use SHA256 like ImageManager
+    }
+    
+    private func normalizeOrientation(_ image: UIImage) -> UIImage {
+        if image.imageOrientation == .up { return image }
+        
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        return UIGraphicsImageRenderer(size: image.size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+        }
     }
 }
