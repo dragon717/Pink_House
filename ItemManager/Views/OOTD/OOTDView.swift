@@ -6,6 +6,7 @@ import PhotosUI
 struct OOTDView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var allClothing: [Clothing] // Fetch all clothing to scan
+    @Query(sort: \Outfit.createdAt, order: .reverse) private var allOutfits: [Outfit]
     
     @State private var currentOutfit: Outfit?
     @State private var isImagePickerPresented = false
@@ -13,43 +14,63 @@ struct OOTDView: View {
     @State private var isProcessing = false
     @State private var processingMessage = ""
     @State private var showingBatchConfirmation = false
+    @State private var showingRenameAlert = false
+    @State private var newName = ""
     @State private var isListExpanded = false
-    
+    @State private var isSidebarVisible = false
+
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                ZStack {
-                    if let outfit = currentOutfit {
-                        OOTDCanvasView(outfit: outfit)
-                    } else {
-                        ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
-                    }
+                HStack(spacing: 0) {
+                    // Sidebar
+                    OOTDSidebarView(
+                        isVisible: $isSidebarVisible,
+                        currentOutfit: $currentOutfit,
+                        onAdd: {
+                            createNewOutfit()
+                        },
+                        onDelete: { outfit in
+                            deleteOutfit(outfit)
+                        }
+                    )
+                    .zIndex(1)
                     
-                    VStack {
-                        Spacer()
-                        OOTDCutoutListView(
-                            isExpanded: $isListExpanded,
-                            onSelect: { cutout in
-                                addToOutfit(cutout)
-                            },
-                            onAddPhoto: {
-                                isImagePickerPresented = true
-                            }
-                        )
-                        .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
-                    }
-                    
-                    if isProcessing {
-                        Color.black.opacity(0.4)
-                            .ignoresSafeArea()
+                    // Main Content
+                    ZStack {
+                        if let outfit = currentOutfit {
+                            OOTDCanvasView(outfit: outfit)
+                                .id(outfit.id) // Force refresh when switching outfits
+                        } else {
+                            ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+                        }
+                        
                         VStack {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                                .tint(.white)
-                            Text(processingMessage)
-                                .foregroundColor(.white)
-                                .padding(.top)
+                            Spacer()
+                            OOTDCutoutListView(
+                                isExpanded: $isListExpanded,
+                                onSelect: { cutout in
+                                    addToOutfit(cutout)
+                                },
+                                onAddPhoto: {
+                                    isImagePickerPresented = true
+                                }
+                            )
+                            .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+                        }
+                        
+                        if isProcessing {
+                            Color.black.opacity(0.4)
+                                .ignoresSafeArea()
+                            VStack {
+                                ProgressView()
+                                    .scaleEffect(1.5)
+                                    .tint(.white)
+                                Text(processingMessage)
+                                    .foregroundColor(.white)
+                                    .padding(.top)
+                            }
                         }
                     }
                 }
@@ -57,22 +78,60 @@ struct OOTDView: View {
             .navigationTitle("OOTD")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        withAnimation {
+                            isSidebarVisible.toggle()
+                        }
+                    }) {
+                        Image(systemName: "sidebar.left")
+                    }
+                }
+                
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("保存搭配") {
-                            saveOutfit()
+                        Button {
+                            createNewOutfit()
+                        } label: {
+                            Label("新建搭配", systemImage: "plus")
                         }
-                        Button("批量处理小裙子") {
+                        
+                        Divider()
+                        
+                        if let current = currentOutfit {
+                            Button {
+                                newName = current.note
+                                showingRenameAlert = true
+                            } label: {
+                                Label("重命名", systemImage: "pencil")
+                            }
+                            
+                            Button {
+                                copyCurrentOutfit()
+                            } label: {
+                                Label("复制搭配", systemImage: "doc.on.doc")
+                            }
+                            
+                            Divider()
+                        }
+                        
+                        Button {
                             showingBatchConfirmation = true
+                        } label: {
+                            Label("批量处理小裙子", systemImage: "wand.and.stars")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                 }
-                
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("新建") {
-                        createNewOutfit()
+            }
+            .alert("重命名搭配", isPresented: $showingRenameAlert) {
+                TextField("名称", text: $newName)
+                Button("取消", role: .cancel) { }
+                Button("确定") {
+                    if let current = currentOutfit {
+                        current.note = newName
+                        try? modelContext.save()
                     }
                 }
             }
@@ -86,7 +145,11 @@ struct OOTDView: View {
             }
             .onAppear {
                 if currentOutfit == nil {
-                    createNewOutfit()
+                    if let first = allOutfits.first {
+                        currentOutfit = first
+                    } else {
+                        createNewOutfit()
+                    }
                 }
             }
             .photosPicker(isPresented: $isImagePickerPresented, selection: $selectedItem, matching: .images)
@@ -94,6 +157,10 @@ struct OOTDView: View {
                 if let newItem {
                     processPickedImage(newItem)
                 }
+            }
+            .onChange(of: currentOutfit) { _, _ in
+                // Auto save when switching (although SwiftData autosaves, we might want to ensure snapshot)
+                // Actually snapshot should be updated when content changes, not just switching
             }
         }
     }
@@ -138,9 +205,98 @@ struct OOTDView: View {
     }
 
     private func createNewOutfit() {
-        let newOutfit = Outfit()
+        let newOutfit = Outfit(note: "搭配 \(Date().formatted(date: .numeric, time: .shortened))")
         modelContext.insert(newOutfit)
+        try? modelContext.save() // Ensure ID is generated
         currentOutfit = newOutfit
+        
+        // Generate initial empty snapshot
+        Task { @MainActor in
+            saveSnapshot(for: newOutfit)
+        }
+    }
+    
+    private func deleteOutfit(_ outfit: Outfit) {
+        // If deleting current, switch first
+        if currentOutfit?.id == outfit.id {
+            // Find next available
+            if let index = allOutfits.firstIndex(where: { $0.id == outfit.id }) {
+                // Prefer previous item if available (since list is reversed time, previous index is older)
+                // Actually list is sorted by time desc.
+                // If we are at index i, next one is i+1.
+                let nextIndex = index + 1
+                if nextIndex < allOutfits.count {
+                    currentOutfit = allOutfits[nextIndex]
+                } else if index > 0 {
+                    currentOutfit = allOutfits[index - 1]
+                } else {
+                    currentOutfit = nil
+                }
+            }
+        }
+        
+        // Clean up snapshot file
+        if let path = outfit.snapshotPath {
+             ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+        }
+        
+        modelContext.delete(outfit)
+        try? modelContext.save()
+        
+        if currentOutfit == nil {
+             createNewOutfit()
+        }
+    }
+    
+    private func copyCurrentOutfit() {
+        guard let current = currentOutfit else { return }
+        
+        // Update snapshot for current before copying
+        saveSnapshot(for: current)
+        
+        let newOutfit = Outfit(note: current.note + " 副本")
+        modelContext.insert(newOutfit)
+        
+        // Copy items (Reference Principle: Point to same CutoutItem)
+        for item in current.items {
+            let newItem = OutfitItem(
+                cutout: item.cutout, // Same reference
+                x: item.x,
+                y: item.y,
+                rotation: item.rotation,
+                scale: item.scale,
+                zIndex: item.zIndex
+            )
+            newOutfit.items.append(newItem)
+        }
+        
+        // Copy snapshot image file if exists
+        if let snapPath = current.snapshotPath,
+           let image = ImageManager.shared.loadImage(fileName: snapPath),
+           let newPath = ImageManager.shared.saveImage(image, context: modelContext) {
+            newOutfit.snapshotPath = newPath
+        }
+        
+        try? modelContext.save()
+        
+        // Switch to new outfit
+        currentOutfit = newOutfit
+    }
+
+    @MainActor
+    private func saveSnapshot(for outfit: Outfit) {
+        let renderer = ImageRenderer(content: OOTDPreviewView(outfit: outfit))
+        renderer.scale = 2.0 
+        
+        if let uiImage = renderer.uiImage,
+           let path = ImageManager.shared.saveImage(uiImage, context: modelContext) {
+            // Delete old snapshot if exists and different
+            if let oldPath = outfit.snapshotPath, oldPath != path {
+                ImageManager.shared.deleteImage(fileName: oldPath, context: modelContext)
+            }
+            outfit.snapshotPath = path
+            try? modelContext.save()
+        }
     }
     
     private func addToOutfit(_ cutout: CutoutItem) {
@@ -157,14 +313,22 @@ struct OOTDView: View {
         )
         
         outfit.items.append(item)
+        
+        // Update snapshot
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000) // Wait for layout?
+            saveSnapshot(for: outfit)
+        }
     }
     
     private func saveOutfit() {
         // Implement snapshot taking and saving
-        // For now just save context
+        if let outfit = currentOutfit {
+            saveSnapshot(for: outfit)
+        }
         try? modelContext.save()
     }
-
+    
     private func processPickedImage(_ item: PhotosPickerItem) {
         isProcessing = true
         processingMessage = "正在识别主体..."
