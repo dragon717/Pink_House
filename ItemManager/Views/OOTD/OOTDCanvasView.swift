@@ -16,10 +16,16 @@ struct OOTDCanvasView: View {
             // Grid or background guide (optional)
             
             ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
-                CanvasItemView(item: item, isSelected: selectedItemId == item.id)
-                    .onTapGesture {
-                        selectedItemId = item.id
+                CanvasItemView(
+                    item: item, 
+                    isSelected: selectedItemId == item.id,
+                    onDelete: {
+                        deleteItem(item)
                     }
+                )
+                .onTapGesture {
+                    selectedItemId = item.id
+                }
             }
         }
         .contentShape(Rectangle())
@@ -27,11 +33,20 @@ struct OOTDCanvasView: View {
             selectedItemId = nil
         }
     }
+    
+    private func deleteItem(_ item: OutfitItem) {
+        if let index = outfit.items.firstIndex(where: { $0.id == item.id }) {
+            outfit.items.remove(at: index)
+            selectedItemId = nil
+            modelContext.delete(item)
+        }
+    }
 }
 
 struct CanvasItemView: View {
     @Bindable var item: OutfitItem
     let isSelected: Bool
+    var onDelete: () -> Void
     
     @State private var currentOffset: CGSize = .zero
     @State private var currentScale: CGFloat = 1.0
@@ -49,14 +64,25 @@ struct CanvasItemView: View {
                 .rotationEffect(Angle(degrees: item.rotation) + currentRotation)
                 .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
                 .overlay(
-                    isSelected ? 
-                        Rectangle()
-                            .strokeBorder(Color.blue, lineWidth: 2)
-                            .frame(width: 200, height: 200) // Match frame
-                            .scaleEffect(item.scale * currentScale)
-                            .rotationEffect(Angle(degrees: item.rotation) + currentRotation)
-                            .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
-                    : nil
+                    ZStack(alignment: .topTrailing) {
+                        if isSelected {
+                            Rectangle()
+                                .strokeBorder(Color.blue, lineWidth: 2)
+                            
+                            // Delete Button on Selection Border
+                            Button(action: onDelete) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.red)
+                                    .background(Circle().fill(Color.white))
+                            }
+                            .offset(x: 12, y: -12) // Position slightly outside
+                        }
+                    }
+                    .frame(width: 200, height: 200) // Match frame
+                    .scaleEffect(item.scale * currentScale)
+                    .rotationEffect(Angle(degrees: item.rotation) + currentRotation)
+                    .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
                 )
                 .gesture(
                     SimultaneousGesture(

@@ -33,8 +33,9 @@ class CutoutService {
         // 2. 添加白边
         let borderedImage = addWhiteBorder(to: cutoutImage)
         
-        // 3. 保存图片 (使用 ImageManager 保存为 PNG)
-        guard let fileName = ImageManager.shared.saveImage(borderedImage, context: context, format: .png) else {
+        // 3. 保存图片 (使用 ImageManager 保存为 HEIC 以获得更小的体积和透明度支持)
+        // 0.8 的质量通常能提供非常好的视觉效果，且体积远小于 PNG
+        guard let fileName = ImageManager.shared.saveImage(borderedImage, context: context, format: .heic(quality: 0.8)) else {
             throw CutoutError.processingFailed
         }
         
