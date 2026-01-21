@@ -117,7 +117,7 @@ struct OOTDView: View {
                     do {
                         // Check if we already have a cutout for this clothing? 
                         // For now, just process.
-                        _ = try await CutoutService.shared.processImage(image: image, category: "裙装", context: modelContext)
+                        _ = try await CutoutService.shared.processImage(image: image, category: "裙装", clothing: clothing, context: modelContext)
                         count += 1
                         await MainActor.run {
                             processingMessage = "已处理 \(count) 件..."

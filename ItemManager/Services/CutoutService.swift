@@ -19,39 +19,58 @@ class CutoutService {
     private init() {}
     
     /// 核心流程：识别主体 -> 抠图 -> 加白边 -> 保存
-    func processImage(image: UIImage, category: String, context: ModelContext) async throws -> CutoutItem {
-        // 0. Normalize Orientation (Fix rotation issue)
+    /// - Parameters:
+    ///   - clothing: 可选关联的服装对象，用于去重检查（同一件衣服同一张图不重复抠）
+    func processImage(image: UIImage, category: String, clothing: Clothing? = nil, context: ModelContext) async throws -> CutoutItem {
+        // 0. Pre-calculation: Hash Check for Deduplication
+        // 计算原始图片哈希用于去重
+        // 使用与 ImageManager 一致的压缩参数来确保 Hash 一致性（虽然这里用于 CutoutItem 的去重，逻辑自洽即可）
+        guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+            throw CutoutError.processingFailed
+        }
+        let originalHash = computeHash(data: imageData)
+        
+        // 检查是否存在相同的抠图记录
+        let descriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.originalImageHash == originalHash })
+        if let existingItem = try? context.fetch(descriptor).first {
+            print("Duplicate cutout found for hash: \(originalHash). Skipping processing.")
+            
+            // 如果传入了 clothing 且现有 item 未关联，则建立关联
+            if let clothing = clothing, existingItem.linkedClothing == nil {
+                existingItem.linkedClothing = clothing
+                // try? context.save() // Auto-save usually handles this, or caller saves
+            }
+            
+            return existingItem
+        }
+        
+        // 1. Normalize Orientation (Fix rotation issue)
         let normalizedImage = normalizeOrientation(image)
         
-        // 1. 识别并抠图
+        // 2. 识别并抠图
         let (cutoutImage, confidence) = try await liftSubject(from: normalizedImage)
         
         guard confidence >= 0.9 else {
             throw CutoutError.lowConfidence
         }
         
-        // 2. 添加白边
+        // 3. 添加白边
         let borderedImage = addWhiteBorder(to: cutoutImage)
         
-        // 3. 保存图片 (使用 ImageManager 保存为 HEIC 以获得更小的体积和透明度支持)
+        // 4. 保存图片 (使用 ImageManager 保存为 HEIC 以获得更小的体积和透明度支持)
         // 0.8 的质量通常能提供非常好的视觉效果，且体积远小于 PNG
         guard let fileName = ImageManager.shared.saveImage(borderedImage, context: context, format: .heic(quality: 0.8)) else {
             throw CutoutError.processingFailed
         }
         
-        // 4. 创建 CutoutItem
-        // 计算原始图片哈希用于去重（这里简化为使用 borderedImage 的哈希，或者应该传入原始图片哈希）
-        // 为了简单，我们暂且重新计算原始图片的哈希，或者就用 borderedImage 的哈希作为唯一标识
-        // 用户需求提到：存储每张抠图元数据（包括原始图像hash...）
-        // 我们这里生成一个基于原始图片的Hash
-        let originalHash = computeHash(data: image.jpegData(compressionQuality: 0.5) ?? Data())
-        
+        // 5. 创建 CutoutItem
         let item = CutoutItem(
             originalImageHash: originalHash,
             category: category,
             imagePath: fileName,
             width: Double(borderedImage.size.width),
-            height: Double(borderedImage.size.height)
+            height: Double(borderedImage.size.height),
+            linkedClothing: clothing
         )
         
         context.insert(item)
