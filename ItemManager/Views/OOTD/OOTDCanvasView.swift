@@ -21,6 +21,15 @@ struct OOTDCanvasView: View {
                     isSelected: selectedItemId == item.id,
                     onDelete: {
                         deleteItem(item)
+                    },
+                    onBringToFront: {
+                        bringToFront(item)
+                    },
+                    onBringForward: {
+                        bringForward(item)
+                    },
+                    onSendBackward: {
+                        sendBackward(item)
                     }
                 )
                 .onTapGesture {
@@ -41,12 +50,60 @@ struct OOTDCanvasView: View {
             modelContext.delete(item)
         }
     }
+    
+    // MARK: - Layer Management
+    
+    private func bringToFront(_ item: OutfitItem) {
+        guard let maxZIndex = outfit.items.map({ $0.zIndex }).max() else { return }
+        item.zIndex = maxZIndex + 1
+        reindexLayers()
+    }
+    
+    private func bringForward(_ item: OutfitItem) {
+        let sortedItems = outfit.items.sorted(by: { $0.zIndex < $1.zIndex })
+        guard let index = sortedItems.firstIndex(where: { $0.id == item.id }),
+              index < sortedItems.count - 1 else { return }
+        
+        let nextItem = sortedItems[index + 1]
+        // Swap zIndex
+        (item.zIndex, nextItem.zIndex) = (nextItem.zIndex, item.zIndex)
+        
+        // Ensure strictly greater if equal (though swap should handle distinct values)
+        if item.zIndex <= nextItem.zIndex {
+            item.zIndex = nextItem.zIndex + 1
+        }
+        
+        reindexLayers()
+    }
+    
+    private func sendBackward(_ item: OutfitItem) {
+        let sortedItems = outfit.items.sorted(by: { $0.zIndex < $1.zIndex })
+        guard let index = sortedItems.firstIndex(where: { $0.id == item.id }),
+              index > 0 else { return }
+        
+        let prevItem = sortedItems[index - 1]
+        // Swap zIndex
+        (item.zIndex, prevItem.zIndex) = (prevItem.zIndex, item.zIndex)
+        
+        reindexLayers()
+    }
+    
+    private func reindexLayers() {
+        // Re-assign zIndexes to be sequential to keep numbers manageable
+        let sortedItems = outfit.items.sorted(by: { $0.zIndex < $1.zIndex })
+        for (index, item) in sortedItems.enumerated() {
+            item.zIndex = index
+        }
+    }
 }
 
 struct CanvasItemView: View {
     @Bindable var item: OutfitItem
     let isSelected: Bool
     var onDelete: () -> Void
+    var onBringToFront: () -> Void
+    var onBringForward: () -> Void
+    var onSendBackward: () -> Void
     
     @State private var currentOffset: CGSize = .zero
     @State private var currentScale: CGFloat = 1.0
@@ -64,19 +121,50 @@ struct CanvasItemView: View {
                 .rotationEffect(Angle(degrees: item.rotation) + currentRotation)
                 .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
                 .overlay(
-                    ZStack(alignment: .topTrailing) {
+                    ZStack {
                         if isSelected {
                             Rectangle()
                                 .strokeBorder(Color.blue, lineWidth: 2)
                             
-                            // Delete Button on Selection Border
+                            // Delete Button (Top Right)
                             Button(action: onDelete) {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 24))
                                     .foregroundColor(.red)
                                     .background(Circle().fill(Color.white))
                             }
-                            .offset(x: 12, y: -12) // Position slightly outside
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                            .offset(x: 12, y: -12)
+                            
+                            // Bring to Front (Top Left) - 置顶
+                            Button(action: onBringToFront) {
+                                Image(systemName: "arrow.up.to.line.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.blue)
+                                    .background(Circle().fill(Color.white))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .offset(x: -12, y: -12)
+                            
+                            // Bring Forward (Bottom Left) - 加一层
+                            Button(action: onBringForward) {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.green)
+                                    .background(Circle().fill(Color.white))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                            .offset(x: -12, y: 12)
+                            
+                            // Send Backward (Bottom Right) - 减一层
+                            Button(action: onSendBackward) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.orange)
+                                    .background(Circle().fill(Color.white))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            .offset(x: 12, y: 12)
                         }
                     }
                     .frame(width: 200, height: 200) // Match frame
