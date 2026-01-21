@@ -16,6 +16,7 @@ struct OOTDView: View {
     @State private var showingBatchConfirmation = false
     @State private var showingRenameAlert = false
     @State private var newName = ""
+    @State private var showingDeleteCurrentAlert = false
     @State private var isListExpanded = false
     @State private var isSidebarVisible = false
 
@@ -62,7 +63,7 @@ struct OOTDView: View {
                         
                         if isProcessing {
                             Color.black.opacity(0.4)
-                                .ignoresSafeArea()
+                            .ignoresSafeArea()
                             VStack {
                                 ProgressView()
                                     .scaleEffect(1.5)
@@ -112,6 +113,12 @@ struct OOTDView: View {
                                 Label("复制搭配", systemImage: "doc.on.doc")
                             }
                             
+                            Button(role: .destructive) {
+                                showingDeleteCurrentAlert = true
+                            } label: {
+                                Label("删除搭配", systemImage: "trash")
+                            }
+                            
                             Divider()
                         }
                         
@@ -134,6 +141,16 @@ struct OOTDView: View {
                         try? modelContext.save()
                     }
                 }
+            }
+            .alert("删除当前搭配", isPresented: $showingDeleteCurrentAlert) {
+                Button("删除", role: .destructive) {
+                    if let current = currentOutfit {
+                        deleteOutfit(current)
+                    }
+                }
+                Button("取消", role: .cancel) { }
+            } message: {
+                Text("确定要删除当前搭配吗？此操作无法撤销。")
             }
             .alert("批量处理", isPresented: $showingBatchConfirmation) {
                 Button("开始扫描", role: .destructive) {

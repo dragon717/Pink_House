@@ -14,6 +14,9 @@ struct OOTDSidebarView: View {
     // Namespace for matched geometry effect (optional, but nice for animations)
     @Namespace private var animation
     
+    @State private var outfitToDelete: Outfit?
+    @State private var showingDeleteAlert = false
+    
     var body: some View {
         if isVisible {
             VStack(spacing: 0) {
@@ -65,7 +68,10 @@ struct OOTDSidebarView: View {
                             OutfitCard(
                                 outfit: outfit,
                                 isSelected: currentOutfit?.id == outfit.id,
-                                onDelete: { onDelete(outfit) }
+                                onDelete: {
+                                    outfitToDelete = outfit
+                                    showingDeleteAlert = true
+                                }
                             )
                             .onTapGesture {
                                 withAnimation(.spring(response: 0.3)) {
@@ -85,9 +91,20 @@ struct OOTDSidebarView: View {
                 Rectangle()
                     .fill(Color.primary.opacity(0.05))
                     .frame(width: 1),
-                alignment: .trailing
+                    alignment: .trailing
             )
             .transition(.move(edge: .leading).combined(with: .opacity))
+            .alert("删除搭配", isPresented: $showingDeleteAlert, presenting: outfitToDelete) { outfit in
+                Button("删除", role: .destructive) {
+                    onDelete(outfit)
+                    outfitToDelete = nil
+                }
+                Button("取消", role: .cancel) {
+                    outfitToDelete = nil
+                }
+            } message: { outfit in
+                Text("确定要删除搭配“\(outfit.note.isEmpty ? "未命名" : outfit.note)”吗？此操作无法撤销。")
+            }
         }
     }
 }
