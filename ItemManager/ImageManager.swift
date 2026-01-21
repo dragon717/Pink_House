@@ -32,12 +32,24 @@ class ImageManager {
     
     // MARK: - Core Logic
     
+    enum ImageFormat {
+        case jpeg(quality: CGFloat)
+        case png
+        
+        var fileExtension: String {
+            switch self {
+            case .png: return "png"
+            case .jpeg: return "jpg"
+            }
+        }
+    }
+
     /// 保存图片：压缩 -> 哈希去重 -> 存储/引用计数
     /// - Returns: 文件名 (如果成功)
-    func saveImage(_ image: UIImage, context: ModelContext) -> String? {
-        // 1. Compression
-        guard let data = compressImage(image) else {
-            AppLogger.error("Failed to compress image")
+    func saveImage(_ image: UIImage, context: ModelContext, format: ImageFormat = .jpeg(quality: 0.7)) -> String? {
+        // 1. Compression/Data Conversion
+        guard let data = convertImage(image, format: format) else {
+            AppLogger.error("Failed to convert image")
             return nil
         }
         
@@ -58,7 +70,7 @@ class ImageManager {
                 return existingImage.fileName
             } else {
                 // New image: Save to disk and DB
-                let fileName = "\(UUID().uuidString).jpg"
+                let fileName = "\(UUID().uuidString).\(format.fileExtension)"
                 let fileURL = imagesDirectory.appendingPathComponent(fileName)
                 
                 try data.write(to: fileURL)
@@ -126,9 +138,18 @@ class ImageManager {
     
     // MARK: - Helpers
     
+    private func convertImage(_ image: UIImage, format: ImageFormat) -> Data? {
+        switch format {
+        case .jpeg(let quality):
+            return image.jpegData(compressionQuality: quality)
+        case .png:
+            return image.pngData()
+        }
+    }
+
     private func compressImage(_ image: UIImage) -> Data? {
         // 智能压缩：先尝试 0.7 质量，如果还太大可以继续调整，这里简化为固定 0.7 JPEG
-        return image.jpegData(compressionQuality: 0.7)
+        return convertImage(image, format: .jpeg(quality: 0.7))
     }
     
     private func computeHash(data: Data) -> String {

@@ -1,3 +1,4 @@
+
 //
 //  Clothing.swift
 //  ItemManager
@@ -104,5 +105,77 @@ final class Clothing {
         self.status = status
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+}
+
+// MARK: - OOTD Models
+// Moved here to ensure availability in all targets (e.g., Widget Extension)
+
+@Model
+final class CutoutItem {
+    @Attribute(.unique) var id: UUID = UUID()
+    var originalImageHash: String = ""
+    var timestamp: Date = Date()
+    var category: String = "未分类" // e.g., 裙装, 上衣, etc.
+    var imagePath: String = "" // Path to the cutout image (PNG with transparency)
+    var width: Double = 0.0
+    var height: Double = 0.0
+    
+    @Relationship(deleteRule: .nullify)
+    var linkedClothing: Clothing?
+    
+    init(originalImageHash: String, 
+         category: String = "未分类",
+         imagePath: String,
+         width: Double,
+         height: Double,
+         linkedClothing: Clothing? = nil) {
+        self.originalImageHash = originalImageHash
+        self.category = category
+        self.imagePath = imagePath
+        self.width = width
+        self.height = height
+        self.linkedClothing = linkedClothing
+    }
+}
+
+@Model
+final class Outfit {
+    @Attribute(.unique) var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var note: String = ""
+    var snapshotPath: String? // Path to the saved OOTD image
+    
+    @Relationship(deleteRule: .cascade)
+    var items: [OutfitItem] = []
+    
+    init(note: String = "", snapshotPath: String? = nil) {
+        self.note = note
+        self.snapshotPath = snapshotPath
+    }
+}
+
+@Model
+final class OutfitItem {
+    @Attribute(.unique) var id: UUID = UUID()
+    var x: Double = 0.0
+    var y: Double = 0.0
+    var rotation: Double = 0.0
+    var scale: Double = 1.0
+    var zIndex: Int = 0
+    
+    @Relationship
+    var cutout: CutoutItem?
+    
+    @Relationship
+    var outfit: Outfit?
+    
+    init(cutout: CutoutItem?, x: Double, y: Double, rotation: Double, scale: Double, zIndex: Int) {
+        self.cutout = cutout
+        self.x = x
+        self.y = y
+        self.rotation = rotation
+        self.scale = scale
+        self.zIndex = zIndex
     }
 }

@@ -20,7 +20,10 @@ class SharedPersistence {
             Clothing.self,
             Item.self,
             Tag.self,
-            Brand.self
+            Brand.self,
+            CutoutItem.self,
+            Outfit.self,
+            OutfitItem.self
         ])
         
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
