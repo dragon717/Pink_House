@@ -10,10 +10,16 @@ struct OOTDCanvasView: View {
     @State private var selectedItemId: UUID?
     
     var body: some View {
-        ZStack {
-            Color.white
-            
-            // Grid or background guide (optional)
+        GeometryReader { geometry in
+            ZStack {
+                Image("ootd_background")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                    .clipped()
+                    .ignoresSafeArea()
+                
+                // Grid or background guide (optional)
             
             ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
                 CanvasItemView(
@@ -36,6 +42,7 @@ struct OOTDCanvasView: View {
                     selectedItemId = item.id
                 }
             }
+        }
         }
         .contentShape(Rectangle())
         .onTapGesture {

@@ -65,7 +65,9 @@ struct DepositPlanView: View {
         return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
     }
     
-    var filteredClothings: [Clothing] {
+    // Base filtered clothings (Year + Search + Tags + etc.)
+    // Used for Series Analysis and Stats
+    var baseClothings: [Clothing] {
         depositClothings.filter { clothing in
             let matchesSearch: Bool
             if searchText.isEmpty {
@@ -106,40 +108,53 @@ struct DepositPlanView: View {
             
             let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             
-            // Time Filter / Series Filter
-            let matchesTimeOrSeries: Bool
+            // Year Filter (Global)
+            // Year logic: Based on finalPaymentDate (Start of final payment period)
+            let matchesYear: Bool
+            if let date = clothing.finalPaymentDate {
+                let calendar = Calendar.current
+                let year = calendar.component(.year, from: date)
+                matchesYear = (year == selectedYear)
+            } else {
+                // If no date, only show if we are not strictly filtering by year?
+                // Or maybe default to current year? 
+                // Currently if no date, it's excluded from year view.
+                matchesYear = false
+            }
             
+            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesYear
+        }
+    }
+    
+    // Final filtered clothings (Base + Month/Series Selection)
+    var filteredClothings: [Clothing] {
+        baseClothings.filter { clothing in
             if viewMode == .monthly {
-                if let date = clothing.finalPaymentDate {
-                    let calendar = Calendar.current
-                    let year = calendar.component(.year, from: date)
-                    let month = calendar.component(.month, from: date)
-                    
-                    if year != selectedYear {
-                        matchesTimeOrSeries = false
-                    } else {
-                        if selectedMonths.isEmpty {
-                            matchesTimeOrSeries = true
-                        } else {
-                            matchesTimeOrSeries = selectedMonths.contains(month)
-                        }
-                    }
+                if selectedMonths.isEmpty {
+                    return true
                 } else {
-                    // If no date is set, show it only if we're not filtering by specific months
-                    matchesTimeOrSeries = false
+                    if let date = clothing.finalPaymentDate {
+                        let month = Calendar.current.component(.month, from: date)
+                        return selectedMonths.contains(month)
+                    }
+                    return false
                 }
             } else {
                 // Series Mode
                 if selectedSeries.isEmpty {
-                    matchesTimeOrSeries = true
+                    return true
                 } else {
-                    matchesTimeOrSeries = selectedSeries.contains { seriesName in
-                        clothing.name.localizedCaseInsensitiveContains(seriesName)
+                    // Refined Series Filter Logic:
+                    // Check if the clothing's sanitized name STARTS WITH any of the selected series (prefixes)
+                    // ignoring case.
+                    return selectedSeries.contains { seriesPrefix in
+                        // We need to sanitize the clothing name first to match how series were generated
+                        let sanitizedName = SeriesAnalyzer.shared.sanitize(clothing.name).lowercased()
+                        let prefix = seriesPrefix.lowercased()
+                        return sanitizedName.hasPrefix(prefix)
                     }
                 }
             }
-            
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesTimeOrSeries
         }
     }
     
@@ -168,6 +183,15 @@ struct DepositPlanView: View {
                     if viewMode == .series {
                         analyzeSeries()
                     }
+                }
+                // Re-analyze series if year changes
+                .onChange(of: selectedYear) { oldValue, newValue in
+                    if viewMode == .series {
+                        analyzeSeries()
+                    }
+                    // Clear selections when year changes to avoid confusion
+                    selectedMonths.removeAll()
+                    selectedSeries.removeAll()
                 }
                 
                 // Stats Section
@@ -198,10 +222,12 @@ struct DepositPlanView: View {
                 
                 // Selector Area
                 if viewMode == .monthly {
-                    MonthSelectorView(year: $selectedYear, selectedMonths: $selectedMonths, clothings: depositClothings)
+                    // Pass filtered clothings (base) so it knows what months have data?
+                    // Or pass baseClothings to calculate stats for each month
+                    MonthSelectorView(selectedMonths: $selectedMonths, year: $selectedYear, clothings: baseClothings)
                         .padding(.horizontal)
                 } else {
-                    SeriesSelectorView(selectedSeries: $selectedSeries, seriesList: seriesList, isAnalyzing: isAnalyzing)
+                    SeriesSelectorView(selectedSeries: $selectedSeries, year: $selectedYear, seriesList: seriesList, isAnalyzing: isAnalyzing)
                         .padding(.horizontal)
                 }
                 
@@ -226,8 +252,11 @@ struct DepositPlanView: View {
     
     private func analyzeSeries() {
         isAnalyzing = true
+        // Analyze based on the YEAR filtered clothings
+        let clothingsToAnalyze = baseClothings
+        
         Task {
-            let series = await SeriesAnalyzer.shared.analyzeSeries(from: depositClothings)
+            let series = await SeriesAnalyzer.shared.analyzeSeries(from: clothingsToAnalyze)
             await MainActor.run {
                 self.seriesList = series
                 self.isAnalyzing = false
@@ -307,9 +336,56 @@ struct DepositStatsView: View {
     }
 }
 
-struct MonthSelectorView: View {
+struct YearSelectorView: View {
     @Binding var year: Int
+    
+    var body: some View {
+        HStack {
+            Button {
+                withAnimation {
+                    year -= 1
+                }
+            } label: {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            
+            Spacer()
+            
+            Text("\(String(year))年")
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+            
+            Spacer()
+            
+            Button {
+                withAnimation {
+                    year += 1
+                }
+            } label: {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .background(
+            GlassCard(cornerRadius: 16) {
+                Color.clear // Placeholder content for GlassCard
+            }
+        )
+    }
+}
+
+struct MonthSelectorView: View {
     @Binding var selectedMonths: Set<Int>
+    @Binding var year: Int
     let clothings: [Clothing] // Pass in all deposit clothings to calculate monthly stats
     @State private var expanded: Bool = true
     
@@ -321,9 +397,10 @@ struct MonthSelectorView: View {
         let calendar = Calendar.current
         let monthlyClothings = clothings.filter { clothing in
             guard let date = clothing.finalPaymentDate else { return false }
-            let y = calendar.component(.year, from: date)
+            // Year is already filtered in baseClothings, but double check doesn't hurt
+            // Actually baseClothings already filtered by year, so we just check month
             let m = calendar.component(.month, from: date)
-            return y == year && m == month
+            return m == month
         }
         
         // Count Items (Stock Sum) and Total Amount (Balance Sum)
@@ -354,25 +431,7 @@ struct MonthSelectorView: View {
             
             if expanded {
                 // Year Selector
-                HStack {
-                    Button {
-                        year -= 1
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Text("\(String(year))年")
-                        .font(.headline)
-                        .frame(width: 80)
-                    
-                    Button {
-                        year += 1
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                YearSelectorView(year: $year)
                 
                 // Month Grid
                 LazyVGrid(columns: columns, spacing: 10) {
@@ -436,6 +495,7 @@ struct MonthSelectorView: View {
 
 struct SeriesSelectorView: View {
     @Binding var selectedSeries: Set<String>
+    @Binding var year: Int
     let seriesList: [SeriesInfo]
     let isAnalyzing: Bool
     @State private var expanded: Bool = true
@@ -470,6 +530,9 @@ struct SeriesSelectorView: View {
             }
             
             if expanded {
+                // Year Selector
+                YearSelectorView(year: $year)
+                
                 if seriesList.isEmpty {
                     if isAnalyzing {
                         Text("正在分析系列...")
@@ -500,7 +563,7 @@ struct SeriesSelectorView: View {
                                                 .fontWeight(isSelected ? .bold : .medium)
                                                 .lineLimit(1)
                                             Spacer()
-                                            Text("\(series.itemCount)")
+                                            Text("\(series.styleCount)")
                                                 .font(.system(size: 9))
                                                 .padding(4)
                                                 .background(Color.black.opacity(0.1))

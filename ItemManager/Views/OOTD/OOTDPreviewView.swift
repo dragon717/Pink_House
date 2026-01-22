@@ -6,7 +6,12 @@ struct OOTDPreviewView: View {
     
     var body: some View {
         ZStack {
-            Color.white
+            Image("ootd_background")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 360, height: 640)
+                .clipped()
+            
             ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
                 if let cutout = item.cutout, 
                    let uiImage = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
@@ -20,6 +25,7 @@ struct OOTDPreviewView: View {
                 }
             }
         }
-        .frame(width: 300, height: 300) // Standard size for thumbnail generation
+        .frame(width: 360, height: 640) // 9:16 aspect ratio
+        .clipped()
     }
 }

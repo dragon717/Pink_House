@@ -83,19 +83,21 @@ struct LiquidBackground: View {
 
 // MARK: - Glass Card
 struct GlassCard<Content: View>: View {
+    var cornerRadius: CGFloat = 24
     var content: Content
     
-    init(@ViewBuilder content: () -> Content) {
+    init(cornerRadius: CGFloat = 24, @ViewBuilder content: () -> Content) {
+        self.cornerRadius = cornerRadius
         self.content = content()
     }
     
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .opacity(0.9)
             
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(
                     LinearGradient(
                         colors: [.white.opacity(0.6), .white.opacity(0.1)],
