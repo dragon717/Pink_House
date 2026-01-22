@@ -60,9 +60,31 @@ struct WealthView: View {
                         }
                         .padding(.horizontal)
                         
-                        Text("已购入小裙子总价 + 定尾计划已付总定金")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        VStack(spacing: 4) {
+                            Text("已购入小裙子总价 + 定尾计划已付总定金")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            if viewModel.selectedCurrency == .jpy {
+                                HStack(spacing: 4) {
+                                    Text("汇率: 1 CNY ≈ \(String(format: "%.2f", viewModel.exchangeRate)) JPY")
+                                    if viewModel.isFetchingRate {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                    } else {
+                                        Button {
+                                            Task {
+                                                await viewModel.fetchExchangeRate()
+                                            }
+                                        } label: {
+                                            Image(systemName: "arrow.clockwise")
+                                        }
+                                    }
+                                }
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            }
+                        }
                     }
                     .padding(.top)
                     
@@ -135,6 +157,9 @@ struct WealthView: View {
             }
             .onAppear {
                 updateAmount()
+                Task {
+                    await viewModel.fetchExchangeRate()
+                }
             }
             .onChange(of: allClothings) { _, _ in
                 updateAmount()
@@ -144,7 +169,7 @@ struct WealthView: View {
     
     private func updateAmount() {
         let total = calculatedTotalAmount
-        viewModel.inputAmount = NSDecimalNumber(decimal: total).intValue.description
+        viewModel.baseAmountCNY = total
     }
 }
 

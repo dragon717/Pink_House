@@ -35,10 +35,61 @@ struct Denomination: Identifiable, Hashable {
 @Observable
 class WealthViewModel {
     var selectedCurrency: CurrencyType = .rmb
-    var inputAmount: String = ""
+    var baseAmountCNY: Decimal = 0.0
+    var exchangeRate: Double = 21.0 // Default estimation
+    var isFetchingRate: Bool = false
+    var lastUpdatedDate: String? = nil
+    
+    // Legacy support for binding if needed, but we prefer computed
+    var inputAmount: String {
+        get { "\(totalAmount)" }
+        set { 
+            // Read-only in this mode, but if we wanted to support input:
+            // if let val = Int(newValue) { baseAmountCNY = Decimal(val) }
+        }
+    }
     
     var totalAmount: Int {
-        return Int(inputAmount) ?? 0
+        switch selectedCurrency {
+        case .rmb:
+            return NSDecimalNumber(decimal: baseAmountCNY).intValue
+        case .jpy:
+            let converted = baseAmountCNY * Decimal(exchangeRate)
+            return NSDecimalNumber(decimal: converted).intValue
+        }
+    }
+    
+    func fetchExchangeRate() async {
+        guard !isFetchingRate else { return }
+        isFetchingRate = true
+        
+        // Using a public free API for exchange rates
+        guard let url = URL(string: "https://api.exchangerate-api.com/v4/latest/CNY") else {
+            isFetchingRate = false
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let rates = json["rates"] as? [String: Double],
+               let jpyRate = rates["JPY"] {
+                
+                await MainActor.run {
+                    self.exchangeRate = jpyRate
+                    self.isFetchingRate = false
+                    
+                    if let dateStr = json["date"] as? String {
+                        self.lastUpdatedDate = dateStr
+                    }
+                }
+            }
+        } catch {
+            print("Failed to fetch exchange rate: \(error)")
+            await MainActor.run {
+                self.isFetchingRate = false
+            }
+        }
     }
     
     // Configurable denominations
