@@ -23,7 +23,10 @@ struct GoldPhysicsView: View {
                     scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
                 }
                 .onChange(of: totalWeightGrams) { _, newValue in
-                    scene?.updateBeans(totalWeight: newValue, beanWeight: beanWeight)
+                    // Ensure update runs on main thread and scene is ready
+                    if let scene = scene {
+                        scene.updateBeans(totalWeight: newValue, beanWeight: beanWeight)
+                    }
                 }
                 .onChange(of: colorScheme) { _, newScheme in
                     scene?.updateBackgroundColor(for: newScheme)
@@ -47,12 +50,19 @@ struct GoldPhysicsView: View {
     }
 }
 
+struct PhysicsCategory {
+    static let none: UInt32 = 0
+    static let wall: UInt32 = 0b1
+    static let beanLayer1: UInt32 = 0b10
+    static let beanLayer2: UInt32 = 0b100
+}
+
 class GoldScene: SKScene {
     private let motionManager = CMMotionManager()
     private var beanNodes: [SKNode] = []
     
     // Config
-    private let maxVisualBeans = 300 // Limit for performance
+    private let maxVisualBeans = 5000 // Significantly increased to match 1g binding
     private let beanRadius: CGFloat = 8.0
     private let bottomPadding: CGFloat = 100.0 // Reserve space for TabBar
     
@@ -73,13 +83,20 @@ class GoldScene: SKScene {
     
     private func setupPhysicsBoundary() {
         // Create a boundary that is raised from the bottom to avoid TabBar
+        // And inset from the sides to avoid edge overflow
+        let sidePadding: CGFloat = 2.0 // Small padding to keep beans fully visible
+        
         let safeFrame = CGRect(
-            x: frame.minX,
+            x: frame.minX + sidePadding,
             y: frame.minY + bottomPadding,
-            width: frame.width,
+            width: frame.width - (sidePadding * 2),
             height: frame.height - bottomPadding
         )
+        
         physicsBody = SKPhysicsBody(edgeLoopFrom: safeFrame)
+        physicsBody?.categoryBitMask = PhysicsCategory.wall
+        physicsBody?.collisionBitMask = PhysicsCategory.beanLayer1 | PhysicsCategory.beanLayer2
+        physicsBody?.contactTestBitMask = 0
     }
     
     override func didChangeSize(_ oldSize: CGSize) {
@@ -88,9 +105,7 @@ class GoldScene: SKScene {
     }
     
     func updateBeans(totalWeight: Double, beanWeight: Double) {
-        // Calculate how many beans to show
-        // If we have 100g and 1g/bean -> 100 beans.
-        // If we have 1000g -> 1000 beans (too many? maybe limit).
+        guard beanWeight > 0 else { return }
         
         let totalRealBeans = Int(totalWeight / beanWeight)
         let beansToShow = min(totalRealBeans, maxVisualBeans)
@@ -98,10 +113,8 @@ class GoldScene: SKScene {
         let currentCount = beanNodes.count
         
         if currentCount < beansToShow {
-            // Add more
             addBeans(count: beansToShow - currentCount)
         } else if currentCount > beansToShow {
-            // Remove some
             removeBeans(count: currentCount - beansToShow)
         }
     }
@@ -144,6 +157,33 @@ class GoldScene: SKScene {
         body.restitution = 0.2 // Bounciness (low for gold, it's heavy/soft)
         body.friction = 0.5
         body.allowsRotation = true // Enable rotation
+        
+        // Randomly assign to a layer
+        // Layer 1: zPosition 0, Collides with Layer 1 + Wall
+        // Layer 2: zPosition 1, Collides with Layer 2 + Wall
+        let isLayer2 = Bool.random()
+        
+        if isLayer2 {
+            node.zPosition = 10 // Visual Front
+            body.categoryBitMask = PhysicsCategory.beanLayer2
+            body.collisionBitMask = PhysicsCategory.beanLayer2 | PhysicsCategory.wall
+            
+            // Slightly darken the back layer beans or lighten the front ones for depth?
+            // Actually, front layer should cast shadow on back layer? Too complex for 2D.
+            // Just size variation?
+            // Let's make front beans slightly larger or same size.
+            // Maybe slight color tint variation.
+            // node.color = .white
+            // node.colorBlendFactor = 0.0
+        } else {
+            node.zPosition = 0 // Visual Back
+            body.categoryBitMask = PhysicsCategory.beanLayer1
+            body.collisionBitMask = PhysicsCategory.beanLayer1 | PhysicsCategory.wall
+            
+            // Darken back layer slightly for depth perception
+            node.color = .black
+            node.colorBlendFactor = 0.2 // 20% Darker
+        }
         
         node.physicsBody = body
         
@@ -226,16 +266,16 @@ class GoldScene: SKScene {
                 // Device +X is Up in UI. Device +Y is Right in UI.
                 // Gravity vector (x, y, z) from CM is relative to Device.
                 // We need to map Device (x, y) to Scene (x, y).
-                // Scene X = -Device Y
+                // Scene X = Device Y
                 // Scene Y = Device X
-                gravityX = -data.gravity.y
+                gravityX = data.gravity.y
                 gravityY = data.gravity.x
             case .landscapeRight:
                 // Device rotated Left (Home button Right).
                 // Device +X is Down in UI. Device +Y is Left in UI.
-                // Scene X = Device Y
+                // Scene X = -Device Y
                 // Scene Y = -Device X
-                gravityX = data.gravity.y
+                gravityX = -data.gravity.y
                 gravityY = -data.gravity.x
             case .portraitUpsideDown:
                 // Device upside down.
