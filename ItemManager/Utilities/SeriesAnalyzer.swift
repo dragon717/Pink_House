@@ -10,7 +10,8 @@ import Foundation
 struct SeriesInfo: Identifiable, Hashable {
     let id = UUID()
     let name: String
-    let count: Int
+    let styleCount: Int
+    let itemCount: Int
     let totalBalance: Decimal
     let totalDeposit: Decimal
 }
@@ -35,36 +36,31 @@ class SeriesAnalyzer {
         }
         
         return await Task.detached(priority: .userInitiated) {
-            // Deduplicate inputs: Keep only unique combinations of name, deposit, balance, and stock
-            var seenKeys: Set<String> = []
-            var uniqueInputs: [SeriesInput] = []
+            // We need to calculate stats based on ALL items, not deduplicated ones.
+            // But for Style Count, we need to know unique styles.
             
-            for input in inputs {
-                // Create a unique key for the clothing
-                // Using a combination of name and financial/stock details
-                let key = "\(input.name)|\(input.deposit)|\(input.balance)|\(input.stock)"
-                
-                if !seenKeys.contains(key) {
-                    seenKeys.insert(key)
-                    uniqueInputs.append(input)
-                }
-            }
-            
-            var candidateCounts: [String: Int] = [:]
+            var candidateStyleKeys: [String: Set<String>] = [:] // Series -> Set of "Name|Price" keys
+            var candidateItemCounts: [String: Int] = [:] // Series -> Total Stock
             var candidateBalances: [String: Decimal] = [:]
             var candidateDeposits: [String: Decimal] = [:]
             var candidateClothingIDs: [String: Set<UUID>] = [:]
             
             // 1. Generate candidates from each clothing name
-            for clothing in uniqueInputs {
+            for clothing in inputs {
                 let name = clothing.name
                 let candidates = self.generateCandidates(from: name)
                 
+                // Style Key: Name + Price info (ignoring stock)
+                let styleKey = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
+                
                 for candidate in candidates {
-                    candidateCounts[candidate, default: 0] += 1
-                    let stock = Decimal(clothing.stock)
-                    candidateBalances[candidate, default: 0] += (clothing.balance * stock)
-                    candidateDeposits[candidate, default: 0] += (clothing.deposit * stock)
+                    candidateStyleKeys[candidate, default: []].insert(styleKey)
+                    
+                    let stock = clothing.stock
+                    candidateItemCounts[candidate, default: 0] += stock
+                    
+                    candidateBalances[candidate, default: 0] += (clothing.balance * Decimal(stock))
+                    candidateDeposits[candidate, default: 0] += (clothing.deposit * Decimal(stock))
                     candidateClothingIDs[candidate, default: []].insert(clothing.id)
                 }
             }
@@ -72,26 +68,26 @@ class SeriesAnalyzer {
             // 2. Filter and Refine
             var seriesList: [SeriesInfo] = []
             
-            // Get all valid candidates (count >= 2)
-            let validCandidates = candidateCounts.keys.filter { count in
-                return (candidateCounts[count] ?? 0) >= 2
+            // Get all valid candidates (style count >= 2)
+            // Use Style Count to determine if it's a series? Or Item Count?
+            // Usually a series implies multiple styles.
+            let validCandidates = candidateStyleKeys.keys.filter { key in
+                return (candidateStyleKeys[key]?.count ?? 0) >= 2
             }
             
             // Sort by length descending to handle subsumption (prefer longer names first)
             let sortedCandidates = validCandidates.sorted { $0.count > $1.count }
             
             for candidate in sortedCandidates {
-                let count = candidateCounts[candidate]!
+                let styleCount = candidateStyleKeys[candidate]?.count ?? 0
+                let itemCount = candidateItemCounts[candidate] ?? 0
                 let ids = candidateClothingIDs[candidate]!
                 
                 // Redundancy Check:
                 // If this candidate is a prefix of an already added series,
                 // AND it covers the exact same set of items, then it's redundant.
-                // e.g. "Pink House" (10 items) vs "Pink" (10 items) -> Keep "Pink House", skip "Pink"
                 var isRedundant = false
                 for existing in seriesList {
-                    // Check if existing series name starts with this candidate (since we are using prefixes)
-                    // Or more generally, if existing name contains this candidate
                     if existing.name.localizedCaseInsensitiveContains(candidate) {
                         if let existingIDs = candidateClothingIDs[existing.name], existingIDs == ids {
                             isRedundant = true
@@ -103,19 +99,20 @@ class SeriesAnalyzer {
                 if !isRedundant {
                     seriesList.append(SeriesInfo(
                         name: candidate, 
-                        count: count, 
+                        styleCount: styleCount,
+                        itemCount: itemCount,
                         totalBalance: candidateBalances[candidate] ?? 0,
                         totalDeposit: candidateDeposits[candidate] ?? 0
                     ))
                 }
             }
             
-            // Sort by total balance descending (priority for deposit plan), then by count
+            // Sort by total balance descending (priority for deposit plan), then by style count
             return seriesList.sorted {
                 if $0.totalBalance != $1.totalBalance {
                     return $0.totalBalance > $1.totalBalance
                 }
-                return $0.count > $1.count
+                return $0.styleCount > $1.styleCount
             }
         }.value
     }

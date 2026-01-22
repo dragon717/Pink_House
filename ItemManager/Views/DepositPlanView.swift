@@ -239,13 +239,15 @@ struct DepositPlanView: View {
 struct DepositStatsView: View {
     let clothings: [Clothing]
     
-    // Deduplicated clothings based on name, deposit, balance, stock
-    private var uniqueClothings: [Clothing] {
+    // Deduplicated clothings based on name, deposit, balance for Style Count
+    // We ignore stock for style counting
+    private var uniqueStyles: [Clothing] {
         var seenKeys: Set<String> = []
         var result: [Clothing] = []
         
         for clothing in clothings {
-            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)|\(clothing.stock)"
+            // Style defined by Name + Price info
+            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
             if !seenKeys.contains(key) {
                 seenKeys.insert(key)
                 result.append(clothing)
@@ -255,19 +257,22 @@ struct DepositStatsView: View {
     }
     
     var styleCount: Int {
-        uniqueClothings.count
+        uniqueStyles.count
     }
     
     var totalCount: Int {
-        uniqueClothings.reduce(0) { $0 + $1.stock }
+        // Sum of stock of ALL clothings (Inventory Count)
+        clothings.reduce(0) { $0 + $1.stock }
     }
     
     var paidDeposit: Decimal {
-        uniqueClothings.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
+        // Sum of deposit * stock for ALL clothings
+        clothings.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
     }
     
     var pendingBalance: Decimal {
-        uniqueClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+        // Sum of balance * stock for ALL clothings
+        clothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
     }
     
     var body: some View {
@@ -321,21 +326,11 @@ struct MonthSelectorView: View {
             return y == year && m == month
         }
         
-        // Deduplicate
-        var seenKeys: Set<String> = []
-        var uniqueMonthlyClothings: [Clothing] = []
-        
-        for clothing in monthlyClothings {
-            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)|\(clothing.stock)"
-            if !seenKeys.contains(key) {
-                seenKeys.insert(key)
-                uniqueMonthlyClothings.append(clothing)
-            }
-        }
-        
-        let count = uniqueMonthlyClothings.count
-        let amount = uniqueMonthlyClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
-        return (count, amount)
+        // Count Items (Stock Sum) and Total Amount (Balance Sum)
+        // No deduplication for totals
+        let itemCount = monthlyClothings.reduce(0) { $0 + $1.stock }
+        let amount = monthlyClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+        return (itemCount, amount)
     }
     
     var body: some View {
@@ -493,7 +488,7 @@ struct SeriesSelectorView: View {
                                                 .fontWeight(isSelected ? .bold : .medium)
                                                 .lineLimit(1)
                                             Spacer()
-                                            Text("\(series.count)")
+                                            Text("\(series.itemCount)")
                                                 .font(.system(size: 9))
                                                 .padding(4)
                                                 .background(Color.black.opacity(0.1))
