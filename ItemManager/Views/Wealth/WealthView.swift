@@ -47,14 +47,22 @@ struct WealthView: View {
                                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                                     LiquidRollingNumber(
                                         value: goldInfo.value,
-                                        exchangeRateToCNY: 1.0, // Colors won't match value strictly but that's ok
-                                        fractionLength: goldInfo.value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+                                        exchangeRateToCNY: 1.0, // Not used when fixedTier is set
+                                        fractionLength: goldInfo.value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2,
+                                        fixedTier: .sparklingGold // Force Sparkling Gold color
                                     )
                                     .font(.system(size: 64, weight: .heavy, design: .rounded))
                                     
                                     Text(goldInfo.unit)
                                         .font(.system(size: 24, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.secondary)
+                                        // Use gradient text for unit as well to match
+                                        .foregroundStyle(
+                                            LinearGradient(
+                                                colors: WealthTier.sparklingGold.textColors,
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
                                 }
                             } else {
                                 LiquidRollingNumber(

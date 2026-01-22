@@ -83,13 +83,19 @@ struct LiquidRollingNumber: View {
     
     // 动画状态
     @State private var animatedValue: Double = 0
+    var fixedTier: WealthTier? = nil // Optional fixed tier overriding calculation
+    
+    private var currentTier: WealthTier {
+        if let fixed = fixedTier {
+            return fixed
+        } else {
+            let currentCNYValue = animatedValue * exchangeRateToCNY
+            return WealthTier.current(for: currentCNYValue)
+        }
+    }
     
     var body: some View {
-        // 计算当前动画数值对应的人民币价值，用于决定颜色等级
-        let currentCNYValue = animatedValue * exchangeRateToCNY
-        let tier = WealthTier.current(for: currentCNYValue)
-        
-        RollingText(value: animatedValue, tier: tier, fractionLength: fractionLength)
+        RollingText(value: animatedValue, tier: currentTier, fractionLength: fractionLength)
             .onAppear {
                 runAnimation(to: value)
             }
