@@ -16,7 +16,13 @@ struct MainTabView: View {
                     Label("OOTD", systemImage: "tshirt.fill")
                 }
             
-            // Tab 3: 我的 (Me)
+            // Tab 3: 来财 (Wealth)
+            WealthView()
+                .tabItem {
+                    Label("来财", systemImage: "yensign.circle.fill")
+                }
+
+            // Tab 4: 我的 (Me)
             MeView()
                 .tabItem {
                     Label("我的", systemImage: "face.smiling")
