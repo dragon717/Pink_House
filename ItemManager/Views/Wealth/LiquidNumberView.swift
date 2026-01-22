@@ -76,9 +76,10 @@ enum WealthTier {
 
 /// 一个带有液态玻璃效果和动态等级颜色的数字滚动组件
 struct LiquidRollingNumber: View {
-    let value: Int
+    let value: Double // Changed to Double
     /// 当前货币对人民币的汇率（例如 JPY 汇率为 0.05 左右，CNY 为 1.0）
     var exchangeRateToCNY: Double = 1.0
+    var fractionLength: Int = 0 // Number of decimal places
     
     // 动画状态
     @State private var animatedValue: Double = 0
@@ -88,14 +89,21 @@ struct LiquidRollingNumber: View {
         let currentCNYValue = animatedValue * exchangeRateToCNY
         let tier = WealthTier.current(for: currentCNYValue)
         
-        RollingText(value: animatedValue, tier: tier)
+        RollingText(value: animatedValue, tier: tier, fractionLength: fractionLength)
             .onAppear {
-                runAnimation(to: Double(value))
+                runAnimation(to: value)
             }
             .onChange(of: value) { _, newValue in
+                // If the value changes drastically, reset animation?
+                // Or just animate to new value.
+                // Existing logic reset animatedValue to 0 then animated.
+                // This creates a "restart" effect.
+                // For unit switching (Int -> Double), this is fine.
+                // For small increments, maybe just animate?
+                // Let's keep existing behavior for "Wealth" effect (counting up).
                 animatedValue = 0
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    runAnimation(to: Double(newValue))
+                    runAnimation(to: newValue)
                 }
             }
     }
@@ -112,6 +120,7 @@ struct LiquidRollingNumber: View {
 fileprivate struct RollingText: View, Animatable {
     var value: Double
     let tier: WealthTier
+    var fractionLength: Int = 0
     
     var animatableData: Double {
         get { value }
@@ -119,11 +128,16 @@ fileprivate struct RollingText: View, Animatable {
     }
     
     var body: some View {
-        let intValue = Int(round(value))
-        let stringValue = "\(intValue)"
+        // Format the value string
+        let stringValue: String
+        if fractionLength > 0 {
+            stringValue = String(format: "%.\(fractionLength)f", value)
+        } else {
+            stringValue = "\(Int(round(value)))"
+        }
         
         // 基础文本层（用于产生形状和阴影）
-        Text(stringValue)
+        return Text(stringValue)
             .monospacedDigit()
             // 关键修正：将底层文字设为透明，防止 Overlay 覆盖不全时露出黑色底色
             .foregroundStyle(.clear)
@@ -272,7 +286,7 @@ struct PreviewRow: View {
     var body: some View {
         VStack {
             Text(label).font(.caption).foregroundStyle(.secondary)
-            LiquidRollingNumber(value: val)
+            LiquidRollingNumber(value: Double(val))
                 .font(.system(size: 40, weight: .heavy, design: .rounded))
         }
         .padding()
