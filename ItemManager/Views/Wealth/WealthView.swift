@@ -36,29 +36,28 @@ struct WealthView: View {
                         .pickerStyle(.segmented)
                         .padding(.horizontal)
                         
-                        HStack {
+                        HStack(alignment: .top, spacing: 8) {
                             Text(viewModel.selectedCurrency.symbol)
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.primary)
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 8) // 微调顶部对齐
                             
-                            HStack(spacing: 8) {
-                                Text(viewModel.inputAmount)
-                                    .font(.largeTitle)
-                                    .fontWeight(.medium)
-                                    .monospacedDigit()
-                                
-                                Image(systemName: "lock.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(uiColor: .secondarySystemBackground))
+                            LiquidRollingNumber(
+                                value: viewModel.totalAmount,
+                                exchangeRateToCNY: viewModel.selectedCurrency == .rmb ? 1.0 : (1.0 / viewModel.exchangeRate)
                             )
+                                .font(.system(size: 64, weight: .heavy, design: .rounded))
                         }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.6))
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+                        )
                         .padding(.horizontal)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                         
                         VStack(spacing: 4) {
                             Text("已购入小裙子总价 + 定尾计划已付总定金")
