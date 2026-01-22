@@ -1,8 +1,22 @@
 
 import SwiftUI
+import SwiftData
 
 struct WealthView: View {
     @State private var viewModel = WealthViewModel()
+    @Query private var allClothings: [Clothing]
+    
+    private var calculatedTotalAmount: Decimal {
+        allClothings.reduce(Decimal(0)) { partialResult, clothing in
+            if clothing.isDepositPlan {
+                // 定尾计划：已付定金总价
+                return partialResult + (clothing.deposit * Decimal(clothing.stock))
+            } else {
+                // 衣橱（非定尾计划）：总价（包含小物）
+                return partialResult + ((clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock))
+            }
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -28,21 +42,27 @@ struct WealthView: View {
                                 .fontWeight(.bold)
                                 .foregroundStyle(.primary)
                             
-                            TextField("输入金额", text: $viewModel.inputAmount)
-                                .keyboardType(.numberPad)
-                                .font(.largeTitle)
-                                .textFieldStyle(.plain)
-                                .padding(8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color(uiColor: .systemBackground))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                                )
+                            HStack(spacing: 8) {
+                                Text(viewModel.inputAmount)
+                                    .font(.largeTitle)
+                                    .fontWeight(.medium)
+                                    .monospacedDigit()
+                                
+                                Image(systemName: "lock.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color(uiColor: .secondarySystemBackground))
+                            )
                         }
                         .padding(.horizontal)
+                        
+                        Text("已购入小裙子总价 + 定尾计划已付总定金")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.top)
                     
@@ -54,9 +74,9 @@ struct WealthView: View {
                             
                             if stacks.isEmpty {
                                 ContentUnavailableView(
-                                    "输入金额以此开始",
+                                    "暂无资产",
                                     systemImage: "banknote",
-                                    description: Text("将为您展示对应的钞票堆叠效果")
+                                    description: Text("衣橱空空如也，快去添加吧")
                                 )
                                 .padding(.top, 50)
                                 .frame(maxWidth: .infinity)
@@ -113,7 +133,18 @@ struct WealthView: View {
                     }
                 }
             }
+            .onAppear {
+                updateAmount()
+            }
+            .onChange(of: allClothings) { _, _ in
+                updateAmount()
+            }
         }
+    }
+    
+    private func updateAmount() {
+        let total = calculatedTotalAmount
+        viewModel.inputAmount = NSDecimalNumber(decimal: total).intValue.description
     }
 }
 

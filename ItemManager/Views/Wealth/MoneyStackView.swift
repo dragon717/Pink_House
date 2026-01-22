@@ -75,15 +75,28 @@ struct IsometricBundleView: View {
     var body: some View {
         let width: CGFloat = 160
         let height: CGFloat = 80 // Depth of the bill
+        let maxLimit = 1000
+        let messyThreshold = maxLimit / 3
+        let isMessy = count < messyThreshold
         
         ZStack {
-            if count <= 50 {
-                // For small counts, draw individual layers for realism
-                // We need to draw from Bottom (Highest Y) to Top (Lowest Y) so Z-order is correct.
+            if isMessy {
+                // For small counts (< 1/3), draw messy pile
+                // Draw from Bottom (Highest Y) to Top (Lowest Y)
                 ForEach(0..<count, id: \.self) { i in
                     let reverseIndex = count - 1 - i
-                    BanknoteLayer(denomination: denomination, currency: currency)
-                        .offset(y: CGFloat(reverseIndex) * thickness) // Stack DOWNWARDS
+                    
+                    // Pseudo-random noise
+                    let seed = i * 2654435761 // Knuth's multiplicative hash
+                    let rotNoise = Double((seed % 21)) - 10.0 // -10 to 10 degrees
+                    let xNoise = CGFloat((seed % 11)) - 5.0 // -5 to 5 points
+                    
+                    BanknoteLayer(
+                        denomination: denomination,
+                        currency: currency,
+                        rotationOffset: rotNoise
+                    )
+                    .offset(x: xNoise, y: CGFloat(reverseIndex) * thickness)
                 }
             } else {
                 // For large counts, draw a solid block + top note
@@ -115,10 +128,11 @@ struct BanknoteLayer: View {
     let denomination: Denomination
     let currency: CurrencyType
     var showShadow: Bool = false
+    var rotationOffset: Double = 0.0
     
     var body: some View {
         BanknoteView(denomination: denomination, currency: currency, showShadow: showShadow)
-            .rotationEffect(.degrees(-45)) // Rotate first
+            .rotationEffect(.degrees(-45 + rotationOffset)) // Rotate first (with noise)
             .scaleEffect(x: 1.0, y: 0.58) // Then squash for isometric
     }
 }
