@@ -128,21 +128,27 @@ class GoldScene: SKScene {
     }
     
     private func createBeanNode() -> SKNode {
-        // Create a visual gold bean
-        // Use ShapeNode for vector drawing
-        let node = SKShapeNode(circleOfRadius: beanRadius)
+        // Create a visual gold bean using Texture
+        let texture = GoldTextureGenerator.shared.getTexture()
+        let node = SKSpriteNode(texture: texture)
         
-        // Gold Color Gradient simulation (Solid color for now, maybe simple shading)
-        node.fillColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0) // Gold
-        node.strokeColor = UIColor(red: 0.8, green: 0.6, blue: 0.0, alpha: 1.0) // Darker gold stroke
-        node.lineWidth = 1.0
+        // Size: The texture is 128x128. We need to scale it to beanRadius * 2
+        let diameter = beanRadius * 2
+        node.size = CGSize(width: diameter, height: diameter)
         
         // Physics
+        // Use a circle physics body for performance and stability
+        // Allow rotation
         let body = SKPhysicsBody(circleOfRadius: beanRadius)
         body.mass = 0.002 // 2g visual mass
         body.restitution = 0.2 // Bounciness (low for gold, it's heavy/soft)
         body.friction = 0.5
+        body.allowsRotation = true // Enable rotation
+        
         node.physicsBody = body
+        
+        // Add random initial rotation for natural look
+        node.zRotation = CGFloat.random(in: 0...(2 * .pi))
         
         return node
     }
