@@ -17,13 +17,13 @@ enum WealthTier {
         switch valueCNY {
         case ..<1_000: return .copper
         case 1_000..<5_000: return .silver
-        // 扩大金色范围 (5k - 50k)
-        case 5_000..<50_000: return .gold
-        case 50_000..<100_000: return .emerald
-        case 100_000..<200_000: return .platinum
-        case 200_000..<500_000: return .diamond
+        // 扩大金色范围 (5k - 500k)
+        case 5_000..<500_000: return .gold
+        case 500_000..<600_000: return .emerald
+        case 600_000..<700_000: return .platinum
+        case 700_000..<800_000: return .diamond
         // 扩大闪金范围 (50w - 200w)
-        case 500_000..<2_000_000: return .sparklingGold
+        case 800_000..<2_000_000: return .sparklingGold
         // 200w 以上为彩金
         default: return .rainbow
         }
