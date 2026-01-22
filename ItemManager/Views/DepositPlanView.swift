@@ -499,6 +499,7 @@ struct SeriesSelectorView: View {
     let seriesList: [SeriesInfo]
     let isAnalyzing: Bool
     @State private var expanded: Bool = true
+    @State private var showTips: Bool = false
     
     // Adaptive grid columns
     let columns = [GridItem(.adaptive(minimum: 100), spacing: 10)]
@@ -515,6 +516,21 @@ struct SeriesSelectorView: View {
                     Text("按系列预估尾款")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
+                    
+                    // Tips Icon
+                    Button {
+                        showTips = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .alert("系列分类规则", isPresented: $showTips) {
+                        Button("知道了", role: .cancel) { }
+                    } message: {
+                        Text("系统会自动根据商品名称的前2-4个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n“Pink House 连衣裙”\n“Pink House 半裙”\n\n都会被归类为 “Pink” 系列。")
+                    }
                     
                     if isAnalyzing {
                         ProgressView()

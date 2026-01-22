@@ -9,15 +9,22 @@ struct OOTDCanvasView: View {
     // Selection state
     @State private var selectedItemId: UUID?
     
+    // Global Gesture State
+    @State private var gestureScale: CGFloat = 1.0
+    @State private var gestureRotation: Angle = .zero
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
+                // Background
                 Image("ootd_background")
                     .resizable()
                     .scaledToFill()
                     .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
                     .clipped()
                     .ignoresSafeArea()
+                    // Global Gestures Area (Background)
+                    // Gestures moved to container
                 
                 // Grid or background guide (optional)
             
@@ -25,6 +32,8 @@ struct OOTDCanvasView: View {
                 CanvasItemView(
                     item: item, 
                     isSelected: selectedItemId == item.id,
+                    additionalScale: selectedItemId == item.id ? gestureScale : 1.0,
+                    additionalRotation: selectedItemId == item.id ? gestureRotation : .zero,
                     onDelete: {
                         deleteItem(item)
                     },
@@ -39,14 +48,60 @@ struct OOTDCanvasView: View {
                     }
                 )
                 .onTapGesture {
-                    selectedItemId = item.id
+                    if selectedItemId == item.id {
+                        selectedItemId = nil
+                    } else {
+                        selectedItemId = item.id
+                    }
                 }
             }
         }
-        }
-        .contentShape(Rectangle())
+        // Move global gestures here to cover everything
+        .contentShape(Rectangle()) // Ensure the whole area is tappable
+        .gesture(
+            SimultaneousGesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        guard selectedItemId != nil else { return }
+                        gestureScale = value
+                    }
+                    .onEnded { value in
+                        guard let id = selectedItemId,
+                              let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
+                        
+                        outfit.items[index].scale *= value
+                        gestureScale = 1.0
+                    },
+                RotationGesture()
+                    .onChanged { value in
+                        guard selectedItemId != nil else { return }
+                        gestureRotation = value
+                    }
+                    .onEnded { value in
+                        guard let id = selectedItemId,
+                              let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
+                        
+                        outfit.items[index].rotation += value.degrees
+                        gestureRotation = .zero
+                    }
+            )
+        )
+        // Handle background tap separately to avoid conflict with item tap
+        .simultaneousGesture(
+            TapGesture()
+                .onEnded {
+                    // Only clear if we didn't tap an item (this is tricky, so we rely on items capturing tap first)
+                    // Actually, SwiftUI TapGesture on parent will fire even if child handles it unless child blocks it.
+                    // But we want background tap to clear.
+                    // Let's rely on hit testing. Items have content. Background is behind.
+                    // If we tap an item, its onTapGesture fires.
+                    // We need a way to clear selection when tapping EMPTY space.
+                }
+        )
         .onTapGesture {
+            // This will be called if no child view handles the tap
             selectedItemId = nil
+        }
         }
     }
     
@@ -107,14 +162,16 @@ struct OOTDCanvasView: View {
 struct CanvasItemView: View {
     @Bindable var item: OutfitItem
     let isSelected: Bool
+    var additionalScale: CGFloat
+    var additionalRotation: Angle
+    
     var onDelete: () -> Void
     var onBringToFront: () -> Void
     var onBringForward: () -> Void
     var onSendBackward: () -> Void
     
     @State private var currentOffset: CGSize = .zero
-    @State private var currentScale: CGFloat = 1.0
-    @State private var currentRotation: Angle = .zero
+    // Removed internal scale/rotation states as they are now controlled by parent
     
     var body: some View {
         if let cutout = item.cutout, 
@@ -124,8 +181,8 @@ struct CanvasItemView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 200, height: 200) // Base size, adjusted by scale
-                .scaleEffect(item.scale * currentScale)
-                .rotationEffect(Angle(degrees: item.rotation) + currentRotation)
+                .scaleEffect(item.scale * additionalScale)
+                .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
                 .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
                 .overlay(
                     ZStack {
@@ -175,40 +232,20 @@ struct CanvasItemView: View {
                         }
                     }
                     .frame(width: 200, height: 200) // Match frame
-                    .scaleEffect(item.scale * currentScale)
-                    .rotationEffect(Angle(degrees: item.rotation) + currentRotation)
+                    .scaleEffect(item.scale * additionalScale)
+                    .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
                     .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
                 )
                 .gesture(
-                    SimultaneousGesture(
-                        SimultaneousGesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    currentOffset = value.translation
-                                }
-                                .onEnded { value in
-                                    item.x += value.translation.width
-                                    item.y += value.translation.height
-                                    currentOffset = .zero
-                                },
-                            MagnificationGesture()
-                                .onChanged { value in
-                                    currentScale = value
-                                }
-                                .onEnded { value in
-                                    item.scale *= value
-                                    currentScale = 1.0
-                                }
-                        ),
-                        RotationGesture()
-                            .onChanged { value in
-                                currentRotation = value
-                            }
-                            .onEnded { value in
-                                item.rotation += value.degrees
-                                currentRotation = .zero
-                            }
-                    )
+                    DragGesture()
+                        .onChanged { value in
+                            currentOffset = value.translation
+                        }
+                        .onEnded { value in
+                            item.x += value.translation.width
+                            item.y += value.translation.height
+                            currentOffset = .zero
+                        }
                 )
         }
     }
