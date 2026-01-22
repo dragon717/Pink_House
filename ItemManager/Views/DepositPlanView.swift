@@ -388,10 +388,22 @@ struct MonthSelectorView: View {
                             }
                         } label: {
                             VStack(spacing: 4) {
-                                Text("\(month)月")
-                                    .font(.caption)
-                                    .fontWeight(isSelected ? .bold : .regular)
-                                    .foregroundStyle(isSelected ? .white : .primary)
+                                HStack(spacing: 2) {
+                                    Text("\(month)月")
+                                        .font(.caption)
+                                        .fontWeight(isSelected ? .bold : .regular)
+                                        .foregroundStyle(isSelected ? .white : .primary)
+                                    
+                                    if stats.count > 0 {
+                                        Text("\(stats.count)")
+                                            .font(.system(size: 8))
+                                            .padding(3)
+                                            .background(isSelected ? Color.white.opacity(0.3) : Color.black.opacity(0.1))
+                                            .clipShape(Circle())
+                                            .foregroundStyle(isSelected ? .white : .primary)
+                                            .offset(y: -1)
+                                    }
+                                }
                                 
                                 if stats.count > 0 {
                                     Text("¥\(NSDecimalNumber(decimal: stats.amount).stringValue)")
