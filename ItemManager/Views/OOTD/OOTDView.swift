@@ -302,6 +302,12 @@ struct OOTDView: View {
 
     @MainActor
     private func saveSnapshot(for outfit: Outfit) {
+        // Safety check: Ensure outfit is still valid and managed
+        guard !outfit.isDeleted, outfit.modelContext != nil else {
+            print("Snapshot skipped: Outfit is deleted or unmanaged")
+            return
+        }
+        
         let renderer = ImageRenderer(content: OOTDPreviewView(outfit: outfit))
         renderer.scale = 2.0 
         
