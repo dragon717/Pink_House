@@ -529,7 +529,7 @@ struct SeriesSelectorView: View {
                     .alert("系列分类规则", isPresented: $showTips) {
                         Button("知道了", role: .cancel) { }
                     } message: {
-                        Text("系统会自动根据商品名称的前2-4个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n“Pink House 连衣裙”\n“Pink House 半裙”\n\n都会被归类为 “Pink” 系列。")
+                        Text("系统会自动根据商品名称的前2-4个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n“Pink House 连衣裙”\n“Pink House 半裙”\n\n都会被归类为 “Pink” 系列。\n注：同名属于同一款商品。")
                     }
                     
                     if isAnalyzing {
@@ -579,11 +579,12 @@ struct SeriesSelectorView: View {
                                                 .fontWeight(isSelected ? .bold : .medium)
                                                 .lineLimit(1)
                                             Spacer()
-                                            Text("\(series.styleCount)")
+                                            Text("\(series.itemCount)")
                                                 .font(.system(size: 9))
-                                                .padding(4)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 4)
                                                 .background(Color.black.opacity(0.1))
-                                                .clipShape(Circle())
+                                                .clipShape(Capsule())
                                         }
                                         .foregroundStyle(isSelected ? .white : .primary)
                                         
