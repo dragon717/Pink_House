@@ -262,9 +262,7 @@ struct WardrobeStatsView: View {
                 }
                 
                 // Bottom Action
-                Button {
-                    // Action for detailed stats
-                } label: {
+                NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings)) {
                     HStack {
                         Image(systemName: "chart.bar.fill")
                         Text("查看详细统计")

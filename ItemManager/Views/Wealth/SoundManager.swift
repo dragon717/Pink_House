@@ -160,4 +160,21 @@ final class SoundManager: ObservableObject {
             }
         }
     }
+    
+    /// 停止所有音效（包括循环音效）
+    func stopAllSounds() {
+        // 停止滚动音效
+        if let player = rollingPlayer, player.isPlaying {
+            player.stop()
+            player.volume = 0
+        }
+        
+        // 停止所有碰撞音效
+        for player in players {
+            if player.isPlaying {
+                player.stop()
+                player.currentTime = 0
+            }
+        }
+    }
 }

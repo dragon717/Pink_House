@@ -41,6 +41,7 @@ struct WealthView: View {
             }
             .onDisappear {
                 lockOrientation(isLocked: false)
+                stopEffects()
             }
             .onChange(of: viewModel.selectedCurrency) { _, newValue in
                 handleCurrencyChange(newValue)
@@ -98,7 +99,13 @@ struct WealthView: View {
             lockOrientation(isLocked: true)
         } else {
             lockOrientation(isLocked: false)
+            stopEffects()
         }
+    }
+    
+    private func stopEffects() {
+        soundManager.stopAllSounds()
+        hapticManager.stopHaptics()
     }
     
     private func updateAmount() {

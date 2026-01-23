@@ -33,6 +33,29 @@ final class HapticEngineManager: ObservableObject {
         prepareHaptics()
         setupLifecycleObserver()
     }
+
+    /// 停止所有震动反馈
+    func stopHaptics() {
+        guard isEngineRunning else { return }
+        
+        // 停止持续震动
+        do {
+            try continuousPlayer?.stop(atTime: 0)
+        } catch {
+            print("Failed to stop continuous player: \(error)")
+        }
+        
+        // 停止引擎
+        engine?.stop(completionHandler: { error in
+            if let error = error {
+                print("Error stopping haptic engine: \(error)")
+            } else {
+                Task { @MainActor in
+                    self.isEngineRunning = false
+                }
+            }
+        })
+    }
     
     private func setupLifecycleObserver() {
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
