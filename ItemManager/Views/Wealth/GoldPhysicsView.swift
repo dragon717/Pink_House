@@ -59,9 +59,15 @@ struct GoldPhysicsView: View {
     // Removed checkState() as it's replaced by shouldPause and onChange
     
     private func createScene(size: CGSize) -> SKScene {
-        if let existingScene = scene, existingScene.size == size {
+        if let existingScene = scene {
+            if existingScene.size != size {
+                // Resize existing scene instead of recreating
+                existingScene.size = size
+            }
             return existingScene
         }
+        
+        // Create new scene only if it doesn't exist
         let newScene = GoldScene(size: size)
         newScene.scaleMode = .aspectFill
         newScene.updateBackgroundColor(for: colorScheme)
@@ -69,7 +75,14 @@ struct GoldPhysicsView: View {
         // Initial population
         newScene.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
         
-        self.scene = newScene
+        // Assign to state asynchronously to avoid "modifying state during view update"
+        // This is a workaround for initializing state that depends on GeometryReader size
+        DispatchQueue.main.async {
+            if self.scene == nil {
+                self.scene = newScene
+            }
+        }
+        
         return newScene
     }
 }
