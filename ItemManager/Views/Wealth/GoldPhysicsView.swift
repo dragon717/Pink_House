@@ -7,20 +7,35 @@ struct GoldPhysicsView: View {
     let beanWeight: Double // Weight per real bean (e.g. 1g)
     
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.scenePhase) var scenePhase
+    @Environment(\.isSimulationActive) var isSimulationActive
     
     // Scene Configuration
     @State private var scene: GoldScene?
+    @State private var isViewVisible: Bool = false
+    
+    // Computed pause state for SpriteView
+    private var shouldPause: Bool {
+        // print("GoldPhysicsView: shouldPause check - Visible: \(isViewVisible), SimActive: \(isSimulationActive), Scene: \(scenePhase)")
+        return !isViewVisible || !isSimulationActive || scenePhase != .active
+    }
     
     var body: some View {
         GeometryReader { proxy in
-            SpriteView(scene: createScene(size: proxy.size))
+            SpriteView(scene: createScene(size: proxy.size), isPaused: shouldPause)
                 // Transparent to let ZStack background show through if needed,
                 // but we will manage background color in scene.
                 .background(Color.clear) 
                 .ignoresSafeArea()
                 .onAppear {
+                    isViewVisible = true
                     // Update bean count when view appears
                     scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
+                    // checkState() // No longer needed, handled by onChange(of: shouldPause)
+                }
+                .onDisappear {
+                    isViewVisible = false
+                    // checkState()
                 }
                 .onChange(of: totalWeightGrams) { _, newValue in
                     // Ensure update runs on main thread and scene is ready
@@ -31,8 +46,17 @@ struct GoldPhysicsView: View {
                 .onChange(of: colorScheme) { _, newScheme in
                     scene?.updateBackgroundColor(for: newScheme)
                 }
+                .onChange(of: shouldPause) { _, newValue in
+                    if newValue {
+                        scene?.pauseSimulation()
+                    } else {
+                        scene?.resumeSimulation()
+                    }
+                }
         }
     }
+    
+    // Removed checkState() as it's replaced by shouldPause and onChange
     
     private func createScene(size: CGSize) -> SKScene {
         if let existingScene = scene, existingScene.size == size {
@@ -75,6 +99,18 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     private let beanRadius: CGFloat = 8.0
     private let bottomPadding: CGFloat = 100.0 // Reserve space for TabBar
     
+    func pauseSimulation() {
+        self.isPaused = true
+        motionManager.stopDeviceMotionUpdates()
+        // Stop any continuous haptics
+        HapticEngineManager.shared.updateHapticParameters(intensity: 0, sharpness: 0)
+    }
+    
+    func resumeSimulation() {
+        self.isPaused = false
+        startMotionUpdates()
+    }
+    
     override func didMove(to view: SKView) {
         setupPhysicsBoundary()
         physicsWorld.gravity = CGVector(dx: 0, dy: -9.8) // Default gravity
@@ -84,15 +120,38 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     }
     
     override func update(_ currentTime: TimeInterval) {
-        // Process aggregated collision data from the previous frame
+        // 1. Process aggregated collision data for transient haptics (瞬态撞击)
         if frameCollisionCount > 0 {
             triggerAggregatedHaptic(currentTime: currentTime)
-            
-            // Reset for next frame
-            frameMaxImpulse = 0.0
-            frameContactPoint = .zero
-            frameCollisionCount = 0
         }
+        
+        // 2. Real-time Modulation for Continuous Haptics (持续震动调制)
+        // 计算当前所有金豆的总动能，作为持续震动的强度依据
+        // 遍历所有 beanNodes 可能太耗时 (5000个)，我们可以采样或者利用物理世界的整体属性
+        // 但 SpriteKit 没有直接提供 "Total Energy"
+        // 替代方案：利用上一帧的碰撞次数和最大冲量来估算“混乱度”
+        
+        // 衰减因子：如果这一帧没有碰撞，能量快速衰减
+        // 我们维护一个平滑的 energyLevel
+        
+        let currentEnergy = min(CGFloat(frameCollisionCount) * 0.1 + frameMaxImpulse * 0.5, 1.0)
+        
+        // 发送给 HapticEngine 进行调制
+        // 注意：不要每一帧都发，除非有变化，而且 Core Haptics 处理频率很高，可以每帧发
+        if currentEnergy > 0.01 {
+             HapticEngineManager.shared.updateHapticParameters(
+                intensity: Float(currentEnergy),
+                sharpness: 0.5 // 持续震动保持低沉，模拟背景噪音
+             )
+        } else {
+             // 静止时关闭
+             HapticEngineManager.shared.updateHapticParameters(intensity: 0, sharpness: 0)
+        }
+
+        // Reset for next frame
+        frameMaxImpulse = 0.0
+        frameContactPoint = .zero
+        frameCollisionCount = 0
     }
     
     func didBegin(_ contact: SKPhysicsContact) {

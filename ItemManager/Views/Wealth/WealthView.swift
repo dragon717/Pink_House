@@ -5,6 +5,7 @@ struct WealthView: View {
     @State private var viewModel = WealthViewModel()
     @Query private var allClothings: [Clothing]
     @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @ObservedObject private var soundManager = SoundManager.shared
     
     private var calculatedTotalAmount: Decimal {
         allClothings.reduce(Decimal(0)) { partialResult, clothing in
@@ -54,11 +55,22 @@ struct WealthView: View {
     private var toolbarContent: some ToolbarContent {
         if viewModel.selectedCurrency == .gold {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    hapticManager.isHapticsEnabled.toggle()
-                } label: {
-                    Image(systemName: hapticManager.isHapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
-                        .foregroundStyle(hapticManager.isHapticsEnabled ? .yellow : .gray)
+                HStack(spacing: 16) {
+                    // Sound Toggle
+                    Button {
+                        soundManager.isSoundEnabled.toggle()
+                    } label: {
+                        Image(systemName: soundManager.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                            .foregroundStyle(soundManager.isSoundEnabled ? .blue : .gray)
+                    }
+                    
+                    // Haptic Toggle
+                    Button {
+                        hapticManager.isHapticsEnabled.toggle()
+                    } label: {
+                        Image(systemName: hapticManager.isHapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
+                            .foregroundStyle(hapticManager.isHapticsEnabled ? .yellow : .gray)
+                    }
                 }
             }
         }

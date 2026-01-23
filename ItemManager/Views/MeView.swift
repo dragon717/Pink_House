@@ -1,101 +1,22 @@
-
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct MeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
+    @ObservedObject private var hapticManager = HapticEngineManager.shared
     @State private var isImporting = false
     @State private var showingImportAlert = false
     @State private var importMessage = ""
+    @State private var showingHapticTestAlert = false
     
     var body: some View {
         NavigationStack {
             List {
-                // Section 1: Account Info
-//                Section {
-//                    HStack(spacing: 15) {
-//                        Image(systemName: "smiley")
-//                            .resizable()
-//                            .scaledToFit()
-//                            .frame(width: 60, height: 60)
-//                            .foregroundStyle(.gray)
-//                            .padding(10)
-//                            .background(Color.gray.opacity(0.1))
-//                            .clipShape(Circle())
-//                        
-//                        VStack(alignment: .leading, spacing: 4) {
-//                            Text("用户 6948")
-//                                .font(.title3)
-//                                .fontWeight(.bold)
-//                            Text("189****6948")
-//                                .font(.subheadline)
-//                                .foregroundStyle(.secondary)
-//                        }
-//                        
-//                        Spacer()
-//                        
-//                        Image(systemName: "chevron.right")
-//                            .foregroundStyle(.gray)
-//                            .font(.caption)
-//                    }
-//                    .padding(.vertical, 4)
-//                    
-//                    NavigationLink(destination: Text("退出登录")) {
-//                        HStack {
-//                            Image(systemName: "rectangle.portrait.and.arrow.right")
-//                                .foregroundStyle(.brown)
-//                                .frame(width: 24)
-//                            Text("退出登录")
-//                        }
-//                    }
-//                    
-//                    NavigationLink(destination: Text("注销账户")) {
-//                        HStack {
-//                            Image(systemName: "person.crop.circle.badge.xmark")
-//                                .foregroundStyle(.red)
-//                                .frame(width: 24)
-//                            Text("注销账户")
-//                                .foregroundStyle(.red)
-//                        }
-//                    }
-//                } header: {
-//                    Text("账户信息")
-//                }
-                
-                // Section 2: Membership
-                // Section {
-                //     NavigationLink(destination: Text("开通会员")) {
-                //         HStack {
-                //             Image(systemName: "crown.fill")
-                //                 .foregroundStyle(.brown)
-                //                 .font(.title2)
-                //                 .frame(width: 40, height: 40)
-                //                 .background(Color.brown.opacity(0.1))
-                //                 .clipShape(Circle())
-                            
-                //             VStack(alignment: .leading) {
-                //                 Text("开通会员")
-                //                     .font(.headline)
-                //                     .foregroundStyle(.brown)
-                //                 Text("解锁全部高级功能")
-                //                     .font(.caption)
-                //                     .foregroundStyle(.gray)
-                //             }
-                //         }
-                //         .padding(.vertical, 4)
-                //     }
-                // }
-                // .listRowBackground(
-                //     LinearGradient(
-                //         colors: [Color.white, Color.pink.opacity(0.05)],
-                //         startPoint: .leading,
-                //         endPoint: .trailing
-                //     )
-                // )
-                
                 // Section 3: Feature Settings
                 Section {
+                    
+
                     NavigationLink(destination: GeneralSettingsView()) {
                         HStack(spacing: 12) {
                             Image(systemName: "slider.horizontal.3")
@@ -130,23 +51,22 @@ struct MeView: View {
                         }
                         .padding(.vertical, 2)
                     }
-                    NavigationLink(destination: PrivacySettingsView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "lock")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("隐私设置")
-                                    .font(.body)
-                                Text("数据与隐私")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
+                    // NavigationLink(destination: PrivacySettingsView()) {
+                    //     HStack(spacing: 12) {
+                    //         Image(systemName: "lock")
+                    //             .foregroundStyle(.brown)
+                    //             .font(.body)
+                    //             .frame(width: 24)
+                    //         VStack(alignment: .leading) {
+                    //             Text("隐私设置")
+                    //                 .font(.body)
+                    //             Text("数据与隐私")
+                    //                 .font(.caption)
+                    //                 .foregroundStyle(.secondary)
+                    //         }
+                    //     }
+                    //     .padding(.vertical, 2)
+                    // }
                     NavigationLink(destination: WidgetSettingsView()) {
                         HStack(spacing: 12) {
                             Image(systemName: "rectangle.3.group")
@@ -180,6 +100,55 @@ struct MeView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    // 触感反馈设置 (跳转详情页)
+                    NavigationLink(destination: HapticSettingsView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "waveform.path.ecg")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("触感反馈")
+                                    .font(.body)
+                                    .foregroundStyle(.white)
+                                Text("震动开关与系统设置引导")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    // 应用系统设置
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "gear.circle")
+                                .foregroundStyle(.brown)
+                                .font(.body)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading) {
+                                Text("应用系统设置")
+                                    .font(.body)
+                                    .foregroundStyle(.white)
+                                Text("管理通知、权限与隐私")
+                                    .font(.caption)
+                                    .foregroundStyle(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.caption)
+                                .foregroundStyle(.gray)
                         }
                         .padding(.vertical, 2)
                     }
@@ -270,26 +239,112 @@ struct SettingsRow: View {
     let subtitle: String
     
     var body: some View {
-        NavigationLink(destination: Text(title)) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .foregroundStyle(.brown)
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(.brown)
+                .font(.body)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading) {
+                Text(title)
                     .font(.body)
-                    .frame(width: 24)
-                
-                VStack(alignment: .leading) {
-                    Text(title)
-                        .font(.body)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.vertical, 2)
         }
+        .padding(.vertical, 2)
     }
 }
 
-#Preview {
-    MeView()
+/// 独立的触感反馈设置页
+struct HapticSettingsView: View {
+    @ObservedObject private var hapticManager = HapticEngineManager.shared
+    
+    var body: some View {
+        List {
+            // 1. 应用内开关
+            Section {
+                Toggle(isOn: $hapticManager.isHapticsEnabled) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                            .foregroundStyle(.brown)
+                            .frame(width: 24)
+                        VStack(alignment: .leading) {
+                            Text("应用内触感")
+                                .foregroundStyle(.primary)
+                            Text("控制金豆滚动、碰撞的震动反馈")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("功能开关")
+            }
+            
+            // 2. 测试与系统引导
+            Section {
+                Button {
+                    hapticManager.playTestHaptic()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "play.circle.fill")
+                            .foregroundStyle(.blue)
+                            .frame(width: 24)
+                        Text("播放测试震动")
+                            .foregroundStyle(.primary)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("如果您在点击测试按钮时感觉不到震动：")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack(alignment: .top) {
+                        Text("1.")
+                        Text("请确保手机未处于静音模式，或在设置中开启了“静音模式下震动”。")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    
+                    HStack(alignment: .top) {
+                        Text("2.")
+                        Text("请检查 iOS 系统设置中是否开启了“系统触感反馈”。")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+                
+                Button {
+                    // 尝试跳转到“声音与触感”设置页
+                    let urlString = "App-Prefs:root=Sounds"
+                    if let url = URL(string: urlString), UIApplication.shared.canOpenURL(url) {
+                        UIApplication.shared.open(url)
+                    } else if let appSettings = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(appSettings)
+                    }
+                } label: {
+                    HStack {
+                        Text("前往系统设置 > 声音与触感")
+                        Spacer()
+                        Image(systemName: "arrow.up.forward.app")
+                    }
+                    .font(.subheadline)
+                }
+            } header: {
+                Text("故障排查")
+            } footer: {
+                Text("注意：如果 iOS 的“系统触感反馈”被关闭，App 将无法提供任何震动体验。")
+            }
+        }
+        .navigationTitle("触感反馈")
+        .background {
+            LiquidBackground()
+        }
+        .scrollContentBackground(.hidden)
+    }
 }

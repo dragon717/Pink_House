@@ -49,6 +49,11 @@ class WidgetBackgroundManager {
     func loadImage() -> UIImage? {
         guard let url = imageURL else { return nil }
         
+        // Check if file exists before trying to open it to avoid console errors
+        if !fileManager.fileExists(atPath: url.path) {
+            return nil
+        }
+        
         // Use ImageIO to downsample image while loading
         // This prevents loading full resolution image into memory if the file on disk is large
         // (e.g. if it was saved by an older version of the app)
