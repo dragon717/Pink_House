@@ -114,7 +114,7 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("触感反馈")
                                     .font(.body)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Text("震动开关与系统设置引导")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -138,10 +138,10 @@ struct MeView: View {
                             VStack(alignment: .leading) {
                                 Text("应用系统设置")
                                     .font(.body)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                                 Text("管理通知、权限与隐私")
                                     .font(.caption)
-                                    .foregroundStyle(.gray)
+                                    .foregroundStyle(.secondary)
                             }
                             
                             Spacer()

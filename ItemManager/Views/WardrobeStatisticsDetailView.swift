@@ -52,7 +52,11 @@ struct OverviewStatsCard: View {
     }
     
     var accessoriesValue: Decimal {
-        clothings.reduce(0) { $0 + ($1.accessoriesPrice * Decimal($1.stock)) }
+        clothings.reduce(0) { total, clothing in
+            let attachedValue = clothing.accessoriesPrice * Decimal(clothing.stock)
+            let selfValue = clothing.types.contains("小物") ? (clothing.price * Decimal(clothing.stock)) : 0
+            return total + attachedValue + selfValue
+        }
     }
     
     var totalValue: Decimal {
@@ -92,12 +96,12 @@ struct OverviewStatsCard: View {
                         .foregroundStyle(.yellow.opacity(0.3))
                 }
                 .padding()
-                .background(Color(uiColor: .secondarySystemBackground))
+                .background(Color(uiColor: .tertiarySystemGroupedBackground))
                 .cornerRadius(12)
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -251,7 +255,7 @@ struct TagStatsCard: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -275,7 +279,7 @@ struct HeaderRow: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 4)
         .padding(.vertical, 8)
-        .background(Color(uiColor: .secondarySystemBackground))
+        .background(Color(uiColor: .tertiarySystemGroupedBackground))
         .cornerRadius(8)
     }
 }
@@ -375,7 +379,7 @@ struct DepositStatsCard: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -384,6 +388,7 @@ struct DepositStatsCard: View {
 // MARK: - 4. 购买时间统计
 struct PurchaseTimeStatsCard: View {
     let clothings: [Clothing]
+    @State private var selectedMonth: String?
     
     var currentMonth: Date { Date() }
     
@@ -494,22 +499,43 @@ struct PurchaseTimeStatsCard: View {
                 
                 Divider()
                 
-                Text("最近12个月金额")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("最近12个月金额")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    if let selectedMonth,
+                       let stat = last12MonthsStats.first(where: { $0.monthLabel == selectedMonth }) {
+                        Text("\(stat.monthLabel): ¥\(NSDecimalNumber(decimal: stat.amount).stringValue)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.orange)
+                            .transition(.opacity)
+                    }
+                }
                 
                 Chart(last12MonthsStats) { stat in
                     BarMark(
                         x: .value("月份", stat.monthLabel),
                         y: .value("金额", NSDecimalNumber(decimal: stat.amount).doubleValue)
                     )
-                    .foregroundStyle(Color.orange.gradient)
+                    .foregroundStyle(selectedMonth == stat.monthLabel ? Color.orange : Color.orange.opacity(0.7))
+                    .annotation(position: .top) {
+                        if selectedMonth == stat.monthLabel {
+                            Text("¥\(NSDecimalNumber(decimal: stat.amount).stringValue)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
+                .chartXSelection(value: $selectedMonth)
                 .frame(height: 150)
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
