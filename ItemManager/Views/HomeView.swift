@@ -113,7 +113,9 @@ struct HomeView: View {
                         selectedSizes: selectedSizes,
                         selectedLengths: selectedLengths,
                         selectedConditions: selectedConditions,
-                        selectedAccessories: selectedAccessories
+                        selectedAccessories: selectedAccessories,
+                        filterDescription: getFilterDescription(),
+                        onClearFilter: clearAllFilters
                     )
                 } else {
                     DepositPlanView(
@@ -513,6 +515,54 @@ struct HomeView: View {
                 .font(.system(size: 16))
                 .foregroundStyle(.primary)
         }
+    }
+    
+    private func getFilterDescription() -> String? {
+        var descriptions: [String] = []
+        
+        // Tags
+        if !selectedTagIDs.isEmpty {
+            let names = selectedTagIDs.compactMap { id in tags.first(where: { $0.id == id })?.name }
+            if !names.isEmpty { descriptions.append(names.joined(separator: "/")) }
+        }
+        
+        // Brands
+        if !selectedBrandIDs.isEmpty {
+            let names = selectedBrandIDs.compactMap { id in brands.first(where: { $0.id == id })?.name }
+            if !names.isEmpty { descriptions.append(names.joined(separator: "/")) }
+        }
+        
+        // Types
+        if !selectedTypes.isEmpty { descriptions.append(selectedTypes.joined(separator: "/")) }
+        
+        // Colors
+        if !selectedColors.isEmpty { descriptions.append(selectedColors.joined(separator: "/")) }
+        
+        // Sizes
+        if !selectedSizes.isEmpty { descriptions.append(selectedSizes.joined(separator: "/")) }
+        
+        // Lengths
+        if !selectedLengths.isEmpty { descriptions.append(selectedLengths.joined(separator: "/")) }
+        
+        // Conditions
+        if !selectedConditions.isEmpty { descriptions.append(selectedConditions.joined(separator: "/")) }
+        
+        // Accessories
+        if !selectedAccessories.isEmpty { descriptions.append(selectedAccessories.joined(separator: "/")) }
+        
+        if descriptions.isEmpty { return nil }
+        return descriptions.joined(separator: " + ")
+    }
+    
+    private func clearAllFilters() {
+        selectedTagIDs.removeAll()
+        selectedBrandIDs.removeAll()
+        selectedTypes.removeAll()
+        selectedColors.removeAll()
+        selectedSizes.removeAll()
+        selectedLengths.removeAll()
+        selectedConditions.removeAll()
+        selectedAccessories.removeAll()
     }
 }
 

@@ -26,6 +26,10 @@ struct WardrobeView: View {
     let selectedConditions: Set<String>
     let selectedAccessories: Set<String>
     
+    // Filter Actions
+    let filterDescription: String?
+    let onClearFilter: (() -> Void)?
+    
     init(searchText: Binding<String>, 
          sortOption: SortOption,
          viewLayout: HomeView.ViewLayout,
@@ -36,7 +40,9 @@ struct WardrobeView: View {
          selectedSizes: Set<String>,
          selectedLengths: Set<String>,
          selectedConditions: Set<String>,
-         selectedAccessories: Set<String>) {
+         selectedAccessories: Set<String>,
+         filterDescription: String? = nil,
+         onClearFilter: (() -> Void)? = nil) {
         _searchText = searchText
         _clothings = Query(sort: sortOption.sortDescriptors)
         self.viewLayout = viewLayout
@@ -49,6 +55,9 @@ struct WardrobeView: View {
         self.selectedLengths = selectedLengths
         self.selectedConditions = selectedConditions
         self.selectedAccessories = selectedAccessories
+        
+        self.filterDescription = filterDescription
+        self.onClearFilter = onClearFilter
     }
     
     // Grid layout
@@ -216,7 +225,9 @@ struct WardrobeView: View {
             .padding(.horizontal)
             
             if showStats {
-                WardrobeStatsView(clothings: filteredClothings)
+                WardrobeStatsView(clothings: filteredClothings,
+                                  filterDescription: filterDescription,
+                                  onClearFilter: onClearFilter)
                     .padding(.horizontal)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -226,6 +237,8 @@ struct WardrobeView: View {
 
 struct WardrobeStatsView: View {
     let clothings: [Clothing]
+    var filterDescription: String? = nil
+    var onClearFilter: (() -> Void)? = nil
     
     var styleCount: Int {
         clothings.count
@@ -262,7 +275,7 @@ struct WardrobeStatsView: View {
                 }
                 
                 // Bottom Action
-                NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings)) {
+                NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
                     HStack {
                         Image(systemName: "chart.bar.fill")
                         Text("查看详细统计")

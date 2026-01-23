@@ -10,6 +10,8 @@ import Charts
 
 struct WardrobeStatisticsDetailView: View {
     let clothings: [Clothing]
+    var filterDescription: String? = nil
+    var onClearFilter: (() -> Void)? = nil
     
     var body: some View {
         ScrollView {
@@ -32,6 +34,23 @@ struct WardrobeStatisticsDetailView: View {
         .navigationTitle("衣橱统计")
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(uiColor: .systemGroupedBackground))
+        .toolbar {
+            if let filterDescription, !filterDescription.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 8) {
+                        Text("筛选:\(filterDescription)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Button("清除") {
+                            onClearFilter?()
+                        }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
     }
 }
 
