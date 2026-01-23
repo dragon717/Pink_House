@@ -57,9 +57,18 @@ struct PhysicsCategory {
     static let beanLayer2: UInt32 = 0b100
 }
 
-class GoldScene: SKScene {
+class GoldScene: SKScene, SKPhysicsContactDelegate {
     private let motionManager = CMMotionManager()
     private var beanNodes: [SKNode] = []
+    
+    // Haptic Control
+    private var lastHapticTime: TimeInterval = 0
+    private let hapticMinInterval: TimeInterval = 0.08
+    
+    // Performance Optimization: Aggregated Collision Data
+    private var frameMaxImpulse: CGFloat = 0.0
+    private var frameContactPoint: CGPoint = .zero
+    private var frameCollisionCount: Int = 0
     
     // Config
     private let maxVisualBeans = 5000 // Significantly increased to match 1g binding
@@ -69,8 +78,71 @@ class GoldScene: SKScene {
     override func didMove(to view: SKView) {
         setupPhysicsBoundary()
         physicsWorld.gravity = CGVector(dx: 0, dy: -9.8) // Default gravity
+        physicsWorld.contactDelegate = self // Set contact delegate
         
         startMotionUpdates()
+    }
+    
+    override func update(_ currentTime: TimeInterval) {
+        // Process aggregated collision data from the previous frame
+        if frameCollisionCount > 0 {
+            triggerAggregatedHaptic(currentTime: currentTime)
+            
+            // Reset for next frame
+            frameMaxImpulse = 0.0
+            frameContactPoint = .zero
+            frameCollisionCount = 0
+        }
+    }
+    
+    func didBegin(_ contact: SKPhysicsContact) {
+        // Lightweight check: only aggregate data, do not run heavy logic here
+        // The bitmasks ensure we only get Wall <-> Bean collisions
+        
+        // Accumulate impulse
+        let impulse = contact.collisionImpulse
+        
+        // Threshold check to ignore micro-collisions (noise)
+        if impulse > 0.05 {
+            if impulse > frameMaxImpulse {
+                frameMaxImpulse = impulse
+                frameContactPoint = contact.contactPoint
+            }
+            frameCollisionCount += 1
+        }
+    }
+    
+    private func triggerAggregatedHaptic(currentTime: TimeInterval) {
+        // Throttle haptics based on time
+        guard currentTime - lastHapticTime > hapticMinInterval else { return }
+        
+        lastHapticTime = currentTime
+        
+        // Logic:
+        // If single collision with high impulse -> Sharp, Strong haptic
+        // If multiple collisions (e.g. rolling pile) -> Muffled, Rumbly haptic
+        
+        // Normalize Impulse (0.0 - 1.0)
+        // Assume max impulse around 3.0 for very hard shake
+        let normalizedIntensity = Float(min(frameMaxImpulse / 2.0, 1.0))
+        
+        // Calculate Sharpness
+        // If many collisions, it's a "thud" or "rumble" -> Lower sharpness
+        // If single collision, it's a "clink" -> Higher sharpness
+        // But also depend on total bean count?
+        // Let's use collision count in this frame as a proxy for "density"
+        let densityFactor = min(Float(frameCollisionCount) / 5.0, 1.0) // 5+ collisions = max density effect
+        let sharpness: Float = 0.9 - (densityFactor * 0.4) // 0.9 (sharp) -> 0.5 (dull)
+        
+        // Spatial Position
+        let normalizedX = frameContactPoint.x / self.size.width
+        let normalizedY = frameContactPoint.y / self.size.height
+        
+        HapticEngineManager.shared.playCollisionHaptic(
+            intensity: normalizedIntensity,
+            sharpness: sharpness,
+            position: CGPoint(x: normalizedX, y: normalizedY)
+        )
     }
     
     func updateBackgroundColor(for scheme: ColorScheme) {
@@ -95,8 +167,11 @@ class GoldScene: SKScene {
         
         physicsBody = SKPhysicsBody(edgeLoopFrom: safeFrame)
         physicsBody?.categoryBitMask = PhysicsCategory.wall
+        // Walls collide with beans
         physicsBody?.collisionBitMask = PhysicsCategory.beanLayer1 | PhysicsCategory.beanLayer2
-        physicsBody?.contactTestBitMask = 0
+        // Walls notify contact only with beans (to trigger haptics)
+        // CRITICAL: We only want to know when beans hit the wall, not when beans hit beans.
+        physicsBody?.contactTestBitMask = PhysicsCategory.beanLayer1 | PhysicsCategory.beanLayer2
     }
     
     override func didChangeSize(_ oldSize: CGSize) {
