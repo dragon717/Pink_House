@@ -99,6 +99,11 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     private let beanRadius: CGFloat = 8.0
     private let bottomPadding: CGFloat = 100.0 // Reserve space for TabBar
     
+    // Batch Processing for Performance
+    private var targetBeanCount: Int = 0
+    private let beansPerFrameAdd: Int = 50 // Add 50 beans per frame (~3000/sec at 60fps)
+    private let beansPerFrameRemove: Int = 100 // Remove faster
+    
     func pauseSimulation() {
         self.isPaused = true
         motionManager.stopDeviceMotionUpdates()
@@ -120,6 +125,9 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     }
     
     override func update(_ currentTime: TimeInterval) {
+        // 0. Batch Processing for Bean Management
+        processBeanQueue()
+
         // 1. Process aggregated collision data for transient haptics (瞬态撞击)
         if frameCollisionCount > 0 {
             triggerAggregatedHaptic(currentTime: currentTime)
@@ -244,12 +252,21 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
         let totalRealBeans = Int(totalWeight / beanWeight)
         let beansToShow = min(totalRealBeans, maxVisualBeans)
         
+        // Just update the target, let update() handle the convergence
+        self.targetBeanCount = beansToShow
+    }
+    
+    private func processBeanQueue() {
         let currentCount = beanNodes.count
         
-        if currentCount < beansToShow {
-            addBeans(count: beansToShow - currentCount)
-        } else if currentCount > beansToShow {
-            removeBeans(count: currentCount - beansToShow)
+        if currentCount < targetBeanCount {
+            // Add beans
+            let countToAdd = min(beansPerFrameAdd, targetBeanCount - currentCount)
+            addBeans(count: countToAdd)
+        } else if currentCount > targetBeanCount {
+            // Remove beans
+            let countToRemove = min(beansPerFrameRemove, currentCount - targetBeanCount)
+            removeBeans(count: countToRemove)
         }
     }
     

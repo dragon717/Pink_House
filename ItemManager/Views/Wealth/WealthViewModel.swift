@@ -45,6 +45,7 @@ class WealthViewModel {
     var goldPriceSource: String = "模拟数据"
     
     var isFetchingRate: Bool = false
+    var isGoldReady: Bool = false
     var lastUpdatedDate: String? = nil
     
     // Gold Configuration
@@ -131,6 +132,7 @@ class WealthViewModel {
         
         await MainActor.run {
             self.isFetchingRate = false
+            self.isGoldReady = true
         }
     }
     

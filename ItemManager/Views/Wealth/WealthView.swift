@@ -250,10 +250,22 @@ struct WealthVisualizationView: View {
     var body: some View {
         GeometryReader { geometry in
             if viewModel.selectedCurrency == .gold {
-                GoldPhysicsView(
-                    totalWeightGrams: viewModel.totalGoldWeightGrams,
-                    beanWeight: viewModel.goldBeanWeightGrams
-                )
+                if viewModel.isGoldReady {
+                    GoldPhysicsView(
+                        totalWeightGrams: viewModel.totalGoldWeightGrams,
+                        beanWeight: viewModel.goldBeanWeightGrams
+                    )
+                } else {
+                    VStack {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("正在计算金克重...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
                 moneyStackScrollView(geometry: geometry)
             }
