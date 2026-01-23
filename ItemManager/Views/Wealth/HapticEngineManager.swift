@@ -203,14 +203,15 @@ final class HapticEngineManager: ObservableObject {
     ///   - intensity: 震动强度 (0.0 - 1.0)，通常基于碰撞速度
     ///   - sharpness: 震动锐度 (0.0 - 1.0)，模拟材质硬度
     ///   - position: 屏幕归一化坐标 (x: 0-1, y: 0-1)，用于模拟空间感
-    func playCollisionHaptic(intensity: Float, sharpness: Float, position: CGPoint? = nil) {
+    ///   - type: 碰撞类型 (撞墙/撞豆)
+    func playCollisionHaptic(intensity: Float, sharpness: Float, position: CGPoint? = nil, type: SoundManager.ImpactType = .soft) {
         // print("playCollisionHaptic called with intensity: \(intensity), sharpness: \(sharpness)")
         
         // 声音总是尝试播放（即使没有震动引擎）
         // 参数限制
         // 即使 intensity 很小，我们也给一个最小音量，确保能听到反馈
         let clampedIntensity = max(0.05, min(intensity, 1.0))
-        soundManager.playCollisionSound(volume: clampedIntensity)
+        soundManager.playCollisionSound(volume: clampedIntensity, type: type)
         
         guard isHapticsEnabled else { return }
         
@@ -218,9 +219,10 @@ final class HapticEngineManager: ObservableObject {
         if !supportsCoreHaptics || engine == nil {
             // print("Fallback to UIKit Haptics")
             if clampedIntensity > 0.6 {
-                let generator = UIImpactFeedbackGenerator(style: .medium)
+                // 撞墙或大力撞击，使用 Heavy 或 Rigid
+                let generator = UIImpactFeedbackGenerator(style: type == .hard ? .heavy : .medium)
                 generator.impactOccurred()
-            } else if clampedIntensity > 0.2 { // Lowered threshold for fallback
+            } else if clampedIntensity > 0.2 { 
                 let generator = UIImpactFeedbackGenerator(style: .light)
                 generator.impactOccurred()
             }
@@ -254,18 +256,6 @@ final class HapticEngineManager: ObservableObject {
              parameters.append(CHHapticEventParameter(parameterID: .attackTime, value: max(0, 0.01 + randomFactor)))
         }
         
-        // 尝试添加基本的立体声参数 (虽然手机上效果有限，但有助于区分左右)
-        // 0.0 是最左，1.0 是最右
-        /* 
-        // 移除 AudioPan，因为日志显示 ERROR: Unknown event param type: AudioPan
-        // 这会导致整个震动播放失败 (Error Code -4820)
-        if let pos = position {
-            // 将 x 坐标映射到 -1.0 到 1.0 的音频声像范围 (Audio Pan)
-            let panValue = (pos.x * 2.0) - 1.0
-            parameters.append(CHHapticEventParameter(parameterID: .audioPan, value: Float(panValue)))
-        }
-        */
-        
         // 创建瞬态事件 (Transient Event) - 适合撞击
         let event = CHHapticEvent(eventType: .hapticTransient, parameters: parameters, relativeTime: 0)
         events.append(event)
@@ -282,10 +272,52 @@ final class HapticEngineManager: ObservableObject {
         }
     }
     
+    // 滚动震动播放器
+    private var rollingPlayer: CHHapticAdvancedPatternPlayer?
+    
     /// 播放连续的滚动纹理（当大量金豆移动时）
     /// - Parameter intensity: 整体滚动的剧烈程度
     func playRollingTexture(intensity: Float) {
-        // 这是一个预留接口，用于处理持续的“沙沙”声震感
-        // 实现需要使用 CHHapticEvent(eventType: .hapticContinuous, ...)
+        // 更新滚动音效
+        soundManager.updateRollingSound(intensity: intensity)
+        
+        guard isHapticsEnabled, supportsCoreHaptics, let engine = engine else { return }
+        
+        // 如果 intensity 很小，停止播放
+        // 提高阈值，避免微小移动产生持续的电流声
+        if intensity < 0.05 {
+            if let player = rollingPlayer {
+                try? player.stop(atTime: 0)
+                rollingPlayer = nil
+            }
+            return
+        }
+        
+        do {
+            // 如果播放器不存在，创建新的持续震动播放器
+            if rollingPlayer == nil {
+                let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),
+                    // Sharpness 极低，模拟沉重的滚动，避免高频蜂鸣
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.05) 
+                ], relativeTime: 0, duration: 100) // 长时间播放，手动停止
+                
+                let pattern = try CHHapticPattern(events: [event], parameters: [])
+                rollingPlayer = try engine.makeAdvancedPlayer(with: pattern)
+                rollingPlayer?.loopEnabled = true
+                try rollingPlayer?.start(atTime: 0)
+            } else {
+                // 更新现有播放器的参数
+                // 动态调整强度，但保持极低的 Sharpness
+                // Sharpness 过高会导致手机外壳发出滋滋声
+                let dynamicParams = [
+                    CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0),
+                    CHHapticDynamicParameter(parameterID: .hapticSharpnessControl, value: 0.05 + (intensity * 0.1), relativeTime: 0)
+                ]
+                try rollingPlayer?.sendParameters(dynamicParams, atTime: 0)
+            }
+        } catch {
+            print("Failed to update rolling haptic: \(error)")
+        }
     }
 }

@@ -164,15 +164,11 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
         let currentEnergy = min(CGFloat(frameCollisionCount) * 0.1 + frameMaxImpulse * 0.5, 1.0)
         
         // 发送给 HapticEngine 进行调制
-        // 注意：不要每一帧都发，除非有变化，而且 Core Haptics 处理频率很高，可以每帧发
-        if currentEnergy > 0.01 {
-             HapticEngineManager.shared.updateHapticParameters(
-                intensity: Float(currentEnergy),
-                sharpness: 0.5 // 持续震动保持低沉，模拟背景噪音
-             )
+        // 增加能量阈值 0.01 -> 0.05，避免静态或微小震动触发引擎噪音
+        if currentEnergy > 0.05 {
+             HapticEngineManager.shared.playRollingTexture(intensity: Float(currentEnergy))
         } else {
-             // 静止时关闭
-             HapticEngineManager.shared.updateHapticParameters(intensity: 0, sharpness: 0)
+             HapticEngineManager.shared.playRollingTexture(intensity: 0)
         }
 
         // Reset for next frame
@@ -224,12 +220,14 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
         
         let normalizedIntensity: Float
         let sharpness: Float
+        let impactType: SoundManager.ImpactType
         
         if isWallCollisionFrame {
              // WALL COLLISION: Strong & Sharp
              // Impulse 0.1+ -> Max intensity
              normalizedIntensity = Float(min(frameMaxImpulse * 10.0, 1.0))
              sharpness = 0.9 // Hard surface
+             impactType = .hard
         } else {
              // BEAN COLLISION: Medium & Soft
              // Impulse 0.05+ -> Max intensity (but capped lower overall)
@@ -237,6 +235,7 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
              let baseIntensity = Float(min(frameMaxImpulse * 15.0, 1.0))
              normalizedIntensity = baseIntensity * 0.6 // Cap at 60% of max possible system haptic
              sharpness = 0.4 // Soft gold/wood sound
+             impactType = .soft
         }
         
         // Spatial Position
@@ -246,7 +245,8 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
         HapticEngineManager.shared.playCollisionHaptic(
             intensity: normalizedIntensity,
             sharpness: sharpness,
-            position: CGPoint(x: normalizedX, y: normalizedY)
+            position: CGPoint(x: normalizedX, y: normalizedY),
+            type: impactType
         )
     }
     
