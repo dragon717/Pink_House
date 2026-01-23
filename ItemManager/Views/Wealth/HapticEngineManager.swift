@@ -3,6 +3,8 @@ import UIKit
 import Combine
 import SwiftUI // Import SwiftUI for AppStorage or other property wrappers if needed, but Combine is key for ObservableObject
 
+// 金豆震动：平时晃动有沙沙的轻微震感，金豆堆积碰撞有中等反馈，用力撞击边缘则会有强烈的震动
+
 /// 管理所有触觉反馈的高级管理器
 /// 负责处理 Core Haptics 引擎的生命周期、震动模式生成以及空间感模拟
 @MainActor
@@ -78,21 +80,26 @@ final class HapticEngineManager: ObservableObject {
     
     /// 启动引擎（如果尚未运行）
     private func startEngineIfNeeded() {
+        // Debug
+        // print("startEngineIfNeeded check: Enabled=\(isHapticsEnabled), EngineExists=\(engine != nil), Running=\(isEngineRunning)")
+        
         guard isHapticsEnabled, let engine = engine, !isEngineRunning else { return }
         
         do {
             try engine.start()
             isEngineRunning = true
+            print("✅ Haptic Engine Started Successfully")
             
             // 引擎启动后，预备持续震动模式
             prepareContinuousHaptic()
         } catch let error as NSError {
-            print("Haptic Engine Start Error: Code \(error.code), Description: \(error.localizedDescription)")
+            print("❌ Haptic Engine Start Error: Code \(error.code), Description: \(error.localizedDescription)")
         }
     }
     
     /// 播放测试震动
     func playTestHaptic() {
+        print("🔊 playTestHaptic called. Enabled: \(isHapticsEnabled), SupportsCH: \(supportsCoreHaptics)")
         guard isHapticsEnabled else { return }
         
         // 确保引擎运行
@@ -109,11 +116,13 @@ final class HapticEngineManager: ObservableObject {
                 let pattern = try CHHapticPattern(events: [event], parameters: [])
                 let player = try engine.makePlayer(with: pattern)
                 try player.start(atTime: 0)
+                print("✅ Test Haptic Played (Core Haptics)")
             } catch {
-                print("Failed to play test haptic: \(error)")
+                print("❌ Failed to play test haptic: \(error)")
             }
         } else {
             // Fallback
+            print("⚠️ Test Haptic Fallback to UIKit")
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
         }
@@ -161,7 +170,9 @@ final class HapticEngineManager: ObservableObject {
         var dynamicParams: [CHHapticDynamicParameter] = []
         
         // 1. 强度调制
-        let clampedIntensity = max(0.0, min(intensity, 1.0))
+        // 对于连续震动（滚动），我们需要确保它不会太强，始终保持“背景感”
+        // 限制最大强度为 0.3
+        let clampedIntensity = max(0.0, min(intensity * 0.3, 0.3))
         let intensityParam = CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: clampedIntensity, relativeTime: 0)
         dynamicParams.append(intensityParam)
         
@@ -173,7 +184,7 @@ final class HapticEngineManager: ObservableObject {
         // 3. 空间调制 (Audio Pan) - 仅在支持设备上有效，且对 Continuous 效果有限，但值得一试
         if let pos = position {
             // x: 0 (Left) -> 1 (Right)  => Pan: -1 -> 1
-            let panValue = (pos.x * 2.0) - 1.0
+            // let panValue = (pos.x * 2.0) - 1.0
             // 注意：Core Haptics 并没有直接暴露 hapticPanControl 动态参数，
             // 但我们可以通过 audioPanControl 间接影响（如果是 Haptic+Audio 模式），或者通过分别调整左右强度来实现（需要两个 Player）。
             // 简单起见，这里我们只调制主参数，空间感主要依靠“瞬态撞击”来实现定位，持续震动负责“氛围”。
@@ -193,19 +204,23 @@ final class HapticEngineManager: ObservableObject {
     ///   - sharpness: 震动锐度 (0.0 - 1.0)，模拟材质硬度
     ///   - position: 屏幕归一化坐标 (x: 0-1, y: 0-1)，用于模拟空间感
     func playCollisionHaptic(intensity: Float, sharpness: Float, position: CGPoint? = nil) {
+        // print("playCollisionHaptic called with intensity: \(intensity), sharpness: \(sharpness)")
+        
         // 声音总是尝试播放（即使没有震动引擎）
         // 参数限制
-        let clampedIntensity = max(0.1, min(intensity, 1.0))
+        // 即使 intensity 很小，我们也给一个最小音量，确保能听到反馈
+        let clampedIntensity = max(0.05, min(intensity, 1.0))
         soundManager.playCollisionSound(volume: clampedIntensity)
         
         guard isHapticsEnabled else { return }
         
         // 如果不支持 Core Haptics 或引擎未就绪，使用 UIKit Fallback
         if !supportsCoreHaptics || engine == nil {
+            // print("Fallback to UIKit Haptics")
             if clampedIntensity > 0.6 {
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()
-            } else if clampedIntensity > 0.3 {
+            } else if clampedIntensity > 0.2 { // Lowered threshold for fallback
                 let generator = UIImpactFeedbackGenerator(style: .light)
                 generator.impactOccurred()
             }
@@ -219,8 +234,16 @@ final class HapticEngineManager: ObservableObject {
         
         // 创建触觉事件参数
         var events: [CHHapticEvent] = []
+        
+        // 这里的 intensity 如果太小，震动会感觉不到。
+        // Core Haptics 的 intensity 0.1 已经很弱了。
+        // 我们做一个非线性映射，让小震动稍微明显一点
+        // Input 0.05 -> Output 0.3
+        // Input 1.0 -> Output 1.0
+        let boostedIntensity = pow(clampedIntensity, 0.5) // 开根号提升低值
+        
         var parameters: [CHHapticEventParameter] = [
-            CHHapticEventParameter(parameterID: .hapticIntensity, value: clampedIntensity),
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: boostedIntensity),
             CHHapticEventParameter(parameterID: .hapticSharpness, value: clampedSharpness)
         ]
         
@@ -233,13 +256,15 @@ final class HapticEngineManager: ObservableObject {
         
         // 尝试添加基本的立体声参数 (虽然手机上效果有限，但有助于区分左右)
         // 0.0 是最左，1.0 是最右
+        /* 
+        // 移除 AudioPan，因为日志显示 ERROR: Unknown event param type: AudioPan
+        // 这会导致整个震动播放失败 (Error Code -4820)
         if let pos = position {
             // 将 x 坐标映射到 -1.0 到 1.0 的音频声像范围 (Audio Pan)
-            // 实际上 Core Haptics 的 audioPan 默认映射到 [-1.0, 1.0]
-            // 输入 pos.x 是 [0.0, 1.0]
             let panValue = (pos.x * 2.0) - 1.0
             parameters.append(CHHapticEventParameter(parameterID: .audioPan, value: Float(panValue)))
         }
+        */
         
         // 创建瞬态事件 (Transient Event) - 适合撞击
         let event = CHHapticEvent(eventType: .hapticTransient, parameters: parameters, relativeTime: 0)

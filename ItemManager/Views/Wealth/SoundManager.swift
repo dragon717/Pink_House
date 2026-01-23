@@ -50,7 +50,7 @@ final class SoundManager: ObservableObject {
         if let url = Bundle.main.url(forResource: "gold_clink", withExtension: "wav") {
             createPlayers(url: url)
         } else {
-            print("SoundManager: 'gold_clink.wav' not found in bundle. Using SystemSound fallback.")
+            // print("SoundManager: 'gold_clink.wav' not found in bundle. Using SystemSound fallback.")
             useSystemSoundFallback = true
         }
     }

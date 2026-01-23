@@ -31,7 +31,12 @@ struct GoldPhysicsView: View {
                     isViewVisible = true
                     // Update bean count when view appears
                     scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
-                    // checkState() // No longer needed, handled by onChange(of: shouldPause)
+                    
+                    // 强制测试震动，确认引擎是否工作
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        print("🧪 Triggering Test Haptic on Appear...")
+                        HapticEngineManager.shared.playTestHaptic()
+                    }
                 }
                 .onDisappear {
                     isViewVisible = false
@@ -106,6 +111,7 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     private var frameMaxImpulse: CGFloat = 0.0
     private var frameContactPoint: CGPoint = .zero
     private var frameCollisionCount: Int = 0
+    private var isWallCollisionFrame: Bool = false // New: Track if this frame has a wall collision
     
     // Config
     private let maxVisualBeans = 5000 // Significantly increased to match 1g binding
@@ -173,22 +179,36 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
         frameMaxImpulse = 0.0
         frameContactPoint = .zero
         frameCollisionCount = 0
+        isWallCollisionFrame = false
     }
     
     func didBegin(_ contact: SKPhysicsContact) {
         // Lightweight check: only aggregate data, do not run heavy logic here
-        // The bitmasks ensure we only get Wall <-> Bean collisions
         
         // Accumulate impulse
         let impulse = contact.collisionImpulse
         
+        // Debug Log (Temporary)
+        // if impulse > 0 { print("Collision Impulse: \(impulse)") }
+        
         // Threshold check to ignore micro-collisions (noise)
-        if impulse > 0.05 {
+        // Lowered threshold significantly for 2g beans
+        if impulse > 0.0001 {
             if impulse > frameMaxImpulse {
                 frameMaxImpulse = impulse
                 frameContactPoint = contact.contactPoint
             }
             frameCollisionCount += 1
+            
+            // Check for wall collision
+            // Wall category is 0b1 (1)
+            // Bean categories are 0b10 (2) and 0b100 (4)
+            if (contact.bodyA.categoryBitMask == PhysicsCategory.wall) || 
+               (contact.bodyB.categoryBitMask == PhysicsCategory.wall) {
+                isWallCollisionFrame = true
+                // Debug high impulse wall collisions
+                // if impulse > 0.01 { print("🧱 Wall Hit! Impulse: \(impulse)") }
+            }
         }
     }
     
@@ -199,20 +219,25 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
         lastHapticTime = currentTime
         
         // Logic:
-        // If single collision with high impulse -> Sharp, Strong haptic
-        // If multiple collisions (e.g. rolling pile) -> Muffled, Rumbly haptic
+        // Tier 1: Wall Collision (High Priority) -> Strong Impact
+        // Tier 2: Bean-Bean Collision (Medium Priority) -> Medium Impact
         
-        // Normalize Impulse (0.0 - 1.0)
-        // Assume max impulse around 3.0 for very hard shake
-        let normalizedIntensity = Float(min(frameMaxImpulse / 2.0, 1.0))
+        let normalizedIntensity: Float
+        let sharpness: Float
         
-        // Calculate Sharpness
-        // If many collisions, it's a "thud" or "rumble" -> Lower sharpness
-        // If single collision, it's a "clink" -> Higher sharpness
-        // But also depend on total bean count?
-        // Let's use collision count in this frame as a proxy for "density"
-        let densityFactor = min(Float(frameCollisionCount) / 5.0, 1.0) // 5+ collisions = max density effect
-        let sharpness: Float = 0.9 - (densityFactor * 0.4) // 0.9 (sharp) -> 0.5 (dull)
+        if isWallCollisionFrame {
+             // WALL COLLISION: Strong & Sharp
+             // Impulse 0.1+ -> Max intensity
+             normalizedIntensity = Float(min(frameMaxImpulse * 10.0, 1.0))
+             sharpness = 0.9 // Hard surface
+        } else {
+             // BEAN COLLISION: Medium & Soft
+             // Impulse 0.05+ -> Max intensity (but capped lower overall)
+             // We scale it so it feels lighter than wall
+             let baseIntensity = Float(min(frameMaxImpulse * 15.0, 1.0))
+             normalizedIntensity = baseIntensity * 0.6 // Cap at 60% of max possible system haptic
+             sharpness = 0.4 // Soft gold/wood sound
+        }
         
         // Spatial Position
         let normalizedX = frameContactPoint.x / self.size.width
@@ -327,10 +352,16 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
         // Layer 2: zPosition 1, Collides with Layer 2 + Wall
         let isLayer2 = Bool.random()
         
+        // 性能优化：仅让约 10% 的金豆作为“触觉传感器”报告碰撞
+        // 避免 5000 个金豆互相碰撞产生过多的回调导致卡顿
+        let isSensor = Int.random(in: 1...10) == 1
+        let contactMask: UInt32 = isSensor ? (PhysicsCategory.beanLayer1 | PhysicsCategory.beanLayer2) : 0
+        
         if isLayer2 {
             node.zPosition = 10 // Visual Front
             body.categoryBitMask = PhysicsCategory.beanLayer2
             body.collisionBitMask = PhysicsCategory.beanLayer2 | PhysicsCategory.wall
+            body.contactTestBitMask = contactMask
             
             // Slightly darken the back layer beans or lighten the front ones for depth?
             // Actually, front layer should cast shadow on back layer? Too complex for 2D.
@@ -343,6 +374,7 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
             node.zPosition = 0 // Visual Back
             body.categoryBitMask = PhysicsCategory.beanLayer1
             body.collisionBitMask = PhysicsCategory.beanLayer1 | PhysicsCategory.wall
+            body.contactTestBitMask = contactMask
             
             // Darken back layer slightly for depth perception
             node.color = .black

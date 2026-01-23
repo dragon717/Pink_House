@@ -507,7 +507,7 @@ struct HomeView: View {
     private var addButton: some View {
         Menu {
             Button { showingAddSheet = true } label: { Label("手动添加", systemImage: "square.and.pencil") }
-            Button {} label: { Label("从社区导入", systemImage: "cloud.download") }
+            Button {} label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16))
