@@ -25,6 +25,14 @@ struct DepositPlanView: View {
     @State private var isAnalyzing: Bool = false
     @State private var showStats = true
     
+    // Money Counting Animation State
+    struct MoneyCountingState: Identifiable {
+        let id = UUID()
+        let amount: Decimal
+    }
+    
+    @State private var moneyCountingState: MoneyCountingState?
+    
     // Filter properties
     let selectedTagIDs: Set<UUID>
     let selectedBrandIDs: Set<UUID>
@@ -214,7 +222,9 @@ struct DepositPlanView: View {
                     .padding(.horizontal)
                     
                     if showStats {
-                        DepositStatsView(clothings: filteredClothings)
+                        DepositStatsView(clothings: filteredClothings) { amount in
+                            self.moneyCountingState = MoneyCountingState(amount: amount)
+                        }
                             .padding(.horizontal)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
@@ -248,6 +258,19 @@ struct DepositPlanView: View {
             .padding(.top, 10)
         }
         .scrollIndicators(.hidden)
+        .fullScreenCover(item: $moneyCountingState) { state in
+            MoneyCountingView(
+                amount: state.amount,
+                denomination: Denomination(value: 100, color: Color(hex: "D93842"), name: "100"),
+                currency: .rmb,
+                onComplete: {
+                    moneyCountingState = nil
+                },
+                onSkip: {
+                    moneyCountingState = nil
+                }
+            )
+        }
     }
     
     private func analyzeSeries() {
@@ -267,6 +290,7 @@ struct DepositPlanView: View {
 
 struct DepositStatsView: View {
     let clothings: [Clothing]
+    var onCountMoney: ((Decimal) -> Void)? = nil
     
     // Deduplicated clothings based on name, deposit, balance for Style Count
     // We ignore stock for style counting
@@ -317,16 +341,29 @@ struct DepositStatsView: View {
                 Divider()
                     .frame(height: 30)
                 
-                statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)")
+                Button {
+                    onCountMoney?(pendingBalance)
+                } label: {
+                    statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
     
-    private func statItem(title: String, value: String, valueColor: Color = .primary) -> some View {
+    private func statItem(title: String, value: String, valueColor: Color = .primary, showIcon: Bool = false) -> some View {
         VStack(spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                if showIcon {
+                    Image(systemName: "banknote")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
             Text(value)
                 .font(.title3)
                 .fontWeight(.semibold)

@@ -26,7 +26,6 @@ struct GoldPhysicsView: View {
                 // Transparent to let ZStack background show through if needed,
                 // but we will manage background color in scene.
                 .background(Color.clear) 
-                .ignoresSafeArea()
                 .onAppear {
                     isViewVisible = true
                     // Update bean count when view appears
@@ -116,7 +115,8 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     // Config
     private let maxVisualBeans = 5000 // Significantly increased to match 1g binding
     private let beanRadius: CGFloat = 8.0
-    private let bottomPadding: CGFloat = 100.0 // Reserve space for TabBar
+    private let bottomPadding: CGFloat = 0.0 // No extra padding needed if not ignoring safe area
+    private let sidePadding: CGFloat = 30.0 // Visible side padding
     
     // Batch Processing for Performance
     private var targetBeanCount: Int = 0
@@ -259,10 +259,7 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     }
     
     private func setupPhysicsBoundary() {
-        // Create a boundary that is raised from the bottom to avoid TabBar
-        // And inset from the sides to avoid edge overflow
-        let sidePadding: CGFloat = 2.0 // Small padding to keep beans fully visible
-        
+        // Create a boundary that fits within the view
         let safeFrame = CGRect(
             x: frame.minX + sidePadding,
             y: frame.minY + bottomPadding,

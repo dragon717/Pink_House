@@ -7,6 +7,15 @@ struct WealthView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
     
+    // Money Counting State
+    struct MoneyCountingState: Identifiable {
+        let id = UUID()
+        let amount: Decimal
+        let denomination: Denomination
+    }
+    
+    @State private var moneyCountingState: MoneyCountingState?
+    
     private var calculatedTotalAmount: Decimal {
         allClothings.reduce(Decimal(0)) { partialResult, clothing in
             if clothing.isDepositPlan {
@@ -29,12 +38,31 @@ struct WealthView: View {
                 VStack(spacing: 20) {
                     WealthHeaderView(viewModel: viewModel)
                     
-                    WealthVisualizationView(viewModel: viewModel)
+                    WealthVisualizationView(viewModel: viewModel) { pile in
+                        // Trigger money counting on tap
+                        self.moneyCountingState = MoneyCountingState(
+                            amount: Decimal(pile.count * pile.denomination.value),
+                            denomination: pile.denomination
+                        )
+                    }
                 }
             }
             .navigationTitle("来财")
             .toolbar {
                 toolbarContent
+            }
+            .fullScreenCover(item: $moneyCountingState) { state in
+                MoneyCountingView(
+                    amount: state.amount,
+                    denomination: state.denomination,
+                    currency: viewModel.selectedCurrency,
+                    onComplete: {
+                        moneyCountingState = nil
+                    },
+                    onSkip: {
+                        moneyCountingState = nil
+                    }
+                )
             }
             .onAppear {
                 handleOnAppear()
@@ -253,6 +281,7 @@ struct WealthHeaderView: View {
 
 struct WealthVisualizationView: View {
     var viewModel: WealthViewModel
+    var onPileTap: ((WealthViewModel.MoneyPile) -> Void)? = nil
     
     var body: some View {
         GeometryReader { geometry in
@@ -321,6 +350,9 @@ struct WealthVisualizationView: View {
                 )
                 .scaleEffect(scale)
                 .frame(width: columnWidth, height: visualRefHeight * scale)
+                .onTapGesture {
+                    onPileTap?(pile)
+                }
             }
         }
         .padding(.horizontal, 8)
