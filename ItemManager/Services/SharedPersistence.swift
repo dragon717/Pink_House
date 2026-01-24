@@ -26,7 +26,17 @@ class SharedPersistence {
             OutfitItem.self
         ])
         
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // 检查 iCloud 同步设置
+        // let isCloudSyncEnabled = UserDefaults.standard.bool(forKey: "useCloudSync")
+        
+        let modelConfiguration: ModelConfiguration
+        // if isCloudSyncEnabled {
+        //     // 启用 iCloud 同步 (.automatic 通常使用 Application Support 目录)
+        //     modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
+        // } else {
+            // 仅本地存储
+            modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
+        // }
         
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])

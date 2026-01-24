@@ -88,15 +88,15 @@ struct MeView: View {
                     }
                     NavigationLink(destination: DataManagementView()) {
                         HStack(spacing: 12) {
-                            Image(systemName: "tag")
+                            Image(systemName: "externaldrive")
                                 .foregroundStyle(.brown)
                                 .font(.body)
                                 .frame(width: 24)
                             
                             VStack(alignment: .leading) {
-                                Text("标签设置")
+                                Text("数据管理")
                                     .font(.body)
-                                Text("管理衣橱标签/品牌/类型等")
+                                Text("备份与导出及属性管理")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -156,32 +156,6 @@ struct MeView: View {
                     Label("功能设置", systemImage: "gearshape")
                         .outlined()
                 }
-                
-                // Section 4: Data Management (临时用)
-//                Section {
-//                    Button {
-//                        isImporting = true
-//                    } label: {
-//                        HStack(spacing: 12) {
-//                            Image(systemName: "square.and.arrow.down")
-//                                .foregroundStyle(.blue)
-//                                .font(.body)
-//                                .frame(width: 24)
-//                            
-//                            VStack(alignment: .leading) {
-//                                Text("导入其他App备份")
-//                                    .font(.body)
-//                                    .foregroundStyle(.primary)
-//                                Text("支持导入 .backup 格式文件")
-//                                    .font(.caption)
-//                                    .foregroundStyle(.secondary)
-//                            }
-//                        }
-//                        .padding(.vertical, 2)
-//                    }
-//                } header: {
-//                    Label("数据管理", systemImage: "externaldrive")
-//                }
             }
             .scrollContentBackground(.hidden)
             .background {
