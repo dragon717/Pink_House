@@ -27,7 +27,7 @@ class ImageManager {
     }
     
     // MARK: - Directory Management
-    private var imagesDirectory: URL {
+    var imagesDirectory: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         let documentsDirectory = paths[0]
         let imagesDirectory = documentsDirectory.appendingPathComponent("Images")
