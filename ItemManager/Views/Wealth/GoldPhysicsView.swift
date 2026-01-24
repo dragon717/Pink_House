@@ -306,11 +306,22 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     }
     
     private func addBeans(count: Int) {
+        // Ensure spawn area is within physics boundaries
+        let safeMinX = sidePadding + beanRadius
+        let safeMaxX = size.width - sidePadding - beanRadius
+        
+        // Safety check if view is too narrow
+        guard safeMaxX > safeMinX else { return }
+        
         for _ in 0..<count {
             let bean = createBeanNode()
-            // Spawn at random x, top y
-            let randomX = CGFloat.random(in: beanRadius...(size.width - beanRadius))
-            let spawnY = size.height - beanRadius - 10 // Start a bit down from top
+            // Spawn at random x within SAFE padding
+            let randomX = CGFloat.random(in: safeMinX...safeMaxX)
+            
+            // Ensure Y is also within boundary (below top edge)
+            // Physics boundary height is frame.height - bottomPadding
+            // Let's spawn them slightly lower to avoid sticking to the top ceiling
+            let spawnY = size.height - bottomPadding - beanRadius - 20
             
             bean.position = CGPoint(x: randomX, y: spawnY)
             addChild(bean)
