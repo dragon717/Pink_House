@@ -19,10 +19,10 @@ struct WealthView: View {
     private var calculatedTotalAmount: Decimal {
         allClothings.reduce(Decimal(0)) { partialResult, clothing in
             if clothing.isDepositPlan {
-                // 定尾计划：已付定金总价
+                // 尾款天使：已付定金总价
                 return partialResult + (clothing.deposit * Decimal(clothing.stock))
             } else {
-                // 衣橱（非定尾计划）：总价（包含小物）
+                // 衣橱（非尾款天使）：总价（包含小物）
                 return partialResult + ((clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock))
             }
         }
@@ -193,7 +193,7 @@ struct WealthHeaderView: View {
             .minimumScaleFactor(0.5)
             
             VStack(spacing: 4) {
-                Text("已购入小裙子总价 + 定尾计划已付总定金")
+                Text("已购入小裙子总价 + 尾款天使已付总定金")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 

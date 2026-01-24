@@ -22,7 +22,7 @@ struct WardrobeStatisticsDetailView: View {
                 // 2. 标签分类统计
                 TagStatsCard(clothings: clothings)
                 
-                // 3. 定尾计划统计
+                // 3. 尾款天使统计
                 DepositStatsCard(clothings: clothings)
                 
                 // 4. 购买时间统计
@@ -355,7 +355,7 @@ struct StatRow: View {
 }
 
 
-// MARK: - 3. 定尾计划统计
+// MARK: - 3. 尾款天使统计
 struct DepositStatsCard: View {
     let clothings: [Clothing]
     
@@ -381,13 +381,13 @@ struct DepositStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("定尾计划统计", systemImage: "list.clipboard.fill")
+            Label("尾款天使统计", systemImage: "list.clipboard.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
             
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    StatBox(title: "定尾计划数量", value: "\(planCount)", unit: "件", color: .brown)
+                    StatBox(title: "尾款天使数量", value: "\(planCount)", unit: "件", color: .brown)
                     StatBox(title: "总金额", value: "¥\(NSDecimalNumber(decimal: totalAmount).stringValue)", unit: "", color: .green)
                 }
                 

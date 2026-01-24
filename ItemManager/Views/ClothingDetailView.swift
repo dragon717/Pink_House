@@ -136,7 +136,7 @@ struct ClothingDetailView: View {
                 confirmPayment()
             }
         } message: {
-            Text("确认后将移除定尾计划，并清空定金和预估尾款时间信息。")
+            Text("确认后将移除尾款天使，并清空定金和预估尾款时间信息。")
         }
         .onAppear {
             // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
@@ -375,7 +375,7 @@ struct ClothingDetailView: View {
                     HStack(spacing: 2) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption2)
-                        Text("定尾计划")
+                        Text("尾款天使")
                             .font(.caption)
                             .bold()
                     }

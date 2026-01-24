@@ -22,12 +22,12 @@ struct NotificationSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("开启定尾计划提醒", isOn: $isEnabled)
+                Toggle("开启尾款天使提醒", isOn: $isEnabled)
                     .onChange(of: isEnabled) { oldValue, newValue in
                         handleSettingsChange()
                     }
             } header: {
-                Text("定尾计划")
+                Text("尾款天使")
             } footer: {
                 Text("开启后，将在到达预估补款时间时发送通知提醒。")
             }

@@ -174,14 +174,14 @@ struct ClothingEditView: View {
                     Divider()
                     
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("加入定尾计划", isOn: $isDepositPlan)
+                        Toggle("加入尾款天使", isOn: $isDepositPlan)
                             .tint(.green)
                         
-                        Text("① 无限量创建定尾计划")
+                        Text("① 无限量创建尾款天使")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
-                        Text("勾选后，该裙子将显示在定尾计划中")
+                        Text("勾选后，该裙子将显示在尾款天使中")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
@@ -196,7 +196,7 @@ struct ClothingEditView: View {
                                 DatePicker("预估尾款时间 (结束)", selection: $finalPaymentEndDate, displayedComponents: .date)
                                     .environment(\.locale, Locale(identifier: "zh_CN"))
                                 
-                                Text("设置预估尾款时间范围，方便在定尾计划中统计和提醒")
+                                Text("设置预估尾款时间范围，方便在尾款天使中统计和提醒")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

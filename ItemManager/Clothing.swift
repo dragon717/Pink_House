@@ -41,7 +41,7 @@ final class Clothing {
     // 购买信息
     var purchaseDate: Date = Date()
     var depositDate: Date? = nil // 定金日期
-    var isDepositPlan: Bool = false // 是否加入定尾计划
+    var isDepositPlan: Bool = false // 是否加入尾款天使
     var finalPaymentDate: Date? = nil // 预估尾款时间（开始）
     var finalPaymentEndDate: Date? = nil // 预估尾款时间（结束）
     var note: String = ""

@@ -33,7 +33,7 @@ struct ClothingCard: View {
                 }
                 
                 if clothing.isDepositPlan {
-                    Text("定尾计划")
+                    Text("尾款天使")
                         .font(.system(size: 10, weight: .medium))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 4)

@@ -189,7 +189,7 @@ struct HomeView: View {
                 VStack(spacing: 2) {
                     Image(systemName: selectedTab == .depositPlan ? "calendar.badge.clock" : "calendar")
                         .font(.system(size: 16))
-                    Text("定尾计划")
+                    Text("尾款天使")
                         .font(.system(size: 10, weight: selectedTab == .depositPlan ? .bold : .medium))
                 }
                 .foregroundStyle(selectedTab == .depositPlan ? Color.brown : .secondary)
