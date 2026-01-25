@@ -179,9 +179,31 @@ extension BackupService {
             
             print("### Export: Collecting files (\(filesToBackup.count) files)...")
             
-            let fileList = Array(filesToBackup)
+            // 构建待打包的文件列表 [文件名: 磁盘路径]
+            var imageFiles: [String: URL] = [:]
+            for fileName in filesToBackup {
+                let fileURL = imagesDir.appendingPathComponent(fileName)
+                if FileManager.default.fileExists(atPath: fileURL.path) {
+                    imageFiles[fileName] = fileURL
+                }
+            }
             
-            // 4. Create Backups Directory in Documents
+            // 1. 生成 Manifest JSON
+            let jsonEncoder = JSONEncoder()
+            jsonEncoder.dateEncodingStrategy = .iso8601
+            let jsonData = try jsonEncoder.encode(manifest)
+            
+            // 2. 调用原生的 FileWrapper 方案进行打包和压缩
+            print("### Export: Archiving using NativePackageWrapper...")
+            let compressedData = try NativePackageWrapper.createPackage(manifestData: jsonData, imageFiles: imageFiles)
+            
+            // 3. 生成输出文件名并写入
+            let dateString = Date().formatted(.dateTime.year().month().day().hour().minute().second())
+                .replacingOccurrences(of: "/", with: "")
+                .replacingOccurrences(of: ":", with: "")
+                .replacingOccurrences(of: " ", with: "_")
+            let fileName = "Shaonvxinyuan\(dateString).save"
+            
             let fileManager = FileManager.default
             let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let backupsDir = documentsURL.appendingPathComponent("Backups")
@@ -195,46 +217,12 @@ extension BackupService {
                 }
             }
             
-            let dateString = Date().formatted(.dateTime.year().month().day().hour().minute().second())
-                .replacingOccurrences(of: "/", with: "")
-                .replacingOccurrences(of: ":", with: "")
-                .replacingOccurrences(of: " ", with: "_")
-            let fileName = "Shaonvxinyuan\(dateString).save"
-            let tempURL = backupsDir.appendingPathComponent(fileName)
+            let finalURL = backupsDir.appendingPathComponent(fileName)
+            try compressedData.write(to: finalURL, options: .atomic)
             
-            // 5. Init Streaming Writer
-            let compressionWriter = try StreamingCompressionWriter(url: tempURL)
-            let tarWriter = TarStreamWriter(writer: compressionWriter)
+            print("### Export: Backup file ready at \(finalURL.path) (Size: \(compressedData.count) bytes)")
             
-            defer {
-                try? compressionWriter.close()
-            }
-            
-            // 6. Write Manifest
-            let jsonEncoder = JSONEncoder()
-            jsonEncoder.dateEncodingStrategy = .iso8601
-            let jsonData = try jsonEncoder.encode(manifest)
-            try tarWriter.appendEntry(fileName: "manifest.json", data: jsonData)
-            
-            // 7. Write Images (Streamed)
-            let totalFiles = fileList.count
-            for (i, fileName) in fileList.enumerated() {
-                if i > 0 && i % 50 == 0 {
-                    print("### Export: Archiving file \(i)/\(totalFiles)...")
-                }
-                
-                let fileURL = imagesDir.appendingPathComponent(fileName)
-                if FileManager.default.fileExists(atPath: fileURL.path) {
-                    try tarWriter.appendEntry(fileName: fileName, fileURL: fileURL)
-                }
-            }
-            
-            // 8. Finalize
-            try tarWriter.finalize()
-            try compressionWriter.close()
-            print("### Export: Backup file ready at \(tempURL)")
-            
-            return tempURL
+            return finalURL
         }.value
     }
 }
