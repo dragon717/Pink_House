@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A226CD742F26A507004E4E41 /* 少女心愿logo.icon in Resources */ = {isa = PBXBuildFile; fileRef = A226CD732F26A507004E4E41 /* 少女心愿logo.icon */; };
 		A28CEA9E2F228D9D007282D8 /* ootd.PNG in Resources */ = {isa = PBXBuildFile; fileRef = A28CEA9D2F228D9D007282D8 /* ootd.PNG */; };
 		A2AE59C32F1EB85300B4B6EB /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2AE59C22F1EB85300B4B6EB /* WidgetKit.framework */; };
 		A2AE59C52F1EB85300B4B6EB /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2AE59C42F1EB85300B4B6EB /* SwiftUI.framework */; };
@@ -52,6 +53,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A226CD732F26A507004E4E41 /* 少女心愿logo.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "少女心愿logo.icon"; sourceTree = "<group>"; };
 		A28CEA9D2F228D9D007282D8 /* ootd.PNG */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ootd.PNG; sourceTree = "<group>"; };
 		A2AE58732F19377500B4B6EB /* ItemManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ItemManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2AE58842F19377600B4B6EB /* ItemManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ItemManagerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -167,6 +169,7 @@
 				A2AE59C12F1EB85300B4B6EB /* Frameworks */,
 				A2AE58742F19377500B4B6EB /* Products */,
 				A28CEA9D2F228D9D007282D8 /* ootd.PNG */,
+				A226CD732F26A507004E4E41 /* 少女心愿logo.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -339,6 +342,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A28CEA9E2F228D9D007282D8 /* ootd.PNG in Resources */,
+				A226CD742F26A507004E4E41 /* 少女心愿logo.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

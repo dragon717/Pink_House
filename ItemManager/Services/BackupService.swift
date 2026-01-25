@@ -377,7 +377,7 @@ class BackupService {
     // MARK: - Export
     
     // Robust ID-based processing to allow skipping individual corrupt objects (Ghost Objects)
-    private func processByIDs<T: PersistentModel, ResultType>(
+    nonisolated private func processByIDs<T: PersistentModel, ResultType>(
         context: ModelContext,
         descriptor: FetchDescriptor<T>,
         entityName: String,
@@ -483,69 +483,7 @@ class BackupService {
                 return StoredImageDTO(id: img.id, imageHash: img.imageHash, fileName: img.fileName, refCount: img.refCount)
             }
             
-            // 4. Cutouts
-            let cutoutDTOs: [CutoutItemDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<CutoutItem>(), entityName: "Cutouts") { c in
-                if !c.imagePath.isEmpty {
-                    filesToBackup.insert((c.imagePath as NSString).lastPathComponent)
-                }
-                return CutoutItemDTO(
-                    id: c.id,
-                    originalImageHash: c.originalImageHash,
-                    timestamp: c.timestamp,
-                    category: c.category,
-                    imagePath: c.imagePath,
-                    width: c.width,
-                    height: c.height,
-                    linkedClothingID: c.linkedClothing?.id
-                )
-            }
-            
-            // 5. Outfits
-            var outfitDescriptor = FetchDescriptor<Outfit>()
-            outfitDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items]
-            let outfitDTOs: [OutfitDTO] = try self.processByIDs(context: context, descriptor: outfitDescriptor, entityName: "Outfits") { o in
-                if let snapshot = o.snapshotPath {
-                    filesToBackup.insert((snapshot as NSString).lastPathComponent)
-                }
-                
-                // Map items (Crash prone area if items are ghosts)
-                var items: [OutfitItemDTO] = []
-                if let outfitItems = o.items {
-                    for item in outfitItems {
-                        // 关联关系安全性检查
-                        do {
-                            // 通过触碰 persistentModelID 来检测对象是否存活
-                            let _ = item.persistentModelID
-                            
-                            if !item.isDeleted {
-                                let itemDTO = OutfitItemDTO(
-                                    id: item.id,
-                                    x: item.x,
-                                    y: item.y,
-                                    rotation: item.rotation,
-                                    scale: item.scale,
-                                    zIndex: item.zIndex,
-                                    cutoutID: item.cutout?.id
-                                )
-                                items.append(itemDTO)
-                            }
-                        } catch {
-                            print("### Export Outfits: 发现失效的关联 Item，跳过。")
-                            continue
-                        }
-                    }
-                }
-                
-                return OutfitDTO(
-                    id: o.id,
-                    createdAt: o.createdAt,
-                    note: o.note,
-                    snapshotPath: o.snapshotPath,
-                    items: items
-                )
-            }
-            
-            // 6. Clothings
+            // 4. Clothings (Move earlier to serve as reference)
             var clothingDescriptor = FetchDescriptor<Clothing>()
             clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags]
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
@@ -554,23 +492,25 @@ class BackupService {
                     filesToBackup.insert(path)
                 }
                 
-                // 为了安全，我们尝试获取关联属性。如果属性加载失败，SwiftData 可能会崩溃。
-                // 这里的 safeItem 是通过 context.model(for:) 获取的，理论上关联关系也是安全的。
-                var brandID: PersistentIdentifier? = nil
-                var tagIDs: [PersistentIdentifier] = []
+                var brandUUID: UUID? = nil
+                var tagUUIDs: [UUID] = []
                 
+                // 关键防御：访问关联时使用 do-catch 和安全性检查
                 do {
-                    brandID = c.brand?.persistentModelID
-                    tagIDs = c.tags?.compactMap { $0.persistentModelID } ?? []
+                    // 尝试触碰关联对象，如果其 backing data 丢失，这里可能会抛出异常或触发内部错误
+                    if let brand = c.brand {
+                        brandUUID = brand.id
+                    }
+                    tagUUIDs = c.tags?.compactMap { $0.id } ?? []
                 } catch {
-                    print("### Export Clothings: 获取关联 Brand/Tags 时发现僵尸对象，尝试跳过关联。")
+                    print("### Export Clothings [ID: \(c.id)]: 获取关联 Brand/Tags 时发现僵尸对象。")
                 }
                 
                 return ClothingDTO(
                     id: c.id,
                     name: c.name,
-                    brandID: brandID?.id, // 使用重新加载后的 ID
-                    tagIDs: tagIDs.map { $0.id },
+                    brandID: brandUUID,
+                    tagIDs: tagUUIDs,
                     types: c.types,
                     colors: c.colors,
                     sizes: c.sizes,
@@ -593,6 +533,86 @@ class BackupService {
                     status: c.status.rawValue,
                     createdAt: c.createdAt,
                     updatedAt: c.updatedAt
+                )
+            }
+            
+            // 5. Cutouts
+            var cutoutDescriptor = FetchDescriptor<CutoutItem>()
+            cutoutDescriptor.relationshipKeyPathsForPrefetching = [\CutoutItem.linkedClothing]
+            let cutoutDTOs: [CutoutItemDTO] = try self.processByIDs(context: context, descriptor: cutoutDescriptor, entityName: "Cutouts") { c in
+                if !c.imagePath.isEmpty {
+                    filesToBackup.insert((c.imagePath as NSString).lastPathComponent)
+                }
+                
+                var clothingID: UUID? = nil
+                do {
+                    // 这里是原先崩溃的核心点。
+                    // 触碰关联前检查对象是否还在 context 中
+                    if let clothing = c.linkedClothing {
+                        clothingID = clothing.id
+                    }
+                } catch {
+                    print("### Export Cutouts [ID: \(c.id)]: 发现失效的关联 Clothing，跳过。")
+                }
+                
+                return CutoutItemDTO(
+                    id: c.id,
+                    originalImageHash: c.originalImageHash,
+                    timestamp: c.timestamp,
+                    category: c.category,
+                    imagePath: c.imagePath,
+                    width: c.width,
+                    height: c.height,
+                    linkedClothingID: clothingID
+                )
+            }
+            
+            // 6. Outfits
+            var outfitDescriptor = FetchDescriptor<Outfit>()
+            outfitDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items]
+            let outfitDTOs: [OutfitDTO] = try self.processByIDs(context: context, descriptor: outfitDescriptor, entityName: "Outfits") { o in
+                if let snapshot = o.snapshotPath {
+                    filesToBackup.insert((snapshot as NSString).lastPathComponent)
+                }
+                
+                var items: [OutfitItemDTO] = []
+                // 注意：o.items 访问也可能由于 cascading delete 的不一致导致异常
+                do {
+                    let outfitItems = o.items
+                    for item in outfitItems {
+                        // 关联关系安全性检查
+                        do {
+                            // 通过触碰 persistentModelID 和 cutout 关联来检测对象是否存活
+                            let _ = item.persistentModelID
+                            let cutoutID = item.cutout?.id
+                            
+                            if !item.isDeleted {
+                                let itemDTO = OutfitItemDTO(
+                                    id: item.id,
+                                    x: item.x,
+                                    y: item.y,
+                                    rotation: item.rotation,
+                                    scale: item.scale,
+                                    zIndex: item.zIndex,
+                                    cutoutID: cutoutID
+                                )
+                                items.append(itemDTO)
+                            }
+                        } catch {
+                            print("### Export Outfits: 发现失效的关联 OutfitItem，跳过。")
+                            continue
+                        }
+                    }
+                } catch {
+                    print("### Export Outfits [ID: \(o.id)]: 访问 items 列表失败。")
+                }
+                
+                return OutfitDTO(
+                    id: o.id,
+                    createdAt: o.createdAt,
+                    note: o.note,
+                    snapshotPath: o.snapshotPath,
+                    items: items
                 )
             }
             
@@ -640,7 +660,7 @@ class BackupService {
                     print("### Export: Archiving file \(i)/\(totalFiles)...")
                 }
                 
-                let fileURL = imagesDirectory.appendingPathComponent(fileName)
+                let fileURL = imagesDir.appendingPathComponent(fileName)
                 if FileManager.default.fileExists(atPath: fileURL.path) {
                     try tarWriter.appendEntry(fileName: fileName, fileURL: fileURL)
                 }

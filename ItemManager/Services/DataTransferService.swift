@@ -85,7 +85,7 @@ class DataTransferService {
         }.value
     }
     
-    private func escapeCSV(_ text: String) -> String {
+    nonisolated private func escapeCSV(_ text: String) -> String {
         var newText = text.replacingOccurrences(of: "\"", with: "\"\"")
         if newText.contains(",") || newText.contains("\n") || newText.contains("\"") {
             newText = "\"\(newText)\""
