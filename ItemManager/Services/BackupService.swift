@@ -376,39 +376,201 @@ class BackupService {
     
     // MARK: - Export
     
-    nonisolated func exportBackup(container: ModelContainer) async throws -> URL {
-        let imagesDir = await ImageManager.shared.imagesDirectory
+    // Robust ID-based processing to allow skipping individual corrupt objects (Ghost Objects)
+    private func processByIDs<T: PersistentModel, ResultType>(
+        context: ModelContext,
+        descriptor: FetchDescriptor<T>,
+        entityName: String,
+        process: (T) -> ResultType?
+    ) throws -> [ResultType] {
+        print("### Export: Fetching IDs for \(entityName)...")
         
-        // Run everything in a detached task with a NEW ModelContext to avoid blocking Main Thread
-        // and avoid accessing MainActor context from background.
+        // 关键修复 1：在执行 Fetch 之前强制 reconciled。
+        // 这将确保背景上下文与持久化存储（SQLite）的状态对齐，清除那些已经物理删除但内存中还存留 ID 的“僵尸”缓存。
+        context.processPendingChanges()
+        
+        // 关键修复 2：禁用挂起更改。
+        var safeDescriptor = descriptor
+        safeDescriptor.includePendingChanges = false
+        
+        let allItems = try context.fetch(safeDescriptor)
+        let totalCount = allItems.count
+        print("### Export: Found \(totalCount) \(entityName) items (Excl. Pending). Starting processing...")
+        
+        var results: [ResultType] = []
+        var successCount = 0
+        var failCount = 0
+        
+        // 2. Iterate and process one by one
+        for (index, item) in allItems.enumerated() {
+            // Periodic log
+            if index > 0 && index % 100 == 0 {
+                print("### Export \(entityName): Processed \(index)/\(totalCount)...")
+            }
+            
+            let id = item.persistentModelID
+            
+            // 关键修复 3：使用 do-catch 包装 model(for:)。
+            // 当 SwiftData 发现数据在存储中消失时，直接访问 item 或调用 model(for:) 可能会抛出致命错误或异常。
+            // 通过显式 Catch，我们可以优雅地跳过这些在 Fetch 后可能又被变更的“僵尸”对象。
+            do {
+                guard let safeItem = try context.model(for: id) as? T else {
+                    print("### Export \(entityName): 跳过无效对象 (Index: \(index), ID: \(id))")
+                    failCount += 1
+                    continue
+                }
+                
+                if safeItem.isDeleted {
+                    print("### Export \(entityName): 跳过已删除对象 (Index: \(index))")
+                    failCount += 1
+                    continue
+                }
+                
+                if let result = process(safeItem) {
+                    results.append(result)
+                    successCount += 1
+                } else {
+                    failCount += 1
+                }
+            } catch {
+                print("### Export \(entityName): 捕获到僵尸对象 (ID: \(id)). 已跳过。错误: \(error)")
+                failCount += 1
+                continue
+            }
+        }
+        
+        print("### Export \(entityName): Finished. Success: \(successCount), Skipped/Failed: \(failCount)")
+        return results
+    }
+    
+    nonisolated func exportBackup(container: ModelContainer) async throws -> URL {
+        // Immediate Log to verify execution start
+        print("### Export: exportBackup called on background service.")
+        
+        let imagesDir = await ImageManager.shared.imagesDirectory
+        // 0. Capture MainActor properties
+        let deviceName = await UIDevice.current.name
+        
+        print("### Export: Captured device info. Starting background task...")
+        
+        // Run everything in a detached task with a NEW ModelContext
         return try await Task.detached(priority: .medium) {
+            print("### Export: Background task started.")
+            
             // Create a local context for background work
             let context = ModelContext(container)
-            // Disable autosave to improve performance during bulk fetch
+            // Note: Keeping autosaveEnabled = true (default) or false?
+            // User reported crash with save(). Let's keep it default aka true but we won't trigger save explicitly.
+            // Actually, false is safer for read-only Ops.
             context.autosaveEnabled = false
             
-            // 1. Fetch All Data (Background)
-            let descriptor = FetchDescriptor<Clothing>()
-            let clothings = try context.fetch(descriptor)
+            // Shared file collection
+            var filesToBackup: Set<String> = []
             
-            let brands = try context.fetch(FetchDescriptor<Brand>())
-            let tags = try context.fetch(FetchDescriptor<Tag>())
-            let storedImages = try context.fetch(FetchDescriptor<StoredImage>())
-            let cutouts = try context.fetch(FetchDescriptor<CutoutItem>())
-            let outfits = try context.fetch(FetchDescriptor<Outfit>())
+            // 1. Brands
+            let brandDTOs: [BrandDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<Brand>(), entityName: "Brands") { b in
+                return BrandDTO(id: b.id, name: b.name, colorHex: b.colorHex)
+            }
             
-            // 2. Convert to DTOs
-            // Since we are in a background context, accessing relationships (like c.brand) is safe
-            // and won't trigger Main Thread warnings or UI blocking.
-            let brandDTOs = brands.map { BrandDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex) }
-            let tagDTOs = tags.map { TagDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex) }
+            // 2. Tags
+            let tagDTOs: [TagDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<Tag>(), entityName: "Tags") { t in
+                return TagDTO(id: t.id, name: t.name, colorHex: t.colorHex)
+            }
             
-            let clothingDTOs = clothings.map { c in
-                ClothingDTO(
+            // 3. Stored Images
+            let storedImageDTOs: [StoredImageDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<StoredImage>(), entityName: "StoredImages") { img in
+                filesToBackup.insert(img.fileName)
+                return StoredImageDTO(id: img.id, imageHash: img.imageHash, fileName: img.fileName, refCount: img.refCount)
+            }
+            
+            // 4. Cutouts
+            let cutoutDTOs: [CutoutItemDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<CutoutItem>(), entityName: "Cutouts") { c in
+                if !c.imagePath.isEmpty {
+                    filesToBackup.insert((c.imagePath as NSString).lastPathComponent)
+                }
+                return CutoutItemDTO(
+                    id: c.id,
+                    originalImageHash: c.originalImageHash,
+                    timestamp: c.timestamp,
+                    category: c.category,
+                    imagePath: c.imagePath,
+                    width: c.width,
+                    height: c.height,
+                    linkedClothingID: c.linkedClothing?.id
+                )
+            }
+            
+            // 5. Outfits
+            var outfitDescriptor = FetchDescriptor<Outfit>()
+            outfitDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items]
+            let outfitDTOs: [OutfitDTO] = try self.processByIDs(context: context, descriptor: outfitDescriptor, entityName: "Outfits") { o in
+                if let snapshot = o.snapshotPath {
+                    filesToBackup.insert((snapshot as NSString).lastPathComponent)
+                }
+                
+                // Map items (Crash prone area if items are ghosts)
+                var items: [OutfitItemDTO] = []
+                if let outfitItems = o.items {
+                    for item in outfitItems {
+                        // 关联关系安全性检查
+                        do {
+                            // 通过触碰 persistentModelID 来检测对象是否存活
+                            let _ = item.persistentModelID
+                            
+                            if !item.isDeleted {
+                                let itemDTO = OutfitItemDTO(
+                                    id: item.id,
+                                    x: item.x,
+                                    y: item.y,
+                                    rotation: item.rotation,
+                                    scale: item.scale,
+                                    zIndex: item.zIndex,
+                                    cutoutID: item.cutout?.id
+                                )
+                                items.append(itemDTO)
+                            }
+                        } catch {
+                            print("### Export Outfits: 发现失效的关联 Item，跳过。")
+                            continue
+                        }
+                    }
+                }
+                
+                return OutfitDTO(
+                    id: o.id,
+                    createdAt: o.createdAt,
+                    note: o.note,
+                    snapshotPath: o.snapshotPath,
+                    items: items
+                )
+            }
+            
+            // 6. Clothings
+            var clothingDescriptor = FetchDescriptor<Clothing>()
+            clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags]
+            let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
+                // 收集图片路径以便后续打包
+                for path in c.imagePaths {
+                    filesToBackup.insert(path)
+                }
+                
+                // 为了安全，我们尝试获取关联属性。如果属性加载失败，SwiftData 可能会崩溃。
+                // 这里的 safeItem 是通过 context.model(for:) 获取的，理论上关联关系也是安全的。
+                var brandID: PersistentIdentifier? = nil
+                var tagIDs: [PersistentIdentifier] = []
+                
+                do {
+                    brandID = c.brand?.persistentModelID
+                    tagIDs = c.tags?.compactMap { $0.persistentModelID } ?? []
+                } catch {
+                    print("### Export Clothings: 获取关联 Brand/Tags 时发现僵尸对象，尝试跳过关联。")
+                }
+                
+                return ClothingDTO(
                     id: c.id,
                     name: c.name,
-                    brandID: c.brand?.id,
-                    tagIDs: c.tags?.map { $0.id } ?? [],
+                    brandID: brandID?.id, // 使用重新加载后的 ID
+                    tagIDs: tagIDs.map { $0.id },
                     types: c.types,
                     colors: c.colors,
                     sizes: c.sizes,
@@ -434,45 +596,10 @@ class BackupService {
                 )
             }
             
-            let storedImageDTOs = storedImages.map { StoredImageDTO(id: $0.id, imageHash: $0.imageHash, fileName: $0.fileName, refCount: $0.refCount) }
-            
-            let cutoutDTOs = cutouts.map { c in
-                CutoutItemDTO(
-                    id: c.id,
-                    originalImageHash: c.originalImageHash,
-                    timestamp: c.timestamp,
-                    category: c.category,
-                    imagePath: c.imagePath,
-                    width: c.width,
-                    height: c.height,
-                    linkedClothingID: c.linkedClothing?.id
-                )
-            }
-            
-            let outfitDTOs = outfits.map { o in
-                OutfitDTO(
-                    id: o.id,
-                    createdAt: o.createdAt,
-                    note: o.note,
-                    snapshotPath: o.snapshotPath,
-                    items: o.items.map { item in
-                        OutfitItemDTO(
-                            id: item.id,
-                            x: item.x,
-                            y: item.y,
-                            rotation: item.rotation,
-                            scale: item.scale,
-                            zIndex: item.zIndex,
-                            cutoutID: item.cutout?.id
-                        )
-                    }
-                )
-            }
-            
             let manifest = BackupManifest(
                 version: "1.0",
                 timestamp: Date(),
-                deviceName: await UIDevice.current.name, // UIDevice is MainActor, but name is just a string property, let's hope it's safe or we might need MainActor.run. Actually UIDevice properties are MainActor isolated.
+                deviceName: deviceName,
                 brands: brandDTOs,
                 tags: tagDTOs,
                 clothings: clothingDTOs,
@@ -484,27 +611,7 @@ class BackupService {
                 outfitCount: outfitDTOs.count
             )
             
-            // Collect files to backup
-            var filesToBackup: Set<String> = []
-            
-            for img in storedImages {
-                filesToBackup.insert(img.fileName)
-            }
-            
-            for cutout in cutouts {
-                let path = cutout.imagePath
-                if !path.isEmpty {
-                    let fileName = (path as NSString).lastPathComponent
-                    filesToBackup.insert(fileName)
-                }
-            }
-            
-            for outfit in outfits {
-                if let snapshot = outfit.snapshotPath {
-                    let fileName = (snapshot as NSString).lastPathComponent
-                    filesToBackup.insert(fileName)
-                }
-            }
+            print("### Export: Collecting files (\(filesToBackup.count) files)...")
             
             let fileList = Array(filesToBackup)
             
@@ -527,8 +634,13 @@ class BackupService {
             try tarWriter.appendEntry(fileName: "manifest.json", data: jsonData)
             
             // 7. Write Images (Streamed)
-            for fileName in fileList {
-                let fileURL = imagesDir.appendingPathComponent(fileName)
+            let totalFiles = fileList.count
+            for (i, fileName) in fileList.enumerated() {
+                if i > 0 && i % 50 == 0 {
+                    print("### Export: Archiving file \(i)/\(totalFiles)...")
+                }
+                
+                let fileURL = imagesDirectory.appendingPathComponent(fileName)
                 if FileManager.default.fileExists(atPath: fileURL.path) {
                     try tarWriter.appendEntry(fileName: fileName, fileURL: fileURL)
                 }
@@ -537,6 +649,7 @@ class BackupService {
             // 8. Finalize
             try tarWriter.finalize()
             try compressionWriter.close()
+            print("### Export: Backup file ready at \(tempURL)")
             
             return tempURL
         }.value

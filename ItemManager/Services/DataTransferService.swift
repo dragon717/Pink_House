@@ -19,54 +19,70 @@ class DataTransferService {
     
     // MARK: - CSV Export
     
-    func exportToCSV(context: ModelContext) throws -> URL {
-        let descriptor = FetchDescriptor<Clothing>(sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
-        let clothings = try context.fetch(descriptor)
-        
-        var csvString = "名称,品牌,标签,类型,颜色,尺码,衣长,状态,小物,价格,定金,尾款,购买日期,定金日期,尾款开始,尾款截止,备注,库存\n"
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        
-        for item in clothings {
-            let brandName = item.brand?.name ?? ""
-            let tagNames = item.tags?.map { $0.name }.joined(separator: ";") ?? ""
-            let purchaseDateStr = dateFormatter.string(from: item.purchaseDate)
+    func exportToCSV(container: ModelContainer) async throws -> URL {
+        return try await Task.detached(priority: .medium) {
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
             
-            let depositDateStr = item.depositDate.map { dateFormatter.string(from: $0) } ?? ""
-            let finalPaymentStartStr = item.finalPaymentDate.map { dateFormatter.string(from: $0) } ?? ""
-            let finalPaymentEndStr = item.finalPaymentEndDate.map { dateFormatter.string(from: $0) } ?? ""
+            var descriptor = FetchDescriptor<Clothing>(sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
+            // 深度隔离：只从磁盘读取已持久化的数据，忽略内存中不稳定的挂起更改
+            descriptor.includePendingChanges = false
             
-            let row: [String] = [
-                escapeCSV(item.name),
-                escapeCSV(brandName),
-                escapeCSV(tagNames),
-                escapeCSV(item.types),
-                escapeCSV(item.colors),
-                escapeCSV(item.sizes),
-                escapeCSV(item.length),
-                escapeCSV(item.condition),
-                escapeCSV(item.accessories),
-                "\(item.price)",
-                "\(item.deposit)",
-                "\(item.balance)",
-                purchaseDateStr,
-                depositDateStr,
-                finalPaymentStartStr,
-                finalPaymentEndStr,
-                escapeCSV(item.note),
-                "\(item.stock)"
-            ]
+            let clothings = try context.fetch(descriptor)
             
-            csvString.append(row.joined(separator: ",") + "\n")
-        }
-        
-        let fileName = "PinkHouse_Export_\(Int(Date().timeIntervalSince1970)).csv"
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent(fileName)
-        
-        try csvString.write(to: fileURL, atomically: true, encoding: .utf8)
-        return fileURL
+            var csvString = "名称,品牌,标签,类型,颜色,尺码,衣长,状态,小物,价格,定金,尾款,购买日期,是否定金,定金日期,尾款开始,尾款截止,备注,库存\n"
+            
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            
+            for faultItem in clothings {
+                let id = faultItem.persistentModelID
+                // 使用 ID 在当前上下文中安全地重新获取对象，防止失效
+                guard let item = context.model(for: id) as? Clothing, !item.isDeleted else {
+                    continue
+                }
+                
+                // 安全地获取关联关系：此时 item 属于背景上下文，读取其属性是线程安全的
+                let brandName = item.brand?.name ?? ""
+                let tagNames = item.tags?.compactMap { $0.name }.joined(separator: ";") ?? ""
+                let purchaseDateStr = dateFormatter.string(from: item.purchaseDate)
+                
+                let depositDateStr = item.depositDate.map { dateFormatter.string(from: $0) } ?? ""
+                let finalPaymentStartStr = item.finalPaymentDate.map { dateFormatter.string(from: $0) } ?? ""
+                let finalPaymentEndStr = item.finalPaymentEndDate.map { dateFormatter.string(from: $0) } ?? ""
+                
+                let row: [String] = [
+                    self.escapeCSV(item.name),
+                    self.escapeCSV(brandName),
+                    self.escapeCSV(tagNames),
+                    self.escapeCSV(item.types),
+                    self.escapeCSV(item.colors),
+                    self.escapeCSV(item.sizes),
+                    self.escapeCSV(item.length),
+                    self.escapeCSV(item.condition),
+                    self.escapeCSV(item.accessories),
+                    "\(item.price)",
+                    "\(item.deposit)",
+                    "\(item.balance)",
+                    purchaseDateStr,
+                    "\(item.isDepositPlan)",
+                    depositDateStr,
+                    finalPaymentStartStr,
+                    finalPaymentEndStr,
+                    self.escapeCSV(item.note),
+                    "\(item.stock)"
+                ]
+                
+                csvString.append(row.joined(separator: ",") + "\n")
+            }
+            
+            let fileName = "少女心愿_导出表格_\(Int(Date().timeIntervalSince1970)).csv"
+            let tempDir = FileManager.default.temporaryDirectory
+            let fileURL = tempDir.appendingPathComponent(fileName)
+            
+            try csvString.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        }.value
     }
     
     private func escapeCSV(_ text: String) -> String {
@@ -79,8 +95,8 @@ class DataTransferService {
     
     // MARK: - Backup
     
-    func createBackup(context: ModelContext) async throws -> URL {
-        return try await BackupService.shared.exportBackup(container: context.container)
+    func createBackup(container: ModelContainer) async throws -> URL {
+        return try await BackupService.shared.exportBackup(container: container)
     }
     
     func restoreBackup(from url: URL, context: ModelContext) async throws {

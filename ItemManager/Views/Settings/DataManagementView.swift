@@ -149,9 +149,16 @@ struct DataManagementView: View {
         isLoading = true
         loadingMessage = "正在生成 CSV..."
         
+        // 获取 container 用于后台操作
+        let container = modelContext.container
+        
         Task {
             do {
-                let url = try DataTransferService.shared.exportToCSV(context: modelContext)
+                // 保存当前上下文以确保数据一致性（写入磁盘）
+                try? modelContext.save()
+                
+                // 现在 exportToCSV 是异步的，内部使用背景上下文和 includePendingChanges = false
+                let url = try await DataTransferService.shared.exportToCSV(container: container)
                 await MainActor.run {
                     self.shareItems = [url]
                     self.showingShareSheet = true
@@ -173,10 +180,21 @@ struct DataManagementView: View {
         isLoading = true
         loadingMessage = "正在打包数据..."
         
+        // Catch container on MainActor
+        let container = modelContext.container
+        
         Task {
             do {
+                print("DataManagementView: 尝试保存当前上下文...")
+                // 在启动后台导出前，必须确保主上下文的改动（尤其是删除）已持久化到磁盘，
+                // 否则后台上下文可能会看到已在主线程逻辑上删除但尚未物理删除的对象，导致崩溃。
+                try? modelContext.save()
+                print("DataManagementView: 上下文保存完毕")
+                
+                print("DataManagementView: 开始调用后台备份服务...")
                 // 现在 createBackup 是异步的，内部会在后台线程执行压缩，不会阻塞 UI
-                let url = try await DataTransferService.shared.createBackup(context: modelContext)
+                let url = try await DataTransferService.shared.createBackup(container: container)
+                print("DataManagementView: 备份服务返回由: \(url)")
                 
                 await MainActor.run {
                     self.shareItems = [url]
