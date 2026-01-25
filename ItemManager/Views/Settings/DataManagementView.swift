@@ -214,32 +214,74 @@ struct DataManagementView: View {
     
     private func performRestore() {
         guard let url = restoreURL else { return }
+        print("DataManagementView: Starting restore pre-check...")
+        print("DataManagementView: Original URL: \(url)")
         
-        // Accessing security scoped resource
-        guard url.startAccessingSecurityScopedResource() else {
-            message = "无法访问文件"
+        // 访问安全通报资源（Security Scoped Resource）
+        let canAccess = url.startAccessingSecurityScopedResource()
+        print("DataManagementView: startAccessingSecurityScopedResource: \(canAccess)")
+        
+        guard canAccess else {
+            message = "无法访问文件 (Security Scoped Access Denied)"
             showingMessage = true
             return
         }
         
         isLoading = true
-        loadingMessage = "正在恢复数据..."
+        loadingMessage = "正在准备恢复数据..."
         
         Task {
+            // 确保在任务结束时停止访问资源
             defer {
                 url.stopAccessingSecurityScopedResource()
                 Task { @MainActor in self.isLoading = false }
             }
             
             do {
-                try await DataTransferService.shared.restoreBackup(from: url, context: modelContext)
+                // 关键修复：将外部文件复制到本应用作用域内的临时目录
+                // 这样可以规避 Sandbox 在跨进程或从 iCloud 读取时的 -54 (process may not map database) 错误
+                let tempDir = FileManager.default.temporaryDirectory
+                let tempURL = tempDir.appendingPathComponent("restore_backup_\(UUID().uuidString).save")
+                print("DataManagementView: Creating local copy at \(tempURL.path)")
+                
+                // 如果已存在则先删除（理论上 UUID 是唯一的）
+                if FileManager.default.fileExists(atPath: tempURL.path) {
+                    try? FileManager.default.removeItem(at: tempURL)
+                }
+                
+                // 执行复制
+                try FileManager.default.copyItem(at: url, to: tempURL)
+                
+                // 验证复制后的文件权限和大小
+                let isReadable = FileManager.default.isReadableFile(atPath: tempURL.path)
+                let attr = try FileManager.default.attributesOfItem(atPath: tempURL.path)
+                let fileSize = attr[.size] as? Int64 ?? 0
+                print("DataManagementView: Local copy pre-check - Readable: \(isReadable), Size: \(fileSize) bytes")
+                
+                if fileSize < 10 {
+                    message = "数据恢复失败: 备份文件无效或尚未从 iCloud 下载完成。请在 文件 App 中确保已下载该文件。"
+                    showingMessage = true
+                    try? FileManager.default.removeItem(at: tempURL)
+                    return
+                }
+                
+                // 在后台服务中进行解压和恢复
+                loadingMessage = "正在恢复数据..."
+                try await DataTransferService.shared.restoreBackup(from: tempURL, context: modelContext)
+                
+                // 清理临时文件
+                try? FileManager.default.removeItem(at: tempURL)
+                
                 await MainActor.run {
                     message = "数据恢复成功"
                     showingMessage = true
                 }
             } catch {
+                print("Restore Error: \(error)")
                 await MainActor.run {
-                    message = "数据恢复失败: \(error.localizedDescription)"
+                    // 如果是 BackupError，使用其详细描述，否则使用原生的
+                    let errorDesc = (error as? BackupService.BackupError)?.errorDescription ?? error.localizedDescription
+                    message = "数据恢复失败: \(errorDesc)"
                     showingMessage = true
                 }
             }

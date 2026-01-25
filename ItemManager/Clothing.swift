@@ -58,6 +58,9 @@ final class Clothing {
     @Relationship(deleteRule: .nullify)
     var brand: Brand?
     
+    @Relationship(deleteRule: .cascade, inverse: \CutoutItem.linkedClothing)
+    var cutouts: [CutoutItem] = []
+    
     init(name: String = "",
          brand: Brand? = nil,
          types: String = "",
@@ -121,8 +124,10 @@ final class CutoutItem {
     var width: Double = 0.0
     var height: Double = 0.0
     
-    @Relationship(deleteRule: .nullify)
     var linkedClothing: Clothing?
+    
+    @Relationship(deleteRule: .cascade, inverse: \OutfitItem.cutout)
+    var outfitItems: [OutfitItem] = []
     
     init(originalImageHash: String, 
          category: String = "未分类",
@@ -164,7 +169,6 @@ final class OutfitItem {
     var scale: Double = 1.0
     var zIndex: Int = 0
     
-    @Relationship
     var cutout: CutoutItem?
     
     @Relationship

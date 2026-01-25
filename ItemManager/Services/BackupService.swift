@@ -127,15 +127,15 @@ class StreamingCompressionWriter {
         self.fileHandle = try FileHandle(forWritingTo: url)
         self.destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
         
-        // Init stream struct manually since Swift import might not provide full zero-init via default constructor if arguments are missing
-        // Actually `compression_stream()` works if all fields have defaults, but C struct mapping can be tricky.
-        // Let's initialize all fields explicitly to 0 or use the pointer directly in init.
-        // Note: src_ptr cannot be nil in Swift binding even if src_size is 0, so we pass a valid pointer (destinationBuffer) casted.
         self.stream = compression_stream(dst_ptr: destinationBuffer, dst_size: bufferSize, src_ptr: UnsafePointer(destinationBuffer), src_size: 0, state: nil)
         
         // Init stream
-        var status = compression_stream_init(&stream, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZFSE)
-        guard status == COMPRESSION_STATUS_OK else { throw BackupService.BackupError.compressionFailed }
+        let status = compression_stream_init(&stream, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZFSE)
+        guard status == COMPRESSION_STATUS_OK else { 
+            destinationBuffer.deallocate()
+            try? fileHandle.close()
+            throw BackupService.BackupError.compressionFailed 
+        }
         
         isInitialized = true
     }
@@ -215,6 +215,11 @@ class TarStreamWriter {
     }
     
     func appendEntry(fileName: String, fileURL: URL) throws {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            print("TarStreamWriter: File missing at \(fileURL.path)")
+            throw BackupService.BackupError.imageNotFound(fileName)
+        }
+        
         let attr = try FileManager.default.attributesOfItem(atPath: fileURL.path)
         let fileSize = attr[.size] as? Int ?? 0
         
@@ -222,18 +227,24 @@ class TarStreamWriter {
         try writer.write(header)
         
         // Stream read file
-        if let fileHandle = try? FileHandle(forReadingFrom: fileURL) {
-            defer { try? fileHandle.close() }
-            
-            let bufferSize = 65536
-            while true {
-                let data = try fileHandle.read(upToCount: bufferSize)
-                if let data = data, !data.isEmpty {
-                    try writer.write(data)
-                } else {
-                    break
-                }
+        let fileHandle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? fileHandle.close() }
+        
+        let bufferSize = 65536
+        var totalRead = 0
+        while true {
+            let data = try fileHandle.read(upToCount: bufferSize)
+            if let data = data, !data.isEmpty {
+                try writer.write(data)
+                totalRead += data.count
+            } else {
+                break
             }
+        }
+        
+        if totalRead != fileSize {
+            print("TarStreamWriter: File size mismatch for \(fileName). Expected \(fileSize), got \(totalRead)")
+            throw BackupService.BackupError.archiveFailed
         }
         
         try writePadding(size: fileSize)
@@ -363,20 +374,36 @@ class TarReader {
 class BackupService {
     static let shared = BackupService()
     
-    enum BackupError: Error {
+    enum BackupError: Error, LocalizedError {
         case dataFetchFailed
         case fileCreateFailed
         case imageNotFound(String)
         case archiveFailed
         case invalidArchive
         case compressionFailed
+        case decompressionFailed(reason: String)
+        case unknownFormat
+        case corruptedArchive(reason: String)
+        
+        var errorDescription: String? {
+            switch self {
+            case .dataFetchFailed: return "获取数据失败"
+            case .fileCreateFailed: return "创建文件失败"
+            case .imageNotFound(let name): return "找不到图片: \(name)"
+            case .archiveFailed: return "打包存档失败"
+            case .invalidArchive: return "无效的备份文件 (找不到 manifest.json)"
+            case .compressionFailed: return "压缩失败"
+            case .decompressionFailed(let reason): return "解压失败: \(reason)"
+            case .unknownFormat: return "无法识别的文件格式。请确保选择的是有效的 .save 或 .json 备份文件。"
+            case .corruptedArchive(let reason): return "备份文件已损坏: \(reason)"
+            }
+        }
     }
     
     private init() {}
     
     // MARK: - Export
     
-    // Robust ID-based processing to allow skipping individual corrupt objects (Ghost Objects)
     nonisolated private func processByIDs<T: PersistentModel, ResultType>(
         context: ModelContext,
         descriptor: FetchDescriptor<T>,
@@ -386,13 +413,13 @@ class BackupService {
         print("### Export: Fetching IDs for \(entityName)...")
         
         // 关键修复 1：在执行 Fetch 之前强制 reconciled。
-        // 这将确保背景上下文与持久化存储（SQLite）的状态对齐，清除那些已经物理删除但内存中还存留 ID 的“僵尸”缓存。
         context.processPendingChanges()
         
-        // 关键修复 2：禁用挂起更改。
+        // 关键修复 2：禁用挂起更改并启用 predicate 级别的安全性。
         var safeDescriptor = descriptor
         safeDescriptor.includePendingChanges = false
         
+        // 我们改为获取所有 IDs 以便后续进行独立处理
         let allItems = try context.fetch(safeDescriptor)
         let totalCount = allItems.count
         print("### Export: Found \(totalCount) \(entityName) items (Excl. Pending). Starting processing...")
@@ -401,27 +428,24 @@ class BackupService {
         var successCount = 0
         var failCount = 0
         
-        // 2. Iterate and process one by one
         for (index, item) in allItems.enumerated() {
-            // Periodic log
             if index > 0 && index % 100 == 0 {
                 print("### Export \(entityName): Processed \(index)/\(totalCount)...")
             }
             
+            // 关键修复 3：通过 PersistentIdentifier 重新在隔离的 context 中实例化对象，
+            // 配合 do-catch 拦截任何底层 CoreData 抛出的 snapshot 缺失错误。
             let id = item.persistentModelID
             
-            // 关键修复 3：使用 do-catch 包装 model(for:)。
-            // 当 SwiftData 发现数据在存储中消失时，直接访问 item 或调用 model(for:) 可能会抛出致命错误或异常。
-            // 通过显式 Catch，我们可以优雅地跳过这些在 Fetch 后可能又被变更的“僵尸”对象。
             do {
+                // 如果对象已经物理从 store 中消失，model(for:) 内部会检测到并抛出
                 guard let safeItem = try context.model(for: id) as? T else {
-                    print("### Export \(entityName): 跳过无效对象 (Index: \(index), ID: \(id))")
+                    print("### Export \(entityName): 跳过无法加载的对象 (Index: \(index), ID: \(id))")
                     failCount += 1
                     continue
                 }
                 
                 if safeItem.isDeleted {
-                    print("### Export \(entityName): 跳过已删除对象 (Index: \(index))")
                     failCount += 1
                     continue
                 }
@@ -433,7 +457,7 @@ class BackupService {
                     failCount += 1
                 }
             } catch {
-                print("### Export \(entityName): 捕获到僵尸对象 (ID: \(id)). 已跳过。错误: \(error)")
+                print("### Export \(entityName): 捕获到失效对象 (ID: \(id)). 已跳过。错误: \(error)")
                 failCount += 1
                 continue
             }
@@ -483,11 +507,18 @@ class BackupService {
                 return StoredImageDTO(id: img.id, imageHash: img.imageHash, fileName: img.fileName, refCount: img.refCount)
             }
             
-            // 4. Clothings (Move earlier to serve as reference)
+            // 4. Clothings
+            // 为了避免直接在 Cutout 侧触碰关联引发崩溃，我们先通过 Clothing 侧建立关系表
+            var cutoutIDToClothingID: [UUID: UUID] = [:]
+            
             var clothingDescriptor = FetchDescriptor<Clothing>()
-            clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags]
+            clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.cutouts]
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
-                // 收集图片路径以便后续打包
+                // 填充映射表
+                for cutout in c.cutouts {
+                    cutoutIDToClothingID[cutout.id] = c.id
+                }
+                
                 for path in c.imagePaths {
                     filesToBackup.insert(path)
                 }
@@ -495,15 +526,11 @@ class BackupService {
                 var brandUUID: UUID? = nil
                 var tagUUIDs: [UUID] = []
                 
-                // 关键防御：访问关联时使用 do-catch 和安全性检查
                 do {
-                    // 尝试触碰关联对象，如果其 backing data 丢失，这里可能会抛出异常或触发内部错误
-                    if let brand = c.brand {
-                        brandUUID = brand.id
-                    }
-                    tagUUIDs = c.tags?.compactMap { $0.id } ?? []
+                    brandUUID = c.brand?.id
+                    tagUUIDs = c.tags?.map { $0.id } ?? []
                 } catch {
-                    print("### Export Clothings [ID: \(c.id)]: 获取关联 Brand/Tags 时发现僵尸对象。")
+                    print("### Export Clothings [ID: \(c.id)]: 获取关联关系失败。")
                 }
                 
                 return ClothingDTO(
@@ -537,23 +564,13 @@ class BackupService {
             }
             
             // 5. Cutouts
-            var cutoutDescriptor = FetchDescriptor<CutoutItem>()
-            cutoutDescriptor.relationshipKeyPathsForPrefetching = [\CutoutItem.linkedClothing]
-            let cutoutDTOs: [CutoutItemDTO] = try self.processByIDs(context: context, descriptor: cutoutDescriptor, entityName: "Cutouts") { c in
+            // 这里我们不再直接触碰 c.linkedClothing，而是使用查表法
+            let cutoutDTOs: [CutoutItemDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<CutoutItem>(), entityName: "Cutouts") { c in
                 if !c.imagePath.isEmpty {
                     filesToBackup.insert((c.imagePath as NSString).lastPathComponent)
                 }
                 
-                var clothingID: UUID? = nil
-                do {
-                    // 这里是原先崩溃的核心点。
-                    // 触碰关联前检查对象是否还在 context 中
-                    if let clothing = c.linkedClothing {
-                        clothingID = clothing.id
-                    }
-                } catch {
-                    print("### Export Cutouts [ID: \(c.id)]: 发现失效的关联 Clothing，跳过。")
-                }
+                let linkedClothingID = cutoutIDToClothingID[c.id]
                 
                 return CutoutItemDTO(
                     id: c.id,
@@ -563,11 +580,14 @@ class BackupService {
                     imagePath: c.imagePath,
                     width: c.width,
                     height: c.height,
-                    linkedClothingID: clothingID
+                    linkedClothingID: linkedClothingID
                 )
             }
             
             // 6. Outfits
+            // 使用同样的方法处理 OutfitItem 和 Cutout 的关联
+            var cutoutIDToOutfitItemDTOs: [UUID: [OutfitItemDTO]] = [:]
+            
             var outfitDescriptor = FetchDescriptor<Outfit>()
             outfitDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items]
             let outfitDTOs: [OutfitDTO] = try self.processByIDs(context: context, descriptor: outfitDescriptor, entityName: "Outfits") { o in
@@ -576,35 +596,26 @@ class BackupService {
                 }
                 
                 var items: [OutfitItemDTO] = []
-                // 注意：o.items 访问也可能由于 cascading delete 的不一致导致异常
                 do {
-                    let outfitItems = o.items
-                    for item in outfitItems {
-                        // 关联关系安全性检查
-                        do {
-                            // 通过触碰 persistentModelID 和 cutout 关联来检测对象是否存活
-                            let _ = item.persistentModelID
-                            let cutoutID = item.cutout?.id
-                            
-                            if !item.isDeleted {
-                                let itemDTO = OutfitItemDTO(
-                                    id: item.id,
-                                    x: item.x,
-                                    y: item.y,
-                                    rotation: item.rotation,
-                                    scale: item.scale,
-                                    zIndex: item.zIndex,
-                                    cutoutID: cutoutID
-                                )
-                                items.append(itemDTO)
-                            }
-                        } catch {
-                            print("### Export Outfits: 发现失效的关联 OutfitItem，跳过。")
-                            continue
-                        }
+                    for item in o.items {
+                        if item.isDeleted { continue }
+                        
+                        // 预先建立反向引用通常更稳健，但对于 OutfitItem，
+                        // 我们在这里直接获取其 cutout ID（如果出错会被外部 catch 拦截）
+                        let cutoutID = item.cutout?.id
+                        let itemDTO = OutfitItemDTO(
+                            id: item.id,
+                            x: item.x,
+                            y: item.y,
+                            rotation: item.rotation,
+                            scale: item.scale,
+                            zIndex: item.zIndex,
+                            cutoutID: cutoutID
+                        )
+                        items.append(itemDTO)
                     }
                 } catch {
-                    print("### Export Outfits [ID: \(o.id)]: 访问 items 列表失败。")
+                    print("### Export Outfits [ID: \(o.id)]: 访问 items 失败。")
                 }
                 
                 return OutfitDTO(
@@ -635,9 +646,28 @@ class BackupService {
             
             let fileList = Array(filesToBackup)
             
-            // 4. Create Temp File
-            let fileName = "少女心愿\(Date().formatted(date: .numeric, time: .omitted).replacingOccurrences(of: "/", with: "")).save"
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            // 4. Create Backups Directory in Documents
+            let fileManager = FileManager.default
+            let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let backupsDir = documentsURL.appendingPathComponent("Backups")
+            
+            if !fileManager.fileExists(atPath: backupsDir.path) {
+                try? fileManager.createDirectory(at: backupsDir, withIntermediateDirectories: true)
+            } else {
+                // 清理旧的备份文件（保留最新的，但这里简化为清空目录）
+                let oldFiles = try? fileManager.contentsOfDirectory(at: backupsDir, includingPropertiesForKeys: nil)
+                for fileURL in oldFiles ?? [] {
+                    try? fileManager.removeItem(at: fileURL)
+                }
+            }
+            
+            // 关键修复：使用 ASCII 文件名以规避 LaunchServices 分享权限问题
+            let dateString = Date().formatted(.dateTime.year().month().day().hour().minute().second())
+                .replacingOccurrences(of: "/", with: "")
+                .replacingOccurrences(of: ":", with: "")
+                .replacingOccurrences(of: " ", with: "_")
+            let fileName = "Shaonvxinyuan\(dateString).save"
+            let tempURL = backupsDir.appendingPathComponent(fileName)
             
             // 5. Init Streaming Writer
             let compressionWriter = try StreamingCompressionWriter(url: tempURL)
@@ -678,36 +708,121 @@ class BackupService {
     // MARK: - Import
     
     func importBackup(from url: URL, context: ModelContext) throws {
-        // 1. Read Data (To be optimized to stream later if needed)
-        let compressedData = try Data(contentsOf: url)
+        print("### Import: Starting import from \(url.path)")
         
-        // 2. Decompress
-        let tarData = try (compressedData as NSData).decompressed(using: .lzfse) as Data
+        // 1. Read Data
+        let compressedData: Data
+        do {
+            compressedData = try Data(contentsOf: url, options: [])
+        } catch {
+            print("### Import: Failed to read file: \(error)")
+            throw error
+        }
         
-        // 3. Extract TAR
-        let entries = TarReader.extract(data: tarData)
+        let fileSize = compressedData.count
+        print("### Import: File size is \(fileSize) bytes")
         
-        // 4. Find Manifest
-        guard let manifestEntry = entries.first(where: { $0.name == "manifest.json" }) else {
+        if fileSize < 5 {
             throw BackupError.invalidArchive
         }
         
-        let jsonDecoder = JSONDecoder()
-        jsonDecoder.dateDecodingStrategy = .iso8601
-        let manifest = try jsonDecoder.decode(BackupManifest.self, from: manifestEntry.data)
+        // Check magic bytes for diagnostic
+        let checkSize = min(compressedData.count, 64)
+        let headerData = compressedData.prefix(checkSize)
+        let hexString = headerData.map { String(format: "%02x", $0) }.joined(separator: " ")
+        print("### Import: Header Hex (64 bytes): \(hexString)")
+        
+        let magicBytes = compressedData.prefix(4)
+        
+        // Check for all-zero block
+        if headerData.count >= 32 && headerData.prefix(32).allSatisfy({ $0 == 0 }) {
+            print("### Import: DETECTED CORRUPTED ALL-ZERO HEADER!")
+            throw BackupError.corruptedArchive(reason: "文件头全为零，备份可能已损坏或未正确生成。")
+        }
+        
+        var tarData: Data
+        
+        // 2. Identify Format and Decompress if needed
+        if magicBytes == "bvxn".data(using: .utf8) || 
+           magicBytes == "bvx1".data(using: .utf8) || 
+           magicBytes == "bvx2".data(using: .utf8) ||
+           hexString.prefix(11) == "18 91 a4 28" { // 新的魔数识别
+            print("### Import: Detected LZFSE or known safe compression")
+            do {
+                tarData = try (compressedData as NSData).decompressed(using: .lzfse) as Data
+            } catch {
+                print("### Import: LZFSE Decompression failed: \(error). Trying fallbacks...")
+                // Fallback: 尝试其他可能的解压方式
+                if let decompressed = try? (compressedData as NSData).decompressed(using: .lz4) as Data {
+                    print("### Import: Fallback to LZ4 success")
+                    tarData = decompressed
+                } else if let decompressed = try? (compressedData as NSData).decompressed(using: .zlib) as Data {
+                    print("### Import: Fallback to Zlib success")
+                    tarData = decompressed
+                } else if let decompressed = try? (compressedData as NSData).decompressed(using: .lzma) as Data {
+                    print("### Import: Fallback to LZMA success")
+                    tarData = decompressed
+                } else {
+                    throw BackupError.decompressionFailed(reason: "所有支持的解压算法均失败。")
+                }
+            }
+        } else if magicBytes.prefix(1) == "{".data(using: .utf8) || magicBytes.prefix(1) == "[".data(using: .utf8) {
+            print("### Import: Detected plain JSON format")
+            try importFromManifestData(compressedData, context: context)
+            return
+        } else {
+            // Check for TAR magic (ustar) at offset 257 (Standard TAR) or 0 (Possible raw TAR)
+            let isTar = (fileSize > 263 && compressedData.subdata(in: 257..<262) == "ustar".data(using: .utf8)) ||
+                        (compressedData.prefix(5) == "ustar".data(using: .utf8))
+            
+            if isTar {
+                print("### Import: Detected uncompressed TAR format")
+                tarData = compressedData
+            } else {
+                // Last ditch effort: 尝试解压即使没有魔数
+                print("### Import: No magic match. Trying bruteforce decompression...")
+                if let decompressed = try? (compressedData as NSData).decompressed(using: .lzfse) as Data {
+                    print("### Import: Bruteforce LZFSE success")
+                    tarData = decompressed
+                } else if let decompressed = try? (compressedData as NSData).decompressed(using: .lz4) as Data {
+                    print("### Import: Bruteforce LZ4 success")
+                    tarData = decompressed
+                } else {
+                    print("### Import: Unknown file format after all attempts")
+                    throw BackupError.unknownFormat
+                }
+            }
+        }
+        
+        // 3. Extract TAR
+        let entries = TarReader.extract(data: tarData)
+        print("### Import: Extracted \(entries.count) entries from TAR")
+        
+        // 4. Find Manifest
+        guard let manifestEntry = entries.first(where: { $0.name == "manifest.json" }) else {
+            print("### Import: manifest.json not found in archive")
+            throw BackupError.invalidArchive
+        }
         
         // 5. Restore Images
         let imagesDir = ImageManager.shared.imagesDirectory
         for entry in entries where entry.name != "manifest.json" {
             let fileURL = imagesDir.appendingPathComponent(entry.name)
-            // Skip if exists? Or overwrite? Restore usually implies overwrite or ensuring existence.
             if !FileManager.default.fileExists(atPath: fileURL.path) {
                 try entry.data.write(to: fileURL)
             }
         }
         
         // 6. Restore Data
-        // Helper map for UUIDs if we were remapping, but here we keep UUIDs.
+        try importFromManifestData(manifestEntry.data, context: context)
+    }
+
+    private func importFromManifestData(_ data: Data, context: ModelContext) throws {
+        let jsonDecoder = JSONDecoder()
+        jsonDecoder.dateDecodingStrategy = .iso8601
+        let manifest = try jsonDecoder.decode(BackupManifest.self, from: data)
+        
+        print("### Import: Restoring manifest (Version: \(manifest.version), Clothings: \(manifest.clothingCount))")
         
         // Restore Brands
         let existingBrands = try context.fetch(FetchDescriptor<Brand>())
