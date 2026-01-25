@@ -175,19 +175,8 @@ struct DataManagementView: View {
         
         Task {
             do {
-                // Run on background to avoid blocking UI, but access context on MainActor?
-                // DataTransferService is MainActor, so it runs on Main thread.
-                // If backup is heavy, it might freeze UI.
-                // However, ModelContext is bound to MainActor here.
-                // BackupService logic can run on background if we pass data, but we pass context.
-                // For now, let's accept it runs on Main Actor, but since it uses async,
-                // we might need to yield.
-                // BackupService.exportBackup is synchronous in gathering data, but compression is fast.
-                // Ideally we should detach, but we need ModelContext.
-                // We can fetch DTOs on MainActor, then compress on background.
-                // BackupService is already structured to take context.
-                // Let's run it.
-                let url = try DataTransferService.shared.createBackup(context: modelContext)
+                // 现在 createBackup 是异步的，内部会在后台线程执行压缩，不会阻塞 UI
+                let url = try await DataTransferService.shared.createBackup(context: modelContext)
                 
                 await MainActor.run {
                     self.shareItems = [url]

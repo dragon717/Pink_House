@@ -79,8 +79,8 @@ class DataTransferService {
     
     // MARK: - Backup
     
-    func createBackup(context: ModelContext) throws -> URL {
-        return try BackupService.shared.exportBackup(context: context)
+    func createBackup(context: ModelContext) async throws -> URL {
+        return try await BackupService.shared.exportBackup(container: context.container)
     }
     
     func restoreBackup(from url: URL, context: ModelContext) async throws {

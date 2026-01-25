@@ -1,6 +1,6 @@
 {
   "fill" : {
-    "automatic-gradient" : "display-p3:1.00000,0.50824,0.67097,1.00000",
+    "automatic-gradient" : "display-p3:1.00000,0.98673,0.99512,1.00000",
     "orientation" : {
       "start" : {
         "x" : 0.5,
@@ -15,12 +15,22 @@
   "groups" : [
     {
       "layers" : [
+
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
         {
-          "fill" : "automatic",
-          "glass" : true,
-          "hidden" : false,
-          "image-name" : "Gemini_Generated_Image_qpve3pqpve3pqpve.png",
-          "name" : "Gemini_Generated_Image_qpve3pqpve3pqpve"
+          "image-name" : "logo.png",
+          "name" : "logo"
         }
       ],
       "shadow" : {

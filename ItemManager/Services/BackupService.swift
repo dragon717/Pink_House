@@ -8,7 +8,9 @@
 import Foundation
 import SwiftData
 import UIKit
+import Compression
 
+// ... (DTOs and Tar Utilities remain unchanged) ...
 // MARK: - Data Transfer Objects
 
 struct BackupManifest: Codable {
@@ -106,13 +108,143 @@ struct OutfitItemDTO: Codable {
     let cutoutID: UUID?
 }
 
-// MARK: - Tar Utilities
+// MARK: - Streaming Writer Utilities
 
-class TarWriter {
-    private var data = Data()
+/// A helper class to write compressed data stream to a file.
+/// Uses LZFSE compression.
+class StreamingCompressionWriter {
+    private let fileHandle: FileHandle
+    private var stream: compression_stream
+    private let bufferSize = 65536
+    private let destinationBuffer: UnsafeMutablePointer<UInt8>
+    private var isInitialized = false
     
-    func append(fileName: String, data fileData: Data) {
-        // 1. Header
+    init(url: URL) throws {
+        // Create file
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+        }
+        self.fileHandle = try FileHandle(forWritingTo: url)
+        self.destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        
+        // Init stream struct manually since Swift import might not provide full zero-init via default constructor if arguments are missing
+        // Actually `compression_stream()` works if all fields have defaults, but C struct mapping can be tricky.
+        // Let's initialize all fields explicitly to 0 or use the pointer directly in init.
+        // Note: src_ptr cannot be nil in Swift binding even if src_size is 0, so we pass a valid pointer (destinationBuffer) casted.
+        self.stream = compression_stream(dst_ptr: destinationBuffer, dst_size: bufferSize, src_ptr: UnsafePointer(destinationBuffer), src_size: 0, state: nil)
+        
+        // Init stream
+        var status = compression_stream_init(&stream, COMPRESSION_STREAM_ENCODE, COMPRESSION_LZFSE)
+        guard status == COMPRESSION_STATUS_OK else { throw BackupService.BackupError.compressionFailed }
+        
+        isInitialized = true
+    }
+    
+    func write(_ data: Data) throws {
+        guard isInitialized else { return }
+        
+        try data.withUnsafeBytes { (sourcePtr: UnsafeRawBufferPointer) in
+            guard let baseAddress = sourcePtr.baseAddress else { return }
+            
+            stream.src_ptr = baseAddress.assumingMemoryBound(to: UInt8.self)
+            stream.src_size = data.count
+            
+            while stream.src_size > 0 {
+                let status = compression_stream_process(&stream, 0) // No flag
+                
+                if status == COMPRESSION_STATUS_ERROR { throw BackupService.BackupError.compressionFailed }
+                
+                // If produced output
+                let bytesWritten = bufferSize - stream.dst_size
+                if bytesWritten > 0 {
+                    let chunk = Data(bytes: destinationBuffer, count: bytesWritten)
+                    try fileHandle.write(contentsOf: chunk)
+                    stream.dst_ptr = destinationBuffer
+                    stream.dst_size = bufferSize
+                }
+            }
+        }
+    }
+    
+    func close() throws {
+        guard isInitialized else { return }
+        
+        // Finalize
+        while true {
+            let status = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
+            
+            let bytesWritten = bufferSize - stream.dst_size
+            if bytesWritten > 0 {
+                let chunk = Data(bytes: destinationBuffer, count: bytesWritten)
+                try fileHandle.write(contentsOf: chunk)
+                stream.dst_ptr = destinationBuffer
+                stream.dst_size = bufferSize
+            }
+            
+            if status == COMPRESSION_STATUS_END { break }
+            if status == COMPRESSION_STATUS_ERROR { throw BackupService.BackupError.compressionFailed }
+        }
+        
+        compression_stream_destroy(&stream)
+        destinationBuffer.deallocate()
+        try fileHandle.close()
+        isInitialized = false
+    }
+    
+    deinit {
+        if isInitialized {
+            compression_stream_destroy(&stream)
+            destinationBuffer.deallocate()
+            try? fileHandle.close()
+        }
+    }
+}
+
+class TarStreamWriter {
+    private let writer: StreamingCompressionWriter
+    
+    init(writer: StreamingCompressionWriter) {
+        self.writer = writer
+    }
+    
+    func appendEntry(fileName: String, data: Data) throws {
+        let header = try createHeader(fileName: fileName, size: data.count)
+        try writer.write(header)
+        try writer.write(data)
+        try writePadding(size: data.count)
+    }
+    
+    func appendEntry(fileName: String, fileURL: URL) throws {
+        let attr = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let fileSize = attr[.size] as? Int ?? 0
+        
+        let header = try createHeader(fileName: fileName, size: fileSize)
+        try writer.write(header)
+        
+        // Stream read file
+        if let fileHandle = try? FileHandle(forReadingFrom: fileURL) {
+            defer { try? fileHandle.close() }
+            
+            let bufferSize = 65536
+            while true {
+                let data = try fileHandle.read(upToCount: bufferSize)
+                if let data = data, !data.isEmpty {
+                    try writer.write(data)
+                } else {
+                    break
+                }
+            }
+        }
+        
+        try writePadding(size: fileSize)
+    }
+    
+    func finalize() throws {
+        // Two empty blocks
+        try writer.write(Data(count: 1024))
+    }
+    
+    private func createHeader(fileName: String, size: Int) throws -> Data {
         var header = Data(count: 512)
         
         // Name (0)
@@ -133,7 +265,7 @@ class TarWriter {
         header.replaceSubrange(116..<124, with: gid.data(using: .utf8)!)
         
         // Size (124) - Octal string
-        let sizeString = String(format: "%011o\0", fileData.count)
+        let sizeString = String(format: "%011o\0", size)
         header.replaceSubrange(124..<136, with: sizeString.data(using: .utf8)!)
         
         // MTime (136)
@@ -152,7 +284,6 @@ class TarWriter {
         header.replaceSubrange(263..<265, with: version.data(using: .utf8)!)
         
         // Checksum (148) - Calculate last
-        // First fill with spaces
         let spaces = "        " // 8 spaces
         header.replaceSubrange(148..<156, with: spaces.data(using: .utf8)!)
         
@@ -163,23 +294,14 @@ class TarWriter {
         let checksumString = String(format: "%06o\0 ", checksum)
         header.replaceSubrange(148..<156, with: checksumString.data(using: .utf8)!)
         
-        // Append Header
-        data.append(header)
-        
-        // Append Data
-        data.append(fileData)
-        
-        // Padding to 512 bytes
-        let paddingSize = (512 - (fileData.count % 512)) % 512
-        if paddingSize > 0 {
-            data.append(Data(count: paddingSize))
-        }
+        return header
     }
     
-    func finalize() -> Data {
-        // Two empty blocks
-        data.append(Data(count: 1024))
-        return data
+    private func writePadding(size: Int) throws {
+        let paddingSize = (512 - (size % 512)) % 512
+        if paddingSize > 0 {
+            try writer.write(Data(count: paddingSize))
+        }
     }
 }
 
@@ -202,7 +324,6 @@ class TarReader {
             }
             
             // Parse Name
-            // Name is at 0, length 100. Find first null byte.
             let nameBytes = header.subdata(in: 0..<100)
             guard let nameString = String(data: nameBytes.prefix(while: { $0 != 0 }), encoding: .utf8) else {
                 offset += 512
@@ -248,180 +369,183 @@ class BackupService {
         case imageNotFound(String)
         case archiveFailed
         case invalidArchive
+        case compressionFailed
     }
     
     private init() {}
     
     // MARK: - Export
     
-    func exportBackup(context: ModelContext) throws -> URL {
-        // 1. Fetch All Data
-        let descriptor = FetchDescriptor<Clothing>()
-        let clothings = try context.fetch(descriptor)
+    nonisolated func exportBackup(container: ModelContainer) async throws -> URL {
+        let imagesDir = await ImageManager.shared.imagesDirectory
         
-        let brands = try context.fetch(FetchDescriptor<Brand>())
-        let tags = try context.fetch(FetchDescriptor<Tag>())
-        let storedImages = try context.fetch(FetchDescriptor<StoredImage>())
-        let cutouts = try context.fetch(FetchDescriptor<CutoutItem>())
-        let outfits = try context.fetch(FetchDescriptor<Outfit>())
-        
-        // 2. Convert to DTOs
-        let brandDTOs = brands.map { BrandDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex) }
-        let tagDTOs = tags.map { TagDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex) }
-        
-        let clothingDTOs = clothings.map { c in
-            ClothingDTO(
-                id: c.id,
-                name: c.name,
-                brandID: c.brand?.id,
-                tagIDs: c.tags?.map { $0.id } ?? [],
-                types: c.types,
-                colors: c.colors,
-                sizes: c.sizes,
-                length: c.length,
-                condition: c.condition,
-                accessories: c.accessories,
-                imagePaths: c.imagePaths,
-                isShared: c.isShared,
-                price: c.price,
-                deposit: c.deposit,
-                balance: c.balance,
-                accessoriesPrice: c.accessoriesPrice,
-                purchaseDate: c.purchaseDate,
-                depositDate: c.depositDate,
-                isDepositPlan: c.isDepositPlan,
-                finalPaymentDate: c.finalPaymentDate,
-                finalPaymentEndDate: c.finalPaymentEndDate,
-                note: c.note,
-                stock: c.stock,
-                status: c.status.rawValue,
-                createdAt: c.createdAt,
-                updatedAt: c.updatedAt
+        // Run everything in a detached task with a NEW ModelContext to avoid blocking Main Thread
+        // and avoid accessing MainActor context from background.
+        return try await Task.detached(priority: .medium) {
+            // Create a local context for background work
+            let context = ModelContext(container)
+            // Disable autosave to improve performance during bulk fetch
+            context.autosaveEnabled = false
+            
+            // 1. Fetch All Data (Background)
+            let descriptor = FetchDescriptor<Clothing>()
+            let clothings = try context.fetch(descriptor)
+            
+            let brands = try context.fetch(FetchDescriptor<Brand>())
+            let tags = try context.fetch(FetchDescriptor<Tag>())
+            let storedImages = try context.fetch(FetchDescriptor<StoredImage>())
+            let cutouts = try context.fetch(FetchDescriptor<CutoutItem>())
+            let outfits = try context.fetch(FetchDescriptor<Outfit>())
+            
+            // 2. Convert to DTOs
+            // Since we are in a background context, accessing relationships (like c.brand) is safe
+            // and won't trigger Main Thread warnings or UI blocking.
+            let brandDTOs = brands.map { BrandDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex) }
+            let tagDTOs = tags.map { TagDTO(id: $0.id, name: $0.name, colorHex: $0.colorHex) }
+            
+            let clothingDTOs = clothings.map { c in
+                ClothingDTO(
+                    id: c.id,
+                    name: c.name,
+                    brandID: c.brand?.id,
+                    tagIDs: c.tags?.map { $0.id } ?? [],
+                    types: c.types,
+                    colors: c.colors,
+                    sizes: c.sizes,
+                    length: c.length,
+                    condition: c.condition,
+                    accessories: c.accessories,
+                    imagePaths: c.imagePaths,
+                    isShared: c.isShared,
+                    price: c.price,
+                    deposit: c.deposit,
+                    balance: c.balance,
+                    accessoriesPrice: c.accessoriesPrice,
+                    purchaseDate: c.purchaseDate,
+                    depositDate: c.depositDate,
+                    isDepositPlan: c.isDepositPlan,
+                    finalPaymentDate: c.finalPaymentDate,
+                    finalPaymentEndDate: c.finalPaymentEndDate,
+                    note: c.note,
+                    stock: c.stock,
+                    status: c.status.rawValue,
+                    createdAt: c.createdAt,
+                    updatedAt: c.updatedAt
+                )
+            }
+            
+            let storedImageDTOs = storedImages.map { StoredImageDTO(id: $0.id, imageHash: $0.imageHash, fileName: $0.fileName, refCount: $0.refCount) }
+            
+            let cutoutDTOs = cutouts.map { c in
+                CutoutItemDTO(
+                    id: c.id,
+                    originalImageHash: c.originalImageHash,
+                    timestamp: c.timestamp,
+                    category: c.category,
+                    imagePath: c.imagePath,
+                    width: c.width,
+                    height: c.height,
+                    linkedClothingID: c.linkedClothing?.id
+                )
+            }
+            
+            let outfitDTOs = outfits.map { o in
+                OutfitDTO(
+                    id: o.id,
+                    createdAt: o.createdAt,
+                    note: o.note,
+                    snapshotPath: o.snapshotPath,
+                    items: o.items.map { item in
+                        OutfitItemDTO(
+                            id: item.id,
+                            x: item.x,
+                            y: item.y,
+                            rotation: item.rotation,
+                            scale: item.scale,
+                            zIndex: item.zIndex,
+                            cutoutID: item.cutout?.id
+                        )
+                    }
+                )
+            }
+            
+            let manifest = BackupManifest(
+                version: "1.0",
+                timestamp: Date(),
+                deviceName: await UIDevice.current.name, // UIDevice is MainActor, but name is just a string property, let's hope it's safe or we might need MainActor.run. Actually UIDevice properties are MainActor isolated.
+                brands: brandDTOs,
+                tags: tagDTOs,
+                clothings: clothingDTOs,
+                storedImages: storedImageDTOs,
+                cutouts: cutoutDTOs,
+                outfits: outfitDTOs,
+                clothingCount: clothingDTOs.count,
+                imageCount: storedImageDTOs.count,
+                outfitCount: outfitDTOs.count
             )
-        }
-        
-        let storedImageDTOs = storedImages.map { StoredImageDTO(id: $0.id, imageHash: $0.imageHash, fileName: $0.fileName, refCount: $0.refCount) }
-        
-        let cutoutDTOs = cutouts.map { c in
-            CutoutItemDTO(
-                id: c.id,
-                originalImageHash: c.originalImageHash,
-                timestamp: c.timestamp,
-                category: c.category,
-                imagePath: c.imagePath,
-                width: c.width,
-                height: c.height,
-                linkedClothingID: c.linkedClothing?.id
-            )
-        }
-        
-        let outfitDTOs = outfits.map { o in
-            OutfitDTO(
-                id: o.id,
-                createdAt: o.createdAt,
-                note: o.note,
-                snapshotPath: o.snapshotPath,
-                items: o.items.map { item in
-                    OutfitItemDTO(
-                        id: item.id,
-                        x: item.x,
-                        y: item.y,
-                        rotation: item.rotation,
-                        scale: item.scale,
-                        zIndex: item.zIndex,
-                        cutoutID: item.cutout?.id
-                    )
+            
+            // Collect files to backup
+            var filesToBackup: Set<String> = []
+            
+            for img in storedImages {
+                filesToBackup.insert(img.fileName)
+            }
+            
+            for cutout in cutouts {
+                let path = cutout.imagePath
+                if !path.isEmpty {
+                    let fileName = (path as NSString).lastPathComponent
+                    filesToBackup.insert(fileName)
                 }
-            )
-        }
-        
-        let manifest = BackupManifest(
-            version: "1.0",
-            timestamp: Date(),
-            deviceName: UIDevice.current.name,
-            brands: brandDTOs,
-            tags: tagDTOs,
-            clothings: clothingDTOs,
-            storedImages: storedImageDTOs,
-            cutouts: cutoutDTOs,
-            outfits: outfitDTOs,
-            clothingCount: clothingDTOs.count,
-            imageCount: storedImageDTOs.count,
-            outfitCount: outfitDTOs.count
-        )
-        
-        // 3. Serialize Manifest
-        let jsonEncoder = JSONEncoder()
-        jsonEncoder.dateEncodingStrategy = .iso8601
-        let jsonData = try jsonEncoder.encode(manifest)
-        
-        // 4. Create TAR Archive
-        let tarWriter = TarWriter()
-        tarWriter.append(fileName: "manifest.json", data: jsonData)
-        
-        // 5. Collect and Append Images
-        let imagesDir = ImageManager.shared.imagesDirectory
-        
-        // Helper to add file if exists
-        func addFileToTar(fileName: String) {
-            let fileURL = imagesDir.appendingPathComponent(fileName)
-            if let data = try? Data(contentsOf: fileURL) {
-                tarWriter.append(fileName: fileName, data: data)
-            } else {
-                print("Warning: Image file not found: \(fileName)")
             }
-        }
-        
-        // Add Stored Images
-        for img in storedImages {
-            addFileToTar(fileName: img.fileName)
-        }
-        
-        // Add Cutout Images (they might not be in StoredImage if handled separately, but let's check path)
-        // CutoutItem imagePath seems to be just filename or relative path?
-        // Let's assume they are in the same Images folder or we need to resolve them.
-        // Looking at CutoutService (if exists) or just assuming they are in Documents.
-        // CutoutItem.imagePath usage needs verification. Assuming filename in Documents.
-        
-        for cutout in cutouts {
-            // Cutout images might be separate. Check if they are full paths or filenames.
-            // If they are full paths, we need to extract filename and ensure we can find them.
-            // Usually we store filenames.
-            let path = cutout.imagePath
-            if !path.isEmpty {
-                let fileName = (path as NSString).lastPathComponent
-                addFileToTar(fileName: fileName)
+            
+            for outfit in outfits {
+                if let snapshot = outfit.snapshotPath {
+                    let fileName = (snapshot as NSString).lastPathComponent
+                    filesToBackup.insert(fileName)
+                }
             }
-        }
-        
-        for outfit in outfits {
-            if let snapshot = outfit.snapshotPath {
-                let fileName = (snapshot as NSString).lastPathComponent
-                addFileToTar(fileName: fileName)
+            
+            let fileList = Array(filesToBackup)
+            
+            // 4. Create Temp File
+            let fileName = "少女心愿\(Date().formatted(date: .numeric, time: .omitted).replacingOccurrences(of: "/", with: "")).save"
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            
+            // 5. Init Streaming Writer
+            let compressionWriter = try StreamingCompressionWriter(url: tempURL)
+            let tarWriter = TarStreamWriter(writer: compressionWriter)
+            
+            defer {
+                try? compressionWriter.close()
             }
-        }
-        
-        let tarData = tarWriter.finalize()
-        
-        // 6. Compress (GZIP)
-        // Since we don't have easy GZIP without importing zlib or using NSData compression,
-        // we'll use `Data.compressed` if available (iOS 13+).
-        // `compressed(using: .lzfse)` is efficient and Apple specific.
-        // User asked for "high compression". LZFSE is good.
-        let compressedData = try (tarData as NSData).compressed(using: .lzfse)
-        
-        // 7. Save to Temp File
-        let fileName = "少女心愿\(Date().formatted(date: .numeric, time: .omitted).replacingOccurrences(of: "/", with: "")).save"
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-        try compressedData.write(to: tempURL)
-        
-        return tempURL
+            
+            // 6. Write Manifest
+            let jsonEncoder = JSONEncoder()
+            jsonEncoder.dateEncodingStrategy = .iso8601
+            let jsonData = try jsonEncoder.encode(manifest)
+            try tarWriter.appendEntry(fileName: "manifest.json", data: jsonData)
+            
+            // 7. Write Images (Streamed)
+            for fileName in fileList {
+                let fileURL = imagesDir.appendingPathComponent(fileName)
+                if FileManager.default.fileExists(atPath: fileURL.path) {
+                    try tarWriter.appendEntry(fileName: fileName, fileURL: fileURL)
+                }
+            }
+            
+            // 8. Finalize
+            try tarWriter.finalize()
+            try compressionWriter.close()
+            
+            return tempURL
+        }.value
     }
     
     // MARK: - Import
     
     func importBackup(from url: URL, context: ModelContext) throws {
-        // 1. Read Data
+        // 1. Read Data (To be optimized to stream later if needed)
         let compressedData = try Data(contentsOf: url)
         
         // 2. Decompress
