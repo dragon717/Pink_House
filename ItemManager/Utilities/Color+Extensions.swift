@@ -20,10 +20,10 @@ extension Color {
 
         self.init(
             .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
+            red: min(max(Double(r) / 255, 0), 1.0),
+            green: min(max(Double(g) / 255, 0), 1.0),
+            blue: min(max(Double(b) / 255, 0), 1.0),
+            opacity: min(max(Double(a) / 255, 0), 1.0)
         )
     }
     

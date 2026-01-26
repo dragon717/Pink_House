@@ -60,7 +60,7 @@ class NativePackageWrapper {
         
         // 2. 通过 FileWrapper 还原目录结构
         guard let rootWrapper = try? FileWrapper(serializedRepresentation: decompressed as Data),
-              rootWrapper.isDirectory,
+              rootWrapper.isDirectory,  
               let childWrappers = rootWrapper.fileWrappers else {
             throw BackupService.BackupError.invalidArchive
         }

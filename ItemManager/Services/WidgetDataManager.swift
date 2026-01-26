@@ -63,7 +63,7 @@ struct WidgetData: Codable {
 
 class WidgetDataManager {
     static let shared = WidgetDataManager()
-    static let appGroupIdentifier = "group.bugod.ItemManager"
+    static let appGroupIdentifier = "group.bugod2.ItemManager"
     private let filename = "widget_data.json"
     private let imagesDirectoryName = "WidgetImages"
     

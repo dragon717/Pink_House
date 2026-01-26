@@ -234,6 +234,7 @@ extension BackupService {
                 } else {
                     item = OutfitItem(cutout: nil, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: itemDTO.scale, zIndex: itemDTO.zIndex)
                     item.id = itemDTO.id
+                    context.insert(item)
                     item.outfit = outfit
                 }
                 if let cid = itemDTO.cutoutID {

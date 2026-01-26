@@ -243,6 +243,18 @@ class ImageManager {
         let width = cgImage.width
         let height = cgImage.height
         
+        let alphaInfo = cgImage.alphaInfo
+        let hasAlpha = alphaInfo == .premultipliedLast || alphaInfo == .premultipliedFirst || 
+                       alphaInfo == .last || alphaInfo == .first
+        
+        var bitmapInfo: UInt32 = CGBitmapInfo.byteOrder32Little.rawValue
+        
+        if hasAlpha {
+            bitmapInfo |= CGImageAlphaInfo.premultipliedFirst.rawValue
+        } else {
+            bitmapInfo |= CGImageAlphaInfo.noneSkipFirst.rawValue
+        }
+        
         guard let context = CGContext(
             data: nil,
             width: width,
@@ -250,7 +262,7 @@ class ImageManager {
             bitsPerComponent: 8,
             bytesPerRow: 0,
             space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+            bitmapInfo: bitmapInfo
         ) else {
             return image
         }
