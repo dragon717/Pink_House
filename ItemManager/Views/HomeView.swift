@@ -92,6 +92,7 @@ struct HomeView: View {
     }
     
     @State private var viewLayout: ViewLayout = .grid2
+    @State private var showingCommunityImportAlert = false
     
     var body: some View {
         NavigationStack {
@@ -509,11 +510,14 @@ struct HomeView: View {
     private var addButton: some View {
         Menu {
             Button { showingAddSheet = true } label: { Label("手动添加", systemImage: "square.and.pencil") }
-            Button {} label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
+            Button { showingCommunityImportAlert = true } label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16))
                 .foregroundStyle(.primary)
+        }
+        .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {
+            Button("好的", role: .cancel) { }
         }
     }
     
