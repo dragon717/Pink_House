@@ -25,6 +25,9 @@ struct DepositPlanView: View {
     @State private var isAnalyzing: Bool = false
     @State private var showStats = true
     
+    @State private var filteredClothings: [Clothing] = []
+    @State private var baseClothings: [Clothing] = []
+    
     // Money Counting Animation State
     struct MoneyCountingState: Identifiable {
         let id = UUID()
@@ -73,10 +76,8 @@ struct DepositPlanView: View {
         return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
     }
     
-    // Base filtered clothings (Year + Search + Tags + etc.)
-    // Used for Series Analysis and Stats
-    var baseClothings: [Clothing] {
-        depositClothings.filter { clothing in
+    private func updateBaseClothings() {
+        let result = depositClothings.filter { clothing in
             let matchesSearch: Bool
             if searchText.isEmpty {
                 matchesSearch = true
@@ -124,19 +125,18 @@ struct DepositPlanView: View {
                 let year = calendar.component(.year, from: date)
                 matchesYear = (year == selectedYear)
             } else {
-                // If no date, only show if we are not strictly filtering by year?
-                // Or maybe default to current year? 
-                // Currently if no date, it's excluded from year view.
                 matchesYear = false
             }
             
             return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesYear
         }
+        
+        self.baseClothings = result
+        updateFilteredClothings()
     }
     
-    // Final filtered clothings (Base + Month/Series Selection)
-    var filteredClothings: [Clothing] {
-        baseClothings.filter { clothing in
+    private func updateFilteredClothings() {
+        let result = baseClothings.filter { clothing in
             if viewMode == .monthly {
                 if selectedMonths.isEmpty {
                     return true
@@ -152,11 +152,7 @@ struct DepositPlanView: View {
                 if selectedSeries.isEmpty {
                     return true
                 } else {
-                    // Refined Series Filter Logic:
-                    // Check if the clothing's sanitized name STARTS WITH any of the selected series (prefixes)
-                    // ignoring case.
                     return selectedSeries.contains { seriesPrefix in
-                        // We need to sanitize the clothing name first to match how series were generated
                         let sanitizedName = SeriesAnalyzer.shared.sanitize(clothing.name).lowercased()
                         let prefix = seriesPrefix.lowercased()
                         return sanitizedName.hasPrefix(prefix)
@@ -164,6 +160,7 @@ struct DepositPlanView: View {
                 }
             }
         }
+        self.filteredClothings = result
     }
     
     var body: some View {
@@ -177,23 +174,27 @@ struct DepositPlanView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
                 .onChange(of: viewMode) { oldValue, newValue in
+                    updateFilteredClothings()
                     if newValue == .series && seriesList.isEmpty {
                         analyzeSeries()
                     }
                 }
                 .task {
-                    // Initial analysis if needed, or wait for switch
+                    // Initial load
+                    updateBaseClothings()
                     if viewMode == .series && seriesList.isEmpty {
                         analyzeSeries()
                     }
                 }
                 .onChange(of: depositClothings) { oldValue, newValue in
+                    updateBaseClothings()
                     if viewMode == .series {
                         analyzeSeries()
                     }
                 }
                 // Re-analyze series if year changes
                 .onChange(of: selectedYear) { oldValue, newValue in
+                    updateBaseClothings()
                     if viewMode == .series {
                         analyzeSeries()
                     }
@@ -201,6 +202,18 @@ struct DepositPlanView: View {
                     selectedMonths.removeAll()
                     selectedSeries.removeAll()
                 }
+                // Filter triggers
+                .onChange(of: searchText) { updateBaseClothings() }
+                .onChange(of: selectedTagIDs) { updateBaseClothings() }
+                .onChange(of: selectedBrandIDs) { updateBaseClothings() }
+                .onChange(of: selectedTypes) { updateBaseClothings() }
+                .onChange(of: selectedColors) { updateBaseClothings() }
+                .onChange(of: selectedSizes) { updateBaseClothings() }
+                .onChange(of: selectedLengths) { updateBaseClothings() }
+                .onChange(of: selectedConditions) { updateBaseClothings() }
+                .onChange(of: selectedAccessories) { updateBaseClothings() }
+                .onChange(of: selectedMonths) { updateFilteredClothings() }
+                .onChange(of: selectedSeries) { updateFilteredClothings() }
                 
                 // Stats Section
                 VStack(spacing: 8) {

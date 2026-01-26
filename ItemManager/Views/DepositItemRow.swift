@@ -14,6 +14,13 @@ struct DepositItemRow: View {
     @State private var isExpanded: Bool = false
     @State private var showEditNoteAlert: Bool = false
     @State private var editingNote: String = ""
+    @State private var thumbnailImage: UIImage?
+    
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月"
+        return formatter
+    }()
     
     var body: some View {
         GlassCard {
@@ -21,8 +28,7 @@ struct DepositItemRow: View {
                 // Top Section: Image + Basic Info
                 HStack(alignment: .top, spacing: 12) {
                     // Image
-                    if let imagePath = clothing.imagePaths.first,
-                       let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
+                    if let uiImage = thumbnailImage {
                         Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -32,6 +38,11 @@ struct DepositItemRow: View {
                         CutePlaceholderView(iconSize: 24)
                             .frame(width: 80, height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .task {
+                                if let imagePath = clothing.imagePaths.first {
+                                    self.thumbnailImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: CGSize(width: 80, height: 80))
+                                }
+                            }
                     }
                     
                     // Basic Info
@@ -177,9 +188,7 @@ struct DepositItemRow: View {
     
     private func formatDate(_ date: Date?) -> String {
         guard let date = date else { return "待定" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月"
-        return formatter.string(from: date)
+        return Self.dateFormatter.string(from: date)
     }
     
     private func getDepositTimeStatus() -> String? {
@@ -226,6 +235,12 @@ struct TimelineRow: View {
     let date: Date?
     var trailing: String? = nil
     
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy/MM/dd"
+        return formatter
+    }()
+    
     var body: some View {
         HStack {
             Text(title)
@@ -257,8 +272,6 @@ struct TimelineRow: View {
     }
     
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy/MM/dd"
-        return formatter.string(from: date)
+        return Self.dateFormatter.string(from: date)
     }
 }
