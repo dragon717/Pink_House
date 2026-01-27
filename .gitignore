@@ -1,3 +1,25 @@
-swift_ui_project/ItemManager/ItemManager.xcodeproj/project.xcworkspace/xcuserdata/muniao.xcuserdatad/UserInterfaceState.xcuserstate
-ItemManager.xcodeproj/project.xcworkspace/xcuserdata/muniao.xcuserdatad/UserInterfaceState.xcuserstate
-ItemManager.xcodeproj/project.xcworkspace/xcuserdata/muniao.xcuserdatad/UserInterfaceState.xcuserstate
+# Xcode
+#
+## User settings
+xcuserdata/
+
+## compatibility with Xcode 8 and earlier (ignoring these won't hurt)
+*.mode1v3
+*.mode2v3
+*.pbuser
+*.perspectivev3
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+
+## Obj-C/Swift specific
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+
+# Misc
+.DS_Store
