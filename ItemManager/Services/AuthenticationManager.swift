@@ -19,6 +19,12 @@ class AuthenticationManager: NSObject, ObservableObject {
     @AppStorage("userFamilyName") var familyName: String = ""
     @AppStorage("userEmail") var email: String = ""
     
+    // 缓存用户信息，用于在 Apple 不返回姓名时（非首次登录）恢复数据
+    @AppStorage("cachedUserIdentifier") private var cachedUserIdentifier: String = ""
+    @AppStorage("cachedGivenName") private var cachedGivenName: String = ""
+    @AppStorage("cachedFamilyName") private var cachedFamilyName: String = ""
+    @AppStorage("cachedEmail") private var cachedEmail: String = ""
+    
     @Published var isAuthenticated: Bool = false
     @Published var errorMessage: String?
     
@@ -80,13 +86,30 @@ class AuthenticationManager: NSObject, ObservableObject {
                 // 姓名和电子邮件仅在第一次登录时返回。
                 // 我们应该将它们持久化保存。
                 if let name = appleIDCredential.fullName {
-                    if let given = name.givenName { self.givenName = given }
-                    if let family = name.familyName { self.familyName = family }
+                    if let given = name.givenName { 
+                        self.givenName = given
+                        self.cachedGivenName = given
+                    }
+                    if let family = name.familyName { 
+                        self.familyName = family
+                        self.cachedFamilyName = family
+                    }
+                } else if userId == self.cachedUserIdentifier {
+                    // 如果是同一个用户且 Apple 没返回名字，尝试从缓存恢复
+                    if self.givenName.isEmpty { self.givenName = self.cachedGivenName }
+                    if self.familyName.isEmpty { self.familyName = self.cachedFamilyName }
                 }
                 
                 if let email = appleIDCredential.email {
                     self.email = email
+                    self.cachedEmail = email
+                } else if userId == self.cachedUserIdentifier {
+                    // 尝试从缓存恢复邮箱
+                    if self.email.isEmpty { self.email = self.cachedEmail }
                 }
+                
+                // 更新缓存的 ID
+                self.cachedUserIdentifier = userId
                 
                 AppLogger.info("登录成功: \(userId)")
             }

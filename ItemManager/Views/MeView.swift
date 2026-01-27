@@ -17,114 +17,22 @@ struct MeView: View {
     @State private var showingHapticTestAlert = false
     @State private var showingSyncAlert = false
     @State private var syncAlertMessage = ""
+    @State private var showingLoginRequiredAlert = false
+    @State private var showingRestoreSuccessAlert = false
     
     var body: some View {
         NavigationStack {
             List {
                 // Section: Account & iCloud Sync
                 Section {
-                    // 1. Sign In / Account Info
-                    if authManager.isAuthenticated {
-                        HStack(spacing: 12) {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .frame(width: 40, height: 40)
-                                .foregroundStyle(.gray)
-                            
-                            VStack(alignment: .leading) {
-                                Text(authManager.givenName.isEmpty ? "已登录用户" : "\(authManager.familyName)\(authManager.givenName)")
-                                    .font(.headline)
-                                if !authManager.email.isEmpty {
-                                    Text(authManager.email)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            
-                            Button("退出") {
-                                authManager.signOut()
-                            }
-                            .font(.caption)
-                            .buttonStyle(.bordered)
-                        }
-                        .padding(.vertical, 4)
-                    } else {
-                        SignInWithAppleButton(
-                            onRequest: { request in
-                                request.requestedScopes = [.fullName, .email]
-                            },
-                            onCompletion: { result in
-                                authManager.handleSignIn(result: result)
-                            }
-                        )
-                        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                        .frame(height: 44)
-                        .padding(.vertical, 4)
-                        
-                        if let errorMessage = authManager.errorMessage {
-                            Text(errorMessage)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                                .padding(.horizontal)
-                        }
-                    }
+                    UserInfoView(authManager: authManager, colorScheme: colorScheme)
                     
-                    // 2. iCloud Sync Controls
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "icloud")
-                                .foregroundStyle(.blue)
-                            Text("iCloud 同步")
-                                .font(.headline)
-                            Spacer()
-                            if cloudManager.isSyncing {
-                                ProgressView()
-                            }
-                        }
-                        
-                        if let lastDate = cloudManager.lastCloudBackupDate {
-                            Text("云端备份: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("云端无备份")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        if let error = cloudManager.syncError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                        
-                        HStack(spacing: 16) {
-                            Button {
-                                Task {
-                                    await cloudManager.uploadBackup(modelContainer: modelContext.container)
-                                }
-                            } label: {
-                                Label("备份到云端", systemImage: "icloud.and.arrow.up")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.white)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.blue)
-                            .disabled(cloudManager.isSyncing)
-                            
-                            Button {
-                                showingSyncAlert = true
-                            } label: {
-                                Label("从云端恢复", systemImage: "icloud.and.arrow.down")
-                                    .font(.subheadline)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(cloudManager.isSyncing)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
+                    CloudSyncControlsView(
+                        authManager: authManager,
+                        cloudManager: cloudManager,
+                        showingLoginRequiredAlert: $showingLoginRequiredAlert,
+                        showingSyncAlert: $showingSyncAlert
+                    )
                 } header: {
                     Text("账户与同步")
                 }
@@ -138,121 +46,44 @@ struct MeView: View {
                     Button("取消", role: .cancel) { }
                     Button("恢复", role: .destructive) {
                         Task {
-                            await cloudManager.restoreFromCloud(context: modelContext)
+                            let success = await cloudManager.restoreFromCloud(context: modelContext)
+                            if success {
+                                showingRestoreSuccessAlert = true
+                            }
                         }
                     }
                 } message: {
                     Text("从云端恢复将覆盖当前的本地数据（合并更新）。确定要继续吗？")
                 }
+                .alert("需要登录", isPresented: $showingLoginRequiredAlert) {
+                    Button("确定", role: .cancel) { }
+                } message: {
+                    Text("请先登录 iCloud 账户以使用云同步功能。")
+                }
+                .alert("恢复成功", isPresented: $showingRestoreSuccessAlert) {
+                    Button("确定", role: .cancel) { }
+                } message: {
+                    Text("云端数据已成功恢复到本地。")
+                }
 
                 // Section 3: Feature Settings
                 Section {
-                    
-
                     NavigationLink(destination: GeneralSettingsView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "slider.horizontal.3")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("通用设置")
-                                    .font(.body)
-                                Text("语言、主题等")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
+                        SettingsRow(icon: "slider.horizontal.3", title: "通用设置", subtitle: "语言、主题等")
                     }
                     NavigationLink(destination: NotificationSettingsView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "bell")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("通知设置")
-                                    .font(.body)
-                                Text("管理通知提醒")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
+                        SettingsRow(icon: "bell", title: "通知设置", subtitle: "管理通知提醒")
                     }
-                    // NavigationLink(destination: PrivacySettingsView()) {
-                    //     HStack(spacing: 12) {
-                    //         Image(systemName: "lock")
-                    //             .foregroundStyle(.brown)
-                    //             .font(.body)
-                    //             .frame(width: 24)
-                    //         VStack(alignment: .leading) {
-                    //             Text("隐私设置")
-                    //                 .font(.body)
-                    //             Text("数据与隐私")
-                    //                 .font(.caption)
-                    //                 .foregroundStyle(.secondary)
-                    //         }
-                    //     }
-                    //     .padding(.vertical, 2)
-                    // }
+                    
                     NavigationLink(destination: WidgetSettingsView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "rectangle.3.group")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("小组件设置")
-                                    .font(.body)
-                                    .outlined()
-                                Text("自定义背景与添加教程")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .outlined()
-                            }
-                        }
-                        .padding(.vertical, 2)
+                        SettingsRow(icon: "rectangle.3.group", title: "小组件设置", subtitle: "自定义背景与添加教程")
                     }
                     NavigationLink(destination: DataManagementView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "externaldrive")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("数据管理")
-                                    .font(.body)
-                                Text("备份与导出及属性管理")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
+                        SettingsRow(icon: "externaldrive", title: "数据管理", subtitle: "备份与导出及属性管理")
                     }
                     // 触感反馈设置 (跳转详情页)
                     NavigationLink(destination: HapticSettingsView()) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "waveform.path.ecg")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("触感反馈")
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                Text("震动开关与系统设置引导")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
+                        SettingsRow(icon: "waveform.path.ecg", title: "触感反馈", subtitle: "震动开关与系统设置引导")
                     }
 
                     // 应用系统设置
@@ -339,6 +170,137 @@ struct MeView: View {
     }
 }
 
+// MARK: - Subviews
+
+struct UserInfoView: View {
+    @ObservedObject var authManager: AuthenticationManager
+    let colorScheme: ColorScheme
+    
+    var body: some View {
+        Group {
+            if authManager.isAuthenticated {
+                HStack(spacing: 12) {
+                    UserAvatarView(
+                        givenName: authManager.givenName,
+                        familyName: authManager.familyName,
+                        size: 40
+                    )
+                    
+                    VStack(alignment: .leading) {
+                        Text(authManager.givenName.isEmpty ? "已登录用户" : "\(authManager.familyName)\(authManager.givenName)")
+                            .font(.headline)
+                        if !authManager.email.isEmpty {
+                            Text(authManager.email)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    
+                    Button("退出") {
+                        authManager.signOut()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
+            } else {
+                SignInWithAppleButton(
+                    onRequest: { request in
+                        request.requestedScopes = [.fullName, .email]
+                    },
+                    onCompletion: { result in
+                        authManager.handleSignIn(result: result)
+                    }
+                )
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 44)
+                .padding(.vertical, 4)
+                .environment(\.locale, Locale(identifier: "zh_CN"))
+                
+                if let errorMessage = authManager.errorMessage {
+                    Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+}
+
+struct CloudSyncControlsView: View {
+    @ObservedObject var authManager: AuthenticationManager
+    @ObservedObject var cloudManager: CloudSyncManager
+    @Environment(\.modelContext) private var modelContext // Use environment instead of passing
+    @Binding var showingLoginRequiredAlert: Bool
+    @Binding var showingSyncAlert: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "icloud")
+                    .foregroundStyle(.blue)
+                Text("iCloud 同步")
+                    .font(.headline)
+                Spacer()
+                if cloudManager.isSyncing {
+                    ProgressView()
+                }
+            }
+            
+            if let lastDate = cloudManager.lastCloudBackupDate {
+                Text("云端备份: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("云端无备份")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            if let error = cloudManager.syncError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            
+            HStack(spacing: 16) {
+                Button {
+                    if !authManager.isAuthenticated {
+                        showingLoginRequiredAlert = true
+                    } else {
+                        Task {
+                            await cloudManager.uploadBackup(modelContainer: modelContext.container)
+                        }
+                    }
+                } label: {
+                    Label("备份到云端", systemImage: "icloud.and.arrow.up")
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .disabled(cloudManager.isSyncing)
+                
+                Button {
+                    if !authManager.isAuthenticated {
+                        showingLoginRequiredAlert = true
+                    } else {
+                        showingSyncAlert = true
+                    }
+                } label: {
+                    Label("从云端恢复", systemImage: "icloud.and.arrow.down")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.bordered)
+                .disabled(cloudManager.isSyncing)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+}
+
 struct SettingsRow: View {
     let icon: String
     let title: String
@@ -389,68 +351,33 @@ struct HapticSettingsView: View {
                 Text("功能开关")
             }
             
-            // 2. 测试与系统引导
+            // 2. 系统设置引导
             Section {
                 Button {
-                    hapticManager.playTestHaptic()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "play.circle.fill")
-                            .foregroundStyle(.blue)
-                            .frame(width: 24)
-                        Text("播放测试震动")
-                            .foregroundStyle(.primary)
-                    }
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("如果您在点击测试按钮时感觉不到震动：")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                    
-                    HStack(alignment: .top) {
-                        Text("1.")
-                        Text("请确保手机未处于静音模式，或在设置中开启了“静音模式下震动”。")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    
-                    HStack(alignment: .top) {
-                        Text("2.")
-                        Text("请检查 iOS 系统设置中是否开启了“系统触感反馈”。")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-                
-                Button {
-                    // 尝试跳转到“声音与触感”设置页
-                    let urlString = "App-Prefs:root=Sounds"
-                    if let url = URL(string: urlString), UIApplication.shared.canOpenURL(url) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
-                    } else if let appSettings = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(appSettings)
                     }
                 } label: {
                     HStack {
-                        Text("前往系统设置 > 声音与触感")
+                        Image(systemName: "gear")
+                            .foregroundStyle(.blue)
+                        Text("前往系统设置")
                         Spacer()
                         Image(systemName: "arrow.up.forward.app")
+                            .font(.caption)
+                            .foregroundStyle(.gray)
                     }
-                    .font(.subheadline)
                 }
+                
+                Text("如果应用内开启后仍无震动，请检查：\n1. 系统设置 > 声音与触感 > 系统触感反馈 是否开启\n2. 手机是否处于静音模式（部分震动在静音下可能不工作）")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
             } header: {
-                Text("故障排查")
-            } footer: {
-                Text("注意：如果 iOS 的“系统触感反馈”被关闭，App 将无法提供任何震动体验。")
+                Text("系统设置")
             }
         }
-        .navigationTitle("触感反馈")
-        .background {
-            LiquidBackground()
-        }
-        .scrollContentBackground(.hidden)
+        .navigationTitle("触感反馈设置")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
