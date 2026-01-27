@@ -1,18 +1,150 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AuthenticationServices
+import SwiftData
 
 struct MeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @StateObject private var authManager = AuthenticationManager.shared
+    @StateObject private var cloudManager = CloudSyncManager.shared
+    
     @State private var isImporting = false
     @State private var showingImportAlert = false
     @State private var importMessage = ""
     @State private var showingHapticTestAlert = false
+    @State private var showingSyncAlert = false
+    @State private var syncAlertMessage = ""
     
     var body: some View {
         NavigationStack {
             List {
+                // Section: Account & iCloud Sync
+                Section {
+                    // 1. Sign In / Account Info
+                    if authManager.isAuthenticated {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .frame(width: 40, height: 40)
+                                .foregroundStyle(.gray)
+                            
+                            VStack(alignment: .leading) {
+                                Text(authManager.givenName.isEmpty ? "已登录用户" : "\(authManager.familyName)\(authManager.givenName)")
+                                    .font(.headline)
+                                if !authManager.email.isEmpty {
+                                    Text(authManager.email)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            
+                            Button("退出") {
+                                authManager.signOut()
+                            }
+                            .font(.caption)
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        SignInWithAppleButton(
+                            onRequest: { request in
+                                request.requestedScopes = [.fullName, .email]
+                            },
+                            onCompletion: { result in
+                                authManager.handleSignIn(result: result)
+                            }
+                        )
+                        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                        .frame(height: 44)
+                        .padding(.vertical, 4)
+                        
+                        if let errorMessage = authManager.errorMessage {
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .padding(.horizontal)
+                        }
+                    }
+                    
+                    // 2. iCloud Sync Controls
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "icloud")
+                                .foregroundStyle(.blue)
+                            Text("iCloud 同步")
+                                .font(.headline)
+                            Spacer()
+                            if cloudManager.isSyncing {
+                                ProgressView()
+                            }
+                        }
+                        
+                        if let lastDate = cloudManager.lastCloudBackupDate {
+                            Text("云端备份: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("云端无备份")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        if let error = cloudManager.syncError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        
+                        HStack(spacing: 16) {
+                            Button {
+                                Task {
+                                    await cloudManager.uploadBackup(modelContainer: modelContext.container)
+                                }
+                            } label: {
+                                Label("备份到云端", systemImage: "icloud.and.arrow.up")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.blue)
+                            .disabled(cloudManager.isSyncing)
+                            
+                            Button {
+                                showingSyncAlert = true
+                            } label: {
+                                Label("从云端恢复", systemImage: "icloud.and.arrow.down")
+                                    .font(.subheadline)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(cloudManager.isSyncing)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                } header: {
+                    Text("账户与同步")
+                }
+                .onAppear {
+                    // 视图显示时检查云端状态
+                    if authManager.isAuthenticated {
+                        cloudManager.fetchLatestBackupMetadata()
+                    }
+                }
+                .alert("确认恢复", isPresented: $showingSyncAlert) {
+                    Button("取消", role: .cancel) { }
+                    Button("恢复", role: .destructive) {
+                        Task {
+                            await cloudManager.restoreFromCloud(context: modelContext)
+                        }
+                    }
+                } message: {
+                    Text("从云端恢复将覆盖当前的本地数据（合并更新）。确定要继续吗？")
+                }
+
                 // Section 3: Feature Settings
                 Section {
                     
