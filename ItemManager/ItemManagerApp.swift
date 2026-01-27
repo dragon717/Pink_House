@@ -39,6 +39,9 @@ struct ItemManagerApp: App {
                     }
 
                     SharedPersistence.shared.syncWidgetData()
+                    
+                    // Check network permission and fetch cloud backup metadata
+                    CloudSyncManager.shared.checkNetworkPermission()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .background || newPhase == .inactive {

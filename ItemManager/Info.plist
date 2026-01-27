@@ -12,5 +12,7 @@
 	<array>
 		<string>zh_CN</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

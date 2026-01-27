@@ -10,12 +10,43 @@ import CloudKit
 import SwiftData
 import UIKit
 import Combine
+import CoreTelephony
 
 @MainActor
 class CloudSyncManager: ObservableObject {
     static let shared = CloudSyncManager()
     
     private let container = CKContainer(identifier: "iCloud.bugod2.ItemManager")
+    private let cellularData = CTCellularData()
+    
+    // MARK: - Network Permission
+    
+    func checkNetworkPermission() {
+        // 检查当前网络权限状态
+        // check current network permission state
+        if cellularData.restrictedState == .notRestricted {
+            print("Network permission already granted. Fetching backup metadata...")
+            fetchLatestBackupMetadata()
+        } else {
+            print("Network permission state: \(cellularData.restrictedState.rawValue)")
+        }
+        
+        // 监听权限变化（例如用户刚刚点击了允许）
+        // Monitor permission changes (e.g. user just tapped Allow)
+        cellularData.cellularDataRestrictionDidUpdateNotifier = { [weak self] state in
+            guard let self = self else { return }
+            
+            // 回到主线程处理
+            DispatchQueue.main.async {
+                if state == .notRestricted {
+                    print("Network permission granted via notifier. Fetching backup metadata...")
+                    self.fetchLatestBackupMetadata()
+                } else {
+                    print("Network permission updated to: \(state.rawValue)")
+                }
+            }
+        }
+    }
     
     // MARK: - Database Configuration
     // 切换策略：由于 Private Database 持续出现 Code 15 (Server Rejected Request) 错误，
