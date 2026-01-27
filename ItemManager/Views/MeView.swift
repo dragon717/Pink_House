@@ -205,18 +205,29 @@ struct UserInfoView: View {
                 }
                 .padding(.vertical, 4)
             } else {
-                SignInWithAppleButton(
-                    onRequest: { request in
-                        request.requestedScopes = [.fullName, .email]
-                    },
-                    onCompletion: { result in
-                        authManager.handleSignIn(result: result)
+                if authManager.isLoggingIn {
+                    HStack {
+                        Spacer()
+                        ProgressView("正在登录...")
+                            .controlSize(.regular)
+                        Spacer()
                     }
-                )
-                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                .frame(height: 44)
-                .padding(.vertical, 4)
-                .environment(\.locale, Locale(identifier: "zh_CN"))
+                    .frame(height: 44)
+                    .padding(.vertical, 4)
+                } else {
+                    SignInWithAppleButton(
+                        onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                        },
+                        onCompletion: { result in
+                            authManager.handleSignIn(result: result)
+                        }
+                    )
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                    .frame(height: 44)
+                    .padding(.vertical, 4)
+                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                }
                 
                 if let errorMessage = authManager.errorMessage {
                     Text(errorMessage)
