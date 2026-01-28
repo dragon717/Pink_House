@@ -265,9 +265,9 @@ struct CloudSyncControlsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("云端无备份")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                // Text("云端无备份")
+                //     .font(.caption)
+                //     .foregroundStyle(.secondary)
             }
             
             if let error = cloudManager.syncError {
