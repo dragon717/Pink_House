@@ -7,6 +7,9 @@ struct GeneralSettingsView: View {
     @State private var showingRestartAlert = false
     @State private var selectedItem: PhotosPickerItem?
     
+    @State private var showingImageEditor = false
+    @State private var tempImage: UIImage?
+    
     var body: some View {
         @Bindable var theme = themeManager
         
@@ -44,6 +47,12 @@ struct GeneralSettingsView: View {
                         set: { theme.backgroundColorHex = $0.toHex() }
                     ))
                 } else {
+                    Picker("填充方式", selection: $theme.backgroundFillMode) {
+                        ForEach(BackgroundFillMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    
                     HStack {
                         Text("当前图片")
                         Spacer()
@@ -67,7 +76,10 @@ struct GeneralSettingsView: View {
                         Task {
                             if let data = try? await newItem?.loadTransferable(type: Data.self),
                                let uiImage = UIImage(data: data) {
-                                theme.setBackgroundImage(uiImage)
+                                await MainActor.run {
+                                    self.tempImage = uiImage
+                                    self.showingImageEditor = true
+                                }
                             }
                         }
                     }
@@ -109,6 +121,18 @@ struct GeneralSettingsView: View {
             Button("稍后") { }
         } message: {
             Text("语言更改将在下次启动应用时生效。")
+        }
+        .fullScreenCover(isPresented: $showingImageEditor) {
+            if let image = tempImage {
+                BackgroundEditView(originalImage: image) { croppedImage in
+                    theme.setBackgroundImage(croppedImage)
+                    showingImageEditor = false
+                    tempImage = nil
+                } onCancel: {
+                    showingImageEditor = false
+                    tempImage = nil
+                }
+            }
         }
     }
 }

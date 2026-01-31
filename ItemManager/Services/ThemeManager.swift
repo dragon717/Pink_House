@@ -15,6 +15,22 @@ enum BackgroundStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum BackgroundFillMode: String, CaseIterable, Identifiable, Codable {
+    case fill
+    case fit
+    case tile
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .fill: return "填充 (Fill)"
+        case .fit: return "适应 (Fit)"
+        case .tile: return "平铺 (Tile)"
+        }
+    }
+}
+
 @Observable
 class ThemeManager {
     static let shared = ThemeManager()
@@ -30,6 +46,12 @@ class ThemeManager {
     var backgroundStyle: BackgroundStyle = .color {
         didSet {
             UserDefaults.standard.set(backgroundStyle.rawValue, forKey: "theme_background_style")
+        }
+    }
+    
+    var backgroundFillMode: BackgroundFillMode = .fill {
+        didSet {
+            UserDefaults.standard.set(backgroundFillMode.rawValue, forKey: "theme_background_fill_mode")
         }
     }
     
@@ -60,6 +82,11 @@ class ThemeManager {
         if let savedStyle = UserDefaults.standard.string(forKey: "theme_background_style"),
            let style = BackgroundStyle(rawValue: savedStyle) {
             self.backgroundStyle = style
+        }
+        
+        if let savedMode = UserDefaults.standard.string(forKey: "theme_background_fill_mode"),
+           let mode = BackgroundFillMode(rawValue: savedMode) {
+            self.backgroundFillMode = mode
         }
         
         // Load opacity, default to 1.0 if not set (register defaults would be better, but this works)

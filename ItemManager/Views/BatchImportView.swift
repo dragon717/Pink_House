@@ -11,7 +11,7 @@ import SwiftData
 
 struct BatchImageItem: Identifiable {
     let id = UUID()
-    let sourceItem: PhotosPickerItem
+    let sourceItem: PhotosPickerItem?
     var image: UIImage?
 }
 
@@ -27,6 +27,12 @@ struct BatchImportView: View {
     @State private var showingConfirmation: Bool = false
     @State private var currentLoadTask: Task<Void, Never>?
     
+    // Camera & ActionSheet States
+    @State private var showingActionSheet = false
+    @State private var showingCamera = false
+    @State private var showingPhotosPicker = false
+    @State private var cameraImage: UIImage?
+    
     var body: some View {
         NavigationStack {
             Form {
@@ -38,14 +44,26 @@ struct BatchImportView: View {
                 }
                 
                 Section(header: Text("选择图片 (\(displayedItems.count) 张)")) {
-                    PhotosPicker(selection: $selectedItems, matching: .images, photoLibrary: .shared()) {
+                    Button {
+                        showingActionSheet = true
+                    } label: {
                         HStack {
-                            Image(systemName: "photo.on.rectangle.angled")
-                            Text("从相册选择")
+                            Image(systemName: "plus.circle.fill")
+                            Text("添加图片")
                         }
                     }
-                    .onChange(of: selectedItems) { _, newItems in
-                        loadImages(from: newItems)
+                    .confirmationDialog("选择图片来源", isPresented: $showingActionSheet) {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button("拍照") {
+                                showingCamera = true
+                            }
+                        }
+                        
+                        Button("从相册选择") {
+                            showingPhotosPicker = true
+                        }
+                        
+                        Button("取消", role: .cancel) {}
                     }
                     
                     if !displayedItems.isEmpty {
@@ -129,6 +147,22 @@ struct BatchImportView: View {
                     }
                 }
             }
+            .fullScreenCover(isPresented: $showingCamera) {
+                CameraPicker(image: $cameraImage)
+                    .ignoresSafeArea()
+            }
+            .onChange(of: cameraImage) { _, newImage in
+                if let image = newImage {
+                    // Add camera image to displayedItems
+                    let newItem = BatchImageItem(sourceItem: nil, image: image)
+                    displayedItems.append(newItem)
+                    cameraImage = nil
+                }
+            }
+            .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItems, matching: .images, photoLibrary: .shared())
+            .onChange(of: selectedItems) { _, newItems in
+                loadImages(from: newItems)
+            }
         }
     }
     
@@ -161,31 +195,22 @@ struct BatchImportView: View {
         // Cancel previous task to prevent race conditions
         currentLoadTask?.cancel()
         
-        guard !items.isEmpty else {
-            print("DEBUG: items is empty, clearing displayedItems")
-            displayedItems = []
-            return
-        }
+        // We must PRESERVE existing items that are not from PhotosPicker (e.g. Camera items)
+        let cameraItems = displayedItems.filter { $0.sourceItem == nil }
         
         isProcessing = true
         
         currentLoadTask = Task {
             var newDisplayedItems: [BatchImageItem] = []
             
-            // Try to reuse existing items to preserve UUIDs and reduce flickering
-            // We map new items to displayed items
-            // Since PhotosPickerItem is Equatable, we can find if we already have it
+            // Add back camera items (optional: decide where to put them, at the end or beginning?
+            // Current logic: append camera items at the end to keep them visible)
+            // Or better: keep them if we want.
+            // But usually PhotosPicker replaces the whole selection.
+            // So if I pick new photos, the camera photos should stay? Yes.
             
-            // Note: PhotosPickerItem equality might not be enough if user picks same image twice?
-            // Assuming unique selection or that we handle duplicates by order.
-            // Let's try to match by index if item matches, otherwise search?
-            // Simple approach: Iterate through new items. Check if we have a corresponding wrapper.
-            
-            // To handle reordering or removal correctly, we should be careful.
-            // But here we are mostly concerned with "syncing".
-            
-            // Optimization: Create a pool of existing items
-            var existingPool = displayedItems
+            // Optimization: Create a pool of existing items (only those with sourceItem)
+            var existingPool = displayedItems.filter { $0.sourceItem != nil }
             
             for item in items {
                 if Task.isCancelled { return }
@@ -212,19 +237,24 @@ struct BatchImportView: View {
                 }
             }
             
-            // Update UI with what we have (placeholders + reused)
+            // Merge: PhotosPicker items + Camera items
+            // Let's put camera items at the end for now, or keep them where they were?
+            // It's hard to keep relative order if selectedItems changed completely.
+            // Appending at the end is safest.
+            newDisplayedItems.append(contentsOf: cameraItems)
+            
+            // Update UI with what we have (placeholders + reused + camera)
             if !Task.isCancelled {
                 let initialItems = newDisplayedItems
                 await MainActor.run {
                     self.displayedItems = initialItems
                 }
                 
-                // Now load the missing images
+                // Now load the missing images (only for those that have sourceItem and no image)
                 for i in 0..<newDisplayedItems.count {
                     if Task.isCancelled { return }
                     
-                    if newDisplayedItems[i].image == nil {
-                        let item = newDisplayedItems[i].sourceItem
+                    if newDisplayedItems[i].image == nil, let item = newDisplayedItems[i].sourceItem {
                         
                         if let data = try? await item.loadTransferable(type: Data.self),
                            let image = downsample(data: data, to: CGSize(width: 200, height: 200)) {
@@ -241,20 +271,12 @@ struct BatchImportView: View {
                                 }
                             }
                             
-                            // Update UI incrementally? Or batch?
-                            // Let's batch update at the end or periodically?
-                            // For smoother UI, maybe update per item?
-                            // Updating state inside loop triggers view update.
+                            // Update UI incrementally
                             let updatedItem = newDisplayedItems[i]
                             let indexToUpdate = i
                             
                             await MainActor.run {
-                                // Check bounds again just in case
                                 if indexToUpdate < self.displayedItems.count {
-                                    // We must ensure we are updating the SAME item by ID, 
-                                    // but displayedItems might have changed if user deleted something?
-                                    // But we are in a Task that gets cancelled on change.
-                                    // So it should be safe.
                                     self.displayedItems[indexToUpdate] = updatedItem
                                 }
                             }
@@ -324,8 +346,23 @@ struct BatchImportView: View {
             for item in displayedItems {
                 if item.image == nil { continue } // Skip failed loads
                 
+                // If it's a camera image (sourceItem is nil), save directly
+                if item.sourceItem == nil, let image = item.image {
+                    if let fileName = await ImageManager.shared.saveImage(image, context: modelContext) {
+                        let clothing = Clothing(
+                            name: seriesName,
+                            imagePaths: [fileName]
+                        )
+                        await MainActor.run {
+                            modelContext.insert(clothing)
+                        }
+                    }
+                    continue
+                }
+                
                 // Load FULL image from sourceItem
-                if let data = try? await item.sourceItem.loadTransferable(type: Data.self),
+                if let sourceItem = item.sourceItem,
+                   let data = try? await sourceItem.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     
                     // Save image

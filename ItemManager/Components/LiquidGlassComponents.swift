@@ -11,25 +11,34 @@ import SwiftUI
 struct SmartBackgroundImage: View {
     let image: UIImage
     let opacity: Double
+    let fillMode: BackgroundFillMode
     
     var body: some View {
         GeometryReader { geometry in
             let screenSize = geometry.size
-            let imageSize = image.size
             
-            // 如果图片尺寸小于屏幕尺寸，则平铺 (Tile)
-            // 否则，缩放填充并居中 (ScaledToFill)
-            if imageSize.width < screenSize.width || imageSize.height < screenSize.height {
+            switch fillMode {
+            case .tile:
                 Image(uiImage: image)
                     .resizable(resizingMode: .tile)
                     .opacity(opacity)
-            } else {
+            case .fill:
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: screenSize.width, height: screenSize.height, alignment: .center)
                     .clipped()
                     .opacity(opacity)
+            case .fit:
+                ZStack {
+                    // Fit mode usually needs a background color if it doesn't fill
+                    Color.clear 
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: screenSize.width, height: screenSize.height, alignment: .center)
+                        .opacity(opacity)
+                }
             }
         }
         .ignoresSafeArea()
@@ -48,7 +57,11 @@ struct LiquidBackground: View {
                 .ignoresSafeArea()
             
             if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
-                SmartBackgroundImage(image: image, opacity: themeManager.backgroundOpacity)
+                SmartBackgroundImage(
+                    image: image,
+                    opacity: themeManager.backgroundOpacity,
+                    fillMode: themeManager.backgroundFillMode
+                )
                 
                 // Dark Mode Overlay
                 if colorScheme == .dark {
