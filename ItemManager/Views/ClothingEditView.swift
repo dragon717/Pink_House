@@ -12,6 +12,7 @@ import Foundation
 struct ClothingEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     @State private var clothing: Clothing?
     
@@ -66,20 +67,32 @@ struct ClothingEditView: View {
                     
                     AutoCompleteTextField(title: "品牌名称", placeholder: "请输入品牌名称", text: $brandName, field: .brand)
                     
-                    AutoCompleteTextField(title: "类型 (逗号分隔，如: JSK,OP,SK,小物)", placeholder: "例如: JSK,OP", text: $types, field: .type)
+                    if visibilityManager.isVisible(.types) {
+                        AutoCompleteTextField(title: "类型 (逗号分隔，如: JSK,OP,SK,小物)", placeholder: "例如: JSK,OP", text: $types, field: .type)
+                    }
                     
-                    AutoCompleteTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
+                    if visibilityManager.isVisible(.colors) {
+                        AutoCompleteTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
+                    }
                     
-                    AutoCompleteTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes, field: .size)
+                    if visibilityManager.isVisible(.sizes) {
+                        AutoCompleteTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes, field: .size)
+                    }
                     
-                    AutoCompleteTextField(title: "衣长 (如: 90cm, 100cm)", placeholder: "例如: 90cm", text: $length, field: .size) // 使用 size 的建议或者新建一个 field
+                    if visibilityManager.isVisible(.length) {
+                        AutoCompleteTextField(title: "衣长 (如: 90cm, 100cm)", placeholder: "例如: 90cm", text: $length, field: .size) // 使用 size 的建议或者新建一个 field
+                    }
                     
-                    AutoCompleteTextField(title: "状态（如: 全新, 95新）", placeholder: "例如: 全新", text: $condition, field: .condition)
+                    if visibilityManager.isVisible(.condition) {
+                        AutoCompleteTextField(title: "状态（如: 全新, 95新）", placeholder: "例如: 全新", text: $condition, field: .condition)
+                    }
                     
-                    AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
-                        // 使用 SuggestionManager 中稳健的内存过滤方法
-                        return await SuggestionManager.shared.searchAccessories(query: query, modelContext: modelContext)
-                    })
+                    if visibilityManager.isVisible(.accessories) {
+                        AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
+                            // 使用 SuggestionManager 中稳健的内存过滤方法
+                            return await SuggestionManager.shared.searchAccessories(query: query, modelContext: modelContext)
+                        })
+                    }
                     
                     Toggle("同步到裙子社区", isOn: $isShared)
                         .padding(.top, 8)

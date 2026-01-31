@@ -25,6 +25,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 struct DataManagementView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("useCloudSync") private var useCloudSync = false
+    @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     @State private var showingRestoreImporter = false
     @State private var showingRestoreAlert = false
@@ -51,29 +52,17 @@ struct DataManagementView: View {
                 }
                 
                 Section(header: Text("属性数据管理")) {
-                    NavigationLink(destination: FieldManagementView(title: "类型管理", keyPath: \.types, isCommaSeparated: true)) {
-                        Label("类型 (Types)", systemImage: "tshirt")
-                    }
+                    fieldRow(title: "类型管理", label: "类型 (Types)", systemImage: "tshirt", field: .types, keyPath: \.types, isCommaSeparated: true)
                     
-                    NavigationLink(destination: FieldManagementView(title: "颜色管理", keyPath: \.colors, isCommaSeparated: true)) {
-                        Label("颜色 (Colors)", systemImage: "paintpalette")
-                    }
+                    fieldRow(title: "颜色管理", label: "颜色 (Colors)", systemImage: "paintpalette", field: .colors, keyPath: \.colors, isCommaSeparated: true)
                     
-                    NavigationLink(destination: FieldManagementView(title: "尺码管理", keyPath: \.sizes, isCommaSeparated: true)) {
-                        Label("尺码 (Sizes)", systemImage: "ruler")
-                    }
+                    fieldRow(title: "尺码管理", label: "尺码 (Sizes)", systemImage: "ruler", field: .sizes, keyPath: \.sizes, isCommaSeparated: true)
                     
-                    NavigationLink(destination: FieldManagementView(title: "衣长管理", keyPath: \.length, isCommaSeparated: false)) {
-                        Label("衣长 (Length)", systemImage: "arrow.up.and.down")
-                    }
+                    fieldRow(title: "衣长管理", label: "衣长 (Length)", systemImage: "arrow.up.and.down", field: .length, keyPath: \.length, isCommaSeparated: false)
                     
-                    NavigationLink(destination: FieldManagementView(title: "状况管理", keyPath: \.condition, isCommaSeparated: false)) {
-                        Label("状况 (Condition)", systemImage: "star")
-                    }
+                    fieldRow(title: "状况管理", label: "状况 (Condition)", systemImage: "star", field: .condition, keyPath: \.condition, isCommaSeparated: false)
                     
-                    NavigationLink(destination: FieldManagementView(title: "小物管理", keyPath: \.accessories, isCommaSeparated: true)) {
-                        Label("小物 (Accessories)", systemImage: "bag")
-                    }
+                    fieldRow(title: "小物管理", label: "小物 (Accessories)", systemImage: "bag", field: .accessories, keyPath: \.accessories, isCommaSeparated: true)
                 }
                 
                 Section(header: Text("备份与导出")) {
@@ -285,6 +274,25 @@ struct DataManagementView: View {
                     showingMessage = true
                 }
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func fieldRow(title: String, label: String, systemImage: String, field: ClothingField, keyPath: ReferenceWritableKeyPath<Clothing, String>, isCommaSeparated: Bool) -> some View {
+        HStack {
+            NavigationLink(destination: FieldManagementView(title: title, keyPath: keyPath, isCommaSeparated: isCommaSeparated)) {
+                Label(label, systemImage: systemImage)
+            }
+            
+            Spacer()
+            
+            Button(action: {
+                visibilityManager.toggleVisibility(field)
+            }) {
+                Image(systemName: visibilityManager.isVisible(field) ? "eye" : "eye.slash")
+                    .foregroundColor(visibilityManager.isVisible(field) ? .blue : .gray)
+            }
+            .buttonStyle(BorderlessButtonStyle())
         }
     }
 }
