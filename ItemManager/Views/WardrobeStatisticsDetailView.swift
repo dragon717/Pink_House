@@ -82,6 +82,15 @@ struct OverviewStatsCard: View {
         clothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
     }
     
+    var totalOriginalPrice: Decimal {
+        clothings.reduce(0) { total, clothing in
+            if clothing.originalPrice > 0 {
+                return total + (clothing.originalPrice * Decimal(clothing.stock))
+            }
+            return total
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("总览统计", systemImage: "chart.pie.fill")
@@ -108,6 +117,13 @@ struct OverviewStatsCard: View {
                             .font(.title)
                             .fontWeight(.bold)
                             .foregroundStyle(.brown)
+                        
+                        if totalOriginalPrice > 0 {
+                            Text("总原价(不包含小物和未填写的): ¥\(formatPrice(totalOriginalPrice))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 2)
+                        }
                     }
                     Spacer()
                     Image(systemName: "star.fill")
