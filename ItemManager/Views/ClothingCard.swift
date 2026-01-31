@@ -68,6 +68,12 @@ struct ClothingCard: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 
+                if clothing.originalPrice > 0 {
+                    Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                
                 if clothing.isDepositPlan {
                     let totalDeposit = clothing.deposit * Decimal(clothing.stock)
                     let totalBalance = clothing.balance * Decimal(clothing.stock)
@@ -75,8 +81,8 @@ struct ClothingCard: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.pink)
                 } else {
-                    let totalPrice = clothing.price * Decimal(clothing.stock)
-                    Text("¥\(totalPrice, format: .number.precision(.fractionLength(2)))")
+                    let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                    Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color(hex: "8D6E63")) // Brownish
                 }
@@ -211,15 +217,31 @@ struct ClothingRow: View {
                     if clothing.isDepositPlan {
                         let totalDeposit = clothing.deposit * Decimal(clothing.stock)
                         let totalBalance = clothing.balance * Decimal(clothing.stock)
-                        Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                        
+                        if clothing.originalPrice > 0 {
+                            Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
+                            .font(.caption)
+                            .foregroundStyle(.pink)
+                        Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
                             .bold()
                             .foregroundStyle(.pink)
                     } else {
-                        let totalPrice = clothing.price * Decimal(clothing.stock)
-                        Text("¥\(totalPrice, format: .number.precision(.fractionLength(2)))")
+                        let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                        
+                        if clothing.originalPrice > 0 {
+                            Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
                             .font(.subheadline)
                             .bold()
+                            .foregroundStyle(Color(hex: "8D6E63"))
                     }
                     
                     if clothing.stock > 1 {
@@ -275,8 +297,8 @@ struct ClothingRowBrief: View {
                         .bold()
                         .foregroundStyle(.pink)
                 } else {
-                    let totalPrice = clothing.price * Decimal(clothing.stock)
-                    Text("¥\(totalPrice, format: .number.precision(.fractionLength(0)))")
+                    let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                    Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
                         .font(.subheadline)
                         .bold()
                 }

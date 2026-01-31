@@ -466,9 +466,13 @@ struct ClothingDetailView: View {
             if let items = clothing.accessoryItems, !items.isEmpty {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("小物明细")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text("小物明细")
+                        Spacer()
+                        Text("小物总价: ¥\(items.reduce(Decimal(0)) { $0 + $1.price }.formatted(.number.precision(.fractionLength(0...2))))")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                     
                     ForEach(items.sorted(by: { $0.sortIndex < $1.sortIndex })) { item in
                         HStack {
