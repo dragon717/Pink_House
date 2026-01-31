@@ -12,6 +12,7 @@ import Foundation
 struct ClothingEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     @State private var clothing: Clothing?
@@ -39,6 +40,12 @@ struct ClothingEditView: View {
     @State private var balance: Double = 0.0
     @State private var accessoriesPrice: Double = 0.0
     @State private var stock: Int = 1
+    
+    // Selection Sheets
+    @State private var showingBrandSelection = false
+    @State private var tempSelectedBrand: Brand?
+    @State private var activeSelectionField: ClothingField?
+    @State private var showingGenericSelection = false
     
     // Custom Accessories
     @State private var accessoryList: [AccessoryItemData] = []
@@ -74,7 +81,48 @@ struct ClothingEditView: View {
                     
                     AutoCompleteTextField(title: "裙子名称", placeholder: "请输入裙子名称", text: $name, field: .name, isRequired: true)
                     
-                    AutoCompleteTextField(title: "品牌名称", placeholder: "请输入品牌名称", text: $brandName, field: .brand)
+                    // Brand Field with Selection Button
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("品牌名称")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 4)
+                        
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                // Try to find existing brand
+                                if !brandName.isEmpty {
+                                    let name = brandName
+                                    let descriptor = FetchDescriptor<Brand>(predicate: #Predicate { $0.name == name })
+                                    if let existing = try? modelContext.fetch(descriptor).first {
+                                        tempSelectedBrand = existing
+                                    } else {
+                                        tempSelectedBrand = nil
+                                    }
+                                } else {
+                                    tempSelectedBrand = nil
+                                }
+                                showingBrandSelection = true
+                            }) {
+                                Image(systemName: "list.bullet")
+                                    .font(.title3)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color(uiColor: .tertiarySystemFill))
+                                    .cornerRadius(12)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            AutoCompleteTextField(title: "", placeholder: "请输入品牌名称", text: $brandName, field: .brand)
+                        }
+                    }
+                    .sheet(isPresented: $showingBrandSelection) {
+                        BrandSelectionView(selectedBrand: $tempSelectedBrand)
+                            .onChange(of: tempSelectedBrand) { _, newValue in
+                                if let brand = newValue {
+                                    brandName = brand.name
+                                }
+                            }
+                    }
                     
                     ForEach(visibilityManager.fieldOrder, id: \.self) { field in
                         if visibilityManager.isVisible(field) {
@@ -138,6 +186,16 @@ struct ClothingEditView: View {
                 .cornerRadius(16)
                 .sheet(isPresented: $showingAddTagSheet) {
                     TagSelectionView(selectedTags: $selectedTags)
+                }
+                .sheet(isPresented: $showingGenericSelection) {
+                    if let field = activeSelectionField {
+                        SimpleStringSelectionView(
+                            title: "选择\(field.rawValue)",
+                            options: getAllOptions(for: field),
+                            allowMultiple: isMultiSelect(field),
+                            selection: binding(for: field)
+                        )
+                    }
                 }
                 
                 // MARK: - 价格信息
@@ -387,23 +445,115 @@ struct ClothingEditView: View {
         }
     }
     
+    // MARK: - Helpers
+    private func binding(for field: ClothingField) -> Binding<String> {
+        switch field {
+        case .types: return $types
+        case .colors: return $colors
+        case .sizes: return $sizes
+        case .length: return $length
+        case .condition: return $condition
+        case .accessories: return $accessories
+        }
+    }
+    
+    private func isMultiSelect(_ field: ClothingField) -> Bool {
+        switch field {
+        case .types, .colors, .sizes, .accessories: return true
+        case .length, .condition: return false
+        }
+    }
+    
+    private func getAllOptions(for field: ClothingField) -> [String] {
+        var uniqueItems = Set<String>()
+        
+        // KeyPaths
+        let keyPath: KeyPath<Clothing, String>
+        switch field {
+        case .types: keyPath = \.types
+        case .colors: keyPath = \.colors
+        case .sizes: keyPath = \.sizes
+        case .length: keyPath = \.length
+        case .condition: keyPath = \.condition
+        case .accessories: keyPath = \.accessories
+        }
+        
+        let isCommaSeparated = isMultiSelect(field)
+        
+        for clothing in allClothings {
+            let value = clothing[keyPath: keyPath]
+            if isCommaSeparated {
+                let parts = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                for part in parts {
+                    if !part.isEmpty {
+                        uniqueItems.insert(part)
+                    }
+                }
+            } else {
+                if !value.isEmpty {
+                    uniqueItems.insert(value)
+                }
+            }
+        }
+        
+        // Default options for Condition if empty
+        if field == .condition && uniqueItems.isEmpty {
+            return ["全新", "99新", "95新", "9成新", "8成新", "有瑕疵"]
+        }
+        
+        return Array(uniqueItems).sorted()
+    }
+
     @ViewBuilder
     private func buildFieldView(for field: ClothingField) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Title for consistency (Optional, since AutoCompleteTextField has title, but we want to group button and field)
+             Text(fieldTitle(for: field))
+                 .font(.subheadline)
+                 .foregroundStyle(.secondary)
+                 .padding(.leading, 4)
+            
+            HStack(spacing: 8) {
+                Button(action: {
+                    activeSelectionField = field
+                    showingGenericSelection = true
+                }) {
+                    Image(systemName: "list.bullet")
+                        .font(.title3)
+                        .frame(width: 44, height: 44)
+                        .background(Color(uiColor: .tertiarySystemFill))
+                        .cornerRadius(12)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                switch field {
+                case .types:
+                    AutoCompleteTextField(title: "", placeholder: "例如: JSK,OP", text: $types, field: .type)
+                case .colors:
+                    AutoCompleteTextField(title: "", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
+                case .sizes:
+                    AutoCompleteTextField(title: "", placeholder: "例如: S,M,L", text: $sizes, field: .size)
+                case .length:
+                    AutoCompleteTextField(title: "", placeholder: "例如: 90cm", text: $length, field: .size)
+                case .condition:
+                    AutoCompleteTextField(title: "", placeholder: "例如: 全新", text: $condition, field: .condition)
+                case .accessories:
+                    AutoCompleteTextField(title: "", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
+                        return await SuggestionManager.shared.searchAccessories(query: query, modelContext: modelContext)
+                    })
+                }
+            }
+        }
+    }
+    
+    private func fieldTitle(for field: ClothingField) -> String {
         switch field {
-        case .types:
-            AutoCompleteTextField(title: "类型 (逗号分隔，如: JSK,OP,SK,小物)", placeholder: "例如: JSK,OP", text: $types, field: .type)
-        case .colors:
-            AutoCompleteTextField(title: "颜色 (逗号分隔，如: 粉色,白色,蓝色)", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
-        case .sizes:
-            AutoCompleteTextField(title: "尺码 (逗号分隔，如: S,M,L)", placeholder: "例如: S,M,L", text: $sizes, field: .size)
-        case .length:
-            AutoCompleteTextField(title: "衣长 (如: 90cm, 100cm)", placeholder: "例如: 90cm", text: $length, field: .size)
-        case .condition:
-            AutoCompleteTextField(title: "状态（如: 全新, 95新）", placeholder: "例如: 全新", text: $condition, field: .condition)
-        case .accessories:
-            AutoCompleteTextField(title: "小物 (逗号分隔，如: BNT,发箍KC,发带)", placeholder: "例如: BNT,发箍KC", text: $accessories, field: .accessory, externalSearch: { query in
-                return await SuggestionManager.shared.searchAccessories(query: query, modelContext: modelContext)
-            })
+        case .types: return "类型 (逗号分隔，如: JSK,OP,SK,小物)"
+        case .colors: return "颜色 (逗号分隔，如: 粉色,白色,蓝色)"
+        case .sizes: return "尺码 (逗号分隔，如: S,M,L)"
+        case .length: return "衣长 (如: 90cm, 100cm)"
+        case .condition: return "状态（如: 全新, 95新）"
+        case .accessories: return "小物 (逗号分隔，如: BNT,发箍KC,发带)"
         }
     }
     
