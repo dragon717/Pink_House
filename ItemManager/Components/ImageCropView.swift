@@ -6,6 +6,12 @@ struct ImageCropView: View {
     let onCrop: (UIImage) -> Void
     let onCancel: () -> Void
     
+    init(image: UIImage, onCrop: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+        self.image = image
+        self.onCrop = onCrop
+        self.onCancel = onCancel
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Toolbar
@@ -59,13 +65,19 @@ struct CropScrollView: UIViewRepresentable {
         scrollView.backgroundColor = .black
         scrollView.contentInsetAdjustmentBehavior = .never
         
-        let imageView = UIImageView(image: image)
-        imageView.contentMode = .scaleAspectFit
-        imageView.frame = CGRect(origin: .zero, size: image.size)
-        scrollView.addSubview(imageView)
-        scrollView.contentSize = image.size // IMPORTANT: Set content size
-        
-        context.coordinator.imageView = imageView
+        // Ensure image is valid before creating view
+        if image.size.width > 0 && image.size.height > 0 {
+            let imageView = UIImageView(image: image)
+            imageView.contentMode = .scaleAspectFit
+            imageView.frame = CGRect(origin: .zero, size: image.size)
+            scrollView.addSubview(imageView)
+            scrollView.contentSize = image.size
+            context.coordinator.imageView = imageView
+            
+            // Force initial layout
+            // We can't do full layout here because we don't know viewSize yet (it might be zero initially)
+            // But we can ensure imageView is ready
+        }
         
         // Setup crop trigger
         NotificationCenter.default.addObserver(forName: NSNotification.Name("TriggerCrop"), object: nil, queue: .main) { _ in
@@ -76,12 +88,26 @@ struct CropScrollView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIScrollView, context: Context) {
+        
+        // Always try to set image view if it's missing (shouldn't happen but safe)
+        if context.coordinator.imageView == nil && image.size.width > 0 {
+             let imageView = UIImageView(image: image)
+             imageView.contentMode = .scaleAspectFit
+             imageView.frame = CGRect(origin: .zero, size: image.size)
+             uiView.addSubview(imageView)
+             uiView.contentSize = image.size
+             context.coordinator.imageView = imageView
+        }
+ 
         // Only layout if size changed and is valid
-        if viewSize != .zero && viewSize != context.coordinator.lastViewSize {
+        // Also force layout if we haven't done it yet (lastViewSize is zero) AND we have a valid viewSize
+        if viewSize != .zero && (viewSize != context.coordinator.lastViewSize || uiView.zoomScale == 1.0) {
             // Update last view size
             context.coordinator.lastViewSize = viewSize
             
-            let imageView = context.coordinator.imageView!
+            guard let imageView = context.coordinator.imageView else {
+                 return 
+            }
             
             // Calculate scales
             let widthRatio = viewSize.width / image.size.width
@@ -96,7 +122,10 @@ struct CropScrollView: UIViewRepresentable {
             
             // Only set initial zoom if we haven't laid out before or if explicitly needed
             // For now, we reset to fill on rotation/resize to ensure coverage
-            uiView.zoomScale = fillScale
+            // OR if zoomScale is currently default (1.0), which might be wrong for large images
+            if uiView.zoomScale == 1.0 || uiView.zoomScale < fillScale {
+                uiView.zoomScale = fillScale
+            }
             
             // Center the image
             let contentWidth = image.size.width * fillScale
@@ -105,7 +134,10 @@ struct CropScrollView: UIViewRepresentable {
             let offsetX = (contentWidth - viewSize.width) / 2
             let offsetY = (contentHeight - viewSize.height) / 2
             
-            uiView.contentOffset = CGPoint(x: max(0, offsetX), y: max(0, offsetY))
+            // Only adjust offset if it seems off (e.g. at 0,0)
+            if uiView.contentOffset == .zero {
+                 uiView.contentOffset = CGPoint(x: max(0, offsetX), y: max(0, offsetY))
+            }
         }
     }
     

@@ -40,6 +40,7 @@ class ThemeManager {
     }
     
     var backgroundImage: UIImage? = nil
+    var originalImage: UIImage? = nil // Cache for original image
     
     // MARK: - Common Settings
     var isBlurEnabled: Bool = false {
@@ -100,6 +101,7 @@ class ThemeManager {
         
         // If this is a new original image (from picker), save it separately
         if isOriginal {
+            self.originalImage = image // Update cache
             if let data = image.pngData(), let url = originalImageURL {
                 try? data.write(to: url)
             }
@@ -107,15 +109,30 @@ class ThemeManager {
     }
     
     func getOriginalImage() -> UIImage? {
-        if let url = originalImageURL, let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
-            return image
+        // Return cached original image if available
+        if let cached = originalImage {
+            return cached
         }
+        
+        // Try load from disk
+        if let url = originalImageURL {
+            if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+                self.originalImage = image // Cache it
+                return image
+            }
+        }
+        
         return backgroundImage // Fallback to current image if original not found
     }
     
     private func loadBackgroundImage() {
         if let url = imageURL, let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
             self.backgroundImage = image
+        }
+        
+        // Preload original image to cache
+        if let url = originalImageURL, let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+            self.originalImage = image
         }
     }
 }

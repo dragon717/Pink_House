@@ -1,15 +1,20 @@
 import SwiftUI
 import PhotosUI
 
+struct CropRequest: Identifiable {
+    let id = UUID()
+    let image: UIImage
+    let isNewSelection: Bool
+}
+
 struct GeneralSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     @State private var languageManager = LanguageManager.shared
     @State private var showingRestartAlert = false
     @State private var showingMissingOriginalAlert = false
     @State private var selectedItem: PhotosPickerItem?
-    @State private var showingCropper = false
-    @State private var tempImage: UIImage?
-    @State private var isNewSelection = false
+    @State private var cropRequest: CropRequest?
+    @State private var isLoadingImage = false // Loading state
     
     var body: some View {
         @Bindable var theme = themeManager
@@ -50,12 +55,17 @@ struct GeneralSettingsView: View {
                 } else {
                     Button {
                         if let original = theme.getOriginalImage() {
-                            self.tempImage = original
-                            self.isNewSelection = false
-                            self.showingCropper = true
+                            // Resize original if it's huge, just in case, though we resized it on save.
+                            // But `getOriginalImage` reads from disk.
+                            // We should probably optimize it here too if needed, but let's assume saved one is 2000x2000 max.
+                            // Wait, if saved one IS the optimized one, we are good.
+                            // BUT, previously we saved 'image' (tempImage) which WAS optimized.
+                            // So original on disk should be optimized.
+                            
+                            self.cropRequest = CropRequest(image: original, isNewSelection: false)
                         } else {
                             // If no original image, fallback to current image if available
-                            if let current = theme.backgroundImage {
+                            if theme.backgroundImage != nil {
                                 // But warn user that this is a low-res/already cropped version
                                 // Ideally we should just ask them to pick new one.
                                 // But let's try to use current one but maybe it's too small.
@@ -87,22 +97,42 @@ struct GeneralSettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .contentShape(Rectangle()) // Make entire row tappable
                     }
-                    .disabled(theme.backgroundImage == nil)
+                    .buttonStyle(.plain) // Remove default button highlighting that might look weird in list
+                    .disabled(theme.backgroundImage == nil || isLoadingImage)
                     
                     PhotosPicker(selection: $selectedItem, matching: .images) {
-                        Label("选择新图片", systemImage: "photo")
-                            .frame(maxWidth: .infinity)
+                        HStack {
+                            if isLoadingImage {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                            }
+                            Label(isLoadingImage ? "处理中..." : "选择新图片", systemImage: "photo")
+                        }
+                        .frame(maxWidth: .infinity)
                     }
+                    .disabled(isLoadingImage)
                     .onChange(of: selectedItem) { _, newItem in
+                        guard let newItem = newItem else { return }
+                        isLoadingImage = true
                         Task {
-                            if let data = try? await newItem?.loadTransferable(type: Data.self),
+                            // Load image data in background
+                            if let data = try? await newItem.loadTransferable(type: Data.self),
                                let uiImage = UIImage(data: data) {
+                                
+                                // Resize image if too large to improve performance and avoid crashes
+                                let optimizedImage = await uiImage.preparingThumbnail(of: CGSize(width: 2000, height: 2000)) ?? uiImage
+                                
                                 await MainActor.run {
-                                    self.tempImage = uiImage
-                                    self.isNewSelection = true
-                                    self.showingCropper = true
+                                    self.cropRequest = CropRequest(image: optimizedImage, isNewSelection: true)
                                     self.selectedItem = nil
+                                    self.isLoadingImage = false
+                                }
+                            } else {
+                                await MainActor.run {
+                                    self.isLoadingImage = false
+                                    // Could show error alert here if needed
                                 }
                             }
                         }
@@ -154,47 +184,41 @@ struct GeneralSettingsView: View {
             }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("由于是旧版本设置的背景，未保存原始图片。请重新选择一张图片以进行裁剪和移动。")
+            Text("请重新选择一张图片以进行裁剪和移动。")
         }
-        .fullScreenCover(isPresented: $showingCropper) {
-            if let image = tempImage {
-                ImageCropView(image: image) { croppedImage in
+        .fullScreenCover(item: $cropRequest) { request in
+            // Use 'request.image' here directly
+            
+            ImageCropView(image: request.image) { croppedImage in
                     // If isNewSelection is true, we update both original and display image.
                     // If false, we only update display image (cropped version), keeping original intact.
                     
-                    if isNewSelection {
-                        // For new selection, 'image' IS the original image
-                        themeManager.setBackgroundImage(croppedImage, isOriginal: true)
-                        // Wait, we need to save the ORIGINAL image, which is 'image' (tempImage), not 'croppedImage'.
-                        // But setBackgroundImage(..., isOriginal: true) logic saves the PASSED image as original.
-                        // This is wrong.
+                    if request.isNewSelection {
+                        // For new selection, 'request.image' IS the original image
                         
-                        // We need a way to save the ORIGINAL image separately.
-                        // Let's manually save original if needed.
-                        if let data = image.pngData(), let url = themeManager.getOriginalImageURL() {
-                            try? data.write(to: url)
-                        }
+                        // 1. Save cropped image as display background
                         themeManager.setBackgroundImage(croppedImage)
+                        
+                        // 2. Save full 'request.image' as original background and update cache
+                        themeManager.originalImage = request.image
+                        if let data = request.image.pngData(), let url = themeManager.getOriginalImageURL() {
+                             try? data.write(to: url)
+                        }
                     } else {
                         themeManager.setBackgroundImage(croppedImage)
                     }
                     
-                    showingCropper = false
-                    tempImage = nil
-                    isNewSelection = false
+                    // Reset state
+                    cropRequest = nil
                 } onCancel: {
-                    showingCropper = false
-                    tempImage = nil
-                    isNewSelection = false
+                    cropRequest = nil
                 }
-            }
         }
     }
 }
 
-#Preview {
-    NavigationStack {
-        GeneralSettingsView()
-            .environment(ThemeManager.shared)
+extension UIImage: Identifiable {
+    public var id: String {
+        return UUID().uuidString
     }
 }
