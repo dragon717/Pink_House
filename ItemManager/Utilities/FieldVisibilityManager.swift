@@ -34,11 +34,14 @@ class FieldVisibilityManager: ObservableObject {
     static let shared = FieldVisibilityManager()
     
     @AppStorage("hiddenFields") private var hiddenFieldsRaw: String = ""
+    @AppStorage("fieldOrder") private var fieldOrderRaw: String = ""
     
     @Published var hiddenFields: Set<ClothingField> = []
+    @Published var fieldOrder: [ClothingField] = []
     
     init() {
         loadHiddenFields()
+        loadFieldOrder()
     }
     
     private func loadHiddenFields() {
@@ -46,8 +49,30 @@ class FieldVisibilityManager: ObservableObject {
         hiddenFields = Set(rawValues.compactMap { ClothingField(rawValue: $0) })
     }
     
+    private func loadFieldOrder() {
+        let rawValues = fieldOrderRaw.split(separator: ",").map { String($0) }
+        let savedOrder = rawValues.compactMap { ClothingField(rawValue: $0) }
+        
+        // Ensure all fields are present
+        var finalOrder = savedOrder
+        for field in ClothingField.allCases {
+            if !finalOrder.contains(field) {
+                finalOrder.append(field)
+            }
+        }
+        
+        // Remove any invalid/deprecated fields if necessary (though enum helps prevent this)
+        finalOrder = finalOrder.filter { ClothingField.allCases.contains($0) }
+        
+        fieldOrder = finalOrder
+    }
+    
     private func saveHiddenFields() {
         hiddenFieldsRaw = hiddenFields.map { $0.rawValue }.joined(separator: ",")
+    }
+    
+    private func saveFieldOrder() {
+        fieldOrderRaw = fieldOrder.map { $0.rawValue }.joined(separator: ",")
     }
     
     func isVisible(_ field: ClothingField) -> Bool {
@@ -61,5 +86,13 @@ class FieldVisibilityManager: ObservableObject {
             hiddenFields.insert(field)
         }
         saveHiddenFields()
+    }
+    
+    func moveField(from source: IndexSet, to destination: Int) {
+        var newOrder = fieldOrder
+        newOrder.move(fromOffsets: source, toOffset: destination)
+        fieldOrder = newOrder
+        saveFieldOrder()
+        print("FieldVisibilityManager: Order updated to \(fieldOrder.map { $0.rawValue })")
     }
 }

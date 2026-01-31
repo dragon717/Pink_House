@@ -51,18 +51,28 @@ struct DataManagementView: View {
                     }
                 }
                 
-                Section(header: Text("属性数据管理")) {
-                    fieldRow(title: "类型管理", label: "类型 (Types)", systemImage: "tshirt", field: .types, keyPath: \.types, isCommaSeparated: true)
-                    
-                    fieldRow(title: "颜色管理", label: "颜色 (Colors)", systemImage: "paintpalette", field: .colors, keyPath: \.colors, isCommaSeparated: true)
-                    
-                    fieldRow(title: "尺码管理", label: "尺码 (Sizes)", systemImage: "ruler", field: .sizes, keyPath: \.sizes, isCommaSeparated: true)
-                    
-                    fieldRow(title: "衣长管理", label: "衣长 (Length)", systemImage: "arrow.up.and.down", field: .length, keyPath: \.length, isCommaSeparated: false)
-                    
-                    fieldRow(title: "状况管理", label: "状况 (Condition)", systemImage: "star", field: .condition, keyPath: \.condition, isCommaSeparated: false)
-                    
-                    fieldRow(title: "小物管理", label: "小物 (Accessories)", systemImage: "bag", field: .accessories, keyPath: \.accessories, isCommaSeparated: true)
+                Section(header: Text("属性数据管理 (长按可排序)")) {
+                    ForEach(visibilityManager.fieldOrder, id: \.self) { field in
+                        let config = getFieldConfig(field)
+                        HStack {
+                            NavigationLink(destination: FieldManagementView(title: config.title, keyPath: config.keyPath, isCommaSeparated: config.isCommaSeparated)) {
+                                Label(config.label, systemImage: config.systemImage)
+                            }
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                visibilityManager.toggleVisibility(field)
+                            }) {
+                                Image(systemName: visibilityManager.isVisible(field) ? "eye" : "eye.slash")
+                                    .foregroundColor(visibilityManager.isVisible(field) ? .blue : .gray)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                        }
+                    }
+                    .onMove { indices, newOffset in
+                        visibilityManager.moveField(from: indices, to: newOffset)
+                    }
                 }
                 
                 Section(header: Text("备份与导出")) {
@@ -81,6 +91,11 @@ struct DataManagementView: View {
                 }
             }
             .navigationTitle("数据管理")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    EditButton()
+                }
+            }
             .sheet(isPresented: $showingShareSheet) {
                 ShareSheet(items: shareItems)
             }
@@ -277,22 +292,20 @@ struct DataManagementView: View {
         }
     }
     
-    @ViewBuilder
-    private func fieldRow(title: String, label: String, systemImage: String, field: ClothingField, keyPath: ReferenceWritableKeyPath<Clothing, String>, isCommaSeparated: Bool) -> some View {
-        HStack {
-            NavigationLink(destination: FieldManagementView(title: title, keyPath: keyPath, isCommaSeparated: isCommaSeparated)) {
-                Label(label, systemImage: systemImage)
-            }
-            
-            Spacer()
-            
-            Button(action: {
-                visibilityManager.toggleVisibility(field)
-            }) {
-                Image(systemName: visibilityManager.isVisible(field) ? "eye" : "eye.slash")
-                    .foregroundColor(visibilityManager.isVisible(field) ? .blue : .gray)
-            }
-            .buttonStyle(BorderlessButtonStyle())
+    private func getFieldConfig(_ field: ClothingField) -> (title: String, label: String, systemImage: String, keyPath: ReferenceWritableKeyPath<Clothing, String>, isCommaSeparated: Bool) {
+        switch field {
+        case .types:
+            return ("类型管理", "类型 (Types)", "tshirt", \.types, true)
+        case .colors:
+            return ("颜色管理", "颜色 (Colors)", "paintpalette", \.colors, true)
+        case .sizes:
+            return ("尺码管理", "尺码 (Sizes)", "ruler", \.sizes, true)
+        case .length:
+            return ("衣长管理", "衣长 (Length)", "arrow.up.and.down", \.length, false)
+        case .condition:
+            return ("状况管理", "状况 (Condition)", "star", \.condition, false)
+        case .accessories:
+            return ("小物管理", "小物 (Accessories)", "bag", \.accessories, true)
         }
     }
 }

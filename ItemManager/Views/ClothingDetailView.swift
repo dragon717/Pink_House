@@ -17,6 +17,8 @@ struct ClothingDetailView: View {
     @State private var showingConfirmPaymentAlert = false
     @State private var currentImageIndex = 0
     
+    @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
@@ -401,17 +403,34 @@ struct ClothingDetailView: View {
                 .font(.headline)
                 .foregroundStyle(.brown)
             
-            InfoRow(label: "类型", value: clothing.types.isEmpty ? "未填写" : clothing.types)
-            InfoRow(label: "颜色", value: clothing.colors.isEmpty ? "未填写" : clothing.colors)
-            InfoRow(label: "尺码", value: clothing.sizes.isEmpty ? "未填写" : clothing.sizes)
-            InfoRow(label: "衣长", value: clothing.length.isEmpty ? "未填写" : clothing.length)
-            InfoRow(label: "状态", value: clothing.condition)
-            InfoRow(label: "小物", value: clothing.accessories.isEmpty ? "无" : clothing.accessories)
+            ForEach(visibilityManager.fieldOrder, id: \.self) { field in
+                if visibilityManager.isVisible(field) {
+                    buildDetailRow(for: field)
+                }
+            }
         }
         .padding()
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    @ViewBuilder
+    private func buildDetailRow(for field: ClothingField) -> some View {
+        switch field {
+        case .types:
+            InfoRow(label: "类型", value: clothing.types.isEmpty ? "未填写" : clothing.types)
+        case .colors:
+            InfoRow(label: "颜色", value: clothing.colors.isEmpty ? "未填写" : clothing.colors)
+        case .sizes:
+            InfoRow(label: "尺码", value: clothing.sizes.isEmpty ? "未填写" : clothing.sizes)
+        case .length:
+            InfoRow(label: "衣长", value: clothing.length.isEmpty ? "未填写" : clothing.length)
+        case .condition:
+            InfoRow(label: "状态", value: clothing.condition)
+        case .accessories:
+            InfoRow(label: "小物", value: clothing.accessories.isEmpty ? "无" : clothing.accessories)
+        }
     }
     
     private var priceInfoCard: some View {

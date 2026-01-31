@@ -80,68 +80,68 @@ struct ClothingFilterMenu: View {
             }
             
             // String-based Filters
-            if visibilityManager.isVisible(.types) {
-                FilterStringSection(
-                    title: "类型",
-                    icon: "tshirt",
-                    selectedIcon: "tshirt.fill",
-                    options: getAllValues(for: \.types),
-                    selection: $selectedTypes
-                )
-            }
-            
-            if visibilityManager.isVisible(.colors) {
-                FilterStringSection(
-                    title: "颜色",
-                    icon: "paintpalette",
-                    selectedIcon: "paintpalette.fill",
-                    options: getAllValues(for: \.colors),
-                    selection: $selectedColors
-                )
-            }
-            
-            if visibilityManager.isVisible(.sizes) {
-                FilterStringSection(
-                    title: "尺码",
-                    icon: "ruler",
-                    selectedIcon: "ruler.fill",
-                    options: getAllValues(for: \.sizes),
-                    selection: $selectedSizes
-                )
-            }
-            
-            if visibilityManager.isVisible(.length) {
-                FilterStringSection(
-                    title: "衣长",
-                    icon: "arrow.up.and.down",
-                    selectedIcon: "arrow.up.and.down.circle.fill",
-                    options: getAllValues(for: \.length),
-                    selection: $selectedLengths
-                )
-            }
-            
-            if visibilityManager.isVisible(.condition) {
-                FilterStringSection(
-                    title: "状态",
-                    icon: "star",
-                    selectedIcon: "star.fill",
-                    options: getAllValues(for: \.condition),
-                    selection: $selectedConditions
-                )
-            }
-            
-            if visibilityManager.isVisible(.accessories) {
-                FilterStringSection(
-                    title: "小物",
-                    icon: "sparkles",
-                    selectedIcon: "sparkles.rectangle.stack.fill",
-                    options: getAllValues(for: \.accessories),
-                    selection: $selectedAccessories
-                )
+            ForEach(visibilityManager.fieldOrder, id: \.self) { field in
+                if visibilityManager.isVisible(field) {
+                    buildFilterSection(for: field)
+                }
             }
             
         } label: {
             Label("筛选", systemImage: "line.3.horizontal.decrease.circle")
+        }
+    }
+    
+    @ViewBuilder
+    private func buildFilterSection(for field: ClothingField) -> some View {
+        switch field {
+        case .types:
+            FilterStringSection(
+                title: "类型",
+                icon: "tshirt",
+                selectedIcon: "tshirt.fill",
+                options: getAllValues(for: \.types),
+                selection: $selectedTypes
+            )
+        case .colors:
+            FilterStringSection(
+                title: "颜色",
+                icon: "paintpalette",
+                selectedIcon: "paintpalette.fill",
+                options: getAllValues(for: \.colors),
+                selection: $selectedColors
+            )
+        case .sizes:
+            FilterStringSection(
+                title: "尺码",
+                icon: "ruler",
+                selectedIcon: "ruler.fill",
+                options: getAllValues(for: \.sizes),
+                selection: $selectedSizes
+            )
+        case .length:
+            FilterStringSection(
+                title: "衣长",
+                icon: "arrow.up.and.down",
+                selectedIcon: "arrow.up.and.down.circle.fill",
+                options: getAllValues(for: \.length),
+                selection: $selectedLengths
+            )
+        case .condition:
+            FilterStringSection(
+                title: "状态",
+                icon: "star",
+                selectedIcon: "star.fill",
+                options: getAllValues(for: \.condition),
+                selection: $selectedConditions
+            )
+        case .accessories:
+            FilterStringSection(
+                title: "小物",
+                icon: "sparkles",
+                selectedIcon: "sparkles.rectangle.stack.fill",
+                options: getAllValues(for: \.accessories),
+                selection: $selectedAccessories
+            )
         }
     }
     

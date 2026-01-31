@@ -12,6 +12,7 @@ import Foundation
 struct ClothingListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @Query(sort: \Clothing.createdAt, order: .reverse) private var clothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]

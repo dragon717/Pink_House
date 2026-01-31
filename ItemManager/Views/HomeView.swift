@@ -94,6 +94,8 @@ struct HomeView: View {
     @State private var viewLayout: ViewLayout = .grid2
     @State private var showingCommunityImportAlert = false
     
+    @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
@@ -303,7 +305,25 @@ struct HomeView: View {
                 Label(selectedBrandName ?? "品牌", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
             }
             
-            // Types Filter
+            // Dynamic String-based Filters
+            ForEach(visibilityManager.fieldOrder, id: \.self) { field in
+                if visibilityManager.isVisible(field) {
+                    buildFilterSection(for: field)
+                }
+            }
+            
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 16))
+                .foregroundStyle(.primary)
+                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+        }
+    }
+    
+    @ViewBuilder
+    private func buildFilterSection(for field: ClothingField) -> some View {
+        switch field {
+        case .types:
             Menu {
                 Button(role: .destructive) {
                     selectedTypes.removeAll()
@@ -332,7 +352,7 @@ struct HomeView: View {
                 Label(selectedTypes.first ?? "类型", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
             }
             
-            // Colors Filter
+        case .colors:
             Menu {
                 Button(role: .destructive) {
                     selectedColors.removeAll()
@@ -361,7 +381,7 @@ struct HomeView: View {
                 Label(selectedColors.first ?? "颜色", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
             }
             
-            // Sizes Filter
+        case .sizes:
             Menu {
                 Button(role: .destructive) {
                     selectedSizes.removeAll()
@@ -390,7 +410,7 @@ struct HomeView: View {
                 Label(selectedSizes.first ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
             }
             
-            // Lengths Filter
+        case .length:
             Menu {
                 Button(role: .destructive) {
                     selectedLengths.removeAll()
@@ -419,7 +439,7 @@ struct HomeView: View {
                 Label(selectedLengths.first ?? "衣长", systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
             }
             
-            // Conditions Filter
+        case .condition:
             Menu {
                 Button(role: .destructive) {
                     selectedConditions.removeAll()
@@ -448,7 +468,7 @@ struct HomeView: View {
                 Label(selectedConditions.first ?? "状态", systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
             }
             
-            // Accessories Filter
+        case .accessories:
             Menu {
                 Button(role: .destructive) {
                     selectedAccessories.removeAll()
@@ -476,11 +496,6 @@ struct HomeView: View {
             } label: {
                 Label(selectedAccessories.first ?? "小物", systemImage: selectedAccessories.isEmpty ? "crown" : "crown.fill")
             }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 16))
-                .foregroundStyle(.primary)
-                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
         }
     }
     
