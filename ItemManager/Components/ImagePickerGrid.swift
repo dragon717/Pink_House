@@ -28,6 +28,10 @@ struct ImagePickerGrid: View {
     @State private var draggingIndex: Int?
     @State private var showingCamera = false
     @State private var cameraImage: UIImage?
+    @State private var showingErrorAlert = false
+    @State private var errorMessage = ""
+    @State private var showingActionSheet = false
+    @State private var showingPhotosPicker = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -40,20 +44,8 @@ struct ImagePickerGrid: View {
                 HStack(spacing: 12) {
                     // Add Button
                     if imagePaths.count < maxCount {
-                        Menu {
-                            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                                Button {
-                                    showingCamera = true
-                                } label: {
-                                    Label("拍照", systemImage: "camera")
-                                }
-                            }
-                            
-                            PhotosPicker(selection: $selectedItems, 
-                                       maxSelectionCount: maxCount - imagePaths.count,
-                                       matching: .images) {
-                                Label("从相册选择", systemImage: "photo.on.rectangle")
-                            }
+                        Button {
+                            showingActionSheet = true
                         } label: {
                             VStack {
                                 if isProcessingImages {
@@ -71,24 +63,18 @@ struct ImagePickerGrid: View {
                             .foregroundStyle(.secondary)
                         }
                         .disabled(isProcessingImages)
-                        .onChange(of: selectedItems) { _, newItems in
-                            guard !newItems.isEmpty else { return }
-                            
-                            isProcessingImages = true
-                            Task {
-                                for item in newItems {
-                                    if let data = try? await item.loadTransferable(type: Data.self),
-                                       let uiImage = UIImage(data: data) {
-                                        // 压缩图片以节省空间
-                                        let compressedImage = uiImage.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? uiImage
-                                        saveImage(compressedImage)
-                                    }
-                                }
-                                await MainActor.run {
-                                    selectedItems = []
-                                    isProcessingImages = false
+                        .confirmationDialog("选择图片来源", isPresented: $showingActionSheet) {
+                            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                                Button("拍照") {
+                                    showingCamera = true
                                 }
                             }
+                            
+                            Button("从相册选择") {
+                                showingPhotosPicker = true
+                            }
+                            
+                            Button("取消", role: .cancel) {}
                         }
                     }
                     
@@ -250,11 +236,55 @@ struct ImagePickerGrid: View {
                 }
             }
         }
+        .alert("错误", isPresented: $showingErrorAlert) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
+        .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItems, maxSelectionCount: maxCount - imagePaths.count, matching: .images)
+        .onChange(of: selectedItems) { _, newItems in
+            guard !newItems.isEmpty else { return }
+            
+            isProcessingImages = true
+            Task {
+                for item in newItems {
+                    do {
+                        if let data = try await item.loadTransferable(type: Data.self),
+                           let uiImage = UIImage(data: data) {
+                            // 压缩图片以节省空间
+                            let compressedImage = uiImage.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? uiImage
+                            await MainActor.run {
+                                saveImage(compressedImage)
+                            }
+                        } else {
+                            print("Failed to load image data or create UIImage")
+                            await MainActor.run {
+                                errorMessage = "无法加载图片数据"
+                                showingErrorAlert = true
+                            }
+                        }
+                    } catch {
+                        print("Error loading image: \(error)")
+                        await MainActor.run {
+                            errorMessage = "加载图片出错：\(error.localizedDescription)"
+                            showingErrorAlert = true
+                        }
+                    }
+                }
+                await MainActor.run {
+                    selectedItems = []
+                    isProcessingImages = false
+                }
+            }
+        }
     }
     
     private func saveImage(_ image: UIImage) {
         if let fileName = ImageManager.shared.saveImage(image, context: modelContext) {
             imagePaths.append(fileName)
+        } else {
+            errorMessage = "保存图片失败"
+            showingErrorAlert = true
         }
     }
     
