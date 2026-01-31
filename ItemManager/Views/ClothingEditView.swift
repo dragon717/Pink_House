@@ -40,6 +40,9 @@ struct ClothingEditView: View {
     @State private var accessoriesPrice: Double = 0.0
     @State private var stock: Int = 1
     
+    // Custom Accessories
+    @State private var accessoryList: [AccessoryItemData] = []
+    
     // Purchase States
     @State private var purchaseDate: Date = Date()
     @State private var depositDate: Date = Date()
@@ -158,6 +161,66 @@ struct ClothingEditView: View {
                     
                     // 小物总价
                     PriceRow(title: "小物总价", value: $accessoriesPrice)
+                        .disabled(!accessoryList.isEmpty)
+                    
+                    // 自定义小物列表
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("自定义小物明细")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button(action: addAccessory) {
+                                Label("添加", systemImage: "plus.circle")
+                                    .font(.subheadline)
+                            }
+                        }
+                        
+                        if !accessoryList.isEmpty {
+                            ForEach($accessoryList) { $item in
+                                HStack {
+                                    TextField("小物名称", text: $item.name)
+                                        .textFieldStyle(.roundedBorder)
+                                    
+                                    TextField("价格", value: $item.price, format: .number)
+                                        .keyboardType(.decimalPad)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 80)
+                                        .multilineTextAlignment(.trailing)
+                                        .onChange(of: item.price) { _, _ in
+                                            calculateAccessoriesTotal()
+                                        }
+                                    
+                                    Menu {
+                                        Button(role: .destructive) {
+                                            if let index = accessoryList.firstIndex(where: { $0.id == item.id }) {
+                                                deleteAccessory(at: IndexSet(integer: index))
+                                            }
+                                        } label: {
+                                            Label("删除", systemImage: "trash")
+                                        }
+                                        
+                                        Button {
+                                            moveAccessoryUp(item)
+                                        } label: {
+                                            Label("上移", systemImage: "arrow.up")
+                                        }
+                                        
+                                        Button {
+                                            moveAccessoryDown(item)
+                                        } label: {
+                                            Label("下移", systemImage: "arrow.down")
+                                        }
+                                    } label: {
+                                        Image(systemName: "ellipsis.circle")
+                                            .font(.title3)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
                     
                     HStack {
                         Text("库存数量")
@@ -276,6 +339,13 @@ struct ClothingEditView: View {
                 balance = balanceVal
                 
                 accessoriesPrice = NSDecimalNumber(decimal: c.accessoriesPrice).doubleValue
+                
+                // Load accessory items
+                if let items = c.accessoryItems {
+                    accessoryList = items.sorted(by: { $0.sortIndex < $1.sortIndex })
+                        .map { AccessoryItemData(id: UUID(), name: $0.name, price: NSDecimalNumber(decimal: $0.price).doubleValue) }
+                }
+                
                 stock = c.stock
                 purchaseDate = c.purchaseDate
                 depositDate = c.depositDate ?? Date()
@@ -421,6 +491,20 @@ struct ClothingEditView: View {
             c.deposit = Decimal(deposit)
             c.balance = Decimal(balance)
             c.accessoriesPrice = Decimal(accessoriesPrice)
+            
+            // Update accessory items
+            // Remove old items (since we are replacing the list)
+            if let oldItems = c.accessoryItems {
+                for item in oldItems {
+                    modelContext.delete(item)
+                }
+            }
+            // Create new items
+            let newItems = accessoryList.enumerated().map { index, data in
+                AccessoryItem(name: data.name, price: Decimal(data.price), sortIndex: index)
+            }
+            c.accessoryItems = newItems
+            
             c.purchaseDate = purchaseDate
             c.depositDate = depositDate
             c.isDepositPlan = isDepositPlan
@@ -460,6 +544,12 @@ struct ClothingEditView: View {
                 note: note,
                 stock: stock
             )
+            
+            let newItems = accessoryList.enumerated().map { index, data in
+                AccessoryItem(name: data.name, price: Decimal(data.price), sortIndex: index)
+            }
+            newClothing.accessoryItems = newItems
+            
             newClothing.tags = selectedTags
             modelContext.insert(newClothing)
             
@@ -476,6 +566,31 @@ struct ClothingEditView: View {
         }
         
         dismiss()
+    }
+    
+    private func addAccessory() {
+        let newItem = AccessoryItemData(name: "", price: 0.0)
+        accessoryList.append(newItem)
+    }
+    
+    private func deleteAccessory(at offsets: IndexSet) {
+        accessoryList.remove(atOffsets: offsets)
+        calculateAccessoriesTotal()
+    }
+    
+    private func moveAccessoryUp(_ item: AccessoryItemData) {
+        guard let index = accessoryList.firstIndex(of: item), index > 0 else { return }
+        accessoryList.swapAt(index, index - 1)
+    }
+    
+    private func moveAccessoryDown(_ item: AccessoryItemData) {
+        guard let index = accessoryList.firstIndex(of: item), index < accessoryList.count - 1 else { return }
+        accessoryList.swapAt(index, index + 1)
+    }
+    
+    private func calculateAccessoriesTotal() {
+        let total = accessoryList.reduce(0) { $0 + $1.price }
+        accessoriesPrice = total
     }
 }
 
@@ -504,5 +619,11 @@ struct PriceRow: View {
                 .foregroundStyle(.secondary)
         }
     }
+}
+
+struct AccessoryItemData: Identifiable, Equatable {
+    var id: UUID = UUID()
+    var name: String
+    var price: Double
 }
 

@@ -198,6 +198,13 @@ struct ClothingDetailView: View {
         
         newClothing.tags = clothing.tags
         
+        // Duplicate accessory items
+        if let items = clothing.accessoryItems {
+            newClothing.accessoryItems = items.map { item in
+                AccessoryItem(name: item.name, price: item.price, sortIndex: item.sortIndex)
+            }
+        }
+        
         // Increment reference count for images
         for imagePath in clothing.imagePaths {
             ImageManager.shared.incrementRefCount(fileName: imagePath, context: modelContext)
@@ -454,6 +461,24 @@ struct ClothingDetailView: View {
             if clothing.stock > 1 {
                 InfoRow(label: "库存数量", value: "\(clothing.stock)")
                 InfoRow(label: "裙子总价", value: "¥\((clothing.price * Decimal(clothing.stock)).formatted(.number.precision(.fractionLength(0))))")
+            }
+            
+            if let items = clothing.accessoryItems, !items.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("小物明细")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    ForEach(items.sorted(by: { $0.sortIndex < $1.sortIndex })) { item in
+                        HStack {
+                            Text(item.name.isEmpty ? "未命名小物" : item.name)
+                            Spacer()
+                            Text("¥\(NSDecimalNumber(decimal: item.price).doubleValue.formatted(.number.precision(.fractionLength(0...2))))")
+                        }
+                        .font(.subheadline)
+                    }
+                }
             }
             
             HStack {

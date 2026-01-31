@@ -59,10 +59,13 @@ final class Clothing {
     @Relationship(deleteRule: .nullify)
     var brand: Brand?
     
+    @Relationship(deleteRule: .cascade)
+    var accessoryItems: [AccessoryItem]? = []
+    
     @Relationship(deleteRule: .cascade, inverse: \CutoutItem.linkedClothing)
     var cutouts: [CutoutItem] = []
     
-    init(name: String = "",
+    init(name: String,
          brand: Brand? = nil,
          types: String = "",
          colors: String = "",
@@ -111,6 +114,20 @@ final class Clothing {
         self.status = status
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+}
+
+@Model
+final class AccessoryItem {
+    @Attribute(.unique) var id: UUID = UUID()
+    var name: String = ""
+    var price: Decimal = 0.0
+    var sortIndex: Int = 0
+    
+    init(name: String, price: Decimal, sortIndex: Int = 0) {
+        self.name = name
+        self.price = price
+        self.sortIndex = sortIndex
     }
 }
 

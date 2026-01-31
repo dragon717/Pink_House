@@ -140,10 +140,10 @@ class ImportManager {
             
             for bItem in backupItems {
                 do {
-                    let clothing = Clothing()
+                    let clothing = Clothing(name: bItem.name)
                     
                     // 基础信息
-                    clothing.name = bItem.name
+                    // clothing.name = bItem.name // Set via init
                     clothing.stock = bItem.num
                     
                     // 关联品牌

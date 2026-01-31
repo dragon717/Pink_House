@@ -21,6 +21,7 @@ class SharedPersistence {
             Item.self,
             Tag.self,
             Brand.self,
+            AccessoryItem.self,
             CutoutItem.self,
             Outfit.self,
             OutfitItem.self
