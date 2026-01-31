@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct ImagePickerGrid: View {
     @Binding var imagePaths: [String]
@@ -19,6 +20,7 @@ struct ImagePickerGrid: View {
     @State private var showingEditSheet = false
     @State private var editingIndex: Int?
     @State private var isProcessingImages = false
+    @State private var draggingIndex: Int?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -81,6 +83,23 @@ struct ImagePickerGrid: View {
                                     .scaledToFill()
                                     .frame(width: 100, height: 100)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(index == 0 ? Color.accentColor : Color.clear, lineWidth: 3)
+                                    )
+                                    .overlay(alignment: .bottom) {
+                                        if index == 0 {
+                                            Text("主图")
+                                                .font(.caption2)
+                                                .fontWeight(.bold)
+                                                .foregroundStyle(.white)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.accentColor.opacity(0.8))
+                                                .clipShape(Capsule())
+                                                .padding(.bottom, 4)
+                                        }
+                                    }
                                     .onTapGesture {
                                         editingIndex = index
                                         showingEditSheet = true
@@ -105,6 +124,33 @@ struct ImagePickerGrid: View {
                                     .background(Circle().fill(Color.black.opacity(0.5)))
                             }
                             .padding(4)
+                        }
+                        .draggable(path) {
+                            if let image = ImageManager.shared.loadImage(fileName: path) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 100, height: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            } else {
+                                Text(path)
+                            }
+                        }
+                        .dropDestination(for: String.self) { items, location in
+                            draggingIndex = nil
+                            return true
+                        } isTargeted: { isTargeted in
+                            if isTargeted, let fromIndex = draggingIndex, fromIndex != index {
+                                withAnimation {
+                                    let item = imagePaths.remove(at: fromIndex)
+                                    imagePaths.insert(item, at: index)
+                                    draggingIndex = index
+                                }
+                            }
+                        }
+                        .onDrag {
+                            draggingIndex = index
+                            return NSItemProvider(object: path as NSString)
                         }
                     }
                 }
@@ -137,7 +183,7 @@ struct ImagePickerGrid: View {
                                     moveImageToFront(from: index)
                                     showingEditSheet = false
                                 }) {
-                                    Label("设为封面", systemImage: "star.fill")
+                                    Label("设为主图", systemImage: "star.fill")
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.borderedProminent)
