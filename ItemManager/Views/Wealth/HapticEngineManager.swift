@@ -15,7 +15,15 @@ final class HapticEngineManager: ObservableObject {
     private var isEngineRunning = false
     
     // 用户偏好设置
-    @Published var isHapticsEnabled: Bool = true
+    @Published var isHapticsEnabled: Bool = true {
+        didSet {
+            if !isHapticsEnabled {
+                Task { @MainActor in
+                    self.stopHaptics()
+                }
+            }
+        }
+    }
     
     // 集成声音管理器
     private let soundManager = SoundManager.shared
@@ -41,8 +49,10 @@ final class HapticEngineManager: ObservableObject {
         // 停止持续震动
         do {
             try continuousPlayer?.stop(atTime: 0)
+            try rollingPlayer?.stop(atTime: 0)
+            rollingPlayer = nil
         } catch {
-            print("Failed to stop continuous player: \(error)")
+            print("Failed to stop continuous/rolling player: \(error)")
         }
         
         // 停止引擎
@@ -304,7 +314,16 @@ final class HapticEngineManager: ObservableObject {
         // 更新滚动音效
         soundManager.updateRollingSound(intensity: intensity)
         
-        guard isHapticsEnabled, supportsCoreHaptics, let engine = engine else { return }
+        // 如果震动被禁用，确保停止播放并返回
+        if !isHapticsEnabled {
+            if rollingPlayer != nil {
+                try? rollingPlayer?.stop(atTime: 0)
+                rollingPlayer = nil
+            }
+            return
+        }
+        
+        guard supportsCoreHaptics, let engine = engine else { return }
         
         // 如果 intensity 很小，停止播放
         // 提高阈值，避免微小移动产生持续的电流声
