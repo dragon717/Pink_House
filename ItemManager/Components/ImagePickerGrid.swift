@@ -14,11 +14,16 @@ struct ImagePickerGrid: View {
     @Binding var imagePaths: [String]
     let maxCount: Int = 9
     
+    private struct EditingSelection: Identifiable {
+        let id = UUID()
+        let index: Int
+        let image: UIImage
+    }
+    
     @Environment(\.modelContext) private var modelContext
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var showingPermissionAlert = false
-    @State private var showingEditSheet = false
-    @State private var editingIndex: Int?
+    @State private var editingSelection: EditingSelection?
     @State private var isProcessingImages = false
     @State private var draggingIndex: Int?
     @State private var showingCamera = false
@@ -88,7 +93,7 @@ struct ImagePickerGrid: View {
                     }
                     
                     // Image List
-                    ForEach(Array(imagePaths.enumerated()), id: \.offset) { index, path in
+                    ForEach(Array(imagePaths.enumerated()), id: \.element) { index, path in
                         ZStack(alignment: .topTrailing) {
                             // Image Display
                             if let image = ImageManager.shared.loadImage(fileName: path) {
@@ -115,8 +120,7 @@ struct ImagePickerGrid: View {
                                         }
                                     }
                                     .onTapGesture {
-                                        editingIndex = index
-                                        showingEditSheet = true
+                                        editingSelection = EditingSelection(index: index, image: image)
                                     }
                             } else {
                                 RoundedRectangle(cornerRadius: 12)
@@ -180,22 +184,22 @@ struct ImagePickerGrid: View {
         } message: {
             Text("请在设置中允许访问相册以选择图片")
         }
-        .sheet(isPresented: $showingEditSheet) {
+        .sheet(item: $editingSelection) { selection in
             NavigationStack {
-                if let index = editingIndex, index < imagePaths.count,
-                   let image = ImageManager.shared.loadImage(fileName: imagePaths[index]) {
-                    VStack {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .padding()
-                        
-                        HStack(spacing: 20) {
+                VStack {
+                    Image(uiImage: selection.image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding()
+                    
+                    HStack(spacing: 20) {
+                        let index = selection.index
+                        if index < imagePaths.count {
                             if index > 0 {
                                 Button(action: {
                                     moveImageToFront(from: index)
-                                    showingEditSheet = false
+                                    editingSelection = nil
                                 }) {
                                     Label("设为主图", systemImage: "star.fill")
                                         .frame(maxWidth: .infinity)
@@ -206,27 +210,25 @@ struct ImagePickerGrid: View {
                             
                             Button(role: .destructive, action: {
                                 deleteImage(at: index)
-                                showingEditSheet = false
+                                editingSelection = nil
                             }) {
                                 Label("删除图片", systemImage: "trash")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
                         }
-                        .padding()
-                        .padding(.bottom, 20)
                     }
-                    .navigationTitle("图片预览")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("关闭") {
-                                showingEditSheet = false
-                            }
+                    .padding()
+                    .padding(.bottom, 20)
+                }
+                .navigationTitle("图片预览")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("关闭") {
+                            editingSelection = nil
                         }
                     }
-                } else {
-                    ContentUnavailableView("图片无法加载", systemImage: "photo.badge.exclamationmark")
                 }
             }
             .presentationDetents([.medium, .large])
