@@ -79,7 +79,7 @@ struct ImagePickerGrid: View {
                     }
                     
                     // Image List
-                    ForEach(Array(imagePaths.enumerated()), id: \.element) { index, path in
+                    ForEach(Array(imagePaths.enumerated()), id: \.offset) { index, path in
                         ZStack(alignment: .topTrailing) {
                             // Image Display
                             if let image = ImageManager.shared.loadImage(fileName: path) {

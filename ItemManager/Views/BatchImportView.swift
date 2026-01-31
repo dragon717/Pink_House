@@ -9,15 +9,23 @@ import SwiftUI
 import PhotosUI
 import SwiftData
 
+struct BatchImageItem: Identifiable {
+    let id = UUID()
+    let sourceItem: PhotosPickerItem
+    var image: UIImage?
+}
+
 struct BatchImportView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
     @State private var seriesName: String = ""
     @State private var selectedItems: [PhotosPickerItem] = []
-    @State private var selectedImages: [UIImage] = []
+    @State private var displayedItems: [BatchImageItem] = []
+    @State private var imageCache: [String: UIImage] = [:]
     @State private var isProcessing: Bool = false
     @State private var showingConfirmation: Bool = false
+    @State private var currentLoadTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -29,7 +37,7 @@ struct BatchImportView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                Section(header: Text("选择图片 (\(selectedImages.count) 张)")) {
+                Section(header: Text("选择图片 (\(displayedItems.count) 张)")) {
                     PhotosPicker(selection: $selectedItems, matching: .images, photoLibrary: .shared()) {
                         HStack {
                             Image(systemName: "photo.on.rectangle.angled")
@@ -40,23 +48,34 @@ struct BatchImportView: View {
                         loadImages(from: newItems)
                     }
                     
-                    if !selectedImages.isEmpty {
+                    if !displayedItems.isEmpty {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))]) {
-                            ForEach(0..<selectedImages.count, id: \.self) { index in
+                            ForEach(displayedItems) { item in
                                 ZStack(alignment: .topTrailing) {
-                                    Image(uiImage: selectedImages[index])
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 80, height: 80)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    if let image = item.image {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 80, height: 80)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(width: 80, height: 80)
+                                            .overlay {
+                                                Image(systemName: "exclamationmark.triangle")
+                                                    .foregroundStyle(.yellow)
+                                            }
+                                    }
                                     
                                     Button {
-                                        removeImage(at: index)
+                                        removeImage(item: item)
                                     } label: {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundStyle(.white, .red)
                                             .background(Circle().fill(.white))
                                     }
+                                    .buttonStyle(.borderless) // Fix for Button in Form/List
                                     .offset(x: 5, y: -5)
                                 }
                             }
@@ -76,11 +95,11 @@ struct BatchImportView: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
-                        if !selectedImages.isEmpty {
+                        if !displayedItems.isEmpty {
                             showingConfirmation = true
                         }
                     }
-                    .disabled(selectedImages.isEmpty || isProcessing)
+                    .disabled(displayedItems.isEmpty || isProcessing)
                 }
             }
             .alert("确认导入", isPresented: $showingConfirmation) {
@@ -89,7 +108,7 @@ struct BatchImportView: View {
                     saveBatchItems()
                 }
             } message: {
-                Text("将创建 \(selectedImages.count) 个新条目，系列名称为“\(seriesName.isEmpty ? "(空)" : seriesName)”。\n确认后将立即保存。")
+                Text("将创建 \(displayedItems.count) 个新条目，系列名称为“\(seriesName.isEmpty ? "(空)" : seriesName)”。\n确认后将立即保存。")
             }
             .disabled(isProcessing)
             .overlay {
@@ -113,59 +132,179 @@ struct BatchImportView: View {
         }
     }
     
-    private func loadImages(from items: [PhotosPickerItem]) {
-        // Reset or append? PhotosPicker with selection binding reflects current selection.
-        // So we should reload everything or handle diffs.
-        // For simplicity, we just reload all.
-        // But we need to be careful about performance if many items.
-        // Actually, if we modify selectedItems (via remove), this triggers again.
+    // MARK: - Helper Methods
+    
+    /// Downsample image from Data to a specific point size
+    private func downsample(data: Data, to pointSize: CGSize, scale: CGFloat = UIScreen.main.scale) -> UIImage? {
+        let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, imageSourceOptions) else {
+            return nil
+        }
         
-        // Optimisation: check if count matches to avoid reload loop if just removing?
-        // But removing updates selectedItems, which triggers onChange.
-        // We can check if we are already processing.
+        let maxDimensionInPixels = max(pointSize.width, pointSize.height) * scale
+        let downsampleOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimensionInPixels
+        ] as CFDictionary
+        
+        guard let downsampledImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions) else {
+            return nil
+        }
+        
+        return UIImage(cgImage: downsampledImage)
+    }
+
+    private func loadImages(from items: [PhotosPickerItem]) {
+        print("DEBUG: loadImages called with \(items.count) items")
+        // Cancel previous task to prevent race conditions
+        currentLoadTask?.cancel()
         
         guard !items.isEmpty else {
-            selectedImages = []
+            print("DEBUG: items is empty, clearing displayedItems")
+            displayedItems = []
             return
         }
         
-        // Only reload if the items actually changed in a way that requires reloading
-        // (This is tricky with PhotosPickerItem equality, but let's just reload for now)
-        
         isProcessing = true
         
-        Task {
-            var newImages: [UIImage] = []
+        currentLoadTask = Task {
+            var newDisplayedItems: [BatchImageItem] = []
+            
+            // Try to reuse existing items to preserve UUIDs and reduce flickering
+            // We map new items to displayed items
+            // Since PhotosPickerItem is Equatable, we can find if we already have it
+            
+            // Note: PhotosPickerItem equality might not be enough if user picks same image twice?
+            // Assuming unique selection or that we handle duplicates by order.
+            // Let's try to match by index if item matches, otherwise search?
+            // Simple approach: Iterate through new items. Check if we have a corresponding wrapper.
+            
+            // To handle reordering or removal correctly, we should be careful.
+            // But here we are mostly concerned with "syncing".
+            
+            // Optimization: Create a pool of existing items
+            var existingPool = displayedItems
+            
             for item in items {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    // Optional: Compress here for display? No, keep original for saving.
-                    // But for display we might want thumbnails? 
-                    // Let's just store the full UIImage for now, assuming user doesn't pick 1000s.
-                    newImages.append(image)
+                if Task.isCancelled { return }
+                
+                // Find if we already have this item in our pool
+                if let index = existingPool.firstIndex(where: { $0.sourceItem == item }) {
+                    // Reuse existing item (already loaded image)
+                    let reusedItem = existingPool[index]
+                    newDisplayedItems.append(reusedItem)
+                    existingPool.remove(at: index) // Consume it so we don't reuse it for another duplicate
+                } else {
+                    // New item, need to load
+                    // Check cache first
+                    if let id = item.itemIdentifier, let cached = imageCache[id] {
+                        newDisplayedItems.append(BatchImageItem(sourceItem: item, image: cached))
+                    } else {
+                        // Need to load async
+                        // We put a placeholder first
+                        let newItem = BatchImageItem(sourceItem: item, image: nil)
+                        newDisplayedItems.append(newItem)
+                        
+                        // We will load it below
+                    }
                 }
             }
             
-            await MainActor.run {
-                self.selectedImages = newImages
-                self.isProcessing = false
+            // Update UI with what we have (placeholders + reused)
+            if !Task.isCancelled {
+                let initialItems = newDisplayedItems
+                await MainActor.run {
+                    self.displayedItems = initialItems
+                }
+                
+                // Now load the missing images
+                for i in 0..<newDisplayedItems.count {
+                    if Task.isCancelled { return }
+                    
+                    if newDisplayedItems[i].image == nil {
+                        let item = newDisplayedItems[i].sourceItem
+                        
+                        if let data = try? await item.loadTransferable(type: Data.self),
+                           let image = downsample(data: data, to: CGSize(width: 200, height: 200)) {
+                            
+                            if Task.isCancelled { return }
+                            
+                            // Update the item in the local array
+                            newDisplayedItems[i].image = image
+                            
+                            // Cache it
+                            if let id = item.itemIdentifier {
+                                await MainActor.run {
+                                    imageCache[id] = image
+                                }
+                            }
+                            
+                            // Update UI incrementally? Or batch?
+                            // Let's batch update at the end or periodically?
+                            // For smoother UI, maybe update per item?
+                            // Updating state inside loop triggers view update.
+                            let updatedItem = newDisplayedItems[i]
+                            let indexToUpdate = i
+                            
+                            await MainActor.run {
+                                // Check bounds again just in case
+                                if indexToUpdate < self.displayedItems.count {
+                                    // We must ensure we are updating the SAME item by ID, 
+                                    // but displayedItems might have changed if user deleted something?
+                                    // But we are in a Task that gets cancelled on change.
+                                    // So it should be safe.
+                                    self.displayedItems[indexToUpdate] = updatedItem
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if !Task.isCancelled {
+                await MainActor.run {
+                    self.isProcessing = false
+                }
             }
         }
     }
     
-    private func removeImage(at index: Int) {
-        guard index < selectedImages.count && index < selectedItems.count else { return }
+    private func removeImage(item: BatchImageItem) {
+        print("DEBUG: Requesting removal of item: \(item.id)")
         
-        // This will trigger onChange, so we need to be careful.
-        // Ideally we update both.
-        var newItems = selectedItems
-        newItems.remove(at: index)
-        selectedItems = newItems // This triggers onChange -> loadImages
+        // Find index of the item to remove
+        guard let index = displayedItems.firstIndex(where: { $0.id == item.id }) else {
+            print("WARNING: removeImage called for item not found in displayedItems. ID: \(item.id)")
+            return
+        }
         
-        // We could let loadImages handle the update of selectedImages,
-        // but it might be slow to reload all. 
-        // Ideally we should have a way to map items to images.
-        // For now, let's rely on the reload.
+        // Optimistically update UI
+        displayedItems.remove(at: index)
+        print("DEBUG: Removed from displayedItems. New count: \(displayedItems.count)")
+        
+        // Update source of truth
+        // We need to remove the corresponding item from selectedItems.
+        // Since we synced them, displayedItems[index] corresponds to selectedItems[index] 
+        // IF selectedItems hasn't changed externally.
+        // Let's verify.
+        if index < selectedItems.count && selectedItems[index] == item.sourceItem {
+            var newItems = selectedItems
+            newItems.remove(at: index)
+            print("DEBUG: Removed from selectedItems at index \(index). New count: \(newItems.count)")
+            selectedItems = newItems // This triggers onChange -> loadImages
+        } else {
+            // Fallback: find by source item
+            if let sourceIndex = selectedItems.firstIndex(where: { $0 == item.sourceItem }) {
+                 var newItems = selectedItems
+                 newItems.remove(at: sourceIndex)
+                 print("DEBUG: Removed from selectedItems at sourceIndex \(sourceIndex). New count: \(newItems.count)")
+                 selectedItems = newItems
+            } else {
+                print("ERROR: Could not find source item to remove in selectedItems")
+            }
+        }
     }
     
     private func saveBatchItems() {
@@ -182,25 +321,23 @@ struct BatchImportView: View {
             
             var createdItems: [(String, String)] = [] // (filename, name)
             
-            for image in selectedImages {
-                // ImageManager.shared.saveImage is MainActor annotated in the file I read!
-                // So I have to call it on MainActor.
-                // If it's slow, it might block UI.
-                // Let's check ImageManager again.
-                // It says @MainActor class ImageManager.
+            for item in displayedItems {
+                if item.image == nil { continue } // Skip failed loads
                 
-                // If saveImage is on MainActor, we can't easily offload it without changing ImageManager.
-                // But saveImage does `try data.write(to: fileURL)` which is blocking IO on Main thread if called from MainActor.
-                // That's not ideal but let's follow existing pattern for now.
-                
-                if let fileName = await ImageManager.shared.saveImage(image, context: modelContext) {
-                     // We can insert immediately
-                    let clothing = Clothing(
-                        name: seriesName,
-                        imagePaths: [fileName]
-                    )
-                    await MainActor.run {
-                        modelContext.insert(clothing)
+                // Load FULL image from sourceItem
+                if let data = try? await item.sourceItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    
+                    // Save image
+                    if let fileName = await ImageManager.shared.saveImage(image, context: modelContext) {
+                         // We can insert immediately
+                        let clothing = Clothing(
+                            name: seriesName,
+                            imagePaths: [fileName]
+                        )
+                        await MainActor.run {
+                            modelContext.insert(clothing)
+                        }
                     }
                 }
             }
