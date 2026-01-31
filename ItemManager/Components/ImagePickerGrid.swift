@@ -14,10 +14,11 @@ struct ImagePickerGrid: View {
     let maxCount: Int = 9
     
     @Environment(\.modelContext) private var modelContext
-    @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedItems: [PhotosPickerItem] = []
     @State private var showingPermissionAlert = false
     @State private var showingEditSheet = false
-    @State private var editingImage: UIImage?
+    @State private var editingIndex: Int?
+    @State private var isProcessingImages = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -30,26 +31,41 @@ struct ImagePickerGrid: View {
                 HStack(spacing: 12) {
                     // Add Button
                     if imagePaths.count < maxCount {
-                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                        PhotosPicker(selection: $selectedItems, 
+                                   maxSelectionCount: maxCount - imagePaths.count,
+                                   matching: .images) {
                             VStack {
-                                Image(systemName: "plus")
-                                    .font(.title)
-                                Text("添加")
-                                    .font(.caption)
+                                if isProcessingImages {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "plus")
+                                        .font(.title)
+                                    Text("添加")
+                                        .font(.caption)
+                                }
                             }
                             .frame(width: 100, height: 100)
                             .background(Color(uiColor: .secondarySystemBackground))
                             .cornerRadius(12)
                             .foregroundStyle(.secondary)
                         }
-                        .onChange(of: selectedItem) { _, newItem in
-                            if let newItem {
-                                Task {
-                                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                        .disabled(isProcessingImages)
+                        .onChange(of: selectedItems) { _, newItems in
+                            guard !newItems.isEmpty else { return }
+                            
+                            isProcessingImages = true
+                            Task {
+                                for item in newItems {
+                                    if let data = try? await item.loadTransferable(type: Data.self),
                                        let uiImage = UIImage(data: data) {
-                                        saveImage(uiImage)
+                                        // 压缩图片以节省空间
+                                        let compressedImage = uiImage.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? uiImage
+                                        saveImage(compressedImage)
                                     }
-                                    selectedItem = nil
+                                }
+                                await MainActor.run {
+                                    selectedItems = []
+                                    isProcessingImages = false
                                 }
                             }
                         }
@@ -66,8 +82,7 @@ struct ImagePickerGrid: View {
                                     .frame(width: 100, height: 100)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .onTapGesture {
-                                        // Tap to edit (placeholder)
-                                        editingImage = image
+                                        editingIndex = index
                                         showingEditSheet = true
                                     }
                             } else {
@@ -106,21 +121,55 @@ struct ImagePickerGrid: View {
             Text("请在设置中允许访问相册以选择图片")
         }
         .sheet(isPresented: $showingEditSheet) {
-            if let img = editingImage {
-                VStack {
-                    Text("编辑图片 (抠图功能开发中)")
-                        .font(.headline)
+            NavigationStack {
+                if let index = editingIndex, index < imagePaths.count,
+                   let image = ImageManager.shared.loadImage(fileName: imagePaths[index]) {
+                    VStack {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding()
+                        
+                        HStack(spacing: 20) {
+                            if index > 0 {
+                                Button(action: {
+                                    moveImageToFront(from: index)
+                                    showingEditSheet = false
+                                }) {
+                                    Label("设为封面", systemImage: "star.fill")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.pink)
+                            }
+                            
+                            Button(role: .destructive, action: {
+                                deleteImage(at: index)
+                                showingEditSheet = false
+                            }) {
+                                Label("删除图片", systemImage: "trash")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
                         .padding()
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 300)
-                    Button("关闭") {
-                        showingEditSheet = false
+                        .padding(.bottom, 20)
                     }
-                    .padding()
+                    .navigationTitle("图片预览")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("关闭") {
+                                showingEditSheet = false
+                            }
+                        }
+                    }
+                } else {
+                    ContentUnavailableView("图片无法加载", systemImage: "photo.badge.exclamationmark")
                 }
             }
+            .presentationDetents([.medium, .large])
         }
     }
     
@@ -134,5 +183,10 @@ struct ImagePickerGrid: View {
         let fileName = imagePaths[index]
         ImageManager.shared.deleteImage(fileName: fileName, context: modelContext)
         imagePaths.remove(at: index)
+    }
+    
+    private func moveImageToFront(from index: Int) {
+        let item = imagePaths.remove(at: index)
+        imagePaths.insert(item, at: 0)
     }
 }
