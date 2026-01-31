@@ -134,7 +134,11 @@ struct ClothingListView: View {
         }
         .sheet(isPresented: $showingAddSheet) {
             NavigationStack {
-                ClothingEditView(clothing: nil)
+                ClothingEditView(
+                    clothing: nil,
+                    initialBrandID: selectedBrandIDs.first,
+                    initialTypes: selectedTypes
+                )
             }
         }
         .alert("确认删除", isPresented: $showingDeleteAlert) {

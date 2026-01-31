@@ -47,8 +47,13 @@ struct ClothingEditView: View {
     @State private var finalPaymentEndDate: Date = Date()
     @State private var note: String = ""
     
-    init(clothing: Clothing?) {
+    private var initialBrandID: UUID?
+    private var initialTypes: Set<String>?
+    
+    init(clothing: Clothing?, initialBrandID: UUID? = nil, initialTypes: Set<String>? = nil) {
         _clothing = State(initialValue: clothing)
+        self.initialBrandID = initialBrandID
+        self.initialTypes = initialTypes
     }
     
     var isEditing: Bool { clothing != nil }
@@ -271,6 +276,22 @@ struct ClothingEditView: View {
                     priceTotal = depositVal + balanceVal
                 } else {
                     priceTotal = NSDecimalNumber(decimal: c.price).doubleValue
+                }
+            } else {
+                // New Item: Apply initial values from filters if available
+                if brandName.isEmpty, let brandID = initialBrandID {
+                    let descriptor = FetchDescriptor<Brand>(predicate: #Predicate { $0.id == brandID })
+                    if let brand = try? modelContext.fetch(descriptor).first {
+                        brandName = brand.name
+                    }
+                }
+                
+                if types.isEmpty, let initTypes = initialTypes, !initTypes.isEmpty {
+                    // Filter out empty strings just in case
+                    let validTypes = initTypes.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                    if !validTypes.isEmpty {
+                        types = validTypes.joined(separator: ",")
+                    }
                 }
             }
         }
