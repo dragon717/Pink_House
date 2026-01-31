@@ -21,6 +21,8 @@ struct ImagePickerGrid: View {
     @State private var editingIndex: Int?
     @State private var isProcessingImages = false
     @State private var draggingIndex: Int?
+    @State private var showingCamera = false
+    @State private var cameraImage: UIImage?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -33,9 +35,21 @@ struct ImagePickerGrid: View {
                 HStack(spacing: 12) {
                     // Add Button
                     if imagePaths.count < maxCount {
-                        PhotosPicker(selection: $selectedItems, 
-                                   maxSelectionCount: maxCount - imagePaths.count,
-                                   matching: .images) {
+                        Menu {
+                            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                                Button {
+                                    showingCamera = true
+                                } label: {
+                                    Label("拍照", systemImage: "camera")
+                                }
+                            }
+                            
+                            PhotosPicker(selection: $selectedItems, 
+                                       maxSelectionCount: maxCount - imagePaths.count,
+                                       matching: .images) {
+                                Label("从相册选择", systemImage: "photo.on.rectangle")
+                            }
+                        } label: {
                             VStack {
                                 if isProcessingImages {
                                     ProgressView()
@@ -217,6 +231,23 @@ struct ImagePickerGrid: View {
             }
             .presentationDetents([.medium, .large])
         }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraPicker(image: $cameraImage)
+                .ignoresSafeArea()
+        }
+        .onChange(of: cameraImage) { _, newImage in
+            if let image = newImage {
+                isProcessingImages = true
+                Task {
+                    let compressedImage = image.jpegData(compressionQuality: 0.7).flatMap { UIImage(data: $0) } ?? image
+                    await MainActor.run {
+                        saveImage(compressedImage)
+                        cameraImage = nil
+                        isProcessingImages = false
+                    }
+                }
+            }
+        }
     }
     
     private func saveImage(_ image: UIImage) {
@@ -234,5 +265,42 @@ struct ImagePickerGrid: View {
     private func moveImageToFront(from index: Int) {
         let item = imagePaths.remove(at: index)
         imagePaths.insert(item, at: 0)
+    }
+}
+
+struct CameraPicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Environment(\.presentationMode) var presentationMode
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .camera
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: CameraPicker
+        
+        init(_ parent: CameraPicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let uiImage = info[.originalImage] as? UIImage {
+                parent.image = uiImage
+            }
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.presentationMode.wrappedValue.dismiss()
+        }
     }
 }
