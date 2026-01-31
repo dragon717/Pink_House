@@ -240,6 +240,10 @@ struct WardrobeStatsView: View {
     var filterDescription: String? = nil
     var onClearFilter: (() -> Void)? = nil
     
+    @AppStorage("showStatsCountAndStyle") private var showCountAndStyle = true
+    @AppStorage("showStatsDressValue") private var showDressValue = true
+    @AppStorage("showStatsTotalValue") private var showTotalValue = true
+    
     var styleCount: Int {
         clothings.count
     }
@@ -261,17 +265,17 @@ struct WardrobeStatsView: View {
             VStack(spacing: 16) {
                 // Main Stats
                 HStack(spacing: 0) {
-                    statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
+                    statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
                     
                     Divider()
                         .frame(height: 30)
                     
-                    statItem(title: "裙子价值", value: "¥\(NSDecimalNumber(decimal: dressValue).stringValue)", valueColor: Color(hex: "FF9800"))
+                    statItem(title: "裙子价值", value: "¥\(NSDecimalNumber(decimal: dressValue).stringValue)", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
                     
                     Divider()
                         .frame(height: 30)
                     
-                    statItem(title: "总价值 (含小物)", value: "¥\(NSDecimalNumber(decimal: totalValue).stringValue)")
+                    statItem(title: "总价值", value: "¥\(NSDecimalNumber(decimal: totalValue).stringValue)", isVisible: $showTotalValue)
                 }
                 
                 // Bottom Action
@@ -294,15 +298,30 @@ struct WardrobeStatsView: View {
         }
     }
     
-    private func statItem(title: String, value: String, valueColor: Color = .primary) -> some View {
+    private func statItem(title: String, value: String, isVisible: Binding<Bool>, valueColor: Color = .primary) -> some View {
         VStack(spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Button {
+                    withAnimation {
+                        isVisible.wrappedValue.toggle()
+                    }
+                } label: {
+                    Image(systemName: isVisible.wrappedValue ? "eye" : "eye.slash")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .contentShape(Rectangle()) // Make it easier to tap
+                }
+            }
+            
+            Text(isVisible.wrappedValue ? value : "****")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(valueColor)
+                .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity)
     }

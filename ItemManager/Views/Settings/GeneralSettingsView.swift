@@ -5,6 +5,7 @@ struct GeneralSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     @State private var languageManager = LanguageManager.shared
     @State private var showingRestartAlert = false
+    @State private var showingMissingOriginalAlert = false
     @State private var selectedItem: PhotosPickerItem?
     @State private var showingCropper = false
     @State private var tempImage: UIImage?
@@ -52,6 +53,19 @@ struct GeneralSettingsView: View {
                             self.tempImage = original
                             self.isNewSelection = false
                             self.showingCropper = true
+                        } else {
+                            // If no original image, fallback to current image if available
+                            if let current = theme.backgroundImage {
+                                // But warn user that this is a low-res/already cropped version
+                                // Ideally we should just ask them to pick new one.
+                                // But let's try to use current one but maybe it's too small.
+                                // Actually, user feedback says "Black Screen" if we don't have image.
+                                // If theme.getOriginalImage() returns nil, we check theme.backgroundImage.
+                                // If theme.backgroundImage is also nil, button is disabled anyway.
+                                // If theme.backgroundImage exists but original doesn't (legacy case),
+                                // we should prompt user.
+                                showingMissingOriginalAlert = true
+                            }
                         }
                     } label: {
                         HStack {
@@ -131,6 +145,16 @@ struct GeneralSettingsView: View {
             Button("稍后") { }
         } message: {
             Text("语言更改将在下次启动应用时生效。")
+        }
+        .alert("无法调整当前图片", isPresented: $showingMissingOriginalAlert) {
+            Button("选择新图片") {
+                // Trigger photo picker somehow? 
+                // We can't easily trigger PhotosPicker programmatically.
+                // Just let user know.
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("由于是旧版本设置的背景，未保存原始图片。请重新选择一张图片以进行裁剪和移动。")
         }
         .fullScreenCover(isPresented: $showingCropper) {
             if let image = tempImage {

@@ -34,6 +34,9 @@ struct ClothingListView: View {
     
     @State private var viewLayout: ViewLayout = .listDetailed
     
+    // 价格显示设置 - 使用单例管理器
+    //@ObservedObject private var privacyManager = PrivacyManager.shared
+    
     private var gridColumns: [GridItem] {
         let count: Int
         let spacing: CGFloat

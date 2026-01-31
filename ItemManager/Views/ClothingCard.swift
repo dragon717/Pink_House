@@ -11,6 +11,8 @@ import Foundation
 
 struct ClothingCard: View {
     let clothing: Clothing
+    @AppStorage("privacyShowPrice") private var showPrice = true
+    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -68,23 +70,25 @@ struct ClothingCard: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary)
                 
-                if clothing.originalPrice > 0 {
+                if showOriginalPrice && clothing.originalPrice > 0 {
                     Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 
-                if clothing.isDepositPlan {
-                    let totalDeposit = clothing.deposit * Decimal(clothing.stock)
-                    let totalBalance = clothing.balance * Decimal(clothing.stock)
-                    Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.pink)
-                } else {
-                    let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
-                    Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color(hex: "8D6E63")) // Brownish
+                if showPrice {
+                    if clothing.isDepositPlan {
+                        let totalDeposit = clothing.deposit * Decimal(clothing.stock)
+                        let totalBalance = clothing.balance * Decimal(clothing.stock)
+                        Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.pink)
+                    } else {
+                        let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                        Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color(hex: "8D6E63")) // Brownish
+                    }
                 }
             }
             .padding(.horizontal, 4)
@@ -145,6 +149,9 @@ struct CutePlaceholderView: View {
 
 struct ClothingRow: View {
     let clothing: Clothing
+    // 直接使用 AppStorage
+    @AppStorage("privacyShowPrice") private var showPrice = true
+    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     
     var body: some View {
         GlassCard {
@@ -214,34 +221,32 @@ struct ClothingRow: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if clothing.isDepositPlan {
-                        let totalDeposit = clothing.deposit * Decimal(clothing.stock)
-                        let totalBalance = clothing.balance * Decimal(clothing.stock)
-                        
-                        if clothing.originalPrice > 0 {
-                            Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                    if showOriginalPrice && clothing.originalPrice > 0 {
+                        Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    if showPrice {
+                        if clothing.isDepositPlan {
+                            let totalDeposit = clothing.deposit * Decimal(clothing.stock)
+                            let totalBalance = clothing.balance * Decimal(clothing.stock)
+                            
+                            Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
+                                .font(.caption)
+                                .foregroundStyle(.pink)
+                            Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(.pink)
+                        } else {
+                            let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                            
+                            Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundStyle(Color(hex: "8D6E63"))
                         }
-                        Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
-                            .font(.caption)
-                            .foregroundStyle(.pink)
-                        Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
-                            .font(.caption)
-                            .bold()
-                            .foregroundStyle(.pink)
-                    } else {
-                        let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
-                        
-                        if clothing.originalPrice > 0 {
-                            Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundStyle(Color(hex: "8D6E63"))
                     }
                     
                     if clothing.stock > 1 {
@@ -258,6 +263,9 @@ struct ClothingRow: View {
 
 struct ClothingRowBrief: View {
     let clothing: Clothing
+    // 直接使用 AppStorage
+    @AppStorage("privacyShowPrice") private var showPrice = true
+    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     
     var body: some View {
         GlassCard {
@@ -289,18 +297,26 @@ struct ClothingRowBrief: View {
                         .lineLimit(1)
                 }
                 
-                if clothing.isDepositPlan {
-                    let totalDeposit = clothing.deposit * Decimal(clothing.stock)
-                    let totalBalance = clothing.balance * Decimal(clothing.stock)
-                    Text("定¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                if showOriginalPrice && clothing.originalPrice > 0 {
+                    Text("原¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
                         .font(.caption)
-                        .bold()
-                        .foregroundStyle(.pink)
-                } else {
-                    let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
-                    Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
-                        .font(.subheadline)
-                        .bold()
+                        .foregroundStyle(.secondary)
+                }
+                
+                if showPrice {
+                    if clothing.isDepositPlan {
+                        let totalDeposit = clothing.deposit * Decimal(clothing.stock)
+                        let totalBalance = clothing.balance * Decimal(clothing.stock)
+                        Text("定¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(.pink)
+                    } else {
+                        let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                        Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
+                            .font(.subheadline)
+                            .bold()
+                    }
                 }
             }
         }

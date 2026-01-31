@@ -5,11 +5,24 @@ import AVFoundation
 struct PrivacySettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     
+    // 价格显示设置
+    @AppStorage("privacyShowPrice") private var showPrice = true
+    @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
+    
     @State private var photoAuthStatus: PHAuthorizationStatus = .notDetermined
     @State private var cameraAuthStatus: AVAuthorizationStatus = .notDetermined
     
     var body: some View {
         List {
+            Section {
+                Toggle("在列表中显示入库价格", isOn: $showPrice)
+                Toggle("在列表中显示原价", isOn: $showOriginalPrice)
+            } header: {
+                Text("价格显示")
+            } footer: {
+                Text("关闭后，衣柜列表将不再显示对应的价格信息，保护您的隐私。")
+            }
+            
             Section {
                 // 照片权限
                 HStack(spacing: 12) {

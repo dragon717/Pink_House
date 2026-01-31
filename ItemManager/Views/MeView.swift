@@ -75,6 +75,10 @@ struct MeView: View {
                         SettingsRow(icon: "bell", title: "通知设置", subtitle: "管理通知提醒")
                     }
                     
+                    NavigationLink(destination: PrivacySettingsView()) {
+                        SettingsRow(icon: "hand.raised", title: "隐私设置", subtitle: "管理价格显示与权限")
+                    }
+                    
                     NavigationLink(destination: WidgetSettingsView()) {
                         SettingsRow(icon: "rectangle.3.group", title: "小组件设置", subtitle: "自定义背景与添加教程")
                     }
