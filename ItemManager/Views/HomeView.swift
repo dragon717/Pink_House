@@ -52,6 +52,7 @@ struct HomeView: View {
 
     @State private var selectedTab: HomeTab = .wardrobe
     @State private var showingAddSheet = false
+    @State private var showingBatchImportSheet = false
     @State private var sortOption: SortOption = .createdAtDesc
     
     // Filter States
@@ -134,6 +135,9 @@ struct HomeView: View {
                         selectedAccessories: selectedAccessories
                     )
                 }
+            }
+            .sheet(isPresented: $showingBatchImportSheet) {
+                BatchImportView()
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -529,6 +533,7 @@ struct HomeView: View {
     private var addButton: some View {
         Menu {
             Button { showingAddSheet = true } label: { Label("手动添加", systemImage: "square.and.pencil") }
+            Button { showingBatchImportSheet = true } label: { Label("批量导入", systemImage: "square.and.arrow.down.on.square") }
             Button { showingCommunityImportAlert = true } label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
         } label: {
             Image(systemName: "plus")

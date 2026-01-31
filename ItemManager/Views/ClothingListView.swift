@@ -27,6 +27,7 @@ struct ClothingListView: View {
     @State private var selectedConditions: Set<String> = []
     @State private var selectedAccessories: Set<String> = []
     @State private var showingAddSheet = false
+    @State private var showingBatchImportSheet = false
     @State private var itemToDelete: Clothing?
     @State private var showingDeleteAlert = false
     
@@ -140,6 +141,9 @@ struct ClothingListView: View {
                     initialTypes: selectedTypes
                 )
             }
+        }
+        .sheet(isPresented: $showingBatchImportSheet) {
+            BatchImportView()
         }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { itemToDelete = nil }
@@ -314,7 +318,19 @@ struct ClothingListView: View {
                             selectedAccessories: $selectedAccessories
                         )
                         
-                        Button(action: { showingAddSheet = true }) {
+                        Menu {
+                            Button {
+                                showingAddSheet = true
+                            } label: {
+                                Label("手动添加", systemImage: "plus")
+                            }
+                            
+                            Button {
+                                showingBatchImportSheet = true
+                            } label: {
+                                Label("批量导入", systemImage: "square.and.arrow.down.on.square")
+                            }
+                        } label: {
                             Label("新增", systemImage: "plus")
                         }
                     }
