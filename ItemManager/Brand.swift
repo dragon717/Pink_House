@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Brand {
+final class Brand: Identifiable {
     @Attribute(.unique) var id: UUID
     var name: String
     var colorHex: String

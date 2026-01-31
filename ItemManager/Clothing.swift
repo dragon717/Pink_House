@@ -33,6 +33,7 @@ final class Clothing {
     var isShared: Bool = false // 同步到裙子广场
     
     // 价格信息
+    var originalPrice: Decimal = 0.0 // 原价
     var price: Decimal = 0.0 // 裙子总价
     var deposit: Decimal = 0.0 // 定金
     var balance: Decimal = 0.0 // 尾款
@@ -71,6 +72,7 @@ final class Clothing {
          accessories: String = "",
          imagePaths: [String] = [],
          isShared: Bool = false,
+         originalPrice: Decimal = 0.0,
          price: Decimal = 0.0,
          deposit: Decimal = 0.0,
          balance: Decimal = 0.0,
@@ -94,6 +96,7 @@ final class Clothing {
         self.accessories = accessories
         self.imagePaths = imagePaths
         self.isShared = isShared
+        self.originalPrice = originalPrice
         self.price = price
         self.deposit = deposit
         self.balance = balance

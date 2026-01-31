@@ -181,6 +181,7 @@ struct ClothingDetailView: View {
             accessories: clothing.accessories,
             imagePaths: clothing.imagePaths,
             isShared: clothing.isShared,
+            originalPrice: clothing.originalPrice,
             price: clothing.price,
             deposit: clothing.deposit,
             balance: clothing.balance,
@@ -444,6 +445,10 @@ struct ClothingDetailView: View {
                 InfoRow(label: "尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
             }
             
+            if clothing.originalPrice > 0 {
+                InfoRow(label: "原价", value: "¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0))))")
+            }
+            
             InfoRow(label: "裙子单价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
             
             if clothing.stock > 1 {
@@ -569,7 +574,7 @@ struct InfoRow: View {
         case "衣长": return "arrow.up.and.down"
         case "状态": return "star.circle"
         case "小物": return "sparkles"
-        case "裙子总价", "裙子单价": return "tag"
+        case "裙子总价", "裙子单价", "原价": return "tag"
         case "库存数量": return "number.circle"
         case "购买日期": return "calendar"
         case "定金日期": return "calendar.badge.clock"

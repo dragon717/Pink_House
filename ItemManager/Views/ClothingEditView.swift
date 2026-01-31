@@ -33,6 +33,7 @@ struct ClothingEditView: View {
     @State private var selectedTags: [Tag] = []
     
     // Price States
+    @State private var originalPrice: Double = 0.0
     @State private var priceTotal: Double = 0.0
     @State private var deposit: Double = 0.0
     @State private var balance: Double = 0.0
@@ -141,6 +142,7 @@ struct ClothingEditView: View {
                     Text("价格信息")
                         .font(.headline)
                     
+                    PriceRow(title: "原价", value: $originalPrice)
                     PriceRow(title: "裙子单价", value: $priceTotal)
                     PriceRow(title: "定金", value: $deposit)
                     PriceRow(title: "尾款", value: $balance)
@@ -256,6 +258,7 @@ struct ClothingEditView: View {
                 accessories = c.accessories
                 imagePaths = c.imagePaths
                 isShared = c.isShared
+                originalPrice = NSDecimalNumber(decimal: c.originalPrice).doubleValue
                 let depositVal = NSDecimalNumber(decimal: c.deposit).doubleValue
                 let balanceVal = NSDecimalNumber(decimal: c.balance).doubleValue
                 deposit = depositVal
@@ -399,6 +402,7 @@ struct ClothingEditView: View {
             c.accessories = finalAccessories
             c.imagePaths = imagePaths
             c.isShared = isShared
+            c.originalPrice = Decimal(originalPrice)
             c.price = Decimal(priceTotal)
             c.deposit = Decimal(deposit)
             c.balance = Decimal(balance)
@@ -429,6 +433,7 @@ struct ClothingEditView: View {
                 accessories: finalAccessories,
                 imagePaths: imagePaths,
                 isShared: isShared,
+                originalPrice: Decimal(originalPrice),
                 price: Decimal(priceTotal),
                 deposit: Decimal(deposit),
                 balance: Decimal(balance),
@@ -468,7 +473,7 @@ struct PriceRow: View {
         HStack {
             Text(title)
             Spacer()
-            TextField("0.00", value: $value, format: .number.precision(.fractionLength(2)))
+            TextField("0", value: $value, format: .number.precision(.fractionLength(0...2)))
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
             Text("¥")

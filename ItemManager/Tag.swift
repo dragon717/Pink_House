@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Tag {
+final class Tag: Identifiable {
     @Attribute(.unique) var id: UUID
     var name: String
     var colorHex: String
