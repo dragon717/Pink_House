@@ -138,14 +138,25 @@ struct ClothingEditView: View {
                 }
                 
                 // MARK: - 价格信息
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 24) {
                     Text("价格信息")
                         .font(.headline)
                     
-                    PriceRow(title: "原价", value: $originalPrice)
-                    PriceRow(title: "裙子单价", value: $priceTotal)
-                    PriceRow(title: "定金", value: $deposit)
-                    PriceRow(title: "尾款", value: $balance)
+                    // 原价和总价
+                    VStack(spacing: 12) {
+                        PriceRow(title: "原价", value: $originalPrice)
+                        Divider()
+                        PriceRow(title: "裙子总价合计", subtitle: "(自动计算=定金+尾款)", value: $priceTotal)
+                    }
+                    
+                    // 定金和尾款
+                    VStack(spacing: 12) {
+                        PriceRow(title: "定金", value: $deposit)
+                        Divider()
+                        PriceRow(title: "尾款", value: $balance)
+                    }
+                    
+                    // 小物总价
                     PriceRow(title: "小物总价", value: $accessoriesPrice)
                     
                     HStack {
@@ -299,6 +310,9 @@ struct ClothingEditView: View {
             }
         }
         .onChange(of: deposit) { oldValue, newValue in
+            updateTotalPrice()
+        }
+        .onChange(of: balance) { oldValue, newValue in
             updateTotalPrice()
         }
     }
@@ -467,11 +481,21 @@ struct ClothingEditView: View {
 
 struct PriceRow: View {
     var title: String
+    var subtitle: String? = nil
     @Binding var value: Double
     
     var body: some View {
         HStack {
-            Text(title)
+            if let subtitle = subtitle {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text(title)
+            }
             Spacer()
             TextField("0", value: $value, format: .number.precision(.fractionLength(0...2)))
                 .keyboardType(.decimalPad)
