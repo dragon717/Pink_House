@@ -6,6 +6,9 @@ struct GeneralSettingsView: View {
     @State private var languageManager = LanguageManager.shared
     @State private var showingRestartAlert = false
     @State private var selectedItem: PhotosPickerItem?
+    @State private var showingCropper = false
+    @State private var tempImage: UIImage?
+    @State private var isNewSelection = false
     
     var body: some View {
         @Bindable var theme = themeManager
@@ -44,20 +47,34 @@ struct GeneralSettingsView: View {
                         set: { theme.backgroundColorHex = $0.toHex() }
                     ))
                 } else {
-                    HStack {
-                        Text("当前图片")
-                        Spacer()
-                        if let image = theme.backgroundImage {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 40, height: 40)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        } else {
-                            Text("未选择")
-                                .foregroundStyle(.secondary)
+                    Button {
+                        if let original = theme.getOriginalImage() {
+                            self.tempImage = original
+                            self.isNewSelection = false
+                            self.showingCropper = true
+                        }
+                    } label: {
+                        HStack {
+                            Text("当前图片")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if let image = theme.backgroundImage {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.accentColor.opacity(0.5), lineWidth: 1)
+                                    )
+                            } else {
+                                Text("未选择")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .disabled(theme.backgroundImage == nil)
                     
                     PhotosPicker(selection: $selectedItem, matching: .images) {
                         Label("选择新图片", systemImage: "photo")
@@ -67,7 +84,12 @@ struct GeneralSettingsView: View {
                         Task {
                             if let data = try? await newItem?.loadTransferable(type: Data.self),
                                let uiImage = UIImage(data: data) {
-                                theme.setBackgroundImage(uiImage)
+                                await MainActor.run {
+                                    self.tempImage = uiImage
+                                    self.isNewSelection = true
+                                    self.showingCropper = true
+                                    self.selectedItem = nil
+                                }
                             }
                         }
                     }
@@ -109,6 +131,39 @@ struct GeneralSettingsView: View {
             Button("稍后") { }
         } message: {
             Text("语言更改将在下次启动应用时生效。")
+        }
+        .fullScreenCover(isPresented: $showingCropper) {
+            if let image = tempImage {
+                ImageCropView(image: image) { croppedImage in
+                    // If isNewSelection is true, we update both original and display image.
+                    // If false, we only update display image (cropped version), keeping original intact.
+                    
+                    if isNewSelection {
+                        // For new selection, 'image' IS the original image
+                        themeManager.setBackgroundImage(croppedImage, isOriginal: true)
+                        // Wait, we need to save the ORIGINAL image, which is 'image' (tempImage), not 'croppedImage'.
+                        // But setBackgroundImage(..., isOriginal: true) logic saves the PASSED image as original.
+                        // This is wrong.
+                        
+                        // We need a way to save the ORIGINAL image separately.
+                        // Let's manually save original if needed.
+                        if let data = image.pngData(), let url = themeManager.getOriginalImageURL() {
+                            try? data.write(to: url)
+                        }
+                        themeManager.setBackgroundImage(croppedImage)
+                    } else {
+                        themeManager.setBackgroundImage(croppedImage)
+                    }
+                    
+                    showingCropper = false
+                    tempImage = nil
+                    isNewSelection = false
+                } onCancel: {
+                    showingCropper = false
+                    tempImage = nil
+                    isNewSelection = false
+                }
+            }
         }
     }
 }

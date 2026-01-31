@@ -77,16 +77,40 @@ class ThemeManager {
         Color(hex: backgroundColorHex)
     }
     
-    // MARK: - Image Handling
+    func getOriginalImageURL() -> URL? {
+        return originalImageURL
+    }
+    
     private var imageURL: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("theme_background_image.png")
     }
     
-    func setBackgroundImage(_ image: UIImage) {
+    private var originalImageURL: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("theme_background_image_original.png")
+    }
+    
+    func setBackgroundImage(_ image: UIImage, isOriginal: Bool = false) {
+        // Always update the display image
         self.backgroundImage = image
+        
+        // Save display image
         if let data = image.pngData(), let url = imageURL {
             try? data.write(to: url)
         }
+        
+        // If this is a new original image (from picker), save it separately
+        if isOriginal {
+            if let data = image.pngData(), let url = originalImageURL {
+                try? data.write(to: url)
+            }
+        }
+    }
+    
+    func getOriginalImage() -> UIImage? {
+        if let url = originalImageURL, let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+            return image
+        }
+        return backgroundImage // Fallback to current image if original not found
     }
     
     private func loadBackgroundImage() {
