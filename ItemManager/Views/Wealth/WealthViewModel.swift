@@ -6,6 +6,7 @@ enum CurrencyType: String, CaseIterable, Identifiable {
     case rmb = "人民币"
     case jpy = "日元"
     case gold = "黄金"
+    case silver = "白银"
     
     var id: String { rawValue }
     
@@ -14,6 +15,7 @@ enum CurrencyType: String, CaseIterable, Identifiable {
         case .rmb: return "CN¥"
         case .jpy: return "JP¥"
         case .gold: return "Gold"
+        case .silver: return "Silver"
         }
     }
 }
@@ -44,12 +46,17 @@ class WealthViewModel {
     var goldPriceCNYPerGram: Double = 600.0 // CNY per Gram
     var goldPriceSource: String = "模拟数据"
     
+    var silverPriceCNYPerGram: Double = 7.0 // CNY per Gram
+    var silverPriceSource: String = "模拟数据"
+    
     var isFetchingRate: Bool = false
     var isGoldReady: Bool = false
+    var isSilverReady: Bool = false
     var lastUpdatedDate: String? = nil
     
     // Gold Configuration
     let goldBeanWeightGrams: Double = 1.0 // 1g per bean
+    let silverBeanWeightGrams: Double = 50.0 // 50g per silver bean (1两)
     
     // Legacy support for binding if needed, but we prefer computed
     var inputAmount: String {
@@ -73,6 +80,9 @@ class WealthViewModel {
             // This is just a placeholder, we won't use this Int for Gold display likely
             let grams = totalGoldWeightGrams
             return Int(grams)
+        case .silver:
+            let grams = totalSilverWeightGrams
+            return Int(grams)
         }
     }
     
@@ -80,6 +90,12 @@ class WealthViewModel {
         let cny = NSDecimalNumber(decimal: baseAmountCNY).doubleValue
         guard goldPriceCNYPerGram > 0 else { return 0 }
         return cny / goldPriceCNYPerGram
+    }
+    
+    var totalSilverWeightGrams: Double {
+        let cny = NSDecimalNumber(decimal: baseAmountCNY).doubleValue
+        guard silverPriceCNYPerGram > 0 else { return 0 }
+        return cny / silverPriceCNYPerGram
     }
     
     // Gold Display Logic
@@ -121,6 +137,22 @@ class WealthViewModel {
         }
     }
     
+    var silverDisplayValue: GoldDisplayValue {
+        let grams = totalSilverWeightGrams
+        // 1两 = 50g
+        // 1吨 = 1,000,000g = 20,000两
+        
+        // 当白银总两数足够大时（例如超过1吨），显示吨
+        // 这里阈值设为 20,000两 (1吨)
+        if grams >= 1_000_000 {
+            let tons = grams / 1_000_000.0
+            return GoldDisplayValue(value: tons, unit: "吨")
+        } else {
+            let liang = grams / 50.0
+            return GoldDisplayValue(value: liang, unit: "两")
+        }
+    }
+    
     func fetchExchangeRate() async {
         guard !isFetchingRate else { return }
         isFetchingRate = true
@@ -129,10 +161,13 @@ class WealthViewModel {
         await fetchJPYRate()
         // Fetch Gold Price
         await fetchGoldPrice()
+        // Fetch Silver Price
+        await fetchSilverPrice()
         
         await MainActor.run {
             self.isFetchingRate = false
             self.isGoldReady = true
+            self.isSilverReady = true
         }
     }
     
@@ -167,22 +202,49 @@ class WealthViewModel {
             // Expected JSON: {"items":[{"curr":"CNY","xauPrice":20000.0,...}]}
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let items = json["items"] as? [[String: Any]],
-               let firstItem = items.first,
-               let xauPriceOunce = firstItem["xauPrice"] as? Double {
+               let firstItem = items.first {
                 
-                // Convert Ounce to Gram (1 Troy Ounce = 31.1034768 Grams)
-                let pricePerGram = xauPriceOunce / 31.1034768
-                
-                await MainActor.run {
-                    self.goldPriceCNYPerGram = pricePerGram
-                    self.goldPriceSource = "数据来源: GoldPrice.org"
-                    // Update date if available, otherwise keep existing or current
+                // Gold
+                if let xauPriceOunce = firstItem["xauPrice"] as? Double {
+                    // Convert Ounce to Gram (1 Troy Ounce = 31.1034768 Grams)
+                    let pricePerGram = xauPriceOunce / 31.1034768
+                    
+                    await MainActor.run {
+                        self.goldPriceCNYPerGram = pricePerGram
+                        self.goldPriceSource = "数据来源: GoldPrice.org"
+                    }
                 }
             }
         } catch {
             print("Failed to fetch Gold rate: \(error)")
             await MainActor.run {
                 self.goldPriceSource = "获取失败，使用默认值"
+            }
+        }
+    }
+    
+    private func fetchSilverPrice() async {
+        guard let url = URL(string: "https://data-asg.goldprice.org/dbXRates/CNY") else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let items = json["items"] as? [[String: Any]],
+               let firstItem = items.first,
+               let xagPriceOunce = firstItem["xagPrice"] as? Double { // XAG is Silver
+                
+                // Convert Ounce to Gram
+                let pricePerGram = xagPriceOunce / 31.1034768
+                
+                await MainActor.run {
+                    self.silverPriceCNYPerGram = pricePerGram
+                    self.silverPriceSource = "数据来源: GoldPrice.org"
+                }
+            }
+        } catch {
+            print("Failed to fetch Silver rate: \(error)")
+            await MainActor.run {
+                self.silverPriceSource = "获取失败，使用默认值"
             }
         }
     }
@@ -211,6 +273,7 @@ class WealthViewModel {
         case .rmb: return rmbDenominations
         case .jpy: return jpyDenominations
         case .gold: return [] // Not used for Gold
+        case .silver: return [] // Not used for Silver
         }
     }
     
@@ -223,7 +286,7 @@ class WealthViewModel {
     // Logic to calculate stacks (Piles of max 1000)
     // Returns a flattened list of Piles
     func calculateStacks() -> [MoneyPile] {
-        if selectedCurrency == .gold { return [] }
+        if selectedCurrency == .gold || selectedCurrency == .silver { return [] }
         
         var remaining = totalAmount
         var result: [MoneyPile] = []

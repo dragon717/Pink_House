@@ -82,7 +82,7 @@ struct WealthView: View {
     
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if viewModel.selectedCurrency == .gold {
+        if viewModel.selectedCurrency == .gold || viewModel.selectedCurrency == .silver {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
                     // Sound Toggle
@@ -117,13 +117,13 @@ struct WealthView: View {
             await viewModel.fetchExchangeRate()
         }
         // Check initial state
-        if viewModel.selectedCurrency == .gold {
+        if viewModel.selectedCurrency == .gold || viewModel.selectedCurrency == .silver {
             lockOrientation(isLocked: true)
         }
     }
     
     private func handleCurrencyChange(_ newCurrency: CurrencyType) {
-        if newCurrency == .gold {
+        if newCurrency == .gold || newCurrency == .silver {
             lockOrientation(isLocked: true)
         } else {
             lockOrientation(isLocked: false)
@@ -177,6 +177,8 @@ struct WealthHeaderView: View {
                 
                 if viewModel.selectedCurrency == .gold {
                     goldDisplay
+                } else if viewModel.selectedCurrency == .silver {
+                    silverDisplay
                 } else {
                     standardCurrencyDisplay
                 }
@@ -201,6 +203,8 @@ struct WealthHeaderView: View {
                     jpyExchangeRateView
                 } else if viewModel.selectedCurrency == .gold {
                     goldPriceView
+                } else if viewModel.selectedCurrency == .silver {
+                    silverPriceView
                 }
             }
         }
@@ -230,6 +234,29 @@ struct WealthHeaderView: View {
         }
     }
     
+    private var silverDisplay: some View {
+        let silverInfo = viewModel.silverDisplayValue
+        return HStack(alignment: .firstTextBaseline, spacing: 4) {
+            LiquidRollingNumber(
+                value: silverInfo.value,
+                exchangeRateToCNY: 1.0,
+                fractionLength: silverInfo.value.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2,
+                fixedTier: .silver // Assuming there is a silver tier or reuse gold with different color
+            )
+            .font(.system(size: 64, weight: .heavy, design: .rounded))
+            
+            Text(silverInfo.unit)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: WealthTier.silver.textColors,
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        }
+    }
+    
     private var standardCurrencyDisplay: some View {
         LiquidRollingNumber(
             value: Double(viewModel.totalAmount),
@@ -251,6 +278,20 @@ struct WealthHeaderView: View {
         HStack(spacing: 4) {
             Text("金价: \(String(format: "%.0f", viewModel.goldPriceCNYPerGram)) CNY/g")
             Text(viewModel.goldPriceSource)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .scaleEffect(0.8)
+            
+            refreshButton
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+    }
+    
+    private var silverPriceView: some View {
+        HStack(spacing: 4) {
+            Text("银价: \(String(format: "%.1f", viewModel.silverPriceCNYPerGram)) CNY/g")
+            Text(viewModel.silverPriceSource)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .scaleEffect(0.8)
@@ -296,6 +337,23 @@ struct WealthVisualizationView: View {
                         ProgressView()
                             .controlSize(.large)
                         Text("正在计算金克重...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else if viewModel.selectedCurrency == .silver {
+                if viewModel.isSilverReady {
+                    SilverPhysicsView(
+                        totalWeightGrams: viewModel.totalSilverWeightGrams,
+                        beanWeight: viewModel.silverBeanWeightGrams
+                    )
+                } else {
+                    VStack {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("正在计算白银重量...")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 8)
