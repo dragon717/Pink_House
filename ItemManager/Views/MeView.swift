@@ -81,6 +81,9 @@ struct MeView: View {
                     NavigationLink(destination: DataManagementView()) {
                         SettingsRow(icon: "externaldrive", title: "数据管理", subtitle: "备份与导出及属性管理")
                     }
+                    NavigationLink(destination: RecycleBinView()) {
+                        SettingsRow(icon: "trash", title: "回收站", subtitle: "恢复已删除的裙子")
+                    }
                     // 触感反馈设置 (跳转详情页)
                     NavigationLink(destination: HapticSettingsView()) {
                         SettingsRow(icon: "waveform.path.ecg", title: "触感反馈", subtitle: "震动开关与系统设置引导")

@@ -125,12 +125,14 @@ struct ClothingDetailView: View {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
                 NotificationManager.shared.cancelNotification(for: clothing)
-                modelContext.delete(clothing)
+                // Soft delete
+                clothing.isDeleted = true
+                clothing.deletedAt = Date()
                 SharedPersistence.shared.syncWidgetData()
                 dismiss()
             }
         } message: {
-            Text("确定要删除这件裙子吗？此操作无法撤销。")
+            Text("确定要删除这件裙子吗？它将被移动到回收站，你可以随时恢复。")
         }
         .alert("确认已付尾款", isPresented: $showingConfirmPaymentAlert) {
             Button("取消", role: .cancel) { }

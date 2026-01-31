@@ -57,7 +57,7 @@ struct DepositPlanView: View {
          selectedConditions: Set<String>,
          selectedAccessories: Set<String>) {
         _searchText = searchText
-        let filter = #Predicate<Clothing> { $0.isDepositPlan == true }
+        let filter = #Predicate<Clothing> { $0.isDepositPlan == true && $0.isDeleted == false }
         _depositClothings = Query(filter: filter, sort: sortOption.sortDescriptors)
         
         self.selectedTagIDs = selectedTagIDs

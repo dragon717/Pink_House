@@ -50,6 +50,8 @@ final class Clothing {
     // 系统信息
     var stock: Int = 1
     var status: ClothingStatus = ClothingStatus.onShelf
+    var isDeleted: Bool = false // 软删除标记
+    var deletedAt: Date? = nil // 删除时间
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     

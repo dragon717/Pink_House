@@ -44,7 +44,7 @@ struct WardrobeView: View {
          filterDescription: String? = nil,
          onClearFilter: (() -> Void)? = nil) {
         _searchText = searchText
-        _clothings = Query(sort: sortOption.sortDescriptors)
+        _clothings = Query(filter: #Predicate<Clothing> { $0.isDeleted == false }, sort: sortOption.sortDescriptors)
         self.viewLayout = viewLayout
         
         self.selectedTagIDs = selectedTagIDs
