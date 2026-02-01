@@ -11,6 +11,41 @@ struct OOTDCutoutListView: View {
     var onAddPhoto: () -> Void
     
     @State private var showErrorAlert = false
+    @State private var searchText = ""
+    @State private var selectedCategory = "全部"
+    
+    // Reclassify & Reprocess States
+    @State private var itemToReclassify: CutoutItem?
+    // @State private var showReclassifySheet = false // Removed in favor of item-based sheet
+    @State private var processingItem: UUID? = nil // ID of item being processed
+    @State private var alertMessage = ""
+    @State private var showAlert = false
+    
+    private let categories = ["全部", "裙子", "外套", "鞋子", "袜子", "玩偶", "小物", "未分类"]
+    // For picker (exclude "全部")
+    private var selectableCategories: [String] {
+        categories.filter { $0 != "全部" }
+    }
+    
+    var filteredCutouts: [CutoutItem] {
+        var result = cutouts
+        
+        // Filter by Category
+        if selectedCategory != "全部" {
+            result = result.filter { $0.category == selectedCategory }
+        }
+        
+        // Filter by Search Text
+        if !searchText.isEmpty {
+            result = result.filter { item in
+                let categoryMatch = item.category.localizedCaseInsensitiveContains(searchText)
+                let clothingNameMatch = item.linkedClothing?.name.localizedCaseInsensitiveContains(searchText) ?? false
+                return categoryMatch || clothingNameMatch
+            }
+        }
+        
+        return result
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -27,26 +62,54 @@ struct OOTDCutoutListView: View {
                     Text("贴纸库")
                         .font(.headline)
                     Spacer()
-                    Text("共 \(cutouts.count) 个")
+                    Text("共 \(filteredCutouts.count) 个")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 
+                // Search Bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+                    TextField("搜索分类或关联服饰...", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                    
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .padding(8)
+                .background(Color(uiColor: .secondarySystemBackground))
+                .cornerRadius(10)
+                .padding(.horizontal)
+                
+                // Category Filter
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(categories, id: \.self) { category in
+                            CategoryChip(title: category, isSelected: selectedCategory == category) {
+                                withAnimation {
+                                    selectedCategory = category
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+                
                 // Expanded View (Grid)
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 16)], spacing: 16) {
                         addButton
                         
-                        ForEach(cutouts) { item in
-                            CutoutThumbnail(imagePath: item.imagePath, onDelete: {
-                                deleteCutout(item)
-                            })
-                            .onTapGesture {
-                                onSelect(item)
-                                withAnimation { isExpanded = false }
-                            }
+                        ForEach(filteredCutouts) { item in
+                            menuForItem(item)
                         }
                     }
                     .padding()
@@ -58,10 +121,11 @@ struct OOTDCutoutListView: View {
                         addButton
                         
                         ForEach(cutouts.prefix(20)) { item in
-                            CutoutThumbnail(imagePath: item.imagePath)
-                                .onTapGesture {
-                                    onSelect(item)
-                                }
+                            // In minimized view, tap still adds directly? 
+                            // Or should we enforce menu here too? 
+                            // User said "提供点击不是直接放到画布上...是先弹出菜单"
+                            // Let's use menu here too for consistency.
+                            menuForItem(item)
                         }
                     }
                     .padding()
@@ -74,9 +138,7 @@ struct OOTDCutoutListView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .onTapGesture {
-            // Expand on tap if not tapping an item (handled above)
-            // But wait, tapping an item adds it. Tapping background expands?
-            // Let's add a button to expand or use drag.
+            // Expand on tap if not tapping an item
         }
         .gesture(
             DragGesture()
@@ -88,10 +150,98 @@ struct OOTDCutoutListView: View {
                     }
                 }
         )
-        .alert("请稍后再试", isPresented: $showErrorAlert) {
+        .alert("提示", isPresented: $showAlert) {
             Button("确定", role: .cancel) { }
         } message: {
-            Text("删除操作暂时无法完成")
+            Text(alertMessage)
+        }
+        .sheet(item: $itemToReclassify) { item in
+            ReclassifyView(item: item, categories: selectableCategories) { newCategory in
+                item.category = newCategory
+                try? modelContext.save()
+                itemToReclassify = nil
+            }
+            .presentationDetents([.height(350)])
+        }
+    }
+    
+    private func menuForItem(_ item: CutoutItem) -> some View {
+        Menu {
+            Button {
+                onSelect(item)
+                withAnimation { isExpanded = false }
+            } label: {
+                Label("添加到画布", systemImage: "plus.square.on.square")
+            }
+            
+            Button {
+                reprocessCutout(item)
+            } label: {
+                Label("重新抠图", systemImage: "arrow.triangle.2.circlepath")
+            }
+            
+            Button {
+                itemToReclassify = item
+                // showReclassifySheet = true // Removed
+            } label: {
+                Label("修改分类", systemImage: "tag")
+            }
+            
+            Divider()
+            
+            Button(role: .destructive) {
+                deleteCutout(item)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        } label: {
+            CutoutThumbnail(imagePath: item.imagePath, category: item.category)
+                .overlay {
+                    if processingItem == item.id {
+                        ZStack {
+                            Color.black.opacity(0.3)
+                                .cornerRadius(12)
+                            ProgressView()
+                                .tint(.white)
+                        }
+                    }
+                }
+        }
+        // Menu usually handles tap, but we want to make sure it works.
+        // SwiftUI Menu works on tap.
+    }
+    
+    private func reprocessCutout(_ item: CutoutItem) {
+        // 1. Check if linked clothing exists and has images
+        guard let clothing = item.linkedClothing,
+              let firstImagePath = clothing.imagePaths.first else {
+            alertMessage = "找不到关联的原图，无法重新抠图。\n(仅支持通过关联服饰创建的抠图)"
+            showAlert = true
+            return
+        }
+        
+        // 2. Load original image
+        processingItem = item.id
+        Task {
+            // Use ImageManager to load the original image
+            // Note: clothing.imagePaths stores filenames
+            if let originalImage = ImageManager.shared.loadImage(fileName: firstImagePath) {
+                do {
+                    try await CutoutService.shared.reprocessItem(item: item, with: originalImage, context: modelContext)
+                    // Success feedback
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                } catch {
+                    print("Reprocess failed: \(error)")
+                    alertMessage = "重新抠图失败，请稍后重试。"
+                    showAlert = true
+                }
+            } else {
+                alertMessage = "原图文件已丢失。"
+                showAlert = true
+            }
+            
+            processingItem = nil
         }
     }
     
@@ -147,7 +297,7 @@ struct OOTDCutoutListView: View {
 
 struct CutoutThumbnail: View {
     let imagePath: String
-    var onDelete: (() -> Void)? = nil
+    var category: String? = nil
     
     @State private var image: UIImage?
     
@@ -165,6 +315,17 @@ struct CutoutThumbnail: View {
                         .background(Color.white)
                         .cornerRadius(12)
                         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        .overlay(alignment: .bottomLeading) {
+                            if let category = category {
+                                Text(category)
+                                    .font(.system(size: 8))
+                                    .padding(2)
+                                    .background(Color.black.opacity(0.5))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(4)
+                                    .padding(4)
+                            }
+                        }
                 } else {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color(uiColor: .secondarySystemBackground))
@@ -178,16 +339,70 @@ struct CutoutThumbnail: View {
                     image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: targetSize)
                 }
             }
-            
-            if let onDelete = onDelete {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.red)
-                        .background(Circle().fill(Color.white).padding(2))
-                        .shadow(color: .black.opacity(0.1), radius: 2)
+        }
+    }
+}
+
+struct CategoryChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.blue : Color(uiColor: .secondarySystemBackground))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(16)
+        }
+    }
+}
+
+struct ReclassifyView: View {
+    let item: CutoutItem
+    let categories: [String]
+    let onConfirm: (String) -> Void
+    
+    @State private var selectedCategory: String
+    
+    init(item: CutoutItem, categories: [String], onConfirm: @escaping (String) -> Void) {
+        self.item = item
+        self.categories = categories
+        self.onConfirm = onConfirm
+        _selectedCategory = State(initialValue: item.category)
+    }
+    
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("选择分类", selection: $selectedCategory) {
+                        ForEach(categories, id: \.self) { category in
+                            Text(category).tag(category)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                } header: {
+                    Text("当前分类: \(item.category)")
                 }
-                .offset(x: 8, y: -8)
+            }
+            .navigationTitle("修改分类")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("确定") {
+                        onConfirm(selectedCategory)
+                    }
+                }
             }
         }
     }

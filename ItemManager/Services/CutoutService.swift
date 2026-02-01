@@ -76,6 +76,16 @@ class CutoutService {
              }
         }
         
+        // 2.1 自动分类 (如果未指定分类)
+        var finalCategory = category
+        if category == "未分类" || category.isEmpty {
+            // 使用原图或抠图后的图进行分类？
+            // 抠图后的图背景是透明/白色，可能更有利于识别物体本身，但也丢失了环境信息
+            // 尝试使用抠图后的图片进行分类
+            finalCategory = await classifyImage(cutoutImage)
+            print("Auto-classified as: \(finalCategory)")
+        }
+        
         // 3. 添加白边
         let borderedImage = addWhiteBorder(to: cutoutImage)
         
@@ -88,7 +98,7 @@ class CutoutService {
         // 5. 创建 CutoutItem
         let item = CutoutItem(
             originalImageHash: originalHash,
-            category: category,
+            category: finalCategory,
             imagePath: fileName,
             width: Double(borderedImage.size.width),
             height: Double(borderedImage.size.height),
@@ -98,6 +108,169 @@ class CutoutService {
         context.insert(item)
         
         return item
+    }
+    
+    /// 重新抠图：使用提供的原图更新现有的 CutoutItem
+    /// - Parameters:
+    ///   - item: 需要更新的 CutoutItem
+    ///   - image: 原图
+    func reprocessItem(item: CutoutItem, with image: UIImage, context: ModelContext) async throws {
+        // 1. Normalize
+        let normalizedImage = normalizeOrientation(image)
+        
+        // 2. 识别并抠图
+        var cutoutImage: UIImage
+        // var confidence: Float // 未使用
+        
+        do {
+            (cutoutImage, _) = try await liftSubject(from: normalizedImage)
+        } catch {
+            print("Reprocess: Standard liftSubject failed: \(error). Trying fallback.")
+            if let saliencyResult = try? await liftSubjectUsingSaliency(from: normalizedImage) {
+                 cutoutImage = saliencyResult.0
+            } else {
+                throw error
+            }
+        }
+        
+        // 3. 添加白边
+        let borderedImage = addWhiteBorder(to: cutoutImage)
+        
+        // 4. 保存新图片
+        guard let fileName = ImageManager.shared.saveImage(borderedImage, context: context, format: .heic(quality: 0.8)) else {
+            throw CutoutError.processingFailed
+        }
+        
+        // 5. 更新 Item
+        // 处理旧图片引用计数
+        let oldPath = item.imagePath
+        if oldPath != fileName {
+            ImageManager.shared.deleteImage(fileName: oldPath, context: context)
+        } else {
+             // 如果文件名相同（内容哈希一致），saveImage 已经增加了引用计数，
+             // 我们需要减少一次，因为我们并没有真正增加一个新的引用持有者（只是更新了同一个对象）
+             // 或者更准确地说：
+             // saveImage: refCount + 1
+             // 我们即将用这个 fileName 替换 item.imagePath (如果是同一个值，则相当于没变)
+             // 如果是同一个值，refCount 增加了 1，但实际上 item 还是那个 item，只引用一次。
+             // 所以如果 fileName == oldPath，我们需要抵消 saveImage 带来的 +1。
+             ImageManager.shared.deleteImage(fileName: fileName, context: context)
+        }
+        
+        item.imagePath = fileName
+        item.width = Double(borderedImage.size.width)
+        item.height = Double(borderedImage.size.height)
+        
+        // 更新原图哈希
+        if let data = image.jpegData(compressionQuality: 0.5) {
+             item.originalImageHash = computeHash(data: data)
+        }
+        
+        // 注意：不更新分类 (category)，保留用户可能的手动修改
+    }
+    
+    // MARK: - Classification
+    
+    private func classifyImage(_ image: UIImage) async -> String {
+        guard let cgImage = image.cgImage else { return "小物" }
+        
+        let request = VNClassifyImageRequest()
+        // Use latest revision for better accuracy if available
+        // request.revision = VNClassifyImageRequestRevision2 
+        
+        let handler = VNImageRequestHandler(cgImage: cgImage)
+        
+        do {
+            try handler.perform([request])
+            guard let observations = request.results else { return "小物" }
+            
+            // Filter by confidence and map
+            // We look at the top results
+            let topResults = observations.filter { $0.confidence > 0.3 }.prefix(10)
+            
+            for observation in topResults {
+                // Check mapping
+                if let category = mapIdentifierToCategory(observation.identifier) {
+                    return category
+                }
+            }
+            
+            // Fallback logic: if no specific category matched, default to "小物"
+            return "小物"
+            
+        } catch {
+            print("Classification failed: \(error)")
+            return "小物"
+        }
+    }
+    
+    private func mapIdentifierToCategory(_ identifier: String) -> String? {
+        let id = identifier.lowercased()
+        
+        // 裙子 (Dresses & Skirts)
+        let dressKeywords = [
+            "dress", "skirt", "gown", "sarong", "kimono", "miniskirt", "overskirt",
+            "sundress", "cocktail dress", "evening gown", "wedding gown", "ball gown",
+            "chemise", "jumper", "pinafore", "frock", "kilt", "petticoat", "crinoline"
+        ]
+        if dressKeywords.contains(where: { id.contains($0) }) {
+            return "裙子"
+        }
+        
+        // 外套/上衣 (Outerwear & Tops)
+        let outerKeywords = [
+            "jacket", "coat", "blazer", "cardigan", "sweater", "sweatshirt", "hoodie",
+            "shirt", "trench coat", "overcoat", "parka", "poncho", "robe", "cloak",
+            "vest", "jersey", "top", "blouse", "t-shirt", "tee", "tank top", "camisole",
+            "pullover", "tunic", "waistcoat", "windbreaker", "bomber", "anorak", "cape",
+            "uniform", "lab coat", "suit", "tuxedo", "bathrobe", "pajama", "nightgown"
+        ]
+        if outerKeywords.contains(where: { id.contains($0) }) {
+            return "外套"
+        }
+        
+        // 鞋子 (Shoes)
+        let shoeKeywords = [
+            "shoe", "boot", "sneaker", "sandal", "heel", "loafer", "clog", "moccasin",
+            "slipper", "pump", "flat", "wedge", "platform", "stiletto", "oxford",
+            "derby", "brogue", "espadrille", "flip-flop", "galoshes", "wellington"
+        ]
+        if shoeKeywords.contains(where: { id.contains($0) }) {
+            return "鞋子"
+        }
+        
+        // 袜子 (Socks & Hosiery)
+        let sockKeywords = [
+            "sock", "stocking", "hosiery", "tights", "legging", "pantyhose", "leg warmer", "anklet"
+        ]
+        if sockKeywords.contains(where: { id.contains($0) }) {
+            return "袜子"
+        }
+        
+        // 玩偶 (Toys & Dolls)
+        let toyKeywords = [
+            "toy", "doll", "plush", "teddy", "figurine", "action figure", "puppet",
+            "marionette", "stuffed animal", "bear", "rabbit", "bunny", "cat", "dog"
+        ]
+        // 注意：某些动物名词可能会误报，但在抠图场景下通常是玩偶
+        if toyKeywords.contains(where: { id.contains($0) }) {
+            return "玩偶"
+        }
+        
+        // 小物 (Accessories)
+        let accessoryKeywords = [
+            "bag", "purse", "wallet", "hat", "cap", "scarf", "glove", "jewelry",
+            "necklace", "ring", "earring", "bracelet", "glasses", "sunglasses",
+            "watch", "umbrella", "tie", "belt", "accessory", "keychain", "hair",
+            "pin", "brooch", "headband", "bow", "ribbon", "fan", "mask", "wig",
+            "crown", "tiara", "helmet", "bonnet", "beret", "fedora", "cowboy hat",
+            "sombrero", "backpack", "satchel", "tote", "handbag", "clutch", "briefcase"
+        ]
+        if accessoryKeywords.contains(where: { id.contains($0) }) {
+            return "小物"
+        }
+        
+        return nil
     }
     
     // MARK: - Image Processing
