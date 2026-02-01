@@ -381,16 +381,15 @@ struct OOTDView: View {
     
     private func processCameraImage(_ image: UIImage, shouldCutout: Bool) {
         isProcessing = true
-        processingMessage = shouldCutout ? "正在识别主体..." : "正在处理图片..."
+        processingMessage = "正在识别主体..."
         
         Task {
             do {
-                let cutout: CutoutItem
-                if shouldCutout {
-                    cutout = try await CutoutService.shared.processImage(image: image, category: "未分类", context: modelContext)
-                } else {
-                    cutout = try await CutoutService.shared.processImageWithoutCutout(image: image, category: "未分类", context: modelContext)
-                }
+                // Since we only support "Camera with Cutout" now, shouldCutout is always true conceptually.
+                // But the caller might still pass parameters.
+                // However, we removed `processImageWithoutCutout`, so we MUST use `processImage` (which cuts out).
+                
+                let cutout = try await CutoutService.shared.processImage(image: image, category: "未分类", context: modelContext)
                 
                 await MainActor.run {
                     let generator = UIImpactFeedbackGenerator(style: .medium)

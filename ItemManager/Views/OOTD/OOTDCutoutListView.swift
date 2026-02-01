@@ -22,9 +22,21 @@ struct OOTDCutoutListView: View {
                 .padding(.bottom, 5)
             
             if isExpanded {
+                // Header
+                HStack {
+                    Text("贴纸库")
+                        .font(.headline)
+                    Spacer()
+                    Text("共 \(cutouts.count) 个")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                
                 // Expanded View (Grid)
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 16)], spacing: 16) {
                         addButton
                         
                         ForEach(cutouts) { item in
@@ -42,11 +54,11 @@ struct OOTDCutoutListView: View {
             } else {
                 // Minimized View (Horizontal Scroll)
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 15) {
+                    HStack(spacing: 16) {
                         addButton
                         
-                        ForEach(cutouts.prefix(10)) { item in
-                            CutoutThumbnail(imagePath: item.imagePath) // Minimized view usually doesn't show delete button to prevent accidental tap, or we can add it too.
+                        ForEach(cutouts.prefix(20)) { item in
+                            CutoutThumbnail(imagePath: item.imagePath)
                                 .onTapGesture {
                                     onSelect(item)
                                 }
@@ -56,9 +68,11 @@ struct OOTDCutoutListView: View {
                 }
             }
         }
-        .background(Color(uiColor: .systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(radius: 5)
+        .background(
+            Color(uiColor: .systemBackground)
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .onTapGesture {
             // Expand on tap if not tapping an item (handled above)
             // But wait, tapping an item adds it. Tapping background expands?
@@ -111,16 +125,21 @@ struct OOTDCutoutListView: View {
     
     var addButton: some View {
         Button(action: onAddPhoto) {
-            VStack {
-                Image(systemName: "camera.fill")
-                    .font(.largeTitle)
-                    .foregroundColor(.blue)
-                Text("抠图")
-                    .font(.caption)
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.1))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "plus")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                }
+                Text("添加")
+                    .font(.caption2)
                     .foregroundColor(.primary)
             }
             .frame(width: 72, height: 72)
-            .background(Color.gray.opacity(0.1))
+            .background(Color(uiColor: .secondarySystemBackground))
             .cornerRadius(12)
         }
     }
@@ -142,16 +161,14 @@ struct CutoutThumbnail: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 72, height: 72)
-                        .background(Color.gray.opacity(0.05))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
+                        .padding(4)
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                 } else {
-                    Color.gray.opacity(0.1)
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(uiColor: .secondarySystemBackground))
                         .frame(width: 72, height: 72)
-                        .cornerRadius(8)
                 }
             }
             .task {
@@ -165,11 +182,12 @@ struct CutoutThumbnail: View {
             if let onDelete = onDelete {
                 Button(action: onDelete) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.system(size: 20))
                         .foregroundColor(.red)
-                        .background(Circle().fill(Color.white))
+                        .background(Circle().fill(Color.white).padding(2))
+                        .shadow(color: .black.opacity(0.1), radius: 2)
                 }
-                .offset(x: 5, y: -5)
+                .offset(x: 8, y: -8)
             }
         }
     }
