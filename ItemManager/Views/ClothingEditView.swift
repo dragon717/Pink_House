@@ -240,7 +240,10 @@ struct ClothingEditView: View {
                                     TextField("小物名称", text: $item.name)
                                         .textFieldStyle(.roundedBorder)
                                     
-                                    TextField("价格", value: $item.price, format: .number)
+                                    TextField("0", value: Binding<Double?>(
+                                        get: { item.price == 0 ? nil : item.price },
+                                        set: { item.price = $0 ?? 0 }
+                                    ), format: .number)
                                         .keyboardType(.decimalPad)
                                         .textFieldStyle(.roundedBorder)
                                         .frame(width: 80)
@@ -762,7 +765,10 @@ struct PriceRow: View {
                 Text(title)
             }
             Spacer()
-            TextField("0", value: $value, format: .number.precision(.fractionLength(0...2)))
+            TextField("0", value: Binding<Double?>(
+                get: { value == 0 ? nil : value },
+                set: { value = $0 ?? 0 }
+            ), format: .number.precision(.fractionLength(0...2)))
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
             Text("¥")
