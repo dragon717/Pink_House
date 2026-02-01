@@ -21,6 +21,12 @@ struct BackupManifest: Codable {
     let cutouts: [CutoutItemDTO]
     let outfits: [OutfitDTO]
     
+    // New Features Backup (Optional for backward compatibility)
+    let appSettings: [String: String]?
+    let themeFiles: [String]?
+    let wealthFiles: [String]?
+    let hasWidgetBackground: Bool?
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int

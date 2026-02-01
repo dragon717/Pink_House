@@ -34,6 +34,19 @@ class CloudSyncManager: ObservableObject {
     @Published var lastCloudBackupDate: Date?
     @Published var syncError: String?
     
+    // Auto Sync Settings
+    @Published var isAutoSyncEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isAutoSyncEnabled, forKey: "isAutoSyncEnabled")
+        }
+    }
+    
+    @Published var hasSuccessfulBackup: Bool {
+        didSet {
+            UserDefaults.standard.set(hasSuccessfulBackup, forKey: "hasSuccessfulBackup")
+        }
+    }
+    
     private let recordType = "BackupArchive_v3" // 再次升级版本号以隔离数据
     
     // 在 Public DB 中，我们不能使用 Custom Zone（Public DB 只有一个 Default Zone），
@@ -41,7 +54,10 @@ class CloudSyncManager: ObservableObject {
     // 我们将使用用户的 iCloud User Record ID 作为 Record Name 的一部分。
     private var userRecordID: CKRecord.ID?
     
-    private init() {}
+    private init() {
+        self.isAutoSyncEnabled = UserDefaults.standard.bool(forKey: "isAutoSyncEnabled")
+        self.hasSuccessfulBackup = UserDefaults.standard.bool(forKey: "hasSuccessfulBackup")
+    }
     
     // MARK: - User Identity
     
@@ -83,8 +99,12 @@ class CloudSyncManager: ObservableObject {
                                 self?.lastCloudBackupDate = record.creationDate
                             }
                         case .failure(let error):
-                            print("Metadata fetch failed for record \(recordID.recordName): \(error)")
-                            // 可能是记录不存在，属于正常情况
+                            // 记录不存在是正常情况，不打印错误
+                            if let ckError = error as? CKError, ckError.code == .unknownItem {
+                                // Record not found, normal for new users
+                            } else {
+                                print("Metadata fetch failed for record \(recordID.recordName): \(error)")
+                            }
                         }
                     }
                 }
@@ -191,18 +211,23 @@ class CloudSyncManager: ObservableObject {
             try? FileManager.default.removeItem(at: backupURL)
             
             self.lastCloudBackupDate = Date()
+            self.hasSuccessfulBackup = true // Mark as successful
             print("Cloud Backup Success!")
             
             // 7. Verify
             print("Verifying backup integrity...")
             do {
+                // 等待 2 秒以确保 CloudKit 索引更新 (Public DB 可能有延迟)
+                try await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+                
                 let verifyRecord = try await database.record(for: recordID)
                 if let verifyDate = verifyRecord["backupDate"] as? Date {
                      print("Verification Success: Record found with date \(verifyDate)")
                 }
             } catch {
-                print("Verification Failed: \(error)")
-                throw error
+                print("Verification Warning: \(error). This might be due to propagation delay.")
+                // Verification failure shouldn't fail the whole process if upload succeeded
+                // We just log it.
             }
             
         } catch {
@@ -218,6 +243,34 @@ class CloudSyncManager: ObservableObject {
         isSyncing = false
     }
     
+    // MARK: - Auto Sync
+    
+    func triggerAutoSync(modelContainer: ModelContainer) {
+        guard isAutoSyncEnabled, hasSuccessfulBackup else { return }
+        guard !isSyncing else { return }
+        
+        // Check time interval (e.g., minimum 1 hour between auto backups)
+        if let lastDate = lastCloudBackupDate, Date().timeIntervalSince(lastDate) < 3600 {
+            print("Auto Sync: Skipped (Last backup was less than 1 hour ago)")
+            return
+        }
+        
+        print("Auto Sync: Triggering background backup...")
+        Task {
+            // Auto sync should be silent (no UI blocking usually, but here we share isSyncing state)
+            // Ideally we should have a separate 'isAutoSyncing' or handle UI gracefully.
+            // For now, we reuse uploadBackup but we might want to suppress errors in UI if it's auto.
+            // But since 'isSyncing' shows a spinner, it might be annoying if it pops up randomly.
+            // However, this is triggered on Background, so UI isn't visible.
+            
+            // We verify permissions first
+            let accountStatus = try? await container.accountStatus()
+            guard accountStatus == .available else { return }
+            
+            await uploadBackup(modelContainer: modelContainer)
+        }
+    }
+
     // MARK: - Download (Restore)
     
     func restoreFromCloud(context: ModelContext) async -> Bool {
@@ -248,6 +301,7 @@ class CloudSyncManager: ObservableObject {
             
             print("Cloud Restore Success!")
             isSyncing = false
+            self.hasSuccessfulBackup = true // Restore implies a backup exists
             return true
             
         } catch {

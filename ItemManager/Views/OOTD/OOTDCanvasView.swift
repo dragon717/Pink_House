@@ -174,79 +174,98 @@ struct CanvasItemView: View {
     // Removed internal scale/rotation states as they are now controlled by parent
     
     var body: some View {
-        if let cutout = item.cutout, 
-           let uiImage = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
-            
-            Image(uiImage: uiImage)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 200, height: 200) // Base size, adjusted by scale
-                .scaleEffect(item.scale * additionalScale)
-                .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
-                .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
-                .overlay(
-                    ZStack {
-                        if isSelected {
-                            Rectangle()
-                                .strokeBorder(Color.blue, lineWidth: 2)
-                            
-                            // Delete Button (Top Right)
-                            Button(action: onDelete) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.red)
-                                    .background(Circle().fill(Color.white))
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                            .offset(x: 12, y: -12)
-                            
-                            // Bring to Front (Top Left) - 置顶
-                            Button(action: onBringToFront) {
-                                Image(systemName: "arrow.up.to.line.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.blue)
-                                    .background(Circle().fill(Color.white))
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                            .offset(x: -12, y: -12)
-                            
-                            // Bring Forward (Bottom Left) - 加一层
-                            Button(action: onBringForward) {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.green)
-                                    .background(Circle().fill(Color.white))
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                            .offset(x: -12, y: 12)
-                            
-                            // Send Backward (Bottom Right) - 减一层
-                            Button(action: onSendBackward) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.orange)
-                                    .background(Circle().fill(Color.white))
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                            .offset(x: 12, y: 12)
-                        }
+        Group {
+            if let cutout = item.cutout, 
+               let uiImage = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
+                
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                // Placeholder for missing image
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.secondary.opacity(0.1))
+                        .stroke(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [5]))
+                    
+                    VStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.largeTitle)
+                            .foregroundStyle(.orange)
+                        Text(item.cutout == nil ? "数据丢失" : "图片丢失")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .frame(width: 200, height: 200) // Match frame
-                    .scaleEffect(item.scale * additionalScale)
-                    .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
-                    .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
-                )
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            currentOffset = value.translation
-                        }
-                        .onEnded { value in
-                            item.x += value.translation.width
-                            item.y += value.translation.height
-                            currentOffset = .zero
-                        }
-                )
+                }
+                .padding()
+            }
         }
+        .frame(width: 200, height: 200) // Base size, adjusted by scale
+        .scaleEffect(item.scale * additionalScale)
+        .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
+        .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
+        .overlay(
+            ZStack {
+                if isSelected {
+                    Rectangle()
+                        .strokeBorder(Color.blue, lineWidth: 2)
+                    
+                    // Delete Button (Top Right)
+                    Button(action: onDelete) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.red)
+                            .background(Circle().fill(Color.white))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .offset(x: 12, y: -12)
+                    
+                    // Bring to Front (Top Left) - 置顶
+                    Button(action: onBringToFront) {
+                        Image(systemName: "arrow.up.to.line.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.blue)
+                            .background(Circle().fill(Color.white))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .offset(x: -12, y: -12)
+                    
+                    // Bring Forward (Bottom Left) - 加一层
+                    Button(action: onBringForward) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.green)
+                            .background(Circle().fill(Color.white))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .offset(x: -12, y: 12)
+                    
+                    // Send Backward (Bottom Right) - 减一层
+                    Button(action: onSendBackward) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.orange)
+                            .background(Circle().fill(Color.white))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .offset(x: 12, y: 12)
+                }
+            }
+            .frame(width: 200, height: 200) // Match frame
+            .scaleEffect(item.scale * additionalScale)
+            .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
+            .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
+        )
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    currentOffset = value.translation
+                }
+                .onEnded { value in
+                    item.x += value.translation.width
+                    item.y += value.translation.height
+                    currentOffset = .zero
+                }
+        )
     }
 }

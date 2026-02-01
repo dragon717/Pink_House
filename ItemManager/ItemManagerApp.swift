@@ -43,6 +43,8 @@ struct ItemManagerApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .background || newPhase == .inactive {
                         SharedPersistence.shared.syncWidgetData()
+                        // Trigger Auto Sync if enabled
+                        CloudSyncManager.shared.triggerAutoSync(modelContainer: SharedPersistence.shared.sharedModelContainer)
                     }
                 }
         }

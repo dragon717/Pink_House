@@ -14,6 +14,7 @@ struct OOTDView: View {
     @State private var isProcessing = false
     @State private var processingMessage = ""
     @State private var showingBatchConfirmation = false
+    @State private var showingRepairConfirmation = false
     @State private var showingRenameAlert = false
     @State private var newName = ""
     @State private var showingDeleteCurrentAlert = false
@@ -131,6 +132,12 @@ struct OOTDView: View {
                         } label: {
                             Label("批量处理小裙子", systemImage: "wand.and.stars")
                         }
+                        
+                        Button {
+                            showingRepairConfirmation = true
+                        } label: {
+                            Label("修复丢失图片", systemImage: "hammer")
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -186,6 +193,14 @@ struct OOTDView: View {
                 Button("取消", role: .cancel) {}
             } message: {
                 Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
+            }
+            .alert("修复数据", isPresented: $showingRepairConfirmation) {
+                Button("开始修复") {
+                    repairMissingCutouts()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将扫描所有搭配中丢失图片的元素，并尝试从关联的小裙子重新生成抠图。")
             }
             .onAppear {
                 if currentOutfit == nil {
@@ -431,6 +446,68 @@ struct OOTDView: View {
         }
     }
     
+    private func repairMissingCutouts() {
+        isProcessing = true
+        processingMessage = "正在扫描并修复数据..."
+        
+        Task {
+            var repairedCount = 0
+            var failCount = 0
+            var skippedCount = 0
+            
+            // Fetch all cutouts
+            let descriptor = FetchDescriptor<CutoutItem>()
+            guard let allCutouts = try? modelContext.fetch(descriptor) else {
+                await MainActor.run { isProcessing = false }
+                return
+            }
+            
+            let total = allCutouts.count
+            print("Repair: Scanning \(total) cutouts...")
+            
+            for (index, cutout) in allCutouts.enumerated() {
+                // Check if image is missing
+                if ImageManager.shared.loadImage(fileName: cutout.imagePath) == nil {
+                    // Try to recover from linked clothing
+                    if let clothing = cutout.linkedClothing,
+                       let firstPath = clothing.imagePaths.first,
+                       let originalImage = ImageManager.shared.loadImage(fileName: firstPath) {
+                        
+                        await MainActor.run {
+                            processingMessage = "修复中: \(cutout.category) (\(index + 1)/\(total))"
+                        }
+                        
+                        do {
+                            try await CutoutService.shared.reprocessItem(item: cutout, with: originalImage, context: modelContext)
+                            repairedCount += 1
+                        } catch {
+                            print("Repair failed for \(cutout.id): \(error)")
+                            failCount += 1
+                        }
+                    } else {
+                        failCount += 1 // Cannot repair
+                    }
+                } else {
+                    skippedCount += 1
+                }
+            }
+            
+            await MainActor.run {
+                isProcessing = false
+                processingMessage = ""
+                // We could show a result alert here using another state, 
+                // but for now printing is enough as the visual change will be immediate.
+                print("Repair finished. Repaired: \(repairedCount), Failed: \(failCount), OK: \(skippedCount)")
+                
+                // Force UI refresh if needed (SwiftData should handle it)
+                if let current = currentOutfit {
+                    // Toggle current to force refresh?
+                    // id(outfit.id) in view should handle it if items update.
+                }
+            }
+        }
+    }
+
     private func processPickedImage(_ item: PhotosPickerItem) {
         isProcessing = true
         processingMessage = "正在识别主体..."
