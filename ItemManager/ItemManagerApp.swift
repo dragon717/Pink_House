@@ -39,6 +39,11 @@ struct ItemManagerApp: App {
                     }
 
                     SharedPersistence.shared.syncWidgetData()
+                    
+                    // Silent Restore Check
+                    Task {
+                        await CloudSyncManager.shared.checkAndSilentRestore(container: SharedPersistence.shared.sharedModelContainer)
+                    }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .background || newPhase == .inactive {

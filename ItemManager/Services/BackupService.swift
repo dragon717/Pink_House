@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 import UIKit
 import WidgetKit
+import CryptoKit
 
 // MARK: - Backup Service
 
@@ -81,10 +82,8 @@ class BackupService {
                     continue
                 }
                 
-                if safeItem.isDeleted {
-                    failCount += 1
-                    continue
-                }
+                // Removed generic isDeleted check to avoid conflict with Clothing.isDeleted (soft delete)
+                // Since we fetched with includePendingChanges = false, we should be safe from hard-deleted items.
                 
                 if let result = process(safeItem) {
                     results.append(result)
@@ -105,12 +104,15 @@ class BackupService {
 
     // MARK: - Export
     
-    nonisolated func exportBackup(container: ModelContainer) async throws -> URL {
-        // Immediate Log to verify execution start
-        print("### Export: exportBackup called on background service.")
+    struct BackupData {
+        let manifest: BackupManifest
+        let imageFiles: [String: URL]
+    }
+    
+    nonisolated func prepareBackupData(container: ModelContainer) async throws -> BackupData {
+        print("### Export: prepareBackupData called.")
         
         let imagesDir = await ImageManager.shared.imagesDirectory
-        // 0. Capture MainActor properties and Settings
         let deviceName = await UIDevice.current.name
         
         // Capture Settings
@@ -122,8 +124,8 @@ class BackupService {
             "theme_is_blur_enabled",
             "isDepositNotificationEnabled",
             "depositNotificationDaysBefore",
-            "depositNotificationTime", // Note: Date needs special handling if stored as Object
-            "AppleLanguages" // Array of strings
+            "depositNotificationTime",
+            "AppleLanguages"
         ]
         
         for key in keysToBackup {
@@ -140,18 +142,12 @@ class BackupService {
             }
         }
         
-        print("### Export: Captured device info and settings. Starting background task...")
-        
-        // Run everything in a detached task with a NEW ModelContext
         return try await Task.detached(priority: .medium) {
             print("### Export: Background task started.")
             
-            // Create a local context for background work
             let context = ModelContext(container)
             context.autosaveEnabled = false
             
-            // Shared file collection
-            // We use this to track which Standard Images need to be backed up
             var standardImagesToBackup: Set<String> = []
             
             // 1. Brands
@@ -176,15 +172,10 @@ class BackupService {
             var clothingDescriptor = FetchDescriptor<Clothing>()
             clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.cutouts]
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
-                // 排除回收站中的物品
-                if c.isDeleted { return nil }
-                
-                // 填充映射表
                 for cutout in c.cutouts {
                     cutoutIDToClothingID[cutout.id] = c.id
                 }
                 
-                // Sanitize and collect image paths
                 let safeImagePaths = c.imagePaths.map { ($0 as NSString).lastPathComponent }
                 
                 for path in safeImagePaths {
@@ -212,7 +203,7 @@ class BackupService {
                     length: c.length,
                     condition: c.condition,
                     accessories: c.accessories,
-                    imagePaths: safeImagePaths, // Use sanitized paths
+                    imagePaths: safeImagePaths,
                     isShared: c.isShared,
                     price: c.price,
                     deposit: c.deposit,
@@ -226,6 +217,8 @@ class BackupService {
                     note: c.note,
                     stock: c.stock,
                     status: c.status.rawValue,
+                    isDeleted: c.isDeleted,
+                    deletedAt: c.deletedAt,
                     createdAt: c.createdAt,
                     updatedAt: c.updatedAt
                 )
@@ -245,7 +238,7 @@ class BackupService {
                     originalImageHash: c.originalImageHash,
                     timestamp: c.timestamp,
                     category: c.category,
-                    imagePath: fileName, // Use sanitized filename
+                    imagePath: fileName,
                     width: c.width,
                     height: c.height,
                     linkedClothingID: linkedClothingID
@@ -268,6 +261,19 @@ class BackupService {
                     for item in o.items {
                         if item.isDeleted { continue }
                         let cutoutID = item.cutout?.id
+                        
+                        var backupImagePath: String?
+                        var backupWidth: Double?
+                        var backupHeight: Double?
+                        
+                        if let cutout = item.cutout {
+                            let fileName = (cutout.imagePath as NSString).lastPathComponent
+                            backupImagePath = fileName
+                            backupWidth = cutout.width
+                            backupHeight = cutout.height
+                            standardImagesToBackup.insert(fileName)
+                        }
+                        
                         let itemDTO = OutfitItemDTO(
                             id: item.id,
                             x: item.x,
@@ -275,7 +281,10 @@ class BackupService {
                             rotation: item.rotation,
                             scale: item.scale,
                             zIndex: item.zIndex,
-                            cutoutID: cutoutID
+                            cutoutID: cutoutID,
+                            backupImagePath: backupImagePath,
+                            backupImageWidth: backupWidth,
+                            backupImageHeight: backupHeight
                         )
                         items.append(itemDTO)
                     }
@@ -287,19 +296,16 @@ class BackupService {
                     id: o.id,
                     createdAt: o.createdAt,
                     note: o.note,
-                    snapshotPath: safeSnapshotPath, // Use sanitized path
+                    snapshotPath: safeSnapshotPath,
                     items: items
                 )
             }
-            
-            // --- New Features: Gather External Files ---
             
             let fileManager = FileManager.default
             guard let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 throw BackupError.fileCreateFailed
             }
             
-            // A. Theme Files
             var themeFiles: [String] = []
             let possibleThemeFiles = ["theme_background_image.png", "theme_background_image_original.png"]
             for file in possibleThemeFiles {
@@ -309,9 +315,7 @@ class BackupService {
                 }
             }
             
-            // B. Wealth Files
             var wealthFiles: [String] = []
-            // Scan for wealth_*.png
             if let docFiles = try? fileManager.contentsOfDirectory(atPath: documentsDir.path) {
                 for file in docFiles {
                     if file.hasPrefix("wealth_") && file.hasSuffix(".png") {
@@ -320,7 +324,6 @@ class BackupService {
                 }
             }
             
-            // C. Widget Background
             var hasWidgetBackground = false
             var widgetBackgroundURL: URL? = nil
             if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.bugod2.ItemManager") {
@@ -331,8 +334,60 @@ class BackupService {
                 }
             }
             
+            print("### Export: Collecting files...")
+            
+            var imageFiles: [String: URL] = [:]
+            
+            for fileName in standardImagesToBackup {
+                let fileURL = imagesDir.appendingPathComponent(fileName)
+                if fileManager.fileExists(atPath: fileURL.path) {
+                    imageFiles[fileName] = fileURL
+                }
+            }
+            
+            for fileName in themeFiles {
+                let fileURL = documentsDir.appendingPathComponent(fileName)
+                if fileManager.fileExists(atPath: fileURL.path) {
+                    imageFiles[fileName] = fileURL
+                }
+            }
+            
+            for fileName in wealthFiles {
+                let fileURL = documentsDir.appendingPathComponent(fileName)
+                if fileManager.fileExists(atPath: fileURL.path) {
+                    imageFiles[fileName] = fileURL
+                }
+            }
+            
+            if let widgetURL = widgetBackgroundURL {
+                imageFiles["widget_background.jpg"] = widgetURL
+            }
+            
+            // Calculate External File Hashes
+            var externalHashes: [String: String] = [:]
+            
+            func fileHash(_ url: URL) -> String? {
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                let digest = SHA256.hash(data: data)
+                return digest.compactMap { String(format: "%02x", $0) }.joined()
+            }
+            
+            for file in themeFiles {
+                if let url = imageFiles[file], let h = fileHash(url) {
+                    externalHashes[file] = h
+                }
+            }
+            for file in wealthFiles {
+                if let url = imageFiles[file], let h = fileHash(url) {
+                    externalHashes[file] = h
+                }
+            }
+            if hasWidgetBackground, let url = imageFiles["widget_background.jpg"], let h = fileHash(url) {
+                externalHashes["widget_background.jpg"] = h
+            }
+            
             let manifest = BackupManifest(
-                version: "1.1", // Bump version
+                version: "1.2",
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -345,111 +400,64 @@ class BackupService {
                 themeFiles: themeFiles,
                 wealthFiles: wealthFiles,
                 hasWidgetBackground: hasWidgetBackground,
+                externalFileHashes: externalHashes,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: outfitDTOs.count
             )
             
-            print("### Export: Collecting files...")
-            
-            // Build file list [FileName: DiskURL]
-            var imageFiles: [String: URL] = [:]
-            
-            // 1. Standard Images
-            for fileName in standardImagesToBackup {
-                let fileURL = imagesDir.appendingPathComponent(fileName)
-                if fileManager.fileExists(atPath: fileURL.path) {
-                    imageFiles[fileName] = fileURL
-                }
-            }
-            
-            // 2. Theme Files
-            for fileName in themeFiles {
-                let fileURL = documentsDir.appendingPathComponent(fileName)
-                if fileManager.fileExists(atPath: fileURL.path) {
-                    imageFiles[fileName] = fileURL
-                }
-            }
-            
-            // 3. Wealth Files
-            for fileName in wealthFiles {
-                let fileURL = documentsDir.appendingPathComponent(fileName)
-                if fileManager.fileExists(atPath: fileURL.path) {
-                    imageFiles[fileName] = fileURL
-                }
-            }
-            
-            // 4. Widget Background
-            if let widgetURL = widgetBackgroundURL {
-                imageFiles["widget_background.jpg"] = widgetURL
-            }
-            
-            print("### Export: Total files to archive: \(imageFiles.count)")
-            
-            // 1. Generate Manifest JSON
-            let jsonEncoder = JSONEncoder()
-            jsonEncoder.dateEncodingStrategy = .iso8601
-            let jsonData = try jsonEncoder.encode(manifest)
-            
-            // 2. Archive
-            print("### Export: Archiving using NativePackageWrapper...")
-            let compressedData = try NativePackageWrapper.createPackage(manifestData: jsonData, imageFiles: imageFiles)
-            
-            // 3. Generate Output File
-            
-            // 3. 生成输出文件名并写入
-            let dateString = Date().formatted(.dateTime.year().month().day().hour().minute().second())
-                .replacingOccurrences(of: "/", with: "")
-                .replacingOccurrences(of: ":", with: "")
-                .replacingOccurrences(of: " ", with: "_")
-            let fileName = "Shaonvxinyuan\(dateString).save"
-            
-            let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let backupsDir = documentsURL.appendingPathComponent("Backups")
-            
-            if !fileManager.fileExists(atPath: backupsDir.path) {
-                try? fileManager.createDirectory(at: backupsDir, withIntermediateDirectories: true)
-            } else {
-                let oldFiles = try? fileManager.contentsOfDirectory(at: backupsDir, includingPropertiesForKeys: nil)
-                for fileURL in oldFiles ?? [] {
-                    try? fileManager.removeItem(at: fileURL)
-                }
-            }
-            
-            let finalURL = backupsDir.appendingPathComponent(fileName)
-            try compressedData.write(to: finalURL, options: .atomic)
-            
-            print("### Export: Backup file ready at \(finalURL.path) (Size: \(compressedData.count) bytes)")
-            
-            return finalURL
+            print("### Export: Prepared data. Total files: \(imageFiles.count)")
+            return BackupData(manifest: manifest, imageFiles: imageFiles)
         }.value
+    }
+    
+    nonisolated func exportBackup(container: ModelContainer) async throws -> URL {
+        let backupData = try await prepareBackupData(container: container)
+        let manifest = backupData.manifest
+        let imageFiles = backupData.imageFiles
+        
+        // 1. Generate Manifest JSON
+        let jsonEncoder = JSONEncoder()
+        jsonEncoder.dateEncodingStrategy = .iso8601
+        let jsonData = try jsonEncoder.encode(manifest)
+        
+        // 2. Archive
+        print("### Export: Archiving using NativePackageWrapper...")
+        let compressedData = try NativePackageWrapper.createPackage(manifestData: jsonData, imageFiles: imageFiles)
+        
+        // 3. Generate Output File
+        let dateString = Date().formatted(.dateTime.year().month().day().hour().minute().second())
+            .replacingOccurrences(of: "/", with: "")
+            .replacingOccurrences(of: ":", with: "")
+            .replacingOccurrences(of: " ", with: "_")
+        let fileName = "Shaonvxinyuan\(dateString).save"
+        
+        let fileManager = FileManager.default
+        let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let backupsDir = documentsURL.appendingPathComponent("Backups")
+        
+        if !fileManager.fileExists(atPath: backupsDir.path) {
+            try? fileManager.createDirectory(at: backupsDir, withIntermediateDirectories: true)
+        } else {
+            let oldFiles = try? fileManager.contentsOfDirectory(at: backupsDir, includingPropertiesForKeys: nil)
+            for fileURL in oldFiles ?? [] {
+                try? fileManager.removeItem(at: fileURL)
+            }
+        }
+        
+        let finalURL = backupsDir.appendingPathComponent(fileName)
+        try compressedData.write(to: finalURL, options: .atomic)
+        
+        print("### Export: Backup file ready at \(finalURL.path) (Size: \(compressedData.count) bytes)")
+        
+        return finalURL
     }
     
     // MARK: - Import
     
-    func importBackup(from url: URL, context: ModelContext) throws {
-        print("### Import: Starting native-wrapper based import from \(url.path)")
-        
-        // 1. 读取备份文件数据
-        let compressedData = try Data(contentsOf: url)
-        if compressedData.isEmpty { 
-            throw BackupError.invalidArchive 
-        }
-        
-        // 2. 使用原生方案解压缩和还原打包目录 (内部映射 libcompression)
-        print("### Import: Unwrapping package...")
-        let fileMap = try NativePackageWrapper.unwrapPackage(data: compressedData)
-        print("### Import: Unwrapped \(fileMap.count) files.")
-        
-        // 3. 提取 Manifest
-        guard let manifestData = fileMap["manifest.json"] else {
-            print("### Import: CRITICAL ERROR - manifest.json missing in fileMap.")
-            throw BackupError.invalidArchive
-        }
-        
-        let jsonDecoder = JSONDecoder()
-        jsonDecoder.dateDecodingStrategy = .iso8601
-        let manifest = try jsonDecoder.decode(BackupManifest.self, from: manifestData)
+    /// Low-level restore function that takes a Manifest and a map of Image Filenames to Local URLs
+    func restoreFromManifest(manifest: BackupManifest, imageFiles: [String: URL], context: ModelContext) throws {
+        print("### Restore: Starting restore from manifest...")
         
         // --- 开始分阶段恢复 ---
         
@@ -464,7 +472,7 @@ class BackupService {
         let themeFilesSet = Set(manifest.themeFiles ?? [])
         let wealthFilesSet = Set(manifest.wealthFiles ?? [])
         
-        for (fileName, data) in fileMap where fileName != "manifest.json" {
+        for (fileName, sourceURL) in imageFiles {
             var destinationURL: URL
             
             if themeFilesSet.contains(fileName) || wealthFilesSet.contains(fileName) {
@@ -487,7 +495,10 @@ class BackupService {
             // Standard images are content-addressed (hashed), so if they exist, they are same.
             // But Settings-related images might change with same filename, so we overwrite them.
             if !fileManager.fileExists(atPath: destinationURL.path) || themeFilesSet.contains(fileName) || wealthFilesSet.contains(fileName) || fileName == "widget_background.jpg" {
-                try? data.write(to: destinationURL)
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    try? fileManager.removeItem(at: destinationURL)
+                }
+                try? fileManager.copyItem(at: sourceURL, to: destinationURL)
             }
         }
         
@@ -577,6 +588,8 @@ class BackupService {
                 clothingBack.note = dto.note
                 clothingBack.stock = dto.stock
                 clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
+                clothingBack.isDeleted = dto.isDeleted ?? false
+                clothingBack.deletedAt = dto.deletedAt
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
             } else {
@@ -606,6 +619,8 @@ class BackupService {
                 clothingBack.note = dto.note
                 clothingBack.stock = dto.stock
                 clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
+                clothingBack.isDeleted = dto.isDeleted ?? false
+                clothingBack.deletedAt = dto.deletedAt
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
             }
@@ -679,8 +694,28 @@ class BackupService {
                     context.insert(item)
                     item.outfit = outfit
                 }
-                if let cid = itemDTO.cutoutID {
-                    item.cutout = cutoutMap[cid]
+                if let cid = itemDTO.cutoutID, let found = cutoutMap[cid] {
+                    item.cutout = found
+                } else if let backupPath = itemDTO.backupImagePath, !backupPath.isEmpty {
+                    // Fallback: Use redundant backup info
+                    print("Restore: OutfitItem \(itemDTO.id) missing linked cutout. Using backup info: \(backupPath)")
+                    
+                    // Check if we already created a fallback cutout for this path to avoid duplicates
+                    let fallbackDescriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.imagePath == backupPath })
+                    if let existingFallback = try? context.fetch(fallbackDescriptor).first {
+                        item.cutout = existingFallback
+                    } else {
+                        // Create new ad-hoc cutout
+                        let newCutout = CutoutItem(
+                            originalImageHash: "restored_fallback_\(UUID().uuidString)",
+                            category: "未分类",
+                            imagePath: backupPath,
+                            width: itemDTO.backupImageWidth ?? 200,
+                            height: itemDTO.backupImageHeight ?? 200
+                        )
+                        context.insert(newCutout)
+                        item.cutout = newCutout
+                    }
                 }
             }
         }
@@ -695,7 +730,6 @@ class BackupService {
                 case "theme_background_opacity":
                     if let doubleVal = Double(value) { UserDefaults.standard.set(doubleVal, forKey: key) }
                 case "theme_is_blur_enabled", "isDepositNotificationEnabled":
-                    // NSNumber.stringValue for true is "1"
                     if let boolVal = Bool(value) { UserDefaults.standard.set(boolVal, forKey: key) }
                     else if let intVal = Int(value) { UserDefaults.standard.set(intVal == 1, forKey: key) }
                 case "depositNotificationDaysBefore":
@@ -706,15 +740,56 @@ class BackupService {
                      let languages = value.components(separatedBy: ",")
                      UserDefaults.standard.set(languages, forKey: key)
                 default:
-                    // String fallback (colors, styles)
                     UserDefaults.standard.set(value, forKey: key)
                 }
             }
             UserDefaults.standard.synchronize()
-            // Notify Widget
             WidgetCenter.shared.reloadAllTimelines()
         }
         
         print("--- Import Successful! ---")
+    }
+
+    func importBackup(from url: URL, context: ModelContext) throws {
+        print("### Import: Starting native-wrapper based import from \(url.path)")
+        
+        // 1. 读取备份文件数据
+        let compressedData = try Data(contentsOf: url)
+        if compressedData.isEmpty { 
+            throw BackupError.invalidArchive 
+        }
+        
+        // 2. 使用原生方案解压缩和还原打包目录 (内部映射 libcompression)
+        print("### Import: Unwrapping package...")
+        let fileMap = try NativePackageWrapper.unwrapPackage(data: compressedData)
+        print("### Import: Unwrapped \(fileMap.count) files.")
+        
+        // 3. 提取 Manifest
+        guard let manifestData = fileMap["manifest.json"] else {
+            print("### Import: CRITICAL ERROR - manifest.json missing in fileMap.")
+            throw BackupError.invalidArchive
+        }
+        
+        let jsonDecoder = JSONDecoder()
+        jsonDecoder.dateDecodingStrategy = .iso8601
+        let manifest = try jsonDecoder.decode(BackupManifest.self, from: manifestData)
+        
+        // 4. Prepare temporary files for restoration
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        var tempFileMap: [String: URL] = [:]
+        
+        for (fileName, data) in fileMap where fileName != "manifest.json" {
+            let tempURL = tempDir.appendingPathComponent(fileName)
+            try data.write(to: tempURL)
+            tempFileMap[fileName] = tempURL
+        }
+        
+        // 5. Call internal restore
+        try restoreFromManifest(manifest: manifest, imageFiles: tempFileMap, context: context)
+        
+        // 6. Cleanup
+        try? FileManager.default.removeItem(at: tempDir)
     }
 }

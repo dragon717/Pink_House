@@ -27,6 +27,9 @@ struct BackupManifest: Codable {
     let wealthFiles: [String]?
     let hasWidgetBackground: Bool?
     
+    // Version 1.2: External File Hashes for Incremental Sync
+    let externalFileHashes: [String: String]? // [FileName: Hash]
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int
@@ -70,6 +73,8 @@ struct ClothingDTO: Codable {
     let note: String
     let stock: Int
     let status: String
+    let isDeleted: Bool?
+    let deletedAt: Date?
     let createdAt: Date
     let updatedAt: Date
 }
@@ -108,4 +113,9 @@ struct OutfitItemDTO: Codable {
     let scale: Double
     let zIndex: Int
     let cutoutID: UUID?
+    
+    // Redundant Backup Data for Robust Restore
+    var backupImagePath: String?
+    var backupImageWidth: Double?
+    var backupImageHeight: Double?
 }

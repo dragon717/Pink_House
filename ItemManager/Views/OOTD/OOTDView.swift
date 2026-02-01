@@ -195,12 +195,12 @@ struct OOTDView: View {
                 Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
             }
             .alert("修复数据", isPresented: $showingRepairConfirmation) {
-                Button("开始修复") {
+                Button("开始深度修复") {
                     repairMissingCutouts()
                 }
                 Button("取消", role: .cancel) {}
             } message: {
-                Text("将扫描所有搭配中丢失图片的元素，并尝试从关联的小裙子重新生成抠图。")
+                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
             }
             .onAppear {
                 if currentOutfit == nil {
@@ -448,61 +448,129 @@ struct OOTDView: View {
     
     private func repairMissingCutouts() {
         isProcessing = true
-        processingMessage = "正在扫描并修复数据..."
+        processingMessage = "正在深度修复数据..."
         
         Task {
-            var repairedCount = 0
+            var relinkedCount = 0
+            var regeneratedCount = 0
             var failCount = 0
-            var skippedCount = 0
             
-            // Fetch all cutouts
-            let descriptor = FetchDescriptor<CutoutItem>()
-            guard let allCutouts = try? modelContext.fetch(descriptor) else {
+            // 1. 获取所有 Outfit
+            let outfitDescriptor = FetchDescriptor<Outfit>()
+            guard let allOutfits = try? modelContext.fetch(outfitDescriptor) else {
                 await MainActor.run { isProcessing = false }
                 return
             }
             
-            let total = allCutouts.count
-            print("Repair: Scanning \(total) cutouts...")
+            // 2. 获取所有 CutoutItem (作为缓存库)
+            let cutoutDescriptor = FetchDescriptor<CutoutItem>()
+            guard let allCutouts = try? modelContext.fetch(cutoutDescriptor) else {
+                await MainActor.run { isProcessing = false }
+                return
+            }
             
-            for (index, cutout) in allCutouts.enumerated() {
-                // Check if image is missing
-                if ImageManager.shared.loadImage(fileName: cutout.imagePath) == nil {
-                    // Try to recover from linked clothing
-                    if let clothing = cutout.linkedClothing,
-                       let firstPath = clothing.imagePaths.first,
-                       let originalImage = ImageManager.shared.loadImage(fileName: firstPath) {
-                        
-                        await MainActor.run {
-                            processingMessage = "修复中: \(cutout.category) (\(index + 1)/\(total))"
-                        }
-                        
-                        do {
-                            try await CutoutService.shared.reprocessItem(item: cutout, with: originalImage, context: modelContext)
-                            repairedCount += 1
-                        } catch {
-                            print("Repair failed for \(cutout.id): \(error)")
-                            failCount += 1
-                        }
-                    } else {
-                        failCount += 1 // Cannot repair
+            // 构建快速查找表
+            // Hash -> [CutoutItem] (Valid ones)
+            var validCutoutsByHash: [String: [CutoutItem]] = [:]
+            // ClothingID -> [CutoutItem] (Valid ones)
+            var validCutoutsByClothing: [UUID: [CutoutItem]] = [:]
+            
+            for cutout in allCutouts {
+                if ImageManager.shared.loadImage(fileName: cutout.imagePath) != nil {
+                    if !cutout.originalImageHash.isEmpty {
+                        validCutoutsByHash[cutout.originalImageHash, default: []].append(cutout)
                     }
-                } else {
-                    skippedCount += 1
+                    if let clothingID = cutout.linkedClothing?.id {
+                        validCutoutsByClothing[clothingID, default: []].append(cutout)
+                    }
                 }
             }
+            
+            let totalOutfits = allOutfits.count
+            print("Repair: Scanning \(totalOutfits) outfits with pool of \(allCutouts.count) cutouts...")
+            
+            for (index, outfit) in allOutfits.enumerated() {
+                // Update UI every few outfits
+                if index % 5 == 0 {
+                    await MainActor.run {
+                        processingMessage = "正在分析搭配: \(outfit.note.isEmpty ? "未命名" : outfit.note) (\(index + 1)/\(totalOutfits))"
+                    }
+                }
+                
+                for item in outfit.items {
+                    // Check if cutout is missing or broken
+                    var needsRepair = false
+                    
+                    if let cutout = item.cutout {
+                        if ImageManager.shared.loadImage(fileName: cutout.imagePath) == nil {
+                            needsRepair = true
+                        }
+                    } else {
+                        // cutout is nil - hard to repair without extra info, skipping for now
+                    }
+                    
+                    if needsRepair, let brokenCutout = item.cutout {
+                        var fixed = false
+                        
+                        // Strategy 1: Relink by Hash
+                        if !fixed, !brokenCutout.originalImageHash.isEmpty {
+                            if let candidates = validCutoutsByHash[brokenCutout.originalImageHash],
+                               let bestMatch = candidates.first {
+                                item.cutout = bestMatch
+                                relinkedCount += 1
+                                fixed = true
+                                print("Repaired by Hash: \(brokenCutout.id) -> \(bestMatch.id)")
+                            }
+                        }
+                        
+                        // Strategy 2: Relink by Clothing
+                        if !fixed, let clothingID = brokenCutout.linkedClothing?.id {
+                            if let candidates = validCutoutsByClothing[clothingID],
+                               let bestMatch = candidates.first {
+                                item.cutout = bestMatch
+                                relinkedCount += 1
+                                fixed = true
+                                print("Repaired by Clothing: \(brokenCutout.id) -> \(bestMatch.id)")
+                            }
+                        }
+                        
+                        // Strategy 3: Regenerate (Original Logic)
+                        if !fixed {
+                            if let clothing = brokenCutout.linkedClothing,
+                               let firstPath = clothing.imagePaths.first,
+                               let originalImage = ImageManager.shared.loadImage(fileName: firstPath) {
+                                
+                                do {
+                                    try await CutoutService.shared.reprocessItem(item: brokenCutout, with: originalImage, context: modelContext)
+                                    regeneratedCount += 1
+                                    fixed = true
+                                } catch {
+                                    print("Regeneration failed: \(error)")
+                                }
+                            }
+                        }
+                        
+                        if !fixed {
+                            failCount += 1
+                        }
+                    }
+                }
+            }
+            
+            try? modelContext.save()
             
             await MainActor.run {
                 isProcessing = false
                 processingMessage = ""
-                // We could show a result alert here using another state, 
-                // but for now printing is enough as the visual change will be immediate.
-                print("Repair finished. Repaired: \(repairedCount), Failed: \(failCount), OK: \(skippedCount)")
+                print("Deep Repair Finished. Relinked: \(relinkedCount), Regenerated: \(regeneratedCount), Failed: \(failCount)")
                 
-                // Force UI refresh if needed (SwiftData should handle it)
+                // Force UI refresh by toggling current outfit if set
                 if let current = currentOutfit {
-                    // Toggle current to force refresh?
-                    // id(outfit.id) in view should handle it if items update.
+                     let temp = currentOutfit
+                     currentOutfit = nil
+                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                         self.currentOutfit = temp
+                     }
                 }
             }
         }

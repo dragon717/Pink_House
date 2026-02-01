@@ -10,6 +10,7 @@ import CloudKit
 import SwiftData
 import UIKit
 import Combine
+import CryptoKit
 
 @MainActor
 class CloudSyncManager: ObservableObject {
@@ -17,15 +18,7 @@ class CloudSyncManager: ObservableObject {
     
     private let container = CKContainer(identifier: "iCloud.bugod2.ItemManager")
     
-    // MARK: - Database Configuration
-    // 切换策略：由于 Private Database 持续出现 Code 15 (Server Rejected Request) 错误，
-    // 这通常意味着开发环境下的 Schema 自动创建失败，或者容器权限未正确传播。
-    // 为了确保功能可用，我们尝试使用 Public Database。
-    // 注意：Public Database 所有用户可读，但在 CloudKit Dashboard 配置 Security Roles 之前，
-    // 默认只有创建者可以修改自己的记录。
-    // 为了数据隐私，建议后续确保存储的数据是加密的，或者解决 Private DB 的问题。
-    // 这里我们使用基于用户 ID 的记录 ID 来在 Public DB 中模拟“私有”存储。
-    
+    // 使用 Public Database 模拟私有存储 (规避 Private DB 权限问题)
     private var database: CKDatabase {
         return container.publicCloudDatabase
     }
@@ -47,11 +40,10 @@ class CloudSyncManager: ObservableObject {
         }
     }
     
-    private let recordType = "BackupArchive_v3" // 再次升级版本号以隔离数据
+    // Version 4: Incremental Backup Support
+    private let indexRecordType = "BackupIndex_v4"
+    private let imageRecordType = "BackupImage"
     
-    // 在 Public DB 中，我们不能使用 Custom Zone（Public DB 只有一个 Default Zone），
-    // 所以我们必须依靠 Record Name 来区分用户。
-    // 我们将使用用户的 iCloud User Record ID 作为 Record Name 的一部分。
     private var userRecordID: CKRecord.ID?
     
     private init() {
@@ -70,12 +62,21 @@ class CloudSyncManager: ObservableObject {
         return id
     }
     
-    // 生成基于用户的唯一记录 ID
-    private func getBackupRecordID() async throws -> CKRecord.ID {
+    private func getBackupIndexRecordID() async throws -> CKRecord.ID {
         let userId = try await fetchUserRecordID()
-        // 记录 ID 格式: "UserBackup_{UserRecordName}"
-        // 这样每个用户只能访问/修改包含自己 ID 的那个记录（配合 CloudKit 权限）
-        return CKRecord.ID(recordName: "UserBackup_\(userId.recordName)")
+        return CKRecord.ID(recordName: "UserBackupIndex_\(userId.recordName)")
+    }
+    
+    private func getImageRecordID(hash: String) -> CKRecord.ID {
+        return CKRecord.ID(recordName: "Image_\(hash)")
+    }
+    
+    // MARK: - Hashing Helper
+    
+    nonisolated private func calculateFileHash(url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        let digest = SHA256.hash(data: data)
+        return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
     
     // MARK: - Metadata Fetching
@@ -83,8 +84,7 @@ class CloudSyncManager: ObservableObject {
     func fetchLatestBackupMetadata() {
         Task {
             do {
-                let recordID = try await getBackupRecordID()
-                
+                let recordID = try await getBackupIndexRecordID()
                 let operation = CKFetchRecordsOperation(recordIDs: [recordID])
                 operation.qualityOfService = .userInitiated
                 operation.desiredKeys = ["backupDate", "creationDate"]
@@ -99,216 +99,388 @@ class CloudSyncManager: ObservableObject {
                                 self?.lastCloudBackupDate = record.creationDate
                             }
                         case .failure(let error):
-                            // 记录不存在是正常情况，不打印错误
                             if let ckError = error as? CKError, ckError.code == .unknownItem {
-                                // Record not found, normal for new users
+                                // Normal for new users
                             } else {
-                                print("Metadata fetch failed for record \(recordID.recordName): \(error)")
+                                print("Metadata fetch failed: \(error)")
                             }
                         }
                     }
                 }
-                
                 database.add(operation)
             } catch {
-                print("Failed to get User Record ID for metadata fetch: \(error)")
+                print("Failed to get User Record ID: \(error)")
             }
         }
     }
     
-    // MARK: - Upload (Backup)
+    // MARK: - Incremental Upload
     
     func uploadBackup(modelContainer: ModelContainer) async {
         isSyncing = true
         syncError = nil
         
         do {
-            // 0. Check iCloud Availability
+            // 0. Check iCloud
             let accountStatus = try await container.accountStatus()
             guard accountStatus == .available else {
-                throw NSError(domain: "CloudSync", code: 401, userInfo: [NSLocalizedDescriptionKey: "iCloud 账户不可用。请在设置中登录并开启 iCloud Drive。"])
+                throw NSError(domain: "CloudSync", code: 401, userInfo: [NSLocalizedDescriptionKey: "iCloud 账户不可用。"])
             }
             
-            // 1. Get Record ID based on User
-            let recordID = try await getBackupRecordID()
-            print("CloudSync: Using Public DB Record ID: \(recordID.recordName)")
+            // 1. Prepare Data
+            print("CloudSync: Preparing backup data...")
+            let backupData = try await BackupService.shared.prepareBackupData(container: modelContainer)
             
-            // 2. Generate Local Backup
-            print("Starting Cloud Backup: Generating local archive...")
-            let backupURL = try await BackupService.shared.exportBackup(container: modelContainer)
+            // 2. Identify Images to Upload
+            // Map: [Hash: FileURL]
+            var imagesToUpload: [String: URL] = [:]
+            var allImageHashes: [String] = []
             
-            // Verify file exists and has size
-            let attr = try FileManager.default.attributesOfItem(atPath: backupURL.path)
-            let fileSize = attr[.size] as? Int64 ?? 0
-            print("Backup file generated at: \(backupURL.path), size: \(fileSize) bytes")
-            
-            guard fileSize > 0 else {
-                throw NSError(domain: "CloudSync", code: 500, userInfo: [NSLocalizedDescriptionKey: "生成的备份文件为空"])
+            // Process Stored Images (Already hashed)
+            for imgDTO in backupData.manifest.storedImages {
+                if let url = backupData.imageFiles[imgDTO.fileName] {
+                    imagesToUpload[imgDTO.imageHash] = url
+                    allImageHashes.append(imgDTO.imageHash)
+                }
             }
-
-            // 3. Fetch or Create Record
-            let recordToSave: CKRecord
+            
+            // Process Other Files (Need hashing)
+            // Theme files, Widget bg, etc.
+            let specialFiles = backupData.imageFiles.keys.filter { key in
+                !backupData.manifest.storedImages.contains { $0.fileName == key }
+            }
+            
+            for fileName in specialFiles {
+                if let url = backupData.imageFiles[fileName],
+                   let hash = calculateFileHash(url: url) {
+                    imagesToUpload[hash] = url
+                    allImageHashes.append(hash)
+                }
+            }
+            
+            print("CloudSync: Total images referenced: \(allImageHashes.count)")
+            
+            // 3. Check which images already exist in Cloud
+            // We use CKFetchRecordsOperation with keys: [] to check existence efficiently
+            let allRecordIDs = Set(allImageHashes).map { getImageRecordID(hash: $0) }
+            
+            // Only check if we have images
+            var missingRecordIDs: [CKRecord.ID] = []
+            
+            if !allRecordIDs.isEmpty {
+                print("CloudSync: Checking existence of \(allRecordIDs.count) images...")
+                // Split into batches of 400 (CloudKit limit)
+                let batches = stride(from: 0, to: allRecordIDs.count, by: 400).map {
+                    Array(allRecordIDs[$0..<min($0 + 400, allRecordIDs.count)])
+                }
+                
+                for batch in batches {
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        let operation = CKFetchRecordsOperation(recordIDs: batch)
+                        operation.desiredKeys = [] // We only need existence
+                        operation.qualityOfService = .userInitiated
+                        
+                        operation.fetchRecordsResultBlock = { result in
+                            switch result {
+                            case .success:
+                                continuation.resume()
+                            case .failure(let error):
+                                continuation.resume(throwing: error)
+                            }
+                        }
+                        
+                        operation.perRecordResultBlock = { recordID, result in
+                            switch result {
+                            case .success:
+                                break // Exists
+                            case .failure(let error):
+                                if let ckError = error as? CKError, ckError.code == .unknownItem {
+                                    missingRecordIDs.append(recordID)
+                                }
+                            }
+                        }
+                        
+                        self.database.add(operation)
+                    }
+                }
+            }
+            
+            print("CloudSync: Found \(missingRecordIDs.count) missing images to upload.")
+            
+            // 4. Upload Missing Images
+            if !missingRecordIDs.isEmpty {
+                var recordsToSave: [CKRecord] = []
+                for recordID in missingRecordIDs {
+                    // Extract Hash from RecordName "Image_{HASH}"
+                    let hash = String(recordID.recordName.dropFirst(6))
+                    if let url = imagesToUpload[hash] {
+                        let record = CKRecord(recordType: imageRecordType, recordID: recordID)
+                        record["imageAsset"] = CKAsset(fileURL: url)
+                        record["hash"] = hash
+                        recordsToSave.append(record)
+                    }
+                }
+                
+                // Batch Upload
+                // Split into batches
+                let saveBatches = stride(from: 0, to: recordsToSave.count, by: 200).map {
+                    Array(recordsToSave[$0..<min($0 + 200, recordsToSave.count)])
+                }
+                
+                for batch in saveBatches {
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        let op = CKModifyRecordsOperation(recordsToSave: batch, recordIDsToDelete: nil)
+                        op.savePolicy = .changedKeys
+                        op.isAtomic = false // Allow partial success if some exist
+                        op.qualityOfService = .userInitiated
+                        
+                        op.modifyRecordsResultBlock = { result in
+                            switch result {
+                            case .success:
+                                continuation.resume()
+                            case .failure(let error):
+                                // If partial failure, we might still proceed.
+                                // For now, treat as error.
+                                continuation.resume(throwing: error)
+                            }
+                        }
+                        self.database.add(op)
+                    }
+                }
+            }
+            
+            // 5. Upload Manifest (Index Record)
+            let indexRecordID = try await getBackupIndexRecordID()
+            
+            let indexRecord: CKRecord
             do {
-                print("Fetching existing record for update...")
-                let existingRecord = try await database.record(for: recordID)
-                recordToSave = existingRecord
-                print("Found existing record, updating.")
+                indexRecord = try await database.record(for: indexRecordID)
             } catch {
-                print("No existing record found, creating new one.")
-                recordToSave = CKRecord(recordType: recordType, recordID: recordID)
+                indexRecord = CKRecord(recordType: indexRecordType, recordID: indexRecordID)
             }
             
-            // 4. Update Record Fields
-            let asset = CKAsset(fileURL: backupURL)
-            recordToSave["archiveAsset"] = asset
-            recordToSave["deviceName"] = UIDevice.current.name
-            recordToSave["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-            recordToSave["backupDate"] = Date()
+            // Serialize Manifest to File
+            let jsonEncoder = JSONEncoder()
+            jsonEncoder.dateEncodingStrategy = .iso8601
+            let manifestData = try jsonEncoder.encode(backupData.manifest)
             
-            // Set public permission: Only Creator can write, Everyone can read (default for Public DB)
-            // Since the Record ID is tied to User ID, it's effectively private-ish,
-            // but for real privacy, encryption is recommended.
+            let tempDir = FileManager.default.temporaryDirectory
+            let manifestURL = tempDir.appendingPathComponent("manifest.json")
+            try manifestData.write(to: manifestURL)
             
-            // 5. Upload
-            print("Starting Cloud Backup: Uploading to CloudKit (Public DB)...")
+            indexRecord["manifest"] = CKAsset(fileURL: manifestURL)
+            indexRecord["deviceName"] = UIDevice.current.name
+            indexRecord["version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+            indexRecord["backupDate"] = Date()
             
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                let modifyOp = CKModifyRecordsOperation(recordsToSave: [recordToSave], recordIDsToDelete: nil)
-                modifyOp.savePolicy = .changedKeys
-                modifyOp.qualityOfService = .userInitiated
-                modifyOp.isAtomic = true
-                
-                modifyOp.perRecordProgressBlock = { record, progress in
-                    // 仅在进度有显著变化时打印，避免刷屏 (例如每 10%)
-                    let percentage = Int(progress * 100)
-                    if percentage % 10 == 0 {
-                        print("CloudSync: Uploading \(record.recordID.recordName)... \(percentage)%")
-                    }
-                }
-                
-                modifyOp.perRecordSaveBlock = { recordID, result in
-                    switch result {
-                    case .success:
-                        print("CloudSync: Record \(recordID.recordName) saved successfully.")
-                    case .failure(let error):
-                        print("CloudSync: Record \(recordID.recordName) save failed: \(error)")
-                    }
-                }
-                
-                modifyOp.modifyRecordsResultBlock = { result in
-                    switch result {
-                    case .success:
-                        continuation.resume()
-                    case .failure(let error):
-                        continuation.resume(throwing: error)
-                    }
-                }
-                
-                self.database.add(modifyOp)
-            }
+            // Save Index
+            try await database.save(indexRecord)
             
-            // 6. Cleanup & Update UI
-            try? FileManager.default.removeItem(at: backupURL)
+            try? FileManager.default.removeItem(at: manifestURL)
             
             self.lastCloudBackupDate = Date()
-            self.hasSuccessfulBackup = true // Mark as successful
+            self.hasSuccessfulBackup = true
             print("Cloud Backup Success!")
-            
-            // 7. Verify
-            print("Verifying backup integrity...")
-            do {
-                // 等待 2 秒以确保 CloudKit 索引更新 (Public DB 可能有延迟)
-                try await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-                
-                let verifyRecord = try await database.record(for: recordID)
-                if let verifyDate = verifyRecord["backupDate"] as? Date {
-                     print("Verification Success: Record found with date \(verifyDate)")
-                }
-            } catch {
-                print("Verification Warning: \(error). This might be due to propagation delay.")
-                // Verification failure shouldn't fail the whole process if upload succeeded
-                // We just log it.
-            }
             
         } catch {
             self.syncError = "备份失败: \(error.localizedDescription)"
-            if let ckError = error as? CKError {
-                 if ckError.code == .serverRejectedRequest {
-                     self.syncError = "服务器拒绝请求 (Code 15)。请检查 iCloud 容器权限配置。"
-                 }
-            }
             print("Cloud Backup Failed: \(error)")
         }
         
         isSyncing = false
     }
     
-    // MARK: - Auto Sync
+    // MARK: - Incremental Restore
+    
+    func restoreFromCloud(context: ModelContext) async -> Bool {
+        return await restoreFromCloudInternal(context: context, silent: false)
+    }
+    
+    private func restoreFromCloudInternal(context: ModelContext, silent: Bool) async -> Bool {
+        if !silent { isSyncing = true }
+        syncError = nil
+        
+        do {
+            print("CloudSync: Fetching Backup Index...")
+            let indexRecordID = try await getBackupIndexRecordID()
+            let indexRecord = try await database.record(for: indexRecordID)
+            
+            guard let manifestAsset = indexRecord["manifest"] as? CKAsset,
+                  let manifestURL = manifestAsset.fileURL else {
+                throw NSError(domain: "CloudSync", code: 404, userInfo: [NSLocalizedDescriptionKey: "Manifest missing"])
+            }
+            
+            let manifestData = try Data(contentsOf: manifestURL)
+            let jsonDecoder = JSONDecoder()
+            jsonDecoder.dateDecodingStrategy = .iso8601
+            let manifest = try jsonDecoder.decode(BackupManifest.self, from: manifestData)
+            
+            // Collect needed images
+            var neededHashes: Set<String> = []
+            // Stored Images
+            for img in manifest.storedImages {
+                neededHashes.insert(img.imageHash)
+            }
+            // External Files
+            if let extHashes = manifest.externalFileHashes {
+                for (_, hash) in extHashes {
+                    neededHashes.insert(hash)
+                }
+            }
+            
+            // 2. Identify Missing Local Images
+            let imagesDir = await ImageManager.shared.imagesDirectory
+            let fileManager = FileManager.default
+            let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+            
+            // Map [FileName: LocalURL]
+            // For existing files, we point to them. For missing, we download to temp.
+            var imageFileMap: [String: URL] = [:]
+            var hashesToDownload: Set<String> = []
+            
+            // A. Stored Images
+            for img in manifest.storedImages {
+                let localURL = imagesDir.appendingPathComponent(img.fileName)
+                if fileManager.fileExists(atPath: localURL.path) {
+                    imageFileMap[img.fileName] = localURL
+                } else {
+                    hashesToDownload.insert(img.imageHash)
+                }
+            }
+            
+            // B. External Files (Theme, Wealth, Widget)
+            if let extHashes = manifest.externalFileHashes {
+                for (fileName, hash) in extHashes {
+                    // Determine where this file lives locally to check existence
+                    var localURL: URL
+                    if fileName == "widget_background.jpg" {
+                        if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.bugod2.ItemManager") {
+                            localURL = containerURL.appendingPathComponent(fileName)
+                        } else {
+                            continue // Skip if no app group
+                        }
+                    } else {
+                        // Theme/Wealth files are in Documents
+                        localURL = documentsDir.appendingPathComponent(fileName)
+                    }
+                    
+                    if fileManager.fileExists(atPath: localURL.path) {
+                         imageFileMap[fileName] = localURL
+                    } else {
+                         hashesToDownload.insert(hash)
+                    }
+                }
+            }
+            
+            if !hashesToDownload.isEmpty {
+                print("CloudSync: Downloading \(hashesToDownload.count) missing images...")
+                
+                // Batch Download
+                let hashesArray = Array(hashesToDownload)
+                let batches = stride(from: 0, to: hashesArray.count, by: 200).map {
+                    Array(hashesArray[$0..<min($0 + 200, hashesArray.count)])
+                }
+                
+                let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("restore_\(UUID().uuidString)")
+                try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+                
+                for batch in batches {
+                    let recordIDs = batch.map { getImageRecordID(hash: $0) }
+                    
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        let op = CKFetchRecordsOperation(recordIDs: recordIDs)
+                        op.qualityOfService = .userInitiated
+                        
+                        op.perRecordResultBlock = { recordID, result in
+                            switch result {
+                            case .success(let record):
+                                if let asset = record["imageAsset"] as? CKAsset,
+                                   let fileURL = asset.fileURL {
+                                    let hash = String(recordID.recordName.dropFirst(6))
+                                    
+                                    // 1. Check StoredImages
+                                    let matchingStored = manifest.storedImages.filter { $0.imageHash == hash }
+                                    for match in matchingStored {
+                                        let destURL = tempDir.appendingPathComponent(match.fileName)
+                                        try? fileManager.copyItem(at: fileURL, to: destURL)
+                                        imageFileMap[match.fileName] = destURL
+                                    }
+                                    
+                                    // 2. Check External Files
+                                    if let extHashes = manifest.externalFileHashes {
+                                        let matchingExt = extHashes.filter { $0.value == hash }
+                                        for (fileName, _) in matchingExt {
+                                            let destURL = tempDir.appendingPathComponent(fileName)
+                                            try? fileManager.copyItem(at: fileURL, to: destURL)
+                                            imageFileMap[fileName] = destURL
+                                        }
+                                    }
+                                }
+                            case .failure(let error):
+                                print("Failed to download image \(recordID): \(error)")
+                            }
+                        }
+                        
+                        op.fetchRecordsResultBlock = { result in
+                            switch result {
+                            case .success:
+                                continuation.resume()
+                            case .failure(let error):
+                                continuation.resume(throwing: error)
+                            }
+                        }
+                        
+                        self.database.add(op)
+                    }
+                }
+            }
+            
+            // 3. Restore
+            print("CloudSync: Applying restore...")
+            try BackupService.shared.restoreFromManifest(manifest: manifest, imageFiles: imageFileMap, context: context)
+            
+            self.hasSuccessfulBackup = true
+            if !silent { isSyncing = false }
+            return true
+            
+        } catch {
+            if !silent {
+                self.syncError = error.localizedDescription
+                isSyncing = false
+            }
+            print("Cloud Restore Failed: \(error)")
+            return false
+        }
+    }
+    
+    // MARK: - Auto Sync & Silent Restore
     
     func triggerAutoSync(modelContainer: ModelContainer) {
         guard isAutoSyncEnabled, hasSuccessfulBackup else { return }
         guard !isSyncing else { return }
         
-        // Check time interval (e.g., minimum 1 hour between auto backups)
         if let lastDate = lastCloudBackupDate, Date().timeIntervalSince(lastDate) < 3600 {
-            print("Auto Sync: Skipped (Last backup was less than 1 hour ago)")
             return
         }
         
-        print("Auto Sync: Triggering background backup...")
         Task {
-            // Auto sync should be silent (no UI blocking usually, but here we share isSyncing state)
-            // Ideally we should have a separate 'isAutoSyncing' or handle UI gracefully.
-            // For now, we reuse uploadBackup but we might want to suppress errors in UI if it's auto.
-            // But since 'isSyncing' shows a spinner, it might be annoying if it pops up randomly.
-            // However, this is triggered on Background, so UI isn't visible.
-            
-            // We verify permissions first
             let accountStatus = try? await container.accountStatus()
             guard accountStatus == .available else { return }
-            
             await uploadBackup(modelContainer: modelContainer)
         }
     }
-
-    // MARK: - Download (Restore)
     
-    func restoreFromCloud(context: ModelContext) async -> Bool {
-        isSyncing = true
-        syncError = nil
+    func checkAndSilentRestore(container: ModelContainer) async {
+        // Condition: Empty Database (No Clothings)
+        let context = ModelContext(container)
+        let count = try? context.fetchCount(FetchDescriptor<Clothing>())
         
-        do {
-            print("Restoring from Cloud: Fetching backup record...")
-            let recordID = try await getBackupRecordID()
-            
-            // 1. Fetch Record
-            let record = try await database.record(for: recordID)
-            print("Found backup record: \(record.recordID.recordName)")
-            
-            // 2. Validate Asset
-            guard let asset = record["archiveAsset"] as? CKAsset else {
-                throw NSError(domain: "CloudSync", code: 404, userInfo: [NSLocalizedDescriptionKey: "备份记录损坏：缺失数据文件"])
+        if count == 0 {
+            print("SilentRestore: Empty database detected. Checking for cloud backup...")
+            let success = await restoreFromCloudInternal(context: context, silent: true)
+            if success {
+                print("SilentRestore: Data restored successfully.")
             }
-            
-            guard let fileURL = asset.fileURL else {
-                throw NSError(domain: "CloudSync", code: 404, userInfo: [NSLocalizedDescriptionKey: "备份文件下载失败 (URL为空)"])
-            }
-            
-            print("Restoring from Cloud: Found backup, downloading from \(fileURL.path)...")
-            
-            // 3. Import
-            try BackupService.shared.importBackup(from: fileURL, context: context)
-            
-            print("Cloud Restore Success!")
-            isSyncing = false
-            self.hasSuccessfulBackup = true // Restore implies a backup exists
-            return true
-            
-        } catch {
-            self.syncError = error.localizedDescription
-            print("Cloud Restore Failed: \(error)")
-            isSyncing = false
-            return false
         }
     }
 }
