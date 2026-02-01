@@ -69,7 +69,7 @@ struct MeView: View {
                 // Section 3: Feature Settings
                 Section {
                     NavigationLink(destination: GeneralSettingsView()) {
-                        SettingsRow(icon: "slider.horizontal.3", title: "通用设置", subtitle: "语言、主题等")
+                        SettingsRow(icon: "slider.horizontal.3", title: "通用设置", subtitle: "语言、主题、个性化等")
                     }
                     NavigationLink(destination: NotificationSettingsView()) {
                         SettingsRow(icon: "bell", title: "通知设置", subtitle: "管理通知提醒")

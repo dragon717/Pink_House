@@ -78,6 +78,39 @@ class CutoutService {
         return item
     }
     
+    /// 不进行抠图，直接保存原图
+    func processImageWithoutCutout(image: UIImage, category: String, clothing: Clothing? = nil, context: ModelContext) async throws -> CutoutItem {
+        guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+            throw CutoutError.processingFailed
+        }
+        let originalHash = computeHash(data: imageData)
+        
+        // Check duplicate
+        let descriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.originalImageHash == originalHash })
+        if let existingItem = try? context.fetch(descriptor).first {
+            return existingItem
+        }
+        
+        let normalizedImage = normalizeOrientation(image)
+        
+        // Save as HEIC
+        guard let fileName = ImageManager.shared.saveImage(normalizedImage, context: context, format: .heic(quality: 0.8)) else {
+            throw CutoutError.processingFailed
+        }
+        
+        let item = CutoutItem(
+            originalImageHash: originalHash,
+            category: category,
+            imagePath: fileName,
+            width: Double(normalizedImage.size.width),
+            height: Double(normalizedImage.size.height),
+            linkedClothing: clothing
+        )
+        
+        context.insert(item)
+        return item
+    }
+    
     // MARK: - Image Processing
     
     /// 智能抠图引擎

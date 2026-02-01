@@ -37,19 +37,7 @@ struct GeneralSettingsView: View {
                 }
             }
             
-            Section(header: Text("外观主题")) {
-                NavigationLink(destination: WealthCustomizationView()) {
-                    HStack {
-                        Image(systemName: "banknote")
-                            .foregroundStyle(.green)
-                        Text("来财个性化")
-                        Spacer()
-                        Text("自定义纸币样式")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                }
-                
+            Section(header: Text("外观主题")) {    
                 Picker("背景类型", selection: $theme.backgroundStyle) {
                     ForEach(BackgroundStyle.allCases) { style in
                         Text(style.displayName).tag(style)
@@ -160,8 +148,19 @@ struct GeneralSettingsView: View {
                 
                 Toggle("启用高斯模糊", isOn: $theme.isBlurEnabled)
             }
-            
-            Section(header: Text("更多个性化 (开发中)")) {
+             
+            Section(header: Text("更多个性化")) {
+                NavigationLink(destination: WealthCustomizationView()) {
+                    HStack {
+                        Image(systemName: "banknote")
+                            .foregroundStyle(.green)
+                        Text("来财个性化")
+                        Spacer()
+                        Text("自定义纸币样式")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
                 HStack {
                     Text("文字颜色")
                     Spacer()

@@ -19,6 +19,10 @@ struct OOTDView: View {
     @State private var showingDeleteCurrentAlert = false
     @State private var isListExpanded = false
     @State private var isSidebarVisible = false
+    @State private var showingActionSheet = false
+    @State private var showingCamera = false
+    @State private var cameraImage: UIImage?
+    @State private var shouldCutoutCameraImage = false
 
     var body: some View {
         NavigationStack {
@@ -54,7 +58,7 @@ struct OOTDView: View {
                                     addToOutfit(cutout)
                                 },
                                 onAddPhoto: {
-                                    isImagePickerPresented = true
+                                    showingActionSheet = true
                                 }
                             )
                             .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
@@ -130,6 +134,29 @@ struct OOTDView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
+                }
+            }
+            .confirmationDialog("选择图片来源", isPresented: $showingActionSheet) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("拍照并抠图") {
+                        shouldCutoutCameraImage = true
+                        showingCamera = true
+                    }
+                }
+                
+                Button("来自图库") {
+                    isImagePickerPresented = true
+                }
+                
+                Button("取消", role: .cancel) {}
+            }
+            .fullScreenCover(isPresented: $showingCamera) {
+                CameraPicker(image: $cameraImage)
+                    .ignoresSafeArea()
+            }
+            .onChange(of: cameraImage) { _, newImage in
+                if let image = newImage {
+                    processCameraImage(image, shouldCutout: shouldCutoutCameraImage)
                 }
             }
             .alert("重命名搭配", isPresented: $showingRenameAlert) {
@@ -350,6 +377,38 @@ struct OOTDView: View {
             saveSnapshot(for: outfit)
         }
         try? modelContext.save()
+    }
+    
+    private func processCameraImage(_ image: UIImage, shouldCutout: Bool) {
+        isProcessing = true
+        processingMessage = shouldCutout ? "正在识别主体..." : "正在处理图片..."
+        
+        Task {
+            do {
+                let cutout: CutoutItem
+                if shouldCutout {
+                    cutout = try await CutoutService.shared.processImage(image: image, category: "未分类", context: modelContext)
+                } else {
+                    cutout = try await CutoutService.shared.processImageWithoutCutout(image: image, category: "未分类", context: modelContext)
+                }
+                
+                await MainActor.run {
+                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                    generator.impactOccurred()
+                    
+                    addToOutfit(cutout)
+                    isProcessing = false
+                    cameraImage = nil
+                }
+            } catch {
+                print("Error processing camera image: \(error)")
+                await MainActor.run {
+                    isProcessing = false
+                    cameraImage = nil
+                    // Show error alert if needed
+                }
+            }
+        }
     }
     
     private func processPickedImage(_ item: PhotosPickerItem) {
