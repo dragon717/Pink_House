@@ -32,7 +32,59 @@ struct OOTDCutoutListView: View {
         
         // Filter by Category
         if selectedCategory != "全部" {
-            result = result.filter { $0.category == selectedCategory }
+            result = result.filter { item in
+                // 精确匹配
+                if item.category == selectedCategory { return true }
+                
+                // 兼容旧数据：如果 Item 的分类是 "JSK" 这种细分词，
+                // 尝试将其标准化，看是否等于当前选中的分类 (e.g. "裙子")
+                // 使用 CutoutService 中的逻辑进行映射
+                if let standardized = CutoutService.shared.standardizeCategory(item.category),
+                   standardized == selectedCategory {
+                    return true
+                }
+                
+                // 救援逻辑：利用关联服饰的名称/类型修正分类显示
+                // 如果 Item 被归类为 "小物" 或 "未分类"，但其关联服饰明确属于当前选中的大类，则允许显示。
+                // 这解决了 AI 将裙子/袜子误判为小物导致无法在对应页签找到的问题。
+                if ["小物", "未分类"].contains(item.category), let clothing = item.linkedClothing {
+                    let nameInfo = (clothing.name + clothing.types).lowercased()
+                    
+                    if selectedCategory == "裙子" && (nameInfo.contains("裙") || nameInfo.contains("jsk") || nameInfo.contains("op") || nameInfo.contains("dress")) {
+                        return true
+                    }
+                    if selectedCategory == "外套" && (nameInfo.contains("外套") || nameInfo.contains("上衣") || nameInfo.contains("开衫") || nameInfo.contains("shirt") || nameInfo.contains("top")) {
+                        return true
+                    }
+                    if selectedCategory == "袜子" && (nameInfo.contains("袜") || nameInfo.contains("sock")) {
+                        return true
+                    }
+                    if selectedCategory == "鞋子" && (nameInfo.contains("鞋") || nameInfo.contains("靴") || nameInfo.contains("shoe") || nameInfo.contains("boot")) {
+                        return true
+                    }
+                    if selectedCategory == "玩偶" && (nameInfo.contains("玩偶") || nameInfo.contains("娃") || nameInfo.contains("toy")) {
+                        return true
+                    }
+                }
+                
+                // 特殊处理 "未分类"
+                // 如果当前选中的是 "未分类"，则显示所有 category 为 "未分类" 或者 标准化失败（无法归入其他5类）的项
+                if selectedCategory == "未分类" {
+                    // 如果已经是标准分类之一，则不属于未分类
+                    let standardCategories = ["裙子", "外套", "鞋子", "袜子", "玩偶", "小物"]
+                    if standardCategories.contains(item.category) { return false }
+                    
+                    // 如果能被标准化为其他分类，也不属于未分类
+                    if let _ = CutoutService.shared.standardizeCategory(item.category) {
+                        return false
+                    }
+                    
+                    // 剩下的都是未分类（包括 "" 或乱码 或 "未分类"）
+                    return true
+                }
+                
+                return false
+            }
         }
         
         // Filter by Search Text

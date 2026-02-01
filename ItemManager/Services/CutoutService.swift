@@ -76,15 +76,30 @@ class CutoutService {
              }
         }
         
-        // 2.1 自动分类 (如果未指定分类)
-        var finalCategory = category
-        if category == "未分类" || category.isEmpty {
-            // 使用原图或抠图后的图进行分类？
-            // 抠图后的图背景是透明/白色，可能更有利于识别物体本身，但也丢失了环境信息
-            // 尝试使用抠图后的图片进行分类
+        // 2.1 自动分类
+        var finalCategory = "未分类"
+        
+        // 1. 尝试标准化传入的分类 (比如将 "JSK" -> "裙子")
+        // 如果传入了有效的分类（非空且非默认），尝试基于它进行标准化
+        if category != "未分类" && !category.isEmpty {
+            if let standardized = standardizeCategory(category) {
+                finalCategory = standardized
+                print("Standardized category '\(category)' to '\(finalCategory)'")
+            } else {
+                // 如果传入了奇怪的词无法标准化，仍然走 Vision 识别？
+                // 或者保留原词？
+                // 为了配合 UI 的固定筛选，建议还是走 Vision 重新识别大类。
+                // 但为了不丢信息，如果 Vision 识别出"未分类"，也许可以回退到 standardized 为 nil 的情况...
+                // 这里简化策略：无法标准化的词 -> 视为无效分类，走 Vision。
+                print("Category '\(category)' not recognized. Falling back to Vision.")
+                finalCategory = await classifyImage(cutoutImage)
+            }
+        } else {
+            // 2. 如果未指定分类，则使用 Vision 识别
             finalCategory = await classifyImage(cutoutImage)
-            print("Auto-classified as: \(finalCategory)")
         }
+        
+        print("Auto-classified as: \(finalCategory)")
         
         // 3. 添加白边
         let borderedImage = addWhiteBorder(to: cutoutImage)
@@ -171,8 +186,45 @@ class CutoutService {
     
     // MARK: - Classification
     
+    /// 将输入的分类字符串标准化为 6 大类
+    /// - Parameter input: 用户输入或关联服饰的类型 (e.g. "JSK", "开衫")
+    /// - Returns: 标准分类 (e.g. "裙子", "外套")，如果无法映射则返回 nil
+    func standardizeCategory(_ input: String) -> String? {
+        let standardCategories = ["裙子", "外套", "鞋子", "袜子", "玩偶", "小物"]
+        if standardCategories.contains(input) { return input }
+        
+        let inputLower = input.lowercased()
+        
+        // 裙子
+        if inputLower.contains("jsk") || inputLower.contains("op") || inputLower.contains("sk") || inputLower.contains("裙") || inputLower.contains("dress") || inputLower.contains("frock") || inputLower.contains("pinafore") {
+            return "裙子"
+        }
+        // 外套
+        if inputLower.contains("外套") || inputLower.contains("上衣") || inputLower.contains("开衫") || inputLower.contains("衬衫") || inputLower.contains("卫衣") || inputLower.contains("衣") || inputLower.contains("top") || inputLower.contains("shirt") || inputLower.contains("blouse") || inputLower.contains("cardigan") || inputLower.contains("内搭") {
+            return "外套"
+        }
+        // 鞋子
+        if inputLower.contains("鞋") || inputLower.contains("靴") {
+            return "鞋子"
+        }
+        // 袜子
+        if inputLower.contains("袜") {
+            return "袜子"
+        }
+        // 玩偶
+        if inputLower.contains("玩偶") || inputLower.contains("娃娃") || inputLower.contains("公仔") || inputLower.contains("手办") || inputLower.contains("toy") || inputLower.contains("doll") {
+            return "玩偶"
+        }
+        // 小物
+        if inputLower.contains("包") || inputLower.contains("饰") || inputLower.contains("帽") || inputLower.contains("夹") || inputLower.contains("带") || inputLower.contains("袖") || inputLower.contains("发") || inputLower.contains("小物") || inputLower.contains("acc") || inputLower.contains("项链") || inputLower.contains("戒指") || inputLower.contains("手链") || inputLower.contains("耳") {
+            return "小物"
+        }
+        
+        return nil
+    }
+    
     private func classifyImage(_ image: UIImage) async -> String {
-        guard let cgImage = image.cgImage else { return "小物" }
+        guard let cgImage = image.cgImage else { return "未分类" }
         
         let request = VNClassifyImageRequest()
         // Use latest revision for better accuracy if available
@@ -182,64 +234,93 @@ class CutoutService {
         
         do {
             try handler.perform([request])
-            guard let observations = request.results else { return "小物" }
+            guard let observations = request.results else { return "未分类" }
             
             // Filter by confidence and map
             // We look at the top results
-            let topResults = observations.filter { $0.confidence > 0.3 }.prefix(10)
+            // 降低置信度阈值，因为很多细分类别置信度可能不高
+            let topResults = observations.filter { $0.confidence > 0.1 }.prefix(20)
+            
+            print("----- Image Classification Results -----")
+            for obs in topResults {
+                print("ID: \(obs.identifier), Confidence: \(obs.confidence)")
+            }
+            print("----------------------------------------")
             
             for observation in topResults {
                 // Check mapping
                 if let category = mapIdentifierToCategory(observation.identifier) {
+                    print("Mapped '\(observation.identifier)' to '\(category)'")
                     return category
                 }
             }
             
-            // Fallback logic: if no specific category matched, default to "小物"
-            return "小物"
+            // Fallback logic: if no specific category matched
+            return "未分类"
             
         } catch {
             print("Classification failed: \(error)")
-            return "小物"
+            return "未分类"
         }
     }
     
     private func mapIdentifierToCategory(_ identifier: String) -> String? {
         let id = identifier.lowercased()
         
-        // 裙子 (Dresses & Skirts)
+        // 1. 优先匹配玩偶 (特征非常明显，容易被误判为小物或装饰品)
+        let toyKeywords = [
+            "toy", "doll", "plush", "teddy", "figurine", "action figure", "puppet",
+            "marionette", "stuffed animal", "bear", "rabbit", "bunny", "cat", "dog",
+            "animal", "mascot", "robot"
+        ]
+        // 排除真实的猫狗（如果是为了抠图，通常是玩偶，但 Vision 可能会识别出 'cat'）
+        // 这里假设用户拍摄的是物品。
+        if toyKeywords.contains(where: { id.contains($0) }) {
+            return "玩偶"
+        }
+        
+        // 2. 裙子 (Dresses & Skirts) - 扩展关键词
+        // 很多洛丽塔裙子会被识别为 costume, gown, clothing 等
         let dressKeywords = [
             "dress", "skirt", "gown", "sarong", "kimono", "miniskirt", "overskirt",
-            "sundress", "cocktail dress", "evening gown", "wedding gown", "ball gown",
-            "chemise", "jumper", "pinafore", "frock", "kilt", "petticoat", "crinoline"
+            "sundress", "cocktail", "evening", "wedding", "ball",
+            "chemise", "jumper", "pinafore", "frock", "kilt", "petticoat", "crinoline",
+            "costume", "cosplay", "lolita", "victorian", "baroque", "rococo", // 风格词
+            "clothing", "apparel", "garment", "wear", "vestment", "outfit", "robe" // 泛指词，通常归为裙子或外套，这里优先裙子尝试
         ]
-        if dressKeywords.contains(where: { id.contains($0) }) {
+        
+        // 2.1 强匹配裙子 (Specific Types)
+        let strongDressKeywords = [
+            "dress", "skirt", "gown", "frock", "pinafore", "sarong", "kilt"
+        ]
+        if strongDressKeywords.contains(where: { id.contains($0) }) {
             return "裙子"
         }
         
-        // 外套/上衣 (Outerwear & Tops)
+        // 3. 外套/上衣 (Outerwear & Tops)
         let outerKeywords = [
             "jacket", "coat", "blazer", "cardigan", "sweater", "sweatshirt", "hoodie",
-            "shirt", "trench coat", "overcoat", "parka", "poncho", "robe", "cloak",
-            "vest", "jersey", "top", "blouse", "t-shirt", "tee", "tank top", "camisole",
+            "shirt", "trench", "overcoat", "parka", "poncho", "cloak",
+            "vest", "jersey", "top", "blouse", "tee", "tank", "camisole",
             "pullover", "tunic", "waistcoat", "windbreaker", "bomber", "anorak", "cape",
-            "uniform", "lab coat", "suit", "tuxedo", "bathrobe", "pajama", "nightgown"
+            "uniform", "lab coat", "suit", "tuxedo", "bathrobe", "pajama", "nightgown",
+            "sleeveless", "long sleeve", "short sleeve"
         ]
         if outerKeywords.contains(where: { id.contains($0) }) {
             return "外套"
         }
         
-        // 鞋子 (Shoes)
+        // 4. 鞋子 (Shoes)
         let shoeKeywords = [
             "shoe", "boot", "sneaker", "sandal", "heel", "loafer", "clog", "moccasin",
             "slipper", "pump", "flat", "wedge", "platform", "stiletto", "oxford",
-            "derby", "brogue", "espadrille", "flip-flop", "galoshes", "wellington"
+            "derby", "brogue", "espadrille", "flip-flop", "galoshes", "wellington", "footwear"
         ]
         if shoeKeywords.contains(where: { id.contains($0) }) {
             return "鞋子"
         }
         
-        // 袜子 (Socks & Hosiery)
+        // 5. 袜子 (Socks & Hosiery)
         let sockKeywords = [
             "sock", "stocking", "hosiery", "tights", "legging", "pantyhose", "leg warmer", "anklet"
         ]
@@ -247,24 +328,30 @@ class CutoutService {
             return "袜子"
         }
         
-        // 玩偶 (Toys & Dolls)
-        let toyKeywords = [
-            "toy", "doll", "plush", "teddy", "figurine", "action figure", "puppet",
-            "marionette", "stuffed animal", "bear", "rabbit", "bunny", "cat", "dog"
+        // 6. 弱匹配裙子 (泛指词) - 放在具体分类之后，避免把“鞋子”识别成“Clothing”
+        let weakDressKeywords = [
+            "costume", "clothing", "apparel", "garment", "wear", "vestment", "textile", "fabric", "fashion"
         ]
-        // 注意：某些动物名词可能会误报，但在抠图场景下通常是玩偶
-        if toyKeywords.contains(where: { id.contains($0) }) {
-            return "玩偶"
+        // 如果是这些词，且没命中鞋袜小物，大概率是主体衣物。
+        // 在洛丽塔/JK制服语境下，主体衣物通常是裙子或套装（归裙子或外套）。
+        // 我们可以暂时归为“裙子”（因为用户说裙子容易丢），或者根据是否包含 "top"/"shirt" 区分。
+        // 这里做一个偏向性策略：如果是泛指 Clothing，优先归为裙子（因为裙子体积大，容易被识别为整体 Clothing）
+        if weakDressKeywords.contains(where: { id.contains($0) }) {
+            // 再次检查是否可能是外套？
+            // 很难区分。但用户反馈裙子被分错，所以这里给裙子权重。
+            return "裙子"
         }
         
-        // 小物 (Accessories)
+        // 7. 小物 (Accessories) - 必须精确匹配
+        // 只有明确识别为包、饰品等才算小物
         let accessoryKeywords = [
             "bag", "purse", "wallet", "hat", "cap", "scarf", "glove", "jewelry",
             "necklace", "ring", "earring", "bracelet", "glasses", "sunglasses",
             "watch", "umbrella", "tie", "belt", "accessory", "keychain", "hair",
             "pin", "brooch", "headband", "bow", "ribbon", "fan", "mask", "wig",
             "crown", "tiara", "helmet", "bonnet", "beret", "fedora", "cowboy hat",
-            "sombrero", "backpack", "satchel", "tote", "handbag", "clutch", "briefcase"
+            "sombrero", "backpack", "satchel", "tote", "handbag", "clutch", "briefcase",
+            "luggage", "suitcase"
         ]
         if accessoryKeywords.contains(where: { id.contains($0) }) {
             return "小物"
