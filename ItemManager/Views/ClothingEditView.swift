@@ -12,7 +12,7 @@ import Foundation
 struct ClothingEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query private var allClothings: [Clothing]
+    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     @State private var clothing: Clothing?

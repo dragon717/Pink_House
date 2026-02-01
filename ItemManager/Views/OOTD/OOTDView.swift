@@ -5,7 +5,7 @@ import PhotosUI
 
 struct OOTDView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var allClothing: [Clothing] // Fetch all clothing to scan
+    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothing: [Clothing] // Fetch all clothing to scan
     @Query(sort: \Outfit.createdAt, order: .reverse) private var allOutfits: [Outfit]
     
     @State private var currentOutfit: Outfit?

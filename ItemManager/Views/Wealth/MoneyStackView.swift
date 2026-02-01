@@ -68,6 +68,16 @@ struct IsometricBundleView: View {
     let currency: CurrencyType
     let thickness: CGFloat
     
+    // Access appearance manager
+    private var appearanceManager = WealthAppearanceManager.shared
+    
+    init(denomination: Denomination, count: Int, currency: CurrencyType, thickness: CGFloat) {
+        self.denomination = denomination
+        self.count = count
+        self.currency = currency
+        self.thickness = thickness
+    }
+    
     var stackHeight: CGFloat {
         CGFloat(count) * thickness
     }
@@ -78,6 +88,9 @@ struct IsometricBundleView: View {
         let maxLimit = 1000
         let messyThreshold = maxLimit / 3
         let isMessy = count < messyThreshold
+        
+        // Determine color: Custom extracted color or default denomination color
+        let displayColor: Color = appearanceManager.getCustomColor(currency: currency, denominationValue: denomination.value) ?? denomination.color
         
         ZStack {
             if isMessy {
@@ -103,7 +116,7 @@ struct IsometricBundleView: View {
                 // Stack grows DOWNWARDS
                 
                 IsometricBlockSides(
-                    color: denomination.color,
+                    color: displayColor,
                     width: width,
                     depth: height,
                     stackHeight: stackHeight

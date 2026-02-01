@@ -38,6 +38,18 @@ struct GeneralSettingsView: View {
             }
             
             Section(header: Text("外观主题")) {
+                NavigationLink(destination: WealthCustomizationView()) {
+                    HStack {
+                        Image(systemName: "banknote")
+                            .foregroundStyle(.green)
+                        Text("来财个性化")
+                        Spacer()
+                        Text("自定义纸币样式")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+                
                 Picker("背景类型", selection: $theme.backgroundStyle) {
                     ForEach(BackgroundStyle.allCases) { style in
                         Text(style.displayName).tag(style)

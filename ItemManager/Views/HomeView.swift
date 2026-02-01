@@ -49,7 +49,7 @@ enum HomeTab {
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var allClothings: [Clothing]
+    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
 

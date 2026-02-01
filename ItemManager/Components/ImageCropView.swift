@@ -3,45 +3,85 @@ import UIKit
 
 struct ImageCropView: View {
     let image: UIImage
+    let aspectRatio: CGFloat? // Width / Height
     let onCrop: (UIImage) -> Void
     let onCancel: () -> Void
     
-    init(image: UIImage, onCrop: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+    init(image: UIImage, aspectRatio: CGFloat? = nil, onCrop: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
         self.image = image
+        self.aspectRatio = aspectRatio
         self.onCrop = onCrop
         self.onCancel = onCancel
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Toolbar
-            HStack {
-                Button("取消", action: onCancel)
-                    .foregroundStyle(.white)
-                Spacer()
-                Text("移动和缩放")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Spacer()
-                Button("使用") {
-                    NotificationCenter.default.post(name: NSNotification.Name("TriggerCrop"), object: nil)
-                }
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-            }
-            .padding()
-            .background(Color.black.opacity(0.8))
-            .zIndex(1)
+        ZStack {
+            Color.black.ignoresSafeArea() // 全屏黑底
             
-            // Crop Area
-            GeometryReader { geometry in
-                CropScrollView(image: image, viewSize: geometry.size) { croppedImage in
-                    onCrop(croppedImage)
+            VStack(spacing: 0) {
+                // Toolbar
+                HStack {
+                    Button("取消", action: onCancel)
+                        .foregroundStyle(.white)
+                        .padding(8) // 增加触摸范围
+                        .contentShape(Rectangle())
+                    Spacer()
+                    Text("移动和缩放")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button("使用") {
+                        NotificationCenter.default.post(name: NSNotification.Name("TriggerCrop"), object: nil)
+                    }
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(8) // 增加触摸范围
+                    .contentShape(Rectangle())
                 }
-                .edgesIgnoringSafeArea(.all)
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .padding(.top, 44) // Force top padding for safe area (approx dynamic island height)
+                .background(Color.black.opacity(0.8))
+                
+                // Crop Area
+                GeometryReader { geometry in
+                    ZStack {
+                        Color.black // Background for empty areas
+                        
+                        if let ratio = aspectRatio {
+                            // Fixed Aspect Ratio Mode
+                            let width = geometry.size.width
+                            let height = width / ratio
+                            
+                            // Check if height exceeds available space
+                            if height > geometry.size.height {
+                                // Constrain by height instead
+                                let h = geometry.size.height
+                                let w = h * ratio
+                                 CropScrollView(image: image, viewSize: CGSize(width: w, height: h)) { croppedImage in
+                                    onCrop(croppedImage)
+                                }
+                                .frame(width: w, height: h)
+                                .clipped()
+                            } else {
+                                // Constrain by width
+                                CropScrollView(image: image, viewSize: CGSize(width: width, height: height)) { croppedImage in
+                                    onCrop(croppedImage)
+                                }
+                                .frame(width: width, height: height)
+                                .clipped()
+                            }
+                        } else {
+                            // Full Screen Mode
+                            CropScrollView(image: image, viewSize: geometry.size) { croppedImage in
+                                onCrop(croppedImage)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
-        .background(Color.black)
     }
 }
 
@@ -97,6 +137,14 @@ struct CropScrollView: UIViewRepresentable {
              uiView.addSubview(imageView)
              uiView.contentSize = image.size
              context.coordinator.imageView = imageView
+        } else if let imageView = context.coordinator.imageView, imageView.image != image {
+            // Update image if it changed
+            imageView.image = image
+            imageView.frame = CGRect(origin: .zero, size: image.size)
+            uiView.contentSize = image.size
+            // Reset zoom to force recalculation
+            uiView.zoomScale = 1.0
+            context.coordinator.lastViewSize = .zero
         }
  
         // Only layout if size changed and is valid
