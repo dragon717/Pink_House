@@ -217,25 +217,45 @@ struct OOTDView: View {
         
         Task {
             var count = 0
-            // Filter skirts (simple string match for demo)
-            let skirts = allClothing.filter { $0.types.contains("裙") || $0.name.contains("裙") || $0.types.contains("JSK") || $0.types.contains("OP") || $0.types.contains("SK") }
+            // Expanded filtering to include more categories
+            // This now includes: Skirts, Dresses (JSK/OP), Tops, Bottoms, Shoes, Bags, Accessories
+            // Basically everything that is not deleted.
+            // If you want to exclude specific things, you can refine this.
+            // For now, let's process ALL clothing items that have images.
+            let itemsToProcess = allClothing.filter { clothing in
+                !clothing.imagePaths.isEmpty
+            }
             
-            for clothing in skirts {
+            let total = itemsToProcess.count
+            print("Batch processing started for \(total) items.")
+            
+            for (index, clothing) in itemsToProcess.enumerated() {
+                // Update progress every few items to avoid UI spam
+                if index % 5 == 0 {
+                    await MainActor.run {
+                        processingMessage = "正在处理 \(index + 1)/\(total)..."
+                    }
+                }
+                
                 // Process first image of each clothing
                 if let firstImagePath = clothing.imagePaths.first,
                    let image = ImageManager.shared.loadImage(fileName: firstImagePath) {
                     
                     do {
                         // Check if we already have a cutout for this clothing? 
-                        // For now, just process.
-                        _ = try await CutoutService.shared.processImage(image: image, category: "裙装", clothing: clothing, context: modelContext)
+                        // The CutoutService handles deduplication via hash check, so it's safe to call repeatedly.
+                        // However, we can optimize by checking linkedClothing relation first if needed, 
+                        // but hash check is more robust against re-imports.
+                        
+                        // Use the clothing's type or name as category
+                        // types is comma separated string e.g. "JSK,OP"
+                        let category = clothing.types.split(separator: ",").first.map(String.init) ?? "未分类"
+                        
+                        _ = try await CutoutService.shared.processImage(image: image, category: category, clothing: clothing, context: modelContext)
                         count += 1
-                        await MainActor.run {
-                            processingMessage = "已处理 \(count) 件..."
-                        }
                     } catch {
-                        // Ignore errors for individual items in batch
-                        print("Failed to process \(clothing.name): \(error)")
+                        // Ignore errors for individual items in batch (e.g. no subject found)
+                        // print("Failed to process \(clothing.name): \(error)")
                     }
                 }
             }
@@ -244,6 +264,7 @@ struct OOTDView: View {
                 isProcessing = false
                 processingMessage = ""
                 // Optional: Show success toast
+                print("Batch processing finished. Processed \(count) items.")
             }
         }
     }
