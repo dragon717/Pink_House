@@ -9,7 +9,16 @@ import SwiftUI
 import SwiftData
 import Foundation
 
-struct ClothingCard: View {
+struct ClothingCard: View, Equatable {
+    static func == (lhs: ClothingCard, rhs: ClothingCard) -> Bool {
+        return lhs.clothing.id == rhs.clothing.id &&
+               lhs.clothing.name == rhs.clothing.name &&
+               lhs.clothing.originalPrice == rhs.clothing.originalPrice &&
+               lhs.clothing.price == rhs.clothing.price &&
+               lhs.clothing.imagePaths == rhs.clothing.imagePaths &&
+               lhs.clothing.stock == rhs.clothing.stock
+    }
+
     let clothing: Clothing
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
@@ -100,7 +109,12 @@ struct ClothingCard: View {
     }
 }
 
-struct ClothingThumbnail: View {
+struct ClothingThumbnail: View, Equatable {
+    static func == (lhs: ClothingThumbnail, rhs: ClothingThumbnail) -> Bool {
+        return lhs.clothing.id == rhs.clothing.id &&
+               lhs.clothing.imagePaths == rhs.clothing.imagePaths
+    }
+    
     let clothing: Clothing
     
     var body: some View {

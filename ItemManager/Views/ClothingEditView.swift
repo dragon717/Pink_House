@@ -117,11 +117,11 @@ struct ClothingEditView: View {
                     }
                     .sheet(isPresented: $showingBrandSelection) {
                         BrandSelectionView(selectedBrand: $tempSelectedBrand)
-                            .onChange(of: tempSelectedBrand) { _, newValue in
-                                if let brand = newValue {
-                                    brandName = brand.name
-                                }
-                            }
+                    }
+                    .onChange(of: tempSelectedBrand) { _, newValue in
+                        if let brand = newValue {
+                            brandName = brand.name
+                        }
                     }
                     
                     ForEach(visibilityManager.fieldOrder, id: \.self) { field in

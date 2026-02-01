@@ -16,6 +16,7 @@ enum SortOption: String, CaseIterable, Identifiable {
     case purchaseDateDesc = "购买时间从晚到早"
     case nameAsc = "名称从A到Z"
     case nameDesc = "名称从Z到A"
+    case custom = "自定义顺序"
     
     var id: String { rawValue }
     
@@ -35,6 +36,8 @@ enum SortOption: String, CaseIterable, Identifiable {
             return [SortDescriptor(\Clothing.name, order: .forward)]
         case .nameDesc:
             return [SortDescriptor(\Clothing.name, order: .reverse)]
+        case .custom:
+            return [SortDescriptor(\Clothing.sortIndex, order: .forward)]
         }
     }
 }

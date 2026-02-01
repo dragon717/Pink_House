@@ -38,6 +38,7 @@ final class Clothing {
     var deposit: Decimal = 0.0 // 定金
     var balance: Decimal = 0.0 // 尾款
     var accessoriesPrice: Decimal = 0.0 // 小物总价
+    var sortIndex: Int = 0 // 自定义排序索引
     
     // 购买信息
     var purchaseDate: Date = Date()

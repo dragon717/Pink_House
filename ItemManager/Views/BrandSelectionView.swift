@@ -144,8 +144,8 @@ struct BrandSelectionView: View {
             .navigationTitle("选择品牌")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
                         dismiss()
                     }
                 }
@@ -206,11 +206,8 @@ struct BrandSelectionView: View {
     }
     
     private func selectBrand(_ brand: Brand) {
-        if selectedBrand?.id == brand.id {
-            selectedBrand = nil // Deselect if already selected
-        } else {
-            selectedBrand = brand
-        }
+        selectedBrand = brand
+        dismiss()
     }
 }
 

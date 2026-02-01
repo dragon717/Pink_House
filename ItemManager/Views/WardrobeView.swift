@@ -7,14 +7,22 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct WardrobeView: View {
     @Binding var searchText: String
+    @Environment(\.modelContext) private var modelContext
     @Query private var clothings: [Clothing]
     @State private var showStats = true
     
+    // Edit Mode States
+    @State private var isEditing = false
+    @State private var editableClothings: [Clothing] = []
+    @State private var draggingItem: Clothing?
+    
     // Layout
     let viewLayout: HomeView.ViewLayout
+    let sortOption: SortOption
     
     // Filter properties
     let selectedTagIDs: Set<UUID>
@@ -44,6 +52,7 @@ struct WardrobeView: View {
          filterDescription: String? = nil,
          onClearFilter: (() -> Void)? = nil) {
         _searchText = searchText
+        self.sortOption = sortOption
         _clothings = Query(filter: #Predicate<Clothing> { $0.isDeleted == false }, sort: sortOption.sortDescriptors)
         self.viewLayout = viewLayout
         
@@ -146,27 +155,50 @@ struct WardrobeView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     
-                    ForEach(filteredClothings) { clothing in
-                        ZStack {
-                            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                EmptyView()
-                            }
-                            .opacity(0)
-                            
-                            VStack(spacing: 0) {
-                                if viewLayout == .listBrief {
-                                    ClothingRowBrief(clothing: clothing)
-                                } else {
-                                    ClothingRow(clothing: clothing)
+                    if isEditing {
+                        ForEach(editableClothings) { clothing in
+                            ZStack {
+                                VStack(spacing: 0) {
+                                    if viewLayout == .listBrief {
+                                        ClothingRowBrief(clothing: clothing)
+                                    } else {
+                                        ClothingRow(clothing: clothing)
+                                    }
+                                    
+                                    Divider()
+                                        .padding(.leading)
                                 }
-                                
-                                Divider()
-                                    .padding(.leading)
                             }
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         }
-                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
+                        .onMove { from, to in
+                            editableClothings.move(fromOffsets: from, toOffset: to)
+                        }
+                    } else {
+                        ForEach(filteredClothings) { clothing in
+                            ZStack {
+                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                    EmptyView()
+                                }
+                                .opacity(0)
+                                
+                                VStack(spacing: 0) {
+                                    if viewLayout == .listBrief {
+                                        ClothingRowBrief(clothing: clothing)
+                                    } else {
+                                        ClothingRow(clothing: clothing)
+                                    }
+                                    
+                                    Divider()
+                                        .padding(.leading)
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                        }
                     }
                     
                     // Bottom padding
@@ -177,6 +209,7 @@ struct WardrobeView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .environment(\.editMode, .constant(isEditing ? .active : .inactive))
                 
             case .grid2, .grid3, .grid6:
                 ScrollView {
@@ -184,25 +217,82 @@ struct WardrobeView: View {
                         statsSection
                         
                         LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
-                            ForEach(filteredClothings) { clothing in
-                                NavigationLink {
-                                    ClothingDetailView(clothing: clothing)
-                                } label: {
-                                    if viewLayout == .grid6 {
-                                        ClothingThumbnail(clothing: clothing)
-                                    } else {
-                                        ClothingCard(clothing: clothing)
+                            if isEditing {
+                                ForEach(editableClothings) { clothing in
+                                    ZStack {
+                                        if viewLayout == .grid6 {
+                                            ClothingThumbnail(clothing: clothing)
+                                        } else {
+                                            ClothingCard(clothing: clothing)
+                                        }
+                                    }
+                                    .contentShape(Rectangle())
+                                    .onDrag {
+                                        self.draggingItem = clothing
+                                        return NSItemProvider(object: clothing.id.uuidString as NSString)
+                                    }
+                                    .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem))
+                                }
+                            } else {
+                                ForEach(filteredClothings) { clothing in
+                                    NavigationLink {
+                                        ClothingDetailView(clothing: clothing)
+                                    } label: {
+                                        if viewLayout == .grid6 {
+                                            ClothingThumbnail(clothing: clothing)
+                                        } else {
+                                            ClothingCard(clothing: clothing)
+                                        }
                                     }
                                 }
                             }
                         }
+                        .id(isEditing ? "editing" : "viewing") // Force recreate LazyVGrid when mode changes
+                        .animation(.default, value: editableClothings)
                         .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
                         .padding(.bottom, 100)
                     }
                     .padding(.top, 10)
                 }
+                .onDrop(of: [UTType.text], isTargeted: nil) { _ in
+                    self.draggingItem = nil
+                    return true
+                }
             }
         }
+        .toolbar {
+            if sortOption == .custom {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        toggleEditMode()
+                    } label: {
+                        Text(isEditing ? "完成" : "编辑")
+                            .fontWeight(isEditing ? .bold : .regular)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func toggleEditMode() {
+        if isEditing {
+            // Save order
+            saveOrder()
+            editableClothings = []
+        } else {
+            // Start editing
+            editableClothings = filteredClothings
+        }
+        withAnimation {
+            isEditing.toggle()
+        }
+    }
+    
+    private func saveOrder() {
+        for (index, clothing) in editableClothings.enumerated() {
+            clothing.sortIndex = index
+        }
+        try? modelContext.save()
     }
     
     private var statsSection: some View {
@@ -287,7 +377,6 @@ struct WardrobeStatsView: View {
                         Image(systemName: "heart.fill")
                             .font(.caption)
                         Text("少女专属")
-                            .font(.caption)
                     }
                     .padding()
                     .background(Color.brown.opacity(0.1))
@@ -324,5 +413,35 @@ struct WardrobeStatsView: View {
                 .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+struct DropViewDelegate: DropDelegate {
+    let item: Clothing
+    @Binding var items: [Clothing]
+    @Binding var draggingItem: Clothing?
+    
+    func performDrop(info: DropInfo) -> Bool {
+        self.draggingItem = nil
+        return true
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggingItem = draggingItem else { return }
+        if draggingItem.id == item.id { return }
+        
+        guard let fromIndex = items.firstIndex(where: { $0.id == draggingItem.id }),
+              let toIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
+        
+        if fromIndex != toIndex {
+            withAnimation(.default) {
+                let fromItem = items.remove(at: fromIndex)
+                items.insert(fromItem, at: toIndex)
+            }
+        }
     }
 }
