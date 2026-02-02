@@ -18,17 +18,17 @@ struct ClothingCard: View, Equatable {
                lhs.clothing.imagePaths == rhs.clothing.imagePaths &&
                lhs.clothing.stock == rhs.clothing.stock
     }
-
+    
     let clothing: Clothing
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
+    @State private var image: UIImage?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Image Area
             ZStack(alignment: .topTrailing) {
-                if let imagePath = clothing.imagePaths.first,
-                   let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
+                if let uiImage = image {
                     Color.clear
                         .aspectRatio(1, contentMode: .fit)
                         .overlay(
@@ -71,6 +71,14 @@ struct ClothingCard: View, Equatable {
                     }
                 }
             }
+            .task {
+                if let imagePath = clothing.imagePaths.first {
+                    // 预估卡片宽度: 屏幕宽度/2 (Grid2) approx 180-200pt -> @2x 400px, @3x 600px
+                    // Grid3 approx 120pt -> 360px
+                    // Safe bet: 500x500
+                    self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: CGSize(width: 500, height: 500))
+                }
+            }
             
             // Info Area
             VStack(alignment: .leading, spacing: 4) {
@@ -103,7 +111,7 @@ struct ClothingCard: View, Equatable {
             .padding(.horizontal, 4)
             .padding(.bottom, 8)
         }
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -116,11 +124,11 @@ struct ClothingThumbnail: View, Equatable {
     }
     
     let clothing: Clothing
+    @State private var image: UIImage?
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            if let imagePath = clothing.imagePaths.first,
-               let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
+            if let uiImage = image {
                 Color.clear
                     .aspectRatio(1, contentMode: .fit)
                     .overlay(
@@ -133,6 +141,12 @@ struct ClothingThumbnail: View, Equatable {
                 CutePlaceholderView(iconSize: 14)
                     .aspectRatio(1, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+        }
+        .task {
+            if let imagePath = clothing.imagePaths.first {
+                // Grid 6: approx 60pt -> 180px. Safe bet: 200x200
+                self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: CGSize(width: 200, height: 200))
             }
         }
     }
@@ -166,15 +180,15 @@ struct ClothingRow: View {
     // 直接使用 AppStorage
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
+    @State private var image: UIImage?
     
     var body: some View {
         GlassCard {
             HStack(spacing: 16) {
                 // Thumbnail
                 ZStack {
-                    if let firstPath = clothing.imagePaths.first,
-                       let image = ImageManager.shared.loadImage(fileName: firstPath) {
-                        Image(uiImage: image)
+                    if let uiImage = image {
+                        Image(uiImage: uiImage)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 60, height: 60)
@@ -183,6 +197,11 @@ struct ClothingRow: View {
                         CutePlaceholderView(iconSize: 24)
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .task {
+                    if let firstPath = clothing.imagePaths.first {
+                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: CGSize(width: 120, height: 120))
                     }
                 }
                 .overlay(alignment: .topTrailing) {
@@ -280,22 +299,29 @@ struct ClothingRowBrief: View {
     // 直接使用 AppStorage
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
+    @State private var image: UIImage?
     
     var body: some View {
         GlassCard {
             HStack(spacing: 12) {
                 // Thumbnail (Smaller)
-                if let firstPath = clothing.imagePaths.first,
-                       let image = ImageManager.shared.loadImage(fileName: firstPath) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    CutePlaceholderView(iconSize: 16)
-                        .frame(width: 40, height: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                ZStack {
+                    if let uiImage = image {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 40, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        CutePlaceholderView(iconSize: 16)
+                            .frame(width: 40, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                .task {
+                    if let firstPath = clothing.imagePaths.first {
+                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: CGSize(width: 80, height: 80))
+                    }
                 }
                 
                 Text(clothing.name)

@@ -20,6 +20,10 @@ struct WardrobeView: View {
     @State private var editableClothings: [Clothing] = []
     @State private var draggingItem: Clothing?
     
+    // Auto-scroll
+    @State private var visibleItemIDs: Set<UUID> = []
+    @State private var autoScrollTask: Task<Void, Never>?
+    
     // Layout
     let viewLayout: HomeView.ViewLayout
     let sortOption: SortOption
@@ -212,51 +216,77 @@ struct WardrobeView: View {
                 .environment(\.editMode, .constant(isEditing ? .active : .inactive))
                 
             case .grid2, .grid3, .grid6:
-                ScrollView {
-                    VStack(spacing: 20) {
-                        statsSection
-                        
-                        LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
-                            if isEditing {
-                                ForEach(editableClothings) { clothing in
-                                    ZStack {
-                                        if viewLayout == .grid6 {
-                                            ClothingThumbnail(clothing: clothing)
-                                        } else {
-                                            ClothingCard(clothing: clothing)
+                ScrollViewReader { proxy in
+                    ZStack {
+                        ScrollView {
+                            VStack(spacing: 20) {
+                                statsSection
+                                
+                                LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
+                                    if isEditing {
+                                        ForEach(editableClothings) { clothing in
+                                            ZStack {
+                                                if viewLayout == .grid6 {
+                                                    ClothingThumbnail(clothing: clothing)
+                                                } else {
+                                                    ClothingCard(clothing: clothing)
+                                                }
+                                            }
+                                            .contentShape(Rectangle())
+                                            .onAppear { visibleItemIDs.insert(clothing.id) }
+                                            .onDisappear { visibleItemIDs.remove(clothing.id) }
+                                            .onDrag {
+                                                self.draggingItem = clothing
+                                                return NSItemProvider(object: clothing.id.uuidString as NSString)
+                                            }
+                                            .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem))
+                                        }
+                                    } else {
+                                        ForEach(filteredClothings) { clothing in
+                                            NavigationLink {
+                                                ClothingDetailView(clothing: clothing)
+                                            } label: {
+                                                if viewLayout == .grid6 {
+                                                    ClothingThumbnail(clothing: clothing)
+                                                } else {
+                                                    ClothingCard(clothing: clothing)
+                                                }
+                                            }
                                         }
                                     }
-                                    .contentShape(Rectangle())
-                                    .onDrag {
-                                        self.draggingItem = clothing
-                                        return NSItemProvider(object: clothing.id.uuidString as NSString)
-                                    }
-                                    .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem))
                                 }
-                            } else {
-                                ForEach(filteredClothings) { clothing in
-                                    NavigationLink {
-                                        ClothingDetailView(clothing: clothing)
-                                    } label: {
-                                        if viewLayout == .grid6 {
-                                            ClothingThumbnail(clothing: clothing)
-                                        } else {
-                                            ClothingCard(clothing: clothing)
-                                        }
-                                    }
-                                }
+                                .id(isEditing ? "editing" : "viewing") // Force recreate LazyVGrid when mode changes
+                                .animation(.default, value: editableClothings)
+                                .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+                                .padding(.bottom, 100)
                             }
+                            .padding(.top, 10)
                         }
-                        .id(isEditing ? "editing" : "viewing") // Force recreate LazyVGrid when mode changes
-                        .animation(.default, value: editableClothings)
-                        .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-                        .padding(.bottom, 100)
+                        .onDrop(of: [UTType.text], isTargeted: nil) { _ in
+                            self.draggingItem = nil
+                            return true
+                        }
+                        
+                        // Auto-scroll Drop Zones
+                        if isEditing {
+                            VStack {
+                                Color.clear.frame(height: 80)
+                                    .contentShape(Rectangle())
+                                    .onDrop(of: [UTType.text], delegate: ScrollDropDelegate(
+                                        onEnter: { startAutoScroll(up: true, proxy: proxy) },
+                                        onExit: { stopAutoScroll() }
+                                    ))
+                                Spacer()
+                                Color.clear.frame(height: 80)
+                                    .contentShape(Rectangle())
+                                    .onDrop(of: [UTType.text], delegate: ScrollDropDelegate(
+                                        onEnter: { startAutoScroll(up: false, proxy: proxy) },
+                                        onExit: { stopAutoScroll() }
+                                    ))
+                            }
+                            .allowsHitTesting(true)
+                        }
                     }
-                    .padding(.top, 10)
-                }
-                .onDrop(of: [UTType.text], isTargeted: nil) { _ in
-                    self.draggingItem = nil
-                    return true
                 }
             }
         }
@@ -293,6 +323,46 @@ struct WardrobeView: View {
             clothing.sortIndex = index
         }
         try? modelContext.save()
+    }
+    
+    // MARK: - Auto Scroll Logic
+    private func startAutoScroll(up: Bool, proxy: ScrollViewProxy) {
+        stopAutoScroll()
+        autoScrollTask = Task { @MainActor in
+            while !Task.isCancelled {
+                performScroll(up: up, proxy: proxy)
+                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
+            }
+        }
+    }
+    
+    private func stopAutoScroll() {
+        autoScrollTask?.cancel()
+        autoScrollTask = nil
+    }
+    
+    private func performScroll(up: Bool, proxy: ScrollViewProxy) {
+        guard !visibleItemIDs.isEmpty, !editableClothings.isEmpty else { return }
+        
+        let visibleIndices = editableClothings.indices.filter { visibleItemIDs.contains(editableClothings[$0].id) }
+        guard !visibleIndices.isEmpty else { return }
+        
+        if up {
+            if let minIndex = visibleIndices.min(), minIndex > 0 {
+                // Scroll to the item just above the current view
+                let targetIndex = max(0, minIndex - 3) // Jump a bit more for smoother feel in grid
+                withAnimation {
+                    proxy.scrollTo(editableClothings[targetIndex].id, anchor: .top)
+                }
+            }
+        } else {
+            if let maxIndex = visibleIndices.max(), maxIndex < editableClothings.count - 1 {
+                let targetIndex = min(editableClothings.count - 1, maxIndex + 3)
+                withAnimation {
+                    proxy.scrollTo(editableClothings[targetIndex].id, anchor: .bottom)
+                }
+            }
+        }
     }
     
     private var statsSection: some View {
@@ -443,5 +513,27 @@ struct DropViewDelegate: DropDelegate {
                 items.insert(fromItem, at: toIndex)
             }
         }
+    }
+}
+
+struct ScrollDropDelegate: DropDelegate {
+    let onEnter: () -> Void
+    let onExit: () -> Void
+    
+    func dropEntered(info: DropInfo) {
+        onEnter()
+    }
+    
+    func dropExited(info: DropInfo) {
+        onExit()
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        onExit()
+        return false
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
     }
 }

@@ -238,18 +238,15 @@ struct ClothingDetailView: View {
                         .tag(0)
                 } else {
                     ForEach(0..<clothing.imagePaths.count, id: \.self) { index in
-                        if let image = ImageManager.shared.loadImage(fileName: clothing.imagePaths[index]) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(maxWidth: .infinity)
-                                .clipped()
-                                .tag(index)
-                        } else {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.2))
-                                .tag(index)
-                        }
+                        // Estimate target size based on screen scale
+                        // Use a reasonable max limit to avoid excessive memory on very large screens or high res assets
+                        let scale = UIScreen.main.scale
+                        let width = UIScreen.main.bounds.width * scale
+                        let targetHeight = height * scale
+                        let targetSize = CGSize(width: min(width, 2048), height: min(targetHeight, 2048))
+                        
+                        CarouselItemView(imagePath: clothing.imagePaths[index], targetSize: targetSize)
+                            .tag(index)
                     }
                 }
             }
@@ -613,6 +610,34 @@ struct InfoRow: View {
         case "拥有时长": return "clock"
         case "尾款金额": return "creditcard"
         default: return "circle"
+        }
+    }
+}
+
+struct CarouselItemView: View {
+    let imagePath: String
+    let targetSize: CGSize
+    
+    @State private var image: UIImage?
+    
+    var body: some View {
+        ZStack {
+            if let uiImage = image {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .overlay {
+                        ProgressView()
+                    }
+            }
+        }
+        .task {
+            self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: targetSize)
         }
     }
 }

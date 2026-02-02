@@ -364,7 +364,7 @@ struct CutoutThumbnail: View {
                         .scaledToFit()
                         .frame(width: 72, height: 72)
                         .padding(4)
-                        .background(Color.white)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground))
                         .cornerRadius(12)
                         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                         .overlay(alignment: .bottomLeading) {

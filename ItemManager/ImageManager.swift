@@ -21,9 +21,25 @@ class ImageManager {
     private let memoryCache = NSCache<NSString, UIImage>()
     
     private init() {
-        // Optional: Configure cache limits
-        memoryCache.countLimit = 100 // Cache up to 100 images
-        memoryCache.totalCostLimit = 1024 * 1024 * 200 // 200 MB
+        // Configure cache limits
+        // 50 images limit might be safer for older devices
+        memoryCache.countLimit = 50 
+        // 100 MB limit. Note: NSCache cost is arbitrary, we need to provide cost when setting object.
+        memoryCache.totalCostLimit = 1024 * 1024 * 100 
+        
+        // Listen for memory warnings
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.clearCache()
+        }
+    }
+    
+    func clearCache() {
+        AppLogger.info("Memory warning received, clearing image cache")
+        memoryCache.removeAllObjects()
     }
     
     // MARK: - Directory Management
@@ -80,7 +96,8 @@ class ImageManager {
                 AppLogger.info("Image exists (Hash: \(hash)), incrementing refCount to \(existingImage.refCount)")
                 
                 // Ensure it's in cache
-                memoryCache.setObject(image, forKey: existingImage.fileName as NSString)
+                let cost = Int(image.size.width * image.size.height * 4)
+                memoryCache.setObject(image, forKey: existingImage.fileName as NSString, cost: cost)
                 
                 return existingImage.fileName
             } else {
@@ -94,7 +111,8 @@ class ImageManager {
                 context.insert(storedImage)
                 
                 // Cache the new image
-                memoryCache.setObject(image, forKey: fileName as NSString)
+                let cost = Int(image.size.width * image.size.height * 4)
+                memoryCache.setObject(image, forKey: fileName as NSString, cost: cost)
                 
                 AppLogger.info("New image saved (Hash: \(hash), File: \(fileName))")
                 return fileName
@@ -169,7 +187,8 @@ class ImageManager {
         guard let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) else { return nil }
         
         // Cache loaded image
-        memoryCache.setObject(image, forKey: fileName as NSString)
+        let cost = Int(image.size.width * image.size.height * 4)
+        memoryCache.setObject(image, forKey: fileName as NSString, cost: cost)
         return image
     }
     
@@ -206,7 +225,8 @@ class ImageManager {
         
         // Cache back on MainActor
         if let image = image {
-            memoryCache.setObject(image, forKey: cacheKey)
+            let cost = Int(image.size.width * image.size.height * 4)
+            memoryCache.setObject(image, forKey: cacheKey, cost: cost)
         }
         
         return image
