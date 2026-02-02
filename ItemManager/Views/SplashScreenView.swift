@@ -9,7 +9,8 @@ struct SplashScreenView: View {
             // Splash Image
             Image("SplashScreen") // Using the name from Assets.xcassets
                 .resizable()
-                .aspectRatio(contentMode: .fill)
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .ignoresSafeArea()
         }
     }
