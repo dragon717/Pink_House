@@ -156,7 +156,7 @@ struct ClothingListView: View {
                     NotificationManager.shared.cancelNotification(for: item)
                     modelContext.delete(item)
                     // Sync widget
-                    SharedPersistence.shared.syncWidgetData()
+                    Task { await SharedPersistence.shared.syncWidgetData() }
                 }
                 itemToDelete = nil
             }
@@ -381,6 +381,6 @@ struct ClothingListView: View {
         NotificationManager.shared.scheduleNotification(for: newItem)
         
         // Sync widget
-        SharedPersistence.shared.syncWidgetData()
+        Task { await SharedPersistence.shared.syncWidgetData() }
     }
 }

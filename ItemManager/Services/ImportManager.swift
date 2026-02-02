@@ -246,7 +246,7 @@ class ImportManager {
         try context.save()
         
         // Sync widget data
-        SharedPersistence.shared.syncWidgetData()
+        Task { await SharedPersistence.shared.syncWidgetData() }
         
         return result
     }

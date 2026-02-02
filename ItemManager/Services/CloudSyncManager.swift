@@ -455,7 +455,7 @@ class CloudSyncManager: ObservableObject {
     
     // MARK: - Auto Sync & Silent Restore
     
-    func triggerAutoSync(modelContainer: ModelContainer) {
+    func triggerAutoSync(modelContainer: ModelContainer) async {
         guard isAutoSyncEnabled, hasSuccessfulBackup else { return }
         guard !isSyncing else { return }
         
@@ -463,11 +463,9 @@ class CloudSyncManager: ObservableObject {
             return
         }
         
-        Task {
-            let accountStatus = try? await container.accountStatus()
-            guard accountStatus == .available else { return }
-            await uploadBackup(modelContainer: modelContainer)
-        }
+        let accountStatus = try? await container.accountStatus()
+        guard accountStatus == .available else { return }
+        await uploadBackup(modelContainer: modelContainer)
     }
     
     func checkAndSilentRestore(container: ModelContainer) async {

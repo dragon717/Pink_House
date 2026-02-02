@@ -128,7 +128,7 @@ struct ClothingDetailView: View {
                 // Soft delete
                 clothing.isDeleted = true
                 clothing.deletedAt = Date()
-                SharedPersistence.shared.syncWidgetData()
+                Task { await SharedPersistence.shared.syncWidgetData() }
                 dismiss()
             }
         } message: {
@@ -168,7 +168,7 @@ struct ClothingDetailView: View {
         clothing.finalPaymentEndDate = nil
         // Try to save context (though it autosaves usually)
         try? modelContext.save()
-        SharedPersistence.shared.syncWidgetData()
+        Task { await SharedPersistence.shared.syncWidgetData() }
     }
     
     private func duplicateClothing() {
@@ -217,7 +217,7 @@ struct ClothingDetailView: View {
         // Schedule notification for the copy
         NotificationManager.shared.scheduleNotification(for: newClothing)
         
-        SharedPersistence.shared.syncWidgetData()
+        Task { await SharedPersistence.shared.syncWidgetData() }
         
         dismiss()
     }

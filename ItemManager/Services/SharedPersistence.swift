@@ -49,7 +49,7 @@ class SharedPersistence {
     // 同步数据给小组件
     // 这个方法应该在数据发生变化时调用（如添加、修改、删除衣物后）
     @MainActor
-    func syncWidgetData() {
+    func syncWidgetData() async {
         let context = sharedModelContainer.mainContext
         
         do {
@@ -83,50 +83,47 @@ class SharedPersistence {
             let totalDeposit = depositPlans.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
             let totalBalance = depositPlans.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
             
-            // 3. Recent Items & Image Processing
-            let recentItems = processWidgetImages(clothings)
+            // 3. Recent Items & Image Processing (Optimized)
+            // Extract DTOs for background processing
+            let recentClothings = Array(clothings.prefix(5))
+            let recentDTOs = recentClothings.map { clothing in
+                ClothingWidgetDataDTO(
+                    id: clothing.id,
+                    name: clothing.name,
+                    price: clothing.price,
+                    stock: clothing.stock,
+                    imagePath: clothing.imagePaths.first
+                )
+            }
             
-            // 4. Series Stats & Save
-            // SeriesAnalyzer might be slow, so we do it async but we need to capture clothings
-            // Since clothings are Model objects, they might not be thread safe if passed directly across actors without care.
-            // But SeriesAnalyzer.analyzeSeries takes [Clothing].
-            // Ideally we should map to simple structs before passing if concurrency is an issue, 
-            // but for now let's assume SeriesAnalyzer handles it or run on MainActor.
-            // Actually SeriesAnalyzer.analyzeSeries is async.
-            
-            Task {
-                // 5. Month Stats
-                var monthStats: [WidgetMonthInfo] = []
-                
-                // Generate for current year (1-12) to match App's year view
-                // Since we already filtered depositPlans by currentYear, we can just iterate months of currentYear
-                
-                for month in 1...12 {
-                    // Construct a date for this month/year for display purposes
-                    // We need to find items in depositPlans that match this month
-                    
-                    let monthlyItems = depositPlans.filter { clothing in
-                        guard let paymentDate = clothing.finalPaymentDate else { return false }
-                        let itemMonth = calendar.component(.month, from: paymentDate)
-                        let itemYear = calendar.component(.year, from: paymentDate)
-                        return itemMonth == month && itemYear == currentYear
-                    }
-                    
-                    let count = monthlyItems.count
-                    let totalBalance = monthlyItems.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
-                    let totalDeposit = monthlyItems.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
-                    
-                    monthStats.append(WidgetMonthInfo(
-                        month: month, 
-                        year: currentYear, 
-                        count: count, 
-                        totalBalance: totalBalance,
-                        totalDeposit: totalDeposit
-                    ))
+            // 5. Month Stats (Pre-calculate here to avoid passing objects)
+            var monthStats: [WidgetMonthInfo] = []
+            for month in 1...12 {
+                let monthlyItems = depositPlans.filter { clothing in
+                    guard let paymentDate = clothing.finalPaymentDate else { return false }
+                    let itemMonth = calendar.component(.month, from: paymentDate)
+                    let itemYear = calendar.component(.year, from: paymentDate)
+                    return itemMonth == month && itemYear == currentYear
                 }
                 
-                // 6. Save and Reload
-                let widgetData = WidgetData(
+                let count = monthlyItems.count
+                let mBalance = monthlyItems.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+                let mDeposit = monthlyItems.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
+                
+                monthStats.append(WidgetMonthInfo(
+                    month: month,
+                    year: currentYear,
+                    count: count,
+                    totalBalance: mBalance,
+                    totalDeposit: mDeposit
+                ))
+            }
+            
+            // Run image processing in background
+            let widgetData = await Task.detached(priority: .background) {
+                let processedItems = SharedPersistence.processWidgetImages(dtos: recentDTOs)
+                
+                return WidgetData(
                     totalCount: totalCount,
                     totalStyleCount: totalStyleCount,
                     depositCount: depositCount,
@@ -134,45 +131,53 @@ class SharedPersistence {
                     totalPrice: totalPrice,
                     totalDeposit: totalDeposit,
                     totalBalance: totalBalance,
-                    seriesStats: [], // No longer calculating series stats for widget
+                    seriesStats: [],
                     monthStats: monthStats,
-                    recentClothings: recentItems,
+                    recentClothings: processedItems,
                     lastUpdated: Date()
                 )
-                
-                WidgetDataManager.shared.save(data: widgetData)
-                WidgetCenter.shared.reloadAllTimelines()
-                print("SharedPersistence: Widget data synced and timeline reloaded.")
-            }
+            }.value
+            
+            WidgetDataManager.shared.save(data: widgetData)
+            WidgetCenter.shared.reloadAllTimelines()
+            print("SharedPersistence: Widget data synced and timeline reloaded.")
             
         } catch {
             print("SharedPersistence: Failed to fetch data for widget sync: \(error)")
         }
     }
     
-    private func processWidgetImages(_ clothings: [Clothing]) -> [WidgetClothing] {
-        // Take top 5 recent items
-        let recent = clothings.prefix(5)
+    // DTO for safe transfer to background task
+    struct ClothingWidgetDataDTO: Sendable {
+        let id: UUID
+        let name: String
+        let price: Decimal
+        let stock: Int
+        let imagePath: String?
+    }
+    
+    // Static function to run in background
+    static func processWidgetImages(dtos: [ClothingWidgetDataDTO]) -> [WidgetClothing] {
         var widgetClothings: [WidgetClothing] = []
         
         let fileManager = FileManager.default
-        // Assuming images are stored in Documents/Images as per ImageManager
+        // Assuming images are stored in Documents/Images
         guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Images"),
               let widgetImagesDir = WidgetDataManager.shared.widgetImagesDirectory else {
-            return recent.map { 
-                WidgetClothing(id: $0.id, name: $0.name, price: $0.price, stock: $0.stock, imagePath: nil) 
+            return dtos.map {
+                WidgetClothing(id: $0.id, name: $0.name, price: $0.price, stock: $0.stock, imagePath: nil)
             }
         }
         
-        for clothing in recent {
+        for dto in dtos {
             var widgetImagePath: String? = nil
             
-            if let originalPath = clothing.imagePaths.first {
+            if let originalPath = dto.imagePath {
                 let sourceURL = documentsPath.appendingPathComponent(originalPath)
                 let destFileName = "thumb_\(originalPath)"
                 let destURL = widgetImagesDir.appendingPathComponent(destFileName)
                 
-                // Compress and Copy if not exists or if source is newer (simplified: just check existence)
+                // Compress and Copy if not exists
                 if !fileManager.fileExists(atPath: destURL.path) {
                     if let image = UIImage(contentsOfFile: sourceURL.path) {
                         // Compress to max 300px width/height and low quality to save memory
@@ -204,10 +209,10 @@ class SharedPersistence {
             }
             
             widgetClothings.append(WidgetClothing(
-                id: clothing.id,
-                name: clothing.name,
-                price: clothing.price,
-                stock: clothing.stock,
+                id: dto.id,
+                name: dto.name,
+                price: dto.price,
+                stock: dto.stock,
                 imagePath: widgetImagePath
             ))
         }

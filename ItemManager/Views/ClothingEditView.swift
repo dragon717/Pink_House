@@ -713,7 +713,7 @@ struct ClothingEditView: View {
         // Save context and sync widget
         do {
             try modelContext.save()
-            SharedPersistence.shared.syncWidgetData()
+            Task { await SharedPersistence.shared.syncWidgetData() }
         } catch {
             AppLogger.error("Failed to save context: \(error)")
         }
