@@ -192,6 +192,17 @@ class BackupService {
                     print("### Export Clothings [ID: \(c.id)]: 获取关联关系失败。")
                 }
                 
+                let accItems = c.accessoryItems?.sorted(by: { $0.sortIndex < $1.sortIndex }).map { item in
+                    AccessoryItemDTO(
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        deposit: item.deposit,
+                        balance: item.balance,
+                        sortIndex: item.sortIndex
+                    )
+                }
+                
                 return ClothingDTO(
                     id: c.id,
                     name: c.name,
@@ -220,7 +231,8 @@ class BackupService {
                     isDeleted: c.isDeleted,
                     deletedAt: c.deletedAt,
                     createdAt: c.createdAt,
-                    updatedAt: c.updatedAt
+                    updatedAt: c.updatedAt,
+                    accessoryItems: accItems
                 )
             }
             
@@ -623,6 +635,30 @@ class BackupService {
                 clothingBack.deletedAt = dto.deletedAt
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
+            }
+            
+            // Restore AccessoryItems
+            if let accDTOs = dto.accessoryItems {
+                // Delete existing (strategy: replace all)
+                if let existingItems = clothingBack.accessoryItems {
+                    for item in existingItems {
+                        context.delete(item)
+                    }
+                }
+                
+                var newItems: [AccessoryItem] = []
+                for accDTO in accDTOs {
+                    let accItem = AccessoryItem(
+                        name: accDTO.name,
+                        price: accDTO.price,
+                        deposit: accDTO.deposit ?? 0,
+                        balance: accDTO.balance ?? 0,
+                        sortIndex: accDTO.sortIndex
+                    )
+                    accItem.id = accDTO.id
+                    newItems.append(accItem)
+                }
+                clothingBack.accessoryItems = newItems
             }
             
             // Re-link Brand

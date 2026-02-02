@@ -77,7 +77,20 @@ struct ClothingDTO: Codable {
     let deletedAt: Date?
     let createdAt: Date
     let updatedAt: Date
+    
+    // Custom Accessories (Added in v1.3)
+    let accessoryItems: [AccessoryItemDTO]?
 }
+
+struct AccessoryItemDTO: Codable {
+    let id: UUID
+    let name: String
+    let price: Decimal
+    let deposit: Decimal?
+    let balance: Decimal?
+    let sortIndex: Int
+}
+
 
 struct StoredImageDTO: Codable {
     let id: UUID

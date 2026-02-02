@@ -18,7 +18,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         // 使用内存数据库
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(for: Schema([
-            Clothing.self, Brand.self, Tag.self, StoredImage.self, CutoutItem.self, Outfit.self, OutfitItem.self
+            Clothing.self, Brand.self, Tag.self, StoredImage.self, CutoutItem.self, Outfit.self, OutfitItem.self, AccessoryItem.self
         ]), configurations: config)
         context = container.mainContext
     }
@@ -44,6 +44,12 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         clothing.brand = brand
         clothing.tags = [tag]
         clothing.imagePaths = ["test_image.jpg"]
+        
+        // Add Accessory Items
+        let acc1 = AccessoryItem(name: "Test Acc 1", price: 100.0, deposit: 30.0, balance: 70.0, sortIndex: 0)
+        let acc2 = AccessoryItem(name: "Test Acc 2", price: 50.0, deposit: 0.0, balance: 0.0, sortIndex: 1)
+        clothing.accessoryItems = [acc1, acc2]
+        
         context.insert(clothing)
         
         // 创建裁剪图
@@ -68,6 +74,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         try context.delete(model: Tag.self)
         try context.delete(model: CutoutItem.self)
         try context.delete(model: StoredImage.self)
+        try context.delete(model: AccessoryItem.self)
         try context.save()
         
         XCTAssertEqual(try context.fetch(FetchDescriptor<Clothing>()).count, 0)
@@ -91,6 +98,21 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         let cutouts = try context.fetch(FetchDescriptor<CutoutItem>())
         XCTAssertEqual(cutouts.count, 1)
         XCTAssertEqual(cutouts.first?.linkedClothing?.id, restoredClothing.id)
+        
+        // 8. 验证小物恢复
+        XCTAssertNotNil(restoredClothing.accessoryItems)
+        let restoredAccessories = restoredClothing.accessoryItems!.sorted(by: { $0.sortIndex < $1.sortIndex })
+        XCTAssertEqual(restoredAccessories.count, 2)
+        
+        let rAcc1 = restoredAccessories[0]
+        XCTAssertEqual(rAcc1.name, "Test Acc 1")
+        XCTAssertEqual(rAcc1.deposit, 30.0)
+        XCTAssertEqual(rAcc1.balance, 70.0)
+        XCTAssertEqual(rAcc1.price, 100.0)
+        
+        let rAcc2 = restoredAccessories[1]
+        XCTAssertEqual(rAcc2.name, "Test Acc 2")
+        XCTAssertEqual(rAcc2.deposit, 0.0)
         
         print("Test: All assertions passed!")
         

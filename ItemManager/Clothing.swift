@@ -125,11 +125,15 @@ final class AccessoryItem {
     @Attribute(.unique) var id: UUID = UUID()
     var name: String = ""
     var price: Decimal = 0.0
+    var deposit: Decimal = 0.0 // 定金
+    var balance: Decimal = 0.0 // 尾款
     var sortIndex: Int = 0
     
-    init(name: String, price: Decimal, sortIndex: Int = 0) {
+    init(name: String, price: Decimal, deposit: Decimal = 0.0, balance: Decimal = 0.0, sortIndex: Int = 0) {
         self.name = name
         self.price = price
+        self.deposit = deposit
+        self.balance = balance
         self.sortIndex = sortIndex
     }
 }

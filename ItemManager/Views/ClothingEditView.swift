@@ -236,48 +236,111 @@ struct ClothingEditView: View {
                         
                         if !accessoryList.isEmpty {
                             ForEach($accessoryList) { $item in
-                                HStack {
-                                    TextField("小物名称", text: $item.name)
-                                        .textFieldStyle(.roundedBorder)
-                                    
-                                    TextField("0", value: Binding<Double?>(
-                                        get: { item.price == 0 ? nil : item.price },
-                                        set: { item.price = $0 ?? 0 }
-                                    ), format: .number)
-                                        .keyboardType(.decimalPad)
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 80)
-                                        .multilineTextAlignment(.trailing)
-                                        .onChange(of: item.price) { _, _ in
-                                            calculateAccessoriesTotal()
-                                        }
-                                    
-                                    Menu {
-                                        Button(role: .destructive) {
-                                            if let index = accessoryList.firstIndex(where: { $0.id == item.id }) {
-                                                deleteAccessory(at: IndexSet(integer: index))
+                                VStack(spacing: 8) {
+                                    HStack {
+                                        TextField("小物名称", text: $item.name)
+                                            .textFieldStyle(.roundedBorder)
+                                        
+                                        Menu {
+                                            Button(role: .destructive) {
+                                                if let index = accessoryList.firstIndex(where: { $0.id == item.id }) {
+                                                    deleteAccessory(at: IndexSet(integer: index))
+                                                }
+                                            } label: {
+                                                Label("删除", systemImage: "trash")
+                                            }
+                                            
+                                            Button {
+                                                moveAccessoryUp(item)
+                                            } label: {
+                                                Label("上移", systemImage: "arrow.up")
+                                            }
+                                            
+                                            Button {
+                                                moveAccessoryDown(item)
+                                            } label: {
+                                                Label("下移", systemImage: "arrow.down")
                                             }
                                         } label: {
-                                            Label("删除", systemImage: "trash")
+                                            Image(systemName: "ellipsis.circle")
+                                                .font(.title3)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    
+                                    HStack {
+                                        // 定金
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("定金")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            TextField("0", value: Binding<Double?>(
+                                                get: { item.deposit == 0 ? nil : item.deposit },
+                                                set: {
+                                                    item.deposit = $0 ?? 0
+                                                    if item.deposit > 0 && item.balance > 0 {
+                                                        item.price = item.deposit + item.balance
+                                                    }
+                                                }
+                                            ), format: .number)
+                                                .keyboardType(.decimalPad)
+                                                .textFieldStyle(.roundedBorder)
+                                                .multilineTextAlignment(.trailing)
                                         }
                                         
-                                        Button {
-                                            moveAccessoryUp(item)
-                                        } label: {
-                                            Label("上移", systemImage: "arrow.up")
-                                        }
-                                        
-                                        Button {
-                                            moveAccessoryDown(item)
-                                        } label: {
-                                            Label("下移", systemImage: "arrow.down")
-                                        }
-                                    } label: {
-                                        Image(systemName: "ellipsis.circle")
-                                            .font(.title3)
+                                        Text("+")
                                             .foregroundStyle(.secondary)
+                                        
+                                        // 尾款
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("尾款")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            TextField("0", value: Binding<Double?>(
+                                                get: { item.balance == 0 ? nil : item.balance },
+                                                set: {
+                                                    item.balance = $0 ?? 0
+                                                    if item.deposit > 0 && item.balance > 0 {
+                                                        item.price = item.deposit + item.balance
+                                                    }
+                                                }
+                                            ), format: .number)
+                                                .keyboardType(.decimalPad)
+                                                .textFieldStyle(.roundedBorder)
+                                                .multilineTextAlignment(.trailing)
+                                        }
+                                        
+                                        Text("=")
+                                            .foregroundStyle(.secondary)
+                                        
+                                        // 总价
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("单价")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            TextField("0", value: Binding<Double?>(
+                                                get: { item.price == 0 ? nil : item.price },
+                                                set: { item.price = $0 ?? 0 }
+                                            ), format: .number)
+                                                .keyboardType(.decimalPad)
+                                                .textFieldStyle(.roundedBorder)
+                                                .multilineTextAlignment(.trailing)
+                                                .onChange(of: item.price) { _, _ in
+                                                    calculateAccessoriesTotal()
+                                                }
+                                                // Trigger update when deposit/balance changes indirectly changes price
+                                                .onChange(of: item.deposit) { _, _ in
+                                                    calculateAccessoriesTotal()
+                                                }
+                                                .onChange(of: item.balance) { _, _ in
+                                                    calculateAccessoriesTotal()
+                                                }
+                                        }
                                     }
                                 }
+                                .padding(8)
+                                .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                                .cornerRadius(8)
                             }
                         }
                     }
@@ -404,7 +467,7 @@ struct ClothingEditView: View {
                 // Load accessory items
                 if let items = c.accessoryItems {
                     accessoryList = items.sorted(by: { $0.sortIndex < $1.sortIndex })
-                        .map { AccessoryItemData(id: UUID(), name: $0.name, price: NSDecimalNumber(decimal: $0.price).doubleValue) }
+                        .map { AccessoryItemData(id: UUID(), name: $0.name, price: NSDecimalNumber(decimal: $0.price).doubleValue, deposit: NSDecimalNumber(decimal: $0.deposit).doubleValue, balance: NSDecimalNumber(decimal: $0.balance).doubleValue) }
                 }
                 
                 stock = c.stock
@@ -654,7 +717,7 @@ struct ClothingEditView: View {
             }
             // Create new items
             let newItems = accessoryList.enumerated().map { index, data in
-                AccessoryItem(name: data.name, price: Decimal(data.price), sortIndex: index)
+                AccessoryItem(name: data.name, price: Decimal(data.price), deposit: Decimal(data.deposit), balance: Decimal(data.balance), sortIndex: index)
             }
             c.accessoryItems = newItems
             
@@ -699,7 +762,7 @@ struct ClothingEditView: View {
             )
             
             let newItems = accessoryList.enumerated().map { index, data in
-                AccessoryItem(name: data.name, price: Decimal(data.price), sortIndex: index)
+                AccessoryItem(name: data.name, price: Decimal(data.price), deposit: Decimal(data.deposit), balance: Decimal(data.balance), sortIndex: index)
             }
             newClothing.accessoryItems = newItems
             
@@ -722,7 +785,7 @@ struct ClothingEditView: View {
     }
     
     private func addAccessory() {
-        let newItem = AccessoryItemData(name: "", price: 0.0)
+        let newItem = AccessoryItemData(name: "", price: 0.0, deposit: 0.0, balance: 0.0)
         accessoryList.append(newItem)
     }
     
@@ -781,5 +844,7 @@ struct AccessoryItemData: Identifiable, Equatable {
     var id: UUID = UUID()
     var name: String
     var price: Double
+    var deposit: Double
+    var balance: Double
 }
 
