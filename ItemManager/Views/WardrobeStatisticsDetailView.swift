@@ -384,15 +384,15 @@ struct DepositStatsCard: View {
     }
     
     var totalAmount: Decimal {
-        depositPlans.reduce(0) { $0 + (($1.deposit + $1.balance) * Decimal($1.stock)) }
+        depositPlans.reduce(0) { $0 + (($1.totalDeposit + $1.totalBalance) * Decimal($1.stock)) }
     }
     
     var paidDeposit: Decimal {
-        depositPlans.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
+        depositPlans.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
     }
     
     var pendingBalance: Decimal {
-        depositPlans.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+        depositPlans.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
     }
     
     var body: some View {

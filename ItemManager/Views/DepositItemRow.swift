@@ -62,14 +62,14 @@ struct DepositItemRow: View {
                         }
                         
                         if clothing.stock > 1 {
-                            let totalDeposit = clothing.deposit * Decimal(clothing.stock)
-                            let totalBalance = clothing.balance * Decimal(clothing.stock)
+                            let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
+                            let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
                             Text("定¥\(totalDeposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(totalBalance.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(.pink)
                         } else {
-                            Text("定¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                            Text("定¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(.pink)

@@ -332,13 +332,13 @@ struct DepositStatsView: View {
     }
     
     var paidDeposit: Decimal {
-        // Sum of deposit * stock for ALL clothings
-        clothings.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
+        // Sum of deposit * stock for ALL clothings (Include accessories)
+        clothings.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
     }
     
     var pendingBalance: Decimal {
-        // Sum of balance * stock for ALL clothings
-        clothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+        // Sum of balance * stock for ALL clothings (Include accessories)
+        clothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
     }
     
     var body: some View {
@@ -456,7 +456,7 @@ struct MonthSelectorView: View {
         // Count Items (Stock Sum) and Total Amount (Balance Sum)
         // No deduplication for totals
         let itemCount = monthlyClothings.reduce(0) { $0 + $1.stock }
-        let amount = monthlyClothings.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+        let amount = monthlyClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
         return (itemCount, amount)
     }
     

@@ -32,7 +32,7 @@ class SeriesAnalyzer {
     func analyzeSeries(from clothings: [Clothing]) async -> [SeriesInfo] {
         // Convert to Sendable structs to safely pass to detached task
         let inputs = clothings.map { 
-            SeriesInput(id: $0.id, name: $0.name, balance: $0.balance, deposit: $0.deposit, stock: $0.stock) 
+            SeriesInput(id: $0.id, name: $0.name, balance: $0.totalBalance, deposit: $0.totalDeposit, stock: $0.stock) 
         }
         
         return await Task.detached(priority: .userInitiated) {

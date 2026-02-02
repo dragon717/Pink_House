@@ -19,8 +19,8 @@ struct WealthView: View {
     private var calculatedTotalAmount: Decimal {
         allClothings.reduce(Decimal(0)) { partialResult, clothing in
             if clothing.isDepositPlan {
-                // 尾款天使：已付定金总价
-                return partialResult + (clothing.deposit * Decimal(clothing.stock))
+                // 尾款天使：已付定金总价（含小物）
+                return partialResult + (clothing.totalDeposit * Decimal(clothing.stock))
             } else {
                 // 衣橱（非尾款天使）：总价（包含小物）
                 return partialResult + ((clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock))

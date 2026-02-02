@@ -447,8 +447,15 @@ struct ClothingDetailView: View {
                 .foregroundStyle(.brown)
             
             if clothing.isDepositPlan {
-                InfoRow(label: "定金", value: "¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0))))")
-                InfoRow(label: "尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                // Show total deposit/balance including accessories
+                InfoRow(label: "总定金", value: "¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                InfoRow(label: "总尾款", value: "¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                
+                Divider()
+                
+                // Show Breakdown for Dress
+                InfoRow(label: "裙子定金", value: "¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0))))")
+                InfoRow(label: "裙子尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
             }
             
             if clothing.originalPrice > 0 {
@@ -474,10 +481,27 @@ struct ClothingDetailView: View {
                     .foregroundStyle(.secondary)
                     
                     ForEach(items.sorted(by: { $0.sortIndex < $1.sortIndex })) { item in
-                        HStack {
-                            Text(item.name.isEmpty ? "未命名小物" : item.name)
-                            Spacer()
-                            Text("¥\(NSDecimalNumber(decimal: item.price).doubleValue.formatted(.number.precision(.fractionLength(0...2))))")
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(item.name.isEmpty ? "未命名小物" : item.name)
+                                Spacer()
+                                Text("¥\(NSDecimalNumber(decimal: item.price).doubleValue.formatted(.number.precision(.fractionLength(0...2))))")
+                            }
+                            
+                            // Show deposit/balance for accessory if it exists
+                            if item.deposit > 0 || item.balance > 0 {
+                                HStack {
+                                    if item.deposit > 0 {
+                                        Text("定金: ¥\(item.deposit.formatted(.number.precision(.fractionLength(0...2))))")
+                                    }
+                                    if item.balance > 0 {
+                                        Text("尾款: ¥\(item.balance.formatted(.number.precision(.fractionLength(0...2))))")
+                                    }
+                                    Spacer()
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
                         }
                         .font(.subheadline)
                     }
@@ -536,7 +560,13 @@ struct ClothingDetailView: View {
             InfoRow(label: "拥有时长", value: "\(duration)天")
             
             if clothing.balance > 0 {
-                InfoRow(label: "尾款金额", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                // 如果是尾款天使，显示总尾款（含小物），否则只显示裙子尾款（因为普通模式下可能不怎么关注小物尾款，或者也可以统一显示总尾款）
+                // 需求是：加入尾款天使的，自定义小物的定金和裙子的定金 加合显示... 尾款也同理
+                if clothing.isDepositPlan {
+                    InfoRow(label: "总尾款金额", value: "¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                } else {
+                    InfoRow(label: "尾款金额", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                }
             }
             
             if !clothing.note.isEmpty {

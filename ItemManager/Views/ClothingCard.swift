@@ -95,8 +95,8 @@ struct ClothingCard: View, Equatable {
                 
                 if showPrice {
                     if clothing.isDepositPlan {
-                        let totalDeposit = clothing.deposit * Decimal(clothing.stock)
-                        let totalBalance = clothing.balance * Decimal(clothing.stock)
+                        let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
+                        let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
                         Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.pink)
@@ -262,8 +262,8 @@ struct ClothingRow: View {
                     
                     if showPrice {
                         if clothing.isDepositPlan {
-                            let totalDeposit = clothing.deposit * Decimal(clothing.stock)
-                            let totalBalance = clothing.balance * Decimal(clothing.stock)
+                            let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
+                            let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
                             
                             Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
@@ -345,8 +345,8 @@ struct ClothingRowBrief: View {
                 
                 if showPrice {
                     if clothing.isDepositPlan {
-                        let totalDeposit = clothing.deposit * Decimal(clothing.stock)
-                        let totalBalance = clothing.balance * Decimal(clothing.stock)
+                        let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
+                        let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
                         Text("定¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
                             .bold()

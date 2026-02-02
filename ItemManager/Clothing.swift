@@ -118,6 +118,17 @@ final class Clothing {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
+    
+    // Computed Properties for Total Calculation
+    var totalDeposit: Decimal {
+        let accDeposit = accessoryItems?.reduce(Decimal(0)) { $0 + $1.deposit } ?? 0
+        return deposit + accDeposit
+    }
+    
+    var totalBalance: Decimal {
+        let accBalance = accessoryItems?.reduce(Decimal(0)) { $0 + $1.balance } ?? 0
+        return balance + accBalance
+    }
 }
 
 @Model

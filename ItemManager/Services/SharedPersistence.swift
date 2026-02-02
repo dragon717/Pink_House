@@ -80,8 +80,8 @@ class SharedPersistence {
             let depositCount = depositPlans.reduce(0) { $0 + $1.stock }
             let depositStyleCount = depositPlans.count // Number of unique clothing items (styles) in the plan
             // Note: Use stock count for price calculation
-            let totalDeposit = depositPlans.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
-            let totalBalance = depositPlans.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
+            let totalDeposit = depositPlans.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
+            let totalBalance = depositPlans.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
             
             // 3. Recent Items & Image Processing (Optimized)
             // Extract DTOs for background processing
@@ -107,8 +107,8 @@ class SharedPersistence {
                 }
                 
                 let count = monthlyItems.count
-                let mBalance = monthlyItems.reduce(0) { $0 + ($1.balance * Decimal($1.stock)) }
-                let mDeposit = monthlyItems.reduce(0) { $0 + ($1.deposit * Decimal($1.stock)) }
+                let mBalance = monthlyItems.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+                let mDeposit = monthlyItems.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
                 
                 monthStats.append(WidgetMonthInfo(
                     month: month,
