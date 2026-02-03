@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import PhotosUI
 
 struct BrandSelectionView: View {
     @Environment(\.modelContext) private var modelContext
@@ -22,6 +23,8 @@ struct BrandSelectionView: View {
     @State private var editingBrand: Brand?
     @State private var brandToDelete: Brand?
     @State private var showingDeleteAlert: Bool = false
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var tempImagePath: String?
     
     private let predefinedColors: [String] = [
         "#FFB6C1", // Light Pink
@@ -47,11 +50,36 @@ struct BrandSelectionView: View {
                 Section {
                     if isAddingBrand {
                         VStack(alignment: .leading, spacing: 12) {
-                            TextField("新品牌名称", text: $newBrandName)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit {
-                                    addNewBrand()
+                            HStack {
+                                if let path = tempImagePath,
+                                   let image = ImageManager.shared.loadImage(fileName: path) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 40, height: 40)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
+                                
+                                PhotosPicker(selection: $selectedItem, matching: .images) {
+                                    Image(systemName: "photo")
+                                        .font(.title2)
+                                        .foregroundStyle(.blue)
+                                }
+                                .task(id: selectedItem) {
+                                    if let item = selectedItem,
+                                       let data = try? await item.loadTransferable(type: Data.self),
+                                       let uiImage = UIImage(data: data),
+                                       let filename = ImageManager.shared.saveImage(uiImage, context: modelContext) {
+                                        tempImagePath = filename
+                                    }
+                                }
+                                
+                                TextField("新品牌名称", text: $newBrandName)
+                                    .textFieldStyle(.roundedBorder)
+                                    .onSubmit {
+                                        addNewBrand()
+                                    }
+                            }
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
@@ -106,9 +134,18 @@ struct BrandSelectionView: View {
                     } else {
                         ForEach(allBrands) { brand in
                             HStack {
-                                Circle()
-                                    .fill(Color(hex: brand.colorHex))
-                                    .frame(width: 12, height: 12)
+                                if let path = brand.imagePath,
+                                   let image = ImageManager.shared.loadImage(fileName: path) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 24, height: 24)
+                                        .clipShape(Circle())
+                                } else {
+                                    Circle()
+                                        .fill(Color(hex: brand.colorHex))
+                                        .frame(width: 12, height: 12)
+                                }
                                 
                                 Text(brand.name)
                                 
@@ -151,7 +188,7 @@ struct BrandSelectionView: View {
                 }
             }
             .sheet(item: $editingBrand) { brand in
-                BrandEditSheet(brand: brand, predefinedColors: predefinedColors)
+                BrandEditSheet(brand: brand)
             }
             .alert("确认删除品牌", isPresented: $showingDeleteAlert) {
                 Button("取消", role: .cancel) {
@@ -178,13 +215,15 @@ struct BrandSelectionView: View {
         
         // Check for duplicates
         if !allBrands.contains(where: { $0.name == newBrandName }) {
-            let newBrand = Brand(name: newBrandName, colorHex: selectedColorHex)
+            let newBrand = Brand(name: newBrandName, colorHex: selectedColorHex, imagePath: tempImagePath)
             modelContext.insert(newBrand)
             selectedBrand = newBrand // Auto select new brand
         }
         
         newBrandName = ""
         selectedColorHex = "#FFB6C1" // Reset to default
+        tempImagePath = nil
+        selectedItem = nil
         isAddingBrand = false
     }
     
@@ -207,74 +246,6 @@ struct BrandSelectionView: View {
     
     private func selectBrand(_ brand: Brand) {
         selectedBrand = brand
-        dismiss()
-    }
-}
-
-struct BrandEditSheet: View {
-    let brand: Brand
-    let predefinedColors: [String]
-    
-    @Environment(\.dismiss) private var dismiss
-    @State private var name: String
-    @State private var colorHex: String
-    
-    init(brand: Brand, predefinedColors: [String]) {
-        self.brand = brand
-        self.predefinedColors = predefinedColors
-        _name = State(initialValue: brand.name)
-        _colorHex = State(initialValue: brand.colorHex)
-    }
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("品牌信息") {
-                    TextField("品牌名称", text: $name)
-                }
-                
-                Section("品牌颜色") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(predefinedColors, id: \.self) { hex in
-                                Circle()
-                                    .fill(Color(hex: hex))
-                                    .frame(width: 30, height: 30)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.primary, lineWidth: colorHex == hex ? 2 : 0)
-                                    )
-                                    .onTapGesture {
-                                        colorHex = hex
-                                    }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .navigationTitle("编辑品牌")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
-                        saveChanges()
-                    }
-                    .disabled(name.isEmpty)
-                }
-            }
-        }
-    }
-    
-    private func saveChanges() {
-        brand.name = name
-        brand.colorHex = colorHex
         dismiss()
     }
 }

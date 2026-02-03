@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct BrandManagementView: View {
     @Query(sort: \Brand.name) private var brands: [Brand]
@@ -14,19 +15,30 @@ struct BrandManagementView: View {
     
     @State private var selectedBrand: Brand?
     @State private var isEditing = false
-    @State private var editText = ""
     @State private var showingDeleteAlert = false
     
     var body: some View {
         List {
             ForEach(brands) { brand in
                 HStack {
+                    if let path = brand.imagePath,
+                       let image = ImageManager.shared.loadImage(fileName: path) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 30, height: 30)
+                            .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color(hex: brand.colorHex))
+                            .frame(width: 30, height: 30)
+                    }
+                    
                     Text(brand.name)
                     Spacer()
                     
                     Button(action: {
                         selectedBrand = brand
-                        editText = brand.name
                         isEditing = true
                     }) {
                         Image(systemName: "pencil")
@@ -47,15 +59,8 @@ struct BrandManagementView: View {
             }
         }
         .navigationTitle("品牌管理")
-        .alert("修改品牌名称", isPresented: $isEditing) {
-            TextField("新名称", text: $editText)
-            Button("取消", role: .cancel) { }
-            Button("保存") {
-                if let brand = selectedBrand {
-                    brand.name = editText
-                    try? modelContext.save()
-                }
-            }
+        .sheet(item: $selectedBrand) { brand in
+             BrandEditSheet(brand: brand)
         }
         .alert("删除品牌", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
@@ -66,7 +71,93 @@ struct BrandManagementView: View {
                 }
             }
         } message: {
-            Text("确定要删除“\(selectedBrand?.name ?? "")”吗？\n删除后，商品上的品牌关联将被移除。")
+            Text("确定要删除此品牌吗？\n删除后，商品上的品牌关联将被移除。")
+        }
+    }
+}
+
+struct BrandEditSheet: View {
+    @Bindable var brand: Brand
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @State private var selectedItem: PhotosPickerItem?
+    
+    private let predefinedColors: [String] = [
+        "#FFB6C1", "#FF69B4", "#FF1493", "#FF4500", "#FFA500",
+        "#FFD700", "#32CD32", "#00FA9A", "#00CED1", "#1E90FF",
+        "#4169E1", "#9370DB", "#BA55D3", "#808080", "#000000"
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("基本信息") {
+                    TextField("品牌名称", text: $brand.name)
+                }
+                
+                Section("品牌图片") {
+                    HStack {
+                        if let path = brand.imagePath,
+                           let image = ImageManager.shared.loadImage(fileName: path) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        
+                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                            Text(brand.imagePath == nil ? "选择图片" : "更换图片")
+                        }
+                        
+                        if brand.imagePath != nil {
+                            Spacer()
+                            Button(role: .destructive) {
+                                brand.imagePath = nil
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                        }
+                    }
+                }
+                
+                Section("品牌颜色") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(predefinedColors, id: \.self) { hex in
+                                Circle()
+                                    .fill(Color(hex: hex))
+                                    .frame(width: 30, height: 30)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.primary, lineWidth: brand.colorHex == hex ? 2 : 0)
+                                    )
+                                    .onTapGesture {
+                                        brand.colorHex = hex
+                                    }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle("编辑品牌")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .task(id: selectedItem) {
+                if let item = selectedItem,
+                   let data = try? await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data),
+                   let filename = ImageManager.shared.saveImage(uiImage, context: modelContext) {
+                    brand.imagePath = filename
+                }
+            }
         }
     }
 }

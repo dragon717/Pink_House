@@ -74,13 +74,16 @@ class ImageManager {
     /// 保存图片：压缩 -> 哈希去重 -> 存储/引用计数
     /// - Returns: 文件名 (如果成功)
     func saveImage(_ image: UIImage, context: ModelContext, format: ImageFormat = .jpeg(quality: 0.7)) -> String? {
-        // 1. Compression/Data Conversion
-        guard let data = convertImage(image, format: format) else {
+        // 1. Normalize image (fix orientation)
+        let normalizedImage = image.normalized()
+        
+        // 2. Compression/Data Conversion
+        guard let data = convertImage(normalizedImage, format: format) else {
             AppLogger.error("Failed to convert image")
             return nil
         }
         
-        // 2. Hashing
+        // 3. Hashing
         let hash = computeHash(data: data)
         
         // 3. Check for existence in DB
@@ -265,39 +268,9 @@ class ImageManager {
     
     /// Force decode image on background thread
     private nonisolated func forceDecode(_ image: UIImage) -> UIImage? {
-        guard let cgImage = image.cgImage else { return image }
-        
-        let width = cgImage.width
-        let height = cgImage.height
-        
-        let alphaInfo = cgImage.alphaInfo
-        let hasAlpha = alphaInfo == .premultipliedLast || alphaInfo == .premultipliedFirst || 
-                       alphaInfo == .last || alphaInfo == .first
-        
-        var bitmapInfo: UInt32 = CGBitmapInfo.byteOrder32Little.rawValue
-        
-        if hasAlpha {
-            bitmapInfo |= CGImageAlphaInfo.premultipliedFirst.rawValue
-        } else {
-            bitmapInfo |= CGImageAlphaInfo.noneSkipFirst.rawValue
-        }
-        
-        guard let context = CGContext(
-            data: nil,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: bitmapInfo
-        ) else {
-            return image
-        }
-        
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        guard let decodedImage = context.makeImage() else { return image }
-        
-        return UIImage(cgImage: decodedImage)
+        // Use normalized(forceCopy: true) to fix orientation AND force decode (render to bitmap)
+        // This ensures the image is loaded into memory and orientation is applied correctly
+        return image.normalized(forceCopy: true)
     }
     
     private func convertImage(_ image: UIImage, format: ImageFormat) -> Data? {

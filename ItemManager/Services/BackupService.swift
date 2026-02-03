@@ -140,7 +140,10 @@ class BackupService {
             
             // 1. Brands
             let brandDTOs: [BrandDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<Brand>(), entityName: "Brands") { b in
-                return BrandDTO(id: b.id, name: b.name, colorHex: b.colorHex)
+                if let path = b.imagePath {
+                    standardImagesToBackup.insert(path)
+                }
+                return BrandDTO(id: b.id, name: b.name, colorHex: b.colorHex, imagePath: b.imagePath)
             }
             
             // 2. Tags
@@ -504,8 +507,9 @@ class BackupService {
             if let existing = brandMap[dto.id] {
                 existing.name = dto.name
                 existing.colorHex = dto.colorHex
+                existing.imagePath = dto.imagePath
             } else {
-                let newBrand = Brand(name: dto.name, colorHex: dto.colorHex)
+                let newBrand = Brand(name: dto.name, colorHex: dto.colorHex, imagePath: dto.imagePath)
                 newBrand.id = dto.id
                 context.insert(newBrand)
                 brandMap[dto.id] = newBrand

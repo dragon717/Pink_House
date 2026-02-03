@@ -13,13 +13,15 @@ final class Brand: Identifiable {
     @Attribute(.unique) var id: UUID
     var name: String
     var colorHex: String
+    var imagePath: String? // Optional path to brand image
     
     @Relationship(inverse: \Clothing.brand)
     var clothings: [Clothing]?
     
-    init(name: String, colorHex: String = "#FFB6C1") {
+    init(name: String, colorHex: String = "#FFB6C1", imagePath: String? = nil) {
         self.id = UUID()
         self.name = name
         self.colorHex = colorHex
+        self.imagePath = imagePath
     }
 }

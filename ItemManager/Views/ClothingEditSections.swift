@@ -30,6 +30,7 @@ struct ClothingBasicInfoView: View {
     @Binding var activeSelectionField: ClothingField?
     
     @Environment(\.modelContext) private var modelContext
+    @Query private var brands: [Brand]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     var body: some View {
@@ -52,11 +53,21 @@ struct ClothingBasicInfoView: View {
                     Button(action: {
                         showingBrandSelection = true
                     }) {
-                        Image(systemName: "list.bullet")
-                            .font(.title3)
-                            .frame(width: 44, height: 44)
-                            .background(Color(uiColor: .tertiarySystemFill))
-                            .cornerRadius(12)
+                        if let brand = brands.first(where: { $0.name == brandName }),
+                           let path = brand.imagePath,
+                           let image = ImageManager.shared.loadImage(fileName: path) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 44, height: 44)
+                                .cornerRadius(12)
+                        } else {
+                            Image(systemName: "list.bullet")
+                                .font(.title3)
+                                .frame(width: 44, height: 44)
+                                .background(Color(uiColor: .tertiarySystemFill))
+                                .cornerRadius(12)
+                        }
                     }
                     .buttonStyle(PlainButtonStyle())
                     

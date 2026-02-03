@@ -16,5 +16,7 @@
 	<string>我们需要使用您的相机来拍摄衣物照片，以便将其添加到您的衣橱中。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>我们需要访问您的相册来选择衣物照片。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>我们需要访问您的相册以保存图片。</string>
 </dict>
 </plist>

@@ -43,6 +43,7 @@ struct BrandDTO: Codable {
     let id: UUID
     let name: String
     let colorHex: String
+    let imagePath: String?
 }
 
 struct TagDTO: Codable {

@@ -13,6 +13,7 @@ struct ClothingDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var showingEditSheet = false
+    @State private var showingImageViewer = false
     @State private var showingDeleteAlert = false
     @State private var showingConfirmPaymentAlert = false
     @State private var currentImageIndex = 0
@@ -121,6 +122,9 @@ struct ClothingDetailView: View {
             NavigationStack {
                 ClothingEditView(clothing: clothing)
             }
+        }
+        .fullScreenCover(isPresented: $showingImageViewer) {
+            ImageViewer(imagePaths: clothing.imagePaths, selectedIndex: $currentImageIndex)
         }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
@@ -248,6 +252,9 @@ struct ClothingDetailView: View {
                         
                         CarouselItemView(imagePath: clothing.imagePaths[index], targetSize: targetSize)
                             .tag(index)
+                            .onTapGesture {
+                                showingImageViewer = true
+                            }
                     }
                 }
             }

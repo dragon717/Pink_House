@@ -29,4 +29,20 @@ extension UIImage {
                        blue: CGFloat(bitmap[2]) / 255.0,
                        alpha: CGFloat(bitmap[3]) / 255.0)
     }
+    
+    /// Returns a new image with orientation fixed to .up.
+    /// If the image is already .up, returns self (unless forceCopy is true).
+    func normalized(forceCopy: Bool = false) -> UIImage {
+        if imageOrientation == .up && !forceCopy {
+            return self
+        }
+        
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
 }
