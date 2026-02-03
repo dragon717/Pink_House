@@ -172,6 +172,9 @@ class BackupService {
             var clothingDescriptor = FetchDescriptor<Clothing>()
             clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.cutouts, \Clothing.accessoryItems]
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
+                // Skip deleted items during backup
+                if c.isDeleted { return nil }
+                
                 for cutout in c.cutouts {
                     cutoutIDToClothingID[cutout.id] = c.id
                 }
@@ -574,8 +577,21 @@ class BackupService {
         var clothingMap: [UUID: Clothing] = Dictionary(uniqueKeysWithValues: existingClothings.map { ($0.id, $0) })
         
         for dto in manifest.clothings {
+            // Logic:
+            // 1. If backup item is deleted, SKIP it (User requirement: "Don't restore deleted items").
+            // 2. If local item is already deleted, KEEP it deleted (Don't revive trash).
+            
+            // Check if backup item is deleted (using isDeleted flag or deletedAt presence)
+            let isBackupDeleted = dto.isDeleted ?? (dto.deletedAt != nil)
+            if isBackupDeleted {
+                continue
+            }
+            
             let clothingBack: Clothing
             if let existing = clothingMap[dto.id] {
+                // Capture local deletion state
+                let localIsDeleted = existing.isDeleted
+                
                 clothingBack = existing
                 // Update properties
                 clothingBack.name = dto.name
@@ -599,8 +615,21 @@ class BackupService {
                 clothingBack.note = dto.note
                 clothingBack.stock = dto.stock
                 clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
-                clothingBack.isDeleted = dto.isDeleted ?? false
-                clothingBack.deletedAt = dto.deletedAt
+                
+                // CRITICAL: If local item was deleted, FORCE it to remain deleted.
+                // This prevents restoring a backup from "reviving" items the user has currently trashed.
+                if localIsDeleted {
+                    clothingBack.isDeleted = true
+                    // Ensure deletedAt is set
+                    if clothingBack.deletedAt == nil {
+                        clothingBack.deletedAt = Date()
+                    }
+                } else {
+                    // Otherwise, since we skipped backup deleted items above, this must be false/nil
+                    clothingBack.isDeleted = false 
+                    clothingBack.deletedAt = nil
+                }
+                
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
             } else {
@@ -630,8 +659,13 @@ class BackupService {
                 clothingBack.note = dto.note
                 clothingBack.stock = dto.stock
                 clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
-                clothingBack.isDeleted = dto.isDeleted ?? false
-                clothingBack.deletedAt = dto.deletedAt
+                
+                // New items from backup (that passed the check above) are by definition not deleted
+                // UNLESS we are in a weird state where we skipped the check? No.
+                // But let's be safe.
+                clothingBack.isDeleted = false
+                clothingBack.deletedAt = nil
+                
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
             }

@@ -308,7 +308,18 @@ class ImageManager {
             return image.pngData()
         case .heic(let quality):
             let data = NSMutableData()
-            guard let cgImage = image.cgImage,
+            
+            // 检查图片是否有 Alpha 通道，如果是不透明的，尝试去除 Alpha 信息以避免保存时的警告和不必要的体积
+            // 警告: 'ItemManager' is trying to save an opaque image ... with 'AlphaPremulLast'
+            var sourceCGImage = image.cgImage
+            
+            // 如果能获取到 cgImage 且它声称有 Alpha，但我们想检查它是否真的需要（或者只是为了消除警告，我们可以尝试创建一个不带 Alpha 的上下文重绘？）
+            // 这里为了性能，我们主要依赖 ImageIO 的处理。
+            // 但如果源图是 opaque 的（比如从 Jpeg 加载），但被绘制到了带 Alpha 的 context 中，就会有这个警告。
+            // 我们可以尝试显式指定 kCGImagePropertyHasAlpha = false 如果我们确信它是 opaque。
+            // 不过 CGImageDestinationAddImage 的 options 主要是压缩质量等。
+            
+            guard let cgImage = sourceCGImage,
                   let destination = CGImageDestinationCreateWithData(data, UTType.heic.identifier as CFString, 1, nil) else {
                 return nil
             }

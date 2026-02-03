@@ -117,6 +117,10 @@ class CloudSyncManager: ObservableObject {
     // MARK: - Incremental Upload
     
     func uploadBackup(modelContainer: ModelContainer) async {
+        // Force save main context to ensure pending changes are persisted to store
+        // so that the new background context created in prepareBackupData can see them.
+        try? modelContainer.mainContext.save()
+        
         isSyncing = true
         syncError = nil
         

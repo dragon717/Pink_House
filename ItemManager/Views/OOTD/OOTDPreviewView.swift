@@ -4,12 +4,16 @@ import SwiftUI
 struct OOTDPreviewView: View {
     let outfit: Outfit
     
+    // Standard Reference Size (Same as Canvas)
+    private let canvasWidth: CGFloat = 1080
+    private let canvasHeight: CGFloat = 1440
+    
     var body: some View {
         ZStack {
             Image("ootd_background")
                 .resizable()
                 .scaledToFill()
-                .frame(width: 360, height: 640)
+                .frame(width: canvasWidth, height: canvasHeight)
                 .clipped()
             
             ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
@@ -18,14 +22,15 @@ struct OOTDPreviewView: View {
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 200, height: 200)
+                        // 200 is base size in CanvasItemView
+                        .frame(width: 200, height: 200) 
                         .scaleEffect(item.scale)
                         .rotationEffect(Angle(degrees: item.rotation))
                         .offset(x: item.x, y: item.y)
                 }
             }
         }
-        .frame(width: 360, height: 640) // 9:16 aspect ratio
+        .frame(width: canvasWidth, height: canvasHeight)
         .clipped()
     }
 }

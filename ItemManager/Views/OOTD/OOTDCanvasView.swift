@@ -6,6 +6,11 @@ struct OOTDCanvasView: View {
     @Bindable var outfit: Outfit
     @Environment(\.modelContext) private var modelContext
     
+    // Standard Reference Size (Fixed Canvas Resolution)
+    // Using 1080x1440 (3:4 aspect ratio) as the standard coordinate system
+    private let canvasWidth: CGFloat = 1080
+    private let canvasHeight: CGFloat = 1440
+    
     // Selection state
     @State private var selectedItemId: UUID?
     
@@ -15,93 +20,94 @@ struct OOTDCanvasView: View {
     
     var body: some View {
         GeometryReader { geometry in
+            // Calculate scale to fit the current view port
+            let fitScale = min(
+                geometry.size.width / canvasWidth,
+                geometry.size.height / canvasHeight
+            )
+            
             ZStack {
                 // Background
                 Image("ootd_background")
                     .resizable()
                     .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                    .frame(width: canvasWidth, height: canvasHeight)
                     .clipped()
-                    .ignoresSafeArea()
-                    // Global Gestures Area (Background)
-                    // Gestures moved to container
                 
-                // Grid or background guide (optional)
-            
-            ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
-                CanvasItemView(
-                    item: item, 
-                    isSelected: selectedItemId == item.id,
-                    additionalScale: selectedItemId == item.id ? gestureScale : 1.0,
-                    additionalRotation: selectedItemId == item.id ? gestureRotation : .zero,
-                    onDelete: {
-                        deleteItem(item)
-                    },
-                    onBringToFront: {
-                        bringToFront(item)
-                    },
-                    onBringForward: {
-                        bringForward(item)
-                    },
-                    onSendBackward: {
-                        sendBackward(item)
-                    }
-                )
-                .onTapGesture {
-                    if selectedItemId == item.id {
-                        selectedItemId = nil
-                    } else {
-                        selectedItemId = item.id
+                // Canvas Content
+                ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
+                    CanvasItemView(
+                        item: item, 
+                        isSelected: selectedItemId == item.id,
+                        additionalScale: selectedItemId == item.id ? gestureScale : 1.0,
+                        additionalRotation: selectedItemId == item.id ? gestureRotation : .zero,
+                        fitScale: fitScale, // Pass scale to handle gesture conversion
+                        onDelete: {
+                            deleteItem(item)
+                        },
+                        onBringToFront: {
+                            bringToFront(item)
+                        },
+                        onBringForward: {
+                            bringForward(item)
+                        },
+                        onSendBackward: {
+                            sendBackward(item)
+                        }
+                    )
+                    .onTapGesture {
+                        if selectedItemId == item.id {
+                            selectedItemId = nil
+                        } else {
+                            selectedItemId = item.id
+                        }
                     }
                 }
             }
-        }
-        // Move global gestures here to cover everything
-        .contentShape(Rectangle()) // Ensure the whole area is tappable
-        .gesture(
-            SimultaneousGesture(
-                MagnificationGesture()
-                    .onChanged { value in
-                        guard selectedItemId != nil else { return }
-                        gestureScale = value
-                    }
-                    .onEnded { value in
-                        guard let id = selectedItemId,
-                              let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
-                        
-                        outfit.items[index].scale *= value
-                        gestureScale = 1.0
-                    },
-                RotationGesture()
-                    .onChanged { value in
-                        guard selectedItemId != nil else { return }
-                        gestureRotation = value
-                    }
-                    .onEnded { value in
-                        guard let id = selectedItemId,
-                              let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
-                        
-                        outfit.items[index].rotation += value.degrees
-                        gestureRotation = .zero
+            .frame(width: canvasWidth, height: canvasHeight)
+            .scaleEffect(fitScale)
+            .position(x: geometry.size.width / 2, y: geometry.size.height / 2) // Center the scaled canvas
+            // Global Gestures Area (Canvas Level)
+            .contentShape(Rectangle())
+            .gesture(
+                SimultaneousGesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            guard selectedItemId != nil else { return }
+                            gestureScale = value
+                        }
+                        .onEnded { value in
+                            guard let id = selectedItemId,
+                                  let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
+                            
+                            outfit.items[index].scale *= value
+                            gestureScale = 1.0
+                            try? modelContext.save()
+                        },
+                    RotationGesture()
+                        .onChanged { value in
+                            guard selectedItemId != nil else { return }
+                            gestureRotation = value
+                        }
+                        .onEnded { value in
+                            guard let id = selectedItemId,
+                                  let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
+                            
+                            outfit.items[index].rotation += value.degrees
+                            gestureRotation = .zero
+                            try? modelContext.save()
+                        }
+                )
+            )
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded {
+                        // Background tap to deselect
                     }
             )
-        )
-        // Handle background tap separately to avoid conflict with item tap
-        .simultaneousGesture(
-            TapGesture()
-                .onEnded {
-                    // Only clear if we didn't tap an item (this is tricky, so we rely on items capturing tap first)
-                    // Actually, SwiftUI TapGesture on parent will fire even if child handles it unless child blocks it.
-                    // But we want background tap to clear.
-                    // Let's rely on hit testing. Items have content. Background is behind.
-                    // If we tap an item, its onTapGesture fires.
-                    // We need a way to clear selection when tapping EMPTY space.
-                }
-        )
-        .onTapGesture {
-            // This will be called if no child view handles the tap
-            selectedItemId = nil
-        }
+            .onTapGesture {
+                selectedItemId = nil
+            }
         }
     }
     
@@ -110,6 +116,7 @@ struct OOTDCanvasView: View {
             outfit.items.remove(at: index)
             selectedItemId = nil
             modelContext.delete(item)
+            try? modelContext.save()
         }
     }
     
@@ -119,6 +126,7 @@ struct OOTDCanvasView: View {
         guard let maxZIndex = outfit.items.map({ $0.zIndex }).max() else { return }
         item.zIndex = maxZIndex + 1
         reindexLayers()
+        try? modelContext.save()
     }
     
     private func bringForward(_ item: OutfitItem) {
@@ -136,6 +144,7 @@ struct OOTDCanvasView: View {
         }
         
         reindexLayers()
+        try? modelContext.save()
     }
     
     private func sendBackward(_ item: OutfitItem) {
@@ -148,6 +157,7 @@ struct OOTDCanvasView: View {
         (item.zIndex, prevItem.zIndex) = (prevItem.zIndex, item.zIndex)
         
         reindexLayers()
+        try? modelContext.save()
     }
     
     private func reindexLayers() {
@@ -160,10 +170,12 @@ struct OOTDCanvasView: View {
 }
 
 struct CanvasItemView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var item: OutfitItem
     let isSelected: Bool
     var additionalScale: CGFloat
     var additionalRotation: Angle
+    var fitScale: CGFloat // Needed to adjust drag translation
     
     var onDelete: () -> Void
     var onBringToFront: () -> Void
@@ -171,33 +183,24 @@ struct CanvasItemView: View {
     var onSendBackward: () -> Void
     
     @State private var currentOffset: CGSize = .zero
-    // Removed internal scale/rotation states as they are now controlled by parent
+    @State private var loadedImage: UIImage?
+    @State private var isLoading = true // Default true to prevent flash of missing state
     
     var body: some View {
         Group {
-            if let cutout = item.cutout, 
-               let uiImage = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
-                
+            if let uiImage = loadedImage {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFit()
+            } else if item.cutout == nil {
+                // Data object missing
+                missingPlaceholder(text: "数据丢失")
+            } else if isLoading {
+                ProgressView()
+                    .frame(width: 50, height: 50)
             } else {
-                // Placeholder for missing image
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.secondary.opacity(0.1))
-                        .stroke(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [5]))
-                    
-                    VStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.largeTitle)
-                            .foregroundStyle(.orange)
-                        Text(item.cutout == nil ? "数据丢失" : "图片丢失")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding()
+                // Image file missing
+                missingPlaceholder(text: "图片丢失")
             }
         }
         .frame(width: 200, height: 200) // Base size, adjusted by scale
@@ -259,13 +262,56 @@ struct CanvasItemView: View {
         .gesture(
             DragGesture()
                 .onChanged { value in
-                    currentOffset = value.translation
+                    // Divide translation by fitScale to map back to standard coordinate system
+                    currentOffset = CGSize(
+                        width: value.translation.width / fitScale,
+                        height: value.translation.height / fitScale
+                    )
                 }
                 .onEnded { value in
-                    item.x += value.translation.width
-                    item.y += value.translation.height
+                    item.x += value.translation.width / fitScale
+                    item.y += value.translation.height / fitScale
                     currentOffset = .zero
+                    try? modelContext.save()
                 }
         )
+        .task(id: item.cutout?.imagePath) {
+            await loadImage()
+        }
+    }
+    
+    private func loadImage() async {
+        guard let cutout = item.cutout, !cutout.imagePath.isEmpty else {
+            isLoading = false
+            loadedImage = nil
+            return
+        }
+        
+        isLoading = true
+        // Try async load
+        if let image = await ImageManager.shared.loadImageAsync(fileName: cutout.imagePath) {
+            loadedImage = image
+        } else {
+            loadedImage = nil
+        }
+        isLoading = false
+    }
+    
+    private func missingPlaceholder(text: String) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.secondary.opacity(0.1))
+                .stroke(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [5]))
+            
+            VStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.largeTitle)
+                    .foregroundStyle(.orange)
+                Text(text)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
     }
 }

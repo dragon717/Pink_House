@@ -372,9 +372,17 @@ struct OOTDView: View {
         }
         
         let renderer = ImageRenderer(content: OOTDPreviewView(outfit: outfit))
-        renderer.scale = 2.0 
+        // Since OOTDPreviewView uses fixed 1080x1440, we don't need to scale up too much.
+        // Scale 1.0 = 1080x1440 output.
+        // If we want a smaller snapshot for thumbnail, we can scale down.
+        // For quality, let's keep 0.5 (540x720) or 1.0
+        renderer.scale = 0.5 
         
         if let uiImage = renderer.uiImage,
+           // Force a new filename UUID each time to avoid caching issues or overwrites
+           // ImageManager handles content-hashing internally, but let's ensure the path updates.
+           // Actually, ImageManager.saveImage returns existing path if hash matches.
+           // If content changed, hash changes -> new path or existing path of same content.
            let path = ImageManager.shared.saveImage(uiImage, context: modelContext) {
             // Delete old snapshot if exists and different
             if let oldPath = outfit.snapshotPath, oldPath != path {

@@ -18,12 +18,18 @@ extension Color {
             (a, r, g, b) = (255, 255, 255, 255)
         }
 
+        // Ensure components are within valid range [0, 255] before division
+        let safeA = min(max(Double(a), 0), 255)
+        let safeR = min(max(Double(r), 0), 255)
+        let safeG = min(max(Double(g), 0), 255)
+        let safeB = min(max(Double(b), 0), 255)
+
         self.init(
             .sRGB,
-            red: min(max(Double(r) / 255, 0), 1.0),
-            green: min(max(Double(g) / 255, 0), 1.0),
-            blue: min(max(Double(b) / 255, 0), 1.0),
-            opacity: min(max(Double(a) / 255, 0), 1.0)
+            red: safeR / 255.0,
+            green: safeG / 255.0,
+            blue: safeB / 255.0,
+            opacity: safeA / 255.0
         )
     }
     

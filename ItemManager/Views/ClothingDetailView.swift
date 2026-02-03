@@ -29,7 +29,8 @@ struct ClothingDetailView: View {
                     VStack(spacing: 16) {
                         // MARK: - Image Carousel
                         // Adjust height based on orientation (portrait vs landscape)
-                        let carouselHeight = geometry.size.height > geometry.size.width ? 400.0 : geometry.size.height * 0.7
+                        // Ensure height is at least 1 to avoid "Failed to create image slot" warnings
+                        let carouselHeight = max(1, geometry.size.height > geometry.size.width ? 400.0 : geometry.size.height * 0.7)
                         imageCarousel(height: carouselHeight)
                         
                         // MARK: - Main Info Card

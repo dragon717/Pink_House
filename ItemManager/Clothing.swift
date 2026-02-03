@@ -65,7 +65,7 @@ final class Clothing {
     @Relationship(deleteRule: .cascade)
     var accessoryItems: [AccessoryItem]? = []
     
-    @Relationship(deleteRule: .cascade, inverse: \CutoutItem.linkedClothing)
+    @Relationship(deleteRule: .nullify, inverse: \CutoutItem.linkedClothing)
     var cutouts: [CutoutItem] = []
     
     init(name: String,

@@ -97,7 +97,10 @@ struct LiquidRollingNumber: View {
     var body: some View {
         RollingText(value: animatedValue, tier: currentTier, fractionLength: fractionLength)
             .onAppear {
-                runAnimation(to: value)
+                // Ensure value is valid
+                if value.isFinite {
+                    runAnimation(to: value)
+                }
             }
             .onChange(of: value) { _, newValue in
                 // If the value changes drastically, reset animation?
@@ -107,16 +110,21 @@ struct LiquidRollingNumber: View {
                 // For unit switching (Int -> Double), this is fine.
                 // For small increments, maybe just animate?
                 // Let's keep existing behavior for "Wealth" effect (counting up).
-                animatedValue = 0
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                if newValue.isFinite {
                     runAnimation(to: newValue)
                 }
             }
     }
     
-    private func runAnimation(to target: Double) {
-        withAnimation(.interpolatingSpring(stiffness: 70, damping: 12)) {
-            animatedValue = target
+    private func runAnimation(to targetValue: Double) {
+        // Reset to 0 to show "counting up" effect
+        // But for small updates, maybe we shouldn't reset?
+        // Current requirement implies "counting up" is desirable for "Wealth" feeling.
+        animatedValue = 0
+        
+        // Use a spring animation for liquid feel
+        withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+            animatedValue = targetValue
         }
     }
 }

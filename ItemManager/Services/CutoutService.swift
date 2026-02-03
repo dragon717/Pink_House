@@ -5,6 +5,7 @@ import Vision
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import SwiftData
+import CryptoKit
 
 enum CutoutError: Error {
     case processingFailed
@@ -546,8 +547,8 @@ class CutoutService {
     }
     
     private func computeHash(data: Data) -> String {
-        // Simple hash helper
-        return String(data.count) // Placeholder, should use SHA256 like ImageManager
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
     
     private func normalizeOrientation(_ image: UIImage) -> UIImage {

@@ -191,8 +191,13 @@ struct DataManagementView: View {
             do {
                 print("DataManagementView: 尝试保存当前上下文...")
                 // 在启动后台导出前，必须确保主上下文的改动（尤其是删除）已持久化到磁盘，
-                // 否则后台上下文可能会看到已在主线程逻辑上删除但尚未物理删除的对象，导致崩溃。
+                // 否则后台上下文可能会看到已在主线程逻辑上删除但尚未物理删除的对象，导致崩溃或数据状态不一致。
                 try? modelContext.save()
+                
+                // 为了双重保险，稍微延迟一下，给 SwiftData/CoreData 的后台队列一点时间同步
+                // 虽然理论上 try? save() 应该是同步阻塞直到写入，但在复杂并发下，给一点点 buffer 是安全的
+                try await Task.sleep(nanoseconds: 200_000_000) // 0.2s
+                
                 print("DataManagementView: 上下文保存完毕")
                 
                 print("DataManagementView: 开始调用后台备份服务...")
