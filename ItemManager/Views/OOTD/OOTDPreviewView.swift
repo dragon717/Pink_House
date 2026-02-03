@@ -10,11 +10,16 @@ struct OOTDPreviewView: View {
     
     var body: some View {
         ZStack {
-            Image("ootd_background")
-                .resizable()
-                .scaledToFill()
-                .frame(width: canvasWidth, height: canvasHeight)
-                .clipped()
+            if outfit.canvasType == "blank" {
+                Color.white
+                    .frame(width: canvasWidth, height: canvasHeight)
+            } else {
+                Image("ootd_background")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: canvasWidth, height: canvasHeight)
+                    .clipped()
+            }
             
             ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
                 if let cutout = item.cutout, 

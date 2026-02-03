@@ -25,6 +25,10 @@ struct OOTDView: View {
     @State private var showingCamera = false
     @State private var cameraImage: UIImage?
     @State private var shouldCutoutCameraImage = false
+    
+    // Save to Clothing States
+    @State private var showingSaveToClothingSheet = false
+    @State private var showingSaveSuccessAlert = false
 
     var body: some View {
         NavigationStack {
@@ -34,8 +38,8 @@ struct OOTDView: View {
                     OOTDSidebarView(
                         isVisible: $isSidebarVisible,
                         currentOutfit: $currentOutfit,
-                        onAdd: {
-                            createNewOutfit()
+                        onAdd: { type in
+                            createNewOutfit(canvasType: type)
                         },
                         onDelete: { outfit in
                             deleteOutfit(outfit)
@@ -74,10 +78,26 @@ struct OOTDView: View {
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button {
-                            createNewOutfit()
+                        Menu {
+                            Button {
+                                createNewOutfit(canvasType: "mannequin")
+                            } label: {
+                                Label("人台画布", systemImage: "tshirt")
+                            }
+                            
+                            Button {
+                                createNewOutfit(canvasType: "blank")
+                            } label: {
+                                Label("空白画布", systemImage: "square.dashed")
+                            }
                         } label: {
                             Label("新建搭配", systemImage: "plus")
+                        }
+                        
+                        Button {
+                            showingSaveToClothingSheet = true
+                        } label: {
+                            Label("保存为裙子主图", systemImage: "photo.badge.arrow.down")
                         }
                         
                         Divider()
@@ -179,6 +199,14 @@ struct OOTDView: View {
                 }
             }
             .photosPicker(isPresented: $isImagePickerPresented, selection: $selectedItem, matching: .images)
+            .sheet(isPresented: $showingSaveToClothingSheet) {
+                ClothingPickerView { selectedClothing in
+                    saveCanvasToClothing(clothing: selectedClothing)
+                }
+            }
+            .alert("保存成功", isPresented: $showingSaveSuccessAlert) {
+                Button("确定", role: .cancel) {}
+            }
             .onChange(of: selectedItem) { _, newItem in
                 if let newItem {
                     processPickedImage(newItem)
@@ -251,8 +279,8 @@ struct OOTDView: View {
         }
     }
 
-    private func createNewOutfit() {
-        let newOutfit = Outfit(note: "搭配 \(Date().formatted(date: .numeric, time: .shortened))")
+    private func createNewOutfit(canvasType: String = "mannequin") {
+        let newOutfit = Outfit(note: "搭配 \(Date().formatted(date: .numeric, time: .shortened))", canvasType: canvasType)
         modelContext.insert(newOutfit)
         try? modelContext.save() // Ensure ID is generated
         currentOutfit = newOutfit
@@ -301,7 +329,7 @@ struct OOTDView: View {
         // Update snapshot for current before copying
         saveSnapshot(for: current)
         
-        let newOutfit = Outfit(note: current.note + " 副本")
+        let newOutfit = Outfit(note: current.note + " 副本", canvasType: current.canvasType)
         modelContext.insert(newOutfit)
         
         // Copy items (Reference Principle: Point to same CutoutItem)
@@ -328,6 +356,32 @@ struct OOTDView: View {
         
         // Switch to new outfit
         currentOutfit = newOutfit
+    }
+    
+    @MainActor
+    private func saveCanvasToClothing(clothing: Clothing) {
+        guard let outfit = currentOutfit else { return }
+        
+        // Render OOTD canvas to image
+        let renderer = ImageRenderer(content: OOTDPreviewView(outfit: outfit))
+        renderer.scale = 1.0 // High quality
+        
+        if let uiImage = renderer.uiImage,
+           let newPath = ImageManager.shared.saveImage(uiImage, context: modelContext) {
+            
+            // Update Clothing: Insert new image at index 0
+            clothing.imagePaths.insert(newPath, at: 0)
+            
+            // Save Context
+            try? modelContext.save()
+            
+            // Show Success
+            showingSaveSuccessAlert = true
+            
+            // Trigger feedback
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        }
     }
 
     @MainActor

@@ -188,13 +188,15 @@ final class Outfit {
     var createdAt: Date = Date()
     var note: String = ""
     var snapshotPath: String? // Path to the saved OOTD image
+    var canvasType: String = "mannequin" // "mannequin" or "blank"
     
     @Relationship(deleteRule: .cascade)
     var items: [OutfitItem] = []
     
-    init(note: String = "", snapshotPath: String? = nil) {
+    init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin") {
         self.note = note
         self.snapshotPath = snapshotPath
+        self.canvasType = canvasType
     }
 }
 

@@ -32,11 +32,16 @@ struct OOTDCanvasView: View {
             
             ZStack {
                 // Background
-                Image("ootd_background")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: canvasWidth, height: canvasHeight)
-                    .clipped()
+                if outfit.canvasType == "blank" {
+                    Color.white
+                        .frame(width: canvasWidth, height: canvasHeight)
+                } else {
+                    Image("ootd_background")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: canvasWidth, height: canvasHeight)
+                        .clipped()
+                }
                 
                 // Canvas Content
                 ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in

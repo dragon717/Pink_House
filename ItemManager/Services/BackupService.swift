@@ -288,6 +288,7 @@ class BackupService {
                     createdAt: o.createdAt,
                     note: o.note,
                     snapshotPath: safeSnapshotPath,
+                    canvasType: o.canvasType,
                     items: items
                 )
             }

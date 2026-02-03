@@ -8,7 +8,7 @@ struct OOTDSidebarView: View {
     @Query(sort: \Outfit.createdAt, order: .reverse) private var outfits: [Outfit]
     @Environment(\.modelContext) private var modelContext
     
-    var onAdd: () -> Void
+    var onAdd: (String) -> Void
     var onDelete: (Outfit) -> Void
     
     // Namespace for matched geometry effect (optional, but nice for animations)
@@ -34,8 +34,20 @@ struct OOTDSidebarView: View {
                 
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        // New Outfit Button - Modern Card Style
-                        Button(action: onAdd) {
+                        // New Outfit Menu - Modern Card Style
+                        Menu {
+                            Button {
+                                onAdd("mannequin")
+                            } label: {
+                                Label("人台画布", systemImage: "tshirt")
+                            }
+                            
+                            Button {
+                                onAdd("blank")
+                            } label: {
+                                Label("空白画布", systemImage: "square.dashed")
+                            }
+                        } label: {
                             HStack(spacing: 12) {
                                 ZStack {
                                     Circle()

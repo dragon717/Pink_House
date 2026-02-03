@@ -118,6 +118,7 @@ struct OutfitDTO: Codable {
     let createdAt: Date
     let note: String
     let snapshotPath: String?
+    var canvasType: String? = "mannequin"
     let items: [OutfitItemDTO]
 }
 
@@ -141,6 +142,7 @@ struct OOTDSnapshotDTO: Codable {
     let createdAt: Date
     let note: String
     let snapshotPath: String?
+    var canvasType: String? = "mannequin"
     let items: [OOTDSnapshotItemDTO]
 }
 
