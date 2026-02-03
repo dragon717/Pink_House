@@ -53,7 +53,7 @@ class BackupService {
         entityName: String,
         process: (T) -> ResultType?
     ) throws -> [ResultType] {
-        print("### Export: Fetching IDs for \(entityName)...")
+        print("### Export: Fetching \(entityName)...")
         
         context.processPendingChanges()
         
@@ -73,28 +73,16 @@ class BackupService {
                 print("### Export \(entityName): Processed \(index)/\(totalCount)...")
             }
             
-            let id = item.persistentModelID
-            
-            do {
-                guard let safeItem = try context.model(for: id) as? T else {
-                    print("### Export \(entityName): 跳过无法加载的对象 (Index: \(index), ID: \(id))")
-                    failCount += 1
-                    continue
-                }
-                
-                // Removed generic isDeleted check to avoid conflict with Clothing.isDeleted (soft delete)
-                // Since we fetched with includePendingChanges = false, we should be safe from hard-deleted items.
-                
-                if let result = process(safeItem) {
-                    results.append(result)
-                    successCount += 1
-                } else {
-                    failCount += 1
-                }
-            } catch {
-                print("### Export \(entityName): 捕获到失效对象 (ID: \(id)). 已跳过。错误: \(error)")
-                failCount += 1
+            // Direct item access logic to avoid context detachment issues
+            if item.isDeleted {
                 continue
+            }
+            
+            if let result = process(item) {
+                results.append(result)
+                successCount += 1
+            } else {
+                failCount += 1
             }
         }
         
@@ -260,10 +248,10 @@ class BackupService {
                 )
             }
             
-            // 6. Outfits
+            // 6. OOTD Snapshots (Replacing Outfits)
             var outfitDescriptor = FetchDescriptor<Outfit>()
             outfitDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items]
-            let outfitDTOs: [OutfitDTO] = try self.processByIDs(context: context, descriptor: outfitDescriptor, entityName: "Outfits") { o in
+            let snapshotDTOs: [OOTDSnapshotDTO] = try self.processByIDs(context: context, descriptor: outfitDescriptor, entityName: "Outfits (Snapshots)") { o in
                 var safeSnapshotPath: String? = nil
                 if let snapshot = o.snapshotPath {
                     let fileName = (snapshot as NSString).lastPathComponent
@@ -271,43 +259,31 @@ class BackupService {
                     safeSnapshotPath = fileName
                 }
                 
-                var items: [OutfitItemDTO] = []
-                do {
-                    for item in o.items {
-                        if item.isDeleted { continue }
-                        let cutoutID = item.cutout?.id
-                        
-                        var backupImagePath: String?
-                        var backupWidth: Double?
-                        var backupHeight: Double?
-                        
-                        if let cutout = item.cutout {
-                            let fileName = (cutout.imagePath as NSString).lastPathComponent
-                            backupImagePath = fileName
-                            backupWidth = cutout.width
-                            backupHeight = cutout.height
-                            standardImagesToBackup.insert(fileName)
-                        }
-                        
-                        let itemDTO = OutfitItemDTO(
-                            id: item.id,
-                            x: item.x,
-                            y: item.y,
-                            rotation: item.rotation,
-                            scale: item.scale,
-                            zIndex: item.zIndex,
-                            cutoutID: cutoutID,
-                            backupImagePath: backupImagePath,
-                            backupImageWidth: backupWidth,
-                            backupImageHeight: backupHeight
-                        )
-                        items.append(itemDTO)
-                    }
-                } catch {
-                    print("### Export Outfits [ID: \(o.id)]: 访问 items 失败。")
+                var items: [OOTDSnapshotItemDTO] = []
+                for item in o.items {
+                    if item.isDeleted { continue }
+                    guard let cutout = item.cutout else { continue }
+                    
+                    let fileName = (cutout.imagePath as NSString).lastPathComponent
+                    standardImagesToBackup.insert(fileName)
+                    
+                    let displayWidth = cutout.width * item.scale
+                    let displayHeight = cutout.height * item.scale
+                    
+                    let itemDTO = OOTDSnapshotItemDTO(
+                        id: item.id,
+                        imageReference: fileName,
+                        x: item.x,
+                        y: item.y,
+                        width: displayWidth,
+                        height: displayHeight,
+                        zIndex: item.zIndex,
+                        rotation: item.rotation
+                    )
+                    items.append(itemDTO)
                 }
                 
-                return OutfitDTO(
+                return OOTDSnapshotDTO(
                     id: o.id,
                     createdAt: o.createdAt,
                     note: o.note,
@@ -409,7 +385,8 @@ class BackupService {
                 clothings: clothingDTOs,
                 storedImages: storedImageDTOs,
                 cutouts: cutoutDTOs,
-                outfits: outfitDTOs,
+                outfits: nil,
+                snapshots: snapshotDTOs,
                 appSettings: settings,
                 themeFiles: themeFiles,
                 wealthFiles: wealthFiles,
@@ -417,7 +394,7 @@ class BackupService {
                 externalFileHashes: externalHashes,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
-                outfitCount: outfitDTOs.count
+                outfitCount: snapshotDTOs.count
             )
             
             print("### Export: Prepared data. Total files: \(imageFiles.count)")
@@ -732,7 +709,7 @@ class BackupService {
         // Outfits
         let existingOutfits = try context.fetch(FetchDescriptor<Outfit>())
         var outfitMap: [UUID: Outfit] = Dictionary(uniqueKeysWithValues: existingOutfits.map { ($0.id, $0) })
-        for dto in manifest.outfits {
+        for dto in manifest.outfits ?? [] {
             let outfit: Outfit
             if let existing = outfitMap[dto.id] {
                 outfit = existing
@@ -770,8 +747,8 @@ class BackupService {
                     print("Restore: OutfitItem \(itemDTO.id) missing linked cutout. Using backup info: \(backupPath)")
                     
                     // Check if we already created a fallback cutout for this path to avoid duplicates
-                    let fallbackDescriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.imagePath == backupPath })
-                    if let existingFallback = try? context.fetch(fallbackDescriptor).first {
+                    let fallbackDescriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate<CutoutItem> { $0.imagePath == backupPath })
+                    if let existingFallback = try context.fetch(fallbackDescriptor).first {
                         item.cutout = existingFallback
                     } else {
                         // Create new ad-hoc cutout

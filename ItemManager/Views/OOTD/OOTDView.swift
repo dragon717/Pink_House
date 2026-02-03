@@ -18,6 +18,7 @@ struct OOTDView: View {
     @State private var showingRenameAlert = false
     @State private var newName = ""
     @State private var showingDeleteCurrentAlert = false
+    @State private var showingLimitAlert = false
     @State private var isListExpanded = false
     @State private var isSidebarVisible = false
     @State private var showingActionSheet = false
@@ -43,42 +44,19 @@ struct OOTDView: View {
                     .zIndex(1)
                     
                     // Main Content
-                    ZStack {
-                        if let outfit = currentOutfit {
-                            OOTDCanvasView(outfit: outfit)
-                                .id(outfit.id) // Force refresh when switching outfits
-                        } else {
-                            ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+                    OOTDContentArea(
+                        currentOutfit: $currentOutfit,
+                        isListExpanded: $isListExpanded,
+                        isProcessing: $isProcessing,
+                        processingMessage: processingMessage,
+                        geometry: geometry,
+                        onAddToOutfit: { cutout in
+                            addToOutfit(cutout)
+                        },
+                        onAddPhoto: {
+                            showingActionSheet = true
                         }
-                        
-                        VStack {
-                            Spacer()
-                            OOTDCutoutListView(
-                                isExpanded: $isListExpanded,
-                                onSelect: { cutout in
-                                    addToOutfit(cutout)
-                                },
-                                onAddPhoto: {
-                                    showingActionSheet = true
-                                }
-                            )
-                            .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
-                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
-                        }
-                        
-                        if isProcessing {
-                            Color.black.opacity(0.4)
-                            .ignoresSafeArea()
-                            VStack {
-                                ProgressView()
-                                    .scaleEffect(1.5)
-                                    .tint(.white)
-                                Text(processingMessage)
-                                    .foregroundColor(.white)
-                                    .padding(.top)
-                            }
-                        }
-                    }
+                    )
                 }
             }
             .navigationTitle("OOTD")
@@ -166,42 +144,31 @@ struct OOTDView: View {
                     processCameraImage(image, shouldCutout: shouldCutoutCameraImage)
                 }
             }
-            .alert("重命名搭配", isPresented: $showingRenameAlert) {
-                TextField("名称", text: $newName)
-                Button("取消", role: .cancel) { }
-                Button("确定") {
+            .modifier(OOTDAlertsModifier(
+                showingRenameAlert: $showingRenameAlert,
+                newName: $newName,
+                onRename: {
                     if let current = currentOutfit {
                         current.note = newName
                         try? modelContext.save()
                     }
-                }
-            }
-            .alert("删除当前搭配", isPresented: $showingDeleteCurrentAlert) {
-                Button("删除", role: .destructive) {
+                },
+                showingDeleteCurrentAlert: $showingDeleteCurrentAlert,
+                onDeleteCurrent: {
                     if let current = currentOutfit {
                         deleteOutfit(current)
                     }
-                }
-                Button("取消", role: .cancel) { }
-            } message: {
-                Text("确定要删除当前搭配吗？此操作无法撤销。")
-            }
-            .alert("批量处理", isPresented: $showingBatchConfirmation) {
-                Button("开始扫描", role: .destructive) {
+                },
+                showingLimitAlert: $showingLimitAlert,
+                showingBatchConfirmation: $showingBatchConfirmation,
+                onBatchProcess: {
                     processWardrobeSkirts()
-                }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
-            }
-            .alert("修复数据", isPresented: $showingRepairConfirmation) {
-                Button("开始深度修复") {
+                },
+                showingRepairConfirmation: $showingRepairConfirmation,
+                onRepair: {
                     repairMissingCutouts()
                 }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
-            }
+            ))
             .onAppear {
                 if currentOutfit == nil {
                     if let first = allOutfits.first {
@@ -396,6 +363,11 @@ struct OOTDView: View {
     private func addToOutfit(_ cutout: CutoutItem) {
         guard let outfit = currentOutfit else { return }
         
+        if outfit.items.count >= 20 {
+            showingLimitAlert = true
+            return
+        }
+        
         // Default position center
         let item = OutfitItem(
             cutout: cutout,
@@ -573,8 +545,7 @@ struct OOTDView: View {
                 print("Deep Repair Finished. Relinked: \(relinkedCount), Regenerated: \(regeneratedCount), Failed: \(failCount)")
                 
                 // Force UI refresh by toggling current outfit if set
-                if let current = currentOutfit {
-                     let temp = currentOutfit
+                if let temp = currentOutfit {
                      currentOutfit = nil
                      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                          self.currentOutfit = temp
@@ -614,6 +585,102 @@ struct OOTDView: View {
                     isProcessing = false
                     selectedItem = nil
                     // Show error alert
+                }
+            }
+        }
+    }
+}
+
+struct OOTDAlertsModifier: ViewModifier {
+    @Binding var showingRenameAlert: Bool
+    @Binding var newName: String
+    let onRename: () -> Void
+    
+    @Binding var showingDeleteCurrentAlert: Bool
+    let onDeleteCurrent: () -> Void
+    
+    @Binding var showingLimitAlert: Bool
+    
+    @Binding var showingBatchConfirmation: Bool
+    let onBatchProcess: () -> Void
+    
+    @Binding var showingRepairConfirmation: Bool
+    let onRepair: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .alert("重命名搭配", isPresented: $showingRenameAlert) {
+                TextField("名称", text: $newName)
+                Button("取消", role: .cancel) { }
+                Button("确定", action: onRename)
+            }
+            .alert("删除当前搭配", isPresented: $showingDeleteCurrentAlert) {
+                Button("删除", role: .destructive, action: onDeleteCurrent)
+                Button("取消", role: .cancel) { }
+            } message: {
+                Text("确定要删除当前搭配吗？此操作无法撤销。")
+            }
+            .alert("数量已达上限", isPresented: $showingLimitAlert) {
+                Button("确定", role: .cancel) { }
+            } message: {
+                Text("每个搭配最多只能添加20个抠图。")
+            }
+            .alert("批量处理", isPresented: $showingBatchConfirmation) {
+                Button("开始扫描", role: .destructive, action: onBatchProcess)
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
+            }
+            .alert("修复数据", isPresented: $showingRepairConfirmation) {
+                Button("开始深度修复", action: onRepair)
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
+            }
+    }
+}
+
+struct OOTDContentArea: View {
+    @Binding var currentOutfit: Outfit?
+    @Binding var isListExpanded: Bool
+    @Binding var isProcessing: Bool
+    let processingMessage: String
+    let geometry: GeometryProxy
+    
+    // Actions
+    let onAddToOutfit: (CutoutItem) -> Void
+    let onAddPhoto: () -> Void
+    
+    var body: some View {
+        ZStack {
+            if let outfit = currentOutfit {
+                OOTDCanvasView(outfit: outfit)
+                    .id(outfit.id) // Force refresh when switching outfits
+            } else {
+                ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+            }
+            
+            VStack {
+                Spacer()
+                OOTDCutoutListView(
+                    isExpanded: $isListExpanded,
+                    onSelect: onAddToOutfit,
+                    onAddPhoto: onAddPhoto
+                )
+                .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+            }
+            
+            if isProcessing {
+                Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                VStack {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    Text(processingMessage)
+                        .foregroundColor(.white)
+                        .padding(.top)
                 }
             }
         }

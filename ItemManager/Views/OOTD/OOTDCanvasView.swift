@@ -18,6 +18,10 @@ struct OOTDCanvasView: View {
     @State private var gestureScale: CGFloat = 1.0
     @State private var gestureRotation: Angle = .zero
     
+    // Alert State
+    @State private var showingDeleteAlert = false
+    @State private var itemToDelete: OutfitItem?
+    
     var body: some View {
         GeometryReader { geometry in
             // Calculate scale to fit the current view port
@@ -38,12 +42,12 @@ struct OOTDCanvasView: View {
                 ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
                     CanvasItemView(
                         item: item, 
-                        isSelected: selectedItemId == item.id,
+                        selectedItemId: $selectedItemId,
                         additionalScale: selectedItemId == item.id ? gestureScale : 1.0,
                         additionalRotation: selectedItemId == item.id ? gestureRotation : .zero,
-                        fitScale: fitScale, // Pass scale to handle gesture conversion
                         onDelete: {
-                            deleteItem(item)
+                            itemToDelete = item
+                            showingDeleteAlert = true
                         },
                         onBringToFront: {
                             bringToFront(item)
@@ -63,8 +67,27 @@ struct OOTDCanvasView: View {
                         }
                     }
                 }
+                
+                // Counter Display - Top Right
+                VStack {
+                    HStack {
+                        Spacer()
+                        Text("\(outfit.items.count)/20")
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(.ultraThinMaterial)
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(Capsule())
+                            .shadow(radius: 4)
+                            .padding(40)
+                    }
+                    Spacer()
+                }
             }
             .frame(width: canvasWidth, height: canvasHeight)
+            .coordinateSpace(name: "ootdCanvas")
             .scaleEffect(fitScale)
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2) // Center the scaled canvas
             // Global Gestures Area (Canvas Level)
@@ -107,6 +130,19 @@ struct OOTDCanvasView: View {
             )
             .onTapGesture {
                 selectedItemId = nil
+            }
+            .alert("确认删除", isPresented: $showingDeleteAlert) {
+                Button("删除", role: .destructive) {
+                    if let item = itemToDelete {
+                        deleteItem(item)
+                    }
+                    itemToDelete = nil
+                }
+                Button("取消", role: .cancel) {
+                    itemToDelete = nil
+                }
+            } message: {
+                Text("确定要删除这个抠图吗？此操作无法撤销。")
             }
         }
     }
@@ -172,10 +208,14 @@ struct OOTDCanvasView: View {
 struct CanvasItemView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var item: OutfitItem
-    let isSelected: Bool
+    @Binding var selectedItemId: UUID?
+    
+    var isSelected: Bool {
+        selectedItemId == item.id
+    }
+    
     var additionalScale: CGFloat
     var additionalRotation: Angle
-    var fitScale: CGFloat // Needed to adjust drag translation
     
     var onDelete: () -> Void
     var onBringToFront: () -> Void
@@ -252,6 +292,20 @@ struct CanvasItemView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .offset(x: 12, y: 12)
+                    
+                    // Name Tag (Bottom Center)
+                    if let name = item.cutout?.linkedClothing?.name {
+                        Text(name)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Capsule())
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                            .offset(y: 30) // Position below the item
+                            .fixedSize() // Prevent text wrapping from affecting layout
+                    }
                 }
             }
             .frame(width: 200, height: 200) // Match frame
@@ -260,17 +314,28 @@ struct CanvasItemView: View {
             .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
         )
         .gesture(
-            DragGesture()
+            DragGesture(coordinateSpace: .named("ootdCanvas"))
                 .onChanged { value in
-                    // Divide translation by fitScale to map back to standard coordinate system
-                    currentOffset = CGSize(
-                        width: value.translation.width / fitScale,
-                        height: value.translation.height / fitScale
-                    )
+                    // 如果有选中的抠图，且不是当前抠图，则不响应
+                    if let selectedId = selectedItemId, selectedId != item.id {
+                        return
+                    }
+                    
+                    // 如果没有选中的抠图，则选中当前抠图
+                    if selectedItemId == nil {
+                        selectedItemId = item.id
+                    }
+                    
+                    currentOffset = value.translation
                 }
                 .onEnded { value in
-                    item.x += value.translation.width / fitScale
-                    item.y += value.translation.height / fitScale
+                    // 如果有选中的抠图，且不是当前抠图，则不响应
+                    if let selectedId = selectedItemId, selectedId != item.id {
+                        return
+                    }
+                    
+                    item.x += value.translation.width
+                    item.y += value.translation.height
                     currentOffset = .zero
                     try? modelContext.save()
                 }

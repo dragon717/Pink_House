@@ -19,7 +19,10 @@ struct BackupManifest: Codable {
     let clothings: [ClothingDTO]
     let storedImages: [StoredImageDTO]
     let cutouts: [CutoutItemDTO]
-    let outfits: [OutfitDTO]
+    // Deprecated: outfits are now handled as snapshots
+    let outfits: [OutfitDTO]?
+    // New: OOTD Snapshots
+    let snapshots: [OOTDSnapshotDTO]?
     
     // New Features Backup (Optional for backward compatibility)
     let appSettings: [String: String]?
@@ -131,4 +134,23 @@ struct OutfitItemDTO: Codable {
     var backupImagePath: String?
     var backupImageWidth: Double?
     var backupImageHeight: Double?
+}
+
+struct OOTDSnapshotDTO: Codable {
+    let id: UUID
+    let createdAt: Date
+    let note: String
+    let snapshotPath: String?
+    let items: [OOTDSnapshotItemDTO]
+}
+
+struct OOTDSnapshotItemDTO: Codable {
+    let id: UUID
+    let imageReference: String // Path to the cutout image
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+    let zIndex: Int
+    let rotation: Double
 }
