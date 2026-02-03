@@ -170,7 +170,7 @@ class BackupService {
             var cutoutIDToClothingID: [UUID: UUID] = [:]
             
             var clothingDescriptor = FetchDescriptor<Clothing>()
-            clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.cutouts]
+            clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.cutouts, \Clothing.accessoryItems]
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
                 for cutout in c.cutouts {
                     cutoutIDToClothingID[cutout.id] = c.id
@@ -384,18 +384,17 @@ class BackupService {
                 return digest.compactMap { String(format: "%02x", $0) }.joined()
             }
             
-            for file in themeFiles {
-                if let url = imageFiles[file], let h = fileHash(url) {
-                    externalHashes[file] = h
+            // Version 1.2+ Fix: Include ALL files not in StoredImages (e.g., Cutouts, Outfits, Theme, etc.)
+            // This ensures CloudSyncManager knows about them.
+            let storedImageNames = Set(storedImageDTOs.map { $0.fileName })
+            
+            for (fileName, url) in imageFiles {
+                // If it's not a standard StoredImage, we must track its hash for Cloud Sync
+                if !storedImageNames.contains(fileName) {
+                    if let h = fileHash(url) {
+                        externalHashes[fileName] = h
+                    }
                 }
-            }
-            for file in wealthFiles {
-                if let url = imageFiles[file], let h = fileHash(url) {
-                    externalHashes[file] = h
-                }
-            }
-            if hasWidgetBackground, let url = imageFiles["widget_background.jpg"], let h = fileHash(url) {
-                externalHashes["widget_background.jpg"] = h
             }
             
             let manifest = BackupManifest(
