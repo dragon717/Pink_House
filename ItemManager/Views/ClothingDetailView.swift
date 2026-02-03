@@ -372,14 +372,23 @@ struct ClothingDetailView: View {
             
             HStack {
                 if let brand = clothing.brand {
-                    Circle()
-                        .fill(Color(hex: brand.colorHex))
-                        .frame(width: 24, height: 24)
-                        .overlay(
-                            Text(brand.name.prefix(1))
-                                .font(.caption2)
-                                .foregroundStyle(.white)
-                        )
+                    if let path = brand.imagePath,
+                       let image = ImageManager.shared.loadImage(fileName: path) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 24, height: 24)
+                            .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color(hex: brand.colorHex))
+                            .frame(width: 24, height: 24)
+                            .overlay(
+                                Text(brand.name.prefix(1))
+                                    .font(.caption2)
+                                    .foregroundStyle(.white)
+                            )
+                    }
                     Text(brand.name)
                         .font(.subheadline)
                 } else {
