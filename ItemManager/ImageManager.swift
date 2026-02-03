@@ -22,10 +22,10 @@ class ImageManager {
     
     private init() {
         // Configure cache limits
-        // 50 images limit might be safer for older devices
-        memoryCache.countLimit = 50 
-        // 100 MB limit. Note: NSCache cost is arbitrary, we need to provide cost when setting object.
-        memoryCache.totalCostLimit = 1024 * 1024 * 100 
+        // Increase limit for grid views (approx 5-6 screens of grid items)
+        memoryCache.countLimit = 300 
+        // 200 MB limit
+        memoryCache.totalCostLimit = 1024 * 1024 * 200 
         
         // Listen for memory warnings
         NotificationCenter.default.addObserver(
@@ -192,6 +192,12 @@ class ImageManager {
         return image
     }
     
+    /// 检查内存缓存
+    func cachedImage(fileName: String, targetSize: CGSize? = nil) -> UIImage? {
+        let cacheKey = (fileName + (targetSize != nil ? "_\(Int(targetSize!.width))x\(Int(targetSize!.height))" : "")) as NSString
+        return memoryCache.object(forKey: cacheKey)
+    }
+
     /// 异步获取图片 (用于列表滚动优化)
     /// - Parameters:
     ///   - fileName: 文件名
@@ -208,10 +214,11 @@ class ImageManager {
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
         
         // Load in background
+        let scale = UIScreen.main.scale
         let image = await Task.detached(priority: .userInitiated) {
             if let targetSize = targetSize {
                 // Downsampling path
-                return self.downsample(imageAt: fileURL, to: targetSize, scale: 1.0) // Scale handled by SwiftUI typically or provide screen scale
+                return self.downsample(imageAt: fileURL, to: targetSize, scale: scale)
             } else {
                 // Normal load path
                 guard let data = try? Data(contentsOf: fileURL),

@@ -76,7 +76,14 @@ struct ClothingCard: View, Equatable {
                     // 预估卡片宽度: 屏幕宽度/2 (Grid2) approx 180-200pt -> @2x 400px, @3x 600px
                     // Grid3 approx 120pt -> 360px
                     // Safe bet: 500x500
-                    self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: CGSize(width: 500, height: 500))
+                    let size = CGSize(width: 500, height: 500)
+                    if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
+                        self.image = cached
+                        return
+                    }
+                    try? await Task.sleep(nanoseconds: 50_000_000)
+                    if Task.isCancelled { return }
+                    self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
                 }
             }
             
@@ -146,7 +153,14 @@ struct ClothingThumbnail: View, Equatable {
         .task {
             if let imagePath = clothing.imagePaths.first {
                 // Grid 6: approx 60pt -> 180px. Safe bet: 200x200
-                self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: CGSize(width: 200, height: 200))
+                let size = CGSize(width: 200, height: 200)
+                if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
+                    self.image = cached
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                if Task.isCancelled { return }
+                self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
             }
         }
     }
@@ -201,7 +215,14 @@ struct ClothingRow: View {
                 }
                 .task {
                     if let firstPath = clothing.imagePaths.first {
-                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: CGSize(width: 120, height: 120))
+                        let size = CGSize(width: 120, height: 120)
+                        if let cached = ImageManager.shared.cachedImage(fileName: firstPath, targetSize: size) {
+                            self.image = cached
+                            return
+                        }
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                        if Task.isCancelled { return }
+                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
                     }
                 }
                 .overlay(alignment: .topTrailing) {
@@ -320,7 +341,14 @@ struct ClothingRowBrief: View {
                 }
                 .task {
                     if let firstPath = clothing.imagePaths.first {
-                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: CGSize(width: 80, height: 80))
+                        let size = CGSize(width: 80, height: 80)
+                        if let cached = ImageManager.shared.cachedImage(fileName: firstPath, targetSize: size) {
+                            self.image = cached
+                            return
+                        }
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                        if Task.isCancelled { return }
+                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
                     }
                 }
                 

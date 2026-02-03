@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PinkHouse")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+094ee364d6099143c840a4a2fe76be397017b231")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e74179f7a8bd2ab87265fbc9478f934cbe6507ae")]
 [assembly: System.Reflection.AssemblyProductAttribute("PinkHouse")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PinkHouse")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

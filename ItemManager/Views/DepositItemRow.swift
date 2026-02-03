@@ -40,7 +40,14 @@ struct DepositItemRow: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .task {
                                 if let imagePath = clothing.imagePaths.first {
-                                    self.thumbnailImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: CGSize(width: 80, height: 80))
+                                    let size = CGSize(width: 80, height: 80)
+                                    if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
+                                        self.thumbnailImage = cached
+                                        return
+                                    }
+                                    try? await Task.sleep(nanoseconds: 50_000_000)
+                                    if Task.isCancelled { return }
+                                    self.thumbnailImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
                                 }
                             }
                     }

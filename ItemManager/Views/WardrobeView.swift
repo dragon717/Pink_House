@@ -233,8 +233,16 @@ struct WardrobeView: View {
                                                 }
                                             }
                                             .contentShape(Rectangle())
-                                            .onAppear { visibleItemIDs.insert(clothing.id) }
-                                            .onDisappear { visibleItemIDs.remove(clothing.id) }
+                                            .onAppear { 
+                                                if isEditing {
+                                                    visibleItemIDs.insert(clothing.id) 
+                                                }
+                                            }
+                                            .onDisappear { 
+                                                if isEditing {
+                                                    visibleItemIDs.remove(clothing.id) 
+                                                }
+                                            }
                                             .onDrag {
                                                 self.draggingItem = clothing
                                                 return NSItemProvider(object: clothing.id.uuidString as NSString)
