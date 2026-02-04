@@ -116,6 +116,10 @@ struct BatchReplaceCutoutView: View {
             // Create a lookup for cutouts by linkedClothing
             let clothingMap = Dictionary(grouping: allCutouts.filter { $0.linkedClothing != nil }) { $0.linkedClothing!.id }
             
+            // 获取所有 CutoutItem 的 imagePath，用于去重检查
+            // 如果主图本身就是一张抠图（存在于 cutout 表中），则认为已经替换过了
+            let allCutoutPaths = Set(allCutouts.map { $0.imagePath })
+            
             var processedCount = 0
             
             for clothing in allClothing {
@@ -126,9 +130,17 @@ struct BatchReplaceCutoutView: View {
                     let sortedCutouts = cutouts.sorted { $0.timestamp > $1.timestamp }
                     if let bestCutout = sortedCutouts.first {
                         // Check if the clothing's first image is ALREADY this cutout
-                        if let firstImage = clothing.imagePaths.first, firstImage == bestCutout.imagePath {
-                            // Already replaced/is the same, skip
-                            continue
+                        if let firstImage = clothing.imagePaths.first {
+                            if firstImage == bestCutout.imagePath {
+                                // Already replaced/is the same, skip
+                                continue
+                            }
+                            
+                            // 检查主图是否已经是某张抠图（可能是旧的抠图，或者其他衣服的抠图，只要是抠图就不建议再替换，除非用户强行操作）
+                            // 这里我们假设如果主图已经在 Cutout 库里，说明已经是白底图了，无需替换。
+                            if allCutoutPaths.contains(firstImage) {
+                                continue
+                            }
                         }
                         
                         // Also, we need to make sure the cutout image file actually exists
