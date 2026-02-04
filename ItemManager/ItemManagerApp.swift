@@ -72,8 +72,6 @@ struct ItemManagerApp: App {
                 if newPhase == .background || newPhase == .inactive {
                     Task {
                         await SharedPersistence.shared.syncWidgetData()
-                        // Trigger Auto Sync if enabled
-                        await CloudSyncManager.shared.triggerAutoSync(modelContainer: SharedPersistence.shared.sharedModelContainer)
                     }
                 }
             }

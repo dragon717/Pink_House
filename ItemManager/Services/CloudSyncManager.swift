@@ -27,13 +27,6 @@ class CloudSyncManager: ObservableObject {
     @Published var lastCloudBackupDate: Date?
     @Published var syncError: String?
     
-    // Auto Sync Settings
-    @Published var isAutoSyncEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(isAutoSyncEnabled, forKey: "isAutoSyncEnabled")
-        }
-    }
-    
     @Published var hasSuccessfulBackup: Bool {
         didSet {
             UserDefaults.standard.set(hasSuccessfulBackup, forKey: "hasSuccessfulBackup")
@@ -47,7 +40,6 @@ class CloudSyncManager: ObservableObject {
     private var userRecordID: CKRecord.ID?
     
     private init() {
-        self.isAutoSyncEnabled = UserDefaults.standard.bool(forKey: "isAutoSyncEnabled")
         self.hasSuccessfulBackup = UserDefaults.standard.bool(forKey: "hasSuccessfulBackup")
     }
     
@@ -458,19 +450,6 @@ class CloudSyncManager: ObservableObject {
     }
     
     // MARK: - Auto Sync & Silent Restore
-    
-    func triggerAutoSync(modelContainer: ModelContainer) async {
-        guard isAutoSyncEnabled, hasSuccessfulBackup else { return }
-        guard !isSyncing else { return }
-        
-        if let lastDate = lastCloudBackupDate, Date().timeIntervalSince(lastDate) < 3600 {
-            return
-        }
-        
-        let accountStatus = try? await container.accountStatus()
-        guard accountStatus == .available else { return }
-        await uploadBackup(modelContainer: modelContainer)
-    }
     
     func checkAndSilentRestore(container: ModelContainer) async {
         // Condition: Empty Database (No Clothings)

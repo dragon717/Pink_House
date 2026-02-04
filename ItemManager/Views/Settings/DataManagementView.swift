@@ -24,13 +24,11 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 struct DataManagementView: View {
     @Environment(\.modelContext) private var modelContext
-    @AppStorage("useCloudSync") private var useCloudSync = false
     @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     @State private var showingRestoreImporter = false
     @State private var showingRestoreAlert = false
-    @State private var showRestartAlert = false
     @State private var showingShareSheet = false
     @State private var shareItems: [Any] = []
     @State private var restoreURL: URL?
@@ -92,19 +90,6 @@ struct DataManagementView: View {
                 }
                 
                 Section(header: Text("高级设置")) {
-                    Toggle(isOn: $useCloudSync) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("iCloud 同步")
-                                .font(.body)
-                            Text("开启后将尝试同步数据。更改此设置需要重启应用。")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .onChange(of: useCloudSync) { _, _ in
-                        showRestartAlert = true
-                    }
-                    
                     Toggle(isOn: $useAggressiveMemoryOptimization) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("积极内存优化")
@@ -160,11 +145,6 @@ struct DataManagementView: View {
                 Button("确定", role: .cancel) { }
             } message: {
                 Text(message ?? "")
-            }
-            .alert("需重启应用", isPresented: $showRestartAlert) {
-                Button("确定", role: .cancel) { }
-            } message: {
-                Text("更改同步设置需要重启应用才能生效。请手动关闭并重新打开应用。")
             }
             
             // Loading Indicator

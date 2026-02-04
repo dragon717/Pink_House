@@ -315,18 +315,7 @@ struct CloudSyncControlsView: View {
                 .disabled(cloudManager.isSyncing)
             }
             
-            if cloudManager.hasSuccessfulBackup {
-                Toggle(isOn: $cloudManager.isAutoSyncEnabled) {
-                    VStack(alignment: .leading) {
-                        Text("自动同步 (增量备份)")
-                            .font(.body)
-                        Text("应用进入后台时自动备份变更")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.top, 4)
-            }
+            
         }
         .padding(.vertical, 8)
     }
