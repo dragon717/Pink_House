@@ -113,7 +113,9 @@ class BackupService {
             "isDepositNotificationEnabled",
             "depositNotificationDaysBefore",
             "depositNotificationTime",
-            "AppleLanguages"
+            "AppleLanguages",
+            "UserPreference_SortOption",
+            "UserPreference_ViewLayout"
         ]
         
         for key in keysToBackup {
@@ -226,6 +228,7 @@ class BackupService {
                     deletedAt: c.deletedAt,
                     createdAt: c.createdAt,
                     updatedAt: c.updatedAt,
+                    sortIndex: c.sortIndex,
                     accessoryItems: accItems
                 )
             }
@@ -614,6 +617,7 @@ class BackupService {
                 
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
+                clothingBack.sortIndex = dto.sortIndex ?? 0
             } else {
                 clothingBack = Clothing(name: dto.name)
                 clothingBack.id = dto.id
@@ -650,6 +654,7 @@ class BackupService {
                 
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
+                clothingBack.sortIndex = dto.sortIndex ?? 0
             }
             
             // Restore AccessoryItems

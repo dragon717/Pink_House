@@ -56,7 +56,9 @@ struct HomeView: View {
     @State private var selectedTab: HomeTab = .wardrobe
     @State private var showingAddSheet = false
     @State private var showingBatchImportSheet = false
-    @State private var sortOption: SortOption = .createdAtDesc
+    @State private var isSelectionMode = false
+    @State private var isEditing = false
+    @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
     
     // Filter States
     @State private var selectedTagIDs: Set<UUID> = []
@@ -95,7 +97,7 @@ struct HomeView: View {
         }
     }
     
-    @State private var viewLayout: ViewLayout = .grid2
+    @AppStorage("UserPreference_ViewLayout") private var viewLayout: ViewLayout = .grid2
     @State private var showingCommunityImportAlert = false
     
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
@@ -111,6 +113,8 @@ struct HomeView: View {
                 if selectedTab == .wardrobe {
                     WardrobeView(
                         searchText: $wardrobeSearchText,
+                        isSelectionMode: $isSelectionMode,
+                        isEditing: $isEditing,
                         sortOption: sortOption,
                         viewLayout: viewLayout,
                         selectedTagIDs: selectedTagIDs,
@@ -179,7 +183,7 @@ struct HomeView: View {
     }
     
     private var tabSwitcher: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 12) {
             Button {
                 withAnimation {
                     selectedTab = .wardrobe
@@ -215,11 +219,17 @@ struct HomeView: View {
     private var actionButtons: some View {
         ViewThatFits(in: .horizontal) {
             // Full Layout
-            HStack(spacing: 12) {
+            HStack(spacing: 6) {
                 sortButton
                 filterButton
                 displayButton
                 addButton
+                if selectedTab == .wardrobe {
+                    if sortOption == .custom {
+                        manualSortButton
+                    }
+                    editButton
+                }
             }
             
             // Compact Layout (Three Dots)
@@ -228,6 +238,12 @@ struct HomeView: View {
                 filterButton
                 displayButton
                 addButton
+                if selectedTab == .wardrobe {
+                    if sortOption == .custom {
+                        manualSortButton
+                    }
+                    editButton
+                }
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: 22, weight: .medium))
@@ -237,6 +253,44 @@ struct HomeView: View {
     }
     
     // Extracted buttons for reuse
+    private var manualSortButton: some View {
+        Button {
+            withAnimation {
+                isEditing.toggle()
+            }
+        } label: {
+            if isEditing {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.pink)
+            } else {
+                Image(systemName: "list.number")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+            }
+        }
+        .disabled(isSelectionMode)
+    }
+    
+    private var editButton: some View {
+        Button {
+            withAnimation {
+                isSelectionMode.toggle()
+            }
+        } label: {
+            if isSelectionMode {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.pink)
+            } else {
+                Image(systemName: "pencil.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+            }
+        }
+        .disabled(isEditing)
+    }
+    
     private var sortButton: some View {
         Menu {
             Picker("排序", selection: $sortOption) {

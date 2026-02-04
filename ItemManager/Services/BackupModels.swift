@@ -81,6 +81,7 @@ struct ClothingDTO: Codable {
     let deletedAt: Date?
     let createdAt: Date
     let updatedAt: Date
+    let sortIndex: Int?
     
     // Custom Accessories (Added in v1.3)
     let accessoryItems: [AccessoryItemDTO]?

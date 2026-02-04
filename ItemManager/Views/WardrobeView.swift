@@ -11,14 +11,25 @@ import UniformTypeIdentifiers
 
 struct WardrobeView: View {
     @Binding var searchText: String
+    @Binding var isSelectionMode: Bool
+    @Binding var isEditing: Bool
     @Environment(\.modelContext) private var modelContext
     @Query private var clothings: [Clothing]
     @State private var showStats = true
     
     // Edit Mode States
-    @State private var isEditing = false
+    @State private var selectedItemIDs: Set<UUID> = []
     @State private var editableClothings: [Clothing] = []
     @State private var draggingItem: Clothing?
+    
+    // Batch Actions States
+    @State private var showingDeleteAlert = false
+    @State private var showingTagSelection = false
+    @State private var tempSelectedTags: [Tag] = []
+    @State private var showingAddTagsConfirmation = false
+    @State private var showingBrandSelection = false
+    @State private var tempSelectedBrand: Brand?
+    @State private var showingSetBrandConfirmation = false
     
     // Auto-scroll
     @State private var visibleItemIDs: Set<UUID> = []
@@ -43,6 +54,8 @@ struct WardrobeView: View {
     let onClearFilter: (() -> Void)?
     
     init(searchText: Binding<String>, 
+         isSelectionMode: Binding<Bool>,
+         isEditing: Binding<Bool>,
          sortOption: SortOption,
          viewLayout: HomeView.ViewLayout,
          selectedTagIDs: Set<UUID>,
@@ -56,6 +69,8 @@ struct WardrobeView: View {
          filterDescription: String? = nil,
          onClearFilter: (() -> Void)? = nil) {
         _searchText = searchText
+        _isSelectionMode = isSelectionMode
+        _isEditing = isEditing
         self.sortOption = sortOption
         _clothings = Query(filter: #Predicate<Clothing> { $0.isDeleted == false }, sort: sortOption.sortDescriptors)
         self.viewLayout = viewLayout
@@ -183,20 +198,43 @@ struct WardrobeView: View {
                     } else {
                         ForEach(filteredClothings) { clothing in
                             ZStack {
-                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                    EmptyView()
-                                }
-                                .opacity(0)
-                                
-                                VStack(spacing: 0) {
-                                    if viewLayout == .listBrief {
-                                        ClothingRowBrief(clothing: clothing)
-                                    } else {
-                                        ClothingRow(clothing: clothing)
+                                if isSelectionMode {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                                            .font(.title3)
+                                            .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+                                        
+                                        VStack(spacing: 0) {
+                                            if viewLayout == .listBrief {
+                                                ClothingRowBrief(clothing: clothing)
+                                            } else {
+                                                ClothingRow(clothing: clothing)
+                                            }
+                                            
+                                            Divider()
+                                                .padding(.leading)
+                                        }
                                     }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        toggleSelection(clothing.id)
+                                    }
+                                } else {
+                                    NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                        EmptyView()
+                                    }
+                                    .opacity(0)
                                     
-                                    Divider()
-                                        .padding(.leading)
+                                    VStack(spacing: 0) {
+                                        if viewLayout == .listBrief {
+                                            ClothingRowBrief(clothing: clothing)
+                                        } else {
+                                            ClothingRow(clothing: clothing)
+                                        }
+                                        
+                                        Divider()
+                                            .padding(.leading)
+                                    }
                                 }
                             }
                             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -251,13 +289,35 @@ struct WardrobeView: View {
                                         }
                                     } else {
                                         ForEach(filteredClothings) { clothing in
-                                            NavigationLink {
-                                                ClothingDetailView(clothing: clothing)
-                                            } label: {
-                                                if viewLayout == .grid6 {
-                                                    ClothingThumbnail(clothing: clothing)
-                                                } else {
-                                                    ClothingCard(clothing: clothing)
+                                            if isSelectionMode {
+                                                ZStack(alignment: .topTrailing) {
+                                                    if viewLayout == .grid6 {
+                                                        ClothingThumbnail(clothing: clothing)
+                                                    } else {
+                                                        ClothingCard(clothing: clothing)
+                                                    }
+                                                    
+                                                    // Selection Indicator
+                                                    Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                                                        .font(.title3)
+                                                        .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+                                                        .background(Circle().fill(.white).padding(2))
+                                                        .shadow(radius: 1)
+                                                        .padding(8)
+                                                }
+                                                .contentShape(Rectangle())
+                                                .onTapGesture {
+                                                    toggleSelection(clothing.id)
+                                                }
+                                            } else {
+                                                NavigationLink {
+                                                    ClothingDetailView(clothing: clothing)
+                                                } label: {
+                                                    if viewLayout == .grid6 {
+                                                        ClothingThumbnail(clothing: clothing)
+                                                    } else {
+                                                        ClothingCard(clothing: clothing)
+                                                    }
                                                 }
                                             }
                                         }
@@ -299,31 +359,183 @@ struct WardrobeView: View {
             }
         }
         .toolbar {
-            if sortOption == .custom {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        toggleEditMode()
-                    } label: {
-                        Text(isEditing ? "完成" : "编辑")
-                            .fontWeight(isEditing ? .bold : .regular)
+        }
+        .onChange(of: isEditing) { oldValue, newValue in
+            if newValue {
+                // Start editing
+                editableClothings = filteredClothings
+            } else {
+                // Save order
+                saveOrder()
+                editableClothings = []
+            }
+        }
+        .onChange(of: isSelectionMode) { oldValue, newValue in
+            if newValue {
+                // Entered selection mode
+                if isEditing {
+                    isEditing = false // Will trigger saveOrder via onChange above
+                }
+            } else {
+                // Exited selection mode
+                selectedItemIDs.removeAll()
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if isSelectionMode {
+                VStack(spacing: 0) {
+                    Divider()
+                    HStack {
+                        // Delete
+                        Button(role: .destructive) {
+                            showingDeleteAlert = true
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text("删除")
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .disabled(selectedItemIDs.isEmpty)
+                        
+                        Divider()
+                            .frame(height: 20)
+                        
+                        // Add Tags
+                        Button {
+                            tempSelectedTags = []
+                            showingTagSelection = true
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "tag")
+                                Text("添加标签")
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .disabled(selectedItemIDs.isEmpty)
+                        
+                        Divider()
+                            .frame(height: 20)
+                        
+                        // Group to Brand
+                        Button {
+                            tempSelectedBrand = nil
+                            showingBrandSelection = true
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "bag")
+                                Text("归类品牌")
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .disabled(selectedItemIDs.isEmpty)
+                    }
+                    .padding()
+                    .background(.regularMaterial)
+                }
+            }
+        }
+        .sheet(isPresented: $showingTagSelection) {
+            TagSelectionView(selectedTags: $tempSelectedTags)
+                .onDisappear {
+                    if !tempSelectedTags.isEmpty {
+                        showingAddTagsConfirmation = true
                     }
                 }
+        }
+        .sheet(isPresented: $showingBrandSelection) {
+            BrandSelectionView(selectedBrand: $tempSelectedBrand)
+                .onDisappear {
+                    if tempSelectedBrand != nil {
+                        showingSetBrandConfirmation = true
+                    }
+                }
+        }
+        .alert("确认删除", isPresented: $showingDeleteAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除 \(selectedItemIDs.count) 项", role: .destructive) {
+                deleteSelectedItems()
+            }
+        }
+        .alert("确认添加标签", isPresented: $showingAddTagsConfirmation) {
+            Button("取消", role: .cancel) {
+                tempSelectedTags = []
+            }
+            Button("确认添加") {
+                if !tempSelectedTags.isEmpty {
+                    addTagsToSelectedItems(tempSelectedTags)
+                }
+            }
+        } message: {
+            Text("确定要为选中的 \(selectedItemIDs.count) 件物品添加 \(tempSelectedTags.count) 个标签吗？")
+        }
+        .alert("确认归类品牌", isPresented: $showingSetBrandConfirmation) {
+            Button("取消", role: .cancel) {
+                tempSelectedBrand = nil
+            }
+            Button("确认修改") {
+                if let brand = tempSelectedBrand {
+                    setBrandForSelectedItems(brand)
+                }
+            }
+        } message: {
+            if let brand = tempSelectedBrand {
+                Text("确定要将选中的 \(selectedItemIDs.count) 件物品归类到品牌“\(brand.name)”吗？")
             }
         }
     }
     
-    private func toggleEditMode() {
-        if isEditing {
-            // Save order
-            saveOrder()
-            editableClothings = []
+    private func toggleSelection(_ id: UUID) {
+        if selectedItemIDs.contains(id) {
+            selectedItemIDs.remove(id)
         } else {
-            // Start editing
-            editableClothings = filteredClothings
+            selectedItemIDs.insert(id)
         }
+    }
+    
+    private func deleteSelectedItems() {
+        let itemsToDelete = clothings.filter { selectedItemIDs.contains($0.id) }
+        for item in itemsToDelete {
+            item.isDeleted = true
+            item.deletedAt = Date()
+        }
+        try? modelContext.save()
+        
         withAnimation {
-            isEditing.toggle()
+            isSelectionMode = false
+            selectedItemIDs.removeAll()
         }
+    }
+    
+    private func addTagsToSelectedItems(_ tags: [Tag]) {
+        let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        for item in items {
+            var itemTags = item.tags ?? []
+            for tag in tags {
+                if !itemTags.contains(where: { $0.id == tag.id }) {
+                    itemTags.append(tag)
+                }
+            }
+            item.tags = itemTags
+        }
+        try? modelContext.save()
+        
+        // Keep selection mode active as requested
+        tempSelectedTags = []
+    }
+    
+    private func setBrandForSelectedItems(_ brand: Brand) {
+        let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        for item in items {
+            item.brand = brand
+        }
+        try? modelContext.save()
+        
+        // Keep selection mode active as requested
+        tempSelectedBrand = nil
     }
     
     private func saveOrder() {
