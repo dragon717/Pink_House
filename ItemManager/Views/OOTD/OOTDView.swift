@@ -62,6 +62,37 @@ struct OOTDView: View {
                         },
                         onAddPhoto: {
                             showingActionSheet = true
+                        },
+                        onBatchAdd: { cutouts in
+                            // Optimized batch add
+                            guard let outfit = currentOutfit else { return false }
+                            
+                            // Check limit
+                            if outfit.items.count + cutouts.count > 20 {
+                                showingLimitAlert = true
+                                return false
+                            }
+                            
+                            // Add items without triggering snapshot each time
+                            for (index, cutout) in cutouts.enumerated() {
+                                let item = OutfitItem(
+                                    cutout: cutout,
+                                    x: Double(index * 20), // Slight offset to see them
+                                    y: Double(index * 20),
+                                    rotation: 0,
+                                    scale: 1.0,
+                                    zIndex: outfit.items.count
+                                )
+                                outfit.items.append(item)
+                            }
+                            
+                            // Save once at the end
+                            Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 100_000_000)
+                                saveSnapshot(for: outfit)
+                            }
+                            
+                            return true
                         }
                     )
                 }
@@ -244,6 +275,11 @@ struct OOTDView: View {
             // Basically everything that is not deleted.
             // If you want to exclude specific things, you can refine this.
             // For now, let's process ALL clothing items that have images.
+            // 获取已有抠图路径，防止重复抠已替换主图的图片
+            let descriptor = FetchDescriptor<CutoutItem>()
+            let existingCutouts = (try? modelContext.fetch(descriptor)) ?? []
+            let existingPaths = Set(existingCutouts.map { $0.imagePath })
+
             let itemsToProcess = allClothing.filter { clothing in
                 !clothing.imagePaths.isEmpty
             }
@@ -261,6 +297,7 @@ struct OOTDView: View {
                 
                 // Process first image of each clothing
                 if let firstImagePath = clothing.imagePaths.first,
+                   !existingPaths.contains(firstImagePath), // 检查主图是否已经是抠图
                    let image = ImageManager.shared.loadImage(fileName: firstImagePath) {
                     
                     do {
@@ -716,6 +753,7 @@ struct OOTDContentArea: View {
     // Actions
     let onAddToOutfit: (CutoutItem) -> Void
     let onAddPhoto: () -> Void
+    let onBatchAdd: ([CutoutItem]) -> Bool
     
     var body: some View {
         ZStack {
@@ -731,7 +769,8 @@ struct OOTDContentArea: View {
                 OOTDCutoutListView(
                     isExpanded: $isListExpanded,
                     onSelect: onAddToOutfit,
-                    onAddPhoto: onAddPhoto
+                    onAddPhoto: onAddPhoto,
+                    onBatchAdd: onBatchAdd
                 )
                 .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)

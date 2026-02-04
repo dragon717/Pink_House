@@ -223,13 +223,13 @@ struct HomeView: View {
                 sortButton
                 filterButton
                 displayButton
-                addButton
                 if selectedTab == .wardrobe {
                     if sortOption == .custom {
                         manualSortButton
                     }
                     editButton
                 }
+                addButton
             }
             
             // Compact Layout (Three Dots)

@@ -271,6 +271,20 @@ struct ClothingListView: View {
                                     ClothingDetailView(clothing: clothing)
                                 } label: {
                                     ClothingCard(clothing: clothing)
+                                        .contextMenu {
+                                            Button {
+                                                duplicateItem(clothing)
+                                            } label: {
+                                                Label("复制", systemImage: "doc.on.doc")
+                                            }
+                                            
+                                            Button(role: .destructive) {
+                                                itemToDelete = clothing
+                                                showingDeleteAlert = true
+                                            } label: {
+                                                Label("删除", systemImage: "trash")
+                                            }
+                                        }
                                 }
                             }
                         }
@@ -285,6 +299,20 @@ struct ClothingListView: View {
                                     ClothingDetailView(clothing: clothing)
                                 } label: {
                                     ClothingThumbnail(clothing: clothing)
+                                        .contextMenu {
+                                            Button {
+                                                duplicateItem(clothing)
+                                            } label: {
+                                                Label("复制", systemImage: "doc.on.doc")
+                                            }
+                                            
+                                            Button(role: .destructive) {
+                                                itemToDelete = clothing
+                                                showingDeleteAlert = true
+                                            } label: {
+                                                Label("删除", systemImage: "trash")
+                                            }
+                                        }
                                 }
                             }
                         }
@@ -350,7 +378,7 @@ struct ClothingListView: View {
         }
         
         let newItem = Clothing(
-            name: item.name + " (副本)",
+            name: item.name ,// 不用+ " (副本)",
             brand: item.brand,
             types: item.types,
             colors: item.colors,
@@ -360,6 +388,7 @@ struct ClothingListView: View {
             accessories: item.accessories,
             imagePaths: item.imagePaths,
             isShared: item.isShared,
+            originalPrice: item.originalPrice,
             price: item.price,
             deposit: item.deposit,
             balance: item.balance,
@@ -374,6 +403,13 @@ struct ClothingListView: View {
             status: item.status
         )
         newItem.tags = item.tags
+        
+        // Duplicate accessory items
+        if let items = item.accessoryItems {
+            newItem.accessoryItems = items.map { item in
+                AccessoryItem(name: item.name, price: item.price, sortIndex: item.sortIndex)
+            }
+        }
         
         modelContext.insert(newItem)
         

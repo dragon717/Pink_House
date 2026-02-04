@@ -9,10 +9,27 @@ struct OOTDCutoutListView: View {
     @Binding var isExpanded: Bool
     var onSelect: (CutoutItem) -> Void
     var onAddPhoto: () -> Void
+    var onBatchAdd: (([CutoutItem]) -> Bool)? // Optional batch callback, returns success
     
     @State private var showErrorAlert = false
     @State private var searchText = ""
     @State private var selectedCategory = "全部"
+    
+    // Selection Mode State
+    @State private var isEditing = false
+    @State private var selectedItems = Set<UUID>()
+    @State private var displayItems: [CutoutItem] = []
+    
+    // Swipe Selection States
+    @State private var itemFrames: [UUID: CGRect] = [:]
+    @State private var isDraggingSelection = false
+    @State private var dragInitialSelectionState: Bool? = nil // true: selecting, false: deselecting
+    @State private var draggedItems = Set<UUID>() // Items touched in current drag
+    
+    // Batch Action States
+    @State private var showDeleteConfirmation = false
+    @State private var showAddConfirmation = false
+    @State private var showBatchCategorySheet = false
     
     // Reclassify & Reprocess States
     @State private var itemToReclassify: CutoutItem?
@@ -21,13 +38,17 @@ struct OOTDCutoutListView: View {
     @State private var alertMessage = ""
     @State private var showAlert = false
     
+    // Toast State
+    @State private var showToast = false
+    @State private var toastMessage = ""
+    
     private let categories = ["全部", "裙子", "外套", "鞋子", "袜子", "玩偶", "小物", "未分类"]
     // For picker (exclude "全部")
     private var selectableCategories: [String] {
         categories.filter { $0 != "全部" }
     }
     
-    var filteredCutouts: [CutoutItem] {
+    private func updateDisplayItems() {
         var result = cutouts
         
         // Filter by Category
@@ -96,7 +117,9 @@ struct OOTDCutoutListView: View {
             }
         }
         
-        return result
+        withAnimation {
+            displayItems = result
+        }
     }
     
     var body: some View {
@@ -114,9 +137,24 @@ struct OOTDCutoutListView: View {
                     Text("贴纸库")
                         .font(.headline)
                     Spacer()
-                    Text("共 \(filteredCutouts.count) 个")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    
+                    if !isEditing {
+                        Text("共 \(displayItems.count) 个")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Button(action: {
+                        withAnimation {
+                            isEditing.toggle()
+                            selectedItems.removeAll()
+                        }
+                    }) {
+                        Text(isEditing ? "完成" : "多选")
+                            .fontWeight(isEditing ? .bold : .regular)
+                            .foregroundColor(isEditing ? .accentColor : .primary)
+                    }
+                    .padding(.leading, 8)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
@@ -158,13 +196,86 @@ struct OOTDCutoutListView: View {
                 // Expanded View (Grid)
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 16)], spacing: 16) {
-                        addButton
+                        if !isEditing {
+                            addButton
+                        }
                         
-                        ForEach(filteredCutouts) { item in
+                        ForEach(displayItems) { item in
                             menuForItem(item)
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear
+                                            .preference(key: ItemFrameKey.self, value: [item.id: geo.frame(in: .named("gridSpace"))])
+                                    }
+                                )
                         }
                     }
                     .padding()
+                    .padding(.bottom, isEditing ? 80 : 0) // Space for toolbar
+                }
+                .coordinateSpace(name: "gridSpace")
+                .onPreferenceChange(ItemFrameKey.self) { frames in
+                    itemFrames = frames
+                }
+                .gesture(
+                    isEditing ? DragGesture(minimumDistance: 10, coordinateSpace: .named("gridSpace"))
+                        .onChanged { value in
+                            handleDragSelection(value: value)
+                        }
+                        .onEnded { _ in
+                            endDragSelection()
+                        } : nil
+                )
+                
+                // Bottom Toolbar (Batch Actions)
+                if isEditing {
+                    VStack(spacing: 0) {
+                        Divider()
+                        HStack {
+                            // Delete
+                            Button(action: { showDeleteConfirmation = true }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 20))
+                                    Text("删除")
+                                        .font(.caption)
+                                }
+                                .foregroundColor(.red)
+                            }
+                            .disabled(selectedItems.isEmpty)
+                            
+                            Spacer()
+                            
+                            // Categorize
+                            Button(action: { showBatchCategorySheet = true }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "tag")
+                                        .font(.system(size: 20))
+                                    Text("分类")
+                                        .font(.caption)
+                                }
+                            }
+                            .disabled(selectedItems.isEmpty)
+                            
+                            Spacer()
+                            
+                            // Add to Canvas
+                            Button(action: {
+                                showAddConfirmation = true
+                            }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "plus.square.on.square")
+                                        .font(.system(size: 20))
+                                    Text("添加到画布")
+                                        .font(.caption)
+                                }
+                            }
+                            .disabled(selectedItems.isEmpty)
+                        }
+                        .padding()
+                        .background(Color(uiColor: .systemBackground))
+                    }
+                    .transition(.move(edge: .bottom))
                 }
             } else {
                 // Minimized View (Horizontal Scroll)
@@ -207,6 +318,29 @@ struct OOTDCutoutListView: View {
         } message: {
             Text(alertMessage)
         }
+        .alert("确认删除", isPresented: $showDeleteConfirmation) {
+            Button("删除 \(selectedItems.count) 项", role: .destructive) {
+                batchDelete()
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("确定要删除选中的 \(selectedItems.count) 个抠图吗？此操作无法撤销。")
+        }
+        .alert("确认添加", isPresented: $showAddConfirmation) {
+            Button("添加", role: .none) {
+                batchAddToCanvas()
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("确定将选中的 \(selectedItems.count) 个抠图添加到当前画布吗？")
+        }
+        .sheet(isPresented: $showBatchCategorySheet) {
+            BatchReclassifyView(categories: selectableCategories) { newCategory in
+                batchReclassify(to: newCategory)
+                showBatchCategorySheet = false
+            }
+            .presentationDetents([.height(350)])
+        }
         .sheet(item: $itemToReclassify) { item in
             ReclassifyView(item: item, categories: selectableCategories) { newCategory in
                 item.category = newCategory
@@ -215,52 +349,217 @@ struct OOTDCutoutListView: View {
             }
             .presentationDetents([.height(350)])
         }
+        .task(id: cutouts) { updateDisplayItems() }
+        .onChange(of: searchText) { _, _ in updateDisplayItems() }
+        .onChange(of: selectedCategory) { _, _ in updateDisplayItems() }
+        .overlay(alignment: .bottom) {
+            if showToast {
+                toastView
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(100)
+            }
+        }
     }
     
     private func menuForItem(_ item: CutoutItem) -> some View {
-        Menu {
-            Button {
-                onSelect(item)
-                withAnimation { isExpanded = false }
-            } label: {
-                Label("添加到画布", systemImage: "plus.square.on.square")
-            }
-            
-            Button {
-                reprocessCutout(item)
-            } label: {
-                Label("重新抠图", systemImage: "arrow.triangle.2.circlepath")
-            }
-            
-            Button {
-                itemToReclassify = item
-                // showReclassifySheet = true // Removed
-            } label: {
-                Label("修改分类", systemImage: "tag")
-            }
-            
-            Divider()
-            
-            Button(role: .destructive) {
-                deleteCutout(item)
-            } label: {
-                Label("删除", systemImage: "trash")
-            }
-        } label: {
-            CutoutThumbnail(imagePath: item.imagePath, category: item.category)
-                .overlay {
-                    if processingItem == item.id {
-                        ZStack {
-                            Color.black.opacity(0.3)
-                                .cornerRadius(12)
-                            ProgressView()
-                                .tint(.white)
+        Group {
+            if isEditing {
+                Button {
+                    toggleSelection(for: item)
+                } label: {
+                    itemThumbnailView(item)
+                        .overlay(alignment: .bottomTrailing) {
+                            if selectedItems.contains(item.id) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.white, .blue)
+                                    .font(.title3)
+                                    .padding(4)
+                            } else {
+                                Image(systemName: "circle")
+                                    .foregroundStyle(.white)
+                                    .shadow(radius: 2)
+                                    .font(.title3)
+                                    .padding(4)
+                            }
                         }
+                }
+            } else {
+                Menu {
+                    Button {
+                        onSelect(item)
+                        withAnimation { isExpanded = false }
+                    } label: {
+                        Label("添加到画布", systemImage: "plus.square.on.square")
+                    }
+                    
+                    Button {
+                        reprocessCutout(item)
+                    } label: {
+                        Label("重新抠图", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    
+                    Button {
+                        itemToReclassify = item
+                    } label: {
+                        Label("修改分类", systemImage: "tag")
+                    }
+                    
+                    Divider()
+                    
+                    Button(role: .destructive) {
+                        deleteCutout(item)
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                } label: {
+                    itemThumbnailView(item)
+                }
+            }
+        }
+    }
+    
+    private func itemThumbnailView(_ item: CutoutItem) -> some View {
+        CutoutThumbnail(imagePath: item.imagePath, category: item.category)
+            .overlay {
+                if processingItem == item.id {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .cornerRadius(12)
+                        ProgressView()
+                            .tint(.white)
                     }
                 }
+            }
+    }
+    
+    private func toggleSelection(for item: CutoutItem) {
+        if selectedItems.contains(item.id) {
+            selectedItems.remove(item.id)
+        } else {
+            selectedItems.insert(item.id)
         }
-        // Menu usually handles tap, but we want to make sure it works.
-        // SwiftUI Menu works on tap.
+    }
+    
+    private func batchDelete() {
+        let itemsToDelete = cutouts.filter { selectedItems.contains($0.id) }
+        
+        // Use a Task to delete efficiently
+        Task {
+            for item in itemsToDelete {
+                let imagePath = item.imagePath
+                modelContext.delete(item)
+                ImageManager.shared.deleteImage(fileName: imagePath, context: modelContext)
+            }
+            try? modelContext.save()
+            
+            await MainActor.run {
+                selectedItems.removeAll()
+                // isEditing = false // User requested to stay in edit mode
+                updateDisplayItems()
+            }
+        }
+    }
+    
+    private func batchReclassify(to category: String) {
+        let itemsToUpdate = cutouts.filter { selectedItems.contains($0.id) }
+        for item in itemsToUpdate {
+            item.category = category
+        }
+        try? modelContext.save()
+        // selectedItems.removeAll() // User requested to keep selection
+        // isEditing = false // User requested to stay in edit mode
+        updateDisplayItems()
+    }
+    
+    private func batchAddToCanvas() {
+        let itemsToAdd = cutouts.filter { selectedItems.contains($0.id) }
+        // Keep order somewhat consistent (e.g. oldest first or newest first?)
+        // Let's add oldest first so they stack naturally? Or newest on top?
+        // Usually adding means "append", so first added is bottom.
+        let sortedItems = itemsToAdd.sorted { $0.timestamp < $1.timestamp }
+        
+        var success = true
+        
+        if let onBatchAdd = onBatchAdd {
+            // Use optimized batch add if available
+            success = onBatchAdd(sortedItems)
+        } else {
+            // Fallback to individual add (assume always success for individual calls as we don't have return value there)
+            for item in sortedItems {
+                onSelect(item)
+            }
+        }
+        
+        if !success {
+            return
+        }
+        
+        withAnimation {
+            // isEditing = false // User requested to stay in edit mode
+            // isExpanded = false // Keep expanded to continue editing
+            // selectedItems.removeAll() // User requested to keep selection
+        }
+        
+        // Show Toast
+        toastMessage = "已添加 \(itemsToAdd.count) 个贴纸"
+        withAnimation {
+            showToast = true
+        }
+        
+        // Auto hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                showToast = false
+            }
+        }
+    }
+    
+    // MARK: - Drag Selection Logic
+    
+    private func handleDragSelection(value: DragGesture.Value) {
+        if !isDraggingSelection {
+            isDraggingSelection = true
+            draggedItems.removeAll()
+            dragInitialSelectionState = nil
+        }
+        
+        let location = value.location
+        
+        // Find which item is under the drag location
+        // Optimized: only check if we haven't processed it yet or if we need to set initial state
+        for (id, frame) in itemFrames {
+            if frame.contains(location) {
+                // If this is the first item touched, determine the target state (select or deselect)
+                if dragInitialSelectionState == nil {
+                    let isCurrentlySelected = selectedItems.contains(id)
+                    dragInitialSelectionState = !isCurrentlySelected
+                }
+                
+                // Only process if we haven't processed this item in this gesture yet
+                if !draggedItems.contains(id) {
+                    draggedItems.insert(id)
+                    
+                    if let targetState = dragInitialSelectionState {
+                        if targetState {
+                            selectedItems.insert(id)
+                        } else {
+                            selectedItems.remove(id)
+                        }
+                        
+                        // Haptic feedback
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                    }
+                }
+                break // Found the item under finger, stop checking others
+            }
+        }
+    }
+    
+    private func endDragSelection() {
+        isDraggingSelection = false
+        draggedItems.removeAll()
+        dragInitialSelectionState = nil
     }
     
     private func reprocessCutout(_ item: CutoutItem) {
@@ -344,6 +643,26 @@ struct OOTDCutoutListView: View {
             .background(Color(uiColor: .secondarySystemBackground))
             .cornerRadius(12)
         }
+    }
+    
+    private var toastView: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+            
+            Text(toastMessage)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(0.8))
+                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+        )
+        .padding(.bottom, 60) // Lift up a bit
     }
 }
 
@@ -457,5 +776,53 @@ struct ReclassifyView: View {
                 }
             }
         }
+    }
+}
+
+struct BatchReclassifyView: View {
+    let categories: [String]
+    let onConfirm: (String) -> Void
+    
+    @State private var selectedCategory: String
+    @Environment(\.dismiss) var dismiss
+    
+    init(categories: [String], onConfirm: @escaping (String) -> Void) {
+        self.categories = categories
+        self.onConfirm = onConfirm
+        _selectedCategory = State(initialValue: categories.first ?? "未分类")
+    }
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("选择分类", selection: $selectedCategory) {
+                    ForEach(categories, id: \.self) { category in
+                        Text(category).tag(category)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+            .navigationTitle("批量修改分类")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("确定") {
+                        onConfirm(selectedCategory)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct ItemFrameKey: PreferenceKey {
+    typealias Value = [UUID: CGRect]
+    static var defaultValue: [UUID: CGRect] = [:]
+    
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
 }

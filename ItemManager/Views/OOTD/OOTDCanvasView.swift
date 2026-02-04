@@ -127,12 +127,6 @@ struct OOTDCanvasView: View {
                         }
                 )
             )
-            .simultaneousGesture(
-                TapGesture()
-                    .onEnded {
-                        // Background tap to deselect
-                    }
-            )
             .onTapGesture {
                 selectedItemId = nil
             }
