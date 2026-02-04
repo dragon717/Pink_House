@@ -85,7 +85,7 @@ struct ImagePickerGrid: View {
                             if let image = ImageManager.shared.loadImage(fileName: path) {
                                 Image(uiImage: image)
                                     .resizable()
-                                    .scaledToFill()
+                                    .scaledToFit()
                                     .frame(width: 100, height: 100)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .overlay(
@@ -133,7 +133,7 @@ struct ImagePickerGrid: View {
                             if let image = ImageManager.shared.loadImage(fileName: path) {
                                 Image(uiImage: image)
                                     .resizable()
-                                    .scaledToFill()
+                                    .scaledToFit()
                                     .frame(width: 100, height: 100)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             } else {

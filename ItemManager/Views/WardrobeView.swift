@@ -205,108 +205,101 @@ struct WardrobeView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     
-                    if isEditing {
-                        ForEach(editableClothings) { clothing in
-                            ZStack {
+                    ForEach(isEditing ? editableClothings : filteredClothings) { clothing in
+                        ZStack {
+                            if isEditing {
                                 VStack(spacing: 0) {
                                     clothingRowView(clothing: clothing)
                                     
                                     Divider()
                                         .padding(.leading)
                                 }
-                            }
-                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                        }
-                        .onMove { from, to in
-                            editableClothings.move(fromOffsets: from, toOffset: to)
-                        }
-                    } else {
-                        ForEach(filteredClothings) { clothing in
-                            ZStack {
-                                if isSelectionMode {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
-                                            .font(.title3)
-                                            .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
-                                        
-                                        VStack(spacing: 0) {
-                                            clothingRowView(clothing: clothing)
-                                            
-                                            Divider()
-                                                .padding(.leading)
-                                        }
-                                    }
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        toggleSelection(clothing.id)
-                                    }
-                                } else {
-                                    // 正常模式
-                                    ZStack {
-                                        VStack(spacing: 0) {
-                                            clothingRowView(clothing: clothing)
-                                            
-                                            Divider()
-                                                .padding(.leading)
-                                        }
-                                        
-                                        // 隐藏的 NavigationLink，确保点击整行可跳转
-                                        NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                            EmptyView()
-                                        }
-                                        .opacity(0)
-                                    }
-                                    .contextMenu {
-                                        Button {
-                                            isSelectionMode = true
-                                            selectedItemIDs.insert(clothing.id)
-                                        } label: {
-                                            Label("选择", systemImage: "checkmark.circle")
-                                        }
-                                        
-                                        NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                            Label("查看详情", systemImage: "info.circle")
-                                        }
+                            } else if isSelectionMode {
+                                HStack(spacing: 12) {
+                                    Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.title3)
+                                        .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+                                    
+                                    VStack(spacing: 0) {
+                                        clothingRowView(clothing: clothing)
                                         
                                         Divider()
-                                        
-                                        Button {
-                                            itemToCopy = clothing
-                                            showingCopyAlert = true
-                                        } label: {
-                                            Label("复制", systemImage: "doc.on.doc")
-                                        }
-                                        
-                                        Button(role: .destructive) {
-                                            itemToDelete = clothing
-                                            showingDeleteSingleAlert = true
-                                        } label: {
-                                            Label("删除", systemImage: "trash")
-                                        }
-                                    }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                        Button(role: .destructive) {
-                                            itemToDelete = clothing
-                                            showingDeleteSingleAlert = true
-                                        } label: {
-                                            Label("删除", systemImage: "trash")
-                                        }
-                                        
-                                        Button {
-                                            itemToCopy = clothing
-                                            showingCopyAlert = true
-                                        } label: {
-                                            Label("复制", systemImage: "doc.on.doc")
-                                        }
-                                        .tint(.blue)
+                                            .padding(.leading)
                                     }
                                 }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    toggleSelection(clothing.id)
+                                }
+                            } else {
+                                // 正常模式
+                                ZStack {
+                                    VStack(spacing: 0) {
+                                        clothingRowView(clothing: clothing)
+                                        
+                                        Divider()
+                                            .padding(.leading)
+                                    }
+                                    
+                                    // 隐藏的 NavigationLink，确保点击整行可跳转
+                                    NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                        EmptyView()
+                                    }
+                                    .opacity(0)
+                                }
+                                .contextMenu {
+                                    Button {
+                                        isSelectionMode = true
+                                        selectedItemIDs.insert(clothing.id)
+                                    } label: {
+                                        Label("选择", systemImage: "checkmark.circle")
+                                    }
+                                    
+                                    NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                        Label("查看详情", systemImage: "info.circle")
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button {
+                                        itemToCopy = clothing
+                                        showingCopyAlert = true
+                                    } label: {
+                                        Label("复制", systemImage: "doc.on.doc")
+                                    }
+                                    
+                                    Button(role: .destructive) {
+                                        itemToDelete = clothing
+                                        showingDeleteSingleAlert = true
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        itemToDelete = clothing
+                                        showingDeleteSingleAlert = true
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                    
+                                    Button {
+                                        itemToCopy = clothing
+                                        showingCopyAlert = true
+                                    } label: {
+                                        Label("复制", systemImage: "doc.on.doc")
+                                    }
+                                    .tint(.blue)
+                                }
                             }
-                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                        }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+                    .onMove { from, to in
+                        if isEditing {
+                            editableClothings.move(fromOffsets: from, toOffset: to)
                         }
                     }
                     
@@ -404,7 +397,7 @@ struct WardrobeView: View {
                                     }
                                 }
                             }
-                            .animation(.default, value: editableClothings)
+                            .animation(isEditing ? .default : nil, value: editableClothings)
                             .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
                             .padding(.bottom, 100)
                             }

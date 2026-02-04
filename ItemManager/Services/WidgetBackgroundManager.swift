@@ -30,7 +30,7 @@ class WidgetBackgroundManager {
         // Using 600px as max dimension is safe for all widget sizes (Large widget is around 360x360 points)
         // @3x screen needs ~1080px, but for background 800px is a good balance between quality and memory
         let maxDimension: CGFloat = 800
-        let resizedImage = image.resized(toMaxDimension: maxDimension)
+        let resizedImage = image.resizedForWidget(toMaxDimension: maxDimension)
         
         // Compress and write to shared container
         // Use 0.6 quality for better compression
@@ -95,9 +95,8 @@ class WidgetBackgroundManager {
     }
 }
 
-// MARK: - Image Resizing Extension
 private extension UIImage {
-    func resized(toMaxDimension maxDimension: CGFloat) -> UIImage {
+    func resizedForWidget(toMaxDimension maxDimension: CGFloat) -> UIImage {
         let size = self.size
         
         // If image is already smaller than max dimension, return original

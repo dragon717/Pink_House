@@ -5,6 +5,7 @@
 //  Created by Pink House Dev on 1/16/26.
 //
 
+import UIKit
 import Foundation
 import SwiftData
 import SwiftUI
@@ -20,21 +21,54 @@ class ImageManager {
     // Cache
     private let memoryCache = NSCache<NSString, UIImage>()
     
+    // Memory Optimization Config
+    @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true {
+        didSet {
+            configureCacheLimits()
+        }
+    }
+    
     private init() {
-        // Configure cache limits
-        // Increase limit for grid views (approx 5-6 screens of grid items)
-        memoryCache.countLimit = 300 
-        // 200 MB limit
-        memoryCache.totalCostLimit = 1024 * 1024 * 200 
+        configureCacheLimits()
         
-        // Listen for memory warnings
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.didReceiveMemoryWarningNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
             self?.clearCache()
         }
+    }
+    
+    private func configureCacheLimits() {
+        // 配置缓存限制，针对不同内存设备动态优化
+        let totalMemory = ProcessInfo.processInfo.physicalMemory
+        var limitInMB: Int
+        
+        if useAggressiveMemoryOptimization {
+            // 积极模式：大幅降低缓存上限，优先保证不崩溃
+            if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
+                limitInMB = 30 // 极小缓存
+            } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB
+                limitInMB = 50
+            } else {
+                limitInMB = 100
+            }
+            memoryCache.countLimit = 50
+            AppLogger.info("Memory Optimization: Aggressive Mode Enabled")
+        } else {
+            // 标准模式：利用更多内存换取流畅度
+            if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
+                limitInMB = 50
+            } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB
+                limitInMB = 150
+            } else {
+                limitInMB = 300
+            }
+            memoryCache.countLimit = 200
+            AppLogger.info("Memory Optimization: Standard Mode Enabled")
+        }
+        
+        // 限制总容量
+        memoryCache.totalCostLimit = limitInMB * 1024 * 1024
+        
+        AppLogger.info("ImageCache re-configured: Limit \(limitInMB)MB, Physical Memory: \(totalMemory / 1024 / 1024)MB")
     }
     
     func clearCache() {
@@ -55,6 +89,61 @@ class ImageManager {
         return imagesDirectory
     }
     
+    // MARK: - Maintenance
+    
+    /// 清理未被任何 Clothing 引用的图片文件
+    /// - Parameter context: ModelContext
+    /// - Returns: 删除的文件数量
+    func cleanOrphanedImages(context: ModelContext) -> Int {
+        var deletedCount = 0
+        do {
+            // 1. 获取所有 Clothing (包括软删除的)
+            let descriptor = FetchDescriptor<Clothing>()
+            let allClothing = try context.fetch(descriptor)
+            
+            // 2. 收集所有正在使用的图片文件名
+            var usedFileNames: Set<String> = []
+            for clothing in allClothing {
+                for path in clothing.imagePaths {
+                    usedFileNames.insert(path)
+                }
+            }
+            
+            // 3. 遍历图片目录
+            let fileManager = FileManager.default
+            let fileURLs = try fileManager.contentsOfDirectory(at: imagesDirectory, includingPropertiesForKeys: nil)
+            
+            for fileURL in fileURLs {
+                let fileName = fileURL.lastPathComponent
+                // 排除系统文件和目录
+                if !fileName.hasPrefix(".") && !usedFileNames.contains(fileName) {
+                    try fileManager.removeItem(at: fileURL)
+                    deletedCount += 1
+                    
+                    // 同时尝试从内存缓存中移除
+                    memoryCache.removeObject(forKey: fileName as NSString)
+                }
+            }
+            
+            // 4. 清理 StoredImage 表中对应的孤儿记录
+            let imageDescriptor = FetchDescriptor<StoredImage>()
+            let allStoredImages = try context.fetch(imageDescriptor)
+            
+            for storedImage in allStoredImages {
+                if !usedFileNames.contains(storedImage.fileName) {
+                    context.delete(storedImage)
+                }
+            }
+            try context.save()
+            
+            AppLogger.info("Cleaned \(deletedCount) orphaned image files")
+            
+        } catch {
+            AppLogger.error("Failed to clean orphaned images: \(error)")
+        }
+        return deletedCount
+    }
+    
     // MARK: - Core Logic
     
     enum ImageFormat {
@@ -70,14 +159,18 @@ class ImageManager {
             }
         }
     }
-
+    
     /// 保存图片：压缩 -> 哈希去重 -> 存储/引用计数
     /// - Returns: 文件名 (如果成功)
     func saveImage(_ image: UIImage, context: ModelContext, format: ImageFormat = .jpeg(quality: 0.7)) -> String? {
-        // 1. Normalize image (fix orientation)
-        let normalizedImage = image.normalized()
+        // 1. Resize large images to save disk space and memory
+        // Limit max dimension to 2048px (Enough for full screen on most iPhones)
+        let resizedImage = image.resized(toMaxDimension: 2048)
         
-        // 2. Compression/Data Conversion
+        // 2. Normalize image (fix orientation)
+        let normalizedImage = resizedImage.normalized()
+        
+        // 3. Compression/Data Conversion
         guard let data = convertImage(normalizedImage, format: format) else {
             AppLogger.error("Failed to convert image")
             return nil

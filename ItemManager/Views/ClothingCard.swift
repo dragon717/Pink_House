@@ -90,10 +90,9 @@ struct ClothingCard: View, Equatable {
             .padding(8) // 图片周围留白，突出悬浮感
             .task {
                 if let imagePath = clothing.imagePaths.first {
-                    // 预估卡片宽度: 屏幕宽度/2 (Grid2) approx 180-200pt -> @2x 400px, @3x 600px
-                    // Grid3 approx 120pt -> 360px
-                    // Safe bet: 500x500
-                    let size = CGSize(width: 500, height: 500)
+                    // Grid 2 (卡片): 文档建议 200x200 (Points)
+                    // 之前是 500x500，内存优化降级
+                    let size = CGSize(width: 200, height: 200)
                     if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
                         self.image = cached
                         return
@@ -188,8 +187,9 @@ struct ClothingThumbnail: View, Equatable {
         }
         .task {
             if let imagePath = clothing.imagePaths.first {
-                // Grid 6: approx 60pt -> 180px. Safe bet: 200x200
-                let size = CGSize(width: 200, height: 200)
+                // Grid 6: 文档建议 80x80 (Points)
+                // 之前是 200x200
+                let size = CGSize(width: 80, height: 80)
                 if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
                     self.image = cached
                     return
@@ -251,7 +251,9 @@ struct ClothingRow: View {
                 }
                 .task {
                     if let firstPath = clothing.imagePaths.first {
-                        let size = CGSize(width: 120, height: 120)
+                        // List Detailed: 文档建议 60x60
+                        // 之前是 120x120
+                        let size = CGSize(width: 60, height: 60)
                         if let cached = ImageManager.shared.cachedImage(fileName: firstPath, targetSize: size) {
                             self.image = cached
                             return
@@ -377,7 +379,9 @@ struct ClothingRowBrief: View {
                 }
                 .task {
                     if let firstPath = clothing.imagePaths.first {
-                        let size = CGSize(width: 80, height: 80)
+                        // List Brief: 文档建议 50x50
+                        // 之前是 80x80
+                        let size = CGSize(width: 50, height: 50)
                         if let cached = ImageManager.shared.cachedImage(fileName: firstPath, targetSize: size) {
                             self.image = cached
                             return

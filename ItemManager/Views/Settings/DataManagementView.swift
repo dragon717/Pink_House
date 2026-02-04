@@ -25,6 +25,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 struct DataManagementView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("useCloudSync") private var useCloudSync = false
+    @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     @State private var showingRestoreImporter = false
@@ -88,6 +89,44 @@ struct DataManagementView: View {
                         Label("恢复数据 (Restore Data)", systemImage: "arrow.clockwise.icloud")
                     }
                     .foregroundColor(.red)
+                }
+                
+                Section(header: Text("高级设置")) {
+                    Toggle(isOn: $useCloudSync) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("iCloud 同步")
+                                .font(.body)
+                            Text("开启后将尝试同步数据。更改此设置需要重启应用。")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .onChange(of: useCloudSync) { _, _ in
+                        showRestartAlert = true
+                    }
+                    
+                    Toggle(isOn: $useAggressiveMemoryOptimization) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("积极内存优化")
+                                .font(.body)
+                            Text("开启后将更积极地清理内存缓存，防止闪退，但可能导致图片需要重新加载。适合小内存设备或大量图片浏览场景。")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(.pink)
+                }
+                
+                Section(header: Text("存储空间优化")) {
+                    Button(action: performStorageCleanup) {
+                        HStack {
+                            Label("清理未使用的图片", systemImage: "trash")
+                            Spacer()
+                            Text("释放空间")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
             .navigationTitle("数据管理")
@@ -293,6 +332,34 @@ struct DataManagementView: View {
                     message = "数据恢复失败: \(errorDesc)"
                     showingMessage = true
                 }
+            }
+        }
+    }
+    
+    private func performStorageCleanup() {
+        isLoading = true
+        loadingMessage = "正在扫描并清理..."
+        
+        Task {
+            // 注意：cleanOrphanedImages 需要在主线程访问 modelContext (因为它不是 Sendable)，
+            // 但文件操作应该在后台？
+            // ImageManager.cleanOrphanedImages 内部使用了 context.fetch，这必须在 context 所在的 actor 执行。
+            // 我们的 modelContext 是 View 的 environment context，绑定在 MainActor。
+            // ImageManager 也是 @MainActor。
+            // 所以整个操作会在 MainActor 执行。
+            // 对于大量文件遍历，可能会卡顿 UI。
+            // 但考虑到是小内存设备优化，且文件操作 I/O 较慢，理想情况下应该 detach 到后台。
+            // 但 context 传递比较麻烦。
+            // 暂时在 MainActor 执行，因为 cleanOrphanedImages 已经是 MainActor 了。
+            // 为了不阻塞 UI 渲染，可以 yield 一下？或者 ImageManager 内部优化。
+            // 鉴于这是一个手动触发的维护操作，显示 Loading 遮罩是可以接受的。
+            
+            let count = ImageManager.shared.cleanOrphanedImages(context: modelContext)
+            
+            await MainActor.run {
+                isLoading = false
+                message = "清理完成，共删除了 \(count) 个未使用的图片文件。"
+                showingMessage = true
             }
         }
     }

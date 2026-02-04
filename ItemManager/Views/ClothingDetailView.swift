@@ -32,7 +32,7 @@ struct ClothingDetailView: View {
                         // Adjust height based on orientation (portrait vs landscape)
                         // Ensure height is at least 1 to avoid "Failed to create image slot" warnings
                         let carouselHeight = max(1, geometry.size.height > geometry.size.width ? 400.0 : geometry.size.height * 0.7)
-                        imageCarousel(height: carouselHeight)
+                        imageCarousel(height: carouselHeight, width: geometry.size.width)
                         
                         // MARK: - Main Info Card
                         mainInfoCard
@@ -229,7 +229,7 @@ struct ClothingDetailView: View {
     
     // MARK: - Subviews
     
-    private func imageCarousel(height: CGFloat) -> some View {
+    private func imageCarousel(height: CGFloat, width: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $currentImageIndex) {
                 if clothing.imagePaths.isEmpty {
@@ -243,12 +243,9 @@ struct ClothingDetailView: View {
                         .tag(0)
                 } else {
                     ForEach(0..<clothing.imagePaths.count, id: \.self) { index in
-                        // Estimate target size based on screen scale
-                        // Use a reasonable max limit to avoid excessive memory on very large screens or high res assets
-                        let scale = UIScreen.main.scale
-                        let width = UIScreen.main.bounds.width * scale
-                        let targetHeight = height * scale
-                        let targetSize = CGSize(width: min(width, 2048), height: min(targetHeight, 2048))
+                        // 修正：直接使用 Points 尺寸，ImageManager 内部会乘以 UIScreen.main.scale
+                        // 之前可能错误地在调用端乘了 Scale，导致加载了 Scale^2 倍的像素
+                        let targetSize = CGSize(width: width, height: height)
                         
                         CarouselItemView(imagePath: clothing.imagePaths[index], targetSize: targetSize)
                             .tag(index)
@@ -672,7 +669,7 @@ struct CarouselItemView: View {
             if let uiImage = image {
                 Image(uiImage: uiImage)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
                     .frame(maxWidth: .infinity)
                     .clipped()
             } else {
