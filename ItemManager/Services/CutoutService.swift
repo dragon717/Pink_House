@@ -213,7 +213,7 @@ class CutoutService {
             return "袜子"
         }
         // 玩偶
-        if inputLower.contains("玩偶") || inputLower.contains("娃娃") || inputLower.contains("公仔") || inputLower.contains("手办") || inputLower.contains("toy") || inputLower.contains("doll") || inputLower.contains("毛绒") {
+        if inputLower.contains("玩偶") || inputLower.contains("娃娃") || inputLower.contains("公仔") || inputLower.contains("手办") || inputLower.contains("toy") || inputLower.contains("doll") || inputLower.contains("毛绒") || inputLower.contains("熊") {
             return "玩偶"
         }
         // 小物

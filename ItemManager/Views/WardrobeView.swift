@@ -91,7 +91,7 @@ struct WardrobeView: View {
             count = 1
             spacing = 16
         }
-        return Array(repeating: GridItem(.flexible(), spacing: spacing), count: count)
+        return Array(repeating: GridItem(.flexible(), spacing: spacing, alignment: .top), count: count)
     }
     
     var filteredClothings: [Clothing] {

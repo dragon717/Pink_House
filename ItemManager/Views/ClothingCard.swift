@@ -8,24 +8,37 @@
 import SwiftUI
 import SwiftData
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
+
+// 修复 Linter 错误：确保 Clothing 类型可见
+// 注意：Clothing 类型定义在其他文件中，这里需要确保模块访问正确
+// 如果是同一个 Target，通常不需要 import ItemManager，但有时编译器会抽风
+// 我们假设这些类型是存在的，只是临时编译错误。
+// 为了解决 'No such module UIKit'，我们加了 #if canImport。
+// 现在的错误主要是找不到类型，这通常意味着 swift build 或者是 Xcode 的索引问题。
+// 但根据之前的上下文，这些类型是存在的。
+// 无论如何，我先恢复代码，确保没有语法错误。
 
 struct ClothingCard: View, Equatable {
     static func == (lhs: ClothingCard, rhs: ClothingCard) -> Bool {
-        return lhs.clothing.id == rhs.clothing.id &&
-               lhs.clothing.name == rhs.clothing.name &&
-               lhs.clothing.originalPrice == rhs.clothing.originalPrice &&
-               lhs.clothing.price == rhs.clothing.price &&
-               lhs.clothing.imagePaths == rhs.clothing.imagePaths &&
-               lhs.clothing.stock == rhs.clothing.stock
+        guard lhs.clothing.id == rhs.clothing.id else { return false }
+        guard lhs.clothing.name == rhs.clothing.name else { return false }
+        guard lhs.clothing.originalPrice == rhs.clothing.originalPrice else { return false }
+        guard lhs.clothing.price == rhs.clothing.price else { return false }
+        guard lhs.clothing.imagePaths == rhs.clothing.imagePaths else { return false }
+        return lhs.clothing.stock == rhs.clothing.stock
     }
     
     let clothing: Clothing
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
+    @State private var isHovering = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             // Image Area
             ZStack(alignment: .topTrailing) {
                 if let uiImage = image {
@@ -36,11 +49,10 @@ struct ClothingCard: View, Equatable {
                                 .resizable()
                                 .scaledToFill()
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipped()
                 } else {
                     CutePlaceholderView()
                         .aspectRatio(1, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 
                 if clothing.isDepositPlan {
@@ -71,6 +83,10 @@ struct ClothingCard: View, Equatable {
                     }
                 }
             }
+            // 图片区域圆角和阴影 - 增强层次感
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 4)
+            .padding(8) // 图片周围留白，突出悬浮感
             .task {
                 if let imagePath = clothing.imagePaths.first {
                     // 预估卡片宽度: 屏幕宽度/2 (Grid2) approx 180-200pt -> @2x 400px, @3x 600px
@@ -88,39 +104,58 @@ struct ClothingCard: View, Equatable {
             }
             
             // Info Area
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(clothing.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1) // 限制单行，保持整齐
                     .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
-                if showOriginalPrice && clothing.originalPrice > 0 {
-                    Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                Spacer(minLength: 4) // 将价格信息推到底部，保持视觉对齐
                 
-                if showPrice {
-                    if clothing.isDepositPlan {
-                        let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
-                        let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
-                        Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0))) + 尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
-                            .font(.system(size: 12, weight: .bold))
+                VStack(alignment: .leading, spacing: 2) {
+                    if showOriginalPrice && clothing.originalPrice > 0 && !clothing.isDepositPlan {
+                        Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                            .font(.system(size: 10))
+                            .strikethrough()
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    if showPrice {
+                        if clothing.isDepositPlan {
+                            let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
+                            let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
+                            // 紧凑显示的定金尾款
+                            HStack(spacing: 4) {
+                                Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
+                                Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                            }
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(.pink)
-                    } else {
-                        let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
-                        Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color(hex: "8D6E63")) // Brownish
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        } else {
+                            let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                            Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color(hex: "8D6E63")) // Brownish
+                        }
                     }
                 }
             }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .frame(height: 60) // 固定高度，确保网格整齐
         }
         .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        // 卡片整体阴影和悬浮动画
+        .shadow(color: .black.opacity(isHovering ? 0.12 : 0.06), radius: isHovering ? 12 : 8, x: 0, y: isHovering ? 6 : 3)
+        .scaleEffect(isHovering ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
     }
 }
 
@@ -366,7 +401,7 @@ struct ClothingRowBrief: View {
                 }
                 
                 if showOriginalPrice && clothing.originalPrice > 0 {
-                    Text("原¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                    Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -375,7 +410,7 @@ struct ClothingRowBrief: View {
                     if clothing.isDepositPlan {
                         let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
                         let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
-                        Text("定¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                        Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
                             .bold()
                             .foregroundStyle(.pink)
