@@ -32,6 +32,7 @@ struct ClothingCard: View, Equatable {
     }
     
     let clothing: Clothing
+    
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
@@ -47,7 +48,7 @@ struct ClothingCard: View, Equatable {
                         .overlay(
                             Image(uiImage: uiImage)
                                 .resizable()
-                                .scaledToFill()
+                                .scaledToFit()
                         )
                         .clipped()
                 } else {
@@ -176,7 +177,7 @@ struct ClothingThumbnail: View, Equatable {
                     .overlay(
                         Image(uiImage: uiImage)
                             .resizable()
-                            .scaledToFill()
+                            .scaledToFit()
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
@@ -239,7 +240,7 @@ struct ClothingRow: View {
                     if let uiImage = image {
                         Image(uiImage: uiImage)
                             .resizable()
-                            .scaledToFill()
+                            .scaledToFit()
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     } else {
@@ -365,7 +366,7 @@ struct ClothingRowBrief: View {
                     if let uiImage = image {
                         Image(uiImage: uiImage)
                             .resizable()
-                            .scaledToFill()
+                            .scaledToFit()
                             .frame(width: 40, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
