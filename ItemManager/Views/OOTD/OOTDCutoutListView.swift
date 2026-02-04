@@ -62,7 +62,7 @@ struct OOTDCutoutListView: View {
                     if selectedCategory == "鞋子" && (nameInfo.contains("鞋") || nameInfo.contains("靴") || nameInfo.contains("shoe") || nameInfo.contains("boot")) {
                         return true
                     }
-                    if selectedCategory == "玩偶" && (nameInfo.contains("玩偶") || nameInfo.contains("娃") || nameInfo.contains("toy")) {
+                    if selectedCategory == "玩偶" && (nameInfo.contains("玩偶") || nameInfo.contains("娃") || nameInfo.contains("toy") || nameInfo.contains("公仔") || nameInfo.contains("手办") || nameInfo.contains("doll") || nameInfo.contains("毛绒") || nameInfo.contains("bear") || nameInfo.contains("rabbit")) {
                         return true
                     }
                 }

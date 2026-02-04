@@ -26,6 +26,9 @@ struct OOTDView: View {
     @State private var cameraImage: UIImage?
     @State private var shouldCutoutCameraImage = false
     
+    // Batch Replace
+    @State private var showingBatchReplaceSheet = false
+    
     // Save to Clothing States
     @State private var showingSaveToClothingSheet = false
     @State private var showingSaveSuccessAlert = false
@@ -132,6 +135,12 @@ struct OOTDView: View {
                         }
                         
                         Button {
+                            showingBatchReplaceSheet = true
+                        } label: {
+                            Label("一键替换裙子主图", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        
+                        Button {
                             showingRepairConfirmation = true
                         } label: {
                             Label("修复丢失图片", systemImage: "hammer")
@@ -203,6 +212,9 @@ struct OOTDView: View {
                 ClothingPickerView { selectedClothing in
                     saveCanvasToClothing(clothing: selectedClothing)
                 }
+            }
+            .sheet(isPresented: $showingBatchReplaceSheet) {
+                BatchReplaceCutoutView()
             }
             .alert("保存成功", isPresented: $showingSaveSuccessAlert) {
                 Button("确定", role: .cancel) {}

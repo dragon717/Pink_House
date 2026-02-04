@@ -213,7 +213,7 @@ class CutoutService {
             return "袜子"
         }
         // 玩偶
-        if inputLower.contains("玩偶") || inputLower.contains("娃娃") || inputLower.contains("公仔") || inputLower.contains("手办") || inputLower.contains("toy") || inputLower.contains("doll") {
+        if inputLower.contains("玩偶") || inputLower.contains("娃娃") || inputLower.contains("公仔") || inputLower.contains("手办") || inputLower.contains("toy") || inputLower.contains("doll") || inputLower.contains("毛绒") {
             return "玩偶"
         }
         // 小物
@@ -248,13 +248,25 @@ class CutoutService {
             }
             print("----------------------------------------")
             
+            // 收集所有可能的分类
+            var candidates: Set<String> = []
+            
             for observation in topResults {
                 // Check mapping
                 if let category = mapIdentifierToCategory(observation.identifier) {
                     print("Mapped '\(observation.identifier)' to '\(category)'")
-                    return category
+                    candidates.insert(category)
                 }
             }
+            
+            // 根据优先级返回
+            // 用户反馈：玩偶容易被误识别为小物，因此提高玩偶优先级
+            if candidates.contains("玩偶") { return "玩偶" }
+            if candidates.contains("裙子") { return "裙子" }
+            if candidates.contains("外套") { return "外套" }
+            if candidates.contains("鞋子") { return "鞋子" }
+            if candidates.contains("袜子") { return "袜子" }
+            if candidates.contains("小物") { return "小物" }
             
             // Fallback logic: if no specific category matched
             return "未分类"

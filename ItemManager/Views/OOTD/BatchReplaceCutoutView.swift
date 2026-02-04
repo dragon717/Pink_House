@@ -1,0 +1,246 @@
+
+import SwiftUI
+import SwiftData
+
+struct BatchReplaceCutoutView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    
+    // Data Source
+    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothing: [Clothing]
+    @Query private var allCutouts: [CutoutItem]
+    
+    // View State
+    @State private var items: [ReplaceableItem] = []
+    @State private var isLoading = true
+    @State private var showingConfirmation = false
+    
+    var body: some View {
+        NavigationStack {
+            VStack {
+                if isLoading {
+                    ProgressView("正在扫描可替换项...")
+                } else if items.isEmpty {
+                    ContentUnavailableView(
+                        "没有可替换的项",
+                        systemImage: "photo.on.rectangle.angled",
+                        description: Text("请先执行“批量处理小裙子”以生成抠图。")
+                    )
+                } else {
+                    List {
+                        Section {
+                            HStack {
+                                Text("全选")
+                                Spacer()
+                                Toggle("", isOn: Binding(
+                                    get: { items.allSatisfy { $0.isSelected } },
+                                    set: { newValue in
+                                        for index in items.indices {
+                                            items[index].isSelected = newValue
+                                        }
+                                    }
+                                ))
+                            }
+                        }
+                        
+                        ForEach($items) { $item in
+                            ReplaceItemRow(item: $item)
+                                .onTapGesture {
+                                    item.isSelected.toggle()
+                                }
+                        }
+                    }
+                }
+                
+                // Bottom Action Bar
+                if !items.isEmpty {
+                    VStack {
+                        Divider()
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text("已选择 \(items.filter { $0.isSelected }.count) 项")
+                                    .font(.headline)
+                                Text("将选中的抠图设为首图")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                showingConfirmation = true
+                            }) {
+                                Text("确认替换")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 12)
+                                    .background(items.filter { $0.isSelected }.isEmpty ? Color.gray : Color.accentColor)
+                                    .cornerRadius(12)
+                            }
+                            .disabled(items.filter { $0.isSelected }.isEmpty)
+                        }
+                        .padding()
+                    }
+                    .background(Color(uiColor: .systemBackground))
+                }
+            }
+            .navigationTitle("替换主图")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                prepareData()
+            }
+            .alert("确认替换", isPresented: $showingConfirmation) {
+                Button("取消", role: .cancel) { }
+                Button("执行", action: performReplacement)
+            } message: {
+                Text("将把选中的 \(items.filter { $0.isSelected }.count) 个抠图设置为对应裙子的第一张图片（主图）。原图将后移。")
+            }
+        }
+    }
+    
+    private func prepareData() {
+        Task { @MainActor in
+            // Build a map of clothing -> cutout
+            // We want the cutout that is linked to the clothing
+            
+            var candidates: [ReplaceableItem] = []
+            
+            // Create a lookup for cutouts by linkedClothing
+            let clothingMap = Dictionary(grouping: allCutouts.filter { $0.linkedClothing != nil }) { $0.linkedClothing!.id }
+            
+            var processedCount = 0
+            
+            for clothing in allClothing {
+                // Find associated cutouts
+                if let cutouts = clothingMap[clothing.id], !cutouts.isEmpty {
+                    // Use the most recent cutout
+                    // Sort by timestamp desc
+                    let sortedCutouts = cutouts.sorted { $0.timestamp > $1.timestamp }
+                    if let bestCutout = sortedCutouts.first {
+                        // Check if the clothing's first image is ALREADY this cutout
+                        if let firstImage = clothing.imagePaths.first, firstImage == bestCutout.imagePath {
+                            // Already replaced/is the same, skip
+                            continue
+                        }
+                        
+                        // Also, we need to make sure the cutout image file actually exists
+                        // Optimization: Use FileManager directly instead of loading the image
+                        let fileURL = ImageManager.shared.imagesDirectory.appendingPathComponent(bestCutout.imagePath)
+                        if FileManager.default.fileExists(atPath: fileURL.path) {
+                            candidates.append(ReplaceableItem(clothing: clothing, cutout: bestCutout))
+                        }
+                    }
+                }
+                
+                processedCount += 1
+                if processedCount % 20 == 0 {
+                    await Task.yield()
+                }
+            }
+            
+            self.items = candidates
+            self.isLoading = false
+        }
+    }
+    
+    private func performReplacement() {
+        let selectedItems = items.filter { $0.isSelected }
+        
+        for item in selectedItems {
+            let clothing = item.clothing
+            let cutoutPath = item.cutout.imagePath
+            
+            // Logic:
+            // 1. Check if cutoutPath is already in imagePaths
+            if let index = clothing.imagePaths.firstIndex(of: cutoutPath) {
+                // Move to front
+                clothing.imagePaths.remove(at: index)
+                clothing.imagePaths.insert(cutoutPath, at: 0)
+            } else {
+                // Insert at front
+                clothing.imagePaths.insert(cutoutPath, at: 0)
+            }
+            
+            // Update timestamp to force refresh if needed? 
+            // clothing.updatedAt = Date()
+        }
+        
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("Failed to save replacements: \(error)")
+        }
+    }
+}
+
+// Helper Model for the View
+struct ReplaceableItem: Identifiable {
+    let id = UUID()
+    let clothing: Clothing
+    let cutout: CutoutItem
+    var isSelected: Bool = true
+}
+
+struct ReplaceItemRow: View {
+    @Binding var item: ReplaceableItem
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Original Image (First one)
+            if let firstPath = item.clothing.imagePaths.first {
+                AsyncLocalImageView(
+                    fileName: firstPath,
+                    displaySize: CGSize(width: 60, height: 60),
+                    contentMode: .fill,
+                    cornerRadius: 8
+                )
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+            } else {
+                Color.gray.opacity(0.2)
+                    .frame(width: 60, height: 60)
+                    .cornerRadius(8)
+            }
+            
+            Image(systemName: "arrow.right")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            
+            // Cutout Image
+            AsyncLocalImageView(
+                fileName: item.cutout.imagePath,
+                displaySize: CGSize(width: 60, height: 60),
+                contentMode: .fit,
+                cornerRadius: 8
+            )
+            .background(Color.gray.opacity(0.1)) // Checkerboard pattern would be better but simple gray is fine
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor.opacity(0.3), lineWidth: 1))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.clothing.name.isEmpty ? "未命名" : item.clothing.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                Text(item.clothing.brand?.name ?? "")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            Toggle("", isOn: $item.isSelected)
+                .labelsHidden()
+        }
+        .padding(.vertical, 4)
+    }
+}
