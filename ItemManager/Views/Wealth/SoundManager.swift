@@ -20,11 +20,17 @@ final class SoundManager: ObservableObject {
     private var useSystemSoundFallback = false
     // 1103: Tink (短促的金属声), 1057: PINKeyPressed (机械点击声), 1104: Tock
     // 1306: KeyPressClickPreview (短促)
+    // 1007: SystemSoundID (Standard Notification)
+    // 1111: Pop (Old Tweet?) - Not standard.
+    // 1022: CalendarAlert?
     private let impactSoundID: SystemSoundID = 1103 // 较清脆，适合撞击
     private let heavyImpactSoundID: SystemSoundID = 1104 // 较沉闷，适合堆积 (Tock)
+    private let fireworksSoundID: SystemSoundID = 1007 // 暂时使用系统通知音作为替代 (Bang)
     
     // 滚动音效播放器（循环播放）
     private var rollingPlayer: AVAudioPlayer?
+    private var fireworksPlayer: AVAudioPlayer?
+    private var pewPlayer: AVAudioPlayer? // Pew Pew 播放器
     private var isRolling: Bool = false
     
     private init() {
@@ -62,6 +68,46 @@ final class SoundManager: ObservableObject {
             } catch {
                 print("Failed to load rolling sound: \(error)")
             }
+        }
+        
+        // 3. 加载礼花音效
+        if let fireworksUrl = Bundle.main.url(forResource: "firework_bang", withExtension: "wav") {
+            createFireworksPlayer(url: fireworksUrl)
+        } else {
+            // 如果资源文件不存在，尝试动态生成
+            // print("SoundManager: 'firework_bang.wav' not found. Generating procedural sound.")
+            if let generatedUrl = AudioGenerator.generateExplosionSound() {
+                createFireworksPlayer(url: generatedUrl)
+            }
+        }
+        
+        // 4. 加载 Pew 音效
+        if let pewUrl = Bundle.main.url(forResource: "pew", withExtension: "wav") {
+            createPewPlayer(url: pewUrl)
+        } else {
+            if let generatedUrl = AudioGenerator.generatePewSound() {
+                createPewPlayer(url: generatedUrl)
+            }
+        }
+    }
+    
+    private func createFireworksPlayer(url: URL) {
+        do {
+            fireworksPlayer = try AVAudioPlayer(contentsOf: url)
+            fireworksPlayer?.volume = 1.0
+            fireworksPlayer?.prepareToPlay()
+        } catch {
+            print("Failed to load fireworks sound: \(error)")
+        }
+    }
+    
+    private func createPewPlayer(url: URL) {
+        do {
+            pewPlayer = try AVAudioPlayer(contentsOf: url)
+            pewPlayer?.volume = 0.6
+            pewPlayer?.prepareToPlay()
+        } catch {
+            print("Failed to load pew sound: \(error)")
         }
     }
     
@@ -158,6 +204,38 @@ final class SoundManager: ObservableObject {
                     player.stop()
                 }
             }
+        }
+    }
+    
+    /// 播放礼花音效
+    func playFireworksSound() {
+        guard isSoundEnabled else { return }
+        
+        if let player = fireworksPlayer {
+            if player.isPlaying {
+                player.stop()
+                player.currentTime = 0
+            }
+            // 随机化音高，增加真实感
+            player.enableRate = true
+            player.rate = Float.random(in: 0.8...1.2)
+            player.play()
+        }
+    }
+    
+    /// 播放 Pew Pew 音效
+    func playPewSound() {
+        guard isSoundEnabled else { return }
+        
+        if let player = pewPlayer {
+            if player.isPlaying {
+                player.stop()
+                player.currentTime = 0
+            }
+            // 随机化音高，增加真实感
+            player.enableRate = true
+            player.rate = Float.random(in: 0.9...1.2)
+            player.play()
         }
     }
     

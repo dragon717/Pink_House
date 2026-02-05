@@ -16,7 +16,10 @@ struct ClothingDetailView: View {
     @State private var showingImageViewer = false
     @State private var showingDeleteAlert = false
     @State private var showingConfirmPaymentAlert = false
+    @State private var showCelebration = false
     @State private var currentImageIndex = 0
+    
+    @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = true
     
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
@@ -115,6 +118,13 @@ struct ClothingDetailView: View {
                         .padding(.bottom, 20)
                     }
                 }
+                
+                // MARK: - Celebration Overlay
+                if showCelebration {
+                    CelebrationOverlay(isPresented: $showCelebration)
+                        .ignoresSafeArea()
+                        .zIndex(100)
+                }
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -174,6 +184,11 @@ struct ClothingDetailView: View {
         // Try to save context (though it autosaves usually)
         try? modelContext.save()
         Task { await SharedPersistence.shared.syncWidgetData() }
+        
+        // Trigger Celebration Effect
+        if isPayBalanceCelebrationEnabled {
+            showCelebration = true
+        }
     }
     
     private func duplicateClothing() {

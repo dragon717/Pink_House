@@ -305,6 +305,44 @@ final class HapticEngineManager: ObservableObject {
         }
     }
     
+    /// 播放礼花爆炸震动 (砰的一下)
+    func playFireworksHaptic() {
+        guard isHapticsEnabled else { return }
+        soundManager.playFireworksSound()
+        
+        guard supportsCoreHaptics, let engine = engine else {
+             // Fallback to Heavy Impact (Stronger than Notification)
+             let generator = UIImpactFeedbackGenerator(style: .heavy)
+             generator.impactOccurred()
+             return
+        }
+        
+        do {
+            // 模拟爆炸：增强的瞬态震动 + 快速衰减的持续震动
+            let events = [
+                CHHapticEvent(eventType: .hapticTransient, parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0) // Max sharpness for "Crack"
+                ], relativeTime: 0),
+                CHHapticEvent(eventType: .hapticContinuous, parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
+                ], relativeTime: 0.05, duration: 0.3),
+                // 衰减
+                CHHapticEvent(eventType: .hapticContinuous, parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.2)
+                ], relativeTime: 0.35, duration: 0.3)
+            ]
+            
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: 0)
+        } catch {
+            print("Failed to play fireworks haptic: \(error)")
+        }
+    }
+    
     // 滚动震动播放器
     private var rollingPlayer: CHHapticAdvancedPatternPlayer?
     

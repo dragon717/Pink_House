@@ -126,6 +126,18 @@ struct MeView: View {
                     Label("功能设置", systemImage: "gearshape")
                         .outlined()
                 }
+                
+                // Section: Test Project
+                #if DEBUG
+                Section {
+                    NavigationLink(destination: TestEffectsView()) {
+                        SettingsRow(icon: "flask", title: "特效测试实验室", subtitle: "预览特效与实验功能")
+                    }
+                } header: {
+                    Label("开发测试", systemImage: "hammer")
+                        .outlined()
+                }
+                #endif
             }
             .scrollContentBackground(.hidden)
             .background {
@@ -348,6 +360,8 @@ struct SettingsRow: View {
 /// 独立的触感反馈设置页
 struct HapticSettingsView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @AppStorage("isCelebrationHapticsEnabled") private var isCelebrationHapticsEnabled = true
+    @AppStorage("isCelebrationSoundEnabled") private var isCelebrationSoundEnabled = true
     
     var body: some View {
         List {
@@ -371,7 +385,42 @@ struct HapticSettingsView: View {
                 Text("功能开关")
             }
             
-            // 2. 系统设置引导
+            // 2. 彩蛋特效设置
+            Section {
+                Toggle(isOn: $isCelebrationHapticsEnabled) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.purple)
+                            .frame(width: 24)
+                        VStack(alignment: .leading) {
+                            Text("彩蛋震动")
+                                .foregroundStyle(.primary)
+                            Text("庆祝特效时的震动反馈")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
+                Toggle(isOn: $isCelebrationSoundEnabled) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "speaker.wave.2")
+                            .foregroundStyle(.pink)
+                            .frame(width: 24)
+                        VStack(alignment: .leading) {
+                            Text("彩蛋音效")
+                                .foregroundStyle(.primary)
+                            Text("庆祝特效时的爆炸与礼花声")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("彩蛋特效")
+            }
+            
+            // 3. 系统设置引导
             Section {
                 Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) {

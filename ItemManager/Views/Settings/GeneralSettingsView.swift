@@ -161,6 +161,19 @@ struct GeneralSettingsView: View {
                             .font(.caption)
                     }
                 }
+                
+                NavigationLink(destination: CelebrationSettingsView()) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.pink)
+                        Text("彩蛋设置")
+                        Spacer()
+                        Text("付尾款特效")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+                
                 HStack {
                     Text("文字颜色")
                     Spacer()
