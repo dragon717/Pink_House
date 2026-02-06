@@ -269,7 +269,6 @@ struct HomeView: View {
                     .foregroundStyle(.primary)
             }
         }
-        .disabled(isSelectionMode)
     }
     
     private var editButton: some View {
@@ -288,7 +287,6 @@ struct HomeView: View {
                     .foregroundStyle(.primary)
             }
         }
-        .disabled(isEditing)
     }
     
     private var sortButton: some View {

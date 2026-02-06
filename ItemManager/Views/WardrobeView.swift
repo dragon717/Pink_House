@@ -321,42 +321,49 @@ struct WardrobeView: View {
                                 statsSection
                                 
                                 LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
-                                ForEach(isEditing ? editableClothings : filteredClothings) { clothing in
-                                    if isEditing {
-                                        // 编辑模式：仅显示卡片，支持拖拽
-                                        ZStack(alignment: .topTrailing) {
-                                            clothingItemView(clothing: clothing)
-                                        }
-                                        .contentShape(Rectangle())
-                                        .onAppear { visibleItemIDs.insert(clothing.id) }
-                                        .onDisappear { visibleItemIDs.remove(clothing.id) }
-                                        .onDrag {
-                                            self.draggingItem = clothing
-                                            return NSItemProvider(object: clothing.id.uuidString as NSString)
-                                        }
-                                        .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true))
-                                        
-                                    } else if isSelectionMode {
-                                        // 选择模式：显示卡片和选择覆盖层，支持点击选择
-                                        ZStack(alignment: .topTrailing) {
-                                            clothingItemView(clothing: clothing)
-                                            
-                                            // Selection Indicator
-                                            Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
-                                                .font(.title3)
-                                                .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
-                                                .background(Circle().fill(.white).padding(2))
-                                                .shadow(radius: 1)
-                                                .padding(8)
-                                        }
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            toggleSelection(clothing.id)
-                                        }
-                                        .onAppear { visibleItemIDs.insert(clothing.id) }
-                                        .onDisappear { visibleItemIDs.remove(clothing.id) }
-                                        
-                                    } else {
+                                ForEach((isEditing || (isSelectionMode && sortOption == .custom)) ? editableClothings : filteredClothings) { clothing in
+                    if isSelectionMode {
+                        // 选择模式：显示卡片和选择覆盖层，支持点击选择
+                        ZStack(alignment: .topTrailing) {
+                            clothingItemView(clothing: clothing)
+                            
+                            // Selection Indicator
+                            Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+                                .background(Circle().fill(.white).padding(2))
+                                .shadow(radius: 1)
+                                .padding(8)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            toggleSelection(clothing.id)
+                        }
+                        .onAppear { visibleItemIDs.insert(clothing.id) }
+                        .onDisappear { visibleItemIDs.remove(clothing.id) }
+                        // 在选择模式下，如果是自定义排序或开启了排序按钮，允许拖拽
+                        .onDrag {
+                            guard sortOption == .custom || isEditing else { return NSItemProvider() }
+                            self.draggingItem = clothing
+                            return NSItemProvider(object: clothing.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: sortOption == .custom || isEditing, selectedItemIDs: selectedItemIDs))
+                        
+                    } else if isEditing {
+                        // 编辑模式：仅显示卡片，支持拖拽
+                        ZStack(alignment: .topTrailing) {
+                            clothingItemView(clothing: clothing)
+                        }
+                        .contentShape(Rectangle())
+                        .onAppear { visibleItemIDs.insert(clothing.id) }
+                        .onDisappear { visibleItemIDs.remove(clothing.id) }
+                        .onDrag {
+                            self.draggingItem = clothing
+                            return NSItemProvider(object: clothing.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true, selectedItemIDs: selectedItemIDs))
+                        
+                    } else {
                                         // 正常模式：使用 NavigationLink 包裹卡片，支持长按菜单
                                         NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
                                             ZStack(alignment: .topTrailing) {
@@ -436,22 +443,40 @@ struct WardrobeView: View {
         .onChange(of: isEditing) { oldValue, newValue in
             if newValue {
                 // Start editing
-                editableClothings = filteredClothings
+                if editableClothings.isEmpty {
+                    editableClothings = filteredClothings
+                }
             } else {
                 // Save order
                 saveOrder()
-                editableClothings = []
+                
+                // Only clear if we are NOT in selection mode with custom sort (because selection mode needs it for drag)
+                // 也要考虑如果 selection mode 下开启了 isEditing，也不能清除
+                if !(isSelectionMode && (sortOption == .custom || isEditing)) {
+                    editableClothings = []
+                }
             }
         }
         .onChange(of: isSelectionMode) { oldValue, newValue in
             if newValue {
                 // Entered selection mode
-                if isEditing {
-                    isEditing = false // Will trigger saveOrder via onChange above
+                
+                // 如果是自定义排序模式，或者在选择模式下开启了排序按钮，初始化 editableClothings 以支持拖拽
+                if (sortOption == .custom || isEditing) && editableClothings.isEmpty {
+                    editableClothings = filteredClothings
                 }
             } else {
                 // Exited selection mode
                 selectedItemIDs.removeAll()
+                
+                // 如果是自定义排序模式，保存排序结果并清理
+                if sortOption == .custom || isEditing {
+                    // Only clear if we are NOT in isEditing mode
+                    if !isEditing {
+                        saveOrder()
+                        editableClothings = []
+                    }
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -914,6 +939,7 @@ struct DropViewDelegate: DropDelegate {
     @Binding var items: [Clothing]
     @Binding var draggingItem: Clothing?
     var isEditing: Bool = true
+    var selectedItemIDs: Set<UUID> = []
     
     func performDrop(info: DropInfo) -> Bool {
         self.draggingItem = nil
@@ -927,15 +953,57 @@ struct DropViewDelegate: DropDelegate {
     func dropEntered(info: DropInfo) {
         guard isEditing else { return }
         guard let draggingItem = draggingItem else { return }
+        
+        // 如果当前拖拽项和目标项相同，不做处理
         if draggingItem.id == item.id { return }
         
+        // 检查是否是多选拖拽
+        // 条件：拖拽项在选中列表中，且选中列表包含多个项目
+        if selectedItemIDs.contains(draggingItem.id) && selectedItemIDs.count > 1 {
+            handleMultiSelectionDrop(targetItem: item)
+        } else {
+            handleSingleItemDrop(targetItem: item, draggingItem: draggingItem)
+        }
+    }
+    
+    private func handleSingleItemDrop(targetItem: Clothing, draggingItem: Clothing) {
         guard let fromIndex = items.firstIndex(where: { $0.id == draggingItem.id }),
-              let toIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
+              let toIndex = items.firstIndex(where: { $0.id == targetItem.id }) else { return }
         
         if fromIndex != toIndex {
             withAnimation(.default) {
                 let fromItem = items.remove(at: fromIndex)
                 items.insert(fromItem, at: toIndex)
+            }
+        }
+    }
+    
+    private func handleMultiSelectionDrop(targetItem: Clothing) {
+        // 如果目标项也是选中项之一，则不进行重排（因为它们是一体的）
+        if selectedItemIDs.contains(targetItem.id) { return }
+        
+        guard let targetIndex = items.firstIndex(where: { $0.id == targetItem.id }) else { return }
+        
+        // 1. 提取所有选中的项目，并保持它们在原数组中的相对顺序（如果需要保持相对顺序）
+        // 或者简单地按当前 items 中的顺序提取
+        let selectedItems = items.filter { selectedItemIDs.contains($0.id) }
+        
+        // 2. 验证所有选中项都找到了
+        guard selectedItems.count == selectedItemIDs.count else { return }
+        
+        withAnimation(.default) {
+            // 3. 从数组中移除所有选中项
+            items.removeAll { selectedItemIDs.contains($0.id) }
+            
+            // 4. 计算新的插入索引
+            // 注意：因为移除了元素，targetIndex 可能需要调整
+            // 重新获取目标项在移除后的数组中的索引
+            if let newTargetIndex = items.firstIndex(where: { $0.id == targetItem.id }) {
+                // 插入到目标项位置（挤占目标项，目标项后移）
+                items.insert(contentsOf: selectedItems, at: newTargetIndex)
+            } else {
+                // 如果找不到目标项（理论上不应该发生，除非目标项也被删了），追加到末尾
+                items.append(contentsOf: selectedItems)
             }
         }
     }
