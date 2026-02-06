@@ -162,6 +162,9 @@ final class CutoutItem {
     var width: Double = 0.0
     var height: Double = 0.0
     
+    // 缓存裙子名字，方便在画布中显示（即使原 Clothing 被删除）
+    var clothingName: String?
+    
     // Use ID instead of Relationship to decouple deletion lifecycle
     var linkedClothingID: UUID?
     
@@ -173,13 +176,15 @@ final class CutoutItem {
          imagePath: String,
          width: Double,
          height: Double,
-         linkedClothingID: UUID? = nil) {
+         linkedClothingID: UUID? = nil,
+         clothingName: String? = nil) {
         self.originalImageHash = originalImageHash
         self.category = category
         self.imagePath = imagePath
         self.width = width
         self.height = height
         self.linkedClothingID = linkedClothingID
+        self.clothingName = clothingName
     }
 }
 

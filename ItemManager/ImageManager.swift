@@ -12,6 +12,7 @@ import SwiftUI
 import CryptoKit
 import PhotosUI
 import UniformTypeIdentifiers
+import Accelerate
 
 @MainActor
 class ImageManager {
@@ -175,7 +176,17 @@ class ImageManager {
     func saveImage(_ image: UIImage, context: ModelContext, format: ImageFormat = .jpeg(quality: 0.7)) -> String? {
         // 1. Resize large images to save disk space and memory
         // Limit max dimension to 2048px (Enough for full screen on most iPhones)
-        let resizedImage = image.resized(toMaxDimension: 2048)
+        // Note: resized(toMaxDimension:) works in points, so we need to adjust for scale to limit pixels
+        let maxPixels: CGFloat = 2048
+        let currentMaxPixels = max(image.size.width, image.size.height) * image.scale
+        
+        let resizedImage: UIImage
+        if currentMaxPixels > maxPixels {
+            // Adjust maxDimension (points) to achieve target maxPixels
+            resizedImage = image.resized(toMaxDimension: maxPixels / image.scale)
+        } else {
+            resizedImage = image
+        }
         
         // 2. Normalize image (fix orientation)
         let normalizedImage = resizedImage.normalized()
@@ -455,86 +466,18 @@ class ImageManager {
         case .heic(let quality):
             let data = NSMutableData()
             
-            // 检查图片是否有 Alpha 通道，如果是不透明的，尝试去除 Alpha 信息以避免保存时的警告和不必要的体积
-            // 警告: 'ItemManager' is trying to save an opaque image ... with 'AlphaPremulLast'
             guard var sourceCGImage = image.cgImage else { return nil }
             
-            // 1. Detect if image is actually opaque
-            // If the image has an alpha channel but all pixels are opaque, or if we can determine it's opaque from metadata,
-            // we should try to save it without alpha to avoid the system warning and save space.
-            // A simple heuristic is checking the alpha info of the CGImage.
-            let alphaInfo = sourceCGImage.alphaInfo
-            let hasAlpha = alphaInfo == .first || alphaInfo == .last || alphaInfo == .premultipliedFirst || alphaInfo == .premultipliedLast
-            
-            // If it technically has alpha, we can try to check if it's needed or if we can strip it.
-            // For now, to fix the specific error "trying to save an opaque image... with Alpha", 
-            // we can try to detect if the source image was created from an opaque context or format.
-            // However, traversing pixels is expensive.
-            // The error usually comes when we save an image that IS opaque (e.g. loaded from JPG) but we inadvertently keep the alpha info in the context or pipeline.
-            
-            // If we know for sure we want to save space and the image MIGHT be opaque (like a photo), we could force remove alpha.
-            // But for Cutouts (stickers), we need alpha.
-            // The warning typically appears for full clothing images (photos) which are usually opaque.
-            
-            // Strategy:
-            // If we are saving a clothing image (usually opaque), we might want to use .jpeg instead of .heic? 
-            // But if we stick to .heic, we can try to check if we can export without alpha if the alpha channel is full 1.
-            
-            // Let's rely on a workaround: Create a new CGImage without alpha if we suspect it's opaque?
-            // Actually, the warning is harmless but annoying. 
-            // To fix it properly:
-            // If the image is opaque, we should instruct ImageIO to save it as opaque.
-            // But `CGImageDestinationAddImage` takes the image as is.
-            
-            // If the alpha info implies alpha, but the content is opaque, ImageIO complains.
-            // We can try to repack the CGImage with .noneSkipLast or .noneSkipFirst if we could detect opacity.
-            
-            // Optimized Fix:
-            // If the caller knows it's an opaque image (e.g. raw photo), they should probably use .jpeg or we add an `isOpaque` flag.
-            // But assuming we want automatic handling:
-            // If alphaInfo says it has alpha, but we want to be safe, we can try to strip it IF we are sure. 
-            // But we aren't sure.
-            
-            // Let's try to verify if the image is actually opaque by checking pixel data is too slow.
-            // Alternative: If the original image was a JPEG, it's opaque.
-            // But we only have UIImage here.
-            
-            // Let's try to ignore the warning for now OR:
-            // If the image has alpha, but we are saving to HEIC, ImageIO tries to preserve it.
-            // The warning says "ignoring alpha", so it's doing the right thing automatically, just complaining.
-            // To silence it, we would need to feed it an opaque CGImage.
-            
-            // Attempt to strip alpha if alphaInfo is present but we don't strictly need it? 
-            // No, that breaks stickers.
-            
-            // What if we check if the image has alpha channel?
-            if hasAlpha {
-                // If it has alpha, we just pass it. The warning only happens if the image content is actually opaque.
-                // There is no cheap way to check content opacity without iterating pixels.
-                // However, we can check if the UIImage.cgImage was created with a specific bitmap info.
-                
-                // Let's check if we can use `isOpaque` property of UIImage?
-                // UIImage.isOpaque is often false even for JPEGs loaded into memory.
-                
-                // If we want to silence the warning for Opaque images being saved as HEIC:
-                // We can try to create an opaque copy if we knew it was opaque.
-                // Since we don't, we might just have to live with the warning for mixed content, 
-                // OR we can try to check a few pixels? No.
-                
-                // One robust fix for the warning "trying to save an opaque image... ignoring alpha" 
-                // is that we are likely creating these images via a UIGraphicsContext or similar that adds an alpha channel by default (e.g. 32-bit RGBA), even if we draw an opaque photo into it.
-                // If we could detect that, we could create the CGImage with `kCGImageAlphaNoneSkipLast`.
-                
-                // For now, let's keep it simple. The warning is log noise from ImageIO.
-                // But to fix the "createThumbnailAtIndex" error, we fixed the downsample method above.
-                
-                // To suppress the "opaque image" warning, we can try to detect if it's a standard photo size/ratio and assume opaque? No.
-                // We will leave the alpha handling as is for now unless it causes functional issues (it says "ignoring alpha" which is what we want for opaque images).
-                // The warning implies it's wasting memory during decode.
-                
-                // If we really want to fix it:
-                // We could try to create a new CGImage with `kCGImageAlphaNoneSkipLast` if `image.cgImage!.alphaInfo` is `.none`?
-                // But here `hasAlpha` is true.
+            // 优化：检测并移除不必要的 Alpha 通道
+            // 解决 "ItemManager is trying to save an opaque image... with AlphaPremulLast" 问题
+            if ImageManager.imageHasAlpha(sourceCGImage) {
+                // 进一步检查像素是否全为不透明
+                if ImageManager.isImageActuallyOpaque(sourceCGImage) {
+                    // 创建不带 Alpha 的副本
+                    if let opaqueImage = ImageManager.createOpaqueImage(from: sourceCGImage) {
+                        sourceCGImage = opaqueImage
+                    }
+                }
             }
             
             guard let destination = CGImageDestinationCreateWithData(data, UTType.heic.identifier as CFString, 1, nil) else {
@@ -547,6 +490,100 @@ class ImageManager {
             guard CGImageDestinationFinalize(destination) else { return nil }
             return data as Data
         }
+    }
+    
+    // MARK: - Alpha Optimization Helpers
+    
+    private static func imageHasAlpha(_ image: CGImage) -> Bool {
+        let alpha = image.alphaInfo
+        return alpha == .first || alpha == .last || alpha == .premultipliedFirst || alpha == .premultipliedLast
+    }
+    
+    private static func isImageActuallyOpaque(_ image: CGImage) -> Bool {
+        var format = vImage_CGImageFormat(
+            bitsPerComponent: UInt32(image.bitsPerComponent),
+            bitsPerPixel: UInt32(image.bitsPerPixel),
+            colorSpace: Unmanaged.passUnretained(image.colorSpace ?? CGColorSpaceCreateDeviceRGB()),
+            bitmapInfo: image.bitmapInfo,
+            version: 0,
+            decode: nil,
+            renderingIntent: .defaultIntent
+        )
+        
+        var buffer = vImage_Buffer()
+        // vImageBuffer_InitWithCGImage 会尝试直接访问数据，或者分配内存并复制
+        let error = vImageBuffer_InitWithCGImage(&buffer, &format, nil, image, vImage_Flags(kvImageNoFlags))
+        guard error == kvImageNoError else { return false }
+        defer { free(buffer.data) }
+        
+        // 使用直方图计算来检查 Alpha 通道
+        if image.bitsPerComponent == 8 && image.bitsPerPixel == 32 {
+            var histogram = [UInt](repeating: 0, count: 256 * 4)
+            let histogramPtrs: [UnsafeMutablePointer<UInt>?] = [
+                UnsafeMutablePointer(mutating: &histogram) + 0,
+                UnsafeMutablePointer(mutating: &histogram) + 256,
+                UnsafeMutablePointer(mutating: &histogram) + 512,
+                UnsafeMutablePointer(mutating: &histogram) + 768
+            ]
+            
+            let error = histogramPtrs.withUnsafeBufferPointer { ptrs in
+                vImageHistogramCalculation_ARGB8888(&buffer, ptrs.baseAddress!, vImage_Flags(kvImageNoFlags))
+            }
+            
+            if error == kvImageNoError {
+                // 检查是否有任何通道完全是 255
+                for i in 0..<4 {
+                    let start = i * 256
+                    let end = start + 254 // Check 0 to 254
+                    let sum = histogram[start...end].reduce(0, +)
+                    if sum == 0 {
+                        // 该通道所有像素都是 255，这极有可能是 Alpha 通道
+                        return true
+                    }
+                }
+            }
+        }
+        
+        return false
+    }
+    
+    private static func createOpaqueImage(from image: CGImage) -> CGImage? {
+        guard image.bitsPerComponent == 8 && image.bitsPerPixel == 32 else { return nil }
+        
+        // 确定新的 AlphaInfo: PremultipliedFirst -> NoneSkipFirst, etc.
+        let alphaInfo = image.alphaInfo
+        var newAlphaInfo: CGImageAlphaInfo = .none
+        
+        switch alphaInfo {
+        case .first, .premultipliedFirst:
+            newAlphaInfo = .noneSkipFirst
+        case .last, .premultipliedLast:
+            newAlphaInfo = .noneSkipLast
+        default:
+            return nil
+        }
+        
+        var newBitmapInfo = image.bitmapInfo
+        // 清除旧的 AlphaInfo
+        let rawBitmapInfo = newBitmapInfo.rawValue & ~CGBitmapInfo.alphaInfoMask.rawValue
+        // 设置新的 AlphaInfo
+        newBitmapInfo = CGBitmapInfo(rawValue: rawBitmapInfo | newAlphaInfo.rawValue)
+        
+        guard let dataProvider = image.dataProvider else { return nil }
+        
+        return CGImage(
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: image.bitsPerComponent,
+            bitsPerPixel: image.bitsPerPixel,
+            bytesPerRow: image.bytesPerRow,
+            space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: newBitmapInfo,
+            provider: dataProvider,
+            decode: image.decode,
+            shouldInterpolate: image.shouldInterpolate,
+            intent: image.renderingIntent
+        )
     }
 
     private func compressImage(_ image: UIImage) -> Data? {

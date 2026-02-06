@@ -36,9 +36,14 @@ class CutoutService {
         if let existingItem = try? context.fetch(descriptor).first {
             print("Duplicate cutout found for hash: \(originalHash). Skipping processing.")
             
-            // 如果传入了 clothing 且现有 item 未关联，则建立关联
-            if let clothing = clothing, existingItem.linkedClothingID == nil {
-                existingItem.linkedClothingID = clothing.id
+            // 如果传入了 clothing
+            if let clothing = clothing {
+                // 如果未关联，则建立关联
+                if existingItem.linkedClothingID == nil {
+                    existingItem.linkedClothingID = clothing.id
+                }
+                // 总是尝试更新缓存的名字
+                existingItem.clothingName = clothing.name
                 // try? context.save() // Auto-save usually handles this, or caller saves
             }
             
@@ -118,7 +123,8 @@ class CutoutService {
             imagePath: fileName,
             width: Double(borderedImage.size.width),
             height: Double(borderedImage.size.height),
-            linkedClothingID: clothing?.id
+            linkedClothingID: clothing?.id,
+            clothingName: clothing?.name
         )
         
         context.insert(item)
@@ -183,6 +189,49 @@ class CutoutService {
         }
         
         // 注意：不更新分类 (category)，保留用户可能的手动修改
+    }
+    
+    /// 修复缺失的 clothingName
+    /// 遍历所有 CutoutItem，如果 clothingName 为空且 linkedClothingID 有效，则填充
+    func fixMissingClothingNames(context: ModelContext) {
+        do {
+            // 只查找 linkedClothingID 不为空的
+            // 注意：SwiftData 的 Predicate 支持有限，这里先取所有关联了的，然后在内存中过滤 clothingName 为空的
+            // 或者直接遍历所有。由于数据量通常不大（几千个），直接遍历也是可以的。
+            // 但为了效率，我们尽量用 Predicate。
+            // Predicate 暂不支持 optional check for nil easily inside complex expressions sometimes, but let's try.
+            // 简单点：获取所有 CutoutItem
+            let descriptor = FetchDescriptor<CutoutItem>()
+            let cutouts = try context.fetch(descriptor)
+            
+            // 获取所有 Clothing
+            let clothingDescriptor = FetchDescriptor<Clothing>()
+            let allClothing = try context.fetch(clothingDescriptor)
+            let clothingMap = Dictionary(uniqueKeysWithValues: allClothing.map { ($0.id, $0) })
+            
+            var updatedCount = 0
+            for cutout in cutouts {
+                // 如果名字为空，或者即使不为空我们也想刷新一下（比如改名了）？
+                // 用户说 "加载时...存下"，可能是为了补全。
+                // 如果一直刷新，会覆盖掉某种情况吗？ CutoutItem 本身没有修改名字的入口，所以应该是同步 Clothing 的名字。
+                // 这里策略：只要关联了 Clothing，就同步名字。
+                if let clothingID = cutout.linkedClothingID,
+                   let clothing = clothingMap[clothingID] {
+                    
+                    if cutout.clothingName != clothing.name {
+                        cutout.clothingName = clothing.name
+                        updatedCount += 1
+                    }
+                }
+            }
+            
+            if updatedCount > 0 {
+                try context.save()
+                print("Fixed/Updated clothing names for \(updatedCount) cutouts.")
+            }
+        } catch {
+            print("Failed to fix missing clothing names: \(error)")
+        }
     }
     
     // MARK: - Classification

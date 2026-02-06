@@ -237,6 +237,11 @@ struct OOTDView: View {
                         createNewOutfit()
                     }
                 }
+                
+                // 尝试修复/同步贴纸的裙子名字
+                Task {
+                    CutoutService.shared.fixMissingClothingNames(context: modelContext)
+                }
             }
             .photosPicker(isPresented: $isImagePickerPresented, selection: $selectedItem, matching: .images)
             .sheet(isPresented: $showingSaveToClothingSheet) {
