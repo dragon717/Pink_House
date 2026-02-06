@@ -26,7 +26,7 @@ class WealthAppearanceManager {
     
     // MARK: - Initialization
     init() {
-        self.shouldShowWealthContainerBackground = UserDefaults.standard.object(forKey: "shouldShowWealthContainerBackground") as? Bool ?? true
+        self.shouldShowWealthContainerBackground = UserDefaults.standard.object(forKey: "shouldShowWealthContainerBackground") as? Bool ?? false
         loadImages()
     }
     
