@@ -34,6 +34,22 @@ class CutoutService {
         // 检查是否存在相同的抠图记录
         let descriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.originalImageHash == originalHash })
         if let existingItem = try? context.fetch(descriptor).first {
+            // 检查是否是旧格式 (非 PNG)，如果是，则重新处理以修复透明度问题
+            if !existingItem.imagePath.lowercased().hasSuffix(".png") {
+                print("Existing cutout found but format is not PNG. Reprocessing to ensure transparency...")
+                try await reprocessItem(item: existingItem, with: image, context: context)
+                
+                // 确保关联信息更新
+                if let clothing = clothing {
+                    if existingItem.linkedClothingID == nil {
+                        existingItem.linkedClothingID = clothing.id
+                    }
+                    existingItem.clothingName = clothing.name
+                }
+                
+                return existingItem
+            }
+            
             print("Duplicate cutout found for hash: \(originalHash). Skipping processing.")
             
             // 如果传入了 clothing
@@ -114,7 +130,8 @@ class CutoutService {
         let borderedImage = addWhiteBorder(to: cutoutImage, borderWidth: 4.0)
         
         // 4. 保存到文件系统和数据库
-        guard let savedPath = ImageManager.shared.saveImage(borderedImage, context: context) else {
+        // 使用 PNG 格式以保留透明通道
+        guard let savedPath = ImageManager.shared.saveImage(borderedImage, context: context, format: .png) else {
             throw CutoutError.processingFailed
         }
         
@@ -478,7 +495,8 @@ class CutoutService {
         let borderedImage = addWhiteBorder(to: cutoutImage, borderWidth: 4.0)
         
         // Save new image
-        guard let newPath = ImageManager.shared.saveImage(borderedImage, context: context) else {
+        // 使用 PNG 格式以保留透明通道
+        guard let newPath = ImageManager.shared.saveImage(borderedImage, context: context, format: .png) else {
             throw CutoutError.processingFailed
         }
         
