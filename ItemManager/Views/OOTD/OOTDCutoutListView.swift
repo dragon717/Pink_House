@@ -5,6 +5,12 @@ import SwiftData
 struct OOTDCutoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CutoutItem.timestamp, order: .reverse) private var cutouts: [CutoutItem]
+    // Fetch all clothings to build a map for lookup (Performance trade-off: Fetching all is better than N+1 queries)
+    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
+    
+    private var clothingMap: [UUID: Clothing] {
+        Dictionary(uniqueKeysWithValues: allClothings.map { ($0.id, $0) })
+    }
     
     @Binding var isExpanded: Bool
     var onSelect: (CutoutItem) -> Void
@@ -51,24 +57,31 @@ struct OOTDCutoutListView: View {
     private func updateDisplayItems() {
         var result = cutouts
         
+        // Use a lightweight lookup for clothing info since we decoupled the relationship
+        // We can't query all clothings every time, so we might need a strategy.
+        // For now, let's fetch all clothings once or rely on an injected map?
+        // Actually, for displayItems, we need to know the linked clothing's name/type.
+        // Since we are inside a View, we can use a Query to get all clothings and build a map.
+        // But @Query is already there in other views. Let's add it here.
+        
         // Filter by Category
         if selectedCategory != "全部" {
             result = result.filter { item in
                 // 精确匹配
                 if item.category == selectedCategory { return true }
                 
-                // 兼容旧数据：如果 Item 的分类是 "JSK" 这种细分词，
-                // 尝试将其标准化，看是否等于当前选中的分类 (e.g. "裙子")
-                // 使用 CutoutService 中的逻辑进行映射
+                // 兼容旧数据
                 if let standardized = CutoutService.shared.standardizeCategory(item.category),
                    standardized == selectedCategory {
                     return true
                 }
                 
                 // 救援逻辑：利用关联服饰的名称/类型修正分类显示
-                // 如果 Item 被归类为 "小物" 或 "未分类"，但其关联服饰明确属于当前选中的大类，则允许显示。
-                // 这解决了 AI 将裙子/袜子误判为小物导致无法在对应页签找到的问题。
-                if ["小物", "未分类"].contains(item.category), let clothing = item.linkedClothing {
+                // Need to find the clothing by ID
+                if ["小物", "未分类"].contains(item.category), 
+                   let clothingID = item.linkedClothingID,
+                   let clothing = clothingMap[clothingID] {
+                    
                     let nameInfo = (clothing.name + clothing.types).lowercased()
                     
                     if selectedCategory == "裙子" && (nameInfo.contains("裙") || nameInfo.contains("jsk") || nameInfo.contains("op") || nameInfo.contains("dress")) {
@@ -89,18 +102,12 @@ struct OOTDCutoutListView: View {
                 }
                 
                 // 特殊处理 "未分类"
-                // 如果当前选中的是 "未分类"，则显示所有 category 为 "未分类" 或者 标准化失败（无法归入其他5类）的项
                 if selectedCategory == "未分类" {
-                    // 如果已经是标准分类之一，则不属于未分类
                     let standardCategories = ["裙子", "外套", "鞋子", "袜子", "玩偶", "小物"]
                     if standardCategories.contains(item.category) { return false }
-                    
-                    // 如果能被标准化为其他分类，也不属于未分类
                     if let _ = CutoutService.shared.standardizeCategory(item.category) {
                         return false
                     }
-                    
-                    // 剩下的都是未分类（包括 "" 或乱码 或 "未分类"）
                     return true
                 }
                 
@@ -112,7 +119,10 @@ struct OOTDCutoutListView: View {
         if !searchText.isEmpty {
             result = result.filter { item in
                 let categoryMatch = item.category.localizedCaseInsensitiveContains(searchText)
-                let clothingNameMatch = item.linkedClothing?.name.localizedCaseInsensitiveContains(searchText) ?? false
+                var clothingNameMatch = false
+                if let clothingID = item.linkedClothingID, let clothing = clothingMap[clothingID] {
+                    clothingNameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
+                }
                 return categoryMatch || clothingNameMatch
             }
         }
@@ -138,7 +148,31 @@ struct OOTDCutoutListView: View {
                         .font(.headline)
                     Spacer()
                     
-                    if !isEditing {
+                    if isEditing {
+                        let currentIDs = Set(displayItems.map { $0.id })
+                        let isAllSelected = !displayItems.isEmpty && currentIDs.isSubset(of: selectedItems)
+                        
+                        // 全选按钮
+                        Button(action: {
+                            withAnimation {
+                                if isAllSelected {
+                                    selectedItems.subtract(currentIDs)
+                                } else {
+                                    selectedItems.formUnion(currentIDs)
+                                }
+                            }
+                        }) {
+                            Text(isAllSelected ? "取消全选" : "全选")
+                                .font(.subheadline)
+                        }
+                        .padding(.trailing, 8)
+                        
+                        // 选中/总数
+                        Text("\(selectedItems.count)/\(displayItems.count)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    } else {
                         Text("共 \(displayItems.count) 个")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -443,20 +477,29 @@ struct OOTDCutoutListView: View {
     private func batchDelete() {
         let itemsToDelete = cutouts.filter { selectedItems.contains($0.id) }
         
-        // Use a Task to delete efficiently
-        Task {
+        // Collect image paths first
+        var imagePaths: [String] = []
+        
+        // Step 1: Just collect paths (No need to unlink manually anymore)
+        for item in itemsToDelete {
+            imagePaths.append(item.imagePath)
+        }
+        
+        // Step 2: Delete items
+        autoreleasepool {
             for item in itemsToDelete {
-                let imagePath = item.imagePath
                 modelContext.delete(item)
-                ImageManager.shared.deleteImage(fileName: imagePath, context: modelContext)
             }
-            try? modelContext.save()
-            
-            await MainActor.run {
-                selectedItems.removeAll()
-                // isEditing = false // User requested to stay in edit mode
-                updateDisplayItems()
-            }
+        }
+        
+        // Batch process image deletion (optimizes background tasks)
+        ImageManager.shared.batchDeleteImages(fileNames: imagePaths, context: modelContext)
+        
+        try? modelContext.save()
+        
+        withAnimation {
+            selectedItems.removeAll()
+            updateDisplayItems()
         }
     }
     
@@ -564,7 +607,8 @@ struct OOTDCutoutListView: View {
     
     private func reprocessCutout(_ item: CutoutItem) {
         // 1. Check if linked clothing exists and has images
-        guard let clothing = item.linkedClothing,
+        guard let clothingID = item.linkedClothingID,
+              let clothing = clothingMap[clothingID],
               let firstImagePath = clothing.imagePaths.first else {
             alertMessage = "找不到关联的原图，无法重新抠图。\n(仅支持通过关联服饰创建的抠图)"
             showAlert = true
@@ -600,27 +644,25 @@ struct OOTDCutoutListView: View {
         // Capture the image path before deleting the item
         let imagePath = item.imagePath
         
+        // No need to manually unlink anymore as we removed the Relationship
+        // SwiftData will simply delete the CutoutItem without touching the Clothing
+        
         // 1. Immediately delete from UI/Context with animation
         withAnimation {
             modelContext.delete(item)
         }
         
-        // 2. Handle resource cleanup and persistence asynchronously
-        // Using Task ensures this runs on the MainActor (since View is MainActor) but allows the UI loop to proceed
-        Task {
-            // Decrement ref count / delete image file (file IO is backgrounded internally in ImageManager)
-            ImageManager.shared.deleteImage(fileName: imagePath, context: modelContext)
-            
-            // Save context with error handling
-            do {
-                try modelContext.save()
-            } catch {
-                // If save fails, show error alert
-                // Note: We don't rollback UI here because delete(item) is a memory operation 
-                // and save failure is rare/critical.
-                print("Delete failed: \(error)")
-                showErrorAlert = true
-            }
+        // 2. Handle resource cleanup and persistence synchronously on MainActor
+        // Decrement ref count / delete image file (file IO is backgrounded internally in ImageManager)
+        ImageManager.shared.deleteImage(fileName: imagePath, context: modelContext)
+        
+        // Save context with error handling
+        do {
+            try modelContext.save()
+        } catch {
+            // If save fails, show error alert
+            print("Delete failed: \(error)")
+            showErrorAlert = true
         }
     }
     

@@ -37,8 +37,8 @@ class CutoutService {
             print("Duplicate cutout found for hash: \(originalHash). Skipping processing.")
             
             // 如果传入了 clothing 且现有 item 未关联，则建立关联
-            if let clothing = clothing, existingItem.linkedClothing == nil {
-                existingItem.linkedClothing = clothing
+            if let clothing = clothing, existingItem.linkedClothingID == nil {
+                existingItem.linkedClothingID = clothing.id
                 // try? context.save() // Auto-save usually handles this, or caller saves
             }
             
@@ -118,7 +118,7 @@ class CutoutService {
             imagePath: fileName,
             width: Double(borderedImage.size.width),
             height: Double(borderedImage.size.height),
-            linkedClothing: clothing
+            linkedClothingID: clothing?.id
         )
         
         context.insert(item)

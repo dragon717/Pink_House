@@ -563,7 +563,7 @@ struct OOTDView: View {
                     if !cutout.originalImageHash.isEmpty {
                         validCutoutsByHash[cutout.originalImageHash, default: []].append(cutout)
                     }
-                    if let clothingID = cutout.linkedClothing?.id {
+                    if let clothingID = cutout.linkedClothingID {
                         validCutoutsByClothing[clothingID, default: []].append(cutout)
                     }
                 }
@@ -607,7 +607,7 @@ struct OOTDView: View {
                         }
                         
                         // Strategy 2: Relink by Clothing
-                        if !fixed, let clothingID = brokenCutout.linkedClothing?.id {
+                        if !fixed, let clothingID = brokenCutout.linkedClothingID {
                             if let candidates = validCutoutsByClothing[clothingID],
                                let bestMatch = candidates.first {
                                 item.cutout = bestMatch
@@ -619,16 +619,21 @@ struct OOTDView: View {
                         
                         // Strategy 3: Regenerate (Original Logic)
                         if !fixed {
-                            if let clothing = brokenCutout.linkedClothing,
-                               let firstPath = clothing.imagePaths.first,
-                               let originalImage = ImageManager.shared.loadImage(fileName: firstPath) {
-                                
-                                do {
-                                    try await CutoutService.shared.reprocessItem(item: brokenCutout, with: originalImage, context: modelContext)
-                                    regeneratedCount += 1
-                                    fixed = true
-                                } catch {
-                                    print("Regeneration failed: \(error)")
+                            // Can't easily access clothing without a lookup map in this view
+                            // But we can try to fetch it if we have ID
+                            if let clothingID = brokenCutout.linkedClothingID {
+                                let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate<Clothing> { $0.id == clothingID })
+                                if let clothing = try? modelContext.fetch(descriptor).first,
+                                   let firstPath = clothing.imagePaths.first,
+                                   let originalImage = ImageManager.shared.loadImage(fileName: firstPath) {
+                                    
+                                    do {
+                                        try await CutoutService.shared.reprocessItem(item: brokenCutout, with: originalImage, context: modelContext)
+                                        regeneratedCount += 1
+                                        fixed = true
+                                    } catch {
+                                        print("Regeneration failed: \(error)")
+                                    }
                                 }
                             }
                         }

@@ -54,7 +54,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         
         // 创建裁剪图
         let cutout = CutoutItem(originalImageHash: "hash123", category: "Skirt", imagePath: "cutout.png", width: 100, height: 100)
-        cutout.linkedClothing = clothing
+        cutout.linkedClothingID = clothing.id
         context.insert(cutout)
         
         try context.save()
@@ -97,7 +97,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         // 7. 验证裁剪图关联
         let cutouts = try context.fetch(FetchDescriptor<CutoutItem>())
         XCTAssertEqual(cutouts.count, 1)
-        XCTAssertEqual(cutouts.first?.linkedClothing?.id, restoredClothing.id)
+        XCTAssertEqual(cutouts.first?.linkedClothingID, restoredClothing.id)
         
         // 8. 验证小物恢复
         XCTAssertNotNil(restoredClothing.accessoryItems)

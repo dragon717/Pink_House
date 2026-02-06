@@ -114,7 +114,7 @@ struct BatchReplaceCutoutView: View {
             var candidates: [ReplaceableItem] = []
             
             // Create a lookup for cutouts by linkedClothing
-            let clothingMap = Dictionary(grouping: allCutouts.filter { $0.linkedClothing != nil }) { $0.linkedClothing!.id }
+            let clothingMap = Dictionary(grouping: allCutouts.filter { $0.linkedClothingID != nil }) { $0.linkedClothingID! }
             
             // 获取所有 CutoutItem 的 imagePath，用于去重检查
             // 如果主图本身就是一张抠图（存在于 cutout 表中），则认为已经替换过了

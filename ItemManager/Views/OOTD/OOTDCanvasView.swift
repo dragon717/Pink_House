@@ -293,6 +293,8 @@ struct CanvasItemView: View {
                     .offset(x: 12, y: 12)
                     
                     // Name Tag (Bottom Center)
+                    // Note: linkedClothing relationship removed. We need to fetch by ID if we want to show name.
+                    /*
                     if let name = item.cutout?.linkedClothing?.name {
                         Text(name)
                             .font(.system(size: 14, weight: .medium))
@@ -305,6 +307,7 @@ struct CanvasItemView: View {
                             .offset(y: 30) // Position below the item
                             .fixedSize() // Prevent text wrapping from affecting layout
                     }
+                    */
                 }
             }
             .frame(width: 200, height: 200) // Match frame

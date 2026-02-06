@@ -505,6 +505,22 @@ struct WardrobeView: View {
                             .frame(maxWidth: .infinity)
                         }
                         .disabled(selectedItemIDs.isEmpty)
+                        
+                        Divider()
+                            .frame(height: 20)
+                        
+                        // Select All
+                        Button {
+                            toggleSelectAll()
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: isAllSelectedInView ? "xmark.circle" : "checkmark.circle")
+                                Text(isAllSelectedInView ? "取消全选" : "全选")
+                                    .font(.caption)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .disabled(filteredClothings.isEmpty)
                     }
                     .padding()
                     .background(.regularMaterial)
@@ -589,6 +605,23 @@ struct WardrobeView: View {
         }
     }
     
+    private var isAllSelectedInView: Bool {
+        let displayedIDs = Set(filteredClothings.map { $0.id })
+        guard !displayedIDs.isEmpty else { return false }
+        return selectedItemIDs.isSuperset(of: displayedIDs)
+    }
+    
+    private func toggleSelectAll() {
+        let displayedIDs = Set(filteredClothings.map { $0.id })
+        if selectedItemIDs.isSuperset(of: displayedIDs) {
+            // Deselect all visible
+            selectedItemIDs.subtract(displayedIDs)
+        } else {
+            // Select all visible
+            selectedItemIDs.formUnion(displayedIDs)
+        }
+    }
+    
     private func toggleSelection(_ id: UUID) {
         if selectedItemIDs.contains(id) {
             selectedItemIDs.remove(id)
@@ -599,11 +632,22 @@ struct WardrobeView: View {
     
     private func deleteSelectedItems() {
         let itemsToDelete = clothings.filter { selectedItemIDs.contains($0.id) }
-        for item in itemsToDelete {
-            item.isDeleted = true
-            item.deletedAt = Date()
+        
+        // Use autoreleasepool to optimize memory usage during batch operations
+        autoreleasepool {
+            for item in itemsToDelete {
+                item.isDeleted = true
+                item.deletedAt = Date()
+            }
         }
-        try? modelContext.save()
+        
+        // Force save immediately to persist changes before any view switching
+        do {
+            try modelContext.save()
+            print("WardrobeView: Successfully saved deletion of \(itemsToDelete.count) items.")
+        } catch {
+            print("WardrobeView: Failed to save deletion: \(error)")
+        }
         
         withAnimation {
             isSelectionMode = false

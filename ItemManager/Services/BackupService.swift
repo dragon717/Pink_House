@@ -160,17 +160,18 @@ class BackupService {
             }
             
             // 4. Clothings
-            var cutoutIDToClothingID: [UUID: UUID] = [:]
+            // var cutoutIDToClothingID: [UUID: UUID] = [:] // Deprecated
             
             var clothingDescriptor = FetchDescriptor<Clothing>()
-            clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.cutouts, \Clothing.accessoryItems]
+            clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.accessoryItems]
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
                 // Skip deleted items during backup
                 if c.isDeleted { return nil }
                 
-                for cutout in c.cutouts {
-                    cutoutIDToClothingID[cutout.id] = c.id
-                }
+                // No need to track cutoutIDToClothingID here anymore since we use direct ID on CutoutItem
+                // for cutout in c.cutouts {
+                //    cutoutIDToClothingID[cutout.id] = c.id
+                // }
                 
                 let safeImagePaths = c.imagePaths.map { ($0 as NSString).lastPathComponent }
                 
@@ -240,7 +241,7 @@ class BackupService {
                     standardImagesToBackup.insert(fileName)
                 }
                 
-                let linkedClothingID = cutoutIDToClothingID[c.id]
+                let linkedClothingID = c.linkedClothingID
                 
                 return CutoutItemDTO(
                     id: c.id,
@@ -710,9 +711,9 @@ class BackupService {
                 cutout.timestamp = dto.timestamp
             }
             if let lid = dto.linkedClothingID {
-                cutout.linkedClothing = clothingMap[lid]
+                cutout.linkedClothingID = lid
             } else {
-                cutout.linkedClothing = nil
+                cutout.linkedClothingID = nil
             }
         }
         

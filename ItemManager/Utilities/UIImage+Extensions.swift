@@ -39,6 +39,10 @@ extension UIImage {
         
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
+        // Optimize: Use opaque context if the source image is opaque to save memory/disk space
+        if let alphaInfo = cgImage?.alphaInfo {
+            format.opaque = (alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast)
+        }
         
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { _ in
@@ -63,7 +67,14 @@ extension UIImage {
             newSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
         }
         
-        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        // Optimize: Use opaque context if the source image is opaque
+        if let alphaInfo = cgImage?.alphaInfo {
+            format.opaque = (alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast)
+        }
+        
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
         return renderer.image { _ in
             self.draw(in: CGRect(origin: .zero, size: newSize))
         }

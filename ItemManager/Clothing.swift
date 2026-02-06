@@ -65,8 +65,8 @@ final class Clothing {
     @Relationship(deleteRule: .cascade)
     var accessoryItems: [AccessoryItem]? = []
     
-    @Relationship(deleteRule: .nullify, inverse: \CutoutItem.linkedClothing)
-    var cutouts: [CutoutItem] = []
+    // Removed direct relationship to prevent SwiftData side effects on deletion
+    // var cutouts: [CutoutItem] = []
     
     init(name: String,
          brand: Brand? = nil,
@@ -162,9 +162,10 @@ final class CutoutItem {
     var width: Double = 0.0
     var height: Double = 0.0
     
-    var linkedClothing: Clothing?
+    // Use ID instead of Relationship to decouple deletion lifecycle
+    var linkedClothingID: UUID?
     
-    @Relationship(deleteRule: .cascade, inverse: \OutfitItem.cutout)
+    @Relationship(deleteRule: .nullify, inverse: \OutfitItem.cutout)
     var outfitItems: [OutfitItem] = []
     
     init(originalImageHash: String, 
@@ -172,13 +173,13 @@ final class CutoutItem {
          imagePath: String,
          width: Double,
          height: Double,
-         linkedClothing: Clothing? = nil) {
+         linkedClothingID: UUID? = nil) {
         self.originalImageHash = originalImageHash
         self.category = category
         self.imagePath = imagePath
         self.width = width
         self.height = height
-        self.linkedClothing = linkedClothing
+        self.linkedClothingID = linkedClothingID
     }
 }
 

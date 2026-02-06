@@ -193,7 +193,15 @@ class SharedPersistence {
                             }
                         }
                         
-                        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+                        // Optimize: Use opaque context if source is opaque
+                        let isOpaque: Bool
+                        if let alphaInfo = image.cgImage?.alphaInfo {
+                            isOpaque = (alphaInfo == .none || alphaInfo == .noneSkipFirst || alphaInfo == .noneSkipLast)
+                        } else {
+                            isOpaque = false
+                        }
+                        
+                        UIGraphicsBeginImageContextWithOptions(newSize, isOpaque, 1.0)
                         image.draw(in: CGRect(origin: .zero, size: newSize))
                         let newImage = UIGraphicsGetImageFromCurrentImageContext()
                         UIGraphicsEndImageContext()
