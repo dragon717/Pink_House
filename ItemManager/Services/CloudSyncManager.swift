@@ -350,7 +350,7 @@ class CloudSyncManager: ObservableObject {
                     // Determine where this file lives locally to check existence
                     var localURL: URL
                     if fileName == "widget_background.jpg" {
-                        if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.bugod2.ItemManager") {
+                        if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
                             localURL = containerURL.appendingPathComponent(fileName)
                         } else {
                             continue // Skip if no app group

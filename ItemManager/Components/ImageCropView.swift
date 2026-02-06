@@ -1,6 +1,12 @@
 import SwiftUI
 import UIKit
 
+struct CropRequest: Identifiable {
+    let id = UUID()
+    let image: UIImage
+    let isNewSelection: Bool
+}
+
 struct ImageCropView: View {
     let image: UIImage
     let aspectRatio: CGFloat? // Width / Height

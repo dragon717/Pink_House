@@ -45,6 +45,21 @@ class BackupService {
     
     private init() {}
     
+    // MARK: - Constants
+    
+    static let keysToBackup = [
+        "theme_background_color",
+        "theme_background_style",
+        "theme_background_opacity",
+        "theme_is_blur_enabled",
+        "isDepositNotificationEnabled",
+        "depositNotificationDaysBefore",
+        "depositNotificationTime",
+        "AppleLanguages",
+        "UserPreference_SortOption",
+        "UserPreference_ViewLayout"
+    ]
+    
     // MARK: - Internal Helpers
     
     nonisolated func processByIDs<T: PersistentModel, ResultType>(
@@ -105,18 +120,7 @@ class BackupService {
         
         // Capture Settings
         var settings: [String: String] = [:]
-        let keysToBackup = [
-            "theme_background_color",
-            "theme_background_style",
-            "theme_background_opacity",
-            "theme_is_blur_enabled",
-            "isDepositNotificationEnabled",
-            "depositNotificationDaysBefore",
-            "depositNotificationTime",
-            "AppleLanguages",
-            "UserPreference_SortOption",
-            "UserPreference_ViewLayout"
-        ]
+        let keysToBackup = BackupService.keysToBackup
         
         for key in keysToBackup {
             if let value = UserDefaults.standard.object(forKey: key) {
@@ -326,11 +330,39 @@ class BackupService {
             
             var hasWidgetBackground = false
             var widgetBackgroundURL: URL? = nil
-            if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.bugod2.ItemManager") {
+            
+            var hasSmallWidgetBackground = false
+            var smallWidgetBackgroundURL: URL? = nil
+            
+            var hasMediumWidgetBackground = false
+            var mediumWidgetBackgroundURL: URL? = nil
+            
+            var hasLargeWidgetBackground = false
+            var largeWidgetBackgroundURL: URL? = nil
+            
+            if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
                 let widgetFile = containerURL.appendingPathComponent("widget_background.jpg")
                 if fileManager.fileExists(atPath: widgetFile.path) {
                     hasWidgetBackground = true
                     widgetBackgroundURL = widgetFile
+                }
+                
+                let smallFile = containerURL.appendingPathComponent("widget_background_small.jpg")
+                if fileManager.fileExists(atPath: smallFile.path) {
+                    hasSmallWidgetBackground = true
+                    smallWidgetBackgroundURL = smallFile
+                }
+                
+                let mediumFile = containerURL.appendingPathComponent("widget_background_medium.jpg")
+                if fileManager.fileExists(atPath: mediumFile.path) {
+                    hasMediumWidgetBackground = true
+                    mediumWidgetBackgroundURL = mediumFile
+                }
+                
+                let largeFile = containerURL.appendingPathComponent("widget_background_large.jpg")
+                if fileManager.fileExists(atPath: largeFile.path) {
+                    hasLargeWidgetBackground = true
+                    largeWidgetBackgroundURL = largeFile
                 }
             }
             
@@ -361,6 +393,15 @@ class BackupService {
             
             if let widgetURL = widgetBackgroundURL {
                 imageFiles["widget_background.jpg"] = widgetURL
+            }
+            if let smallURL = smallWidgetBackgroundURL {
+                imageFiles["widget_background_small.jpg"] = smallURL
+            }
+            if let mediumURL = mediumWidgetBackgroundURL {
+                imageFiles["widget_background_medium.jpg"] = mediumURL
+            }
+            if let largeURL = largeWidgetBackgroundURL {
+                imageFiles["widget_background_large.jpg"] = largeURL
             }
             
             // Calculate External File Hashes
@@ -400,6 +441,9 @@ class BackupService {
                 themeFiles: themeFiles,
                 wealthFiles: wealthFiles,
                 hasWidgetBackground: hasWidgetBackground,
+                hasSmallWidgetBackground: hasSmallWidgetBackground,
+                hasMediumWidgetBackground: hasMediumWidgetBackground,
+                hasLargeWidgetBackground: hasLargeWidgetBackground,
                 externalFileHashes: externalHashes,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
@@ -475,12 +519,18 @@ class BackupService {
         for (fileName, sourceURL) in imageFiles {
             var destinationURL: URL
             
-            if themeFilesSet.contains(fileName) || wealthFilesSet.contains(fileName) {
+            // 增强判定：直接检查文件名，防止 manifest 列表缺失导致路径错误
+            let isThemeFileByName = fileName == "theme_background_image.png" || fileName == "theme_background_image_original.png"
+            
+            if themeFilesSet.contains(fileName) || wealthFilesSet.contains(fileName) || isThemeFileByName {
                 // Restore to Documents
                 destinationURL = documentsDir.appendingPathComponent(fileName)
-            } else if fileName == "widget_background.jpg" && (manifest.hasWidgetBackground == true) {
+            } else if (fileName == "widget_background.jpg" && manifest.hasWidgetBackground == true) ||
+                      (fileName == "widget_background_small.jpg" && manifest.hasSmallWidgetBackground == true) ||
+                      (fileName == "widget_background_medium.jpg" && manifest.hasMediumWidgetBackground == true) ||
+                      (fileName == "widget_background_large.jpg" && manifest.hasLargeWidgetBackground == true) {
                 // Restore to App Group
-                 if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.bugod2.ItemManager") {
+                 if let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
                     destinationURL = containerURL.appendingPathComponent(fileName)
                  } else {
                     print("Skipping widget background: App Group not found")
@@ -494,11 +544,29 @@ class BackupService {
             // Write file
             // Standard images are content-addressed (hashed), so if they exist, they are same.
             // But Settings-related images might change with same filename, so we overwrite them.
-            if !fileManager.fileExists(atPath: destinationURL.path) || themeFilesSet.contains(fileName) || wealthFilesSet.contains(fileName) || fileName == "widget_background.jpg" {
+            let isWidgetFile = fileName.hasPrefix("widget_background")
+            let isThemeFile = themeFilesSet.contains(fileName) || isThemeFileByName
+            let isWealthFile = wealthFilesSet.contains(fileName)
+            
+            // Fix: If source and destination are the same (e.g. CloudSync using local file), skip copy to avoid self-deletion
+            if sourceURL.standardizedFileURL == destinationURL.standardizedFileURL {
+                print("Restore: Source and destination are the same file. Skipping copy for \(fileName).")
+                continue
+            }
+            
+            if !fileManager.fileExists(atPath: destinationURL.path) || isThemeFile || isWealthFile || isWidgetFile {
                 if fileManager.fileExists(atPath: destinationURL.path) {
                     try? fileManager.removeItem(at: destinationURL)
                 }
-                try? fileManager.copyItem(at: sourceURL, to: destinationURL)
+                
+                do {
+                    try fileManager.copyItem(at: sourceURL, to: destinationURL)
+                    if isThemeFile {
+                        print("Restore: Successfully restored theme file: \(fileName) to \(destinationURL.path)")
+                    }
+                } catch {
+                    print("Restore: Failed to copy file \(fileName): \(error)")
+                }
             }
         }
         
@@ -784,11 +852,25 @@ class BackupService {
         
         // 阶段 4: 恢复设置
         print("--- Stage 4: Restoring Settings ---")
+        
+        // 1. Reset all known keys to default (remove from UserDefaults)
+        // This ensures that if a key is missing in the backup (e.g. user was using default),
+        // we don't keep the dirty state from current session.
+        for key in BackupService.keysToBackup {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        
         if let settings = manifest.appSettings {
             for (key, value) in settings {
+                print("Restore Setting: \(key) = \(value)")
                 switch key {
                 case "theme_background_opacity":
-                    if let doubleVal = Double(value) { UserDefaults.standard.set(doubleVal, forKey: key) }
+                    // Fix: Handle both String (legacy backup) and Number types
+                    if let doubleVal = Double(value) {
+                        UserDefaults.standard.set(doubleVal, forKey: key)
+                    } else if let doubleVal = value as? Double { // unlikely given [String:String] dict but good practice
+                         UserDefaults.standard.set(doubleVal, forKey: key)
+                    }
                 case "theme_is_blur_enabled", "isDepositNotificationEnabled":
                     if let boolVal = Bool(value) { UserDefaults.standard.set(boolVal, forKey: key) }
                     else if let intVal = Int(value) { UserDefaults.standard.set(intVal == 1, forKey: key) }
@@ -804,13 +886,26 @@ class BackupService {
                 }
             }
             UserDefaults.standard.synchronize()
-            WidgetCenter.shared.reloadAllTimelines()
         }
+        
+        // Refresh Theme & Widget
+        print("Restore: Reloading Theme Background...")
+        ThemeManager.shared.reloadBackgroundImage()
+        
+        if ThemeManager.shared.backgroundImage != nil {
+             print("Restore: Theme Background loaded successfully.")
+        } else {
+             print("Restore: WARNING - Theme Background is nil after reload.")
+             let themeURL = documentsDir.appendingPathComponent("theme_background_image.png")
+             print("Restore: File at \(themeURL.path) exists? \(fileManager.fileExists(atPath: themeURL.path))")
+        }
+        
+        WidgetCenter.shared.reloadAllTimelines()
         
         print("--- Import Successful! ---")
     }
 
-    func importBackup(from url: URL, context: ModelContext) throws {
+    nonisolated func importBackup(from url: URL, context: ModelContext) async throws {
         print("### Import: Starting native-wrapper based import from \(url.path)")
         
         // 1. 读取备份文件数据
@@ -846,8 +941,10 @@ class BackupService {
             tempFileMap[fileName] = tempURL
         }
         
-        // 5. Call internal restore
-        try restoreFromManifest(manifest: manifest, imageFiles: tempFileMap, context: context)
+        // 5. Call internal restore (Must be on MainActor)
+        await MainActor.run {
+            try? restoreFromManifest(manifest: manifest, imageFiles: tempFileMap, context: context)
+        }
         
         // 6. Cleanup
         try? FileManager.default.removeItem(at: tempDir)

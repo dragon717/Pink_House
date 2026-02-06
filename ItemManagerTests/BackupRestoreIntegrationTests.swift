@@ -81,7 +81,7 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         print("Test: Environment cleared.")
         
         // 4. 执行恢复
-        try BackupService.shared.importBackup(from: exportURL, context: context)
+        try await BackupService.shared.importBackup(from: exportURL, context: context)
         print("Test: Import call finished.")
         
         // 5. 验证模型恢复

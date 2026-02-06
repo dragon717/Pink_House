@@ -100,6 +100,6 @@ class DataTransferService {
     }
     
     func restoreBackup(from url: URL, context: ModelContext) async throws {
-        try BackupService.shared.importBackup(from: url, context: context)
+        try await BackupService.shared.importBackup(from: url, context: context)
     }
 }

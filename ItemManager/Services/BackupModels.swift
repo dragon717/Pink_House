@@ -29,6 +29,9 @@ struct BackupManifest: Codable {
     let themeFiles: [String]?
     let wealthFiles: [String]?
     let hasWidgetBackground: Bool?
+    let hasSmallWidgetBackground: Bool?
+    let hasMediumWidgetBackground: Bool?
+    let hasLargeWidgetBackground: Bool?
     
     // Version 1.2: External File Hashes for Incremental Sync
     let externalFileHashes: [String: String]? // [FileName: Hash]

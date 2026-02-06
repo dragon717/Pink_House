@@ -13,6 +13,15 @@ struct WidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     @Environment(\.colorScheme) var colorScheme
     
+    private var currentFamilyType: WidgetFamilyType {
+        switch family {
+        case .systemSmall: return .small
+        case .systemMedium: return .medium
+        case .systemLarge: return .large
+        default: return .common
+        }
+    }
+    
     var body: some View {
         // 使用 ZStack 确保布局层级清晰
         // 实际上 iOS 17 的 containerBackground 会自动处理背景裁剪和适配（包括 StandBy）
@@ -30,7 +39,7 @@ struct WidgetEntryView: View {
         }
         .containerBackground(for: .widget) {
             ZStack {
-                if let customImage = WidgetBackgroundManager.shared.loadImage() {
+                if let customImage = WidgetBackgroundManager.shared.loadImage(for: currentFamilyType) {
                     Image(uiImage: customImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)

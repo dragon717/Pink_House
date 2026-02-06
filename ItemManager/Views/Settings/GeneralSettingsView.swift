@@ -1,12 +1,6 @@
 import SwiftUI
 import PhotosUI
 
-struct CropRequest: Identifiable {
-    let id = UUID()
-    let image: UIImage
-    let isNewSelection: Bool
-}
-
 struct GeneralSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     @State private var languageManager = LanguageManager.shared

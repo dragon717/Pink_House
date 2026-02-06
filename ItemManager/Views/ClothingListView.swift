@@ -407,7 +407,7 @@ struct ClothingListView: View {
         // Duplicate accessory items
         if let items = item.accessoryItems {
             newItem.accessoryItems = items.map { item in
-                AccessoryItem(name: item.name, price: item.price, sortIndex: item.sortIndex)
+                AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex)
             }
         }
         

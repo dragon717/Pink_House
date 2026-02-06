@@ -125,14 +125,42 @@ class ThemeManager {
         return backgroundImage // Fallback to current image if original not found
     }
     
-    private func loadBackgroundImage() {
+    func reloadBackgroundImage() {
         if let url = imageURL, let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
             self.backgroundImage = image
+        } else {
+            // 如果文件不存在（可能被删除了），需要重置
+            self.backgroundImage = nil
         }
         
         // Preload original image to cache
         if let url = originalImageURL, let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
             self.originalImage = image
+        } else {
+            self.originalImage = nil
         }
+        
+        // Refresh properties from UserDefaults in case they were restored
+        if let savedColor = UserDefaults.standard.string(forKey: "theme_background_color") {
+            self.backgroundColorHex = savedColor
+        }
+        
+        if let savedStyle = UserDefaults.standard.string(forKey: "theme_background_style"),
+           let style = BackgroundStyle(rawValue: savedStyle) {
+            self.backgroundStyle = style
+        }
+        
+        self.backgroundOpacity = UserDefaults.standard.double(forKey: "theme_background_opacity")
+        // Handle case where opacity might be 0.0 if key missing, but default logic in init handled it. 
+        // Here we just trust UserDefaults which was just restored.
+        if self.backgroundOpacity == 0.0 && UserDefaults.standard.object(forKey: "theme_background_opacity") == nil {
+            self.backgroundOpacity = 1.0
+        }
+        
+        self.isBlurEnabled = UserDefaults.standard.bool(forKey: "theme_is_blur_enabled")
+    }
+    
+    private func loadBackgroundImage() {
+        reloadBackgroundImage()
     }
 }

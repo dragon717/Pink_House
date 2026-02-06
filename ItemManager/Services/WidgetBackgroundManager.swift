@@ -9,31 +9,68 @@ import UIKit
 import WidgetKit
 import ImageIO
 
+enum WidgetFamilyType: String, CaseIterable {
+    case small
+    case medium
+    case large
+    case common // The default one, used as fallback
+    
+    var filename: String {
+        switch self {
+        case .common: return "widget_background.jpg"
+        case .small: return "widget_background_small.jpg"
+        case .medium: return "widget_background_medium.jpg"
+        case .large: return "widget_background_large.jpg"
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .common: return "通用"
+        case .small: return "小号"
+        case .medium: return "中号"
+        case .large: return "大号"
+        }
+    }
+    
+    var aspectRatio: CGFloat {
+        switch self {
+        case .small: return 1.0 // 1:1
+        case .medium: return 2.14 // ~338/158
+        case .large: return 0.95 // ~338/354 (approx 1:1)
+        case .common: return 1.0
+        }
+    }
+}
+
 class WidgetBackgroundManager {
     static let shared = WidgetBackgroundManager()
     private let fileManager = FileManager.default
-    private let filename = "widget_background.jpg"
     
-    // Computed property to get the file URL in the App Group container
-    private var imageURL: URL? {
+    // MARK: - File Management
+    
+    private func getContainerURL() -> URL? {
         guard let container = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) else {
             print("WidgetBackgroundManager: Could not find App Group container.")
             return nil
         }
-        return container.appendingPathComponent(filename)
+        return container
     }
     
-    func saveImage(_ image: UIImage) {
-        guard let url = imageURL else { return }
+    private func imageURL(for family: WidgetFamilyType) -> URL? {
+        return getContainerURL()?.appendingPathComponent(family.filename)
+    }
+    
+    // MARK: - Save
+    
+    func saveImage(_ image: UIImage, for family: WidgetFamilyType = .common) {
+        guard let url = imageURL(for: family) else { return }
         
-        // Resize image to avoid memory limits (Widget limit is around 2.5M pixels)
-        // Using 600px as max dimension is safe for all widget sizes (Large widget is around 360x360 points)
-        // @3x screen needs ~1080px, but for background 800px is a good balance between quality and memory
+        // Resize image to avoid memory limits
         let maxDimension: CGFloat = 800
         let resizedImage = image.resizedForWidget(toMaxDimension: maxDimension)
         
         // Compress and write to shared container
-        // Use 0.6 quality for better compression
         if let data = resizedImage.jpegData(compressionQuality: 0.6) {
             do {
                 try data.write(to: url)
@@ -46,18 +83,31 @@ class WidgetBackgroundManager {
         }
     }
     
-    func loadImage() -> UIImage? {
-        guard let url = imageURL else { return nil }
-        
-        // Check if file exists before trying to open it to avoid console errors
-        if !fileManager.fileExists(atPath: url.path) {
-            return nil
+    // MARK: - Load
+    
+    func loadImage(for family: WidgetFamilyType = .common) -> UIImage? {
+        // 1. Try to load specific image
+        if let url = imageURL(for: family), fileManager.fileExists(atPath: url.path) {
+            return loadFromURL(url)
         }
         
-        // Use ImageIO to downsample image while loading
-        // This prevents loading full resolution image into memory if the file on disk is large
-        // (e.g. if it was saved by an older version of the app)
+        // 2. If requesting specific, but not found, try fallback to common
+        if family != .common {
+            if let commonUrl = imageURL(for: .common), fileManager.fileExists(atPath: commonUrl.path) {
+                return loadFromURL(commonUrl)
+            }
+        }
         
+        return nil
+    }
+    
+    // Helper to check if specific image exists (without fallback)
+    func hasSpecificImage(for family: WidgetFamilyType) -> Bool {
+        guard let url = imageURL(for: family) else { return false }
+        return fileManager.fileExists(atPath: url.path)
+    }
+    
+    private func loadFromURL(_ url: URL) -> UIImage? {
         guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else {
             return nil
         }
@@ -76,12 +126,14 @@ class WidgetBackgroundManager {
         return nil
     }
     
-    func deleteImage() {
-        guard let url = imageURL else { return }
+    // MARK: - Delete
+    
+    func deleteImage(for family: WidgetFamilyType = .common) {
+        guard let url = imageURL(for: family) else { return }
         do {
             if fileManager.fileExists(atPath: url.path) {
                 try fileManager.removeItem(at: url)
-                print("WidgetBackgroundManager: Image deleted.")
+                print("WidgetBackgroundManager: Image deleted for \(family.displayName).")
                 WidgetCenter.shared.reloadAllTimelines()
             }
         } catch {
@@ -89,9 +141,21 @@ class WidgetBackgroundManager {
         }
     }
     
+    // Delete all images (Reset)
+    func deleteAllImages() {
+        for family in WidgetFamilyType.allCases {
+            deleteImage(for: family)
+        }
+    }
+    
     func hasCustomBackground() -> Bool {
-        guard let url = imageURL else { return false }
-        return fileManager.fileExists(atPath: url.path)
+        // Check if any background exists
+        for family in WidgetFamilyType.allCases {
+            if let url = imageURL(for: family), fileManager.fileExists(atPath: url.path) {
+                return true
+            }
+        }
+        return false
     }
 }
 

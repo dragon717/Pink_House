@@ -11,70 +11,115 @@ import PhotosUI
 struct WidgetSettingsView: View {
     // MARK: - Background Settings State
     @State private var selectedItem: PhotosPickerItem?
-    @State private var selectedImage: UIImage?
-    @State private var isDefault: Bool = true
+    @State private var editingFamily: WidgetFamilyType? // 当前正在编辑的尺寸
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var cropRequest: CropRequest?
+    @State private var isLoadingImage = false
+    
+    // Preview Images State
+    @State private var smallImage: UIImage?
+    @State private var mediumImage: UIImage?
+    @State private var largeImage: UIImage?
+    @State private var commonImage: UIImage?
+    
+    // State to trigger refresh
+    @State private var refreshID = UUID()
     
     var body: some View {
         Form {
-            // MARK: - Background Settings Section
+            // MARK: - Multi-Size Background Section
             Section {
-                ZStack {
-                    if let image = selectedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        // Default preview
-                        ZStack {
-                            // 使用与 Widget 一致的梦幻背景
-                            DreamyBackgroundPreview()
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("分别为不同尺寸的小组件设置背景，或设置一张通用背景。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            // Small
+                            WidgetPreviewCard(
+                                title: "小号 (Small)",
+                                image: smallImage ?? commonImage,
+                                aspectRatio: 1.0,
+                                isSpecific: smallImage != nil
+                            ) {
+                                startEditing(family: .small)
+                            }
                             
-                            VStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                    .font(.largeTitle)
-                                    .foregroundStyle(.pink.opacity(0.5))
-                                Text("当前使用梦幻粉白动态背景")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            // Medium
+                            WidgetPreviewCard(
+                                title: "中号 (Medium)",
+                                image: mediumImage ?? commonImage,
+                                aspectRatio: 2.14, // 158/338 approx
+                                width: 200,
+                                isSpecific: mediumImage != nil
+                            ) {
+                                startEditing(family: .medium)
+                            }
+                            
+                            // Large
+                            WidgetPreviewCard(
+                                title: "大号 (Large)",
+                                image: largeImage ?? commonImage,
+                                aspectRatio: 0.95, // 338/354 approx
+                                isSpecific: largeImage != nil
+                            ) {
+                                startEditing(family: .large)
                             }
                         }
-                        .frame(height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.vertical, 4)
                     }
                 }
-                .listRowInsets(EdgeInsets())
-                .padding()
+                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 0))
             } header: {
-                Text("背景设置")
-            } footer: {
-                Text("设置的背景图将应用到所有尺寸的桌面小组件。")
+                Text("分尺寸设置")
             }
             
+            // MARK: - Common Background Section
             Section {
-                PhotosPicker(selection: $selectedItem, matching: .images) {
+                Button {
+                    startEditing(family: .common)
+                } label: {
                     HStack {
                         Image(systemName: "photo.badge.plus")
-                        .foregroundStyle(.pink)
-                        Text("从相册选择新背景")
+                            .foregroundStyle(.pink)
+                        Text("设置通用背景 (默认)")
+                        Spacer()
+                        if commonImage != nil {
+                            Text("已设置")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .disabled(isLoadingImage)
                 
-                if !isDefault {
+                if hasAnyCustomBackground {
                     Button(role: .destructive) {
-                        WidgetBackgroundManager.shared.deleteImage()
+                        WidgetBackgroundManager.shared.deleteAllImages()
                         loadCurrentStatus()
                         alertMessage = "已恢复默认背景"
                         showingAlert = true
                     } label: {
                         HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("恢复默认背景")
+                            Image(systemName: "trash")
+                            Text("恢复默认背景 (清除所有)")
                         }
                     }
+                }
+            } header: {
+                Text("通用设置")
+            } footer: {
+                if isLoadingImage {
+                    HStack {
+                        ProgressView()
+                            .padding(.trailing, 8)
+                        Text("正在处理图片...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 8)
                 }
             }
             
@@ -133,17 +178,28 @@ struct WidgetSettingsView: View {
             }
         }
         .navigationTitle("小组件设置")
-        .onChange(of: selectedItem) { newItem in
-            Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let uiImage = UIImage(data: data) {
-                    WidgetBackgroundManager.shared.saveImage(uiImage)
-                    await MainActor.run {
-                        loadCurrentStatus()
-                        alertMessage = "背景设置成功！\n请回到桌面查看小组件变化。"
-                        showingAlert = true
-                    }
+        // Hidden PhotosPicker to be triggered programmatically
+        .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
+        .onChange(of: selectedItem) { _, newItem in
+            handleImageSelection(newItem)
+        }
+        .fullScreenCover(item: $cropRequest) { request in
+            // Determine aspect ratio based on editingFamily
+            let ratio = editingFamily?.aspectRatio
+            
+            ImageCropView(image: request.image, aspectRatio: ratio) { croppedImage in
+                if let family = editingFamily {
+                    WidgetBackgroundManager.shared.saveImage(croppedImage, for: family)
+                    loadCurrentStatus()
+                    alertMessage = "\(family.displayName)背景设置成功！"
+                    showingAlert = true
                 }
+                
+                cropRequest = nil
+                editingFamily = nil
+            } onCancel: {
+                cropRequest = nil
+                editingFamily = nil
             }
         }
         .onAppear {
@@ -156,18 +212,129 @@ struct WidgetSettingsView: View {
         }
     }
     
-    private func loadCurrentStatus() {
-        if let image = WidgetBackgroundManager.shared.loadImage() {
-            self.selectedImage = image
-            self.isDefault = false
-        } else {
-            self.selectedImage = nil
-            self.isDefault = true
+    @State private var showingPhotosPicker = false
+    
+    private func startEditing(family: WidgetFamilyType) {
+        self.editingFamily = family
+        self.showingPhotosPicker = true
+    }
+    
+    private func handleImageSelection(_ newItem: PhotosPickerItem?) {
+        guard let newItem = newItem else { return }
+        isLoadingImage = true
+        Task {
+            if let data = try? await newItem.loadTransferable(type: Data.self),
+               let uiImage = UIImage(data: data) {
+                
+                let optimizedImage = await uiImage.preparingThumbnail(of: CGSize(width: 2000, height: 2000)) ?? uiImage
+                
+                await MainActor.run {
+                    self.cropRequest = CropRequest(image: optimizedImage, isNewSelection: true)
+                    self.selectedItem = nil
+                    self.isLoadingImage = false
+                }
+            } else {
+                await MainActor.run {
+                    self.isLoadingImage = false
+                }
+            }
         }
+    }
+    
+    private var hasAnyCustomBackground: Bool {
+        smallImage != nil || mediumImage != nil || largeImage != nil || commonImage != nil
+    }
+    
+    private func loadCurrentStatus() {
+        // Load specific images
+        if WidgetBackgroundManager.shared.hasSpecificImage(for: .small) {
+            self.smallImage = WidgetBackgroundManager.shared.loadImage(for: .small)
+        } else {
+            self.smallImage = nil
+        }
+        
+        if WidgetBackgroundManager.shared.hasSpecificImage(for: .medium) {
+            self.mediumImage = WidgetBackgroundManager.shared.loadImage(for: .medium)
+        } else {
+            self.mediumImage = nil
+        }
+        
+        if WidgetBackgroundManager.shared.hasSpecificImage(for: .large) {
+            self.largeImage = WidgetBackgroundManager.shared.loadImage(for: .large)
+        } else {
+            self.largeImage = nil
+        }
+        
+        // Load common image
+        self.commonImage = WidgetBackgroundManager.shared.loadImage(for: .common)
     }
 }
 
 // MARK: - Components
+
+struct WidgetPreviewCard: View {
+    let title: String
+    let image: UIImage?
+    let aspectRatio: CGFloat
+    var width: CGFloat = 100
+    let isSpecific: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        VStack {
+            Button(action: action) {
+                ZStack {
+                    if let image = image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(aspectRatio, contentMode: .fit)
+                            .frame(width: width)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(isSpecific ? Color.pink : Color.secondary.opacity(0.3), lineWidth: isSpecific ? 2 : 1)
+                            )
+                    } else {
+                        // Default Preview
+                        DreamyBackgroundPreview()
+                            .frame(width: width, height: width / aspectRatio)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                            )
+                            .overlay {
+                                Image(systemName: "plus")
+                                    .foregroundStyle(.white)
+                                    .font(.title)
+                                    .shadow(radius: 2)
+                            }
+                    }
+                    
+                    // Badge if specific
+                    if isSpecific {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.pink)
+                                    .background(Circle().fill(.white))
+                                    .padding(4)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(isSpecific ? .pink : .primary)
+        }
+    }
+}
 
 // App 端预览用的梦幻背景 (复制自 Widget 代码以解耦 Target)
 struct DreamyBackgroundPreview: View {
@@ -270,17 +437,11 @@ struct TutorialStepRow: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(title)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    Spacer()
-                    Image(systemName: icon)
-                        .foregroundStyle(.pink)
-                }
-                
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
                 Text(description)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
