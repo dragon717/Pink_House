@@ -628,7 +628,19 @@ class BackupService {
         // 阶段 3: 恢复复杂模型与关系 (Clothing, CutoutItem, Outfit)
         print("--- Stage 3: Rebuilding Relationships ---")
         
-        let existingClothings = try context.fetch(FetchDescriptor<Clothing>())
+        // 尝试直接获取所有对象，不做任何过滤
+        var descriptor = FetchDescriptor<Clothing>()
+        descriptor.includePendingChanges = true
+        let existingClothings = try context.fetch(descriptor)
+        
+        // Debug Log: Check for soft-deleted items specifically using deletedAt to avoid property shadowing issues
+        let softDeletedItems = existingClothings.filter { $0.isDeleted || $0.deletedAt != nil }
+        print("### Restore: Found \(existingClothings.count) existing clothings in local DB (Soft Deleted: \(softDeletedItems.count))")
+        
+        if softDeletedItems.count > 0 {
+            print("### Restore: Soft deleted items sample: \(softDeletedItems.prefix(3).map { "\($0.name) (isDeleted:\($0.isDeleted), deletedAt:\($0.deletedAt != nil))" })")
+        }
+        
         var clothingMap: [UUID: Clothing] = Dictionary(uniqueKeysWithValues: existingClothings.map { ($0.id, $0) })
         
         for dto in manifest.clothings {
@@ -639,95 +651,84 @@ class BackupService {
             // Check if backup item is deleted (using isDeleted flag or deletedAt presence)
             let isBackupDeleted = dto.isDeleted ?? (dto.deletedAt != nil)
             if isBackupDeleted {
+                // print("### Restore: Skipping deleted backup item \(dto.name) (\(dto.id))")
                 continue
             }
             
-            let clothingBack: Clothing
+            var clothingBack: Clothing!
+            var isLocalDeleted = false
+            
             if let existing = clothingMap[dto.id] {
-                // Capture local deletion state
-                let localIsDeleted = existing.isDeleted
-                
                 clothingBack = existing
-                // Update properties
-                clothingBack.name = dto.name
-                clothingBack.types = dto.types
-                clothingBack.colors = dto.colors
-                clothingBack.sizes = dto.sizes
-                clothingBack.length = dto.length
-                clothingBack.condition = dto.condition
-                clothingBack.accessories = dto.accessories
-                clothingBack.imagePaths = dto.imagePaths
-                clothingBack.isShared = dto.isShared
-                clothingBack.price = dto.price
-                clothingBack.deposit = dto.deposit
-                clothingBack.balance = dto.balance
-                clothingBack.accessoriesPrice = dto.accessoriesPrice
-                clothingBack.purchaseDate = dto.purchaseDate
-                clothingBack.depositDate = dto.depositDate
-                clothingBack.isDepositPlan = dto.isDepositPlan
-                clothingBack.finalPaymentDate = dto.finalPaymentDate
-                clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
-                clothingBack.note = dto.note
-                clothingBack.stock = dto.stock
-                clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
-                
-                // CRITICAL: If local item was deleted, FORCE it to remain deleted.
-                // This prevents restoring a backup from "reviving" items the user has currently trashed.
-                if localIsDeleted {
-                    clothingBack.isDeleted = true
-                    // Ensure deletedAt is set
-                    if clothingBack.deletedAt == nil {
-                        clothingBack.deletedAt = Date()
-                    }
-                } else {
-                    // Otherwise, since we skipped backup deleted items above, this must be false/nil
-                    clothingBack.isDeleted = false 
-                    clothingBack.deletedAt = nil
+                // Enhanced check: Use deletedAt as fallback for isDeleted
+                isLocalDeleted = existing.isDeleted || existing.deletedAt != nil
+                if isLocalDeleted {
+                    print("### Restore: Item '\(dto.name)' (\(dto.id)) exists locally but is DELETED (isDeleted:\(existing.isDeleted), deletedAt:\(String(describing: existing.deletedAt))). Ensuring it stays deleted.")
                 }
-                
-                clothingBack.createdAt = dto.createdAt
-                clothingBack.updatedAt = dto.updatedAt
-                clothingBack.sortIndex = dto.sortIndex ?? 0
-                clothingBack.replacedCutoutID = dto.replacedCutoutID
             } else {
-                clothingBack = Clothing(name: dto.name)
-                clothingBack.id = dto.id
-                context.insert(clothingBack)
-                clothingMap[dto.id] = clothingBack
+                // Double check: Try to fetch by ID directly to be absolutely sure
+                let targetID = dto.id
+                let specificDescriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.id == targetID })
+                // specificDescriptor.includePendingChanges = true // FetchDescriptor struct is value type
+                var specificDesc = specificDescriptor
+                specificDesc.includePendingChanges = true
                 
-                clothingBack.name = dto.name
-                clothingBack.types = dto.types
-                clothingBack.colors = dto.colors
-                clothingBack.sizes = dto.sizes
-                clothingBack.length = dto.length
-                clothingBack.condition = dto.condition
-                clothingBack.accessories = dto.accessories
-                clothingBack.imagePaths = dto.imagePaths
-                clothingBack.isShared = dto.isShared
-                clothingBack.price = dto.price
-                clothingBack.deposit = dto.deposit
-                clothingBack.balance = dto.balance
-                clothingBack.accessoriesPrice = dto.accessoriesPrice
-                clothingBack.purchaseDate = dto.purchaseDate
-                clothingBack.depositDate = dto.depositDate
-                clothingBack.isDepositPlan = dto.isDepositPlan
-                clothingBack.finalPaymentDate = dto.finalPaymentDate
-                clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
-                clothingBack.note = dto.note
-                clothingBack.stock = dto.stock
-                clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
-                
-                // New items from backup (that passed the check above) are by definition not deleted
-                // UNLESS we are in a weird state where we skipped the check? No.
-                // But let's be safe.
+                if let found = try? context.fetch(specificDesc).first {
+                    // Enhanced check here too
+                    let foundIsDeleted = found.isDeleted || found.deletedAt != nil
+                    print("### Restore: CRITICAL - Found item '\(dto.name)' (\(dto.id)) via specific fetch which was missed in batch fetch! isDeleted=\(found.isDeleted), deletedAt=\(String(describing: found.deletedAt))")
+                    clothingBack = found
+                    clothingMap[dto.id] = found
+                    isLocalDeleted = foundIsDeleted
+                } else {
+                    print("### Restore: Item '\(dto.name)' (\(dto.id)) NOT found locally. Creating new (isDeleted=false).")
+                    clothingBack = Clothing(name: dto.name)
+                    clothingBack.id = dto.id
+                    context.insert(clothingBack)
+                    clothingMap[dto.id] = clothingBack
+                    isLocalDeleted = false
+                }
+            }
+            
+            // Update properties
+            clothingBack.name = dto.name
+            clothingBack.types = dto.types
+            clothingBack.colors = dto.colors
+            clothingBack.sizes = dto.sizes
+            clothingBack.length = dto.length
+            clothingBack.condition = dto.condition
+            clothingBack.accessories = dto.accessories
+            clothingBack.imagePaths = dto.imagePaths
+            clothingBack.isShared = dto.isShared
+            clothingBack.price = dto.price
+            clothingBack.deposit = dto.deposit
+            clothingBack.balance = dto.balance
+            clothingBack.accessoriesPrice = dto.accessoriesPrice
+            clothingBack.purchaseDate = dto.purchaseDate
+            clothingBack.depositDate = dto.depositDate
+            clothingBack.isDepositPlan = dto.isDepositPlan
+            clothingBack.finalPaymentDate = dto.finalPaymentDate
+            clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
+            clothingBack.note = dto.note
+            clothingBack.stock = dto.stock
+            clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
+            
+            // CRITICAL: If local item was deleted, FORCE it to remain deleted.
+            if isLocalDeleted {
+                clothingBack.isDeleted = true
+                if clothingBack.deletedAt == nil {
+                    clothingBack.deletedAt = Date()
+                }
+                print("### Restore: FORCE DELETED applied to '\(clothingBack.name)'")
+            } else {
                 clothingBack.isDeleted = false
                 clothingBack.deletedAt = nil
-                
-                clothingBack.createdAt = dto.createdAt
-                clothingBack.updatedAt = dto.updatedAt
-                clothingBack.sortIndex = dto.sortIndex ?? 0
-                clothingBack.replacedCutoutID = dto.replacedCutoutID
             }
+            
+            clothingBack.createdAt = dto.createdAt
+            clothingBack.updatedAt = dto.updatedAt
+            clothingBack.sortIndex = dto.sortIndex ?? 0
+            clothingBack.replacedCutoutID = dto.replacedCutoutID
             
             // Restore AccessoryItems
             if let accDTOs = dto.accessoryItems {
