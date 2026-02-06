@@ -93,6 +93,15 @@ struct OOTDView: View {
                             }
                             
                             return true
+                        },
+                        onUpdate: {
+                            if let outfit = currentOutfit {
+                                // Add a small delay to ensure View hierarchy is updated before snapshot
+                                Task { @MainActor in
+                                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                                    saveSnapshot(for: outfit)
+                                }
+                            }
                         }
                     )
                 }
@@ -764,11 +773,12 @@ struct OOTDContentArea: View {
     let onAddToOutfit: (CutoutItem) -> Void
     let onAddPhoto: () -> Void
     let onBatchAdd: ([CutoutItem]) -> Bool
+    let onUpdate: () -> Void
     
     var body: some View {
         ZStack {
             if let outfit = currentOutfit {
-                OOTDCanvasView(outfit: outfit)
+                OOTDCanvasView(outfit: outfit, onCanvasChange: onUpdate)
                     .id(outfit.id) // Force refresh when switching outfits
             } else {
                 ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")

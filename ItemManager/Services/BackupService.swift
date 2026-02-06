@@ -792,58 +792,151 @@ class BackupService {
         // Outfits
         let existingOutfits = try context.fetch(FetchDescriptor<Outfit>())
         var outfitMap: [UUID: Outfit] = Dictionary(uniqueKeysWithValues: existingOutfits.map { ($0.id, $0) })
-        for dto in manifest.outfits ?? [] {
-            let outfit: Outfit
-            if let existing = outfitMap[dto.id] {
-                outfit = existing
-                outfit.note = dto.note
-                outfit.snapshotPath = dto.snapshotPath
-            } else {
-                outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath)
-                outfit.id = dto.id
-                outfit.createdAt = dto.createdAt
-                context.insert(outfit)
-                outfitMap[dto.id] = outfit
-            }
+        
+        // Fetch ALL OutfitItems globally to avoid ID collision
+        let allOutfitItems = try context.fetch(FetchDescriptor<OutfitItem>())
+        var globalItemMap: [UUID: OutfitItem] = Dictionary(uniqueKeysWithValues: allOutfitItems.map { ($0.id, $0) })
+        print("### Restore: Found \(globalItemMap.count) global OutfitItems.")
+        
+        // 建立 Cutout 反向查找表 (FileName -> CutoutItem) 以支持 Snapshot 恢复
+        var cutoutFileMap: [String: CutoutItem] = [:]
+        for cutout in cutoutMap.values {
+            let fileName = (cutout.imagePath as NSString).lastPathComponent
+            cutoutFileMap[fileName] = cutout
+        }
+        print("### Restore: Built cutoutFileMap with \(cutoutFileMap.count) entries from \(cutoutMap.count) cutouts.")
+        
+        // 1. 优先尝试恢复 Snapshots (新版备份格式)
+        if let snapshots = manifest.snapshots {
+            print("### Restore: Found \(snapshots.count) snapshots. Restoring as Outfits...")
             
-            let existingItems = outfit.items
-            var itemMap: [UUID: OutfitItem] = Dictionary(uniqueKeysWithValues: existingItems.map { ($0.id, $0) })
-            for itemDTO in dto.items {
-                let item: OutfitItem
-                if let ex = itemMap[itemDTO.id] {
-                    item = ex
-                    item.x = itemDTO.x
-                    item.y = itemDTO.y
-                    item.rotation = itemDTO.rotation
-                    item.scale = itemDTO.scale
-                    item.zIndex = itemDTO.zIndex
+            for dto in snapshots {
+                let outfit: Outfit
+                if let existing = outfitMap[dto.id] {
+                    outfit = existing
+                    outfit.note = dto.note
+                    outfit.snapshotPath = dto.snapshotPath
+                    outfit.canvasType = dto.canvasType ?? "mannequin"
                 } else {
-                    item = OutfitItem(cutout: nil, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: itemDTO.scale, zIndex: itemDTO.zIndex)
-                    item.id = itemDTO.id
-                    context.insert(item)
-                    item.outfit = outfit
+                    outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin")
+                    outfit.id = dto.id
+                    outfit.createdAt = dto.createdAt
+                    context.insert(outfit)
+                    outfitMap[dto.id] = outfit
                 }
-                if let cid = itemDTO.cutoutID, let found = cutoutMap[cid] {
-                    item.cutout = found
-                } else if let backupPath = itemDTO.backupImagePath, !backupPath.isEmpty {
-                    // Fallback: Use redundant backup info
-                    print("Restore: OutfitItem \(itemDTO.id) missing linked cutout. Using backup info: \(backupPath)")
+                
+                print("### Restore: Processing Outfit \(dto.note) (\(dto.id)) with \(dto.items.count) items...")
+                
+                // 处理 Items
+                // We don't use local itemMap anymore, we use globalItemMap to prevent collision
+                
+                for itemDTO in dto.items {
+                    // 查找对应的 Cutout
+                    guard let cutout = cutoutFileMap[itemDTO.imageReference] else {
+                        print("### Restore: WARNING - Cutout not found for snapshot item [\(itemDTO.imageReference)]. Skipping.")
+                        if cutoutFileMap.count < 10 {
+                            print("Available keys: \(cutoutFileMap.keys.joined(separator: ", "))")
+                        }
+                        continue
+                    }
                     
-                    // Check if we already created a fallback cutout for this path to avoid duplicates
-                    let fallbackDescriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate<CutoutItem> { $0.imagePath == backupPath })
-                    if let existingFallback = try context.fetch(fallbackDescriptor).first {
-                        item.cutout = existingFallback
+                    // 计算 Scale
+                    let scale = cutout.width > 0 ? (itemDTO.width / cutout.width) : 1.0
+                    
+                    let item: OutfitItem
+                    if let ex = globalItemMap[itemDTO.id] {
+                        item = ex
+                        item.x = itemDTO.x
+                        item.y = itemDTO.y
+                        item.rotation = itemDTO.rotation
+                        item.scale = scale
+                        item.zIndex = itemDTO.zIndex
+                        
+                        // Remove dangerous check for item.outfit?.id which causes crash if old outfit is invalid
+                        // We will rely on outfit.items.append(item) to establish relationship
                     } else {
-                        // Create new ad-hoc cutout
-                        let newCutout = CutoutItem(
-                            originalImageHash: "restored_fallback_\(UUID().uuidString)",
-                            category: "未分类",
-                            imagePath: backupPath,
-                            width: itemDTO.backupImageWidth ?? 200,
-                            height: itemDTO.backupImageHeight ?? 200
-                        )
-                        context.insert(newCutout)
-                        item.cutout = newCutout
+                        item = OutfitItem(cutout: cutout, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: scale, zIndex: itemDTO.zIndex)
+                        item.id = itemDTO.id
+                        context.insert(item)
+                        globalItemMap[item.id] = item // Update global map
+                    }
+                    
+                    item.cutout = cutout
+                    
+                    // Ensure item is in outfit's list
+                    // Use ID check to avoid object comparison which might trigger faults
+                    if !outfit.items.contains(where: { $0.id == item.id }) {
+                        outfit.items.append(item)
+                    }
+                }
+                
+                print("### Restore: Outfit \(outfit.note) now has \(outfit.items.count) items in memory before save.")
+            }
+        }
+        
+        // 2. 尝试恢复 Outfits (旧版备份格式，兼容性保留)
+        // 只有当 manifest.outfits 存在且不为空时才执行
+        if let oldOutfits = manifest.outfits, !oldOutfits.isEmpty {
+            print("### Restore: Found \(oldOutfits.count) legacy outfits. Restoring...")
+            for dto in oldOutfits {
+                // 如果 ID 已经在 Snapshot 中恢复过了，跳过
+                // 或者是合并？通常备份只会有一种格式。
+                
+                let outfit: Outfit
+                if let existing = outfitMap[dto.id] {
+                    outfit = existing
+                    // 仅更新基本信息，避免覆盖 Snapshot 的详细数据（如果两者共存）
+                    if manifest.snapshots == nil {
+                        outfit.note = dto.note
+                        outfit.snapshotPath = dto.snapshotPath
+                        outfit.canvasType = dto.canvasType ?? "mannequin"
+                    }
+                } else {
+                    outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin")
+                    outfit.id = dto.id
+                    outfit.createdAt = dto.createdAt
+                    context.insert(outfit)
+                    outfitMap[dto.id] = outfit
+                }
+                
+                // 仅当没有 Snapshot 数据时，才使用旧格式恢复 Items
+                if manifest.snapshots == nil {
+                    let existingItems = outfit.items
+                    var itemMap: [UUID: OutfitItem] = Dictionary(uniqueKeysWithValues: existingItems.map { ($0.id, $0) })
+                    for itemDTO in dto.items {
+                        let item: OutfitItem
+                        if let ex = itemMap[itemDTO.id] {
+                            item = ex
+                            item.x = itemDTO.x
+                            item.y = itemDTO.y
+                            item.rotation = itemDTO.rotation
+                            item.scale = itemDTO.scale
+                            item.zIndex = itemDTO.zIndex
+                        } else {
+                            item = OutfitItem(cutout: nil, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: itemDTO.scale, zIndex: itemDTO.zIndex)
+                            item.id = itemDTO.id
+                            context.insert(item)
+                            item.outfit = outfit
+                        }
+                        if let cid = itemDTO.cutoutID, let found = cutoutMap[cid] {
+                            item.cutout = found
+                        } else if let backupPath = itemDTO.backupImagePath, !backupPath.isEmpty {
+                            // Fallback logic...
+                            let fallbackDescriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate<CutoutItem> { $0.imagePath == backupPath })
+                            if let existingFallback = try context.fetch(fallbackDescriptor).first {
+                                item.cutout = existingFallback
+                            } else {
+                                let newCutout = CutoutItem(
+                                    originalImageHash: "restored_fallback_\(UUID().uuidString)",
+                                    category: "未分类",
+                                    imagePath: backupPath,
+                                    width: itemDTO.backupImageWidth ?? 200,
+                                    height: itemDTO.backupImageHeight ?? 200
+                                )
+                                context.insert(newCutout)
+                                item.cutout = newCutout
+                            }
+                        }
                     }
                 }
             }

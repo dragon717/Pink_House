@@ -22,6 +22,9 @@ struct OOTDCanvasView: View {
     @State private var showingDeleteAlert = false
     @State private var itemToDelete: OutfitItem?
     
+    // Callback for when canvas content changes (for snapshot updates)
+    var onCanvasChange: (() -> Void)?
+    
     var body: some View {
         GeometryReader { geometry in
             // Calculate scale to fit the current view port
@@ -62,6 +65,9 @@ struct OOTDCanvasView: View {
                         },
                         onSendBackward: {
                             sendBackward(item)
+                        },
+                        onUpdate: {
+                            saveContext()
                         }
                     )
                     .onTapGesture {
@@ -110,7 +116,8 @@ struct OOTDCanvasView: View {
                             
                             outfit.items[index].scale *= value
                             gestureScale = 1.0
-                            try? modelContext.save()
+                            print("[OOTD] Scale updated for item \(id): \(outfit.items[index].scale)")
+                            saveContext()
                         },
                     RotationGesture()
                         .onChanged { value in
@@ -123,7 +130,8 @@ struct OOTDCanvasView: View {
                             
                             outfit.items[index].rotation += value.degrees
                             gestureRotation = .zero
-                            try? modelContext.save()
+                            print("[OOTD] Rotation updated for item \(id): \(outfit.items[index].rotation)")
+                            saveContext()
                         }
                 )
             )
@@ -143,15 +151,32 @@ struct OOTDCanvasView: View {
             } message: {
                 Text("确定要删除这个抠图吗？此操作无法撤销。")
             }
+            .onAppear {
+                print("[OOTD] Canvas appeared with \(outfit.items.count) items")
+                for item in outfit.items {
+                    print("[OOTD] Item \(item.id): x=\(item.x), y=\(item.y), scale=\(item.scale), rot=\(item.rotation), z=\(item.zIndex)")
+                }
+            }
         }
     }
     
     private func deleteItem(_ item: OutfitItem) {
         if let index = outfit.items.firstIndex(where: { $0.id == item.id }) {
+            print("[OOTD] Deleting item \(item.id)")
             outfit.items.remove(at: index)
             selectedItemId = nil
             modelContext.delete(item)
-            try? modelContext.save()
+            saveContext()
+        }
+    }
+    
+    private func saveContext() {
+        do {
+            try modelContext.save()
+            print("[OOTD] Context saved successfully")
+            onCanvasChange?()
+        } catch {
+            print("[OOTD] Failed to save context: \(error)")
         }
     }
     
@@ -161,7 +186,8 @@ struct OOTDCanvasView: View {
         guard let maxZIndex = outfit.items.map({ $0.zIndex }).max() else { return }
         item.zIndex = maxZIndex + 1
         reindexLayers()
-        try? modelContext.save()
+        print("[OOTD] Brought item \(item.id) to front")
+        saveContext()
     }
     
     private func bringForward(_ item: OutfitItem) {
@@ -179,7 +205,8 @@ struct OOTDCanvasView: View {
         }
         
         reindexLayers()
-        try? modelContext.save()
+        print("[OOTD] Brought item \(item.id) forward")
+        saveContext()
     }
     
     private func sendBackward(_ item: OutfitItem) {
@@ -192,7 +219,8 @@ struct OOTDCanvasView: View {
         (item.zIndex, prevItem.zIndex) = (prevItem.zIndex, item.zIndex)
         
         reindexLayers()
-        try? modelContext.save()
+        print("[OOTD] Sent item \(item.id) backward")
+        saveContext()
     }
     
     private func reindexLayers() {
@@ -220,6 +248,7 @@ struct CanvasItemView: View {
     var onBringToFront: () -> Void
     var onBringForward: () -> Void
     var onSendBackward: () -> Void
+    var onUpdate: () -> Void // New callback for drag end
     
     @State private var currentOffset: CGSize = .zero
     @State private var loadedImage: UIImage?
@@ -336,7 +365,8 @@ struct CanvasItemView: View {
                     item.x += value.translation.width
                     item.y += value.translation.height
                     currentOffset = .zero
-                    try? modelContext.save()
+                    print("[OOTD] Moved item \(item.id) to (\(item.x), \(item.y))")
+                    onUpdate()
                 }
         )
         .task(id: item.cutout?.imagePath) {

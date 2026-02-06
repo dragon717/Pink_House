@@ -433,7 +433,10 @@ class CloudSyncManager: ObservableObject {
             
             // 3. Restore
             print("CloudSync: Applying restore...")
-            try BackupService.shared.restoreFromManifest(manifest: manifest, imageFiles: imageFileMap, context: context)
+            // Ensure we are on Main Actor for context operations
+            try await MainActor.run {
+                try BackupService.shared.restoreFromManifest(manifest: manifest, imageFiles: imageFileMap, context: context)
+            }
             
             self.hasSuccessfulBackup = true
             if !silent { isSyncing = false }
