@@ -149,8 +149,13 @@ struct ClothingCard: View, Equatable {
         }
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        // 卡片整体阴影和悬浮动画
-        .shadow(color: .black.opacity(isHovering ? 0.12 : 0.06), radius: isHovering ? 12 : 8, x: 0, y: isHovering ? 6 : 3)
+        // 卡片整体阴影和悬浮动画 - 针对低端设备优化阴影
+        .shadow(
+            color: .black.opacity(isHovering ? 0.12 : 0.06),
+            radius: ProcessInfo.processInfo.physicalMemory <= 2 * 1024 * 1024 * 1024 ? (isHovering ? 4 : 2) : (isHovering ? 12 : 8),
+            x: 0,
+            y: isHovering ? 6 : 3
+        )
         .scaleEffect(isHovering ? 1.02 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
         .onHover { hovering in

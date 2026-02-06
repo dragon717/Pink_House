@@ -14,6 +14,14 @@ struct GoldPhysicsView: View {
     @State private var scene: GoldScene?
     @State private var isViewVisible: Bool = false
     
+    // Appearance Manager (for background toggle)
+    private var appearanceManager = WealthAppearanceManager.shared
+    
+    init(totalWeightGrams: Double, beanWeight: Double) {
+        self.totalWeightGrams = totalWeightGrams
+        self.beanWeight = beanWeight
+    }
+    
     // Computed pause state for SpriteView
     private var shouldPause: Bool {
         // print("GoldPhysicsView: shouldPause check - Visible: \(isViewVisible), SimActive: \(isSimulationActive), Scene: \(scenePhase)")
@@ -22,41 +30,51 @@ struct GoldPhysicsView: View {
     
     var body: some View {
         GeometryReader { proxy in
-            SpriteView(scene: createScene(size: proxy.size), isPaused: shouldPause)
-                // Transparent to let ZStack background show through if needed,
-                // but we will manage background color in scene.
-                .background(Color.clear) 
-                .onAppear {
-                    isViewVisible = true
-                    // Update bean count when view appears
-                    scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
-                    
-                    // 强制测试震动，确认引擎是否工作
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        print("🧪 Triggering Test Haptic on Appear...")
-                        HapticEngineManager.shared.playTestHaptic()
+            ZStack {
+                // Background Image
+                if appearanceManager.shouldShowWealthContainerBackground {
+                    Image("WealthContainerBackground")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                }
+                
+                SpriteView(scene: createScene(size: proxy.size), isPaused: shouldPause, options: [.allowsTransparency])
+                    // Transparent to let ZStack background show through
+                    .background(Color.clear)
+                    .onAppear {
+                        isViewVisible = true
+                        // Update bean count when view appears
+                        scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
+                        
+                        // 强制测试震动，确认引擎是否工作
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            print("🧪 Triggering Test Haptic on Appear...")
+                            HapticEngineManager.shared.playTestHaptic()
+                        }
                     }
-                }
-                .onDisappear {
-                    isViewVisible = false
-                    // checkState()
-                }
-                .onChange(of: totalWeightGrams) { _, newValue in
-                    // Ensure update runs on main thread and scene is ready
-                    if let scene = scene {
-                        scene.updateBeans(totalWeight: newValue, beanWeight: beanWeight)
+                    .onDisappear {
+                        isViewVisible = false
+                        // checkState()
                     }
-                }
-                .onChange(of: colorScheme) { _, newScheme in
-                    scene?.updateBackgroundColor(for: newScheme)
-                }
-                .onChange(of: shouldPause) { _, newValue in
-                    if newValue {
-                        scene?.pauseSimulation()
-                    } else {
-                        scene?.resumeSimulation()
+                    .onChange(of: totalWeightGrams) { _, newValue in
+                        // Ensure update runs on main thread and scene is ready
+                        if let scene = scene {
+                            scene.updateBeans(totalWeight: newValue, beanWeight: beanWeight)
+                        }
                     }
-                }
+                    .onChange(of: colorScheme) { _, newScheme in
+                        scene?.updateBackgroundColor(for: newScheme)
+                    }
+                    .onChange(of: shouldPause) { _, newValue in
+                        if newValue {
+                            scene?.pauseSimulation()
+                        } else {
+                            scene?.resumeSimulation()
+                        }
+                    }
+            }
         }
     }
     
@@ -251,11 +269,7 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     }
     
     func updateBackgroundColor(for scheme: ColorScheme) {
-        if scheme == .dark {
-            self.backgroundColor = .black
-        } else {
-            self.backgroundColor = .white
-        }
+        self.backgroundColor = .clear
     }
     
     private func setupPhysicsBoundary() {

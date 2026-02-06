@@ -14,8 +14,16 @@ class WealthAppearanceManager {
     // Dictionary to store dominant colors per currency and denomination
     var customColors: [String: Color] = [:]
     
+    // MARK: - Settings
+    var shouldShowWealthContainerBackground: Bool {
+        didSet {
+            UserDefaults.standard.set(shouldShowWealthContainerBackground, forKey: "shouldShowWealthContainerBackground")
+        }
+    }
+    
     // MARK: - Initialization
     init() {
+        self.shouldShowWealthContainerBackground = UserDefaults.standard.object(forKey: "shouldShowWealthContainerBackground") as? Bool ?? true
         loadImages()
     }
     

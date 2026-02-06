@@ -93,9 +93,15 @@ struct GlassCard<Content: View>: View {
     
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .opacity(0.9)
+            // Optimization: Use simple color opacity for very low memory devices to save GPU
+            if ProcessInfo.processInfo.physicalMemory <= 2 * 1024 * 1024 * 1024 {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color(uiColor: .secondarySystemBackground).opacity(0.8))
+            } else {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.9)
+            }
             
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(
@@ -110,7 +116,7 @@ struct GlassCard<Content: View>: View {
             content
                 .padding()
         }
-        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2) // Reduced shadow radius from 10 to 5
     }
 }
 

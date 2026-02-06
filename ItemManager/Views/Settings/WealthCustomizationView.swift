@@ -11,6 +11,14 @@ struct WealthCustomizationView: View {
     var body: some View {
         Form {
             Section {
+                Toggle("显示容器背景", isOn: $viewModel.shouldShowWealthContainerBackground)
+            } header: {
+                Text("全局设置")
+            } footer: {
+                Text("开启后，在黄金和白银页面显示“财源广进”背景图。")
+            }
+            
+            Section {
                 ForEach(rmbDenominations, id: \.self) { value in
                     CustomizationRowView(currency: .rmb, denomination: value, viewModel: viewModel)
                 }

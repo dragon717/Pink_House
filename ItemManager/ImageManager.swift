@@ -35,6 +35,21 @@ class ImageManager {
         NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
             self?.clearCache()
         }
+        
+        // Add Observer for Background state to clear cache and free up memory
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            // Only clear if aggressive mode is on, or if we want to be nice citizens
+            // Clearing on background is generally safe and good for low memory devices
+            if self?.useAggressiveMemoryOptimization == true {
+                AppLogger.info("App entered background, clearing image cache (Aggressive Mode)")
+                self?.clearCache()
+            } else {
+                // For standard mode, maybe just trim? NSCache handles itself, but we can be explicit.
+                // Let's keep 50% capacity or just leave it to OS.
+                // For now, let's clear it to be safe against termination.
+                // self?.clearCache() 
+            }
+        }
     }
     
     private func configureCacheLimits() {
@@ -44,26 +59,30 @@ class ImageManager {
         
         if useAggressiveMemoryOptimization {
             // 积极模式：大幅降低缓存上限，优先保证不崩溃
-            if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
-                limitInMB = 30 // 极小缓存
-            } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB
+            if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB (iPhone 8, X, XR, SE2 etc)
+                limitInMB = 20 // 极小缓存，防止OOM
+                memoryCache.countLimit = 20
+            } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB (iPhone 11, 12, 13 non-pro)
                 limitInMB = 50
+                memoryCache.countLimit = 40
             } else {
                 limitInMB = 100
+                memoryCache.countLimit = 80
             }
-            memoryCache.countLimit = 50
-            AppLogger.info("Memory Optimization: Aggressive Mode Enabled")
+            AppLogger.info("Memory Optimization: Aggressive Mode Enabled (Limit: \(limitInMB)MB)")
         } else {
             // 标准模式：利用更多内存换取流畅度
             if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
                 limitInMB = 50
+                memoryCache.countLimit = 50
             } else if totalMemory <= 4 * 1024 * 1024 * 1024 { // <= 4GB
                 limitInMB = 150
+                memoryCache.countLimit = 100
             } else {
                 limitInMB = 300
+                memoryCache.countLimit = 200
             }
-            memoryCache.countLimit = 200
-            AppLogger.info("Memory Optimization: Standard Mode Enabled")
+            AppLogger.info("Memory Optimization: Standard Mode Enabled (Limit: \(limitInMB)MB)")
         }
         
         // 限制总容量
@@ -452,6 +471,15 @@ class ImageManager {
     
     /// Force decode image on background thread
     private nonisolated func forceDecode(_ image: UIImage) -> UIImage? {
+        // Optimization: Skip force decode on low memory devices to save RAM
+        // Force decoding decompresses the entire image into memory (bitmap), which can be huge.
+        // On modern iOS, UIKit handles lazy decoding reasonably well, so skipping this on
+        // constrained devices is a good trade-off.
+        let totalMemory = ProcessInfo.processInfo.physicalMemory
+        if totalMemory <= 2 * 1024 * 1024 * 1024 { // <= 2GB
+             return image // Just return the image, let UIKit decode it when displaying
+        }
+        
         // Use normalized(forceCopy: true) to fix orientation AND force decode (render to bitmap)
         // This ensures the image is loaded into memory and orientation is applied correctly
         return image.normalized(forceCopy: true)
