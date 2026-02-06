@@ -32,7 +32,7 @@ struct WealthView: View {
         NavigationStack {
             ZStack {
                 // Background
-                Color(uiColor: .systemGroupedBackground)
+                LiquidBackground()
                     .ignoresSafeArea()
                 
                 VStack(spacing: 20) {

@@ -61,8 +61,12 @@ struct MoneyCountingView: View {
     
     var body: some View {
         ZStack {
-            // 背景遮罩
-            Color.black.opacity(0.85)
+            // 应用全局背景
+            LiquidBackground()
+                .ignoresSafeArea()
+            
+            // 背景遮罩（稍微降低透明度以便透出背景，同时保持点击交互）
+            Color.black.opacity(0.6)
                 .ignoresSafeArea()
                 .onTapGesture {
                     // 点击背景也可以抽取（为了方便）

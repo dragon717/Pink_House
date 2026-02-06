@@ -12,10 +12,14 @@ struct WealthCustomizationView: View {
         Form {
             Section {
                 Toggle("显示容器背景", isOn: $viewModel.shouldShowWealthContainerBackground)
+                
+                if viewModel.shouldShowWealthContainerBackground {
+                    ContainerBackgroundCustomizationRow(viewModel: viewModel)
+                }
             } header: {
                 Text("全局设置")
             } footer: {
-                Text("开启后，在黄金和白银页面显示“财源广进”背景图。")
+                Text("开启后，在黄金和白银页面显示背景图。")
             }
             
             Section {
@@ -82,52 +86,52 @@ struct CustomizationRowView: View {
                             Text("\(denomination)")
                                 .foregroundStyle(.white)
                                 .font(.title)
-                                .fontWeight(.bold)
+                                .bold()
                         )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
-                        )
-                        .shadow(radius: 1)
-                }
-            }
-            .padding(.vertical, 8)
-            
-            // Actions
-            HStack {
-                if viewModel.getCustomImage(currency: currency, denominationValue: denomination) != nil {
-                    Button(role: .destructive) {
-                        viewModel.removeCustomImage(currency: currency, denominationValue: denomination)
-                    } label: {
-                        Text("恢复默认")
-                            .font(.subheadline)
-                    }
-                    .buttonStyle(.borderless) // Prevent tapping row from triggering other actions
+                        .shadow(radius: 2)
                 }
                 
-                Spacer()
-                
-                PhotosPicker(selection: $selectedItem, matching: .images) {
-                    Text(viewModel.getCustomImage(currency: currency, denominationValue: denomination) == nil ? "选择图片" : "更换图片")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-                .buttonStyle(.borderless) // Prevent tapping row from triggering other actions
-            }
-        }
-        .padding(.vertical, 4)
-        .onChange(of: selectedItem) { _, newItem in
-            if let newItem {
-                Task {
-                    if let data = try? await newItem.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        await MainActor.run {
-                            self.selectedImage = image
-                            self.showingCropView = true
+                // Actions Overlay
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        
+                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.title)
+                                .foregroundStyle(.white)
+                                .shadow(radius: 2)
+                        }
+                        
+                        if viewModel.getCustomImage(currency: currency, denominationValue: denomination) != nil {
+                            Button {
+                                viewModel.removeCustomImage(currency: currency, denominationValue: denomination)
+                            } label: {
+                                Image(systemName: "trash.circle.fill")
+                                    .font(.title)
+                                    .foregroundStyle(.red)
+                                    .shadow(radius: 2)
+                            }
                         }
                     }
-                    selectedItem = nil
+                    .padding(4)
                 }
+            }
+            .frame(width: 160, height: 80)
+        }
+        .padding(.vertical, 8)
+        .onChange(of: selectedItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.selectedImage = image
+                        self.showingCropView = true
+                    }
+                }
+                selectedItem = nil
             }
         }
         .fullScreenCover(isPresented: $showingCropView) {
@@ -149,32 +153,123 @@ struct CustomizationRowView: View {
         }
     }
     
-    // Helper to get default colors
     private func getDefaultColor(currency: CurrencyType, value: Int) -> Color {
+        // Simplified default colors matching WealthViewModel logic
         if currency == .rmb {
             switch value {
-            case 100: return .red
-            case 50: return .green
-            case 20: return .orange // Brownish
-            case 10: return .blue
-            case 5: return .purple
-            case 1: return .green.opacity(0.7) // Olive
+            case 100: return Color(red: 0.9, green: 0.3, blue: 0.3)
+            case 50: return Color(red: 0.3, green: 0.7, blue: 0.5)
+            case 20: return Color(red: 0.6, green: 0.4, blue: 0.2)
+            case 10: return Color(red: 0.3, green: 0.5, blue: 0.8)
+            case 5: return Color(red: 0.6, green: 0.3, blue: 0.7)
+            case 1: return Color(red: 0.7, green: 0.7, blue: 0.3)
             default: return .gray
             }
         } else {
-            // JPY
             switch value {
-            case 10000: return .brown
-            case 5000: return .purple
-            case 1000: return .blue
+            case 10000: return Color(red: 0.5, green: 0.3, blue: 0.2)
+            case 5000: return Color(red: 0.5, green: 0.2, blue: 0.6)
+            case 1000: return Color(red: 0.2, green: 0.4, blue: 0.7)
             default: return .gray
             }
         }
     }
 }
 
-#Preview {
-    NavigationStack {
-        WealthCustomizationView()
+struct ContainerBackgroundCustomizationRow: View {
+    var viewModel: WealthAppearanceManager
+    
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedImage: UIImage?
+    @State private var showingCropView = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("容器背景图")
+                .font(.headline)
+            
+            ZStack {
+                if let image = viewModel.containerBackgroundImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 200)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .cornerRadius(8)
+                } else {
+                    // Default preview
+                    Image("WealthContainerBackground")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 200)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(.secondary.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                
+                // Actions Overlay
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        
+                        PhotosPicker(selection: $selectedItem, matching: .images) {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.largeTitle)
+                                .foregroundStyle(.white)
+                                .shadow(radius: 2)
+                        }
+                        
+                        if viewModel.containerBackgroundImage != nil {
+                            Button {
+                                viewModel.removeContainerBackgroundImage()
+                            } label: {
+                                Image(systemName: "trash.circle.fill")
+                                    .font(.largeTitle)
+                                    .foregroundStyle(.red)
+                                    .shadow(radius: 2)
+                            }
+                        }
+                    }
+                    .padding(12)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .onChange(of: selectedItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.selectedImage = image
+                        self.showingCropView = true
+                    }
+                }
+                selectedItem = nil
+            }
+        }
+        .fullScreenCover(isPresented: $showingCropView) {
+            if let image = selectedImage {
+                // User requested square crop for background
+                ImageCropView(image: image, aspectRatio: 1.0) { croppedImage in
+                    // Compress image
+                    if let compressedData = croppedImage.jpegData(compressionQuality: 0.7),
+                       let compressedImage = UIImage(data: compressedData) {
+                        viewModel.setContainerBackgroundImage(compressedImage)
+                    }
+                    showingCropView = false
+                    selectedImage = nil
+                } onCancel: {
+                    showingCropView = false
+                    selectedImage = nil
+                }
+            }
+        }
     }
 }

@@ -29,21 +29,29 @@ struct SilverPhysicsView: View {
     
     var body: some View {
         GeometryReader { proxy in
+            let backgroundInfo = getBackgroundInfo(proxySize: proxy.size)
+            
             ZStack {
                 // Background Image
                 if appearanceManager.shouldShowWealthContainerBackground {
-                    Image("WealthContainerBackground")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
+                    if let image = backgroundInfo.image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: backgroundInfo.isCustom ? .fit : .fill)
+                            .frame(width: backgroundInfo.frame.width, height: backgroundInfo.frame.height)
+                            .position(x: backgroundInfo.frame.midX, y: backgroundInfo.frame.midY)
+                            .clipped()
+                    }
                 }
                 
-                SpriteView(scene: createScene(size: proxy.size), isPaused: shouldPause, options: [.allowsTransparency])
+                SpriteView(scene: createScene(size: proxy.size, boundary: backgroundInfo.physicsBoundary), isPaused: shouldPause, options: [.allowsTransparency])
                     .background(Color.clear)
                     .onAppear {
                         isViewVisible = true
                         scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
+                        
+                        // Update boundary in case it changed
+                        scene?.updateBoundary(backgroundInfo.physicsBoundary)
                         
                         // 强制测试震动，确认引擎是否工作
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -68,21 +76,60 @@ struct SilverPhysicsView: View {
                             scene?.resumeSimulation()
                         }
                     }
+                    .onChange(of: backgroundInfo.physicsBoundary) { _, newBoundary in
+                        scene?.updateBoundary(newBoundary)
+                    }
             }
         }
     }
     
-    private func createScene(size: CGSize) -> SKScene {
+    private struct BackgroundInfo {
+        let image: UIImage?
+        let isCustom: Bool
+        let frame: CGRect
+        let physicsBoundary: CGRect
+    }
+    
+    private func getBackgroundInfo(proxySize: CGSize) -> BackgroundInfo {
+        if let customBg = appearanceManager.containerBackgroundImage {
+            // Custom Background: Fit mode
+            let widthRatio = proxySize.width / customBg.size.width
+            let heightRatio = proxySize.height / customBg.size.height
+            let scale = min(widthRatio, heightRatio)
+            
+            let width = customBg.size.width * scale
+            let height = customBg.size.height * scale
+            
+            let x = (proxySize.width - width) / 2
+            let y = (proxySize.height - height) / 2
+            
+            let frame = CGRect(x: x, y: y, width: width, height: height)
+            
+            // Convert to SK coordinates (Y-up)
+            let skY = proxySize.height - (y + height)
+            let physicsBoundary = CGRect(x: x, y: skY, width: width, height: height)
+            
+            return BackgroundInfo(image: customBg, isCustom: true, frame: frame, physicsBoundary: physicsBoundary)
+        } else {
+            // Default Background: Fill mode (Full Screen)
+            let frame = CGRect(origin: .zero, size: proxySize)
+            return BackgroundInfo(image: UIImage(named: "WealthContainerBackground"), isCustom: false, frame: frame, physicsBoundary: frame)
+        }
+    }
+    
+    private func createScene(size: CGSize, boundary: CGRect) -> SKScene {
         if let existingScene = scene {
             if existingScene.size != size {
                 existingScene.size = size
             }
+            existingScene.updateBoundary(boundary)
             return existingScene
         }
         
         let newScene = SilverScene(size: size)
         newScene.scaleMode = .aspectFill
         newScene.updateBackgroundColor(for: colorScheme)
+        newScene.updateBoundary(boundary)
         
         newScene.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
         
@@ -130,6 +177,16 @@ class SilverScene: SKScene, SKPhysicsContactDelegate {
     private var targetBeanCount: Int = 0
     private let beansPerFrameAdd: Int = 50
     private let beansPerFrameRemove: Int = 100
+    
+    // Boundary Control
+    private var customBoundary: CGRect?
+    
+    func updateBoundary(_ rect: CGRect) {
+        if customBoundary != rect {
+            self.customBoundary = rect
+            setupPhysicsBoundary()
+        }
+    }
     
     func pauseSimulation() {
         self.isPaused = true
@@ -224,14 +281,21 @@ class SilverScene: SKScene, SKPhysicsContactDelegate {
     }
     
     private func setupPhysicsBoundary() {
-        let safeFrame = CGRect(
-            x: frame.minX + sidePadding,
-            y: frame.minY + bottomPadding,
-            width: frame.width - (sidePadding * 2),
-            height: frame.height - bottomPadding
-        )
+        let boundaryRect: CGRect
         
-        physicsBody = SKPhysicsBody(edgeLoopFrom: safeFrame)
+        if let custom = customBoundary {
+             boundaryRect = custom
+        } else {
+            let safeFrame = CGRect(
+                x: frame.minX + sidePadding,
+                y: frame.minY + bottomPadding,
+                width: frame.width - (sidePadding * 2),
+                height: frame.height - bottomPadding
+            )
+            boundaryRect = safeFrame
+        }
+        
+        physicsBody = SKPhysicsBody(edgeLoopFrom: boundaryRect)
         physicsBody?.categoryBitMask = SilverPhysicsCategory.wall
         physicsBody?.collisionBitMask = SilverPhysicsCategory.beanLayer1 | SilverPhysicsCategory.beanLayer2
         physicsBody?.contactTestBitMask = SilverPhysicsCategory.beanLayer1 | SilverPhysicsCategory.beanLayer2
@@ -264,15 +328,27 @@ class SilverScene: SKScene, SKPhysicsContactDelegate {
     }
     
     private func addBeans(count: Int) {
-        let safeMinX = sidePadding + beanRadius
-        let safeMaxX = size.width - sidePadding - beanRadius
+        let spawnRect: CGRect
+        if let custom = customBoundary {
+            spawnRect = custom
+        } else {
+            spawnRect = CGRect(
+                x: sidePadding,
+                y: bottomPadding,
+                width: size.width - (sidePadding * 2),
+                height: size.height - bottomPadding
+            )
+        }
+        
+        let safeMinX = spawnRect.minX + beanRadius
+        let safeMaxX = spawnRect.maxX - beanRadius
         
         guard safeMaxX > safeMinX else { return }
         
         for _ in 0..<count {
             let bean = createBeanNode()
             let randomX = CGFloat.random(in: safeMinX...safeMaxX)
-            let spawnY = size.height - bottomPadding - beanRadius - 20
+            let spawnY = spawnRect.maxY - beanRadius - 20
             
             bean.position = CGPoint(x: randomX, y: spawnY)
             addChild(bean)

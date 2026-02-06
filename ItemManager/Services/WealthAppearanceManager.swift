@@ -14,6 +14,9 @@ class WealthAppearanceManager {
     // Dictionary to store dominant colors per currency and denomination
     var customColors: [String: Color] = [:]
     
+    // Custom container background image
+    var containerBackgroundImage: UIImage?
+    
     // MARK: - Settings
     var shouldShowWealthContainerBackground: Bool {
         didSet {
@@ -37,7 +40,26 @@ class WealthAppearanceManager {
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(filename)
     }
     
+    private var containerBackgroundImageURL: URL? {
+        let filename = "wealth_container_background.png"
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(filename)
+    }
+    
     // MARK: - Methods
+    
+    func setContainerBackgroundImage(_ image: UIImage) {
+        if let data = image.pngData(), let url = containerBackgroundImageURL {
+            try? data.write(to: url)
+        }
+        self.containerBackgroundImage = image
+    }
+    
+    func removeContainerBackgroundImage() {
+        if let url = containerBackgroundImageURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        self.containerBackgroundImage = nil
+    }
     
     func setCustomImage(currency: CurrencyType, denominationValue: Int, image: UIImage) {
         // Save to disk
@@ -93,6 +115,13 @@ class WealthAppearanceManager {
         
         for val in jpyDenominations {
             loadSingleImage(currency: .jpy, val: val)
+        }
+        
+        // Load container background
+        if let url = containerBackgroundImageURL,
+           let data = try? Data(contentsOf: url),
+           let image = UIImage(data: data) {
+            self.containerBackgroundImage = image
         }
     }
     
