@@ -26,6 +26,12 @@ struct OOTDView: View {
     @State private var cameraImage: UIImage?
     @State private var shouldCutoutCameraImage = false
     
+    // Custom Background Creation
+    @State private var isBackgroundPickerPresented = false
+    @State private var selectedBackgroundItem: PhotosPickerItem?
+    @State private var tempBackgroundImage: UIImage?
+    @State private var showingBackgroundCropper = false
+    
     // Batch Replace
     @State private var showingBatchReplaceSheet = false
     
@@ -42,7 +48,11 @@ struct OOTDView: View {
                         isVisible: $isSidebarVisible,
                         currentOutfit: $currentOutfit,
                         onAdd: { type in
-                            createNewOutfit(canvasType: type)
+                            if type == "custom" {
+                                isBackgroundPickerPresented = true
+                            } else {
+                                createNewOutfit(canvasType: type)
+                            }
                         },
                         onDelete: { outfit in
                             deleteOutfit(outfit)
@@ -132,6 +142,12 @@ struct OOTDView: View {
                                 createNewOutfit(canvasType: "blank")
                             } label: {
                                 Label("空白画布", systemImage: "square.dashed")
+                            }
+                            
+                            Button {
+                                isBackgroundPickerPresented = true
+                            } label: {
+                                Label("自定义图片", systemImage: "photo")
                             }
                         } label: {
                             Label("新建搭配", systemImage: "plus")
@@ -253,6 +269,33 @@ struct OOTDView: View {
                 }
             }
             .photosPicker(isPresented: $isImagePickerPresented, selection: $selectedItem, matching: .images)
+            .photosPicker(isPresented: $isBackgroundPickerPresented, selection: $selectedBackgroundItem, matching: .images)
+            .onChange(of: selectedBackgroundItem) { _, newItem in
+                if let newItem {
+                    Task {
+                        if let data = try? await newItem.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            await MainActor.run {
+                                tempBackgroundImage = image
+                                showingBackgroundCropper = true
+                                selectedBackgroundItem = nil
+                            }
+                        }
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showingBackgroundCropper) {
+                if let image = tempBackgroundImage {
+                    OOTDBackgroundCropperView(image: image) { croppedImage in
+                         createCustomOutfit(with: croppedImage)
+                         showingBackgroundCropper = false
+                         tempBackgroundImage = nil
+                    } onCancel: {
+                         showingBackgroundCropper = false
+                         tempBackgroundImage = nil
+                    }
+                }
+            }
             .sheet(isPresented: $showingSaveToClothingSheet) {
                 ClothingPickerView { selectedClothing in
                     saveCanvasToClothing(clothing: selectedClothing)
@@ -351,6 +394,21 @@ struct OOTDView: View {
         // Generate initial empty snapshot
         Task { @MainActor in
             saveSnapshot(for: newOutfit)
+        }
+    }
+    
+    private func createCustomOutfit(with image: UIImage) {
+        if let path = ImageManager.shared.saveImage(image, context: modelContext) {
+            let newOutfit = Outfit(note: "搭配 \(Date().formatted(date: .numeric, time: .shortened))", 
+                                   canvasType: "custom", 
+                                   backgroundImagePath: path)
+            modelContext.insert(newOutfit)
+            try? modelContext.save()
+            currentOutfit = newOutfit
+            
+            Task { @MainActor in
+                saveSnapshot(for: newOutfit)
+            }
         }
     }
     

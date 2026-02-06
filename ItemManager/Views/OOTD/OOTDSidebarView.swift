@@ -47,6 +47,12 @@ struct OOTDSidebarView: View {
                             } label: {
                                 Label("空白画布", systemImage: "square.dashed")
                             }
+                            
+                            Button {
+                                onAdd("custom")
+                            } label: {
+                                Label("自定义图片", systemImage: "photo")
+                            }
                         } label: {
                             HStack(spacing: 12) {
                                 ZStack {

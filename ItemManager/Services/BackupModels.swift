@@ -151,6 +151,7 @@ struct OOTDSnapshotDTO: Codable {
     let note: String
     let snapshotPath: String?
     var canvasType: String? = "mannequin"
+    var backgroundImagePath: String?
     let items: [OOTDSnapshotItemDTO]
 }
 

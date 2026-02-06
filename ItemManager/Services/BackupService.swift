@@ -271,6 +271,13 @@ class BackupService {
                     safeSnapshotPath = fileName
                 }
                 
+                var safeBackgroundImagePath: String? = nil
+                if let bgPath = o.backgroundImagePath {
+                    let fileName = (bgPath as NSString).lastPathComponent
+                    standardImagesToBackup.insert(fileName)
+                    safeBackgroundImagePath = fileName
+                }
+                
                 var items: [OOTDSnapshotItemDTO] = []
                 for item in o.items {
                     if item.isDeleted { continue }
@@ -301,6 +308,7 @@ class BackupService {
                     note: o.note,
                     snapshotPath: safeSnapshotPath,
                     canvasType: o.canvasType,
+                    backgroundImagePath: safeBackgroundImagePath,
                     items: items
                 )
             }
@@ -817,8 +825,9 @@ class BackupService {
                     outfit.note = dto.note
                     outfit.snapshotPath = dto.snapshotPath
                     outfit.canvasType = dto.canvasType ?? "mannequin"
+                    outfit.backgroundImagePath = dto.backgroundImagePath
                 } else {
-                    outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin")
+                    outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin", backgroundImagePath: dto.backgroundImagePath)
                     outfit.id = dto.id
                     outfit.createdAt = dto.createdAt
                     context.insert(outfit)

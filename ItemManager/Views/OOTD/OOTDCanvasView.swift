@@ -38,6 +38,14 @@ struct OOTDCanvasView: View {
                 if outfit.canvasType == "blank" {
                     Color.white
                         .frame(width: canvasWidth, height: canvasHeight)
+                } else if outfit.canvasType == "custom", 
+                          let path = outfit.backgroundImagePath,
+                          let uiImage = ImageManager.shared.loadImage(fileName: path) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: canvasWidth, height: canvasHeight)
+                        .clipped()
                 } else {
                     Image("ootd_background")
                         .resizable()

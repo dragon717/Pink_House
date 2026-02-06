@@ -196,14 +196,16 @@ final class Outfit {
     var note: String = ""
     var snapshotPath: String? // Path to the saved OOTD image
     var canvasType: String = "mannequin" // "mannequin" or "blank"
+    var backgroundImagePath: String? // Custom background image path
     
     @Relationship(deleteRule: .cascade)
     var items: [OutfitItem] = []
     
-    init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin") {
+    init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin", backgroundImagePath: String? = nil) {
         self.note = note
         self.snapshotPath = snapshotPath
         self.canvasType = canvasType
+        self.backgroundImagePath = backgroundImagePath
     }
 }
 
