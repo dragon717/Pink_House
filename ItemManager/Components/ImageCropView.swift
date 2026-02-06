@@ -7,241 +7,280 @@ struct CropRequest: Identifiable {
     let isNewSelection: Bool
 }
 
+enum CropOverlayType: Equatable {
+    case rectangle
+    case circle
+    case roundedRectangle(cornerRadius: CGFloat)
+    case none
+}
+
 struct ImageCropView: View {
     let image: UIImage
     let aspectRatio: CGFloat? // Width / Height
+    let targetWidth: CGFloat? // Optional target width for output
+    let overlayType: CropOverlayType
     let onCrop: (UIImage) -> Void
     let onCancel: () -> Void
     
-    init(image: UIImage, aspectRatio: CGFloat? = nil, onCrop: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+    @State private var scale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastScale: CGFloat = 1.0
+    @State private var lastOffset: CGSize = .zero
+    
+    // Optimization states
+    @State private var displayedImage: UIImage?
+    @State private var isPreparing = true
+    
+    init(image: UIImage, 
+         aspectRatio: CGFloat? = nil, 
+         targetWidth: CGFloat? = nil, 
+         overlayType: CropOverlayType = .rectangle,
+         onCrop: @escaping (UIImage) -> Void, 
+         onCancel: @escaping () -> Void) {
         self.image = image
         self.aspectRatio = aspectRatio
+        self.targetWidth = targetWidth
+        self.overlayType = overlayType
         self.onCrop = onCrop
         self.onCancel = onCancel
     }
     
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea() // 全屏黑底
-            
-            VStack(spacing: 0) {
-                // Toolbar
-                HStack {
-                    Button("取消", action: onCancel)
-                        .foregroundStyle(.white)
-                        .padding(8) // 增加触摸范围
-                        .contentShape(Rectangle())
-                    Spacer()
-                    Text("移动和缩放")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                    Spacer()
-                    Button("使用") {
-                        NotificationCenter.default.post(name: NSNotification.Name("TriggerCrop"), object: nil)
-                    }
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .padding(8) // 增加触摸范围
-                    .contentShape(Rectangle())
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 12)
-                .padding(.top, 44) // Force top padding for safe area (approx dynamic island height)
-                .background(Color.black.opacity(0.8))
-                
-                // Crop Area
-                GeometryReader { geometry in
-                    ZStack {
-                        Color.black // Background for empty areas
-                        
-                        if let ratio = aspectRatio {
-                            // Fixed Aspect Ratio Mode
-                            let width = geometry.size.width
-                            let height = width / ratio
+        NavigationStack {
+            GeometryReader { geometry in
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    
+                    if isPreparing {
+                        VStack {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(1.5)
+                            Text("正在准备图片...")
+                                .foregroundStyle(.white)
+                                .padding(.top)
+                        }
+                    } else if let displayImg = displayedImage {
+                        VStack {
+                            Spacer()
                             
-                            // Check if height exceeds available space
-                            if height > geometry.size.height {
-                                // Constrain by height instead
-                                let h = geometry.size.height
-                                let w = h * ratio
-                                 CropScrollView(image: image, viewSize: CGSize(width: w, height: h)) { croppedImage in
-                                    onCrop(croppedImage)
+                            // Calculate crop area dimensions
+                            let cropSize: CGSize = {
+                                if let ratio = aspectRatio {
+                                    // With padding for specific aspect ratio
+                                    let width = geometry.size.width - 40
+                                    let height = width / ratio
+                                    
+                                    // Check if height fits
+                                    if height > geometry.size.height - 100 { // Allow some vertical padding
+                                        let h = geometry.size.height - 100
+                                        let w = h * ratio
+                                        return CGSize(width: w, height: h)
+                                    }
+                                    
+                                    return CGSize(width: width, height: height)
+                                } else {
+                                    // Full screen for nil aspect ratio
+                                    return geometry.size
                                 }
-                                .frame(width: w, height: h)
-                                .clipped()
-                            } else {
-                                // Constrain by width
-                                CropScrollView(image: image, viewSize: CGSize(width: width, height: height)) { croppedImage in
-                                    onCrop(croppedImage)
-                                }
-                                .frame(width: width, height: height)
-                                .clipped()
+                            }()
+                            
+                            ZStack {
+                                // Mask to clip content visually
+                                Color.black // Background behind image
+                                
+                                // The Image
+                                Image(uiImage: displayImg)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .scaleEffect(scale)
+                                    .offset(offset)
+                                    .gesture(
+                                        SimultaneousGesture(
+                                            MagnificationGesture()
+                                                .onChanged { value in
+                                                    let delta = value / lastScale
+                                                    lastScale = value
+                                                    scale *= delta
+                                                }
+                                                .onEnded { _ in
+                                                    lastScale = 1.0
+                                                    // Optional: Add bounds check or bounce back here
+                                                    if scale < 0.5 { withAnimation { scale = 0.5 } }
+                                                    if scale > 5.0 { withAnimation { scale = 5.0 } }
+                                                },
+                                            DragGesture()
+                                                .onChanged { value in
+                                                    let delta = CGSize(
+                                                        width: value.translation.width - lastOffset.width,
+                                                        height: value.translation.height - lastOffset.height
+                                                    )
+                                                    offset.width += delta.width
+                                                    offset.height += delta.height
+                                                    lastOffset = value.translation
+                                                }
+                                                .onEnded { _ in
+                                                    lastOffset = .zero
+                                                }
+                                        )
+                                    )
                             }
-                        } else {
-                            // Full Screen Mode
-                            CropScrollView(image: image, viewSize: geometry.size) { croppedImage in
-                                onCrop(croppedImage)
-                            }
+                            .frame(width: cropSize.width, height: cropSize.height)
+                            // Apply clip shape based on overlay type
+                            .clipShape(AnyShape(shapeForOverlay()))
+                            .overlay(
+                                overlayView()
+                            )
+                            .contentShape(Rectangle()) // Ensure gestures work within the frame
+                            
+                            Spacer()
+                            
+                            Text("双指缩放，单指拖动")
+                                .foregroundStyle(.gray)
+                                .padding(.bottom)
+                                .opacity(aspectRatio == nil ? 0 : 1)
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("取消", action: onCancel)
+                            .foregroundStyle(.white)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") {
+                            guard let displayImg = displayedImage else { return }
+                            
+                            // Calculate crop dimensions again for consistency
+                            let cropSize: CGSize = {
+                                if let ratio = aspectRatio {
+                                    let width = geometry.size.width - 40
+                                    let height = width / ratio
+                                    if height > geometry.size.height - 100 {
+                                        let h = geometry.size.height - 100
+                                        let w = h * ratio
+                                        return CGSize(width: w, height: h)
+                                    }
+                                    return CGSize(width: width, height: height)
+                                } else {
+                                    return geometry.size
+                                }
+                            }()
+                            
+                            // Determine output size
+                            // If targetWidth is provided, use it.
+                            // Otherwise, if we downsampled, maybe we should try to be smart, 
+                            // but simpler is to output at the "display resolution" scaled up to match original if needed?
+                            // No, let's keep it simple:
+                            // If targetWidth is set (e.g. 1080), we output at that width.
+                            // If not, we output at the cropSize * screenScale (basically screen res crop).
+                            
+                            let outputWidth: CGFloat
+                            let outputHeight: CGFloat
+                            let multiplier: CGFloat
+                            
+                            if let targetW = targetWidth {
+                                outputWidth = targetW
+                                outputHeight = outputWidth / (cropSize.width / cropSize.height)
+                                multiplier = outputWidth / cropSize.width
+                            } else {
+                                // Default to 2x or 3x screen scale for good quality
+                                let screenScale = UIScreen.main.scale
+                                outputWidth = cropSize.width * screenScale
+                                outputHeight = cropSize.height * screenScale
+                                multiplier = screenScale
+                            }
+                            
+                            cropImage(image: displayImg, width: outputWidth, height: outputHeight, multiplier: multiplier)
+                        }
+                        .foregroundStyle(.white)
+                        .disabled(isPreparing)
+                    }
                 }
             }
         }
-    }
-}
-
-struct CropScrollView: UIViewRepresentable {
-    let image: UIImage
-    let viewSize: CGSize
-    let onCrop: (UIImage) -> Void
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+        .task {
+            // Optimization: Prepare image in background
+            await prepareImage()
+        }
     }
     
-    func makeUIView(context: Context) -> UIScrollView {
-        let scrollView = UIScrollView()
-        scrollView.delegate = context.coordinator
-        scrollView.minimumZoomScale = 0.1
-        scrollView.maximumZoomScale = 5.0
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.bouncesZoom = true
-        scrollView.backgroundColor = .black
-        scrollView.contentInsetAdjustmentBehavior = .never
+    private func shapeForOverlay() -> any Shape {
+        switch overlayType {
+        case .rectangle:
+            return Rectangle()
+        case .circle:
+            return Circle()
+        case .roundedRectangle(let radius):
+            return RoundedRectangle(cornerRadius: radius)
+        case .none:
+            return Rectangle() // Default clip to rectangle for none
+        }
+    }
+    
+    @ViewBuilder
+    private func overlayView() -> some View {
+        switch overlayType {
+        case .rectangle:
+            Rectangle().stroke(Color.white, lineWidth: 2)
+        case .circle:
+            Circle().stroke(Color.white, lineWidth: 2)
+        case .roundedRectangle(let radius):
+            RoundedRectangle(cornerRadius: radius).stroke(Color.white, lineWidth: 2)
+        case .none:
+            EmptyView()
+        }
+    }
+    
+    private func prepareImage() async {
+        // Max dimension to keep in memory for display
+        // 2560px is good enough for any phone screen (even Pro Max is ~1290pt @3x ~> 4000px, but 2560 is safe for memory)
+        // Actually, for "Low Memory", let's be conservative. 2048 is a standard texture size.
+        let maxDimension: CGFloat = 2048 
         
-        // Ensure image is valid before creating view
-        if image.size.width > 0 && image.size.height > 0 {
-            let imageView = UIImageView(image: image)
-            imageView.contentMode = .scaleAspectFit
-            imageView.frame = CGRect(origin: .zero, size: image.size)
-            scrollView.addSubview(imageView)
-            scrollView.contentSize = image.size
-            context.coordinator.imageView = imageView
+        let originalSize = image.size
+        
+        if max(originalSize.width, originalSize.height) > maxDimension {
+            // Resize needed
+            let scale = maxDimension / max(originalSize.width, originalSize.height)
+            let newSize = CGSize(width: originalSize.width * scale, height: originalSize.height * scale)
             
-            // Force initial layout
-            // We can't do full layout here because we don't know viewSize yet (it might be zero initially)
-            // But we can ensure imageView is ready
-        }
-        
-        // Setup crop trigger
-        NotificationCenter.default.addObserver(forName: NSNotification.Name("TriggerCrop"), object: nil, queue: .main) { _ in
-            context.coordinator.cropImage(scrollView: scrollView)
-        }
-        
-        return scrollView
-    }
-    
-    func updateUIView(_ uiView: UIScrollView, context: Context) {
-        
-        // Always try to set image view if it's missing (shouldn't happen but safe)
-        if context.coordinator.imageView == nil && image.size.width > 0 {
-             let imageView = UIImageView(image: image)
-             imageView.contentMode = .scaleAspectFit
-             imageView.frame = CGRect(origin: .zero, size: image.size)
-             uiView.addSubview(imageView)
-             uiView.contentSize = image.size
-             context.coordinator.imageView = imageView
-        } else if let imageView = context.coordinator.imageView, imageView.image != image {
-            // Update image if it changed
-            imageView.image = image
-            imageView.frame = CGRect(origin: .zero, size: image.size)
-            uiView.contentSize = image.size
-            // Reset zoom to force recalculation
-            uiView.zoomScale = 1.0
-            context.coordinator.lastViewSize = .zero
-        }
- 
-        // Only layout if size changed and is valid
-        // Also force layout if we haven't done it yet (lastViewSize is zero) AND we have a valid viewSize
-        if viewSize != .zero && (viewSize != context.coordinator.lastViewSize || uiView.zoomScale == 1.0) {
-            // Update last view size
-            context.coordinator.lastViewSize = viewSize
+            // Perform resize on background thread
+            let resized = await image.byPreparingThumbnail(ofSize: newSize)
             
-            guard let imageView = context.coordinator.imageView else {
-                 return 
+            await MainActor.run {
+                self.displayedImage = resized ?? image // Fallback to original if fail
+                self.isPreparing = false
             }
-            
-            // Calculate scales
-            let widthRatio = viewSize.width / image.size.width
-            let heightRatio = viewSize.height / image.size.height
-            
-            // Aspect Fill scale (ensure image covers the screen)
-            let fillScale = max(widthRatio, heightRatio)
-            
-            // Update constraints
-            uiView.minimumZoomScale = fillScale
-            uiView.maximumZoomScale = max(fillScale * 5.0, 5.0)
-            
-            // Only set initial zoom if we haven't laid out before or if explicitly needed
-            // For now, we reset to fill on rotation/resize to ensure coverage
-            // OR if zoomScale is currently default (1.0), which might be wrong for large images
-            if uiView.zoomScale == 1.0 || uiView.zoomScale < fillScale {
-                uiView.zoomScale = fillScale
-            }
-            
-            // Center the image
-            let contentWidth = image.size.width * fillScale
-            let contentHeight = image.size.height * fillScale
-            
-            let offsetX = (contentWidth - viewSize.width) / 2
-            let offsetY = (contentHeight - viewSize.height) / 2
-            
-            // Only adjust offset if it seems off (e.g. at 0,0)
-            if uiView.contentOffset == .zero {
-                 uiView.contentOffset = CGPoint(x: max(0, offsetX), y: max(0, offsetY))
+        } else {
+            await MainActor.run {
+                self.displayedImage = image
+                self.isPreparing = false
             }
         }
     }
     
-    static func dismantleUIView(_ uiView: UIScrollView, coordinator: Coordinator) {
-        NotificationCenter.default.removeObserver(coordinator)
-    }
-    
-    class Coordinator: NSObject, UIScrollViewDelegate {
-        var parent: CropScrollView
-        var imageView: UIImageView?
-        var lastViewSize: CGSize = .zero
+    @MainActor
+    private func cropImage(image: UIImage, width: CGFloat, height: CGFloat, multiplier: CGFloat) {
+        // Render the view at high resolution
+        let renderer = ImageRenderer(content:
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .scaleEffect(scale)
+                .offset(x: offset.width * multiplier, y: offset.height * multiplier)
+                .frame(width: width, height: height)
+                .clipped()
+        )
         
-        init(_ parent: CropScrollView) {
-            self.parent = parent
-        }
+        // Ensure we get a good quality image
+        renderer.scale = 1.0 
         
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-            return imageView
-        }
-        
-        func cropImage(scrollView: UIScrollView) {
-            guard let image = imageView?.image else { return }
-            
-            // Calculate visible rect in image coordinates (points)
-            let scale = 1.0 / scrollView.zoomScale
-            let visibleRect = CGRect(
-                x: scrollView.contentOffset.x * scale,
-                y: scrollView.contentOffset.y * scale,
-                width: scrollView.bounds.width * scale,
-                height: scrollView.bounds.height * scale
-            )
-            
-            // Convert to pixels for CGImage cropping
-            let imageScale = image.scale
-            let pixelRect = CGRect(
-                x: visibleRect.origin.x * imageScale,
-                y: visibleRect.origin.y * imageScale,
-                width: visibleRect.width * imageScale,
-                height: visibleRect.height * imageScale
-            )
-            
-            if let cgImage = image.cgImage?.cropping(to: pixelRect) {
-                // Create new UIImage. Note: The new image will have the same scale as original
-                // but its size will match the screen bounds (in points).
-                let cropped = UIImage(cgImage: cgImage, scale: imageScale, orientation: image.imageOrientation)
-                parent.onCrop(cropped)
-            } else {
-                // Fallback
-                parent.onCrop(image)
-            }
+        if let cropped = renderer.uiImage {
+            onCrop(cropped)
+        } else {
+            // Fallback (shouldn't happen usually)
+            onCancel()
         }
     }
 }

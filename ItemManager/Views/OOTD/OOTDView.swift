@@ -286,7 +286,11 @@ struct OOTDView: View {
             }
             .fullScreenCover(isPresented: $showingBackgroundCropper) {
                 if let image = tempBackgroundImage {
-                    OOTDBackgroundCropperView(image: image) { croppedImage in
+                    ImageCropView(
+                        image: image,
+                        aspectRatio: 0.75, // 3:4 aspect ratio
+                        targetWidth: 1080  // Ensure high quality output
+                    ) { croppedImage in
                          createCustomOutfit(with: croppedImage)
                          showingBackgroundCropper = false
                          tempBackgroundImage = nil

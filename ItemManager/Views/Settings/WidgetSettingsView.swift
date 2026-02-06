@@ -187,7 +187,11 @@ struct WidgetSettingsView: View {
             // Determine aspect ratio based on editingFamily
             let ratio = editingFamily?.aspectRatio
             
-            ImageCropView(image: request.image, aspectRatio: ratio) { croppedImage in
+            ImageCropView(
+                image: request.image, 
+                aspectRatio: ratio,
+                overlayType: .roundedRectangle(cornerRadius: 22) // iOS Widget style
+            ) { croppedImage in
                 if let family = editingFamily {
                     WidgetBackgroundManager.shared.saveImage(croppedImage, for: family)
                     loadCurrentStatus()
