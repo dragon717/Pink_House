@@ -92,9 +92,6 @@ struct ClothingDetailView: View {
                 }
                 .ignoresSafeArea(edges: .top)
                 
-                // MARK: - Custom Navigation Bar
-                customNavBar
-                
                 // MARK: - FAB
                 VStack {
                     Spacer()
@@ -127,7 +124,35 @@ struct ClothingDetailView: View {
                 }
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle("衣橱详情")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        showingEditSheet = true
+                    } label: {
+                        Label("编辑", systemImage: "pencil")
+                    }
+                    
+                    Button {
+                        duplicateClothing()
+                    } label: {
+                        Label("复制", systemImage: "doc.on.doc")
+                    }
+                    
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                }
+            }
+        }
         .sheet(isPresented: $showingEditSheet) {
             NavigationStack {
                 ClothingEditView(clothing: clothing)
@@ -244,6 +269,7 @@ struct ClothingDetailView: View {
     
     // MARK: - Subviews
     
+    @ViewBuilder
     private func imageCarousel(height: CGFloat, width: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $currentImageIndex) {
@@ -290,57 +316,7 @@ struct ClothingDetailView: View {
         }
     }
     
-    private var customNavBar: some View {
-        HStack {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.headline)
-                    .foregroundStyle(.black)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(.white))
-                    .shadow(radius: 2)
-            }
-            
-            Spacer()
-            
-            Text("衣橱详情")
-                .font(.headline)
-                .foregroundStyle(.white)
-                .shadow(radius: 2)
-            
-            Spacer()
-            
-            Menu {
-                Button {
-                    showingEditSheet = true
-                } label: {
-                    Label("编辑", systemImage: "pencil")
-                }
-                
-                Button {
-                    duplicateClothing()
-                } label: {
-                    Label("复制", systemImage: "doc.on.doc")
-                }
-                
-                Button(role: .destructive) {
-                    showingDeleteAlert = true
-                } label: {
-                    Label("删除", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.headline)
-                    .foregroundStyle(.black)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(.white))
-                    .shadow(radius: 2)
-            }
-        }
-        .padding(.horizontal)
-    }
+    // customNavBar removed
     
     private var mainInfoCard: some View {
         VStack(alignment: .leading, spacing: 12) {

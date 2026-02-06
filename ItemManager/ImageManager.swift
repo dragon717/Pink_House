@@ -473,19 +473,9 @@ class ImageManager {
             if ImageManager.imageHasAlpha(sourceCGImage) {
                 // 进一步检查像素是否全为不透明
                 if ImageManager.isImageActuallyOpaque(sourceCGImage) {
-                    // 使用 UIGraphicsImageRenderer 创建不带 Alpha 的副本 (强制重绘为不透明)
-                    // 相比之前的 createOpaqueImage (仅修改元数据)，这种方式更可靠，
-                    // 能确保生成的新 CGImage 具有正确的 kCGImageAlphaNoneSkipLast/First 且数据一致。
-                    let format = UIGraphicsImageRendererFormat()
-                    format.opaque = true
-                    format.scale = image.scale
-                    let renderer = UIGraphicsImageRenderer(size: image.size, format: format)
-                    let opaqueImage = renderer.image { _ in
-                        image.draw(at: .zero)
-                    }
-                    
-                    if let newCGImage = opaqueImage.cgImage {
-                        sourceCGImage = newCGImage
+                    // 使用 CoreGraphics 创建明确的无 Alpha (NoneSkipLast) 副本
+                    if let stripped = ImageManager.stripAlpha(from: sourceCGImage) {
+                        sourceCGImage = stripped
                     }
                 }
             }
@@ -562,6 +552,30 @@ class ImageManager {
         return false
     }
     
+    private static func stripAlpha(from image: CGImage) -> CGImage? {
+        let width = image.width
+        let height = image.height
+        let bitsPerComponent = 8
+        let bytesPerRow = 4 * width
+        let colorSpace = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        // 使用 NoneSkipLast 明确忽略 Alpha 通道
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.noneSkipLast.rawValue
+        
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+        
+        context.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+        
+        return context.makeImage()
+    }
+
     private static func createOpaqueImage(from image: CGImage) -> CGImage? {
         guard image.bitsPerComponent == 8 && image.bitsPerPixel == 32 else { return nil }
         
