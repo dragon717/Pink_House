@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ClothingDetailView: View {
     @Bindable var clothing: Clothing
@@ -14,6 +15,9 @@ struct ClothingDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingEditSheet = false
     @State private var showingImageViewer = false
+    @State private var showing3DPreview = false
+    @State private var previewImage: UIImage?
+    @State private var previewPath: String?
     @State private var showingDeleteAlert = false
     @State private var showingConfirmPaymentAlert = false
     @State private var showCelebration = false
@@ -24,104 +28,135 @@ struct ClothingDetailView: View {
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .top) {
-                Color(uiColor: .systemGroupedBackground)
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 16) {
-                        // MARK: - Image Carousel
-                        // Adjust height based on orientation (portrait vs landscape)
-                        // Ensure height is at least 1 to avoid "Failed to create image slot" warnings
-                        let carouselHeight = max(1, geometry.size.height > geometry.size.width ? 400.0 : geometry.size.height * 0.7)
-                        imageCarousel(height: carouselHeight, width: geometry.size.width)
-                        
-                        // MARK: - Main Info Card
-                        mainInfoCard
-                            .padding(.horizontal)
-                            .offset(y: -40) // Overlap the image slightly
-                        
-                        // MARK: - Detail Info
-                        detailInfoCard
-                            .padding(.horizontal)
-                            .offset(y: -40)
-                        
-                        // MARK: - Price Info
-                        priceInfoCard
-                            .padding(.horizontal)
-                            .offset(y: -40)
-                        
-                        // MARK: - Purchase Info
-                        purchaseInfoCard
-                            .padding(.horizontal)
-                            .offset(y: -40)
-                        
-                        // MARK: - Pay Balance Button
-                        if clothing.isDepositPlan {
-                            Button {
-                                showingConfirmPaymentAlert = true
-                            } label: {
-                                Text("已付尾款")
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.pink)
-                                    .cornerRadius(16)
-                            }
-                            .padding(.horizontal)
-                            .offset(y: -40)
-                            .shadow(color: .pink.opacity(0.3), radius: 8, x: 0, y: 4)
-                        }
-                        
-                        // MARK: - Metadata Info (Created/Updated)
-                        VStack(spacing: 4) {
-                            Text("添加时间: \(clothing.createdAt.formatted(date: .numeric, time: .shortened))")
-                            Text("修改时间: \(clothing.updatedAt.formatted(date: .numeric, time: .shortened))")
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.bottom, 20)
-                        .offset(y: -20)
-                        
-                        // Bottom Padding for FAB
-                        Color.clear.frame(height: 80)
-                    }
-                }
-                .ignoresSafeArea(edges: .top)
-                
-                // MARK: - FAB
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button {
-                            // Action for Community/Square
-                        } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "bubble.left.and.bubble.right")
-                                    .font(.title2)
-                                Text("社区")
-                                    .font(.caption2)
-                            }
-                            .foregroundStyle(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Circle().fill(Color.black.opacity(0.6)))
-                            .shadow(radius: 4)
-                        }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20)
-                    }
-                }
-                
-                // MARK: - Celebration Overlay
-                if showCelebration {
-                    CelebrationOverlay(isPresented: $showCelebration)
+        ZStack {
+            // 1. Content
+            GeometryReader { geometry in
+                ZStack(alignment: .top) {
+                    Color(uiColor: .systemGroupedBackground)
                         .ignoresSafeArea()
-                        .zIndex(100)
+                    
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // MARK: - Image Carousel
+                            // Adjust height based on orientation (portrait vs landscape)
+                            // Ensure height is at least 1 to avoid "Failed to create image slot" warnings
+                            let carouselHeight = max(1, geometry.size.height > geometry.size.width ? 400.0 : geometry.size.height * 0.7)
+                            imageCarousel(height: carouselHeight, width: geometry.size.width)
+                            
+                            // MARK: - Main Info Card
+                            mainInfoCard
+                                .padding(.horizontal)
+                                .offset(y: -40) // Overlap the image slightly
+                            
+                            // MARK: - Detail Info
+                            detailInfoCard
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                            
+                            // MARK: - Price Info
+                            priceInfoCard
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                            
+                            // MARK: - Purchase Info
+                            purchaseInfoCard
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                            
+                            // MARK: - Pay Balance Button
+                            if clothing.isDepositPlan {
+                                Button {
+                                    showingConfirmPaymentAlert = true
+                                } label: {
+                                    Text("已付尾款")
+                                        .font(.headline)
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.pink)
+                                        .cornerRadius(16)
+                                }
+                                .padding(.horizontal)
+                                .offset(y: -40)
+                                .shadow(color: .pink.opacity(0.3), radius: 8, x: 0, y: 4)
+                            }
+                            
+                            // MARK: - Metadata Info (Created/Updated)
+                            VStack(spacing: 4) {
+                                Text("添加时间: \(clothing.createdAt.formatted(date: .numeric, time: .shortened))")
+                                Text("修改时间: \(clothing.updatedAt.formatted(date: .numeric, time: .shortened))")
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 20)
+                            .offset(y: -20)
+                            
+                            // Bottom Padding for FAB
+                            Color.clear.frame(height: 80)
+                        }
+                    }
+                    .ignoresSafeArea(edges: .top)
+                    
+                    // MARK: - FAB
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Button {
+                                // Action for Community/Square
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "bubble.left.and.bubble.right")
+                                        .font(.title2)
+                                        Text("社区")
+                                        .font(.caption2)
+                                }
+                                .foregroundStyle(.white)
+                                .frame(width: 60, height: 60)
+                                .background(Circle().fill(Color.black.opacity(0.6)))
+                                .shadow(radius: 4)
+                            }
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 20)
+                        }
+                    }
+                    
+                    // MARK: - Celebration Overlay
+                    if showCelebration {
+                        CelebrationOverlay(isPresented: $showCelebration)
+                            .ignoresSafeArea()
+                            .zIndex(100)
+                    }
                 }
+            }
+            
+            // 2. 3D Preview Overlay (Explicitly on top in ZStack)
+            if showing3DPreview {
+                ZStack {
+                    Color.black
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                    
+                    if let image = previewImage {
+                        // Debug Mode: Test if OOTD3DPreviewView is the cause
+                        OOTD3DPreviewView(inputImage: image) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showing3DPreview = false
+                                previewImage = nil
+                            }
+                        }
+                    } else if let path = previewPath {
+                        OOTD3DPreviewView(imagePath: path) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showing3DPreview = false
+                                previewPath = nil
+                            }
+                        }
+                    }
+                }
+                .zIndex(999) // Force highest zIndex
+                .transition(.opacity)
             }
         }
         .navigationTitle("衣橱详情")
@@ -139,6 +174,26 @@ struct ClothingDetailView: View {
                         duplicateClothing()
                     } label: {
                         Label("复制", systemImage: "doc.on.doc")
+                    }
+                    
+                    if !clothing.imagePaths.isEmpty {
+                        Button {
+                            AppLogger.info("Clicked Generate 3D Model button")
+                            if let firstPath = clothing.imagePaths.first {
+                                // Reset states
+                                previewImage = nil
+                                previewPath = firstPath
+                                
+                                // Show immediately with loading state in OOTD3DPreviewView
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    showing3DPreview = true
+                                }
+                            } else {
+                                AppLogger.error("No image path found in clothing.imagePaths")
+                            }
+                        } label: {
+                            Label("生成 3D 模型", systemImage: "cube.transparent")
+                        }
                     }
                     
                     Button(role: .destructive) {
@@ -161,6 +216,7 @@ struct ClothingDetailView: View {
         .fullScreenCover(isPresented: $showingImageViewer) {
             ImageViewer(imagePaths: clothing.imagePaths, selectedIndex: $currentImageIndex)
         }
+        // Removed fullScreenCover for 3D Preview in favor of ZStack Overlay
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {

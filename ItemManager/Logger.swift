@@ -22,4 +22,8 @@ struct AppLogger {
     static func info(_ message: String) {
         log(message, type: .info)
     }
+    
+    static func warning(_ message: String) {
+        logger.warning("\(message)")
+    }
 }

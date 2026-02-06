@@ -1,4 +1,6 @@
 import UIKit
+import CoreVideo
+import CoreImage
 
 extension UIImage {
     var averageColor: UIColor? {
@@ -78,5 +80,63 @@ extension UIImage {
         return renderer.image { _ in
             self.draw(in: CGRect(origin: .zero, size: newSize))
         }
+    }
+    
+    // MARK: - ML Helpers (Consolidated)
+    
+    func resized(to size: CGSize) -> UIImage? {
+        UIGraphicsBeginImageContextWithOptions(size, false, 1.0)
+        draw(in: CGRect(origin: .zero, size: size))
+        let resized = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return resized
+    }
+    
+    func pixelBuffer() -> CVPixelBuffer? {
+        let width = Int(size.width)
+        let height = Int(size.height)
+        var pixelBuffer: CVPixelBuffer?
+        let attrs = [kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+                     kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue] as CFDictionary
+        CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
+        
+        guard let buffer = pixelBuffer else { return nil }
+        
+        CVPixelBufferLockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
+        defer { CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0)) }
+        
+        let context = CIContext()
+        if let cgImage = self.cgImage {
+             context.render(CIImage(cgImage: cgImage), to: buffer)
+        }
+        
+        return buffer
+    }
+    
+    convenience init?(pixelBuffer: CVPixelBuffer) {
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
+        self.init(cgImage: cgImage)
+    }
+    
+    func masking(with mask: UIImage) -> UIImage {
+        guard let cgImage = self.cgImage,
+              let maskCG = mask.cgImage else { return self }
+        
+        let originalCI = CIImage(cgImage: cgImage)
+        let maskCI = CIImage(cgImage: maskCG)
+        
+        let filter = CIFilter.blendWithMask()
+        filter.inputImage = originalCI
+        filter.maskImage = maskCI
+        filter.backgroundImage = CIImage.empty()
+        
+        let context = CIContext()
+        if let result = filter.outputImage,
+           let resultCG = context.createCGImage(result, from: originalCI.extent) {
+            return UIImage(cgImage: resultCG)
+        }
+        return self
     }
 }
