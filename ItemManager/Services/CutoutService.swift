@@ -98,260 +98,192 @@ class CutoutService {
                 // 但为了不丢信息，如果 Vision 识别出"未分类"，也许可以回退到 standardized 为 nil 的情况...
                 // 这里简化策略：无法标准化的词 -> 视为无效分类，走 Vision。
                 print("Category '\(category)' not recognized. Falling back to Vision.")
-                finalCategory = await classifyImage(cutoutImage)
             }
-        } else {
-            // 2. 如果未指定分类，则使用 Vision 识别
-            finalCategory = await classifyImage(cutoutImage)
         }
         
-        print("Auto-classified as: \(finalCategory)")
+        // 只有当需要 Vision 识别时（分类是默认的"未分类"或空的），才调用分类器
+        if finalCategory == "未分类" {
+            if let recognizedCategory = try? await classifyImage(image: normalizedImage) {
+                print("Vision recognized category: \(recognizedCategory)")
+                finalCategory = recognizedCategory
+            }
+        }
         
-        // 3. 添加白边
-        let borderedImage = addWhiteBorder(to: cutoutImage)
+        // 3. 加白边 (UI 线程处理)
+        // 考虑到性能，这里使用较简单的绘制
+        let borderedImage = addWhiteBorder(to: cutoutImage, borderWidth: 4.0)
         
-        // 4. 保存图片 (使用 ImageManager 保存为 HEIC 以获得更小的体积和透明度支持)
-        // 0.8 的质量通常能提供非常好的视觉效果，且体积远小于 PNG
-        guard let fileName = ImageManager.shared.saveImage(borderedImage, context: context, format: .heic(quality: 0.8)) else {
+        // 4. 保存到文件系统和数据库
+        guard let savedPath = ImageManager.shared.saveImage(borderedImage, context: context) else {
             throw CutoutError.processingFailed
         }
         
-        // 5. 创建 CutoutItem
-        let item = CutoutItem(
+        let width = Double(borderedImage.size.width)
+        let height = Double(borderedImage.size.height)
+        
+        let cutoutItem = CutoutItem(
             originalImageHash: originalHash,
             category: finalCategory,
-            imagePath: fileName,
-            width: Double(borderedImage.size.width),
-            height: Double(borderedImage.size.height),
+            imagePath: savedPath,
+            width: width,
+            height: height,
             linkedClothingID: clothing?.id,
             clothingName: clothing?.name
         )
         
-        context.insert(item)
-        
-        return item
+        context.insert(cutoutItem)
+        return cutoutItem
     }
     
-    /// 重新抠图：使用提供的原图更新现有的 CutoutItem
+    /// 当删除图片或抠图时，检查并重置关联裙子的“已替换”状态
     /// - Parameters:
-    ///   - item: 需要更新的 CutoutItem
-    ///   - image: 原图
-    func reprocessItem(item: CutoutItem, with image: UIImage, context: ModelContext) async throws {
-        // 1. Normalize
-        let normalizedImage = normalizeOrientation(image)
-        
-        // 2. 识别并抠图
-        var cutoutImage: UIImage
-        // var confidence: Float // 未使用
+    ///   - imagePath: 被删除图片的路径（文件名）
+    ///   - context: ModelContext
+    func handleCutoutDeletion(imagePath: String, context: ModelContext) {
+        // 查找是否是抠图 (根据 imagePath)
+        let descriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.imagePath == imagePath })
         
         do {
-            (cutoutImage, _) = try await liftSubject(from: normalizedImage)
-        } catch {
-            print("Reprocess: Standard liftSubject failed: \(error). Trying fallback.")
-            if let saliencyResult = try? await liftSubjectUsingSaliency(from: normalizedImage) {
-                 cutoutImage = saliencyResult.0
-            } else {
-                throw error
-            }
-        }
-        
-        // 3. 添加白边
-        let borderedImage = addWhiteBorder(to: cutoutImage)
-        
-        // 4. 保存新图片
-        guard let fileName = ImageManager.shared.saveImage(borderedImage, context: context, format: .heic(quality: 0.8)) else {
-            throw CutoutError.processingFailed
-        }
-        
-        // 5. 更新 Item
-        // 处理旧图片引用计数
-        let oldPath = item.imagePath
-        if oldPath != fileName {
-            ImageManager.shared.deleteImage(fileName: oldPath, context: context)
-        } else {
-             // 如果文件名相同（内容哈希一致），saveImage 已经增加了引用计数，
-             // 我们需要减少一次，因为我们并没有真正增加一个新的引用持有者（只是更新了同一个对象）
-             // 或者更准确地说：
-             // saveImage: refCount + 1
-             // 我们即将用这个 fileName 替换 item.imagePath (如果是同一个值，则相当于没变)
-             // 如果是同一个值，refCount 增加了 1，但实际上 item 还是那个 item，只引用一次。
-             // 所以如果 fileName == oldPath，我们需要抵消 saveImage 带来的 +1。
-             ImageManager.shared.deleteImage(fileName: fileName, context: context)
-        }
-        
-        item.imagePath = fileName
-        item.width = Double(borderedImage.size.width)
-        item.height = Double(borderedImage.size.height)
-        
-        // 更新原图哈希
-        if let data = image.jpegData(compressionQuality: 0.5) {
-             item.originalImageHash = computeHash(data: data)
-        }
-        
-        // 注意：不更新分类 (category)，保留用户可能的手动修改
-    }
-    
-    /// 修复缺失的 clothingName
-    /// 遍历所有 CutoutItem，如果 clothingName 为空且 linkedClothingID 有效，则填充
-    func fixMissingClothingNames(context: ModelContext) {
-        do {
-            // 只查找 linkedClothingID 不为空的
-            // 注意：SwiftData 的 Predicate 支持有限，这里先取所有关联了的，然后在内存中过滤 clothingName 为空的
-            // 或者直接遍历所有。由于数据量通常不大（几千个），直接遍历也是可以的。
-            // 但为了效率，我们尽量用 Predicate。
-            // Predicate 暂不支持 optional check for nil easily inside complex expressions sometimes, but let's try.
-            // 简单点：获取所有 CutoutItem
-            let descriptor = FetchDescriptor<CutoutItem>()
-            let cutouts = try context.fetch(descriptor)
-            
-            // 获取所有 Clothing
-            let clothingDescriptor = FetchDescriptor<Clothing>()
-            let allClothing = try context.fetch(clothingDescriptor)
-            let clothingMap = Dictionary(uniqueKeysWithValues: allClothing.map { ($0.id, $0) })
-            
-            var updatedCount = 0
-            for cutout in cutouts {
-                // 如果名字为空，或者即使不为空我们也想刷新一下（比如改名了）？
-                // 用户说 "加载时...存下"，可能是为了补全。
-                // 如果一直刷新，会覆盖掉某种情况吗？ CutoutItem 本身没有修改名字的入口，所以应该是同步 Clothing 的名字。
-                // 这里策略：只要关联了 Clothing，就同步名字。
-                if let clothingID = cutout.linkedClothingID,
-                   let clothing = clothingMap[clothingID] {
-                    
-                    if cutout.clothingName != clothing.name {
-                        cutout.clothingName = clothing.name
-                        updatedCount += 1
+            if let cutout = try context.fetch(descriptor).first {
+                // 如果找到了 CutoutItem，检查其关联
+                if let clothingID = cutout.linkedClothingID {
+                    let clothingDesc = FetchDescriptor<Clothing>(predicate: #Predicate { $0.id == clothingID })
+                    if let clothing = try context.fetch(clothingDesc).first {
+                        // 重置标记
+                        if clothing.hasReplacedCutoutImage {
+                            clothing.hasReplacedCutoutImage = false
+                            print("CutoutService: Reset hasReplacedCutoutImage for clothing '\(clothing.name)' because cutout '\(imagePath)' is being deleted.")
+                        }
                     }
                 }
             }
-            
-            if updatedCount > 0 {
-                try context.save()
-                print("Fixed/Updated clothing names for \(updatedCount) cutouts.")
-            }
         } catch {
-            print("Failed to fix missing clothing names: \(error)")
+            print("CutoutService: Failed to fetch cutout for deletion check: \(error)")
         }
     }
     
-    // MARK: - Classification
+    // MARK: - Private Helpers
     
-    /// 将输入的分类字符串标准化为 6 大类
-    /// - Parameter input: 用户输入或关联服饰的类型 (e.g. "JSK", "开衫")
-    /// - Returns: 标准分类 (e.g. "裙子", "外套")，如果无法映射则返回 nil
-    func standardizeCategory(_ input: String) -> String? {
-        let standardCategories = ["裙子", "外套", "鞋子", "袜子", "玩偶", "小物"]
-        if standardCategories.contains(input) { return input }
-        
-        let inputLower = input.lowercased()
-        
-        // 裙子
-        if inputLower.contains("jsk") || inputLower.contains("op") || inputLower.contains("sk") || inputLower.contains("裙") || inputLower.contains("dress") || inputLower.contains("frock") || inputLower.contains("pinafore") {
-            return "裙子"
-        }
-        // 外套
-        if inputLower.contains("外套") || inputLower.contains("上衣") || inputLower.contains("开衫") || inputLower.contains("衬衫") || inputLower.contains("卫衣") || inputLower.contains("衣") || inputLower.contains("top") || inputLower.contains("shirt") || inputLower.contains("blouse") || inputLower.contains("cardigan") || inputLower.contains("内搭") {
-            return "外套"
-        }
-        // 鞋子
-        if inputLower.contains("鞋") || inputLower.contains("靴") {
-            return "鞋子"
-        }
-        // 袜子
-        if inputLower.contains("袜") {
-            return "袜子"
-        }
-        // 玩偶
-        if inputLower.contains("玩偶") || inputLower.contains("娃娃") || inputLower.contains("公仔") || inputLower.contains("手办") || inputLower.contains("toy") || inputLower.contains("doll") || inputLower.contains("毛绒") || inputLower.contains("熊") {
-            return "玩偶"
-        }
-        // 小物
-        if inputLower.contains("包") || inputLower.contains("饰") || inputLower.contains("帽") || inputLower.contains("夹") || inputLower.contains("带") || inputLower.contains("袖") || inputLower.contains("发") || inputLower.contains("小物") || inputLower.contains("acc") || inputLower.contains("项链") || inputLower.contains("戒指") || inputLower.contains("手链") || inputLower.contains("耳") {
-            return "小物"
-        }
-        
-        return nil
+    private func computeHash(data: Data) -> String {
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
     
-    private func classifyImage(_ image: UIImage) async -> String {
-        guard let cgImage = image.cgImage else { return "未分类" }
+    private func normalizeOrientation(_ image: UIImage) -> UIImage {
+        if image.imageOrientation == .up { return image }
+        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
+        image.draw(in: CGRect(origin: .zero, size: image.size))
+        let normalizedImage = UIGraphicsGetImageFromCurrentImageContext() ?? image
+        UIGraphicsEndImageContext()
+        return normalizedImage
+    }
+    
+    private func liftSubject(from image: UIImage) async throws -> (UIImage, Float) {
+        let request = VNGenerateForegroundInstanceMaskRequest()
+        let handler = VNImageRequestHandler(cgImage: image.cgImage!, options: [:])
+        try handler.perform([request])
         
+        guard let result = request.results?.first else {
+            throw CutoutError.noSubjectFound
+        }
+        
+        let maskPixelBuffer = try result.generateScaledMaskForImage(forInstances: result.allInstances, from: handler)
+        
+        // Convert CVPixelBuffer to CIImage
+        let maskImage = CIImage(cvPixelBuffer: maskPixelBuffer)
+        let originalImage = CIImage(cgImage: image.cgImage!)
+        
+        // Apply mask
+        let filter = CIFilter.blendWithMask()
+        filter.inputImage = originalImage
+        filter.maskImage = maskImage
+        filter.backgroundImage = CIImage.empty()
+        
+        guard let outputImage = filter.outputImage,
+              let cgImage = CIContext().createCGImage(outputImage, from: outputImage.extent) else {
+            throw CutoutError.processingFailed
+        }
+        
+        // 计算置信度 (平均 mask 强度？Vision 不直接提供整体置信度，这里用 mask 覆盖率或假设成功即 1.0)
+        // 实际上 VNInstanceMaskObservation 没有 confidence 属性。
+        // 我们可以假设如果有结果，置信度尚可。
+        // 为了兼容上面的逻辑，我们返回 1.0 (High)
+        return (UIImage(cgImage: cgImage), 1.0)
+    }
+    
+    // Fallback using Saliency
+    private func liftSubjectUsingSaliency(from image: UIImage) async throws -> (UIImage, Float) {
+        let request = VNGenerateAttentionBasedSaliencyImageRequest()
+        let handler = VNImageRequestHandler(cgImage: image.cgImage!, options: [:])
+        try handler.perform([request])
+        
+        guard let result = request.results?.first else {
+            throw CutoutError.noSubjectFound
+        }
+        
+        // Saliency returns a heatmap (low res). Need to threshold and upscale.
+        // This is a rough fallback.
+        // Better: Use Saliency rect to crop? No, we want transparency.
+        // Simple implementation: Just treat saliency map as alpha mask (after thresholding)
+        
+        // For now, let's just return failure to trigger UI warning if Vision fails.
+        // Or implement a simple center-crop or "Keep as is" if all else fails?
+        // Let's implement a basic mask from saliency.
+        
+        let pixelBuffer = result.pixelBuffer
+        let maskImage = CIImage(cvPixelBuffer: pixelBuffer)
+        
+        // Resize mask to match image
+        let scaleX = image.size.width / maskImage.extent.width
+        let scaleY = image.size.height / maskImage.extent.height
+        let scaledMask = maskImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+        
+        // Thresholding
+        let thresholdFilter = CIFilter.colorMatrix()
+        thresholdFilter.inputImage = scaledMask
+        // Boost alpha
+        thresholdFilter.aVector = CIVector(x: 0, y: 0, z: 0, w: 5) // Amplify
+        
+        let originalImage = CIImage(cgImage: image.cgImage!)
+        let blendFilter = CIFilter.blendWithMask()
+        blendFilter.inputImage = originalImage
+        blendFilter.maskImage = thresholdFilter.outputImage
+        blendFilter.backgroundImage = CIImage.empty()
+        
+        guard let outputImage = blendFilter.outputImage,
+              let cgImage = CIContext().createCGImage(outputImage, from: outputImage.extent) else {
+             throw CutoutError.processingFailed
+        }
+        
+        return (UIImage(cgImage: cgImage), 0.6) // Lower confidence
+    }
+    
+    private func classifyImage(image: UIImage) async throws -> String {
+        // 使用 Vision 的 VNClassifyImageRequest
         let request = VNClassifyImageRequest()
-        // Use latest revision for better accuracy if available
-        // request.revision = VNClassifyImageRequestRevision2 
+        let handler = VNImageRequestHandler(cgImage: image.cgImage!, options: [:])
+        try handler.perform([request])
         
-        let handler = VNImageRequestHandler(cgImage: cgImage)
-        
-        do {
-            try handler.perform([request])
-            guard let observations = request.results else { return "未分类" }
-            
-            // Filter by confidence and map
-            // We look at the top results
-            // 降低置信度阈值，因为很多细分类别置信度可能不高
-            let topResults = observations.filter { $0.confidence > 0.1 }.prefix(20)
-            
-            print("----- Image Classification Results -----")
-            for obs in topResults {
-                print("ID: \(obs.identifier), Confidence: \(obs.confidence)")
-            }
-            print("----------------------------------------")
-            
-            // 收集所有可能的分类
-            var candidates: Set<String> = []
-            
-            for observation in topResults {
-                // Check mapping
-                if let category = mapIdentifierToCategory(observation.identifier) {
-                    print("Mapped '\(observation.identifier)' to '\(category)'")
-                    candidates.insert(category)
-                }
-            }
-            
-            // 根据优先级返回
-            // 用户反馈：玩偶容易被误识别为小物，因此提高玩偶优先级
-            if candidates.contains("玩偶") { return "玩偶" }
-            if candidates.contains("裙子") { return "裙子" }
-            if candidates.contains("外套") { return "外套" }
-            if candidates.contains("鞋子") { return "鞋子" }
-            if candidates.contains("袜子") { return "袜子" }
-            if candidates.contains("小物") { return "小物" }
-            
-            // Fallback logic: if no specific category matched
-            return "未分类"
-            
-        } catch {
-            print("Classification failed: \(error)")
+        guard let observations = request.results else {
             return "未分类"
         }
+        
+        // 过滤高置信度的结果
+        let validObservations = observations.filter { $0.confidence > 0.3 }
+        
+        // 映射英文标签到我们的中文分类
+        for observation in validObservations {
+            let identifier = observation.identifier.lowercased()
+            if let category = mapIdentifierToCategory(identifier) {
+                return category
+            }
+        }
+        
+        return "未分类"
     }
     
-    private func mapIdentifierToCategory(_ identifier: String) -> String? {
-        let id = identifier.lowercased()
-        
-        // 1. 优先匹配玩偶 (特征非常明显，容易被误判为小物或装饰品)
-        let toyKeywords = [
-            "toy", "doll", "plush", "teddy", "figurine", "action figure", "puppet",
-            "marionette", "stuffed animal", "bear", "rabbit", "bunny", "cat", "dog",
-            "animal", "mascot", "robot"
-        ]
-        // 排除真实的猫狗（如果是为了抠图，通常是玩偶，但 Vision 可能会识别出 'cat'）
-        // 这里假设用户拍摄的是物品。
-        if toyKeywords.contains(where: { id.contains($0) }) {
-            return "玩偶"
-        }
-        
-        // 2. 裙子 (Dresses & Skirts) - 扩展关键词
-        // 很多洛丽塔裙子会被识别为 costume, gown, clothing 等
-        let dressKeywords = [
-            "dress", "skirt", "gown", "sarong", "kimono", "miniskirt", "overskirt",
-            "sundress", "cocktail", "evening", "wedding", "ball",
-            "chemise", "jumper", "pinafore", "frock", "kilt", "petticoat", "crinoline",
-            "costume", "cosplay", "lolita", "victorian", "baroque", "rococo", // 风格词
-            "clothing", "apparel", "garment", "wear", "vestment", "outfit", "robe" // 泛指词，通常归为裙子或外套，这里优先裙子尝试
-        ]
-        
-        // 2.1 强匹配裙子 (Specific Types)
+    private func mapIdentifierToCategory(_ id: String) -> String? {
+        // 1. 裙子 (Skirts & Dresses)
         let strongDressKeywords = [
             "dress", "skirt", "gown", "frock", "pinafore", "sarong", "kilt"
         ]
@@ -390,235 +322,179 @@ class CutoutService {
             return "袜子"
         }
         
-        // 6. 弱匹配裙子 (泛指词) - 放在具体分类之后，避免把“鞋子”识别成“Clothing”
-        let weakDressKeywords = [
-            "costume", "clothing", "apparel", "garment", "wear", "vestment", "textile", "fabric", "fashion"
+        // 6. 包包 (Bags)
+        let bagKeywords = [
+            "bag", "purse", "handbag", "backpack", "tote", "satchel", "clutch", "wallet",
+            "briefcase", "suitcase", "luggage", "pouch"
         ]
-        // 如果是这些词，且没命中鞋袜小物，大概率是主体衣物。
-        // 在洛丽塔/JK制服语境下，主体衣物通常是裙子或套装（归裙子或外套）。
-        // 我们可以暂时归为“裙子”（因为用户说裙子容易丢），或者根据是否包含 "top"/"shirt" 区分。
-        // 这里做一个偏向性策略：如果是泛指 Clothing，优先归为裙子（因为裙子体积大，容易被识别为整体 Clothing）
-        if weakDressKeywords.contains(where: { id.contains($0) }) {
-            // 再次检查是否可能是外套？
-            // 很难区分。但用户反馈裙子被分错，所以这里给裙子权重。
-            return "裙子"
+        if bagKeywords.contains(where: { id.contains($0) }) {
+            return "包包"
         }
         
-        // 7. 小物 (Accessories) - 必须精确匹配
-        // 只有明确识别为包、饰品等才算小物
+        // 7. 头饰/配饰 (Headwear & Accessories)
         let accessoryKeywords = [
-            "bag", "purse", "wallet", "hat", "cap", "scarf", "glove", "jewelry",
-            "necklace", "ring", "earring", "bracelet", "glasses", "sunglasses",
-            "watch", "umbrella", "tie", "belt", "accessory", "keychain", "hair",
-            "pin", "brooch", "headband", "bow", "ribbon", "fan", "mask", "wig",
-            "crown", "tiara", "helmet", "bonnet", "beret", "fedora", "cowboy hat",
-            "sombrero", "backpack", "satchel", "tote", "handbag", "clutch", "briefcase",
-            "luggage", "suitcase"
+            "hat", "cap", "bonnet", "beret", "beanie", "helmet", "headband", "hair",
+            "bow", "ribbon", "scarf", "glove", "mitten", "belt", "tie", "umbrella",
+            "glasses", "sunglasses", "jewelry", "necklace", "earring", "bracelet", "ring",
+            "watch", "fan", "mask"
         ]
         if accessoryKeywords.contains(where: { id.contains($0) }) {
-            return "小物"
+            return "配饰"
+        }
+        
+        // 2. 裤子 (Pants & Shorts) - Put lower priority than skirts/dresses
+        let pantKeywords = [
+            "pant", "trouser", "jean", "denim", "short", "legging", "slack", "chino",
+            "bottom", "culotte", "overall", "dungaree", "jumpsuit", "romper"
+        ]
+        if pantKeywords.contains(where: { id.contains($0) }) {
+            return "裤子"
         }
         
         return nil
     }
     
-    // MARK: - Image Processing
-    
-    /// 备用抠图引擎：基于显著性检测 (Saliency)
-    /// 当标准的主体识别失败时，使用此方法尝试提取画面中最显著的物体
-    private func liftSubjectUsingSaliency(from image: UIImage) async throws -> (UIImage, Float) {
-        guard let cgImage = image.cgImage else { throw CutoutError.processingFailed }
+    func standardizeCategory(_ input: String) -> String? {
+        let normalized = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         
-        let request = VNGenerateAttentionBasedSaliencyImageRequest()
-        // request.revision = VNGenerateAttentionBasedSaliencyImageRequestRevision1
+        // 映射表 (用户输入习惯 -> 标准分类)
+        let mapping: [String: String] = [
+            "jsk": "裙子", "op": "裙子", "sk": "裙子", "连衣裙": "裙子", "半身裙": "裙子", "背带裙": "裙子",
+            "上衣": "外套", "衬衫": "外套", "内搭": "外套", "外套": "外套", "开衫": "外套", "大衣": "外套",
+            "鞋": "鞋子", "鞋子": "鞋子", "靴子": "鞋子", "单鞋": "鞋子", "凉鞋": "鞋子",
+            "袜": "袜子", "袜子": "袜子", "裤袜": "袜子", "丝袜": "袜子",
+            "包": "包包", "包包": "包包", "手提包": "包包", "痛包": "包包",
+            "裤": "裤子", "裤子": "裤子", "短裤": "裤子", "长裤": "裤子", "南瓜裤": "裤子",
+            "头饰": "配饰", "发带": "配饰", "kc": "配饰", "bn": "配饰", "边夹": "配饰", "帽子": "配饰",
+            "小物": "配饰", "配饰": "配饰", "项链": "配饰", "手袖": "配饰", "手套": "配饰", "假发": "配饰"
+        ]
         
-        let handler = VNImageRequestHandler(cgImage: cgImage)
-        try handler.perform([request])
-        
-        guard let result = request.results?.first else {
-             throw CutoutError.noSubjectFound
+        // 1. 精确匹配
+        if let standard = mapping[normalized] {
+            return standard
         }
         
-        // Saliency returns a heatmap. We need to threshold it to create a mask.
-        let pixelBuffer = result.pixelBuffer
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        // 2. 包含匹配 (e.g. "衬衫/雪纺" -> "外套")
+        for (key, value) in mapping {
+            if normalized.contains(key) {
+                return value
+            }
+        }
         
-        // Resize mask to match image size
-        let scaleX = CGFloat(cgImage.width) / CGFloat(CVPixelBufferGetWidth(result.pixelBuffer))
-        let scaleY = CGFloat(cgImage.height) / CGFloat(CVPixelBufferGetHeight(result.pixelBuffer))
+        return nil
+    }
+    
+    private func addWhiteBorder(to image: UIImage, borderWidth: CGFloat = 4.0) -> UIImage {
+        // 1. Define rect
+        let rect = CGRect(origin: .zero, size: image.size)
         
-        let resizedMask = ciImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+        // 2. Setup context
+        UIGraphicsBeginImageContextWithOptions(rect.size, false, image.scale)
+        guard let context = UIGraphicsGetCurrentContext() else { return image }
         
-        // Thresholding: Convert soft heatmap to hard binary mask
-        // Values usually range 0.0-1.0. Let's pick 0.3 as threshold
-        let thresholdFilter = CIFilter.colorMatrix()
-        thresholdFilter.inputImage = resizedMask
-        // R, G, B, A vectors.
-        // We want to boost values > 0.3 to 1.0, and < 0.3 to 0.0.
-        // Simplified approach: Contrast boost + Step
+        // 3. Draw original image to get the mask/alpha channel
+        image.draw(in: rect)
         
-        // Better approach using CIColorKernel or built-in filters chain
-        // 1. Clamp to 0-1 (already is)
-        // 2. Apply a steep s-curve or step function.
-        // Let's use CIColorControls to maximize contrast
-        let contrast = resizedMask.applyingFilter("CIColorControls", parameters: [
-            kCIInputContrastKey: 10.0,
-            kCIInputBrightnessKey: -0.5 // Shift center
-        ])
+        // 4. Create a mask from the alpha channel
+        // We want to stroke the edge of the non-transparent area.
+        // A simple way is to draw the image slightly larger in white behind, but that blurs details.
+        // Better approach for "Sticker Outline":
+        // This is complex to do perfectly in CoreGraphics without external libraries.
+        // Simplified approach: Draw white shadow/glow behind.
         
-        // Use the mask to crop original
-        let originalCI = CIImage(cgImage: cgImage)
+        // CLEAR Context for clean start
+        context.clear(rect)
         
-        // Apply mask to alpha channel
-        let masked = originalCI.applyingFilter("CIBlendWithMask", parameters: [
-            kCIInputMaskImageKey: contrast,
-            kCIInputBackgroundImageKey: CIImage.empty()
-        ])
+        // Draw white silhouette with shadow/stroke effect
+        context.setShadow(offset: .zero, blur: borderWidth, color: UIColor.white.cgColor)
+        // Draw multiple times to make it solid
+        image.draw(in: rect)
+        image.draw(in: rect)
+        image.draw(in: rect)
         
-        let context = CIContext()
-        guard let resultCG = context.createCGImage(masked, from: originalCI.extent) else {
+        // Draw original image on top
+        context.setShadow(offset: .zero, blur: 0, color: nil)
+        image.draw(in: rect)
+        
+        let result = UIGraphicsGetImageFromCurrentImageContext() ?? image
+        UIGraphicsEndImageContext()
+        return result
+    }
+    
+    /// 修复缺失的 clothingName
+    /// 遍历所有 CutoutItem，如果 clothingName 为空且 linkedClothingID 有效，则填充
+    func fixMissingClothingNames(context: ModelContext) {
+        do {
+            // 只查找 linkedClothingID 不为空的
+            // 注意：SwiftData 的 Predicate 支持有限，这里先取所有关联了的，然后在内存中过滤 clothingName 为空的
+            // 或者直接遍历所有。由于数据量通常不大（几千个），直接遍历也是可以的。
+            // 但为了效率，我们尽量用 Predicate。
+            // Predicate 暂不支持 optional check for nil easily inside complex expressions sometimes, but let's try.
+            // 简单点：获取所有 CutoutItem
+            let descriptor = FetchDescriptor<CutoutItem>()
+            let cutouts = try context.fetch(descriptor)
+            
+            // 获取所有 Clothing
+            let clothingDescriptor = FetchDescriptor<Clothing>()
+            let allClothing = try context.fetch(clothingDescriptor)
+            let clothingMap = Dictionary(uniqueKeysWithValues: allClothing.map { ($0.id, $0) })
+            
+            var updatedCount = 0
+            for cutout in cutouts {
+                // 如果名字为空，或者即使不为空我们也想刷新一下（比如改名了）？
+                // 用户说 "加载时...存下"，可能是为了补全。
+                if let id = cutout.linkedClothingID, let clothing = clothingMap[id] {
+                    if cutout.clothingName != clothing.name {
+                        cutout.clothingName = clothing.name
+                        updatedCount += 1
+                    }
+                }
+            }
+            
+            if updatedCount > 0 {
+                try context.save()
+                print("Fixed missing clothing names for \(updatedCount) cutouts.")
+            }
+        } catch {
+            print("Failed to fix missing clothing names: \(error)")
+        }
+    }
+    
+    /// 重新处理/重新抠图 (Task 2 功能)
+    func reprocessItem(item: CutoutItem, with originalImage: UIImage, context: ModelContext) async throws {
+        // 1. 删除旧图片文件
+        ImageManager.shared.deleteImage(fileName: item.imagePath, context: context)
+        
+        // 2. 重新执行 processImage 的核心逻辑
+        // 注意：这里我们手动执行，因为 processImage 会创建新 Item。我们想更新现有 Item。
+        
+        // Normalize
+        let normalizedImage = normalizeOrientation(originalImage)
+        
+        // Cutout
+        let (cutoutImage, _) = try await liftSubject(from: normalizedImage)
+        
+        // Border
+        let borderedImage = addWhiteBorder(to: cutoutImage, borderWidth: 4.0)
+        
+        // Save new image
+        guard let newPath = ImageManager.shared.saveImage(borderedImage, context: context) else {
             throw CutoutError.processingFailed
         }
         
-        // Saliency is less precise, so we give it a lower confidence score but enough to pass
-        return (UIImage(cgImage: resultCG), 0.6)
-    }
-
-    // MARK: - Advanced Processing (RMBG)
-    
-    private func liftSubjectUsingRMBG(from image: UIImage) async throws -> (UIImage, Float) {
-        // Try to use RMBG Service
-        // This requires RMBG14.mlpackage to be present and compiled
+        // Update Item
+        item.imagePath = newPath
+        item.width = Double(borderedImage.size.width)
+        item.height = Double(borderedImage.size.height)
+        item.timestamp = Date() // Update timestamp to show as "fresh"
         
-        // We use a safe check. If the model throws "missing", we fallback.
-        // Since we have a dummy class, it will "run" but return dummy data if not replaced.
-        // But for real usage, we assume user replaced it.
-        
-        do {
-            let result = try await RMBGService.shared.process(image: image)
-            // RMBG usually works well, we give it high confidence
-            return (result, 0.98)
-        } catch {
-            print("RMBG failed: \(error)")
-            throw error
-        }
-    }
-
-    /// 智能抠图引擎
-    private func liftSubject(from image: UIImage) async throws -> (UIImage, Float) {
-        // Strategy: 
-        // 1. Try RMBG-1.4 (SOTA) if available
-        // 2. Fallback to Apple Vision (Native)
-        
-        // Check if we really have RMBG model (heuristic: check if file exists or just try)
-        // For now, let's try calling it. If it fails (e.g. dummy model returns empty), we continue.
-        
-        do {
-             // Uncomment this line when you have the real model!
-             // return try await liftSubjectUsingRMBG(from: image)
-             
-             // For now, stick to Vision as primary until user installs model
-             throw CutoutError.processingFailed 
-        } catch {
-            // Fallthrough to Vision
-        }
-        
-        guard let cgImage = image.cgImage else { throw CutoutError.processingFailed }
-        guard let cgImage = image.cgImage else { throw CutoutError.processingFailed }
-        
-        if #available(iOS 17.0, *) {
-            let request = VNGenerateForegroundInstanceMaskRequest()
-            let handler = VNImageRequestHandler(cgImage: cgImage)
-            
-            try handler.perform([request])
-            
-            guard let result = request.results?.first else {
-                throw CutoutError.noSubjectFound
+        // Try to refine category if it was "未分类"
+        if item.category == "未分类" {
+            if let newCat = try? await classifyImage(image: normalizedImage) {
+                item.category = newCat
             }
-            
-            // 获取 Mask
-            let maskPixelBuffer = try result.generateMaskedImage(ofInstances: result.allInstances, from: handler, croppedToInstancesExtent: false)
-            
-            let maskImage = maskPixelBuffer
-            
-            let ciImage = CIImage(cvPixelBuffer: maskImage)
-            let context = CIContext()
-            guard let maskedCGImage = context.createCGImage(ciImage, from: ciImage.extent) else {
-                throw CutoutError.processingFailed
-            }
-            
-            let finalImage = UIImage(cgImage: maskedCGImage)
-            
-            // 简单估算置信度 (Vision API 不直接返回整体置信度，这里假设只要识别到了就是高置信度，或者根据 mask 覆盖率等)
-            // 实际应用中可能需要更复杂的逻辑
-            return (finalImage, 0.95)
-            
-        } else {
-            // Fallback for older iOS versions (iOS 15+)
-            // 使用 Person Segmentation 作为降级方案
-            let request = VNGeneratePersonSegmentationRequest()
-            request.qualityLevel = .accurate
-            let handler = VNImageRequestHandler(cgImage: cgImage)
-            try handler.perform([request])
-            
-            guard let result = request.results?.first else {
-                throw CutoutError.noSubjectFound
-            }
-            
-            let mask = result.pixelBuffer
-            // ... 处理 Mask 并应用到原图 ...
-            // 这里为了简化，仅在 iOS 17+ 完整实现，旧版本抛出错误或返回原图
-            // 实际项目中应实现完整降级
-             throw CutoutError.processingFailed
-        }
-    }
-    
-    /// 白边生成
-    private func addWhiteBorder(to image: UIImage, borderSize: CGFloat = 3.0) -> UIImage {
-        guard let cgImage = image.cgImage else { return image }
-        let ciImage = CIImage(cgImage: cgImage)
-        
-        // 1. 提取 Alpha 通道
-        let alpha = ciImage.applyingFilter("CIMaskToAlpha")
-        
-        // 2. 膨胀 (Morphology Maximum)
-        let dilate = alpha.applyingFilter("CIMorphologyMaximum", parameters: [
-            kCIInputRadiusKey: borderSize
-        ])
-        
-        // 3. 将膨胀后的区域变成白色
-        // 我们可以将膨胀后的 Alpha 作为 Mask，用白色填充
-        let white = CIImage(color: .white)
-        let borderMask = dilate
-        
-        let whiteBorder = white.applyingFilter("CIBlendWithMask", parameters: [
-            kCIInputMaskImageKey: borderMask,
-            kCIInputBackgroundImageKey: CIImage.empty() // 透明背景
-        ])
-        
-        // 4. 将原图叠加在白边上
-        let composite = ciImage.composited(over: whiteBorder)
-        
-        let context = CIContext()
-        if let resultCGImage = context.createCGImage(composite, from: composite.extent) {
-            return UIImage(cgImage: resultCGImage)
         }
         
-        return image
-    }
-    
-    private func computeHash(data: Data) -> String {
-        let hash = SHA256.hash(data: data)
-        return hash.compactMap { String(format: "%02x", $0) }.joined()
-    }
-    
-    private func normalizeOrientation(_ image: UIImage) -> UIImage {
-        if image.imageOrientation == .up { return image }
-        
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = image.scale
-        return UIGraphicsImageRenderer(size: image.size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: image.size))
-        }
+        try context.save()
     }
 }

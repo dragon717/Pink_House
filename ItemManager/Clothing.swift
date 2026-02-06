@@ -31,6 +31,7 @@ final class Clothing {
     var accessories: String = "" // 逗号分隔，小物
     var imagePaths: [String] = [] // 图片路径列表
     var isShared: Bool = false // 同步到裙子广场
+    var hasReplacedCutoutImage: Bool = false // 是否已执行过一键替换主图
     
     // 价格信息
     var originalPrice: Decimal = 0.0 // 原价

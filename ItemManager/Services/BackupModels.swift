@@ -83,6 +83,9 @@ struct ClothingDTO: Codable {
     let updatedAt: Date
     let sortIndex: Int?
     
+    // New Fields (v1.4)
+    let hasReplacedCutoutImage: Bool?
+    
     // Custom Accessories (Added in v1.3)
     let accessoryItems: [AccessoryItemDTO]?
 }

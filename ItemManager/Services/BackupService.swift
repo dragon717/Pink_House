@@ -230,6 +230,7 @@ class BackupService {
                     createdAt: c.createdAt,
                     updatedAt: c.updatedAt,
                     sortIndex: c.sortIndex,
+                    hasReplacedCutoutImage: c.hasReplacedCutoutImage,
                     accessoryItems: accItems
                 )
             }
@@ -619,6 +620,7 @@ class BackupService {
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
                 clothingBack.sortIndex = dto.sortIndex ?? 0
+                clothingBack.hasReplacedCutoutImage = dto.hasReplacedCutoutImage ?? false
             } else {
                 clothingBack = Clothing(name: dto.name)
                 clothingBack.id = dto.id
@@ -656,6 +658,7 @@ class BackupService {
                 clothingBack.createdAt = dto.createdAt
                 clothingBack.updatedAt = dto.updatedAt
                 clothingBack.sortIndex = dto.sortIndex ?? 0
+                clothingBack.hasReplacedCutoutImage = dto.hasReplacedCutoutImage ?? false
             }
             
             // Restore AccessoryItems

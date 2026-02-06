@@ -24,7 +24,7 @@ struct BatchReplaceCutoutView: View {
                     ContentUnavailableView(
                         "没有可替换的项",
                         systemImage: "photo.on.rectangle.angled",
-                        description: Text("请先执行“批量处理小裙子”以生成抠图。")
+                        description: Text("请先执行“批量处理小裙子”以生成抠图，或者所有裙子都已经包含抠图图片。")
                     )
                 } else {
                     List {
@@ -117,12 +117,26 @@ struct BatchReplaceCutoutView: View {
             let clothingMap = Dictionary(grouping: allCutouts.filter { $0.linkedClothingID != nil }) { $0.linkedClothingID! }
             
             // 获取所有 CutoutItem 的 imagePath，用于去重检查
-            // 如果主图本身就是一张抠图（存在于 cutout 表中），则认为已经替换过了
             let allCutoutPaths = Set(allCutouts.map { $0.imagePath })
             
             var processedCount = 0
             
             for clothing in allClothing {
+                // 如果已经标记为已替换，则直接跳过
+                if clothing.hasReplacedCutoutImage {
+                    continue
+                }
+                
+                // 保护机制：若裙子图片里已经有抠图图片（无论在哪个位置），则不应该出现在一键替换列表里
+                // 这避免了重复添加或打乱用户已有的排序
+                let hasAnyCutout = clothing.imagePaths.contains { path in
+                    allCutoutPaths.contains(path)
+                }
+                
+                if hasAnyCutout {
+                    continue
+                }
+                
                 // Find associated cutouts
                 if let cutouts = clothingMap[clothing.id], !cutouts.isEmpty {
                     // Use the most recent cutout
@@ -133,12 +147,6 @@ struct BatchReplaceCutoutView: View {
                         if let firstImage = clothing.imagePaths.first {
                             if firstImage == bestCutout.imagePath {
                                 // Already replaced/is the same, skip
-                                continue
-                            }
-                            
-                            // 检查主图是否已经是某张抠图（可能是旧的抠图，或者其他衣服的抠图，只要是抠图就不建议再替换，除非用户强行操作）
-                            // 这里我们假设如果主图已经在 Cutout 库里，说明已经是白底图了，无需替换。
-                            if allCutoutPaths.contains(firstImage) {
                                 continue
                             }
                         }
@@ -180,6 +188,9 @@ struct BatchReplaceCutoutView: View {
                 // Insert at front
                 clothing.imagePaths.insert(cutoutPath, at: 0)
             }
+            
+            // Mark as replaced to prevent future suggestions
+            clothing.hasReplacedCutoutImage = true
             
             // Update timestamp to force refresh if needed? 
             // clothing.updatedAt = Date()

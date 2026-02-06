@@ -644,15 +644,12 @@ struct OOTDCutoutListView: View {
         // Capture the image path before deleting the item
         let imagePath = item.imagePath
         
-        // No need to manually unlink anymore as we removed the Relationship
-        // SwiftData will simply delete the CutoutItem without touching the Clothing
-        
-        // 1. Immediately delete from UI/Context with animation
+        // 2. Immediately delete from UI/Context with animation
         withAnimation {
             modelContext.delete(item)
         }
         
-        // 2. Handle resource cleanup and persistence synchronously on MainActor
+        // 3. Handle resource cleanup and persistence synchronously on MainActor
         // Decrement ref count / delete image file (file IO is backgrounded internally in ImageManager)
         ImageManager.shared.deleteImage(fileName: imagePath, context: modelContext)
         

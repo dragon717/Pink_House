@@ -519,15 +519,20 @@ class ImageManager {
         // 使用直方图计算来检查 Alpha 通道
         if image.bitsPerComponent == 8 && image.bitsPerPixel == 32 {
             var histogram = [UInt](repeating: 0, count: 256 * 4)
-            let histogramPtrs: [UnsafeMutablePointer<UInt>?] = [
-                UnsafeMutablePointer(mutating: &histogram) + 0,
-                UnsafeMutablePointer(mutating: &histogram) + 256,
-                UnsafeMutablePointer(mutating: &histogram) + 512,
-                UnsafeMutablePointer(mutating: &histogram) + 768
-            ]
             
-            let error = histogramPtrs.withUnsafeBufferPointer { ptrs in
-                vImageHistogramCalculation_ARGB8888(&buffer, ptrs.baseAddress!, vImage_Flags(kvImageNoFlags))
+            let error = histogram.withUnsafeMutableBufferPointer { histogramBuf -> vImage_Error in
+                guard let base = histogramBuf.baseAddress else { return kvImageMemoryAllocationError }
+                
+                var histogramPtrs: [UnsafeMutablePointer<vImagePixelCount>?] = [
+                    base,
+                    base.advanced(by: 256),
+                    base.advanced(by: 512),
+                    base.advanced(by: 768)
+                ]
+                
+                return histogramPtrs.withUnsafeMutableBufferPointer { ptrs in
+                    vImageHistogramCalculation_ARGB8888(&buffer, ptrs.baseAddress!, vImage_Flags(kvImageNoFlags))
+                }
             }
             
             if error == kvImageNoError {
