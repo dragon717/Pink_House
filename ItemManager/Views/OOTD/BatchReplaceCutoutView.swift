@@ -122,10 +122,6 @@ struct BatchReplaceCutoutView: View {
             var processedCount = 0
             
             for clothing in allClothing {
-                // 如果已经标记为已替换，则直接跳过
-                if clothing.hasReplacedCutoutImage {
-                    continue
-                }
                 
                 // 保护机制：若裙子图片里已经有抠图图片（无论在哪个位置），则不应该出现在一键替换列表里
                 // 这避免了重复添加或打乱用户已有的排序
@@ -143,6 +139,11 @@ struct BatchReplaceCutoutView: View {
                     // Sort by timestamp desc
                     let sortedCutouts = cutouts.sorted { $0.timestamp > $1.timestamp }
                     if let bestCutout = sortedCutouts.first {
+                        // Check if already replaced by this specific cutout
+                        if clothing.replacedCutoutID != nil {
+                            continue
+                        }
+                        
                         // Check if the clothing's first image is ALREADY this cutout
                         if let firstImage = clothing.imagePaths.first {
                             if firstImage == bestCutout.imagePath {
@@ -190,7 +191,7 @@ struct BatchReplaceCutoutView: View {
             }
             
             // Mark as replaced to prevent future suggestions
-            clothing.hasReplacedCutoutImage = true
+            clothing.replacedCutoutID = item.cutout.id
             
             // Update timestamp to force refresh if needed? 
             // clothing.updatedAt = Date()

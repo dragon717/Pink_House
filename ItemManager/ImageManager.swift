@@ -473,9 +473,19 @@ class ImageManager {
             if ImageManager.imageHasAlpha(sourceCGImage) {
                 // 进一步检查像素是否全为不透明
                 if ImageManager.isImageActuallyOpaque(sourceCGImage) {
-                    // 创建不带 Alpha 的副本
-                    if let opaqueImage = ImageManager.createOpaqueImage(from: sourceCGImage) {
-                        sourceCGImage = opaqueImage
+                    // 使用 UIGraphicsImageRenderer 创建不带 Alpha 的副本 (强制重绘为不透明)
+                    // 相比之前的 createOpaqueImage (仅修改元数据)，这种方式更可靠，
+                    // 能确保生成的新 CGImage 具有正确的 kCGImageAlphaNoneSkipLast/First 且数据一致。
+                    let format = UIGraphicsImageRendererFormat()
+                    format.opaque = true
+                    format.scale = image.scale
+                    let renderer = UIGraphicsImageRenderer(size: image.size, format: format)
+                    let opaqueImage = renderer.image { _ in
+                        image.draw(at: .zero)
+                    }
+                    
+                    if let newCGImage = opaqueImage.cgImage {
+                        sourceCGImage = newCGImage
                     }
                 }
             }

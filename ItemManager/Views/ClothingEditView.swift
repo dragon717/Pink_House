@@ -354,6 +354,35 @@ struct ClothingEditView: View {
             c.length = finalLength
             c.condition = finalCondition
             c.accessories = finalAccessories
+            // 检查 replacedCutoutID 是否还有效
+            if let replacedID = c.replacedCutoutID {
+                // 如果图片列表为空，或者 replacedCutoutID 对应的图片已经不在 imagePaths 中，则重置
+                // 注意：imagePaths 存储的是文件名，我们需要根据 replacedCutoutID 找到对应的 CutoutItem，然后获取其 imagePath
+                
+                // 为了性能，我们先不查数据库，而是直接在 CutoutService 中提供一个辅助检查方法
+                // 或者更简单：我们不依赖 CutoutItem 的查找，而是依赖 CutoutService.handleCutoutDeletion 已经在删除时处理了。
+                // 但是！这里是全量替换 imagePaths。如果是 UI 上的“删除”操作，已经在 ImagePickerGrid 中触发了 handleCutoutDeletion。
+                // 如果是“移动”或“添加”操作，imagePaths 会变化，但文件没被删。
+                
+                // 用户的需求是：若图片里删除抠图，则保存时，clothing.replacedCutoutID, 也应该重新保存（置空或更新）。
+                // 在 ClothingEditView 中，imagePaths 是最终状态。
+                // 如果 replacedCutoutID 对应的抠图图片还在 imagePaths 中，则保留。
+                // 如果不在了，则置空。
+                
+                // 问题：我们只知道 replacedCutoutID (UUID)，不知道它对应的 imagePath。
+                // 所以必须查询 CutoutItem。
+                
+                let descriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate { $0.id == replacedID })
+                if let cutout = try? modelContext.fetch(descriptor).first {
+                    if !imagePaths.contains(cutout.imagePath) {
+                        c.replacedCutoutID = nil
+                    }
+                } else {
+                    // 找不到 CutoutItem，说明可能被删了，或者数据不一致
+                    c.replacedCutoutID = nil
+                }
+            }
+            
             c.imagePaths = imagePaths
             c.isShared = isShared
             c.originalPrice = Decimal(originalPrice)

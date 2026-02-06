@@ -150,9 +150,9 @@ class CutoutService {
                     let clothingDesc = FetchDescriptor<Clothing>(predicate: #Predicate { $0.id == clothingID })
                     if let clothing = try context.fetch(clothingDesc).first {
                         // 重置标记
-                        if clothing.hasReplacedCutoutImage {
-                            clothing.hasReplacedCutoutImage = false
-                            print("CutoutService: Reset hasReplacedCutoutImage for clothing '\(clothing.name)' because cutout '\(imagePath)' is being deleted.")
+                        if let replacedID = clothing.replacedCutoutID, replacedID == cutout.id {
+                            clothing.replacedCutoutID = nil
+                            print("CutoutService: Reset replacedCutoutID for clothing '\(clothing.name)' because cutout '\(imagePath)' is being deleted.")
                         }
                     }
                 }

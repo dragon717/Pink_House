@@ -37,6 +37,10 @@ struct OOTDCutoutListView: View {
     @State private var showAddConfirmation = false
     @State private var showBatchCategorySheet = false
     
+    // Single Action States
+    @State private var itemToDelete: CutoutItem?
+    @State private var showSingleDeleteConfirmation = false
+    
     // Reclassify & Reprocess States
     @State private var itemToReclassify: CutoutItem?
     // @State private var showReclassifySheet = false // Removed in favor of item-based sheet
@@ -368,6 +372,19 @@ struct OOTDCutoutListView: View {
         } message: {
             Text("确定将选中的 \(selectedItems.count) 个抠图添加到当前画布吗？")
         }
+        .alert("确认删除", isPresented: $showSingleDeleteConfirmation) {
+            Button("删除", role: .destructive) {
+                if let item = itemToDelete {
+                    deleteCutout(item)
+                }
+                itemToDelete = nil
+            }
+            Button("取消", role: .cancel) {
+                itemToDelete = nil
+            }
+        } message: {
+            Text("确定要删除这个贴纸吗？此操作无法撤销。")
+        }
         .sheet(isPresented: $showBatchCategorySheet) {
             BatchReclassifyView(categories: selectableCategories) { newCategory in
                 batchReclassify(to: newCategory)
@@ -441,7 +458,8 @@ struct OOTDCutoutListView: View {
                     Divider()
                     
                     Button(role: .destructive) {
-                        deleteCutout(item)
+                        itemToDelete = item
+                        showSingleDeleteConfirmation = true
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
