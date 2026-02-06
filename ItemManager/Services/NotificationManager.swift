@@ -25,7 +25,8 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     // MARK: - Settings Keys
     struct Keys {
         static let isDepositNotificationEnabled = "isDepositNotificationEnabled"
-        static let depositNotificationDaysBefore = "depositNotificationDaysBefore"
+        static let depositNotificationDaysBefore = "depositNotificationDaysBefore" // Deprecated, kept for migration
+        static let depositNotificationDaysList = "depositNotificationDaysList"
         static let depositNotificationTime = "depositNotificationTime"
     }
     
@@ -35,9 +36,28 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         set { UserDefaults.standard.set(newValue, forKey: Keys.isDepositNotificationEnabled) }
     }
     
+    // Support multiple reminder days
+    var daysBeforeList: [Int] {
+        get {
+            if let list = UserDefaults.standard.array(forKey: Keys.depositNotificationDaysList) as? [Int] {
+                return list
+            }
+            // Migration: if old key exists, use it
+            if UserDefaults.standard.object(forKey: Keys.depositNotificationDaysBefore) != nil {
+                let oldDay = UserDefaults.standard.integer(forKey: Keys.depositNotificationDaysBefore)
+                return [oldDay]
+            }
+            return [0] // Default
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Keys.depositNotificationDaysList)
+        }
+    }
+    
+    // Compatibility property (optional, but good to keep basic logic working if accessed elsewhere)
     var daysBefore: Int {
-        get { UserDefaults.standard.integer(forKey: Keys.depositNotificationDaysBefore) }
-        set { UserDefaults.standard.set(newValue, forKey: Keys.depositNotificationDaysBefore) }
+        get { daysBeforeList.first ?? 0 }
+        set { daysBeforeList = [newValue] }
     }
     
     var notificationTime: Date {
@@ -67,61 +87,53 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     // MARK: - Scheduling
     @MainActor
     func scheduleNotification(for clothing: Clothing) {
+        // Cancel existing first (synchronously removes all potential variants)
+        cancelNotification(for: clothing)
+        
         guard isEnabled, clothing.isDepositPlan, let finalDate = clothing.finalPaymentDate else {
-            // If conditions not met, ensure no notification exists
-            cancelNotification(for: clothing)
             return
         }
         
         let center = UNUserNotificationCenter.current()
-        
-        // Calculate trigger date
         let calendar = Calendar.current
-        
-        // Adjust final date by subtracting daysBefore
-        // Ensure we are working with the start of the day for finalDate to avoid time confusion
         let finalDateStart = calendar.startOfDay(for: finalDate)
-        
-        guard let targetDate = calendar.date(byAdding: .day, value: -daysBefore, to: finalDateStart) else { return }
-        
-        // Combine target date with notificationTime
         let timeComponents = calendar.dateComponents([.hour, .minute], from: notificationTime)
         
-        var triggerComponents = calendar.dateComponents([.year, .month, .day], from: targetDate)
-        triggerComponents.hour = timeComponents.hour
-        triggerComponents.minute = timeComponents.minute
-        
-        guard let triggerDate = calendar.date(from: triggerComponents) else { return }
-        
-        // Don't schedule if in the past
-        if triggerDate < Date() {
-            // print("Skipping past notification for \(clothing.name) at \(triggerDate)")
-            return
-        }
-        
-        let content = UNMutableNotificationContent()
-        content.title = "尾款支付提醒"
-        
-        var body = "您的 \"\(clothing.name)\" 需要支付尾款了"
-        if daysBefore > 0 {
-            body += " (还有 \(daysBefore) 天)"
-        } else {
-            body += " (今天是截止日)"
-        }
-        body += "\n预估时间: \(formatDate(finalDate))"
-        
-        content.body = body
-        content.sound = .default
-        
-        let trigger = UNCalendarNotificationTrigger(dateMatching: triggerComponents, repeats: false)
-        
-        let request = UNNotificationRequest(identifier: clothing.id.uuidString, content: content, trigger: trigger)
-        
-        center.add(request) { error in
-            if let error = error {
-                print("Error scheduling notification for \(clothing.name): \(error)")
+        for days in daysBeforeList {
+            guard let targetDate = calendar.date(byAdding: .day, value: -days, to: finalDateStart) else { continue }
+            
+            var triggerComponents = calendar.dateComponents([.year, .month, .day], from: targetDate)
+            triggerComponents.hour = timeComponents.hour
+            triggerComponents.minute = timeComponents.minute
+            
+            guard let triggerDate = calendar.date(from: triggerComponents) else { continue }
+            
+            if triggerDate < Date() { continue }
+            
+            let content = UNMutableNotificationContent()
+            content.title = "尾款支付提醒"
+            
+            var body = "您的 \"\(clothing.name)\" 需要支付尾款了"
+            if days > 0 {
+                body += " (还有 \(days) 天)"
             } else {
-                // print("Scheduled notification for \(clothing.name) at \(triggerDate)")
+                body += " (今天是截止日)"
+            }
+            body += "\n预估时间: \(formatDate(finalDate))"
+            
+            content.body = body
+            content.sound = .default
+            
+            let trigger = UNCalendarNotificationTrigger(dateMatching: triggerComponents, repeats: false)
+            
+            // ID format: UUID_days
+            let identifier = "\(clothing.id.uuidString)_\(days)"
+            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+            
+            center.add(request) { error in
+                if let error = error {
+                    print("Error scheduling notification for \(clothing.name): \(error)")
+                }
             }
         }
     }
@@ -129,7 +141,19 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     @MainActor
     func cancelNotification(for clothing: Clothing) {
         let center = UNUserNotificationCenter.current()
+        
+        // Remove legacy ID (exact match)
         center.removePendingNotificationRequests(withIdentifiers: [clothing.id.uuidString])
+        center.removeDeliveredNotifications(withIdentifiers: [clothing.id.uuidString])
+        
+        // Remove all potential variants based on supported options
+        // Ideally we should fetch pending requests to be sure, but that's async.
+        // For now, we iterate through all possible options provided in UI.
+        let potentialDays = [0, 1, 3, 7, 15, 30]
+        let idsToRemove = potentialDays.map { "\(clothing.id.uuidString)_\($0)" }
+        
+        center.removePendingNotificationRequests(withIdentifiers: idsToRemove)
+        center.removeDeliveredNotifications(withIdentifiers: idsToRemove)
     }
     
     @MainActor

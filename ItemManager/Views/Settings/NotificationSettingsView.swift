@@ -11,7 +11,7 @@ import UserNotifications
 
 struct NotificationSettingsView: View {
     @AppStorage(NotificationManager.Keys.isDepositNotificationEnabled) private var isEnabled = false
-    @AppStorage(NotificationManager.Keys.depositNotificationDaysBefore) private var daysBefore = 0
+    @State private var selectedDays: Set<Int> = []
     
     @State private var notificationTime: Date = Date()
     @State private var showPermissionAlert = false
@@ -34,16 +34,20 @@ struct NotificationSettingsView: View {
             
             if isEnabled {
                 Section {
-                    Picker("提醒时间", selection: $daysBefore) {
-                        Text("当天").tag(0)
-                        Text("提前1天").tag(1)
-                        Text("提前3天").tag(3)
-                        Text("提前7天").tag(7)
-                        Text("提前15天").tag(15)
-                        Text("提前30天").tag(30)
-                    }
-                    .onChange(of: daysBefore) { _, _ in
-                        handleSettingsChange()
+                    ForEach([0, 1, 3, 7, 15, 30], id: \.self) { day in
+                        Button {
+                            toggleDay(day)
+                        } label: {
+                            HStack {
+                                Text(dayText(for: day))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedDays.contains(day) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                        }
                     }
                     
                     DatePicker("每日提醒时间", selection: $notificationTime, displayedComponents: .hourAndMinute)
@@ -53,6 +57,8 @@ struct NotificationSettingsView: View {
                         }
                 } header: {
                     Text("提醒设置")
+                } footer: {
+                    Text("您可以选择多个提醒时间点。")
                 }
             }
             
@@ -68,6 +74,9 @@ struct NotificationSettingsView: View {
         .navigationTitle("通知设置")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            // Load days
+            selectedDays = Set(NotificationManager.shared.daysBeforeList)
+            
             if let date = UserDefaults.standard.object(forKey: NotificationManager.Keys.depositNotificationTime) as? Date {
                 notificationTime = date
             } else {
@@ -96,6 +105,29 @@ struct NotificationSettingsView: View {
         }
     }
     
+    private func toggleDay(_ day: Int) {
+        if selectedDays.contains(day) {
+            selectedDays.remove(day)
+        } else {
+            selectedDays.insert(day)
+        }
+        // Save immediately
+        NotificationManager.shared.daysBeforeList = Array(selectedDays)
+        handleSettingsChange()
+    }
+    
+    private func dayText(for day: Int) -> String {
+        switch day {
+        case 0: return "当天"
+        case 1: return "提前1天"
+        case 3: return "提前3天"
+        case 7: return "提前7天"
+        case 15: return "提前15天"
+        case 30: return "提前30天"
+        default: return "提前\(day)天"
+        }
+    }
+
     private func checkPermissions() {
         Task {
             let status = await NotificationManager.shared.checkAuthorizationStatus()

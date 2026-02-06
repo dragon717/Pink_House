@@ -26,7 +26,7 @@ struct DepositItemRow: View {
         GlassCard {
             VStack(alignment: .leading, spacing: 16) {
                 // Top Section: Image + Basic Info
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .center, spacing: 12) {
                     // Image
                     if let uiImage = thumbnailImage {
                         Image(uiImage: uiImage)
@@ -69,20 +69,6 @@ struct DepositItemRow: View {
                         }
                         
                         if clothing.stock > 1 {
-                            let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
-                            let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
-                            Text("定¥\(totalDeposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(totalBalance.formatted(.number.precision(.fractionLength(0))))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(.pink)
-                        } else {
-                            Text("定¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0)))) + 尾¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(.pink)
-                        }
-                        
-                        if clothing.stock > 1 {
                             Text("库存: \(clothing.stock)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -103,6 +89,34 @@ struct DepositItemRow: View {
                             }
                         }
                     }
+                    
+                    Spacer()
+                    
+                    if clothing.stock > 1 {
+                        let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
+                        let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("定金¥\(totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(.orange)
+                            Text("尾款¥\(totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(.pink)
+                        }
+                    } else {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(.orange)
+                            Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(.pink)
+                        }
+                    }
                 }
                 
                 Divider()
@@ -115,11 +129,6 @@ struct DepositItemRow: View {
                     }
                     
                     // Phase 2: Deposit (Always shown or shown as part of list)
-                    // If collapsed, we only show Deposit. If expanded, we show it in order.
-                    // Actually, the screenshot shows "Deposit" at the top even when collapsed.
-                    // So we keep "Deposit" always visible, but maybe its position implies order?
-                    // Let's stick to the screenshot: "Deposit" is the main row.
-                    
                     TimelineRow(title: "定金", date: clothing.depositDate, trailing: getDepositTimeStatus())
                     
                     if isExpanded {
@@ -221,6 +230,115 @@ struct DepositItemRow: View {
             }
         }
         return nil
+    }
+}
+
+struct SimpleDepositItemRow: View {
+    @Environment(\.modelContext) private var modelContext
+    let clothing: Clothing
+    @State private var thumbnailImage: UIImage?
+    @State private var showEditNoteAlert: Bool = false
+    @State private var editingNote: String = ""
+    
+    private static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月"
+        return formatter
+    }()
+    
+    var body: some View {
+        GlassCard {
+            HStack(spacing: 12) {
+                // 1. Image
+                if let uiImage = thumbnailImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 50, height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else {
+                    CutePlaceholderView(iconSize: 20)
+                        .frame(width: 50, height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .task {
+                            if let imagePath = clothing.imagePaths.first {
+                                let size = CGSize(width: 50, height: 50)
+                                if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
+                                    self.thumbnailImage = cached
+                                    return
+                                }
+                                try? await Task.sleep(nanoseconds: 50_000_000)
+                                if Task.isCancelled { return }
+                                self.thumbnailImage = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+                            }
+                        }
+                }
+                
+                // 2. Name & Info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(clothing.name)
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                    
+                    HStack(spacing: 6) {
+                        if let date = clothing.finalPaymentDate {
+                            Text("尾款: \(Self.monthFormatter.string(from: date))")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        } else {
+                            Text("尾款待定")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        if let brand = clothing.brand {
+                            Text(brand.name)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                // 3. Prices
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                        .font(.caption)
+                        .bold()
+                        .foregroundStyle(.pink)
+                }
+                
+                // 4. Note Icon
+                Button {
+                    editingNote = clothing.note
+                    showEditNoteAlert = true
+                } label: {
+                    Image(systemName: clothing.note.isEmpty ? "square.and.pencil" : "text.bubble.fill")
+                        .font(.caption)
+                        .foregroundStyle(clothing.note.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.brown))
+                        .padding(8)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .alert("修改备注", isPresented: $showEditNoteAlert) {
+                    TextField("请输入备注", text: $editingNote)
+                    Button("取消", role: .cancel) { }
+                    Button("保存") {
+                        clothing.note = editingNote
+                        try? modelContext.save()
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -75,6 +75,7 @@ struct HomeView: View {
     
     // For Deposit Plan View
     @State private var depositSearchText = ""
+    @AppStorage("UserPreference_DepositDisplayMode") private var depositDisplayMode: DepositDisplayMode = .detail
     
     // View Layout Management
     enum ViewLayout: String, CaseIterable, Identifiable {
@@ -131,6 +132,7 @@ struct HomeView: View {
                 } else {
                     DepositPlanView(
                         searchText: $depositSearchText,
+                        displayMode: $depositDisplayMode,
                         sortOption: sortOption,
                         selectedTagIDs: selectedTagIDs,
                         selectedBrandIDs: selectedBrandIDs,
@@ -229,6 +231,9 @@ struct HomeView: View {
                     }
                     editButton
                 }
+                if selectedTab == .depositPlan {
+                    notificationButton
+                }
                 addButton
             }
             
@@ -237,6 +242,9 @@ struct HomeView: View {
                 sortButton
                 filterButton
                 displayButton
+                if selectedTab == .depositPlan {
+                    notificationLink
+                }
                 addButton
                 if selectedTab == .wardrobe {
                     if sortOption == .custom {
@@ -253,6 +261,20 @@ struct HomeView: View {
     }
     
     // Extracted buttons for reuse
+    private var notificationButton: some View {
+        NavigationLink(destination: NotificationSettingsView()) {
+            Image(systemName: "bell")
+                .font(.system(size: 16))
+                .foregroundStyle(.primary)
+        }
+    }
+    
+    private var notificationLink: some View {
+        NavigationLink(destination: NotificationSettingsView()) {
+            Label("补款提醒", systemImage: "bell")
+        }
+    }
+    
     private var manualSortButton: some View {
         Button {
             withAnimation {
@@ -572,14 +594,23 @@ struct HomeView: View {
     
     private var displayButton: some View {
         Menu {
-            Picker("布局", selection: $viewLayout) {
-                ForEach(ViewLayout.allCases) { layout in
-                    Label(layout.rawValue, systemImage: layout.icon)
-                        .tag(layout)
+            if selectedTab == .wardrobe {
+                Picker("布局", selection: $viewLayout) {
+                    ForEach(ViewLayout.allCases) { layout in
+                        Label(layout.rawValue, systemImage: layout.icon)
+                            .tag(layout)
+                    }
+                }
+            } else {
+                Picker("布局", selection: $depositDisplayMode) {
+                    ForEach(DepositDisplayMode.allCases) { mode in
+                        Label(mode.rawValue, systemImage: mode.icon)
+                            .tag(mode)
+                    }
                 }
             }
         } label: {
-            Image(systemName: viewLayout.icon)
+            Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
                 .font(.system(size: 16))
                 .foregroundStyle(.primary)
         }

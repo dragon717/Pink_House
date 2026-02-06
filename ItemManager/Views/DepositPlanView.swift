@@ -13,8 +13,22 @@ enum DepositViewMode {
     case series
 }
 
+enum DepositDisplayMode: String, CaseIterable, Identifiable {
+    case detail = "详情"
+    case simple = "简略"
+    
+    var id: String { rawValue }
+    var icon: String {
+        switch self {
+        case .detail: return "list.bullet.rectangle.portrait"
+        case .simple: return "list.bullet"
+        }
+    }
+}
+
 struct DepositPlanView: View {
     @Binding var searchText: String
+    @Binding var displayMode: DepositDisplayMode
     @Query private var depositClothings: [Clothing]
     
     @State private var viewMode: DepositViewMode = .monthly
@@ -47,6 +61,7 @@ struct DepositPlanView: View {
     let selectedAccessories: Set<String>
     
     init(searchText: Binding<String>, 
+         displayMode: Binding<DepositDisplayMode>,
          sortOption: SortOption,
          selectedTagIDs: Set<UUID>,
          selectedBrandIDs: Set<UUID>,
@@ -57,6 +72,7 @@ struct DepositPlanView: View {
          selectedConditions: Set<String>,
          selectedAccessories: Set<String>) {
         _searchText = searchText
+        _displayMode = displayMode
         let filter = #Predicate<Clothing> { $0.isDepositPlan == true && $0.isDeleted == false }
         _depositClothings = Query(filter: filter, sort: sortOption.sortDescriptors)
         
@@ -260,7 +276,11 @@ struct DepositPlanView: View {
                         NavigationLink {
                             ClothingDetailView(clothing: clothing)
                         } label: {
-                            DepositItemRow(clothing: clothing)
+                            if displayMode == .simple {
+                                SimpleDepositItemRow(clothing: clothing)
+                            } else {
+                                DepositItemRow(clothing: clothing)
+                            }
                         }
                         .buttonStyle(.plain)
                     }
