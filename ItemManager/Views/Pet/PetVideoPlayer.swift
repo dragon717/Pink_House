@@ -12,6 +12,10 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
         controller.showsPlaybackControls = false
         controller.videoGravity = .resizeAspectFill
         controller.view.backgroundColor = .clear // 尝试透明背景
+        
+        // 默认不播放声音
+        // 注意：AVPlayerViewController 本身没有 isMuted 属性，需要通过 player 设置
+        // 这里只是初始化 controller，player 在 updateUIViewController 中设置
         return controller
     }
     
@@ -38,20 +42,31 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                 return
             }
             
-            // 清理旧的观察者
-            context.coordinator.removeObserver()
+            // 清理旧的状态
+            context.coordinator.cleanup()
             
-            let item = AVPlayerItem(url: validUrl)
-            let player = AVPlayer(playerItem: item)
-            uiViewController.player = player
+            if isLooping {
+                // 使用 AVQueuePlayer + AVPlayerLooper 实现无缝循环
+                let item = AVPlayerItem(url: validUrl)
+                let player = AVQueuePlayer(playerItem: item)
+                player.isMuted = true // 默认静音
+                uiViewController.player = player
+                
+                context.coordinator.setupLooper(player: player, item: item, url: validUrl)
+                player.play()
+            } else {
+                // 使用普通 AVPlayer 实现一次性播放
+                let item = AVPlayerItem(url: validUrl)
+                let player = AVPlayer(playerItem: item)
+                player.isMuted = true // 默认静音
+                uiViewController.player = player
+                
+                context.coordinator.setupObserver(player: player, item: item, onFinished: onFinished)
+                player.play()
+            }
             
-            // 添加新的观察者
-            context.coordinator.setupObserver(player: player, item: item, isLooping: isLooping, onFinished: onFinished)
-            
-            player.play()
         } else {
-            // 如果视频没变，只更新循环状态（通常状态变了视频名也会变，所以这里可能不需要做太多）
-            // 确保正在播放
+            // 如果视频没变，确保正在播放
             if uiViewController.player?.timeControlStatus != .playing {
                 uiViewController.player?.play()
             }
@@ -65,14 +80,22 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
     class Coordinator: NSObject {
         var player: AVPlayer?
         var item: AVPlayerItem?
-        var isLooping: Bool = false
+        var looper: AVPlayerLooper?
+        var queuePlayer: AVQueuePlayer?
         var onFinished: (() -> Void)?
         var observer: Any?
         
-        func setupObserver(player: AVPlayer, item: AVPlayerItem, isLooping: Bool, onFinished: (() -> Void)?) {
+        func setupLooper(player: AVQueuePlayer, item: AVPlayerItem, url: URL) {
+            self.player = player
+            self.queuePlayer = player
+            self.item = item
+            // 创建 Looper，这会自动处理循环
+            self.looper = AVPlayerLooper(player: player, templateItem: item)
+        }
+        
+        func setupObserver(player: AVPlayer, item: AVPlayerItem, onFinished: (() -> Void)?) {
             self.player = player
             self.item = item
-            self.isLooping = isLooping
             self.onFinished = onFinished
             
             // 移除旧的（如果有）
@@ -84,12 +107,7 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                 queue: .main
             ) { [weak self] _ in
                 guard let self = self else { return }
-                if self.isLooping {
-                    self.player?.seek(to: .zero)
-                    self.player?.play()
-                } else {
-                    self.onFinished?()
-                }
+                self.onFinished?()
             }
         }
         
@@ -100,8 +118,18 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             }
         }
         
-        deinit {
+        func cleanup() {
             removeObserver()
+            looper?.disableLooping()
+            looper = nil
+            queuePlayer?.removeAllItems()
+            queuePlayer = nil
+            player = nil
+            item = nil
+        }
+        
+        deinit {
+            cleanup()
         }
     }
 }
