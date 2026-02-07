@@ -9,14 +9,36 @@ struct RollingNumberView: View {
     var body: some View {
         // 使用 contentTransition 实现数字滚动 (iOS 16+)
         if #available(iOS 16.0, *) {
-            Text("\(value)")
+            Text(formattedString)
                 .font(font)
                 .contentTransition(.numericText())
                 .animation(.default, value: value)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(minWidth: 50, alignment: .trailing)
         } else {
             // Fallback for older iOS versions
-            Text("\(value)")
+            Text(formattedString)
                 .font(font)
+                .frame(minWidth: 50, alignment: .trailing)
+        }
+    }
+    
+    private var formattedString: String {
+        if value >= 100_000_000 {
+            // 亿
+            let doubleValue = Double(value) / 100_000_000.0
+            return String(format: "%.2f亿", doubleValue)
+        } else if value >= 10_000 {
+            // 万
+            let doubleValue = Double(value) / 10_000.0
+            return String(format: "%.2f万", doubleValue)
+        } else {
+            // 保持原样，但确保至少有一定宽度或者用空格补齐（如果需要对齐）
+            // 但用户要求是“最低显示4位数”，这里可能指的是保留足够的显示空间，
+            // 或者仅仅是说“即使是很小的数字，也要按照正常数字显示”
+            // 结合上下文“显示不全时，显示x万”，这里的逻辑主要是处理大数。
+            return "\(value)"
         }
     }
 }
@@ -40,10 +62,10 @@ struct CurrencyView: View {
                     .font(.system(size: 12))
                     .foregroundColor(.blue)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
             .background(.regularMaterial)
-            .cornerRadius(15)
+            .cornerRadius(20)
             .shadow(radius: 1)
         }
     }

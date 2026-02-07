@@ -22,28 +22,44 @@ struct PetHomeView: View {
             } else {
                 GeometryReader { geo in
                     let isLandscape = geo.size.width > geo.size.height
-                    let videoHeight = isLandscape ? geo.size.height * 0.5 : 400
+                    let videoHeight = isLandscape ? min(geo.size.width, geo.size.height) * 0.8 : 400
                     
                     ZStack {
                         // 背景
                         LiquidBackground()
                             .ignoresSafeArea()
                         
-                        VStack(spacing: 0) {
-                            // 顶部状态栏和货币栏
-                            PetStatusHeaderView(viewModel: viewModel, isLandscape: isLandscape)
-                            
-                            Spacer()
-                            
-                            // 中间萌宠区域
-                            PetInteractionAreaView(
-                                viewModel: viewModel,
-                                audioManager: audioManager,
-                                videoHeight: videoHeight
-                            )
+                        // 通用布局逻辑：
+                        // 1. 底层：视频区域 (绝对居中)
+                        PetInteractionAreaView(
+                            viewModel: viewModel,
+                            audioManager: audioManager,
+                            videoHeight: videoHeight
+                        )
+                        .frame(width: videoHeight, height: videoHeight)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .offset(y: -40) // 整体向上偏移，避免视觉重心过低或被底部遮挡
+                        
+                        // 2. 上层 UI：Header
+                        if isLandscape {
+                            HStack(spacing: 0) {
+                                // 左侧：状态栏和货币栏
+                                PetStatusHeaderView(viewModel: viewModel, isLandscape: true)
+                                    .frame(width: 120)
+                                    .padding(.leading, 10)
+                                
+                                Spacer()
+                            }
+                        } else {
+                            VStack(spacing: 0) {
+                                // 顶部状态栏和货币栏
+                                PetStatusHeaderView(viewModel: viewModel, isLandscape: false)
+                                
+                                Spacer()
+                            }
                         }
                         
-                        // 底部操作面板 (可展开)
+                        // 3. 顶层 UI：底部操作面板 (可展开)
                         PetBottomPanel(viewModel: viewModel, isExpanded: $isExpanded, isLandscape: isLandscape)
                     }
                 }

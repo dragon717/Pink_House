@@ -7,30 +7,36 @@ struct PetStatusHeaderView: View {
     var body: some View {
         Group {
             if isLandscape {
-                HStack(alignment: .top, spacing: 20) {
+                VStack(spacing: 20) {
                     // 状态栏
-                    statusRow
+                    statusRow(isVertical: true)
                     
                     Spacer()
                     
                     // 货币栏
-                    currencyRow
+                    currencyRow(isVertical: true)
                 }
+                .padding(.vertical, 20)
+                .padding(.horizontal, 10)
+                // .background(Material.ultraThin) // Removed background
+                // .clipShape(Capsule()) // Removed clipShape
+                .padding(.leading)
             } else {
                 VStack(spacing: 10) {
                     // 状态栏 - 单行显示
-                    statusRow
+                    statusRow(isVertical: false)
                     
-                    currencyRow
+                    currencyRow(isVertical: false)
                 }
+                .padding(.top, 10)
+                .padding(.horizontal)
             }
         }
-        .padding(.top, 10)
-        .padding(.horizontal)
     }
     
-    private var statusRow: some View {
-        HStack(spacing: 8) {
+    private func statusRow(isVertical: Bool) -> some View {
+        let layout = isVertical ? AnyLayout(VStackLayout(spacing: 15)) : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
             StatusView(icon: "fork.knife", value: viewModel.status.hunger, color: .orange)
             StatusView(icon: "shower.fill", value: viewModel.status.hygiene, color: .blue)
             StatusView(icon: "bolt.fill", value: viewModel.status.energy, color: .green)
@@ -38,8 +44,9 @@ struct PetStatusHeaderView: View {
         }
     }
     
-    private var currencyRow: some View {
-        HStack(spacing: 15) {
+    private func currencyRow(isVertical: Bool) -> some View {
+        let layout = isVertical ? AnyLayout(VStackLayout(spacing: 15)) : AnyLayout(HStackLayout(spacing: 15))
+        return layout {
             CurrencyView(type: .meowCoin, amount: viewModel.status.meowCoin) {
                 viewModel.rechargeMeowCoin(amount: 100)
             }
