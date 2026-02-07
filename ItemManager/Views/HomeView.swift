@@ -192,8 +192,14 @@ struct HomeView: View {
                 }
             } label: {
                 VStack(spacing: 2) {
-                    Image(systemName: selectedTab == .wardrobe ? "tshirt.fill" : "tshirt")
-                        .font(.system(size: 16))
+                    Group {
+                        if #available(iOS 18.0, *) {
+                            Image(systemName: selectedTab == .wardrobe ? "cabinet" : "cabinet.fill")
+                        } else {
+                            Image(systemName: selectedTab == .wardrobe ? "tshirt" : "tshirt.fill")
+                        }
+                    }
+                    .font(.system(size: 16))
                     Text("少女衣橱")
                         .font(.system(size: 10, weight: selectedTab == .wardrobe ? .bold : .medium))
                 }

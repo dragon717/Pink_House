@@ -20,11 +20,9 @@ struct MainTabView: View {
             // Tab 1: 衣橱 (Wardrobe)
             HomeView()
                 .tabItem {
-                    Label {
-                        Text("衣橱")
-                    } icon: {
-                        Image(systemName: selectedTab == 0 ? "cabinet.fill" : "cabinet")
-                    }
+                    Image(systemName: selectedTab == 0 ? "cabinet" : "cabinet.fill")
+                        .renderingMode(.original)
+                    Text("衣橱")
                 }
                 .tag(0)
             
