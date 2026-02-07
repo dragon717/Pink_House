@@ -434,6 +434,9 @@ class BackupService {
                 }
             }
             
+            // Pet Status
+            let petStatusData = UserDefaults.standard.data(forKey: "PetStatus_Data")
+            
             let manifest = BackupManifest(
                 version: "1.2",
                 timestamp: Date(),
@@ -453,6 +456,7 @@ class BackupService {
                 hasMediumWidgetBackground: hasMediumWidgetBackground,
                 hasLargeWidgetBackground: hasLargeWidgetBackground,
                 externalFileHashes: externalHashes,
+                petStatusData: petStatusData,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: snapshotDTOs.count
@@ -989,6 +993,12 @@ class BackupService {
                 }
             }
             UserDefaults.standard.synchronize()
+        }
+        
+        // Restore Pet Status
+        if let petData = manifest.petStatusData {
+            print("Restore: Restoring Pet Status...")
+            UserDefaults.standard.set(petData, forKey: "PetStatus_Data")
         }
         
         // Refresh Theme & Widget

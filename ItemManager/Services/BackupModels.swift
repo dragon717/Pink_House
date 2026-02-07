@@ -36,6 +36,9 @@ struct BackupManifest: Codable {
     // Version 1.2: External File Hashes for Incremental Sync
     let externalFileHashes: [String: String]? // [FileName: Hash]
     
+    // Pet Module
+    let petStatusData: Data?
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int
