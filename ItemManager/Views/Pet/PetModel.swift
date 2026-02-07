@@ -7,9 +7,11 @@ enum PetState: String, CaseIterable {
     case cleaning = "cleaning"
     case expecting = "expecting" // 期待状态
     case playing = "playing" // 玩耍状态
+    case sleeping = "sleeping" // 睡觉状态
+    case working = "working" // 工作状态
     
     // 对应的视频文件名（不含扩展名）
-    var videoFileName: String {
+    func videoFileName(for job: PetJob = .none) -> String {
         switch self {
         case .idle: return "idle"
         case .eating: return "eat"
@@ -17,13 +19,26 @@ enum PetState: String, CaseIterable {
         case .cleaning: return "clean"
         case .expecting: return "idle" // 暂时复用 idle，通过 UI 区分
         case .playing: return "idle" // 暂时复用 idle，后续添加专属动画
+        case .sleeping: return "idle" // 暂时复用 idle，后续添加 sleep 视频
+        case .working:
+            switch job {
+            case .none: return "idle"
+            case .waiter: return "waiter"
+            case .security: return "security"
+            case .streamer: return "streamer"
+            }
         }
+    }
+    
+    // 兼容旧属性，默认不传 job
+    var videoFileName: String {
+        return videoFileName()
     }
     
     // 是否是循环动画
     var isLooping: Bool {
         switch self {
-        case .idle, .expecting, .playing: return true
+        case .idle, .expecting, .playing, .sleeping, .working: return true
         default: return false
         }
     }
@@ -170,7 +185,7 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
         }
     }
     
-    // 饱食度/清洁度消耗倍率 (基于基础消耗)
+    // 饱食度/清洁度/精力/心情消耗倍率 (基于基础消耗)
     var consumptionMultiplier: Double {
         switch self {
         case .none: return 1.0

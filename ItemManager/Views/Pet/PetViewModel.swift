@@ -27,6 +27,15 @@ class PetViewModel: ObservableObject {
     private var timer: Timer?
     private let statusKey = "PetStatus_Data"
     
+    // MARK: - Constants
+    private let sleepThreshold: Double = 20.0
+    private let forceSleepMinuteStart: Int = 45 // 每小时 45 分开始 (保留 15 分钟休息)
+    private let forceSleepMinuteEnd: Int = 0    // 整点结束
+    private let sleepEnergyRecoveryRate: Double = 100.0 / 3600.0 // 睡觉每小时回满 (100点)
+    private let idleEnergyRecoveryRate: Double = 20.0 / 3600.0   // 闲置每小时回 20 点
+    private let sleepMoodRecoveryRate: Double = 30.0 / 3600.0    // 睡觉心情恢复 (降低恢复量，确保不交互时心情总体下降)
+    private let idleMoodRecoveryRate: Double = 10.0 / 3600.0     // 闲置心情恢复
+    
     // MARK: - Initialization
     init() {
         // Initial load
@@ -232,6 +241,14 @@ class PetViewModel: ObservableObject {
         }
     }
     
+    // 抚摸互动
+    func pet() {
+        let moodIncrease = 5.0
+        status.mood = min(100, status.mood + moodIncrease)
+        showFloatingText("心情 +\(Int(moodIncrease))", color: .pink)
+        saveStatus()
+    }
+    
     func clean() {
         guard currentState == .idle else { return }
         
@@ -257,7 +274,8 @@ class PetViewModel: ObservableObject {
     
     func onAnimationFinished() {
         // Return to idle after action finished
-        if currentState != .idle {
+        // 只有非循环动画才自动切回 idle
+        if !currentState.isLooping && currentState != .idle {
             changeState(to: .idle)
         }
     }
@@ -362,6 +380,9 @@ class PetViewModel: ObservableObject {
         status.jobStartTime = Date()
         jobIncomeAccumulator = 0.0
         
+        // 切换到工作状态
+        changeState(to: .working)
+        
         saveStatus()
         
         if job != .none {
@@ -377,88 +398,168 @@ class PetViewModel: ObservableObject {
         status.jobStartTime = nil
         jobIncomeAccumulator = 0.0
         
+        // 如果当前是工作状态，停止工作后切回 idle
+        if currentState == .working {
+            changeState(to: .idle)
+        }
+        
         saveStatus()
         
         showFloatingText("结束打工: \(jobName)", color: .green)
     }
     
     private func updateStatus() {
-        // 检查跨天重置
-        checkDailyReset()
+        processTimePassage(timeInterval: 1.0)
+    }
+    
+    /// 核心状态流逝逻辑
+    /// - Parameters:
+    ///   - timeInterval: 流逝的时间（秒）
+    ///   - isOfflineSimulation: 是否是离线模拟（不触发UI和实时保存）
+    func processTimePassage(timeInterval: Double, isOfflineSimulation: Bool = false) {
+        let calendar = Calendar.current
+        // 在线模式下用当前时间，离线模拟模式下基于 lastUpdateTime 递推
+        let now = isOfflineSimulation ? status.lastUpdateTime.addingTimeInterval(timeInterval) : Date()
+        let currentMinute = calendar.component(.minute, from: now)
         
-        // Decay logic
-        let multiplier = status.currentJob.consumptionMultiplier
-        
-        status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate * multiplier)
-        status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate * multiplier)
-        
-        // 精力逻辑：工作时衰减，空闲时恢复
-        if status.currentJob != .none {
-            status.energy = max(0, status.energy - PetStatus.energyDecayRate * multiplier)
-        } else {
-            // 空闲时每小时恢复 20 点 (20.0 / 3600.0)
-            status.energy = min(100, status.energy + (20.0 / 3600.0))
+        // 检查跨天重置 (仅在线或模拟到新的一天时)
+        if !isOfflineSimulation || !calendar.isDate(now, inSameDayAs: status.lastDailyResetDate) {
+            checkDailyReset()
         }
         
-        status.mood = max(0, status.mood - PetStatus.moodDecayRate * multiplier)
-        status.lastUpdateTime = Date()
+        // 1. 判定是否处于强制睡觉时间段 (每小时 45-59 分)
+        let isFixedSleepTime = currentMinute >= forceSleepMinuteStart
         
-        // Job Income
-        if status.currentJob != .none {
+        // 2. 判定是否精力耗尽 (昏睡)
+        let isExhausted = status.energy <= 0
+        
+        // 3. 判定是否低精力自动睡觉 (仅在空闲时触发)
+        let isLowEnergy = status.energy < sleepThreshold
+        
+        // 决策当前行为
+        var isSleeping = false
+        var isWorking = false
+        
+        // 状态判定
+        if isFixedSleepTime || isExhausted {
+            isSleeping = true
+            // 强制停止工作
+            if status.currentJob != .none {
+                if !isOfflineSimulation {
+                    stopJob()
+                    let reason = isExhausted ? "精力耗尽，强制昏睡！" : "休息时间到了，去睡觉吧~"
+                    showFloatingText(reason, color: .purple)
+                } else {
+                    status.currentJob = .none
+                    status.jobStartTime = nil
+                }
+            }
+        } else if status.currentJob != .none {
+            // 正在工作
+            isWorking = true
+            // 检查状态是否过低导致停止工作
+            if status.hunger < 10 || status.hygiene < 10 || status.mood < 10 {
+                isWorking = false
+                 if !isOfflineSimulation {
+                    stopJob()
+                    showFloatingText("状态不好，不干了！", color: .red)
+                } else {
+                    status.currentJob = .none
+                    status.jobStartTime = nil
+                }
+            }
+        } else if isLowEnergy {
+            // 没有工作，精力低 -> 自动睡觉
+            isSleeping = true
+        }
+        
+        // 更新 UI 状态 (仅在线模式)
+        if !isOfflineSimulation {
+            if isSleeping && currentState != .sleeping {
+                changeState(to: .sleeping)
+            } else if !isSleeping && currentState == .sleeping {
+                // 醒来条件：精力充足且不在强制睡眠时间
+                if status.energy > 50 && !isFixedSleepTime {
+                    changeState(to: .idle)
+                }
+            } else if isWorking && currentState != .working && !isSleeping {
+                // 确保工作时处于工作状态（除非正在睡觉）
+                changeState(to: .working)
+            } else if !isWorking && currentState == .working {
+                // 如果不再工作但状态还是 working，切回 idle
+                 changeState(to: .idle)
+            }
+        }
+        
+        // 计算属性变化
+        if isSleeping {
+            // 睡觉：快速恢复精力，恢复心情，消耗饱食/清洁
+            status.energy = min(100, status.energy + sleepEnergyRecoveryRate * timeInterval)
+            status.mood = min(100, status.mood + sleepMoodRecoveryRate * timeInterval)
+            status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate * timeInterval)
+            status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate * timeInterval)
+        } else if isWorking {
+            // 工作：消耗所有属性，增加收入
+            let multiplier = status.currentJob.consumptionMultiplier
+            
+            status.energy = max(0, status.energy - PetStatus.energyDecayRate * multiplier * timeInterval)
+            status.mood = max(0, status.mood - PetStatus.moodDecayRate * multiplier * timeInterval)
+            status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate * multiplier * timeInterval)
+            status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate * multiplier * timeInterval)
+            
+            // 结算收益
             let incomePerSecond = Double(status.currentJob.incomeRate) / 60.0
-            jobIncomeAccumulator += incomePerSecond
+            jobIncomeAccumulator += incomePerSecond * timeInterval
             
             if jobIncomeAccumulator >= 1.0 {
                 let coinToAdd = Int(jobIncomeAccumulator)
-                earnFishCoin(amount: coinToAdd) // 使用 earnFishCoin 处理每日上限
+                if !isOfflineSimulation {
+                     earnFishCoin(amount: coinToAdd)
+                } else {
+                     // 离线模拟直接加，不触发保存
+                     let remainingQuota = PetStatus.dailyFishCoinLimit - status.dailyFishCoinEarned
+                     let actualEarned = min(coinToAdd, remainingQuota)
+                     if actualEarned > 0 {
+                         status.fishCoin += actualEarned
+                         status.dailyFishCoinEarned += actualEarned
+                     }
+                }
                 jobIncomeAccumulator -= Double(coinToAdd)
             }
+        } else {
+            // 闲置：缓慢恢复精力，消耗心情/饱食/清洁
+            status.energy = min(100, status.energy + idleEnergyRecoveryRate * timeInterval)
+            // 闲置时心情随时间衰减
+            status.mood = max(0, status.mood - PetStatus.moodDecayRate * timeInterval)
             
-            // 自动停止打工条件
-            if status.hunger < 10 || status.hygiene < 10 || status.energy < 10 || status.mood < 10 {
-                stopJob()
-                showFloatingText("太累了，回家休息...", color: .red)
-            }
+            status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate * timeInterval)
+            status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate * timeInterval)
         }
+        
+        status.lastUpdateTime = now
     }
     
     private func calculateOfflineDecay() {
         let now = Date()
-        let timeInterval = now.timeIntervalSince(status.lastUpdateTime)
+        var simulationTime = status.lastUpdateTime
         
-        let multiplier = status.currentJob.consumptionMultiplier
-        
-        let hungerLoss = timeInterval * PetStatus.hungerDecayRate * multiplier
-        let hygieneLoss = timeInterval * PetStatus.hygieneDecayRate * multiplier
-        let moodLoss = timeInterval * PetStatus.moodDecayRate * multiplier
-        
-        // 计算收益 (在扣除属性前计算，简单处理)
-        if status.currentJob != .none {
-            let totalIncome = Int(timeInterval / 60.0 * Double(status.currentJob.incomeRate))
-            if totalIncome > 0 {
-                earnFishCoin(amount: totalIncome)
-            }
+        // 为了防止离线太久导致死循环，如果离线超过 24 小时，只计算最后 24 小时
+        let maxSimulationDuration: TimeInterval = 24 * 3600
+        if now.timeIntervalSince(simulationTime) > maxSimulationDuration {
+            simulationTime = now.addingTimeInterval(-maxSimulationDuration)
+            status.lastUpdateTime = simulationTime
         }
         
-        status.hunger = max(0, status.hunger - hungerLoss)
-        status.hygiene = max(0, status.hygiene - hygieneLoss)
-        status.mood = max(0, status.mood - moodLoss)
+        // 步进模拟，步长 60 秒 (分钟级精度)
+        let step: TimeInterval = 60.0
         
-        // 精力逻辑：工作时衰减，空闲时恢复
-        if status.currentJob != .none {
-            let energyLoss = timeInterval * PetStatus.energyDecayRate * multiplier
-            status.energy = max(0, status.energy - energyLoss)
-        } else {
-            let energyGain = timeInterval * (20.0 / 3600.0)
-            status.energy = min(100, status.energy + energyGain)
-        }
-        
-        status.lastUpdateTime = now
-        
-        // 检查是否需要自动停止
-        if status.currentJob != .none && (status.hunger < 10 || status.hygiene < 10 || status.energy < 10 || status.mood < 10) {
-            status.currentJob = .none
-            status.jobStartTime = nil
+        while simulationTime < now {
+            let remaining = now.timeIntervalSince(simulationTime)
+            let currentStep = min(step, remaining)
+            
+            processTimePassage(timeInterval: currentStep, isOfflineSimulation: true)
+            
+            simulationTime = status.lastUpdateTime
         }
         
         saveStatus()

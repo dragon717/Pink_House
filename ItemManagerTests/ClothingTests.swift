@@ -9,6 +9,7 @@ import XCTest
 import SwiftData
 @testable import ItemManager
 
+@MainActor
 final class ClothingTests: XCTestCase {
     var modelContainer: ModelContainer!
     var modelContext: ModelContext!

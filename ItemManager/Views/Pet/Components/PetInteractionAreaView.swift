@@ -11,7 +11,7 @@ struct PetInteractionAreaView: View {
     var body: some View {
         ZStack {
             PetVideoPlayer(
-                videoName: viewModel.currentState.videoFileName,
+                videoName: viewModel.currentState.videoFileName(for: viewModel.status.currentJob),
                 isLooping: viewModel.currentState.isLooping,
                 onFinished: {
                     viewModel.onAnimationFinished()
