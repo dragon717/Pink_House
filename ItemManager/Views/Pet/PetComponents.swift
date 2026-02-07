@@ -109,8 +109,9 @@ struct ShopItemView: View {
     var body: some View {
         Button(action: action) {
             VStack {
-                Image(systemName: item.icon)
-                    .font(.system(size: 30))
+                Image(item.icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 50, height: 50)
                     .background(Color.gray.opacity(0.1))
                     .cornerRadius(10)
@@ -145,8 +146,9 @@ struct InventoryItemView: View {
     var body: some View {
         VStack {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: item.icon)
-                    .font(.system(size: 30))
+                Image(item.icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 50, height: 50)
                     .background(Color.blue.opacity(0.1))
                     .cornerRadius(10)

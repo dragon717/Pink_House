@@ -65,9 +65,9 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
     // 水
     case warmWater = "温水"
     case boiledWater = "白开水"
-    
+
     // 特殊道具
-    case renameCard = "改名卡"
+    case renameCard = "改名项圈"
     
     var id: String { rawValue }
     

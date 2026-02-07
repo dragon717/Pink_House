@@ -34,7 +34,7 @@
       "price": 500,
       "currency": "fishCoin",
       "recoveryValue": 30,
-      "icon": "tray.fill",
+      "icon": "catRice",
       "description": "营养均衡的自制猫饭。",
       "sortIndex": 10
     },
@@ -45,7 +45,7 @@
       "price": 300,
       "currency": "fishCoin",
       "recoveryValue": 20,
-      "icon": "circle.grid.2x2.fill",
+      "icon": "catFood",
       "description": "口感酥脆的优质猫粮。",
       "sortIndex": 20
     },
@@ -56,7 +56,7 @@
       "price": 500,
       "currency": "fishCoin",
       "recoveryValue": 30,
-      "icon": "circle.grid.cross.fill",
+      "icon": "cannedFood",
       "description": "美味多汁的主食罐头。",
       "sortIndex": 30
     },
@@ -67,7 +67,7 @@
       "price": 200,
       "currency": "fishCoin",
       "recoveryValue": 15,
-      "icon": "capsule.fill",
+      "icon": "catStrip",
       "description": "猫咪最爱的零食。",
       "sortIndex": 40
     },
@@ -78,7 +78,7 @@
       "price": 800,
       "currency": "fishCoin",
       "recoveryValue": 40,
-      "icon": "snowflake",
+      "icon": "freezeDried",
       "description": "保留原汁原味的肉类冻干。",
       "sortIndex": 50
     },
@@ -89,7 +89,7 @@
       "price": 100,
       "currency": "fishCoin",
       "recoveryValue": 10,
-      "icon": "bird.fill",
+      "icon": "chickenBreast",
       "description": "水煮鸡胸肉，健康低脂。",
       "sortIndex": 60
     },
@@ -100,7 +100,7 @@
       "price": 1500,
       "currency": "fishCoin",
       "recoveryValue": 60,
-      "icon": "hare.fill",
+      "icon": "rawMeat",
       "description": "还原天性的顶级盛宴。",
       "sortIndex": 70
     },
@@ -111,7 +111,7 @@
       "price": 2,
       "currency": "fishCoin",
       "recoveryValue": 10,
-      "icon": "drop.fill",
+      "icon": "warmWater",
       "description": "适宜入口的温水。",
       "sortIndex": 80
     },
@@ -122,18 +122,18 @@
       "price": 1,
       "currency": "fishCoin",
       "recoveryValue": 5,
-      "icon": "drop",
+      "icon": "boiledWater",
       "description": "普通的凉白开。",
       "sortIndex": 90
     },
     {
       "id": "renameCard",
-      "name": "改名卡",
+      "name": "改名项圈",
       "category": "special",
       "price": 10,
       "currency": "meowCoin",
       "recoveryValue": 0,
-      "icon": "pencil.and.outline",
+      "icon": "renameCard",
       "description": "可以给萌宠重新起名。",
       "sortIndex": 100
     },
@@ -145,7 +145,7 @@
       "currency": "fishCoin",
       "recoveryValue": 20,
       "energyCost": 10,
-      "icon": "circle.grid.cross",
+      "icon": "yarnBall",
       "description": "猫咪最爱的玩具，消耗精力增加心情。",
       "sortIndex": 110
     }

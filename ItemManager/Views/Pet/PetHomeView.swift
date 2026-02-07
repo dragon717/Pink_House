@@ -74,12 +74,12 @@ struct PetHomeView: View {
                         }
                     }
                 } message: {
-                    Text("改名将消耗一张改名卡")
+                    Text("改名将消耗一个改名项圈")
                 }
                 .alert("缺少道具", isPresented: $showNoCardAlert) {
                     Button("这都要买！", role: .cancel) { }
                 } message: {
-                    Text("修改名字需要消耗改名卡，请前往商店购买喵～")
+                    Text("修改名字需要消耗改名项圈，请前往商店购买喵～")
                 }
                 .sheet(isPresented: $showJobSelection) {
                     PetJobSelectionView(viewModel: viewModel, isPresented: $showJobSelection)
