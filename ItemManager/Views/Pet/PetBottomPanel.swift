@@ -164,7 +164,7 @@ struct InventoryView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
                         ForEach(inventoryItems) { item in
                             InventoryItemView(item: item, count: viewModel.status.inventory[item] ?? 0)
-                                .draggable(item.rawValue)
+                                .draggable("inventory:\(item.rawValue)")
                         }
                     }
                     .padding(20)
@@ -176,7 +176,7 @@ struct InventoryView: View {
                     HStack(spacing: 15) {
                         ForEach(inventoryItems) { item in
                             InventoryItemView(item: item, count: viewModel.status.inventory[item] ?? 0)
-                                .draggable(item.rawValue)
+                                .draggable("inventory:\(item.rawValue)")
                         }
                     }
                     .padding(.horizontal, 20)
@@ -200,6 +200,7 @@ struct ShopView: View {
                         ShopItemView(item: item) {
                             buy(item)
                         }
+                        .draggable("shop:\(item.rawValue)")
                     }
                 }
                 .padding(20)
@@ -213,6 +214,7 @@ struct ShopView: View {
                         ShopItemView(item: item) {
                             buy(item)
                         }
+                        .draggable("shop:\(item.rawValue)")
                     }
                 }
                 .padding(.horizontal, 20)

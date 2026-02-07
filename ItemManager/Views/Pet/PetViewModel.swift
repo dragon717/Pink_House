@@ -98,6 +98,47 @@ class PetViewModel: ObservableObject {
         }
     }
     
+    // 购买并立即消费（拖拽购买）
+    func purchaseAndConsumeItem(_ itemType: PetItemType) {
+        // 1. 检查钱够不够
+        let canAfford: Bool
+        switch itemType.currency {
+        case .fishCoin:
+            canAfford = status.fishCoin >= itemType.price
+        case .meowCoin:
+            canAfford = status.meowCoin >= itemType.price
+        }
+        
+        guard canAfford else {
+            showFloatingText("余额不足", color: .gray)
+            return
+        }
+        
+        // 2. 扣钱
+        switch itemType.currency {
+        case .fishCoin:
+            status.fishCoin -= itemType.price
+        case .meowCoin:
+            status.meowCoin -= itemType.price
+        }
+        
+        // 3. 消费效果 (这里不经过背包，直接产生效果)
+        // 增加库存只是为了记录？或者直接跳过库存？
+        // 既然是拖拽给宠物吃，就不加库存了，直接产生效果。
+        // 但为了逻辑一致性，我们可以临时加库存然后马上 consume，或者提取 consume 的核心逻辑。
+        // 这里为了简单，直接复用 consumeItem 的逻辑，但要注意 consumeItem 会扣库存。
+        // 所以先加库存
+        status.inventory[itemType, default: 0] += 1
+        
+        // 4. 消费
+        consumeItem(itemType)
+        
+        // 5. 显示扣款提示
+        showFloatingText("-\(itemType.price)", color: .orange)
+        
+        saveStatus()
+    }
+    
     // 拖拽喂食/饮水成功
     func consumeItem(_ itemType: PetItemType) {
         // 特殊道具不能直接食用

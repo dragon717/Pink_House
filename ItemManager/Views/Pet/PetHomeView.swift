@@ -93,6 +93,53 @@ struct PetHomeView: View {
                                 )
                                 .frame(height: videoHeight) // 动态高度
                                 .clipShape(RoundedRectangle(cornerRadius: 20))
+                                // 接收拖拽区域 (作为 Overlay 确保尺寸一致)
+                                .overlay(
+                                    Color.clear
+                                        .contentShape(Rectangle())
+                                        .dropDestination(for: String.self) { items, location in
+                                            print("DEBUG: Drop at \(location)")
+                                            guard let itemString = items.first else { return false }
+                                            
+                                            // 解析来源
+                                            if itemString.hasPrefix("shop:") {
+                                                let rawValue = String(itemString.dropFirst(5))
+                                                if let itemType = PetItemType(rawValue: rawValue) {
+                                                    print("DEBUG: Drop source: Shop, Item: \(rawValue)")
+                                                    viewModel.purchaseAndConsumeItem(itemType)
+                                                    viewModel.onDragEnded()
+                                                    return true
+                                                }
+                                            } else if itemString.hasPrefix("inventory:") {
+                                                let rawValue = String(itemString.dropFirst(10))
+                                                if let itemType = PetItemType(rawValue: rawValue) {
+                                                    print("DEBUG: Drop source: Inventory, Item: \(rawValue)")
+                                                    viewModel.consumeItem(itemType)
+                                                    viewModel.onDragEnded()
+                                                    return true
+                                                }
+                                            } else {
+                                                // 兼容旧逻辑
+                                                if let itemType = PetItemType(rawValue: itemString) {
+                                                    print("DEBUG: Drop source: Unknown, Item: \(itemString)")
+                                                    viewModel.consumeItem(itemType)
+                                                    viewModel.onDragEnded()
+                                                    return true
+                                                }
+                                            }
+                                            return false
+                                        } isTargeted: { isTargeted in
+                                            if isTargeted {
+                                                viewModel.onDragStarted()
+                                            } else {
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                    if viewModel.currentState == .expecting {
+                                                        viewModel.onDragEnded()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                )
                     
                     // 期待状态 UI 反馈
                     if viewModel.currentState == .expecting {
@@ -157,27 +204,7 @@ struct PetHomeView: View {
                     .animation(.spring(), value: viewModel.recognizedSpeechText)
                     .animation(.spring(), value: audioManager.interactionState)
                     
-                    // 接收拖拽区域
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .dropDestination(for: String.self) { items, location in
-                            guard let itemRawValue = items.first,
-                                  let itemType = PetItemType(rawValue: itemRawValue) else { return false }
-                            
-                            viewModel.consumeItem(itemType)
-                            viewModel.onDragEnded()
-                            return true
-                        } isTargeted: { isTargeted in
-                            if isTargeted {
-                                viewModel.onDragStarted()
-                            } else {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    if viewModel.currentState == .expecting {
-                                        viewModel.onDragEnded()
-                                    }
-                                }
-                            }
-                        }
+                    // 接收拖拽区域 (Moved to overlay)
                 }
                 
                 // 底部操作面板 (可展开)
@@ -248,6 +275,8 @@ struct PetHomeView: View {
                                 }
                             }
                         }
+                        .padding(4)
+                        .contentShape(Rectangle()) // 增大点击热区
                     }
                 }
                 
