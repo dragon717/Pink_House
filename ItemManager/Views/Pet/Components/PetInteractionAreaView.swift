@@ -4,6 +4,9 @@ struct PetInteractionAreaView: View {
     @ObservedObject var viewModel: PetViewModel
     @ObservedObject var audioManager: AudioManager
     let videoHeight: CGFloat
+    var isLandscape: Bool = false
+    
+    @State private var showStatusIcon = false
     
     var body: some View {
         ZStack {
@@ -65,15 +68,19 @@ struct PetInteractionAreaView: View {
             )
             
             // 期待状态 UI 反馈
-            if viewModel.currentState == .expecting {
+            if showStatusIcon && viewModel.currentState == .expecting {
                 VStack {
-                    Image(systemName: "face.smiling.fill") // 临时表情
-                        .font(.system(size: 50))
-                        .foregroundColor(.yellow)
-                        .shadow(radius: 5)
+                    HStack {
+                        Image(systemName: "face.smiling.fill") // 临时表情
+                            .font(.system(size: 50))
+                            .foregroundColor(.yellow)
+                            .shadow(radius: 5)
+                            .padding(16)
+                        Spacer()
+                    }
                     Spacer()
                 }
-                .padding(.top, 20)
+                .transition(.opacity)
             }
             
             // 浮动文字层
@@ -95,37 +102,75 @@ struct PetInteractionAreaView: View {
             
             // 语音识别和互动状态层
             VStack {
-                Spacer()
-                
-                // 语音识别文字气泡
-                if !viewModel.recognizedSpeechText.isEmpty {
-                    Text(viewModel.recognizedSpeechText)
-                        .font(.body)
-                        .padding()
-                        .background(Material.regular)
-                        .cornerRadius(12)
-                        .shadow(radius: 2)
+                if isLandscape {
+                    // 横屏模式：字幕在顶部
+                    speechBubbleView()
+                        .padding(.top, 0) // 调整位置更高一些
+                    
+                    Spacer()
+                } else {
+                    // 竖屏模式：字幕在底部
+                    Spacer()
+                    
+                    speechBubbleView()
                         .padding(.bottom, 20)
-                        .transition(.scale.combined(with: .opacity))
                 }
                 
                 // 互动状态指示器
                 if audioManager.isInteractionEnabled {
                     HStack {
-                        Image(systemName: getInteractionIcon(for: audioManager.interactionState))
-                            .symbolEffect(.bounce, value: audioManager.interactionState)
-                        Text(getInteractionText(for: audioManager.interactionState))
+                        HStack {
+                            Image(systemName: getInteractionIcon(for: audioManager.interactionState))
+                                .symbolEffect(.bounce, value: audioManager.interactionState)
+                            Text(getInteractionText(for: audioManager.interactionState))
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Capsule().fill(Color.blue.opacity(0.8)))
+                        
+                        Spacer()
                     }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 16)
-                    .background(Capsule().fill(Color.blue.opacity(0.8)))
-                    .padding(.bottom, 100) // 避免遮挡底部面板
+                    .padding(.leading, 16)
+                    .padding(.bottom, 16)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.spring(), value: viewModel.recognizedSpeechText)
             .animation(.spring(), value: audioManager.interactionState)
+        }
+        .onChange(of: viewModel.currentState) { newState in
+            if newState == .expecting {
+                withAnimation {
+                    showStatusIcon = true
+                }
+                // 3秒后自动消失
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    if viewModel.currentState == .expecting {
+                        withAnimation {
+                            showStatusIcon = false
+                        }
+                    }
+                }
+            } else {
+                withAnimation {
+                    showStatusIcon = false
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func speechBubbleView() -> some View {
+        if !viewModel.recognizedSpeechText.isEmpty {
+            Text(viewModel.recognizedSpeechText)
+                .font(.body)
+                .padding()
+                .background(Material.regular)
+                .cornerRadius(12)
+                .shadow(radius: 2)
+                .transition(.scale.combined(with: .opacity))
         }
     }
     

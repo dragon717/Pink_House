@@ -2,3 +2,4 @@ swift_ui_project/ItemManager/ItemManager.xcodeproj/project.xcworkspace/xcuserdat
 ItemManager.xcodeproj/project.xcworkspace/xcuserdata/muniao.xcuserdatad/UserInterfaceState.xcuserstate
 build/*
 ItemManager/asserts/*.mp4
+.DS_Store

@@ -34,7 +34,8 @@ struct PetHomeView: View {
                         PetInteractionAreaView(
                             viewModel: viewModel,
                             audioManager: audioManager,
-                            videoHeight: videoHeight
+                            videoHeight: videoHeight,
+                            isLandscape: isLandscape
                         )
                         .frame(width: videoHeight, height: videoHeight)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,6 +80,9 @@ struct PetHomeView: View {
                     Button("这都要买！", role: .cancel) { }
                 } message: {
                     Text("修改名字需要消耗改名卡，请前往商店购买喵～")
+                }
+                .sheet(isPresented: $showJobSelection) {
+                    PetJobSelectionView(viewModel: viewModel, isPresented: $showJobSelection)
                 }
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)

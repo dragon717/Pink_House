@@ -122,9 +122,9 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
 
 // 宠物工作
 enum PetJob: String, Codable, CaseIterable, Identifiable {
-    case none = "啃老中"
+    case none = "啃老喵"
     case waiter = "猫咖喵"
-    case security = "保安喵"
+    case security = "喵警长"
     case streamer = "直播喵"
     
     var id: String { rawValue }
@@ -132,9 +132,9 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
     var description: String {
         switch self {
         case .none: return "宠物正在啃老，状态消耗正常。"
-        case .waiter: return "在猫咖端被rua，赚取少量鱼币，稍微有点累。"
-        case .security: return "负责巡逻抓老鼠，赚取中等鱼币，比较累。"
-        case .streamer: return "在线卖萌直播，赚取大量鱼币，非常累！"
+        case .waiter: return "在猫咖被rua，赚取少量鱼币，稍微有点累。"
+        case .security: return "负责巡逻抓老鼠，赚取大等鱼币，比较累。"
+        case .streamer: return "在线卖萌直播，赚取巨量鱼币，非常累！"
         }
     }
     
