@@ -100,11 +100,20 @@ class PetViewModel: ObservableObject {
     
     // 拖拽喂食/饮水成功
     func consumeItem(_ itemType: PetItemType) {
+        // 特殊道具不能直接食用
+        if itemType == .renameCard {
+            showFloatingText("这个不能吃哦", color: .red)
+            return
+        }
+        
         // 扣除物品
         guard let count = status.inventory[itemType], count > 0 else { return }
         status.inventory[itemType] = count - 1
         
         // 增加属性
+        let moodRecovery = itemType.recoveryValue * 0.2 // 恢复心情（食物效果的 20%）
+        status.mood = min(100, status.mood + moodRecovery)
+        
         if itemType.isDrink {
             status.hunger = min(100, status.hunger + itemType.recoveryValue)
             changeState(to: .drinking)
@@ -128,6 +137,7 @@ class PetViewModel: ObservableObject {
             
             // 更新状态
             status.hygiene = min(100, status.hygiene + 20)
+            status.mood = min(100, status.mood + 10) // 清洁也恢复心情
             saveStatus()
             
             // 切换状态
@@ -154,11 +164,21 @@ class PetViewModel: ObservableObject {
     // MARK: - Economy & Inventory
     
     func purchaseItem(_ itemType: PetItemType) -> Bool {
-        if status.fishCoin >= itemType.price {
-            status.fishCoin -= itemType.price
-            status.inventory[itemType, default: 0] += 1
-            saveStatus()
-            return true
+        switch itemType.currency {
+        case .fishCoin:
+            if status.fishCoin >= itemType.price {
+                status.fishCoin -= itemType.price
+                status.inventory[itemType, default: 0] += 1
+                saveStatus()
+                return true
+            }
+        case .meowCoin:
+            if status.meowCoin >= itemType.price {
+                status.meowCoin -= itemType.price
+                status.inventory[itemType, default: 0] += 1
+                saveStatus()
+                return true
+            }
         }
         return false
     }
@@ -216,23 +236,113 @@ class PetViewModel: ObservableObject {
         timer = nil
     }
     
+    // MARK: - Job System
+    private var jobIncomeAccumulator: Double = 0.0
+    
+    func startJob(_ job: PetJob) {
+        if status.currentJob != .none {
+            stopJob()
+        }
+        
+        status.currentJob = job
+        status.jobStartTime = Date()
+        jobIncomeAccumulator = 0.0
+        
+        saveStatus()
+        
+        if job != .none {
+            showFloatingText("开始打工: \(job.rawValue)", color: .blue)
+        }
+    }
+    
+    func stopJob() {
+        guard status.currentJob != .none else { return }
+        
+        let jobName = status.currentJob.rawValue
+        status.currentJob = .none
+        status.jobStartTime = nil
+        jobIncomeAccumulator = 0.0
+        
+        saveStatus()
+        
+        showFloatingText("结束打工: \(jobName)", color: .green)
+    }
+    
     private func updateStatus() {
         // Decay logic
-        status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate)
-        status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate)
+        let multiplier = status.currentJob.consumptionMultiplier
+        
+        status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate * multiplier)
+        status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate * multiplier)
+        
+        // 精力逻辑：工作时衰减，空闲时恢复
+        if status.currentJob != .none {
+            status.energy = max(0, status.energy - PetStatus.energyDecayRate * multiplier)
+        } else {
+            // 空闲时每小时恢复 20 点 (20.0 / 3600.0)
+            status.energy = min(100, status.energy + (20.0 / 3600.0))
+        }
+        
+        status.mood = max(0, status.mood - PetStatus.moodDecayRate * multiplier)
         status.lastUpdateTime = Date()
+        
+        // Job Income
+        if status.currentJob != .none {
+            let incomePerSecond = Double(status.currentJob.incomeRate) / 60.0
+            jobIncomeAccumulator += incomePerSecond
+            
+            if jobIncomeAccumulator >= 1.0 {
+                let coinToAdd = Int(jobIncomeAccumulator)
+                earnFishCoin(amount: coinToAdd) // 使用 earnFishCoin 处理每日上限
+                jobIncomeAccumulator -= Double(coinToAdd)
+            }
+            
+            // 自动停止打工条件
+            if status.hunger < 10 || status.hygiene < 10 || status.energy < 10 || status.mood < 10 {
+                stopJob()
+                showFloatingText("太累了，回家休息...", color: .red)
+            }
+        }
     }
     
     private func calculateOfflineDecay() {
         let now = Date()
         let timeInterval = now.timeIntervalSince(status.lastUpdateTime)
         
-        let hungerLoss = timeInterval * PetStatus.hungerDecayRate
-        let hygieneLoss = timeInterval * PetStatus.hygieneDecayRate
+        let multiplier = status.currentJob.consumptionMultiplier
+        
+        let hungerLoss = timeInterval * PetStatus.hungerDecayRate * multiplier
+        let hygieneLoss = timeInterval * PetStatus.hygieneDecayRate * multiplier
+        let moodLoss = timeInterval * PetStatus.moodDecayRate * multiplier
+        
+        // 计算收益 (在扣除属性前计算，简单处理)
+        if status.currentJob != .none {
+            let totalIncome = Int(timeInterval / 60.0 * Double(status.currentJob.incomeRate))
+            if totalIncome > 0 {
+                earnFishCoin(amount: totalIncome)
+            }
+        }
         
         status.hunger = max(0, status.hunger - hungerLoss)
         status.hygiene = max(0, status.hygiene - hygieneLoss)
+        status.mood = max(0, status.mood - moodLoss)
+        
+        // 精力逻辑：工作时衰减，空闲时恢复
+        if status.currentJob != .none {
+            let energyLoss = timeInterval * PetStatus.energyDecayRate * multiplier
+            status.energy = max(0, status.energy - energyLoss)
+        } else {
+            let energyGain = timeInterval * (20.0 / 3600.0)
+            status.energy = min(100, status.energy + energyGain)
+        }
+        
         status.lastUpdateTime = now
+        
+        // 检查是否需要自动停止
+        if status.currentJob != .none && (status.hunger < 10 || status.hygiene < 10 || status.energy < 10 || status.mood < 10) {
+            status.currentJob = .none
+            status.jobStartTime = nil
+        }
         
         saveStatus()
     }
@@ -244,8 +354,26 @@ class PetViewModel: ObservableObject {
     }
     
     func setPetName(_ name: String) {
-        status.petName = name
+        let cleanName = name.replacingOccurrences(of: "\"", with: "")
+                            .replacingOccurrences(of: "“", with: "")
+                            .replacingOccurrences(of: "”", with: "")
+        status.petName = cleanName
         saveStatus()
+    }
+    
+    func hasRenameCard() -> Bool {
+        return (status.inventory[.renameCard] ?? 0) > 0
+    }
+    
+    func useRenameCard(newName: String) -> Bool {
+        guard hasRenameCard() else { return false }
+        
+        // 消耗改名卡
+        status.inventory[.renameCard, default: 0] -= 1
+        
+        // 改名
+        setPetName(newName)
+        return true
     }
     
     private func requestMicrophonePermission() {

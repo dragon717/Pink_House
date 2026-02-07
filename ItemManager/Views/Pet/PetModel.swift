@@ -27,6 +27,28 @@ enum PetState: String, CaseIterable {
     }
 }
 
+// 萌宠货币类型
+enum PetCurrency: String, CaseIterable, Identifiable {
+    case meowCoin = "喵币"
+    case fishCoin = "鱼币"
+    
+    var id: String { rawValue }
+    
+    var iconName: String {
+        switch self {
+        case .meowCoin: return "pawprint.circle.fill"
+        case .fishCoin: return "fish.circle.fill"
+        }
+    }
+    
+    var color: String {
+        switch self {
+        case .meowCoin: return "yellow" // SwiftUI Color name or hex
+        case .fishCoin: return "orange"
+        }
+    }
+}
+
 // 道具类型
 enum PetItemType: String, Codable, CaseIterable, Identifiable {
     // 食物
@@ -40,6 +62,9 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
     case warmWater = "温水"
     case boiledWater = "白开水"
     
+    // 特殊道具
+    case renameCard = "改名卡"
+    
     var id: String { rawValue }
     
     var price: Int {
@@ -48,9 +73,17 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
         case .cannedFood: return 500
         case .catStrip: return 200
         case .freezeDried: return 800
-        case .chickenBreast: return 1000
-        case .warmWater: return 50
-        case .boiledWater: return 20
+        case .chickenBreast: return 1500
+        case .warmWater: return 0
+        case .boiledWater: return 0
+        case .renameCard: return 10
+        }
+    }
+    
+    var currency: PetCurrency {
+        switch self {
+        case .renameCard: return .meowCoin
+        default: return .fishCoin
         }
     }
     
@@ -64,6 +97,7 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
         case .chickenBreast: return "bird.fill"
         case .warmWater: return "drop.fill"
         case .boiledWater: return "drop"
+        case .renameCard: return "pencil.and.outline"
         }
     }
     
@@ -77,11 +111,60 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
         case .chickenBreast: return 50
         case .warmWater: return 10
         case .boiledWater: return 5
+        case .renameCard: return 0
         }
     }
     
     var isDrink: Bool {
         return self == .warmWater || self == .boiledWater
+    }
+}
+
+// 宠物工作
+enum PetJob: String, Codable, CaseIterable, Identifiable {
+    case none = "啃老中"
+    case waiter = "猫咖喵"
+    case security = "保安喵"
+    case streamer = "直播喵"
+    
+    var id: String { rawValue }
+    
+    var description: String {
+        switch self {
+        case .none: return "宠物正在啃老，状态消耗正常。"
+        case .waiter: return "在猫咖端被rua，赚取少量鱼币，稍微有点累。"
+        case .security: return "负责巡逻抓老鼠，赚取中等鱼币，比较累。"
+        case .streamer: return "在线卖萌直播，赚取大量鱼币，非常累！"
+        }
+    }
+    
+    // 鱼币收益 (每分钟)
+    var incomeRate: Int {
+        switch self {
+        case .none: return 0
+        case .waiter: return 5
+        case .security: return 10
+        case .streamer: return 20
+        }
+    }
+    
+    // 饱食度/清洁度消耗倍率 (基于基础消耗)
+    var consumptionMultiplier: Double {
+        switch self {
+        case .none: return 1.0
+        case .waiter: return 1.5
+        case .security: return 2.0
+        case .streamer: return 3.0
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .none: return "zzz"
+        case .waiter: return "cup.and.saucer.fill"
+        case .security: return "shield.fill"
+        case .streamer: return "video.fill"
+        }
     }
 }
 
@@ -95,6 +178,8 @@ struct PetStatus: Codable {
     var petName: String? // 萌宠名字
     var hunger: Double = 100.0 // 饱食度 0-100
     var hygiene: Double = 100.0 // 清洁度 0-100
+    var energy: Double = 100.0 // 精力 0-100
+    var mood: Double = 100.0 // 心情 0-100
     var lastUpdateTime: Date = Date()
     
     // 货币系统
@@ -108,9 +193,15 @@ struct PetStatus: Codable {
     // 背包系统
     var inventory: [PetItemType: Int] = [:] // 存储物品数量
     
+    // 工作系统
+    var currentJob: PetJob = .none
+    var jobStartTime: Date?
+    
     // 衰减速率 (每秒减少多少)
     static let hungerDecayRate: Double = 10.0 / 3600.0 // 每小时减少10点
     static let hygieneDecayRate: Double = 5.0 / 3600.0 // 每小时减少5点
+    static let energyDecayRate: Double = 8.0 / 3600.0 // 每小时减少8点
+    static let moodDecayRate: Double = 12.0 / 3600.0 // 每小时减少12点
     
     static let dailyFishCoinLimit: Int = 10000
 }

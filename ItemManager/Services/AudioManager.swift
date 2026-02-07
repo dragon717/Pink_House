@@ -1,6 +1,7 @@
 import AVFoundation
 import Combine
 import Speech
+import UIKit
 
 /// 萌宠互动状态
 enum PetInteractionState: String {
@@ -77,11 +78,69 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         super.init()
         speechRecognizer?.delegate = self
         setupRecordingURL()
+        setupNotifications()
     }
     
     private func setupRecordingURL() {
         let tempDir = FileManager.default.temporaryDirectory
         recordingURL = tempDir.appendingPathComponent("pet_echo_recording.wav")
+    }
+    
+    // MARK: - Notifications
+    
+    private func setupNotifications() {
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(handleInterruption), name: AVAudioSession.interruptionNotification, object: nil)
+        nc.addObserver(self, selector: #selector(handleAppDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        nc.addObserver(self, selector: #selector(handleAppWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+    
+    @objc private func handleAppDidEnterBackground() {
+        print("AudioManager: App entered background")
+        // 进入后台时，暂停所有音频活动
+        if isInteractionEnabled {
+            // 停止引擎和录音，但不改变 isInteractionEnabled 开关状态
+            stopInteraction()
+        }
+        stopBackgroundMusic()
+    }
+    
+    @objc private func handleAppWillEnterForeground() {
+        print("AudioManager: App will enter foreground")
+        // 回到前台时，根据开关状态恢复
+        if isInteractionEnabled {
+            startInteraction()
+        }
+        if isBackgroundMusicEnabled {
+            playBackgroundMusic()
+        }
+    }
+    
+    @objc private func handleInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        if type == .began {
+            print("AudioManager: Interruption began")
+            stopInteraction()
+            stopBackgroundMusic()
+        } else if type == .ended {
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    print("AudioManager: Interruption ended, resuming")
+                    if isInteractionEnabled {
+                        startInteraction()
+                    }
+                    if isBackgroundMusicEnabled {
+                        playBackgroundMusic()
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Audio Session
@@ -210,6 +269,13 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         let inputNode = engine.inputNode
         let format = inputNode.inputFormat(forBus: 0)
+        
+        // 崩溃修复：检查格式有效性，防止后台进入或设备状态异常时崩溃
+        if format.sampleRate == 0 || format.channelCount == 0 {
+            print("AudioManager: Invalid input format: \(format)")
+            stopInteraction()
+            return
+        }
         
         // 准备语音识别
         prepareSpeechRecognition()

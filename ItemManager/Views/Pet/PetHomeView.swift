@@ -7,6 +7,10 @@ struct PetHomeView: View {
     @ObservedObject private var soundManager = SoundManager.shared
     @Environment(\.scenePhase) var scenePhase
     @State private var isExpanded = false
+    @State private var showRenameAlert = false
+    @State private var showNoCardAlert = false
+    @State private var showJobSelection = false
+    @State private var newName = ""
     
     var body: some View {
         NavigationStack {
@@ -24,10 +28,13 @@ struct PetHomeView: View {
                 VStack(spacing: 0) {
                     // 顶部状态栏和货币栏
                     VStack(spacing: 10) {
-                    HStack(spacing: 20) {
-                        StatusView(icon: "fork.knife", value: viewModel.status.hunger, color: .orange)
-                        StatusView(icon: "shower.fill", value: viewModel.status.hygiene, color: .blue)
-                    }
+                        // 状态栏 - 单行显示
+                        HStack(spacing: 8) {
+                            StatusView(icon: "fork.knife", value: viewModel.status.hunger, color: .orange)
+                            StatusView(icon: "shower.fill", value: viewModel.status.hygiene, color: .blue)
+                            StatusView(icon: "bolt.fill", value: viewModel.status.energy, color: .green)
+                            StatusView(icon: "face.smiling.fill", value: viewModel.status.mood, color: .pink)
+                        }
                     
                     HStack(spacing: 15) {
                         CurrencyView(type: .meowCoin, amount: viewModel.status.meowCoin) {
@@ -147,9 +154,73 @@ struct PetHomeView: View {
                 // 底部操作面板 (可展开)
                 PetBottomPanel(viewModel: viewModel, isExpanded: $isExpanded)
             }
-            .navigationTitle(viewModel.status.petName ?? "萌宠")
+            .alert("修改萌宠名字", isPresented: $showRenameAlert) {
+                TextField("输入新名字", text: $newName)
+                Button("取消", role: .cancel) { }
+                Button("确定") {
+                    let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        _ = viewModel.useRenameCard(newName: trimmed)
+                    }
+                }
+            } message: {
+                Text("改名将消耗一张改名卡")
+            }
+            .alert("缺少道具", isPresented: $showNoCardAlert) {
+                Button("这都要买！", role: .cancel) { }
+            } message: {
+                Text("修改名字需要消耗改名卡，请前往商店购买喵～")
+            }
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button {
+                            if viewModel.hasRenameCard() {
+                                newName = viewModel.status.petName ?? ""
+                                showRenameAlert = true
+                            } else {
+                                showNoCardAlert = true
+                            }
+                        } label: {
+                            Label("修改名字", systemImage: "pencil")
+                        }
+                        
+                        Button {
+                            showJobSelection = true
+                        } label: {
+                            Label("猫咖打工", systemImage: "briefcase")
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "cat.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.orange)
+                            
+                            let petName = viewModel.status.petName
+                            let rawName = petName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? petName! : "萌宠"
+                            // 移除所有可能的引号
+                            let cleanName = rawName.replacingOccurrences(of: "\"", with: "")
+                                .replacingOccurrences(of: "“", with: "")
+                                .replacingOccurrences(of: "”", with: "")
+                            let displayName = cleanName.isEmpty ? "萌宠" : cleanName
+                            
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(displayName)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                
+                                if viewModel.status.currentJob != .none {
+                                    Text(viewModel.status.currentJob.rawValue)
+                                        .font(.caption2)
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
                         // Background Music Toggle (新增)

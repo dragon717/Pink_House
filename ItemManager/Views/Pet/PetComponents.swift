@@ -22,33 +22,7 @@ struct RollingNumberView: View {
 }
 
 struct CurrencyView: View {
-    enum CurrencyType {
-        case meowCoin
-        case fishCoin
-        
-        var name: String {
-            switch self {
-            case .meowCoin: return "喵币"
-            case .fishCoin: return "鱼币"
-            }
-        }
-        
-        var color: Color {
-            switch self {
-            case .meowCoin: return .yellow
-            case .fishCoin: return .orange
-            }
-        }
-        
-        var iconName: String {
-            switch self {
-            case .meowCoin: return "centsign.circle.fill" // 临时图标
-            case .fishCoin: return "fish.circle.fill"   // 临时图标
-            }
-        }
-    }
-    
-    let type: CurrencyType
+    let type: PetCurrency
     let amount: Int
     let action: () -> Void
     
@@ -56,7 +30,7 @@ struct CurrencyView: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: type.iconName)
-                    .foregroundColor(type.color)
+                    .foregroundColor(type == .meowCoin ? .yellow : .orange)
                     .font(.system(size: 20))
                 
                 RollingNumberView(value: amount)
@@ -99,7 +73,8 @@ struct StatusView: View {
             }
             .frame(height: 10)
         }
-        .padding(8)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
         .background(Color.white.opacity(0.8))
         .cornerRadius(10)
     }
@@ -125,9 +100,9 @@ struct ShopItemView: View {
                     .foregroundColor(.primary)
                 
                 HStack(spacing: 2) {
-                    Image(systemName: "fish.circle.fill") // 鱼币图标
+                    Image(systemName: item.currency.iconName) // 动态图标
                         .font(.caption2)
-                        .foregroundColor(.orange)
+                        .foregroundColor(item.currency == .meowCoin ? .yellow : .orange)
                     Text("\(item.price)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
