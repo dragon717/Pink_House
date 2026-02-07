@@ -11,6 +11,13 @@ final class SoundManager: ObservableObject {
     // 用户偏好设置
     @Published var isSoundEnabled: Bool = true
     
+    /// 彩蛋音效音量 (0.0 - 1.0)
+    @Published var celebrationVolume: Double {
+        didSet {
+            UserDefaults.standard.set(celebrationVolume, forKey: "celebrationVolume")
+        }
+    }
+    
     // 音频播放器池，用于支持并发播放
     private var players: [AVAudioPlayer] = []
     private let maxConcurrentPlayers = 10
@@ -34,6 +41,7 @@ final class SoundManager: ObservableObject {
     private var isRolling: Bool = false
     
     private init() {
+        self.celebrationVolume = UserDefaults.standard.object(forKey: "celebrationVolume") as? Double ?? 1.0
         prepareAudioSession()
         loadSounds()
     }
@@ -219,6 +227,7 @@ final class SoundManager: ObservableObject {
             // 随机化音高，增加真实感
             player.enableRate = true
             player.rate = Float.random(in: 0.8...1.2)
+            player.volume = Float(celebrationVolume) // 应用音量
             player.play()
         }
     }
@@ -235,6 +244,7 @@ final class SoundManager: ObservableObject {
             // 随机化音高，增加真实感
             player.enableRate = true
             player.rate = Float.random(in: 0.9...1.2)
+            player.volume = Float(celebrationVolume) * 0.6 // 应用音量，保持基础音量比
             player.play()
         }
     }

@@ -20,6 +20,23 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     
     // MARK: - Published Properties
     
+    /// BGM 音量 (0.0 - 1.0)
+    @Published var bgmVolume: Double {
+        didSet {
+            UserDefaults.standard.set(bgmVolume, forKey: "bgmVolume")
+            bgmPlayer?.volume = Float(bgmVolume)
+        }
+    }
+    
+    /// 萌宠语音音量 (0.0 - 1.0)
+    @Published var petVoiceVolume: Double {
+        didSet {
+            UserDefaults.standard.set(petVoiceVolume, forKey: "petVoiceVolume")
+            // 实时更新播放节点音量
+            playerNode.volume = Float(petVoiceVolume)
+        }
+    }
+    
     /// 背景音乐开关
     @Published var isBackgroundMusicEnabled: Bool = false {
         didSet {
@@ -52,6 +69,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     // MARK: - Private Properties
     
     private var bgmPlayer: AVAudioPlayer?
+    // private let defaultBGMVolume: Float = 0.3 // Use bgmVolume instead
     
     // Audio Engine & Nodes
     private var engine = AVAudioEngine()
@@ -61,7 +79,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     
     // VAD (Voice Activity Detection)
     private var silenceTimer: Timer?
-    private let silenceThreshold: Float = -45.0 // dB
+    private let silenceThreshold: Float = -40.0 // dB
     private let silenceDuration: TimeInterval = 1.2 // 持续静音多久视为结束
     private var isSpeechDetected = false
     
@@ -75,6 +93,9 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private var recognitionTask: SFSpeechRecognitionTask?
     
     private override init() {
+        self.bgmVolume = UserDefaults.standard.object(forKey: "bgmVolume") as? Double ?? 0.3
+        self.petVoiceVolume = UserDefaults.standard.object(forKey: "petVoiceVolume") as? Double ?? 1.0
+        
         super.init()
         speechRecognizer?.delegate = self
         setupRecordingURL()
@@ -150,7 +171,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             let session = AVAudioSession.sharedInstance()
             if isInteractionEnabled {
                 // 互动模式下始终保持 playAndRecord，避免切换开销和 I/O 错误
-                try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+                // 使用 .voiceChat 模式以启用回声消除 (AEC)，防止 BGM 触发 VAD
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+                
+                // 强制使用扬声器（解决 voiceChat 模式下声音可能走听筒导致声音小的问题）
+                try session.overrideOutputAudioPort(.speaker)
             } else if isRecording {
                 // 仅录音（虽然目前逻辑不会走到这里，除非有其他录音需求）
                 try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
@@ -207,9 +232,16 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             if bgmPlayer == nil {
                 bgmPlayer = try AVAudioPlayer(contentsOf: validUrl)
                 bgmPlayer?.numberOfLoops = -1
-                bgmPlayer?.volume = 0.3
                 bgmPlayer?.prepareToPlay()
             }
+            
+            // 如果处于倾听状态，静音播放
+            if interactionState == .listening || interactionState == .recording {
+                bgmPlayer?.volume = 0
+            } else {
+                bgmPlayer?.volume = Float(bgmVolume)
+            }
+            
             bgmPlayer?.play()
         } catch {
             print("AudioManager: Failed to play BGM: \(error)")
@@ -245,6 +277,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         stopListening()
         stopPlayback()
         interactionState = .idle
+        
+        // 互动结束，恢复 BGM
+        if isBackgroundMusicEnabled {
+            bgmPlayer?.setVolume(Float(bgmVolume), fadeDuration: 0.5)
+        }
     }
     
     private func checkPermissions(completion: @escaping (Bool) -> Void) {
@@ -276,6 +313,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     
     private func startListening() {
         stopPlayback() // 确保没有在播放
+        
+        // 倾听时，暂时将 BGM 静音
+        if isBackgroundMusicEnabled {
+            bgmPlayer?.setVolume(0, fadeDuration: 0.5)
+        }
         
         setupAudioSession(isRecording: true)
         
@@ -451,10 +493,23 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     // MARK: - Playback (Pitch Shift)
     
     private func playRecordedAudio() {
+        // 检查全局音效开关 (复用 SoundManager 的开关状态)
+        // 如果音效关闭，则不播放复述，直接重新开始监听
+        if !SoundManager.shared.isSoundEnabled {
+            print("AudioManager: Sound is disabled (SoundManager), skipping playback")
+            restartListening()
+            return
+        }
+        
         guard let url = recordingURL, FileManager.default.fileExists(atPath: url.path) else {
             print("AudioManager: No recording file found")
             restartListening()
             return
+        }
+        
+        // 播放回复时，恢复 BGM
+        if isBackgroundMusicEnabled {
+            bgmPlayer?.setVolume(Float(bgmVolume), fadeDuration: 0.5)
         }
         
         // 保持 playAndRecord 模式，不切换 Session
@@ -471,6 +526,9 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         engine.attach(playerNode)
         engine.attach(timePitch)
+        
+        // 设置播放节点音量
+        playerNode.volume = Float(petVoiceVolume)
         
         // 变音设置
         timePitch.pitch = 800 // 提高音调

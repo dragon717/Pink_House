@@ -90,7 +90,7 @@ struct MeView: View {
                     }
                     // 触感反馈设置 (跳转详情页)
                     NavigationLink(destination: HapticSettingsView()) {
-                        SettingsRow(icon: "waveform.path.ecg", title: "触感反馈", subtitle: "震动开关与系统设置引导")
+                        SettingsRow(icon: "waveform.path.ecg", title: "音效和触感反馈", subtitle: "震动开关与系统设置引导")
                     }
 
                     // 应用系统设置
@@ -360,6 +360,8 @@ struct SettingsRow: View {
 /// 独立的触感反馈设置页
 struct HapticSettingsView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @ObservedObject private var audioManager = AudioManager.shared
+    @ObservedObject private var soundManager = SoundManager.shared
     @AppStorage("isCelebrationHapticsEnabled") private var isCelebrationHapticsEnabled = true
     @AppStorage("isCelebrationSoundEnabled") private var isCelebrationSoundEnabled = true
     
@@ -385,7 +387,64 @@ struct HapticSettingsView: View {
                 Text("功能开关")
             }
             
-            // 2. 彩蛋特效设置
+            // 2. 音量调节 (新增)
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.purple)
+                            .frame(width: 24)
+                        Text("彩蛋音量: \(Int(soundManager.celebrationVolume * 100))%")
+                    }
+                    Slider(value: $soundManager.celebrationVolume, in: 0...1) {
+                        Text("彩蛋音量")
+                    } minimumValueLabel: {
+                        Image(systemName: "speaker.fill").font(.caption)
+                    } maximumValueLabel: {
+                        Image(systemName: "speaker.wave.3.fill").font(.caption)
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "music.note")
+                            .foregroundStyle(.pink)
+                            .frame(width: 24)
+                        Text("萌宠 BGM: \(Int(audioManager.bgmVolume * 100))%")
+                    }
+                    Slider(value: $audioManager.bgmVolume, in: 0...1) {
+                        Text("BGM 音量")
+                    } minimumValueLabel: {
+                        Image(systemName: "speaker.fill").font(.caption)
+                    } maximumValueLabel: {
+                        Image(systemName: "speaker.wave.3.fill").font(.caption)
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "mic.fill")
+                            .foregroundStyle(.green)
+                            .frame(width: 24)
+                        Text("萌宠语音: \(Int(audioManager.petVoiceVolume * 100))%")
+                    }
+                    Slider(value: $audioManager.petVoiceVolume, in: 0...1.5) { // 允许稍微放大一点
+                        Text("语音音量")
+                    } minimumValueLabel: {
+                        Image(systemName: "speaker.fill").font(.caption)
+                    } maximumValueLabel: {
+                        Image(systemName: "speaker.wave.3.fill").font(.caption)
+                    }
+                }
+                .padding(.vertical, 4)
+                
+            } header: {
+                Text("音量调节")
+            }
+            
+            // 3. 彩蛋特效设置
             Section {
                 Toggle(isOn: $isCelebrationHapticsEnabled) {
                     HStack(spacing: 12) {
@@ -446,7 +505,7 @@ struct HapticSettingsView: View {
                 Text("系统设置")
             }
         }
-        .navigationTitle("触感反馈设置")
+        .navigationTitle("音效和触感反馈设置")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
