@@ -21,8 +21,8 @@ class PetWorkTests: XCTestCase {
     func testWorkConsumptionRates() {
         let jobs: [PetJob] = [.waiter, .security, .streamer]
         
-        print("| Job | Multiplier | Energy Decay/h | Mood Decay/h | Hunger Decay/h | Hygiene Decay/h |")
-        print("|---|---|---|---|---|---|")
+        print("| Job | Income/min | Multiplier | Energy Decay/h | Mood Decay/h | Hunger Decay/h | Hygiene Decay/h |")
+        print("|---|---|---|---|---|---|---|")
         
         for job in jobs {
             // Setup
@@ -44,7 +44,7 @@ class PetWorkTests: XCTestCase {
             let hungerDecay = 100 - viewModel.status.hunger
             let hygieneDecay = 100 - viewModel.status.hygiene
             
-            print("| \(job.rawValue) | \(job.consumptionMultiplier)x | \(format(energyDecay)) | \(format(moodDecay)) | \(format(hungerDecay)) | \(format(hygieneDecay)) |")
+            print("| \(job.rawValue) | \(job.incomeRate) | \(job.consumptionMultiplier)x | \(format(energyDecay)) | \(format(moodDecay)) | \(format(hungerDecay)) | \(format(hygieneDecay)) |")
         }
     }
     

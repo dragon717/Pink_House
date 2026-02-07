@@ -454,6 +454,9 @@ struct ClothingEditView: View {
             
             // Schedule notification
             NotificationManager.shared.scheduleNotification(for: newClothing)
+            
+            // Trigger Reward for adding new clothing
+            RewardManager.shared.triggerReward(type: .addClothing)
         }
         
         // Save context and sync widget

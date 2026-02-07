@@ -100,10 +100,18 @@ struct PetHomeView: View {
                                 Label("修改名字", systemImage: "pencil")
                             }
                             
-                            Button {
-                                showJobSelection = true
-                            } label: {
-                                Label("送去打工", systemImage: "briefcase")
+                            if viewModel.status.currentJob != .none {
+                                Button {
+                                    viewModel.stopJob()
+                                } label: {
+                                    Label("结束打工", systemImage: "briefcase.fill")
+                                }
+                            } else {
+                                Button {
+                                    showJobSelection = true
+                                } label: {
+                                    Label("送去打工", systemImage: "briefcase")
+                                }
                             }
                         } label: {
                             HStack(spacing: 6) {

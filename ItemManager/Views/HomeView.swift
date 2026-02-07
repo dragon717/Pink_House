@@ -145,6 +145,9 @@ struct HomeView: View {
                     )
                 }
             }
+            .onChange(of: viewLayout) { _, _ in
+                RewardManager.shared.triggerReward(type: .firstTimeFeature("ViewLayoutChange"))
+            }
             .sheet(isPresented: $showingBatchImportSheet) {
                 BatchImportView()
             }

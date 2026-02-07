@@ -55,6 +55,9 @@ struct MainTabView: View {
                 .tag(4)
         }
         .environment(\.isSimulationActive, selectedTab == 3)
+        .overlay(
+            RewardBubbleView()
+        )
     }
 }
 

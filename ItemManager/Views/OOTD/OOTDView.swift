@@ -124,6 +124,9 @@ struct OOTDView: View {
                         withAnimation {
                             isSidebarVisible.toggle()
                         }
+                        if isSidebarVisible {
+                            RewardManager.shared.triggerReward(type: .firstTimeFeature("OOTDSidebar"))
+                        }
                     }) {
                         Image(systemName: "sidebar.left")
                     }
@@ -558,6 +561,15 @@ struct OOTDView: View {
         )
         
         outfit.items.append(item)
+        
+        // Check for Reward (2 or more items)
+        if outfit.items.count >= 2 {
+            let key = "hasRewarded_OOTD_\(outfit.id.uuidString)"
+            if !UserDefaults.standard.bool(forKey: key) {
+                UserDefaults.standard.set(true, forKey: key)
+                RewardManager.shared.triggerReward(type: .createOOTD(itemCount: outfit.items.count))
+            }
+        }
         
         // Update snapshot
         Task { @MainActor in

@@ -334,11 +334,11 @@ class PetViewModel: ObservableObject {
         saveStatus()
     }
     
-    private func checkDailyReset() {
+    private func checkDailyReset(currentTime: Date = Date()) {
         let calendar = Calendar.current
-        if !calendar.isDateInToday(status.lastDailyResetDate) {
+        if !calendar.isDate(currentTime, inSameDayAs: status.lastDailyResetDate) {
             status.dailyFishCoinEarned = 0
-            status.lastDailyResetDate = Date()
+            status.lastDailyResetDate = currentTime
             saveStatus()
         }
     }
@@ -424,7 +424,7 @@ class PetViewModel: ObservableObject {
         
         // 检查跨天重置 (仅在线或模拟到新的一天时)
         if !isOfflineSimulation || !calendar.isDate(now, inSameDayAs: status.lastDailyResetDate) {
-            checkDailyReset()
+            checkDailyReset(currentTime: now)
         }
         
         // 1. 判定是否处于强制睡觉时间段 (每小时 45-59 分)
@@ -440,27 +440,32 @@ class PetViewModel: ObservableObject {
         var isSleeping = false
         var isWorking = false
         
-        // 状态判定
-        if isFixedSleepTime || isExhausted {
+        // 状态判定优先级：精力耗尽 > 强制休息 > 工作 > 低精力自动休息
+        
+        if isExhausted {
             isSleeping = true
-            // 强制停止工作
+            // 精力耗尽，强制停止工作（彻底罢工）
             if status.currentJob != .none {
                 if !isOfflineSimulation {
                     stopJob()
-                    let reason = isExhausted ? "精力耗尽，强制昏睡！" : "休息时间到了，去睡觉吧~"
-                    showFloatingText(reason, color: .purple)
+                    showFloatingText("精力耗尽，强制昏睡！", color: .purple)
                 } else {
                     status.currentJob = .none
                     status.jobStartTime = nil
                 }
             }
+        } else if isFixedSleepTime {
+            isSleeping = true
+            // 强制休息时间，暂时中断工作状态（但不辞职），转为睡觉恢复精力
+            // isWorking 默认为 false，不产生收益，不消耗工作精力
         } else if status.currentJob != .none {
-            // 正在工作
+            // 正常工作时间
             isWorking = true
-            // 检查状态是否过低导致停止工作
+            
+            // 检查状态是否过低导致停止工作 (罢工)
             if status.hunger < 10 || status.hygiene < 10 || status.mood < 10 {
                 isWorking = false
-                 if !isOfflineSimulation {
+                if !isOfflineSimulation {
                     stopJob()
                     showFloatingText("状态不好，不干了！", color: .red)
                 } else {
@@ -478,8 +483,11 @@ class PetViewModel: ObservableObject {
             if isSleeping && currentState != .sleeping {
                 changeState(to: .sleeping)
             } else if !isSleeping && currentState == .sleeping {
-                // 醒来条件：精力充足且不在强制睡眠时间
-                if status.energy > 50 && !isFixedSleepTime {
+                // 醒来逻辑优化：优先恢复工作
+                if status.currentJob != .none {
+                    changeState(to: .working)
+                } else if status.energy > 50 {
+                    // 只有在非工作状态下，才需要精力门槛避免反复横跳
                     changeState(to: .idle)
                 }
             } else if isWorking && currentState != .working && !isSleeping {

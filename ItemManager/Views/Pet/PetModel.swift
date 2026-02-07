@@ -181,7 +181,7 @@ enum PetJob: String, Codable, CaseIterable, Identifiable {
         case .none: return 0
         case .waiter: return 5
         case .security: return 10
-        case .streamer: return 20
+        case .streamer: return 15
         }
     }
     

@@ -51,6 +51,9 @@ struct WardrobeStatisticsDetailView: View {
                 }
             }
         }
+        .onAppear {
+            RewardManager.shared.triggerReward(type: .firstTimeFeature("WardrobeStats"))
+        }
     }
 }
 

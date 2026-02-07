@@ -214,6 +214,9 @@ struct ClothingDetailView: View {
         if isPayBalanceCelebrationEnabled {
             showCelebration = true
         }
+        
+        // Trigger Reward
+        RewardManager.shared.triggerReward(type: .payBalance)
     }
     
     private func duplicateClothing() {
