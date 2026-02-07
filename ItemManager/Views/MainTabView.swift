@@ -33,21 +33,28 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
+            // Tab 2: 萌宠 (Pet)
+            PetHomeView()
+                .tabItem {
+                    Label("萌宠", systemImage: "pawprint.fill")
+                }
+                .tag(2)
+            
             // Tab 3: 来财 (Wealth)
             WealthView()
                 .tabItem {
                     Label("来财", systemImage: "yensign.circle.fill")
                 }
-                .tag(2)
+                .tag(3)
 
             // Tab 4: 我的 (Me)
             MeView()
                 .tabItem {
                     Label("我的", systemImage: "face.smiling")
                 }
-                .tag(3)
+                .tag(4)
         }
-        .environment(\.isSimulationActive, selectedTab == 2)
+        .environment(\.isSimulationActive, selectedTab == 3)
     }
 }
 
