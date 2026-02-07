@@ -176,13 +176,32 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         var url: URL?
         
         for name in bgmNames {
+            // 1. 尝试直接查找 (Root)
             if let u = Bundle.main.url(forResource: name, withExtension: "mp3") ?? Bundle.main.url(forResource: name, withExtension: "wav") {
+                url = u
+                break
+            }
+            // 2. 尝试在 asserts 子目录查找
+            if let u = Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "asserts") ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "asserts") {
+                url = u
+                break
+            }
+            // 3. 尝试手动拼接路径
+            if let u = Bundle.main.url(forResource: "asserts/\(name)", withExtension: "mp3") ?? Bundle.main.url(forResource: "asserts/\(name)", withExtension: "wav") {
+                url = u
+                break
+            }
+            // 4. 尝试 ItemManager/asserts (以防万一)
+            if let u = Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "ItemManager/asserts") ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "ItemManager/asserts") {
                 url = u
                 break
             }
         }
         
-        guard let validUrl = url else { return }
+        guard let validUrl = url else {
+            print("AudioManager: No BGM found. Searched for: \(bgmNames) in root and asserts/")
+            return
+        }
         
         do {
             if bgmPlayer == nil {
