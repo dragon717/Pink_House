@@ -42,7 +42,7 @@ struct CurrencyView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(Color.white.opacity(0.8))
+            .background(.regularMaterial)
             .cornerRadius(15)
             .shadow(radius: 1)
         }
@@ -61,22 +61,20 @@ struct StatusView: View {
             
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .cornerRadius(5)
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.2))
                     
-                    Rectangle()
+                    Capsule()
                         .fill(color)
                         .frame(width: geometry.size.width * CGFloat(value / 100.0))
-                        .cornerRadius(5)
                 }
             }
-            .frame(height: 10)
+            .frame(height: 8)
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.8))
-        .cornerRadius(10)
+        .background(.regularMaterial)
+        .cornerRadius(12)
     }
 }
 
@@ -105,8 +103,13 @@ struct ShopItemView: View {
                         .foregroundColor(item.currency == .meowCoin ? .yellow : .orange)
                     Text("\(item.price)")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
                 }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.secondary.opacity(0.1))
+                .clipShape(Capsule())
             }
             .frame(width: 80)
         }

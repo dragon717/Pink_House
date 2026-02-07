@@ -6,8 +6,18 @@ struct PetBottomPanel: View {
     @State private var selectedTab: Int = 0 // 0: 背包, 1: 商店
     
     // 面板高度配置
-    private let collapsedHeight: CGFloat = 200 // 收起时的高度 (含 safe area)
-    private let expandedHeight: CGFloat = 600  // 展开时的高度 (或 UIScreen.main.bounds.height * 0.7)
+    private var collapsedHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        // 横屏模式下，收起高度减小，避免遮挡太多
+        return screenHeight < 500 ? 80 : 200
+    }
+    
+    private var expandedHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        // 横屏模式下，限制最大高度，避免占满屏幕导致无法操作
+        // 如果高度小于 500 (通常是横屏)，则只占 80%
+        return screenHeight < 500 ? screenHeight * 0.8 : 600
+    }
     
     @State private var dragOffset: CGFloat = 0
     
@@ -17,13 +27,13 @@ struct PetBottomPanel: View {
                 // 1. Handle (拖拽手柄)
                 VStack {
                     Capsule()
-                        .fill(Color.gray.opacity(0.3))
+                        .fill(Color.secondary.opacity(0.3))
                         .frame(width: 40, height: 5)
                         .padding(.top, 10)
                         .padding(.bottom, 5)
                 }
                 .frame(maxWidth: .infinity)
-                .background(Color.white.opacity(0.95))
+                .background(.regularMaterial)
                 .gesture(
                     DragGesture()
                         .onChanged { value in
@@ -98,11 +108,13 @@ struct PetBottomPanel: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 10)
-                .background(Color.white.opacity(0.95))
+                .background(.regularMaterial)
                 
                 // 3. Content Area
                 ZStack {
-                    Color.white.opacity(0.9) // 背景
+                    Rectangle()
+                        .fill(.regularMaterial)
+                        .ignoresSafeArea()
                     
                     if selectedTab == 0 {
                         // 背包视图
@@ -113,7 +125,7 @@ struct PetBottomPanel: View {
                     }
                 }
             }
-            .background(Color.white.opacity(0.9))
+            .background(.regularMaterial)
             .cornerRadius(20, corners: [.topLeft, .topRight])
             .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
             .frame(height: isExpanded ? expandedHeight : collapsedHeight)

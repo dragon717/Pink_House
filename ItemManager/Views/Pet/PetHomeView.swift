@@ -20,50 +20,79 @@ struct PetHomeView: View {
                     set: { viewModel.setPetName($0 ?? "") }
                 )) { }
             } else {
-                ZStack {
-                // 背景
-                Color(uiColor: .systemBackground)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    // 顶部状态栏和货币栏
-                    VStack(spacing: 10) {
-                        // 状态栏 - 单行显示
-                        HStack(spacing: 8) {
-                            StatusView(icon: "fork.knife", value: viewModel.status.hunger, color: .orange)
-                            StatusView(icon: "shower.fill", value: viewModel.status.hygiene, color: .blue)
-                            StatusView(icon: "bolt.fill", value: viewModel.status.energy, color: .green)
-                            StatusView(icon: "face.smiling.fill", value: viewModel.status.mood, color: .pink)
-                        }
+                GeometryReader { geo in
+                    let isLandscape = geo.size.width > geo.size.height
+                    let videoHeight = isLandscape ? geo.size.height * 0.5 : 400
                     
-                    HStack(spacing: 15) {
-                        CurrencyView(type: .meowCoin, amount: viewModel.status.meowCoin) {
-                            // 模拟充值喵币
-                            viewModel.rechargeMeowCoin(amount: 100)
-                        }
+                    ZStack {
+                        // 背景
+                        LiquidBackground()
+                            .ignoresSafeArea()
                         
-                        CurrencyView(type: .fishCoin, amount: viewModel.status.fishCoin) {
-                            // 模拟获取鱼币
-                            viewModel.earnFishCoin(amount: 1000)
-                        }
-                    }
-                }
-                .padding(.top, 10)
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                // 中间萌宠区域
-                ZStack {
-                    PetVideoPlayer(
-                        videoName: viewModel.currentState.videoFileName,
-                        isLooping: viewModel.currentState.isLooping,
-                        onFinished: {
-                            viewModel.onAnimationFinished()
-                        }
-                    )
-                    .frame(height: 400) // 根据视频比例调整
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                        VStack(spacing: 0) {
+                            // 顶部状态栏和货币栏
+                            Group {
+                                if isLandscape {
+                                    HStack(alignment: .top, spacing: 20) {
+                                        // 状态栏
+                                        HStack(spacing: 8) {
+                                            StatusView(icon: "fork.knife", value: viewModel.status.hunger, color: .orange)
+                                            StatusView(icon: "shower.fill", value: viewModel.status.hygiene, color: .blue)
+                                            StatusView(icon: "bolt.fill", value: viewModel.status.energy, color: .green)
+                                            StatusView(icon: "face.smiling.fill", value: viewModel.status.mood, color: .pink)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        // 货币栏
+                                        HStack(spacing: 15) {
+                                            CurrencyView(type: .meowCoin, amount: viewModel.status.meowCoin) {
+                                                viewModel.rechargeMeowCoin(amount: 100)
+                                            }
+                                            
+                                            CurrencyView(type: .fishCoin, amount: viewModel.status.fishCoin) {
+                                                viewModel.earnFishCoin(amount: 1000)
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    VStack(spacing: 10) {
+                                        // 状态栏 - 单行显示
+                                        HStack(spacing: 8) {
+                                            StatusView(icon: "fork.knife", value: viewModel.status.hunger, color: .orange)
+                                            StatusView(icon: "shower.fill", value: viewModel.status.hygiene, color: .blue)
+                                            StatusView(icon: "bolt.fill", value: viewModel.status.energy, color: .green)
+                                            StatusView(icon: "face.smiling.fill", value: viewModel.status.mood, color: .pink)
+                                        }
+                                        
+                                        HStack(spacing: 15) {
+                                            CurrencyView(type: .meowCoin, amount: viewModel.status.meowCoin) {
+                                                viewModel.rechargeMeowCoin(amount: 100)
+                                            }
+                                            
+                                            CurrencyView(type: .fishCoin, amount: viewModel.status.fishCoin) {
+                                                viewModel.earnFishCoin(amount: 1000)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.top, 10)
+                            .padding(.horizontal)
+                            
+                            Spacer()
+                            
+                            // 中间萌宠区域
+                            ZStack {
+                                PetVideoPlayer(
+                                    videoName: viewModel.currentState.videoFileName,
+                                    isLooping: viewModel.currentState.isLooping,
+                                    onFinished: {
+                                        viewModel.onAnimationFinished()
+                                    }
+                                )
+                                .frame(height: videoHeight) // 动态高度
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
                     
                     // 期待状态 UI 反馈
                     if viewModel.currentState == .expecting {
@@ -154,7 +183,8 @@ struct PetHomeView: View {
                 // 底部操作面板 (可展开)
                 PetBottomPanel(viewModel: viewModel, isExpanded: $isExpanded)
             }
-            .alert("修改萌宠名字", isPresented: $showRenameAlert) {
+        }
+        .alert("修改萌宠名字", isPresented: $showRenameAlert) {
                 TextField("输入新名字", text: $newName)
                 Button("取消", role: .cancel) { }
                 Button("确定") {
