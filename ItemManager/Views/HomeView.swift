@@ -217,24 +217,14 @@ struct HomeView: View {
                         if let indicator = depositMonthIndicator {
                             switch indicator {
                             case .current(let day):
-                                ZStack {
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 18))
-                                        .foregroundStyle(Color.pink)
-                                    Text("\(day)")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Color.pink)
-                                }
-                                .frame(width: 24, height: 24)
+                                Image(systemName: "\(day).calendar")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color.pink)
+                                    .frame(width: 24, height: 24)
                             case .next(let day):
-                                ZStack {
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 18))
-                                        .foregroundStyle(Color.brown)
-                                    Text("\(day)")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Color.brown)
-                                }
+                                Image(systemName: "\(day).calendar")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color.brown)
                                 .frame(width: 24, height: 24)
                             }
                         } else {
