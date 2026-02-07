@@ -3,7 +3,7 @@ import SwiftData
 
 struct WealthView: View {
     @State private var viewModel = WealthViewModel()
-    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
     

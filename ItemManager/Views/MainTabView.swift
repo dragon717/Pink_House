@@ -20,7 +20,11 @@ struct MainTabView: View {
             // Tab 1: 衣橱 (Wardrobe)
             HomeView()
                 .tabItem {
-                    Label("衣橱", systemImage: "square.grid.2x2.fill")
+                    Label {
+                        Text("衣橱")
+                    } icon: {
+                        Image(systemName: selectedTab == 0 ? "cabinet.fill" : "cabinet")
+                    }
                 }
                 .tag(0)
             

@@ -7,7 +7,7 @@ struct BatchReplaceCutoutView: View {
     @Environment(\.modelContext) private var modelContext
     
     // Data Source
-    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothing: [Clothing]
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
     @Query private var allCutouts: [CutoutItem]
     
     // View State

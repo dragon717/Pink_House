@@ -49,7 +49,7 @@ enum HomeTab {
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
 
@@ -207,8 +207,38 @@ struct HomeView: View {
                 }
             } label: {
                 VStack(spacing: 2) {
-                    Image(systemName: selectedTab == .depositPlan ? "calendar.badge.clock" : "calendar")
-                        .font(.system(size: 16))
+                    if selectedTab == .wardrobe {
+                        if let indicator = depositMonthIndicator {
+                            switch indicator {
+                            case .current(let day):
+                                ZStack {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(Color.pink)
+                                    Text("\(day)")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.pink)
+                                }
+                                .frame(width: 24, height: 24)
+                            case .next(let day):
+                                ZStack {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(Color.brown)
+                                    Text("\(day)")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.brown)
+                                }
+                                .frame(width: 24, height: 24)
+                            }
+                        } else {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 16))
+                        }
+                    } else {
+                        Image(systemName: selectedTab == .depositPlan ? "calendar.badge.clock" : "calendar")
+                            .font(.system(size: 16))
+                    }
                     Text("尾款天使")
                         .font(.system(size: 10, weight: selectedTab == .depositPlan ? .bold : .medium))
                 }
@@ -682,4 +712,42 @@ struct HomeView: View {
 
 #Preview {
     HomeView()
+}
+
+extension HomeView {
+    private enum DepositMonthIndicatorType {
+        case current(Int)
+        case next(Int)
+    }
+    
+    private var depositMonthIndicator: DepositMonthIndicatorType? {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        // Month intervals
+        guard let currentInterval = calendar.dateInterval(of: .month, for: now) else { return nil }
+        let nextMonthDate = calendar.date(byAdding: .month, value: 1, to: now)!
+        guard let nextInterval = calendar.dateInterval(of: .month, for: nextMonthDate) else { return nil }
+        
+        func pickDay(in interval: DateInterval) -> Int? {
+            var candidates: [Date] = []
+            for c in allClothings where c.isDepositPlan {
+                if let end = c.finalPaymentEndDate, interval.contains(end) {
+                    candidates.append(end)
+                    continue
+                }
+                if let start = c.finalPaymentDate, interval.contains(start) {
+                    candidates.append(start)
+                }
+            }
+            if candidates.isEmpty { return nil }
+            let future = candidates.filter { $0 >= now }
+            let chosen = future.min() ?? candidates.min()
+            return chosen.map { calendar.component(.day, from: $0) }
+        }
+        
+        if let day = pickDay(in: currentInterval) { return .current(day) }
+        if let day = pickDay(in: nextInterval) { return .next(day) }
+        return nil
+    }
 }

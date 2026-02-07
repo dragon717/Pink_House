@@ -6,7 +6,7 @@ struct OOTDCutoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CutoutItem.timestamp, order: .reverse) private var cutouts: [CutoutItem]
     // Fetch all clothings to build a map for lookup (Performance trade-off: Fetching all is better than N+1 queries)
-    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     
     private var clothingMap: [UUID: Clothing] {
         Dictionary(uniqueKeysWithValues: allClothings.map { ($0.id, $0) })
@@ -494,30 +494,36 @@ struct OOTDCutoutListView: View {
     
     private func batchDelete() {
         let itemsToDelete = cutouts.filter { selectedItems.contains($0.id) }
-        
-        // Collect image paths first
         var imagePaths: [String] = []
+        imagePaths.reserveCapacity(itemsToDelete.count)
         
-        // Step 1: Just collect paths (No need to unlink manually anymore)
         for item in itemsToDelete {
             imagePaths.append(item.imagePath)
+            CutoutService.shared.handleCutoutDeletion(imagePath: item.imagePath, context: modelContext)
         }
         
-        // Step 2: Delete items
         autoreleasepool {
             for item in itemsToDelete {
                 modelContext.delete(item)
             }
         }
         
-        // Batch process image deletion (optimizes background tasks)
         ImageManager.shared.batchDeleteImages(fileNames: imagePaths, context: modelContext)
         
-        try? modelContext.save()
-        
-        withAnimation {
-            selectedItems.removeAll()
-            updateDisplayItems()
+        do {
+            try modelContext.save()
+            withAnimation {
+                selectedItems.removeAll()
+                updateDisplayItems()
+            }
+            toastMessage = "已删除 \(itemsToDelete.count) 个贴纸"
+            withAnimation { showToast = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation { showToast = false }
+            }
+        } catch {
+            alertMessage = "批量删除失败，请稍后重试。"
+            showAlert = true
         }
     }
     

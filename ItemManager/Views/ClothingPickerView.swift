@@ -5,7 +5,7 @@ import SwiftData
 struct ClothingPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }, sort: \Clothing.createdAt, order: .reverse) 
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }, sort: \Clothing.createdAt, order: .reverse) 
     private var allClothings: [Clothing]
     
     @State private var searchText = ""

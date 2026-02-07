@@ -13,7 +13,7 @@ struct RecycleBinView: View {
     @Environment(\.dismiss) private var dismiss
     
     // 查询已删除的项目
-    @Query(filter: #Predicate<Clothing> { $0.isDeleted == true }, sort: \Clothing.deletedAt, order: .reverse)
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt != nil }, sort: \Clothing.deletedAt, order: .reverse)
     private var deletedClothings: [Clothing]
     
     @State private var selectedItems: Set<UUID> = []

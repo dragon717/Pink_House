@@ -78,7 +78,7 @@ struct WardrobeView: View {
         _isSelectionMode = isSelectionMode
         _isEditing = isEditing
         self.sortOption = sortOption
-        _clothings = Query(filter: #Predicate<Clothing> { $0.isDeleted == false }, sort: sortOption.sortDescriptors)
+        _clothings = Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }, sort: sortOption.sortDescriptors)
         self.viewLayout = viewLayout
         
         self.selectedTagIDs = selectedTagIDs
