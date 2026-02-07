@@ -59,6 +59,20 @@ struct OOTDCutoutListView: View {
         categories.filter { $0 != "全部" }
     }
     
+    private func iconForCategory(_ category: String) -> String {
+        switch category {
+        case "全部": return "square.grid.2x2.fill"
+        case "裙子": return "frock.fill"
+        case "外套": return "jacket.fill"
+        case "鞋子": return "shoe.fill"
+        case "袜子": return "sun.min.fill" // 暂替代
+        case "玩偶": return "teddybear.fill"
+        case "小物": return "bag.fill"
+        case "未分类": return "questionmark.circle.fill"
+        default: return "tag.fill"
+        }
+    }
+    
     private func updateDisplayItems() {
         var result = cutouts
         
@@ -226,7 +240,7 @@ struct OOTDCutoutListView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(categories, id: \.self) { category in
-                                CategoryChip(title: category, isSelected: selectedCategory == category) {
+                                CategoryChip(title: category, icon: iconForCategory(category), isSelected: selectedCategory == category) {
                                     withAnimation {
                                         selectedCategory = category
                                     }
@@ -796,19 +810,25 @@ struct CutoutThumbnail: View {
 
 struct CategoryChip: View {
     let title: String
+    var icon: String? = nil
     let isSelected: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.blue : Color(uiColor: .secondarySystemBackground))
-                .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(16)
+            HStack(spacing: 4) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                }
+                Text(title)
+            }
+            .font(.caption)
+            .fontWeight(isSelected ? .semibold : .regular)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isSelected ? Color.pink : Color(uiColor: .secondarySystemBackground))
+            .foregroundColor(isSelected ? .white : .primary)
+            .clipShape(Capsule())
         }
     }
 }

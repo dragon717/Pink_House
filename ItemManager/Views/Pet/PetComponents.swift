@@ -103,7 +103,7 @@ struct StatusView: View {
 // MARK: - Shop & Inventory Items
 
 struct ShopItemView: View {
-    let item: PetItemType
+    let item: PetItemDefinition
     let action: () -> Void
     
     var body: some View {
@@ -115,14 +115,14 @@ struct ShopItemView: View {
                     .background(Color.gray.opacity(0.1))
                     .cornerRadius(10)
                 
-                Text(item.rawValue)
+                Text(item.name)
                     .font(.caption)
                     .foregroundColor(.primary)
                 
                 HStack(spacing: 2) {
-                    Image(systemName: item.currency.iconName) // 动态图标
+                    Image(systemName: item.petCurrency.iconName) // 动态图标
                         .font(.caption2)
-                        .foregroundColor(item.currency == .meowCoin ? .yellow : .orange)
+                        .foregroundColor(item.petCurrency == .meowCoin ? .yellow : .orange)
                     Text("\(item.price)")
                         .font(.caption2)
                         .fontWeight(.bold)
@@ -139,7 +139,7 @@ struct ShopItemView: View {
 }
 
 struct InventoryItemView: View {
-    let item: PetItemType
+    let item: PetItemDefinition
     let count: Int
     
     var body: some View {
@@ -161,7 +161,7 @@ struct InventoryItemView: View {
                     .offset(x: 5, y: -5)
             }
             
-            Text(item.rawValue)
+            Text(item.name)
                 .font(.caption)
                 .foregroundColor(.primary)
         }

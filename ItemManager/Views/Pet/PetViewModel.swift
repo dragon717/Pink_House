@@ -31,7 +31,17 @@ class PetViewModel: ObservableObject {
     init() {
         // Load saved status
         if let data = UserDefaults.standard.data(forKey: statusKey),
-           let decoded = try? JSONDecoder().decode(PetStatus.self, from: data) {
+           var decoded = try? JSONDecoder().decode(PetStatus.self, from: data) {
+            
+            // 数据清理：只保留在新配置中存在的物品，遗弃老数据
+            var validInv: [String: Int] = [:]
+            for (key, count) in decoded.inventory {
+                if PetConfigManager.shared.getItem(byId: key) != nil {
+                    validInv[key] = count
+                }
+            }
+            decoded.inventory = validInv
+            
             self.status = decoded
         } else {
             self.status = PetStatus()
@@ -82,6 +92,13 @@ class PetViewModel: ObservableObject {
         stopTimer()
     }
     
+    // MARK: - Lifecycle
+    
+    func onAppDidBecomeActive() {
+        calculateOfflineDecay()
+        checkDailyReset()
+    }
+    
     // MARK: - State Management
     
     // 拖拽物品开始
@@ -99,14 +116,14 @@ class PetViewModel: ObservableObject {
     }
     
     // 购买并立即消费（拖拽购买）
-    func purchaseAndConsumeItem(_ itemType: PetItemType) {
+    func purchaseAndConsumeItem(_ item: PetItemDefinition) {
         // 1. 检查钱够不够
         let canAfford: Bool
-        switch itemType.currency {
+        switch item.petCurrency {
         case .fishCoin:
-            canAfford = status.fishCoin >= itemType.price
+            canAfford = status.fishCoin >= item.price
         case .meowCoin:
-            canAfford = status.meowCoin >= itemType.price
+            canAfford = status.meowCoin >= item.price
         }
         
         guard canAfford else {
@@ -115,11 +132,11 @@ class PetViewModel: ObservableObject {
         }
         
         // 2. 扣钱
-        switch itemType.currency {
+        switch item.petCurrency {
         case .fishCoin:
-            status.fishCoin -= itemType.price
+            status.fishCoin -= item.price
         case .meowCoin:
-            status.meowCoin -= itemType.price
+            status.meowCoin -= item.price
         }
         
         // 3. 消费效果 (这里不经过背包，直接产生效果)
@@ -128,42 +145,71 @@ class PetViewModel: ObservableObject {
         // 但为了逻辑一致性，我们可以临时加库存然后马上 consume，或者提取 consume 的核心逻辑。
         // 这里为了简单，直接复用 consumeItem 的逻辑，但要注意 consumeItem 会扣库存。
         // 所以先加库存
-        status.inventory[itemType, default: 0] += 1
+        status.inventory[item.id, default: 0] += 1
         
         // 4. 消费
-        consumeItem(itemType)
+        consumeItem(item)
         
         // 5. 显示扣款提示
-        showFloatingText("-\(itemType.price)", color: .orange)
+        showFloatingText("-\(item.price)", color: .orange)
         
         saveStatus()
     }
     
+    // 兼容旧代码
+    func purchaseAndConsumeItem(_ itemType: PetItemType) {
+        if let def = PetConfigManager.shared.getItem(byId: itemType.configId) {
+            purchaseAndConsumeItem(def)
+        }
+    }
+    
     // 拖拽喂食/饮水成功
-    func consumeItem(_ itemType: PetItemType) {
+    func consumeItem(_ item: PetItemDefinition) {
         // 特殊道具不能直接食用
-        if itemType == .renameCard {
+        if item.id == "renameCard" {
             showFloatingText("这个不能吃哦", color: .red)
             return
         }
         
         // 扣除物品
-        guard let count = status.inventory[itemType], count > 0 else { return }
-        status.inventory[itemType] = count - 1
+        guard let count = status.inventory[item.id], count > 0 else { return }
+        status.inventory[item.id] = count - 1
         
-        // 增加属性
-        let moodRecovery = itemType.recoveryValue * 0.2 // 恢复心情（食物效果的 20%）
-        status.mood = min(100, status.mood + moodRecovery)
-        
-        if itemType.isDrink {
-            status.hunger = min(100, status.hunger + itemType.recoveryValue)
-            changeState(to: .drinking)
+        if item.isToy {
+            // 玩具：消耗精力，大幅增加心情
+            let energyCost = Double(item.energyCost ?? 0)
+            status.energy = max(0, status.energy - energyCost)
+            status.mood = min(100, status.mood + item.recoveryValue)
+            changeState(to: .playing)
+            
+            // 提示
+            if energyCost > 0 {
+                showFloatingText("精力 -\(Int(energyCost))", color: .blue)
+            }
+            showFloatingText("心情 +\(Int(item.recoveryValue))", color: .pink)
         } else {
-            status.hunger = min(100, status.hunger + itemType.recoveryValue)
-            changeState(to: .eating)
+            // 食物/水
+            // 增加属性
+            let moodRecovery = item.recoveryValue * 0.2 // 恢复心情（食物效果的 20%）
+            status.mood = min(100, status.mood + moodRecovery)
+            
+            if item.isDrink {
+                status.hunger = min(100, status.hunger + item.recoveryValue)
+                changeState(to: .drinking)
+            } else {
+                status.hunger = min(100, status.hunger + item.recoveryValue)
+                changeState(to: .eating)
+            }
         }
         
         saveStatus()
+    }
+    
+    // 兼容旧代码
+    func consumeItem(_ itemType: PetItemType) {
+        if let def = PetConfigManager.shared.getItem(byId: itemType.configId) {
+            consumeItem(def)
+        }
     }
     
     func clean() {
@@ -204,22 +250,29 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Economy & Inventory
     
-    func purchaseItem(_ itemType: PetItemType) -> Bool {
-        switch itemType.currency {
+    func purchaseItem(_ item: PetItemDefinition) -> Bool {
+        switch item.petCurrency {
         case .fishCoin:
-            if status.fishCoin >= itemType.price {
-                status.fishCoin -= itemType.price
-                status.inventory[itemType, default: 0] += 1
+            if status.fishCoin >= item.price {
+                status.fishCoin -= item.price
+                status.inventory[item.id, default: 0] += 1
                 saveStatus()
                 return true
             }
         case .meowCoin:
-            if status.meowCoin >= itemType.price {
-                status.meowCoin -= itemType.price
-                status.inventory[itemType, default: 0] += 1
+            if status.meowCoin >= item.price {
+                status.meowCoin -= item.price
+                status.inventory[item.id, default: 0] += 1
                 saveStatus()
                 return true
             }
+        }
+        return false
+    }
+    
+    func purchaseItem(_ itemType: PetItemType) -> Bool {
+        if let def = PetConfigManager.shared.getItem(byId: itemType.configId) {
+            return purchaseItem(def)
         }
         return false
     }
@@ -310,6 +363,9 @@ class PetViewModel: ObservableObject {
     }
     
     private func updateStatus() {
+        // 检查跨天重置
+        checkDailyReset()
+        
         // Decay logic
         let multiplier = status.currentJob.consumptionMultiplier
         
@@ -403,14 +459,14 @@ class PetViewModel: ObservableObject {
     }
     
     func hasRenameCard() -> Bool {
-        return (status.inventory[.renameCard] ?? 0) > 0
+        return (status.inventory["renameCard"] ?? 0) > 0
     }
     
     func useRenameCard(newName: String) -> Bool {
         guard hasRenameCard() else { return false }
         
         // 消耗改名卡
-        status.inventory[.renameCard, default: 0] -= 1
+        status.inventory["renameCard", default: 0] -= 1
         
         // 改名
         setPetName(newName)

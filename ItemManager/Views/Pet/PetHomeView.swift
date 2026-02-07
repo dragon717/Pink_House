@@ -103,7 +103,7 @@ struct PetHomeView: View {
                             Button {
                                 showJobSelection = true
                             } label: {
-                                Label("猫咖打工", systemImage: "briefcase")
+                                Label("送去打工", systemImage: "briefcase")
                             }
                         } label: {
                             HStack(spacing: 6) {
@@ -177,6 +177,8 @@ struct PetHomeView: View {
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .background {
                 viewModel.saveStatus()
+            } else if newPhase == .active {
+                viewModel.onAppDidBecomeActive()
             }
         }
     }

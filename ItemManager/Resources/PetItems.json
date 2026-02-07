@@ -1,0 +1,153 @@
+{
+  "categories": [
+    {
+      "id": "all",
+      "name": "全部",
+      "icon": "square.grid.2x2.fill"
+    },
+    {
+      "id": "food",
+      "name": "食物",
+      "icon": "fork.knife"
+    },
+    {
+      "id": "water",
+      "name": "饮水",
+      "icon": "drop.fill"
+    },
+    {
+      "id": "special",
+      "name": "特殊",
+      "icon": "star.fill"
+    },
+    {
+      "id": "toy",
+      "name": "玩具",
+      "icon": "gamecontroller.fill"
+    }
+  ],
+  "items": [
+    {
+      "id": "catRice",
+      "name": "猫饭",
+      "category": "food",
+      "price": 500,
+      "currency": "fishCoin",
+      "recoveryValue": 30,
+      "icon": "tray.fill",
+      "description": "营养均衡的自制猫饭。",
+      "sortIndex": 10
+    },
+    {
+      "id": "catFood",
+      "name": "猫粮",
+      "category": "food",
+      "price": 300,
+      "currency": "fishCoin",
+      "recoveryValue": 20,
+      "icon": "circle.grid.2x2.fill",
+      "description": "口感酥脆的优质猫粮。",
+      "sortIndex": 20
+    },
+    {
+      "id": "cannedFood",
+      "name": "猫罐头",
+      "category": "food",
+      "price": 500,
+      "currency": "fishCoin",
+      "recoveryValue": 30,
+      "icon": "circle.grid.cross.fill",
+      "description": "美味多汁的主食罐头。",
+      "sortIndex": 30
+    },
+    {
+      "id": "catStrip",
+      "name": "猫条",
+      "category": "food",
+      "price": 200,
+      "currency": "fishCoin",
+      "recoveryValue": 15,
+      "icon": "capsule.fill",
+      "description": "猫咪最爱的零食。",
+      "sortIndex": 40
+    },
+    {
+      "id": "freezeDried",
+      "name": "冻干",
+      "category": "food",
+      "price": 800,
+      "currency": "fishCoin",
+      "recoveryValue": 40,
+      "icon": "snowflake",
+      "description": "保留原汁原味的肉类冻干。",
+      "sortIndex": 50
+    },
+    {
+      "id": "chickenBreast",
+      "name": "鸡胸肉",
+      "category": "food",
+      "price": 100,
+      "currency": "fishCoin",
+      "recoveryValue": 10,
+      "icon": "bird.fill",
+      "description": "水煮鸡胸肉，健康低脂。",
+      "sortIndex": 60
+    },
+    {
+      "id": "rawMeat",
+      "name": "生骨肉",
+      "category": "food",
+      "price": 1500,
+      "currency": "fishCoin",
+      "recoveryValue": 60,
+      "icon": "hare.fill",
+      "description": "还原天性的顶级盛宴。",
+      "sortIndex": 70
+    },
+    {
+      "id": "warmWater",
+      "name": "温水",
+      "category": "water",
+      "price": 2,
+      "currency": "fishCoin",
+      "recoveryValue": 10,
+      "icon": "drop.fill",
+      "description": "适宜入口的温水。",
+      "sortIndex": 80
+    },
+    {
+      "id": "boiledWater",
+      "name": "白开水",
+      "category": "water",
+      "price": 1,
+      "currency": "fishCoin",
+      "recoveryValue": 5,
+      "icon": "drop",
+      "description": "普通的凉白开。",
+      "sortIndex": 90
+    },
+    {
+      "id": "renameCard",
+      "name": "改名卡",
+      "category": "special",
+      "price": 10,
+      "currency": "meowCoin",
+      "recoveryValue": 0,
+      "icon": "pencil.and.outline",
+      "description": "可以给萌宠重新起名。",
+      "sortIndex": 100
+    },
+    {
+      "id": "yarnBall",
+      "name": "毛线球",
+      "category": "toy",
+      "price": 5,
+      "currency": "fishCoin",
+      "recoveryValue": 20,
+      "energyCost": 10,
+      "icon": "circle.grid.cross",
+      "description": "猫咪最爱的玩具，消耗精力增加心情。",
+      "sortIndex": 110
+    }
+  ]
+}

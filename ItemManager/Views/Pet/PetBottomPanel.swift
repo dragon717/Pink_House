@@ -239,50 +239,123 @@ struct PetBottomPanel: View {
 
 struct InventoryView: View {
     @ObservedObject var viewModel: PetViewModel
+    @ObservedObject var config = PetConfigManager.shared
     var isExpanded: Bool
     var isLandscape: Bool = false
     
+    @State private var searchText = ""
+    @State private var selectedCategoryId = "all"
+    
     // 过滤出拥有的物品
-    var inventoryItems: [PetItemType] {
-        PetItemType.allCases.filter { (viewModel.status.inventory[$0] ?? 0) > 0 }
+    var filteredItems: [PetItemDefinition] {
+        var items = viewModel.status.inventory
+            .filter { $0.value > 0 }
+            .compactMap { PetConfigManager.shared.getItem(byId: $0.key) }
+            .sorted { $0.sortIndex < $1.sortIndex }
+            
+        // Filter by Category
+        if selectedCategoryId != "all" {
+            items = items.filter { $0.category == selectedCategoryId }
+        }
+        
+        // Filter by Search
+        if !searchText.isEmpty {
+            items = items.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.description.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        return items
     }
     
     var body: some View {
-        if inventoryItems.isEmpty {
-            VStack {
-                Image(systemName: "cube.box")
-                    .font(.largeTitle)
-                    .foregroundColor(.gray.opacity(0.5))
-                Text("背包空空如也，去商店买点东西吧~")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            // 横屏模式或者展开模式下使用网格
+        VStack(spacing: 0) {
+            // Search & Filter Header (Only when expanded or landscape)
             if isExpanded || isLandscape {
-                // 展开：网格布局
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
-                        ForEach(inventoryItems) { item in
-                            InventoryItemView(item: item, count: viewModel.status.inventory[item] ?? 0)
-                                .draggable("inventory:\(item.rawValue)")
+                VStack(spacing: 12) {
+                    // Search Bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                        TextField("搜索背包...", text: $searchText)
+                            .textFieldStyle(PlainTextFieldStyle())
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
-                    .padding(20)
-                    .padding(.bottom, 50) // 底部留白
+                    .padding(8)
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    
+                    // Category Filter
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(config.categories) { category in
+                                Button(action: {
+                                    withAnimation {
+                                        selectedCategoryId = category.id
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: category.icon)
+                                        Text(category.name)
+                                    }
+                                    .font(.caption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(selectedCategoryId == category.id ? Color.pink : Color.secondary.opacity(0.1))
+                                    .foregroundColor(selectedCategoryId == category.id ? .white : .primary)
+                                    .clipShape(Capsule())
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
                 }
+                .padding(.bottom, 10)
+            }
+            
+            if filteredItems.isEmpty {
+                VStack {
+                    Image(systemName: "cube.box")
+                        .font(.largeTitle)
+                        .foregroundColor(.gray.opacity(0.5))
+                    Text(searchText.isEmpty && selectedCategoryId == "all" ? "背包空空如也，去商店买点东西吧~" : "没有找到相关物品")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // 竖屏收起：横向滚动
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 15) {
-                        ForEach(inventoryItems) { item in
-                            InventoryItemView(item: item, count: viewModel.status.inventory[item] ?? 0)
-                                .draggable("inventory:\(item.rawValue)")
+                // 横屏模式或者展开模式下使用网格
+                if isExpanded || isLandscape {
+                    // 展开：网格布局
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
+                            ForEach(filteredItems) { item in
+                                InventoryItemView(item: item, count: viewModel.status.inventory[item.id] ?? 0)
+                                    .draggable("inventory:\(item.id)")
+                            }
                         }
+                        .padding(20)
+                        .padding(.bottom, 50) // 底部留白
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                } else {
+                    // 竖屏收起：横向滚动
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 15) {
+                            ForEach(filteredItems) { item in
+                                InventoryItemView(item: item, count: viewModel.status.inventory[item.id] ?? 0)
+                                    .draggable("inventory:\(item.id)")
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                    }
                 }
             }
         }
@@ -291,43 +364,118 @@ struct InventoryView: View {
 
 struct ShopView: View {
     @ObservedObject var viewModel: PetViewModel
+    @ObservedObject var config = PetConfigManager.shared
+    
     var isExpanded: Bool
     var isLandscape: Bool = false
     
-    var body: some View {
-        // 横屏模式或者展开模式下使用网格
-        if isExpanded || isLandscape {
-            // 展开：网格布局
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
-                    ForEach(PetItemType.allCases) { item in
-                        ShopItemView(item: item) {
-                            buy(item)
-                        }
-                        .draggable("shop:\(item.rawValue)")
-                    }
-                }
-                .padding(20)
-                .padding(.bottom, 50)
+    @State private var searchText = ""
+    @State private var selectedCategoryId = "all"
+    
+    var filteredItems: [PetItemDefinition] {
+        var items = config.items.sorted { $0.sortIndex < $1.sortIndex }
+        
+        // Filter by Category
+        if selectedCategoryId != "all" {
+            items = items.filter { $0.category == selectedCategoryId }
+        }
+        
+        // Filter by Search
+        if !searchText.isEmpty {
+            items = items.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.description.localizedCaseInsensitiveContains(searchText)
             }
-        } else {
-            // 竖屏收起：横向滚动
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 15) {
-                    ForEach(PetItemType.allCases) { item in
-                        ShopItemView(item: item) {
-                            buy(item)
+        }
+        
+        return items
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search & Filter Header (Only when expanded or landscape)
+            if isExpanded || isLandscape {
+                VStack(spacing: 12) {
+                    // Search Bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                        TextField("搜索商品...", text: $searchText)
+                            .textFieldStyle(PlainTextFieldStyle())
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
                         }
-                        .draggable("shop:\(item.rawValue)")
+                    }
+                    .padding(8)
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    
+                    // Category Filter
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(config.categories) { category in
+                                Button(action: {
+                                    withAnimation {
+                                        selectedCategoryId = category.id
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: category.icon)
+                                        Text(category.name)
+                                    }
+                                    .font(.caption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(selectedCategoryId == category.id ? Color.pink : Color.secondary.opacity(0.1))
+                                    .foregroundColor(selectedCategoryId == category.id ? .white : .primary)
+                                    .clipShape(Capsule())
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
+                .padding(.bottom, 10)
+            }
+            
+            // Content
+            if isExpanded || isLandscape {
+                // 展开：网格布局
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
+                        ForEach(filteredItems) { item in
+                            ShopItemView(item: item) {
+                                buy(item)
+                            }
+                            .draggable("shop:\(item.id)")
+                        }
+                    }
+                    .padding(20)
+                    .padding(.bottom, 50)
+                }
+            } else {
+                // 竖屏收起：横向滚动
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 15) {
+                        ForEach(filteredItems) { item in
+                            ShopItemView(item: item) {
+                                buy(item)
+                            }
+                            .draggable("shop:\(item.id)")
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                }
             }
         }
     }
     
-    func buy(_ item: PetItemType) {
+    func buy(_ item: PetItemDefinition) {
         if viewModel.purchaseItem(item) {
             viewModel.showFloatingText("- \(item.price)", color: .orange)
         } else {

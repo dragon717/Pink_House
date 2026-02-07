@@ -6,6 +6,7 @@ enum PetState: String, CaseIterable {
     case drinking = "drinking"
     case cleaning = "cleaning"
     case expecting = "expecting" // 期待状态
+    case playing = "playing" // 玩耍状态
     
     // 对应的视频文件名（不含扩展名）
     var videoFileName: String {
@@ -15,13 +16,14 @@ enum PetState: String, CaseIterable {
         case .drinking: return "eat" // 复用 eat 或 separate
         case .cleaning: return "clean"
         case .expecting: return "idle" // 暂时复用 idle，通过 UI 区分
+        case .playing: return "idle" // 暂时复用 idle，后续添加专属动画
         }
     }
     
     // 是否是循环动画
     var isLooping: Bool {
         switch self {
-        case .idle, .expecting: return true
+        case .idle, .expecting, .playing: return true
         default: return false
         }
     }
@@ -49,7 +51,7 @@ enum PetCurrency: String, CaseIterable, Identifiable {
     }
 }
 
-// 道具类型
+// 道具类型 - 兼容旧代码，建议使用 PetItemDefinition
 enum PetItemType: String, Codable, CaseIterable, Identifiable {
     // 食物
     case catRice = "猫饭"
@@ -57,6 +59,8 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
     case catStrip = "猫条"
     case freezeDried = "冻干"
     case chickenBreast = "鸡胸肉"
+    case rawMeat = "生骨肉"
+    case catFood = "猫粮"
     
     // 水
     case warmWater = "温水"
@@ -67,58 +71,76 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
     
     var id: String { rawValue }
     
-    var price: Int {
+    // 映射到新的配置 ID
+    var configId: String {
         switch self {
-        case .catRice: return 100
-        case .cannedFood: return 500
-        case .catStrip: return 200
-        case .freezeDried: return 800
-        case .chickenBreast: return 1500
-        case .warmWater: return 0
-        case .boiledWater: return 0
-        case .renameCard: return 10
+        case .catRice: return "catRice"
+        case .cannedFood: return "cannedFood"
+        case .catStrip: return "catStrip"
+        case .freezeDried: return "freezeDried"
+        case .chickenBreast: return "chickenBreast"
+        case .rawMeat: return "rawMeat"
+        case .catFood: return "catFood"
+        case .warmWater: return "warmWater"
+        case .boiledWater: return "boiledWater"
+        case .renameCard: return "renameCard"
         }
+    }
+    
+    var price: Int {
+        return PetConfigManager.shared.getItem(byId: configId)?.price ?? 0
     }
     
     var currency: PetCurrency {
-        switch self {
-        case .renameCard: return .meowCoin
-        default: return .fishCoin
-        }
+        return PetConfigManager.shared.getItem(byId: configId)?.petCurrency ?? .fishCoin
     }
     
     var icon: String {
-        // SF Symbols 或自定义图片
-        switch self {
-        case .catRice: return "tray.fill" // Replaced bowl.fill to avoid crash
-        case .cannedFood: return "circle.grid.cross.fill"
-        case .catStrip: return "capsule.fill"
-        case .freezeDried: return "snowflake"
-        case .chickenBreast: return "bird.fill"
-        case .warmWater: return "drop.fill"
-        case .boiledWater: return "drop"
-        case .renameCard: return "pencil.and.outline"
-        }
+        return PetConfigManager.shared.getItem(byId: configId)?.icon ?? "questionmark"
     }
     
     var recoveryValue: Double {
-        // 恢复饱食度或清洁度（这里简化为统一恢复，具体逻辑在 ViewModel 处理）
-        switch self {
-        case .catRice: return 10
-        case .cannedFood: return 30
-        case .catStrip: return 15
-        case .freezeDried: return 40
-        case .chickenBreast: return 50
-        case .warmWater: return 10
-        case .boiledWater: return 5
-        case .renameCard: return 0
-        }
+        return PetConfigManager.shared.getItem(byId: configId)?.recoveryValue ?? 0
     }
     
     var isDrink: Bool {
-        return self == .warmWater || self == .boiledWater
+        return PetConfigManager.shared.getItem(byId: configId)?.category == "water"
     }
 }
+
+// MARK: - New Config Models
+
+struct PetCategory: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let icon: String
+}
+
+struct PetItemDefinition: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let category: String
+    let price: Int
+    let currency: String // "fishCoin" or "meowCoin"
+    let recoveryValue: Double
+    let energyCost: Int? // 消耗精力
+    let icon: String
+    let description: String
+    let sortIndex: Int
+    
+    var petCurrency: PetCurrency {
+        return currency == "meowCoin" ? .meowCoin : .fishCoin
+    }
+    
+    var isDrink: Bool {
+        return category == "water"
+    }
+    
+    var isToy: Bool {
+        return category == "toy"
+    }
+}
+
 
 // 宠物工作
 enum PetJob: String, Codable, CaseIterable, Identifiable {
@@ -191,7 +213,7 @@ struct PetStatus: Codable {
     var lastDailyResetDate: Date = Date()
     
     // 背包系统
-    var inventory: [PetItemType: Int] = [:] // 存储物品数量
+    var inventory: [String: Int] = [:] // 存储物品数量 (Key: Config ID)
     
     // 工作系统
     var currentJob: PetJob = .none
