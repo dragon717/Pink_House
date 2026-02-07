@@ -58,9 +58,11 @@ struct CurrencyView: View {
                 RollingNumberView(value: amount)
                     .foregroundColor(.primary)
                 
+                #if DEBUG
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 12))
                     .foregroundColor(.blue)
+                #endif
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

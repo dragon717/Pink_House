@@ -48,11 +48,15 @@ struct PetStatusHeaderView: View {
         let layout = isVertical ? AnyLayout(VStackLayout(spacing: 15)) : AnyLayout(HStackLayout(spacing: 15))
         return layout {
             CurrencyView(type: .meowCoin, amount: viewModel.status.meowCoin) {
+                #if DEBUG
                 viewModel.rechargeMeowCoin(amount: 100)
+                #endif
             }
             
             CurrencyView(type: .fishCoin, amount: viewModel.status.fishCoin) {
+                #if DEBUG
                 viewModel.earnFishCoin(amount: 1000)
+                #endif
             }
         }
     }

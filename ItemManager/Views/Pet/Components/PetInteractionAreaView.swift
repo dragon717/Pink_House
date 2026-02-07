@@ -30,22 +30,38 @@ struct PetInteractionAreaView: View {
                         // 解析来源
                         if itemString.hasPrefix("shop:") {
                             let rawValue = String(itemString.dropFirst(5))
-                            if let itemType = PetItemType(rawValue: rawValue) {
+                            // 尝试使用 ConfigManager 获取物品定义 (新逻辑)
+                            if let itemDef = PetConfigManager.shared.getItem(byId: rawValue) {
                                 print("DEBUG: Drop source: Shop, Item: \(rawValue)")
+                                viewModel.purchaseAndConsumeItem(itemDef)
+                                viewModel.onDragEnded()
+                                return true
+                            }
+                            // 兼容旧逻辑 (尝试作为 PetItemType 解析)
+                            else if let itemType = PetItemType(rawValue: rawValue) {
+                                print("DEBUG: Drop source: Shop, Legacy Item: \(rawValue)")
                                 viewModel.purchaseAndConsumeItem(itemType)
                                 viewModel.onDragEnded()
                                 return true
                             }
                         } else if itemString.hasPrefix("inventory:") {
                             let rawValue = String(itemString.dropFirst(10))
-                            if let itemType = PetItemType(rawValue: rawValue) {
+                            // 尝试使用 ConfigManager 获取物品定义 (新逻辑)
+                            if let itemDef = PetConfigManager.shared.getItem(byId: rawValue) {
                                 print("DEBUG: Drop source: Inventory, Item: \(rawValue)")
+                                viewModel.consumeItem(itemDef)
+                                viewModel.onDragEnded()
+                                return true
+                            }
+                            // 兼容旧逻辑
+                            else if let itemType = PetItemType(rawValue: rawValue) {
+                                print("DEBUG: Drop source: Inventory, Legacy Item: \(rawValue)")
                                 viewModel.consumeItem(itemType)
                                 viewModel.onDragEnded()
                                 return true
                             }
                         } else {
-                            // 兼容旧逻辑
+                            // 兼容旧逻辑 (没有前缀的情况)
                             if let itemType = PetItemType(rawValue: itemString) {
                                 print("DEBUG: Drop source: Unknown, Item: \(itemString)")
                                 viewModel.consumeItem(itemType)
@@ -90,7 +106,7 @@ struct PetInteractionAreaView: View {
                     .foregroundColor(textData.color)
                     .shadow(radius: 2)
                     .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity))
-                    .offset(y: -50) // 初始偏移
+                    .offset(y: -120) // 初始偏移
                     .onAppear {
                         withAnimation(.easeOut(duration: 1.5)) {
                             // 这里可以通过 viewModel 控制更复杂的动画，

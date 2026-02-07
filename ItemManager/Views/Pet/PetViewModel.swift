@@ -29,7 +29,22 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Initialization
     init() {
-        // Load saved status
+        // Initial load
+        self.status = PetViewModel.loadStatusFromDisk()
+        
+        // Calculate offline decay
+        calculateOfflineDecay()
+        checkDailyReset()
+        
+        // Start timer
+        startTimer()
+        
+        setupAudioBindings()
+        setupNotificationObserver()
+    }
+    
+    static func loadStatusFromDisk() -> PetStatus {
+        let statusKey = "PetStatus_Data"
         if let data = UserDefaults.standard.data(forKey: statusKey),
            var decoded = try? JSONDecoder().decode(PetStatus.self, from: data) {
             
@@ -42,19 +57,24 @@ class PetViewModel: ObservableObject {
             }
             decoded.inventory = validInv
             
-            self.status = decoded
+            return decoded
         } else {
-            self.status = PetStatus()
+            return PetStatus()
         }
-        
-        // Calculate offline decay
-        calculateOfflineDecay()
-        checkDailyReset()
-        
-        // Start timer
-        startTimer()
-        
-        setupAudioBindings()
+    }
+    
+    private func setupNotificationObserver() {
+        NotificationCenter.default.addObserver(forName: Notification.Name("PetStatusDidUpdateExternally"), object: nil, queue: .main) { [weak self] _ in
+            self?.reloadStatus()
+        }
+    }
+    
+    func reloadStatus() {
+        let newStatus = PetViewModel.loadStatusFromDisk()
+        // 只更新货币，避免覆盖运行时的其他状态（如饥饿度等瞬时变化）
+        self.status.fishCoin = newStatus.fishCoin
+        self.status.meowCoin = newStatus.meowCoin
+        // 也可以选择完全重载，视需求而定
     }
     
     private func setupAudioBindings() {
