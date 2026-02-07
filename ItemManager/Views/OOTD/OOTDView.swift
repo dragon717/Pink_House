@@ -838,24 +838,83 @@ struct OOTDContentArea: View {
     let onUpdate: () -> Void
     
     var body: some View {
+        let isLandscape = geometry.size.width > geometry.size.height
+        
         ZStack {
-            if let outfit = currentOutfit {
-                OOTDCanvasView(outfit: outfit, onCanvasChange: onUpdate)
-                    .id(outfit.id) // Force refresh when switching outfits
+            if isLandscape {
+                // Landscape Layout: HStack (Canvas + Sidebar)
+                HStack(spacing: 0) {
+                    // Canvas Area
+                    if let outfit = currentOutfit {
+                        OOTDCanvasView(outfit: outfit, onCanvasChange: onUpdate)
+                            .id(outfit.id)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    
+                    // Right Sidebar (Cutout List)
+                    OOTDCutoutListView(
+                        isExpanded: $isListExpanded,
+                        isLandscape: true,
+                        onSelect: onAddToOutfit,
+                        onAddPhoto: onAddPhoto,
+                        onBatchAdd: onBatchAdd
+                    )
+                    .frame(width: isListExpanded ? 320 : 100) // Width control
+                    .background(Color(uiColor: .systemBackground))
+                    .transition(.move(edge: .trailing))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isListExpanded)
+                    // Add a toggle button or handle if needed? 
+                    // Actually, tapping on the collapsed list might need to expand it?
+                    // But we modified `onTapGesture` to do nothing in landscape.
+                    // We might need a button in the list or outside.
+                    // Let's rely on the list items being clickable even when collapsed.
+                    // But how to EXPAND?
+                    // Maybe add a chevron button overlay on the list edge?
+                    .overlay(alignment: .leading) {
+                         // Toggle Handle
+                         Button(action: {
+                             withAnimation {
+                                 isListExpanded.toggle()
+                             }
+                         }) {
+                             Image(systemName: isListExpanded ? "chevron.right" : "chevron.left")
+                                 .font(.system(size: 16, weight: .bold))
+                                 .foregroundColor(.secondary)
+                                 .padding(8)
+                                 .background(.ultraThinMaterial)
+                                 .clipShape(Circle())
+                                 .shadow(radius: 2)
+                         }
+                         .padding(.leading, -16) // Offset to overlap or sit on edge
+                         .offset(x: 10) // Push it a bit inside
+                    }
+                }
             } else {
-                ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
-            }
-            
-            VStack {
-                Spacer()
-                OOTDCutoutListView(
-                    isExpanded: $isListExpanded,
-                    onSelect: onAddToOutfit,
-                    onAddPhoto: onAddPhoto,
-                    onBatchAdd: onBatchAdd
-                )
-                .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+                // Portrait Layout: ZStack (Canvas + Bottom Sheet)
+                ZStack {
+                    if let outfit = currentOutfit {
+                        OOTDCanvasView(outfit: outfit, onCanvasChange: onUpdate)
+                            .id(outfit.id)
+                    } else {
+                        ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
+                    }
+                    
+                    VStack {
+                        Spacer()
+                        OOTDCutoutListView(
+                            isExpanded: $isListExpanded,
+                            isLandscape: false,
+                            onSelect: onAddToOutfit,
+                            onAddPhoto: onAddPhoto,
+                            onBatchAdd: onBatchAdd
+                        )
+                        .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+                    }
+                }
             }
             
             if isProcessing {

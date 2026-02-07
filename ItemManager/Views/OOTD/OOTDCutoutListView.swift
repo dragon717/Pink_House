@@ -13,6 +13,7 @@ struct OOTDCutoutListView: View {
     }
     
     @Binding var isExpanded: Bool
+    var isLandscape: Bool = false
     var onSelect: (CutoutItem) -> Void
     var onAddPhoto: () -> Void
     var onBatchAdd: (([CutoutItem]) -> Bool)? // Optional batch callback, returns success
@@ -138,100 +139,107 @@ struct OOTDCutoutListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Handle
-            Capsule()
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: 40, height: 5)
-                .padding(.top, 10)
-                .padding(.bottom, 5)
+            // Handle (Only in Portrait)
+            if !isLandscape {
+                Capsule()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 40, height: 5)
+                    .padding(.top, 10)
+                    .padding(.bottom, 5)
+            }
             
-            if isExpanded {
-                // Header
-                HStack {
-                    Text("贴纸库")
-                        .font(.headline)
-                    Spacer()
-                    
-                    if isEditing {
-                        let currentIDs = Set(displayItems.map { $0.id })
-                        let isAllSelected = !displayItems.isEmpty && currentIDs.isSubset(of: selectedItems)
+            if isExpanded || isLandscape {
+                // Header, Search, Filter (Show if expanded, or if landscape and expanded)
+                // In Landscape + Collapsed, we hide these to save space
+                if isExpanded {
+                    // Header
+                    HStack {
+                        Text("贴纸库")
+                            .font(.headline)
+                        Spacer()
                         
-                        // 全选按钮
+                        if isEditing {
+                            let currentIDs = Set(displayItems.map { $0.id })
+                            let isAllSelected = !displayItems.isEmpty && currentIDs.isSubset(of: selectedItems)
+                            
+                            // 全选按钮
+                            Button(action: {
+                                withAnimation {
+                                    if isAllSelected {
+                                        selectedItems.subtract(currentIDs)
+                                    } else {
+                                        selectedItems.formUnion(currentIDs)
+                                    }
+                                }
+                            }) {
+                                Text(isAllSelected ? "取消全选" : "全选")
+                                    .font(.subheadline)
+                            }
+                            .padding(.trailing, 8)
+                            
+                            // 选中/总数
+                            Text("\(selectedItems.count)/\(displayItems.count)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        } else {
+                            Text("共 \(displayItems.count) 个")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        
                         Button(action: {
                             withAnimation {
-                                if isAllSelected {
-                                    selectedItems.subtract(currentIDs)
-                                } else {
-                                    selectedItems.formUnion(currentIDs)
-                                }
+                                isEditing.toggle()
+                                selectedItems.removeAll()
                             }
                         }) {
-                            Text(isAllSelected ? "取消全选" : "全选")
-                                .font(.subheadline)
+                            Text(isEditing ? "完成" : "多选")
+                                .fontWeight(isEditing ? .bold : .regular)
+                                .foregroundColor(isEditing ? .accentColor : .primary)
                         }
-                        .padding(.trailing, 8)
-                        
-                        // 选中/总数
-                        Text("\(selectedItems.count)/\(displayItems.count)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    } else {
-                        Text("共 \(displayItems.count) 个")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Button(action: {
-                        withAnimation {
-                            isEditing.toggle()
-                            selectedItems.removeAll()
-                        }
-                    }) {
-                        Text(isEditing ? "完成" : "多选")
-                            .fontWeight(isEditing ? .bold : .regular)
-                            .foregroundColor(isEditing ? .accentColor : .primary)
-                    }
-                    .padding(.leading, 8)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                
-                // Search Bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-                    TextField("搜索分类或关联服饰...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                    
-                    if !searchText.isEmpty {
-                        Button(action: { searchText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-                .padding(8)
-                .background(Color(uiColor: .secondarySystemBackground))
-                .cornerRadius(10)
-                .padding(.horizontal)
-                
-                // Category Filter
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(categories, id: \.self) { category in
-                            CategoryChip(title: category, isSelected: selectedCategory == category) {
-                                withAnimation {
-                                    selectedCategory = category
-                                }
-                            }
-                        }
+                        .padding(.leading, 8)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 8)
+                    
+                    // Search Bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                        TextField("搜索分类或关联服饰...", text: $searchText)
+                            .textFieldStyle(PlainTextFieldStyle())
+                        
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                    .padding(8)
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    
+                    // Category Filter
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(categories, id: \.self) { category in
+                                CategoryChip(title: category, isSelected: selectedCategory == category) {
+                                    withAnimation {
+                                        selectedCategory = category
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                    }
                 }
                 
                 // Expanded View (Grid)
+                // In Landscape + Collapsed (Narrow), this grid will adapt to 1 column
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 16)], spacing: 16) {
                         if !isEditing {
@@ -316,7 +324,7 @@ struct OOTDCutoutListView: View {
                     .transition(.move(edge: .bottom))
                 }
             } else {
-                // Minimized View (Horizontal Scroll)
+                // Minimized View (Horizontal Scroll) - Only for Portrait!
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         addButton
@@ -335,21 +343,30 @@ struct OOTDCutoutListView: View {
         }
         .background(
             Color(uiColor: .systemBackground)
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
+                .shadow(color: .black.opacity(0.1), radius: 10, x: isLandscape ? -5 : 0, y: isLandscape ? 0 : -5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 24, style: .continuous)) // No rounded corners in landscape
         .onTapGesture {
             // Expand on tap if not tapping an item
+            // Only relevant for Portrait Minimized view? 
+            // In Landscape Collapsed, tapping empty space might expand?
+            if !isExpanded && !isLandscape {
+                 // withAnimation { isExpanded = true } 
+                 // Removing this as it might conflict with item taps if not careful, 
+                 // but originally it was there (implied). 
+                 // Original code had empty onTapGesture comment.
+            }
         }
         .gesture(
-            DragGesture()
+            // Drag to expand/collapse - Only for Portrait
+            !isLandscape ? DragGesture()
                 .onEnded { value in
                     if value.translation.height < -50 {
                         withAnimation { isExpanded = true }
                     } else if value.translation.height > 50 {
                         withAnimation { isExpanded = false }
                     }
-                }
+                } : nil
         )
         .alert("提示", isPresented: $showAlert) {
             Button("确定", role: .cancel) { }
