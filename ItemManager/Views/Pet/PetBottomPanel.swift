@@ -1,7 +1,18 @@
 import SwiftUI
+
+enum PanelState {
+    case hidden
+    case collapsed
+    case expanded
+    
+    var isExpanded: Bool {
+        return self == .expanded
+    }
+}
+
 struct PetBottomPanel: View {
     @ObservedObject var viewModel: PetViewModel
-    @Binding var isExpanded: Bool
+    @Binding var panelState: PanelState
     var isLandscape: Bool = false
     @State private var selectedTab: Int = 0 // 0: 背包, 1: 商店
     
@@ -30,7 +41,7 @@ struct PetBottomPanel: View {
     var body: some View {
         GeometryReader { geometry in
             if isLandscape {
-                // 横屏布局：右侧侧边栏
+                // 横屏布局：右侧侧边栏 (暂时保持原有逻辑，映射 state)
                 HStack(spacing: 0) {
                     // 1. Handle (左侧拖拽手柄 + 箭头)
                     ZStack {
@@ -40,10 +51,10 @@ struct PetBottomPanel: View {
                         // 箭头按钮 (参考 OOTD 风格)
                         Button(action: {
                             withAnimation(.spring()) {
-                                isExpanded.toggle()
+                                toggleLandscapeState()
                             }
                         }) {
-                            Image(systemName: isExpanded ? "chevron.right" : "chevron.left")
+                            Image(systemName: panelState == .expanded ? "chevron.right" : "chevron.left")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.secondary)
                                 .padding(8)
@@ -60,30 +71,25 @@ struct PetBottomPanel: View {
                         DragGesture()
                             .onChanged { value in
                                 let translation = value.translation.width
-                                // 阻尼效果：向左拖（展开），向右拖（收起）
-                                // isExpanded = true (显示全部), offset = 0
-                                // isExpanded = false (隐藏大部分), offset = positive
-                                
-                                // 逻辑：offset 控制整个 panel 的 x 位置
-                                // 初始位置根据 isExpanded 决定
-                                if isExpanded && translation > 0 {
+                                // 简单适配横屏拖拽逻辑
+                                if panelState == .expanded && translation > 0 {
                                      dragOffset = translation
-                                } else if !isExpanded && translation < 0 {
+                                } else if panelState != .expanded && translation < 0 {
                                      dragOffset = translation
                                 }
                             }
                             .onEnded { value in
                                 let threshold: CGFloat = 50
-                                if isExpanded {
+                                if panelState == .expanded {
                                     if value.translation.width > threshold {
                                         withAnimation(.spring()) {
-                                            isExpanded = false
+                                            panelState = .collapsed
                                         }
                                     }
                                 } else {
                                     if value.translation.width < -threshold {
                                         withAnimation(.spring()) {
-                                            isExpanded = true
+                                            panelState = .expanded
                                         }
                                     }
                                 }
@@ -103,15 +109,13 @@ struct PetBottomPanel: View {
                     .frame(width: sidebarWidth)
                 }
                 // 位置控制
-                // isExpanded: offset = 0 (显示在屏幕右侧)
-                // !isExpanded: offset = sidebarWidth - collapsedWidth (大部分藏在屏幕右侧外)
-                .offset(x: isExpanded ? dragOffset : (sidebarWidth - collapsedWidth) + dragOffset)
+                .offset(x: panelState == .expanded ? dragOffset : (sidebarWidth - collapsedWidth) + dragOffset)
                 // 确保停靠在右边
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: panelState)
                 
             } else {
-                // 竖屏布局：底部面板 (保持原有逻辑)
+                // 竖屏布局：底部面板
                 VStack(spacing: 0) {
                     // 1. Handle
                     VStack {
@@ -123,36 +127,6 @@ struct PetBottomPanel: View {
                     }
                     .frame(maxWidth: .infinity)
                     .background(.regularMaterial)
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                let translation = value.translation.height
-                                if isExpanded && translation > 0 {
-                                    dragOffset = translation
-                                } else if !isExpanded && translation < 0 {
-                                    dragOffset = translation
-                                }
-                            }
-                            .onEnded { value in
-                                let threshold: CGFloat = 50
-                                if isExpanded {
-                                    if value.translation.height > threshold {
-                                        withAnimation(.spring()) {
-                                            isExpanded = false
-                                        }
-                                    }
-                                } else {
-                                    if value.translation.height < -threshold {
-                                        withAnimation(.spring()) {
-                                            isExpanded = true
-                                        }
-                                    }
-                                }
-                                withAnimation {
-                                    dragOffset = 0
-                                }
-                            }
-                    )
                     
                     // 2. Tabs
                     tabHeader
@@ -163,10 +137,72 @@ struct PetBottomPanel: View {
                 .background(.regularMaterial)
                 .cornerRadius(20, corners: [.topLeft, .topRight])
                 .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
-                .frame(height: isExpanded ? expandedHeight : collapsedHeight)
-                .offset(y: geometry.size.height - (isExpanded ? expandedHeight : collapsedHeight) + dragOffset)
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
+                .frame(height: panelState == .expanded ? expandedHeight : collapsedHeight)
+                // 关键修改：根据状态控制 offset y
+                // Hidden: offset = height (完全移出屏幕)
+                // Collapsed/Expanded: offset = 0 (正常显示，高度由 frame 控制)
+                // 加上 dragOffset 实现拖拽跟手
+                .offset(y: calculateVerticalOffset(geometry: geometry))
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: panelState)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            let translation = value.translation.height
+                            // 限制拖拽范围，避免这Expanded状态下过度上拉
+                            if panelState == .expanded && translation < 0 {
+                                dragOffset = translation * 0.2 // 阻尼
+                            } else {
+                                dragOffset = translation
+                            }
+                        }
+                        .onEnded { value in
+                            let threshold: CGFloat = 50
+                            let translation = value.translation.height
+                            
+                            withAnimation(.spring()) {
+                                if panelState == .expanded {
+                                    if translation > threshold {
+                                        // 向下拖拽 -> 折叠
+                                        panelState = .collapsed
+                                    }
+                                } else if panelState == .collapsed {
+                                    if translation < -threshold {
+                                        // 向上拖拽 -> 展开
+                                        panelState = .expanded
+                                    } else if translation > threshold {
+                                        // 向下拖拽 -> 隐藏
+                                        panelState = .hidden
+                                    }
+                                }
+                                dragOffset = 0
+                            }
+                        }
+                )
             }
+        }
+    }
+    
+    private func calculateVerticalOffset(geometry: GeometryProxy) -> CGFloat {
+        if panelState == .hidden {
+            return geometry.size.height + 200 // 增加额外偏移，确保完全移出可视区域
+        }
+        
+        // 基础位置是底部对齐
+        let currentHeight = panelState == .expanded ? expandedHeight : collapsedHeight
+        let baseOffset = geometry.size.height - currentHeight
+        
+        // 增加拖拽时的弹性效果或跟手
+        // 当 collapsed 向下拖时，dragOffset > 0，面板向下移动
+        // 当 expanded 向下拖时，dragOffset > 0，面板向下移动
+        
+        return baseOffset + dragOffset
+    }
+
+    private func toggleLandscapeState() {
+        if panelState == .expanded {
+            panelState = .collapsed
+        } else {
+            panelState = .expanded
         }
     }
     
@@ -226,10 +262,10 @@ struct PetBottomPanel: View {
             
             if selectedTab == 0 {
                 // 背包视图
-                InventoryView(viewModel: viewModel, isExpanded: isExpanded, isLandscape: isLandscape)
+                InventoryView(viewModel: viewModel, panelState: panelState, isLandscape: isLandscape)
             } else {
                 // 商店视图
-                ShopView(viewModel: viewModel, isExpanded: isExpanded, isLandscape: isLandscape)
+                ShopView(viewModel: viewModel, panelState: panelState, isLandscape: isLandscape)
             }
         }
     }
@@ -240,7 +276,7 @@ struct PetBottomPanel: View {
 struct InventoryView: View {
     @ObservedObject var viewModel: PetViewModel
     @ObservedObject var config = PetConfigManager.shared
-    var isExpanded: Bool
+    var panelState: PanelState
     var isLandscape: Bool = false
     
     @State private var searchText = ""
@@ -272,7 +308,7 @@ struct InventoryView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Search & Filter Header (Only when expanded or landscape)
-            if isExpanded || isLandscape {
+            if panelState == .expanded || isLandscape {
                 VStack(spacing: 12) {
                     // Search Bar
                     HStack {
@@ -323,8 +359,8 @@ struct InventoryView: View {
             if filteredItems.isEmpty {
                 VStack {
                     Image(systemName: "cube.box")
-                        .font(.largeTitle)
-                        .foregroundColor(.gray.opacity(0.5))
+                    .font(.largeTitle)
+                    .foregroundColor(.gray.opacity(0.5))
                     Text(searchText.isEmpty && selectedCategoryId == "all" ? "背包空空如也，去商店买点东西吧~" : "没有找到相关物品")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -332,7 +368,7 @@ struct InventoryView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // 横屏模式或者展开模式下使用网格
-                if isExpanded || isLandscape {
+                if panelState == .expanded || isLandscape {
                     // 展开：网格布局
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
@@ -366,7 +402,7 @@ struct ShopView: View {
     @ObservedObject var viewModel: PetViewModel
     @ObservedObject var config = PetConfigManager.shared
     
-    var isExpanded: Bool
+    var panelState: PanelState
     var isLandscape: Bool = false
     
     @State private var searchText = ""
@@ -394,7 +430,7 @@ struct ShopView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Search & Filter Header (Only when expanded or landscape)
-            if isExpanded || isLandscape {
+            if panelState == .expanded || isLandscape {
                 VStack(spacing: 12) {
                     // Search Bar
                     HStack {
@@ -443,7 +479,7 @@ struct ShopView: View {
             }
             
             // Content
-            if isExpanded || isLandscape {
+            if panelState == .expanded || isLandscape {
                 // 展开：网格布局
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {

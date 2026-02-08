@@ -6,7 +6,7 @@ struct PetHomeView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
     @Environment(\.scenePhase) var scenePhase
-    @State private var isExpanded = false
+    @State private var panelState: PanelState = .collapsed
     @State private var showRenameAlert = false
     @State private var showNoCardAlert = false
     @State private var showJobSelection = false
@@ -61,7 +61,38 @@ struct PetHomeView: View {
                         }
                         
                         // 3. 顶层 UI：底部操作面板 (可展开)
-                        PetBottomPanel(viewModel: viewModel, isExpanded: $isExpanded, isLandscape: isLandscape)
+                        PetBottomPanel(viewModel: viewModel, panelState: $panelState, isLandscape: isLandscape)
+                        
+                        // 4. 悬浮按钮 (仅在隐藏状态且竖屏显示)
+                        if !isLandscape && panelState == .hidden {
+                            VStack {
+                                Spacer()
+                                HStack {
+                                    Spacer()
+                                    Button(action: {
+                                        withAnimation(.spring()) {
+                                            panelState = .collapsed
+                                        }
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "backpack.fill")
+                                                .font(.system(size: 20))
+                                            Text("背包")
+                                                .font(.system(size: 16, weight: .bold))
+                                        }
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(Color.blue)
+                                        .clipShape(Capsule())
+                                        .shadow(radius: 4, x: 0, y: 2)
+                                    }
+                                    .padding(.trailing, 20)
+                                    .padding(.bottom, 40) // 稍微高一点，避免被 HomeIndicator 遮挡
+                                }
+                            }
+                            .transition(.opacity)
+                        }
                     }
                 }
                 .alert("修改萌宠名字", isPresented: $showRenameAlert) {

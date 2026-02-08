@@ -4,4 +4,4 @@ build/*
 ItemManager/asserts/*.mp4
 ItemManager/asserts/*.mp3
 .DS_Store
-ItemManager/asserts/也字工厂小石头.ttf
+ItemManager/asserts/*.ttf
