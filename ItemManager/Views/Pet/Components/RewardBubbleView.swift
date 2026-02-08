@@ -4,43 +4,106 @@ import Combine
 
 struct RewardBubbleView: View {
     @State private var rewards: [(amount: Int, message: String, id: UUID)] = []
+    @State private var isExpanded = false
     @StateObject private var rewardManager = RewardManager.shared
     
     var body: some View {
         ZStack(alignment: .top) {
             Color.clear.allowsHitTesting(false) // Pass through touches
             
-            VStack(spacing: 10) {
-                ForEach(rewards, id: \.id) { reward in
-                    RewardBubble(amount: reward.amount, message: reward.message)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .top).combined(with: .opacity).combined(with: .scale(scale: 0.8)),
-                            removal: .move(edge: .top).combined(with: .opacity)
-                        ))
+            VStack {
+                if isExpanded {
+                    // 展开状态：垂直排列所有气泡
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 10) {
+                            ForEach(rewards, id: \.id) { reward in
+                                RewardBubble(amount: reward.amount, message: reward.message) {
+                                    // 点击关闭单个气泡
+                                    withAnimation {
+                                        rewards.removeAll(where: { $0.id == reward.id })
+                                        if rewards.isEmpty {
+                                            isExpanded = false
+                                        }
+                                    }
+                                }
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                            }
+                        }
+                        .padding(.top, 60)
+                        .padding(.bottom, 20)
+                    }
+                    .background(
+                        Color.black.opacity(0.01) // 透明背景以捕获点击
+                            .onTapGesture {
+                                withAnimation(.spring()) {
+                                    isExpanded = false
+                                }
+                            }
+                    )
+                } else {
+                    // 折叠状态：堆叠显示
+                    ZStack(alignment: .top) {
+                        // 只显示最新的 3 个
+                        ForEach(Array(rewards.prefix(3).enumerated()), id: \.element.id) { index, reward in
+                            RewardBubble(amount: reward.amount, message: reward.message, onClose: nil)
+                                .scaleEffect(scale(for: index))
+                                .offset(y: offset(for: index))
+                                .zIndex(Double(rewards.count - index)) // 确保最新的在最上面
+                                .opacity(opacity(for: index))
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                                .onTapGesture {
+                                    if rewards.count > 1 {
+                                        withAnimation(.spring()) {
+                                            isExpanded = true
+                                        }
+                                    }
+                                }
+                        }
+                    }
+                    .padding(.top, 60)
                 }
             }
-            .padding(.top, 60) // Avoid status bar / dynamic island
         }
-        .allowsHitTesting(false) // Don't block interactions
+        .allowsHitTesting(!rewards.isEmpty) // 只有当有奖励时才允许交互
         .onReceive(rewardManager.rewardPublisher) { (amount, message) in
             let id = UUID()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                rewards.append((amount, message, id))
+                // 新奖励插入到最前面
+                rewards.insert((amount, message, id), at: 0)
             }
             
-            // Auto dismiss
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation {
-                    rewards.removeAll(where: { $0.id == id })
+            // 自动移除 (仅在未展开时，或者你可以决定展开时不自动移除)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                if !isExpanded {
+                    withAnimation {
+                        rewards.removeAll(where: { $0.id == id })
+                    }
                 }
             }
         }
+    }
+    
+    // 堆叠效果计算
+    private func scale(for index: Int) -> CGFloat {
+        // index 0: 1.0, index 1: 0.95, index 2: 0.9
+        return 1.0 - CGFloat(index) * 0.05
+    }
+    
+    private func offset(for index: Int) -> CGFloat {
+        // 增大垂直间距，让堆叠感更强
+        // index 0: 0, index 1: 35, index 2: 70
+        return CGFloat(index) * 35
+    }
+    
+    private func opacity(for index: Int) -> Double {
+        return 1.0 - Double(index) * 0.15
     }
 }
 
 struct RewardBubble: View {
     let amount: Int
     let message: String
+    var onClose: (() -> Void)? = nil
     
     var body: some View {
         HStack(spacing: 12) {
@@ -68,12 +131,22 @@ struct RewardBubble: View {
             
             Spacer()
             
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            if let onClose = onClose {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .padding(8)
+                        .background(Circle().fill(Color.gray.opacity(0.1)))
+                }
+            } else {
+                Image(systemName: "chevron.compact.down")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(10)
-        .padding(.trailing, 16)
+        .padding(.trailing, 10)
         .background {
             Capsule()
                 .fill(.regularMaterial)

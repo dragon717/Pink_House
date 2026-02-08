@@ -100,21 +100,32 @@ struct PetInteractionAreaView: View {
             }
             
             // 浮动文字层
-            ForEach(viewModel.floatingTexts) { textData in
-                Text(textData.text)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(textData.color)
-                    .shadow(radius: 2)
-                    .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity))
-                    .offset(y: -120) // 初始偏移
-                    .onAppear {
-                        withAnimation(.easeOut(duration: 1.5)) {
-                            // 这里可以通过 viewModel 控制更复杂的动画，
-                            // 或者在 View 内部做一个局部状态来控制 offset，
-                            // 简单起见，这里只做出现和消失的 transition，位置由 ZStack 决定
-                        }
-                    }
+            // 使用 drawingGroup 优化多层渲染性能
+            ZStack {
+                ForEach(viewModel.floatingTexts) { textData in
+                    StyledFloatingText(text: textData.text, style: textData.style)
+                        .transition(
+                            .asymmetric(
+                                // 入场：快速弹跳 (Pop)
+                                insertion: .scale(scale: 0.5, anchor: .bottom) // 稍微调大初始比例，防止完全看不见
+                                    .combined(with: .opacity)
+                                    .combined(with: .offset(y: 40)), // 从下方一点点弹出来
+                                // 离场：飘散消失 (Disperse)
+                                // 结合放大 (Scale Up) + 淡出 (Fade Out) + 轻微上浮 (Float Up)
+                                // 模拟烟雾或云朵消散的感觉
+                                removal: .opacity.animation(.easeOut(duration: 0.8))
+                                    .combined(with: .scale(scale: 1.5).animation(.easeOut(duration: 0.8))) // 放大消散
+                                    .combined(with: .offset(y: -40).animation(.easeOut(duration: 0.8))) // 轻微上浮
+                            )
+                        )
+                        // 确保最新的在最上面 (ZStack 默认顺序也是如此，但为了保险)
+                        .zIndex(Double(textData.id.hashValue))
+                        // 位置由数据决定 (X随机，Y固定)
+                        .offset(x: textData.offset.width, y: -120 + textData.offset.height)
+                }
             }
+            // 移除 drawingGroup，因为它可能导致转场动画中的视图不可见
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: viewModel.floatingTexts.count)
             
             // 语音识别和互动状态层
             VStack {
@@ -207,6 +218,134 @@ struct PetInteractionAreaView: View {
         case .recording: return "正在听..."
         case .processing: return "思考中..."
         case .playing: return "复述中..."
+        }
+    }
+}
+
+// MARK: - Components
+
+struct StyledFloatingText: View {
+    let text: String
+    let style: FloatingTextStyle
+    
+    var body: some View {
+        switch style {
+        case .meowCoin, .fishCoin:
+            SparklingCurrencyText(text: text, style: style)
+        default:
+            StandardFloatingText(text: text, color: style.color)
+        }
+    }
+}
+
+struct StandardFloatingText: View {
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        // 优化：使用 Shadow 替代 8向 Text 描边，大幅减少视图节点数量 (10 -> 2)
+        // 虽然阴影稍微柔和一点，但性能提升巨大，适合小内存设备
+        ZStack {
+            // 主体 + 描边 (通过多重阴影模拟)
+            Text(text)
+                .font(.system(size: 36, weight: .black, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [color, color.opacity(0.8)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                // 模拟描边：4个方向的硬阴影
+                .shadow(color: .black, radius: 0, x: 1, y: 1)
+                .shadow(color: .black, radius: 0, x: -1, y: -1)
+                .shadow(color: .black, radius: 0, x: 1, y: -1)
+                .shadow(color: .black, radius: 0, x: -1, y: 1)
+                // 增加一层扩散阴影增加立体感
+                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 2)
+            
+            // 顶部高光 (保留，增加精致感)
+            Text(text)
+                .font(.system(size: 36, weight: .black, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.white.opacity(0.6), .clear],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                )
+                .mask(
+                    Text(text)
+                        .font(.system(size: 36, weight: .black, design: .rounded))
+                )
+                .offset(y: -1)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+struct SparklingCurrencyText: View {
+    let text: String
+    let style: FloatingTextStyle
+    
+    @State private var shineOffset: CGFloat = -1.0
+    
+    var config: (icon: String, color: Color, gradient: [Color]) {
+        switch style {
+        case .meowCoin:
+            return (
+                icon: "pawprint.circle.fill",
+                color: .yellow,
+                gradient: [.yellow, .orange, .yellow]
+            )
+        case .fishCoin:
+            return (
+                icon: "fish.circle.fill",
+                color: .orange, // 铜色近似
+                gradient: [Color(hex: "CD7F32"), Color(hex: "8B4513"), Color(hex: "CD7F32")] // 铜色渐变
+            )
+        default:
+            return ("circle.fill", .white, [.white, .gray])
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            // 文本部分
+            StandardFloatingText(text: text, color: config.color)
+            
+            // 图标部分
+            Image(systemName: config.icon)
+                .font(.system(size: 36, weight: .bold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: config.gradient,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: .black, radius: 1, x: 1, y: 1)
+                .overlay(
+                    // 闪光效果
+                    GeometryReader { geo in
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.clear, .white.opacity(0.8), .clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .rotationEffect(.degrees(30))
+                            .offset(x: shineOffset * geo.size.width * 2)
+                    }
+                    .mask(Image(systemName: config.icon).font(.system(size: 36, weight: .bold)))
+                )
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                shineOffset = 1.0
+            }
         }
     }
 }

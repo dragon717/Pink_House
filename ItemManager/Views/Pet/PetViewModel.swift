@@ -5,9 +5,33 @@ import AVFoundation
 struct FloatingTextData: Identifiable {
     let id = UUID()
     let text: String
-    let color: Color
+    let style: FloatingTextStyle
     var offset: CGSize = .zero
-    var opacity: Double = 1.0
+    // 移除 opacity，由 View 层动画控制
+}
+
+enum FloatingTextStyle {
+    case warning    // 红色
+    case meowCoin   // 闪光的金色，带喵币icon
+    case fishCoin   // 闪光的铜色，带鱼币icon
+    case hunger     // 橙色
+    case hygiene    // 蓝色
+    case energy     // 绿色
+    case mood       // 粉色
+    case custom(Color) // 自定义颜色
+    
+    var color: Color {
+        switch self {
+        case .warning: return .red
+        case .meowCoin: return .yellow // 基础色，View层会做特殊处理
+        case .fishCoin: return .orange // 基础色，View层会做特殊处理
+        case .hunger: return .orange
+        case .hygiene: return .blue
+        case .energy: return .green
+        case .mood: return .pink
+        case .custom(let color): return color
+        }
+    }
 }
 
 class PetViewModel: ObservableObject {
@@ -156,7 +180,7 @@ class PetViewModel: ObservableObject {
         }
         
         guard canAfford else {
-            showFloatingText("余额不足", color: .gray)
+            showFloatingText("余额不足", style: .warning)
             return
         }
         
@@ -166,6 +190,13 @@ class PetViewModel: ObservableObject {
             status.fishCoin -= item.price
         case .meowCoin:
             status.meowCoin -= item.price
+        }
+        
+        // 显示扣款提示 (先显示扣款，再显示属性增加)
+        if item.petCurrency == .meowCoin {
+            showFloatingText("-\(item.price)", style: .meowCoin)
+        } else {
+            showFloatingText("-\(item.price)", style: .fishCoin)
         }
         
         // 3. 消费效果 (这里不经过背包，直接产生效果)
@@ -178,9 +209,6 @@ class PetViewModel: ObservableObject {
         
         // 4. 消费
         consumeItem(item)
-        
-        // 5. 显示扣款提示
-        showFloatingText("-\(item.price)", color: .orange)
         
         saveStatus()
     }
@@ -196,7 +224,7 @@ class PetViewModel: ObservableObject {
     func consumeItem(_ item: PetItemDefinition) {
         // 特殊道具不能直接食用
         if item.id == "renameCard" {
-            showFloatingText("这个不能吃哦", color: .red)
+            showFloatingText("这个不能吃哦", style: .warning)
             return
         }
         
@@ -213,9 +241,9 @@ class PetViewModel: ObservableObject {
             
             // 提示
             if energyCost > 0 {
-                showFloatingText("精力 -\(Int(energyCost))", color: .blue)
+                showFloatingText("精力 -\(Int(energyCost))", style: .energy)
             }
-            showFloatingText("心情 +\(Int(item.recoveryValue))", color: .pink)
+            showFloatingText("心情 +\(Int(item.recoveryValue))", style: .mood)
         } else {
             // 食物/水
             // 增加属性
@@ -228,6 +256,20 @@ class PetViewModel: ObservableObject {
             } else {
                 status.hunger = min(100, status.hunger + item.recoveryValue)
                 changeState(to: .eating)
+            }
+            
+            // 提示属性增加
+            if item.recoveryValue > 0 {
+                if item.isDrink {
+                    // 饮水可能同时增加饱食度（如果是奶）或者只是解渴？当前逻辑是加 hunger
+                    // 但通常水是解渴。这里假设 hunger 也代表渴度。
+                    showFloatingText("饱食度 +\(Int(item.recoveryValue))", style: .hunger)
+                } else {
+                    showFloatingText("饱食度 +\(Int(item.recoveryValue))", style: .hunger)
+                }
+            }
+            if moodRecovery >= 1 {
+                showFloatingText("心情 +\(Int(moodRecovery))", style: .mood)
             }
         }
         
@@ -245,7 +287,7 @@ class PetViewModel: ObservableObject {
     func pet() {
         let moodIncrease = 5.0
         status.mood = min(100, status.mood + moodIncrease)
-        showFloatingText("心情 +\(Int(moodIncrease))", color: .pink)
+        showFloatingText("心情 +\(Int(moodIncrease))", style: .mood)
         saveStatus()
     }
     
@@ -257,7 +299,7 @@ class PetViewModel: ObservableObject {
         if status.fishCoin >= cost {
             // 扣除鱼币
             status.fishCoin -= cost
-            showFloatingText("-\(cost)", color: .red)
+            showFloatingText("-\(cost)", style: .fishCoin)
             
             // 更新状态
             status.hygiene = min(100, status.hygiene + 20)
@@ -266,9 +308,13 @@ class PetViewModel: ObservableObject {
             
             // 切换状态
             changeState(to: .cleaning)
+            
+            // 提示属性变化
+            showFloatingText("清洁度 +20", style: .hygiene)
+            showFloatingText("心情 +10", style: .mood)
         } else {
             // 余额不足提示
-            showFloatingText("鱼币不足!", color: .gray)
+            showFloatingText("鱼币不足!", style: .warning)
         }
     }
     
@@ -345,14 +391,60 @@ class PetViewModel: ObservableObject {
     
     // MARK: - UI Effects
     
-    func showFloatingText(_ text: String, color: Color) {
-        let newData = FloatingTextData(text: text, color: color)
+    private var pendingBubbleQueue: [(String, FloatingTextStyle)] = []
+    private var isProcessingBubbles = false
+    
+    func showFloatingText(_ text: String, style: FloatingTextStyle) {
+        // 加入队列
+        pendingBubbleQueue.append((text, style))
+        
+        // 如果当前没有在处理队列，开始处理
+        if !isProcessingBubbles {
+            processNextBubble()
+        }
+    }
+    
+    private func processNextBubble() {
+        guard !pendingBubbleQueue.isEmpty else {
+            isProcessingBubbles = false
+            return
+        }
+        
+        isProcessingBubbles = true
+        let (text, style) = pendingBubbleQueue.removeFirst()
+        
+        // 限制最大数量，防止内存暴涨
+        if floatingTexts.count >= 6 {
+            floatingTexts.removeFirst()
+        }
+        
+        // 生成随机偏移，避免重叠
+        // 增加 X/Y 轴的随机范围，防止多个气泡同时出现时完全重叠
+        let randomX = CGFloat.random(in: -50...50)
+        let randomY = CGFloat.random(in: -60...40) // 上下分布随机些，稍微偏上一点(-60)给下方留空间
+        
+        let newData = FloatingTextData(
+            text: text,
+            style: style,
+            offset: CGSize(width: randomX, height: randomY)
+        )
         floatingTexts.append(newData)
         
-        // 自动移除
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        // 自动移除 (稍微延长一点时间，配合 View 层的进出动画)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            // 只有当该 ID 还在数组中时才移除 (避免已经被 max count 移除导致的无效操作，虽无害但浪费)
             self?.floatingTexts.removeAll(where: { $0.id == newData.id })
         }
+        
+        // 调度下一个气泡
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.processNextBubble()
+        }
+    }
+    
+    // 兼容旧代码的方法
+    func showFloatingText(_ text: String, color: Color) {
+        showFloatingText(text, style: .custom(color))
     }
     
     // MARK: - Status Management
@@ -386,7 +478,7 @@ class PetViewModel: ObservableObject {
         saveStatus()
         
         if job != .none {
-            showFloatingText("开始打工: \(job.rawValue)", color: .blue)
+            showFloatingText("开始打工: \(job.rawValue)", style: .custom(.blue))
         }
     }
     
@@ -405,7 +497,7 @@ class PetViewModel: ObservableObject {
         
         saveStatus()
         
-        showFloatingText("结束打工: \(jobName)", color: .green)
+        showFloatingText("结束打工: \(jobName)", style: .custom(.green))
     }
     
     private func updateStatus() {
@@ -448,7 +540,7 @@ class PetViewModel: ObservableObject {
             if status.currentJob != .none {
                 if !isOfflineSimulation {
                     stopJob()
-                    showFloatingText("精力耗尽，强制昏睡！", color: .purple)
+                    showFloatingText("精力耗尽，强制昏睡！", style: .warning)
                 } else {
                     status.currentJob = .none
                     status.jobStartTime = nil
@@ -467,7 +559,7 @@ class PetViewModel: ObservableObject {
                 isWorking = false
                 if !isOfflineSimulation {
                     stopJob()
-                    showFloatingText("状态不好，不干了！", color: .red)
+                    showFloatingText("状态不好，不干了！", style: .warning)
                 } else {
                     status.currentJob = .none
                     status.jobStartTime = nil
