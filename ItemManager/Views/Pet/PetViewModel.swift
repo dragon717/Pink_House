@@ -170,6 +170,14 @@ class PetViewModel: ObservableObject {
     
     // 购买并立即消费（拖拽购买）
     func purchaseAndConsumeItem(_ item: PetItemDefinition) {
+        // 0. 检查精力是否足够 (如果道具消耗精力)
+        if let energyCost = item.energyCost, energyCost > 0 {
+             if status.energy < Double(energyCost) {
+                 showFloatingText("\(status.petName ?? "萌宠")太累了，不想玩...", style: .warning)
+                 return
+             }
+        }
+        
         // 1. 检查钱够不够
         let canAfford: Bool
         switch item.petCurrency {
@@ -226,6 +234,14 @@ class PetViewModel: ObservableObject {
         if item.id == "renameCard" {
             showFloatingText("这个不能吃哦", style: .warning)
             return
+        }
+        
+        // 检查精力是否足够 (如果道具消耗精力)
+        if let energyCost = item.energyCost, energyCost > 0 {
+             if status.energy < Double(energyCost) {
+                 showFloatingText("\(status.petName ?? "萌宠")太累了，不想玩...", style: .warning)
+                 return
+             }
         }
         
         // 扣除物品
@@ -292,7 +308,36 @@ class PetViewModel: ObservableObject {
     }
     
     func clean() {
-        guard currentState == .idle else { return }
+        // 如果是休息状态，且精力 >= 20，允许打断
+        let canInterruptSleep = currentState == .sleeping && status.energy >= 20
+        
+        guard currentState == .idle || canInterruptSleep else {
+            print("DEBUG: clean blocked, current state: \(currentState), energy: \(status.energy)")
+            
+            let petName = status.petName ?? "萌宠"
+            let message: String
+            switch currentState {
+            case .sleeping:
+                if status.energy < 20 {
+                    message = "\(petName)太累了，需要休息~"
+                } else {
+                    message = "\(petName)正在休息，请稍后再来~"
+                }
+            case .working:
+                message = "\(petName)正在努力打工，不能洗澡哦~"
+            case .eating, .drinking:
+                message = "\(petName)正在用餐，请稍等~"
+            case .playing:
+                message = "\(petName)玩得正开心呢~"
+            case .expecting:
+                message = "\(petName)正在期待你的投喂呢~"
+            default:
+                message = "\(petName)正忙着呢~ (\(currentState.rawValue))"
+            }
+            
+            showFloatingText(message, style: .warning)
+            return
+        }
         
         // 检查鱼币是否足够
         let cost = 20
@@ -302,7 +347,10 @@ class PetViewModel: ObservableObject {
             showFloatingText("-\(cost)", style: .fishCoin)
             
             // 更新状态
-            status.hygiene = min(100, status.hygiene + 20)
+            let oldHygiene = status.hygiene
+            status.hygiene = 100 // 直接加满
+            let addedHygiene = 100.0 - oldHygiene
+            
             status.mood = min(100, status.mood + 10) // 清洁也恢复心情
             saveStatus()
             
@@ -310,7 +358,11 @@ class PetViewModel: ObservableObject {
             changeState(to: .cleaning)
             
             // 提示属性变化
-            showFloatingText("清洁度 +20", style: .hygiene)
+            if addedHygiene > 0 {
+                showFloatingText("清洁度 +\(Int(addedHygiene))", style: .hygiene)
+            } else {
+                showFloatingText("清洁度已满", style: .hygiene)
+            }
             showFloatingText("心情 +10", style: .mood)
         } else {
             // 余额不足提示
@@ -547,7 +599,14 @@ class PetViewModel: ObservableObject {
                 }
             }
         } else if isFixedSleepTime {
-            isSleeping = true
+            // 如果正在进行用户交互（洗澡、吃饭、喝水、玩耍），且精力尚可，则不强制睡觉
+            // 注意：isExhausted (energy <= 0) 在上面已经被处理，所以这里能进来的肯定是 energy > 0
+            // 但为了保险起见，我们还是检查一下是否处于交互状态
+            if (currentState == .cleaning || currentState == .eating || currentState == .drinking || currentState == .playing) {
+                isSleeping = false
+            } else {
+                isSleeping = true
+            }
             // 强制休息时间，暂时中断工作状态（但不辞职），转为睡觉恢复精力
             // isWorking 默认为 false，不产生收益，不消耗工作精力
         } else if status.currentJob != .none {

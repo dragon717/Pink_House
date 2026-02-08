@@ -209,7 +209,7 @@ struct PetBottomPanel: View {
                 .foregroundColor(.blue)
                 .clipShape(Capsule())
             }
-            .disabled(viewModel.currentState != .idle)
+            // .disabled(viewModel.currentState != .idle) // 移除禁用，改为点击提示
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 10)
