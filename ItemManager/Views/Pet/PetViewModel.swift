@@ -359,80 +359,100 @@ class PetViewModel: ObservableObject {
     // 开始触摸（按下）
     // 长按时一直播放对应动画，循环播放
     func startTouching(at location: CGPoint, in size: CGSize) {
+        print("DEBUG: startTouching at \(location), isTouching: \(isTouching)")
         // 1. 如果有待执行的“松开”任务，立即取消，保持视频循环播放（视为连续点击）
+        var isContinuousClick = false
         if let item = touchReleaseWorkItem {
+            print("DEBUG: Cancelling pending release item")
             item.cancel()
             touchReleaseWorkItem = nil
+            isContinuousClick = true
         }
         
-        guard !isTouching else { return }
+        guard !isTouching else {
+            print("DEBUG: Already touching, ignoring start")
+            return
+        }
         isTouching = true
         touchStartTime = Date()
         
-        let isUpper = location.y < size.height / 2
         var videoName: String = PetVideoPaths.enjoy
         
-        if isUpper {
-            // Touch Head
-            if status.mood < 50 {
-                // 心情差，大概率生气
-                if Double.random(in: 0...1) < 0.6 {
-                    videoName = PetVideoPaths.angry
-                } else {
-                    videoName = PetVideoPaths.enjoy
-                }
-            } else {
-                // 心情好，大概率享受
-                if Double.random(in: 0...1) < 0.9 {
-                    videoName = PetVideoPaths.enjoy
-                } else {
-                    videoName = PetVideoPaths.angry
-                }
-            }
+        // [修改] 只要当前处于互动状态，且视频不是 idle，就锁定当前视频，确保动画不被打断
+        // 无论是否是连续点击（isContinuousClick），只要动画还没播完（还在 interacting 状态），就复用。
+        if currentState == .interacting && currentVideoName != "idle" {
+            videoName = currentVideoName
+            print("DEBUG: Interacting active, keeping video: \(videoName)")
         } else {
-            // Touch Belly
-            if status.mood < 50 {
-                if Double.random(in: 0...1) < 0.6 {
-                    videoName = PetVideoPaths.angry
-                    // 只有在开始触摸时提示一次，或者不提示避免刷屏
-                    // showFloatingText("别碰我！", style: .warning) 
+            // 新的交互序列，执行原有的随机逻辑
+            let isUpper = location.y < size.height / 2
+            
+            if isUpper {
+                // Touch Head
+                if status.mood < 50 {
+                    // 心情差，大概率生气
+                    if Double.random(in: 0...1) < 0.6 {
+                        videoName = PetVideoPaths.angry
+                    } else {
+                        videoName = PetVideoPaths.enjoy
+                    }
                 } else {
-                    videoName = PetVideoPaths.rolling
+                    // 心情好，大概率享受
+                    if Double.random(in: 0...1) < 0.9 {
+                        videoName = PetVideoPaths.enjoy
+                    } else {
+                        videoName = PetVideoPaths.angry
+                    }
                 }
             } else {
-                if Double.random(in: 0...1) < 0.9 {
-                    videoName = PetVideoPaths.rolling
+                // Touch Belly
+                if status.mood < 50 {
+                    if Double.random(in: 0...1) < 0.6 {
+                        videoName = PetVideoPaths.angry
+                        // 只有在开始触摸时提示一次，或者不提示避免刷屏
+                        // showFloatingText("别碰我！", style: .warning) 
+                    } else {
+                        videoName = PetVideoPaths.rolling
+                    }
                 } else {
-                    videoName = PetVideoPaths.angry
+                    if Double.random(in: 0...1) < 0.9 {
+                        videoName = PetVideoPaths.rolling
+                    } else {
+                        videoName = PetVideoPaths.angry
+                    }
                 }
             }
         }
+        
+        print("DEBUG: startTouching decided video: \(videoName)")
         
         // 关键：强制设为循环播放
         // 注意：如果是连续点击，changeState 内部会判断如果 videoName 没变，不会重新加载，
         // 并且 forceLoop 为 true 会保持/重新设置为循环模式。
         changeState(to: .interacting, videoName: videoName, forceLoop: true)
     }
-    
+
     // 结束触摸（松开）
     // 结算算一次点击，停止循环（自然播放完当前次后切回 idle）
     func stopTouching() {
+        print("DEBUG: stopTouching call, isTouching: \(isTouching)")
         guard isTouching else { return }
         isTouching = false
         
         // 计算按下时长
         let duration = Date().timeIntervalSince(touchStartTime ?? Date())
+        print("DEBUG: stopTouching duration: \(duration)")
         
         // 只有短按 (< 0.3s) 才触发点击反馈 (心情+5)
         if duration < 0.3 {
-            // 结算心情 (每次完整的短按算一次)
-            let moodIncrease = 5.0
-            status.mood = min(100, status.mood + moodIncrease)
-            showFloatingText("心情 +\(Int(moodIncrease))", style: .mood)
-            
-            // 如果触发了生气视频，额外提示
+            // 如果触发了生气视频，不加心情，只提示
             if currentVideoName == PetVideoPaths.angry {
                  showFloatingText("别碰我！", style: .warning)
+            } else {
+                // 结算心情 (每次完整的短按算一次)
+                let moodIncrease = 5.0
+                status.mood = min(100, status.mood + moodIncrease)
+                showFloatingText("心情 +\(Int(moodIncrease))", style: .mood)
             }
             
             saveStatus()
@@ -442,6 +462,7 @@ class PetViewModel: ObservableObject {
         // 创建一个新的任务，延迟 0.3 秒执行
         let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            print("DEBUG: Executing touch release work item")
             // 真正执行停止循环
             // PetVideoPlayer 监听到 isCurrentLooping 变 false 后，会停止 Looper，并监听播放结束通知。
             // 当视频播放结束时，会调用 onAnimationFinished，从而切回 idle。
