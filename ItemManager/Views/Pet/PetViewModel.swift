@@ -236,6 +236,31 @@ class PetViewModel: ObservableObject {
             return
         }
         
+        // 精力药丸
+        if item.id == "energyPill" {
+            // 扣除物品
+            guard let count = status.inventory[item.id], count > 0 else { return }
+            status.inventory[item.id] = count - 1
+            
+            // 恢复精力
+            let oldEnergy = status.energy
+            status.energy = min(100, status.energy + item.recoveryValue)
+            let recovered = status.energy - oldEnergy
+            
+            // 稍微加点心情
+            status.mood = min(100, status.mood + 5)
+            
+            // 提示
+            if recovered > 0 {
+                showFloatingText("精力 +\(Int(recovered))", style: .energy)
+            } else {
+                showFloatingText("精力已满", style: .energy)
+            }
+            
+            saveStatus()
+            return
+        }
+        
         // 检查精力是否足够 (如果道具消耗精力)
         if let energyCost = item.energyCost, energyCost > 0 {
              if status.energy < Double(energyCost) {
@@ -424,6 +449,12 @@ class PetViewModel: ObservableObject {
             status.dailyFishCoinEarned += actualEarned
             saveStatus()
         }
+    }
+    
+    // 调试用：无视上限增加鱼币
+    func debugAddFishCoin(amount: Int) {
+        status.fishCoin += amount
+        saveStatus()
     }
     
     // 充值喵币 (模拟)

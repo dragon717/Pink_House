@@ -127,6 +127,17 @@
       "sortIndex": 90
     },
     {
+      "id": "goatMilk",
+      "name": "山羊奶",
+      "category": "water",
+      "price": 200,
+      "currency": "fishCoin",
+      "recoveryValue": 30,
+      "icon": "goatMilk",
+      "description": "营养丰富的山羊奶，补水又抗饿。",
+      "sortIndex": 95
+    },
+    {
       "id": "renameCard",
       "name": "改名项圈",
       "category": "special",
@@ -136,6 +147,17 @@
       "icon": "renameCard",
       "description": "可以给萌宠重新起名。",
       "sortIndex": 100
+    },
+    {
+      "id": "energyPill",
+      "name": "精力药丸",
+      "category": "special",
+      "price": 5,
+      "currency": "meowCoin",
+      "recoveryValue": 50,
+      "icon": "energyPill",
+      "description": "神奇的药丸，能快速恢复精力。",
+      "sortIndex": 105
     },
     {
       "id": "yarnBall",

@@ -80,9 +80,11 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
     // 水
     case warmWater = "温水"
     case boiledWater = "白开水"
+    case goatMilk = "山羊奶"
 
     // 特殊道具
     case renameCard = "改名项圈"
+    case energyPill = "精力药丸"
     
     var id: String { rawValue }
     
@@ -98,7 +100,9 @@ enum PetItemType: String, Codable, CaseIterable, Identifiable {
         case .catFood: return "catFood"
         case .warmWater: return "warmWater"
         case .boiledWater: return "boiledWater"
+        case .goatMilk: return "goatMilk"
         case .renameCard: return "renameCard"
+        case .energyPill: return "energyPill"
         }
     }
     

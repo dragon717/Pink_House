@@ -55,7 +55,7 @@ struct PetStatusHeaderView: View {
             
             CurrencyView(type: .fishCoin, amount: viewModel.status.fishCoin) {
                 #if DEBUG
-                viewModel.earnFishCoin(amount: 1000)
+                viewModel.debugAddFishCoin(amount: 1000)
                 #endif
             }
         }
