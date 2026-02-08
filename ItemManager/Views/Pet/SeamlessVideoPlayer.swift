@@ -18,6 +18,7 @@ class SeamlessVideoPlayerView: UIView {
     
     // 当前配置
     private var currentVideoName: String?
+    private var currentVideoURL: URL?
     private var isLooping: Bool = false
     private var isMuted: Bool = false
     private var volume: Float = 1.0
@@ -75,7 +76,7 @@ class SeamlessVideoPlayerView: UIView {
         if player.currentItem == nil {
              print("SeamlessPlayer Watchdog: No item in player. Reloading current video.")
              if let name = currentVideoName {
-                 loadAndSwitch(to: name, looping: isLooping)
+                 loadAndSwitch(to: name, url: currentVideoURL, looping: isLooping)
              }
         }
     }
@@ -120,11 +121,28 @@ class SeamlessVideoPlayerView: UIView {
         updateVolumeAndMute()
         
         // 检查视频是否变化
+        let newURL = findVideoURL(name: videoName)
+        var shouldReload = false
+        
         if self.currentVideoName != videoName {
+            // 名字不同，检查 URL 是否也不同
+            if let currentURL = self.currentVideoURL, let new = newURL, currentURL == new {
+                print("SeamlessPlayer: Video name changed but URL is same. Ignoring reload. (\(videoName))")
+                self.currentVideoName = videoName
+                shouldReload = false
+            } else {
+                shouldReload = true
+            }
+        } else {
+            shouldReload = false
+        }
+        
+        if shouldReload {
             print("SeamlessPlayer: Switching video to \(videoName)")
             self.currentVideoName = videoName
+            self.currentVideoURL = newURL
             self.isLooping = isLooping // 记录新视频的循环状态
-            loadAndSwitch(to: videoName, looping: isLooping)
+            loadAndSwitch(to: videoName, url: newURL, looping: isLooping)
         } else {
             // 视频没变，但循环状态可能变了 (例如长按松手)
             if self.isLooping != isLooping {
@@ -149,11 +167,12 @@ class SeamlessVideoPlayerView: UIView {
         playerB.volume = volume
     }
     
-    private func loadAndSwitch(to videoName: String, looping: Bool) {
-        guard let url = findVideoURL(name: videoName) else {
+    private func loadAndSwitch(to videoName: String, url: URL?, looping: Bool) {
+        guard let url = url ?? findVideoURL(name: videoName) else {
             print("SeamlessPlayer: Failed to find video \(videoName)")
             return
         }
+        self.currentVideoURL = url
         
         // 确定下一个使用的播放器 (如果当前是 A，下一个用 B，反之亦然)
         let nextPlayer: AVQueuePlayer
@@ -265,12 +284,23 @@ class SeamlessVideoPlayerView: UIView {
         
         print("SeamlessPlayer: Performing switch")
         
+        // 0. 确保新 Layer 在最上层
+        context.layer.zPosition = 10
+        if let old = activeLayer {
+            old.zPosition = 0
+        }
+        
         // 1. 显示新 Layer
         context.layer.opacity = 1
         
         // 记录旧 Layer 和 Player
         let oldLayer = activeLayer
         let oldPlayer = activePlayer
+        
+        // 2. 立即静音旧视频 (如果存在)
+        // 这样可以实现声音的立即切换，避免混音
+        oldPlayer?.volume = 0
+        oldPlayer?.isMuted = true
         
         // 移除旧的时间监听
         if let timeObserver = timeObserver {
@@ -281,25 +311,56 @@ class SeamlessVideoPlayerView: UIView {
         // 3. 更新状态 (立即更新 active 指针，这样后续的逻辑都知道谁是新的)
         activeLayer = context.layer
         activePlayer = context.player
-        activeLooper = context.looper
+        
+        // 处理 Race Condition: 检查当前的 isLooping 是否与 context.isLooping 一致
+        // 如果在加载过程中用户改变了循环状态（例如快速松手），这里需要修正
+        if self.isLooping != context.isLooping {
+            print("SeamlessPlayer: Loop state mismatch in switch (Context: \(context.isLooping), Current: \(self.isLooping))")
+            
+            if self.isLooping {
+                // Context 是单次，现在变成循环
+                if context.looper == nil {
+                     activeLooper = AVPlayerLooper(player: context.player, templateItem: context.item)
+                     context.player.play()
+                } else {
+                     activeLooper = context.looper
+                }
+                setupFinishObserver(for: context.item, isLooping: true)
+            } else {
+                // Context 是循环，现在变成单次
+                context.looper?.disableLooping()
+                activeLooper = nil
+                
+                // 清理队列
+                let items = context.player.items()
+                if items.count > 1 {
+                    for item in items.dropFirst() {
+                        context.player.remove(item)
+                    }
+                }
+                
+                setupFinishObserver(for: context.item, isLooping: false)
+            }
+        } else {
+            // 正常情况
+            activeLooper = context.looper
+            setupFinishObserver(for: context.item, isLooping: context.isLooping)
+        }
         
         // 4. 清理观察者
         statusObserver?.invalidate()
         statusObserver = nil
         
-        // 5. 设置结束监听 (如果是单次播放)
-        setupFinishObserver(for: context.item, isLooping: context.isLooping)
-        
         // 6. 设置进度监听
         setupTimeObserver(for: context.player)
         
-        // 延迟关闭旧视频 (实现 50ms 重叠)
+        // 延迟关闭旧视频 (修改为 300ms)
         if let layerToHide = oldLayer, let playerToStop = oldPlayer {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 guard let self = self else { return }
                 
                 // 关键检查：确保要隐藏的 Layer 确实不再是 activeLayer
-                // 如果在 50ms 内又切回去了，那么 activeLayer 就会等于 layerToHide，此时不应该隐藏
+                // 如果在 300ms 内又切回去了，那么 activeLayer 就会等于 layerToHide，此时不应该隐藏
                 if self.activeLayer !== layerToHide {
                     // 使用 CoreAnimation 事务
                     CATransaction.begin()
@@ -309,6 +370,11 @@ class SeamlessVideoPlayerView: UIView {
                     
                     playerToStop.pause()
                     playerToStop.removeAllItems()
+                    
+                    // 恢复音量 (虽然 removeAllItems 已经清理了，但重置状态是个好习惯，
+                    // 实际上下次 updateVolumeAndMute 会处理，这里可以省略，或者为了保险重置一下)
+                    // playerToStop.volume = self.volume
+                    // playerToStop.isMuted = self.isMuted
                 }
             }
         }
@@ -331,6 +397,17 @@ class SeamlessVideoPlayerView: UIView {
                 looper.disableLooping()
                 activeLooper = nil
                 
+                // 清理队列中多余的 items (pending 的循环副本)
+                // AVPlayerLooper 可能会在队列中预加载后续的 items
+                // 我们必须移除它们，否则视频会继续播放下一遍
+                let items = player.items()
+                if items.count > 1 {
+                    print("SeamlessPlayer: Removing \(items.count - 1) pending items from queue")
+                    for item in items.dropFirst() {
+                        player.remove(item)
+                    }
+                }
+                
                 // 关键修复：在添加监听前，先检查是否已经播完
                 // 如果在 disableLooping 的瞬间刚好播完，AVPlayer 可能已经停止，且不会再触发 Notification
                 let currentTime = currentItem.currentTime().seconds
@@ -339,7 +416,14 @@ class SeamlessVideoPlayerView: UIView {
                 // 如果剩余时间极短 (< 0.1s) 或者已经结束，直接触发完成
                 if duration > 0 && currentTime >= duration - 0.1 {
                      print("SeamlessPlayer: Video already near end, triggering finish manually")
-                     self.onFinished?()
+                     
+                     // 停止播放，防止状态不一致
+                     player.pause()
+                     
+                     // 异步调用 onFinished，避免状态更新循环
+                     DispatchQueue.main.async { [weak self] in
+                         self?.onFinished?()
+                     }
                 } else {
                      // 正常添加结束监听
                      setupFinishObserver(for: currentItem, isLooping: false)
