@@ -8,6 +8,23 @@ struct PetInteractionAreaView: View {
     var isLandscape: Bool = false
     
     @State private var showStatusIcon = false
+    @State private var videoProgress: Double = 0.0
+    @State private var videoDuration: Double = 1.0
+    
+    // 需要显示进度条的状态
+    var shouldShowProgressBar: Bool {
+        switch viewModel.currentState {
+        case .eating, .cleaning, .playing, .sleeping:
+            return true
+        case .interacting:
+            // 只有洗脸(grooming)是明确的进度任务，其他点击互动(interacting)通常很快且是反馈性质
+            // 但如果用户把 interacting 也算作"洗脸"，那就显示。
+            // 检查当前视频是否是 grooming
+            return viewModel.currentVideoName == PetViewModel.PetVideoPaths.grooming
+        default:
+            return false
+        }
+    }
     
     var body: some View {
         ZStack {
@@ -18,6 +35,10 @@ struct PetInteractionAreaView: View {
                 volume: 0.6,
                 onFinished: {
                     viewModel.onAnimationFinished()
+                },
+                onProgress: { current, duration in
+                    self.videoProgress = current
+                    self.videoDuration = duration
                 }
             )
             .frame(height: videoHeight) // 动态高度
@@ -97,6 +118,31 @@ struct PetInteractionAreaView: View {
                         }
                     }
             )
+            
+            // 进度条显示 (在视频右下角)
+            if shouldShowProgressBar && videoDuration > 0 {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        ZStack(alignment: .leading) {
+                            // 背景槽
+                            Capsule()
+                                .fill(Color.black.opacity(0.4))
+                                .frame(width: 80, height: 8)
+                            
+                            // 进度
+                            Capsule()
+                                .fill(LinearGradient(colors: [.yellow, .orange], startPoint: .leading, endPoint: .trailing))
+                                .frame(width: 80 * CGFloat(min(max(videoProgress / videoDuration, 0), 1)), height: 8)
+                                .animation(.linear(duration: 0.1), value: videoProgress)
+                        }
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 16)
+                        .transition(.opacity.combined(with: .scale))
+                    }
+                }
+            }
             
             // 期待状态 UI 反馈
             if showStatusIcon && viewModel.currentState == .expecting {

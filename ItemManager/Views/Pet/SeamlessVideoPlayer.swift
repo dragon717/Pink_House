@@ -22,9 +22,11 @@ class SeamlessVideoPlayerView: UIView {
     private var isMuted: Bool = false
     private var volume: Float = 1.0
     private var onFinished: (() -> Void)?
+    private var onProgress: ((Double, Double) -> Void)?
     
     // 观察者
     private var finishObserver: Any?
+    private var timeObserver: Any?
     private var statusObserver: NSKeyValueObservation?
     private var watchdogTimer: Timer?
     
@@ -108,11 +110,12 @@ class SeamlessVideoPlayerView: UIView {
     
     // MARK: - Public Interface
     
-    func update(videoName: String, isLooping: Bool, isMuted: Bool, volume: Float, onFinished: (() -> Void)?) {
+    func update(videoName: String, isLooping: Bool, isMuted: Bool, volume: Float, onFinished: (() -> Void)?, onProgress: ((Double, Double) -> Void)?) {
         // 更新非视频属性
         self.isMuted = isMuted
         self.volume = volume
         self.onFinished = onFinished
+        self.onProgress = onProgress
         
         updateVolumeAndMute()
         
@@ -269,6 +272,12 @@ class SeamlessVideoPlayerView: UIView {
         let oldLayer = activeLayer
         let oldPlayer = activePlayer
         
+        // 移除旧的时间监听
+        if let timeObserver = timeObserver {
+            oldPlayer?.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
+        
         // 3. 更新状态 (立即更新 active 指针，这样后续的逻辑都知道谁是新的)
         activeLayer = context.layer
         activePlayer = context.player
@@ -280,6 +289,9 @@ class SeamlessVideoPlayerView: UIView {
         
         // 5. 设置结束监听 (如果是单次播放)
         setupFinishObserver(for: context.item, isLooping: context.isLooping)
+        
+        // 6. 设置进度监听
+        setupTimeObserver(for: context.player)
         
         // 延迟关闭旧视频 (实现 50ms 重叠)
         if let layerToHide = oldLayer, let playerToStop = oldPlayer {
@@ -336,6 +348,20 @@ class SeamlessVideoPlayerView: UIView {
         }
     }
     
+    private func setupTimeObserver(for player: AVQueuePlayer) {
+        // 每 0.1 秒更新一次进度
+        let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            guard let self = self, let item = player.currentItem else { return }
+            let duration = item.duration.seconds
+            let current = time.seconds
+            
+            if duration > 0 {
+                self.onProgress?(current, duration)
+            }
+        }
+    }
+    
     private func setupFinishObserver(for item: AVPlayerItem, isLooping: Bool) {
         removeFinishObserver()
         
@@ -388,6 +414,9 @@ class SeamlessVideoPlayerView: UIView {
     deinit {
         statusObserver?.invalidate()
         removeFinishObserver()
+        if let timeObserver = timeObserver {
+            activePlayer?.removeTimeObserver(timeObserver)
+        }
     }
 }
 
@@ -399,6 +428,7 @@ struct SeamlessVideoPlayer: UIViewRepresentable {
     var isMuted: Bool
     var volume: Float
     var onFinished: (() -> Void)?
+    var onProgress: ((Double, Double) -> Void)? = nil
     
     func makeUIView(context: Context) -> SeamlessVideoPlayerView {
         let view = SeamlessVideoPlayerView()
@@ -412,7 +442,8 @@ struct SeamlessVideoPlayer: UIViewRepresentable {
             isLooping: isLooping,
             isMuted: isMuted,
             volume: volume,
-            onFinished: onFinished
+            onFinished: onFinished,
+            onProgress: onProgress
         )
     }
 }

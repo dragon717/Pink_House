@@ -19,7 +19,7 @@ enum PetState: String, CaseIterable {
         case .drinking: return "eat" // 复用 eat 或 separate
         case .cleaning: return "clean"
         case .expecting: return "idle" // 暂时复用 idle，通过 UI 区分
-        case .playing: return "idle" // 暂时复用 idle，后续添加专属动画
+        case .playing: return "playing" // 播放玩耍视频
         case .sleeping: return "idle" // 暂时复用 idle，后续添加 sleep 视频
         case .interacting: return "idle" // 由 ViewModel 动态控制
         case .working:

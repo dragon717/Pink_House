@@ -354,10 +354,17 @@ class PetViewModel: ObservableObject {
     
     private var isTouching = false
     private var touchStartTime: Date?
+    private var touchReleaseWorkItem: DispatchWorkItem?
     
     // 开始触摸（按下）
     // 长按时一直播放对应动画，循环播放
     func startTouching(at location: CGPoint, in size: CGSize) {
+        // 1. 如果有待执行的“松开”任务，立即取消，保持视频循环播放（视为连续点击）
+        if let item = touchReleaseWorkItem {
+            item.cancel()
+            touchReleaseWorkItem = nil
+        }
+        
         guard !isTouching else { return }
         isTouching = true
         touchStartTime = Date()
@@ -402,6 +409,8 @@ class PetViewModel: ObservableObject {
         }
         
         // 关键：强制设为循环播放
+        // 注意：如果是连续点击，changeState 内部会判断如果 videoName 没变，不会重新加载，
+        // 并且 forceLoop 为 true 会保持/重新设置为循环模式。
         changeState(to: .interacting, videoName: videoName, forceLoop: true)
     }
     
@@ -429,10 +438,19 @@ class PetViewModel: ObservableObject {
             saveStatus()
         }
         
-        // 关键：取消循环。
-        // PetVideoPlayer 监听到 isCurrentLooping 变 false 后，会停止 Looper，并监听播放结束通知。
-        // 当视频播放结束时，会调用 onAnimationFinished，从而切回 idle。
-        isCurrentLooping = false
+        // 关键：延迟取消循环，实现“连续点击不打断”
+        // 创建一个新的任务，延迟 0.3 秒执行
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            // 真正执行停止循环
+            // PetVideoPlayer 监听到 isCurrentLooping 变 false 后，会停止 Looper，并监听播放结束通知。
+            // 当视频播放结束时，会调用 onAnimationFinished，从而切回 idle。
+            self.isCurrentLooping = false
+            self.touchReleaseWorkItem = nil
+        }
+        
+        self.touchReleaseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
 
     // 兼容旧代码
@@ -671,8 +689,10 @@ class PetViewModel: ObservableObject {
         }
         
         // 生成随机偏移，避免重叠
-        // 增加 X/Y 轴的随机范围，防止多个气泡同时出现时完全重叠
-        let randomX = CGFloat.random(in: -50...50)
+        // 分布在两边，避开中间区域（避免遮挡小猫视频）
+        let isLeft = Bool.random()
+        // 中间保留约 200pt 的空隙 (-100 ~ 100)，气泡分布在两边
+        let randomX = isLeft ? CGFloat.random(in: -150...(-100)) : CGFloat.random(in: 100...150)
         let randomY = CGFloat.random(in: -60...40) // 上下分布随机些，稍微偏上一点(-60)给下方留空间
         
         let newData = FloatingTextData(
