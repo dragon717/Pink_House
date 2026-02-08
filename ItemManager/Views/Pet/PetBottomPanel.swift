@@ -476,10 +476,6 @@ struct ShopView: View {
     }
     
     func buy(_ item: PetItemDefinition) {
-        if viewModel.purchaseItem(item) {
-            viewModel.showFloatingText("- \(item.price)", color: .orange)
-        } else {
-            viewModel.showFloatingText("余额不足", color: .gray)
-        }
+        _ = viewModel.purchaseItem(item)
     }
 }

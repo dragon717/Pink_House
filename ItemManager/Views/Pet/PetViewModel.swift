@@ -418,14 +418,20 @@ class PetViewModel: ObservableObject {
                 status.fishCoin -= item.price
                 status.inventory[item.id, default: 0] += 1
                 saveStatus()
+                showFloatingText("-\(item.price)", style: .fishCoin)
                 return true
+            } else {
+                showFloatingText("余额不足", style: .warning)
             }
         case .meowCoin:
             if status.meowCoin >= item.price {
                 status.meowCoin -= item.price
                 status.inventory[item.id, default: 0] += 1
                 saveStatus()
+                showFloatingText("-\(item.price)", style: .meowCoin)
                 return true
+            } else {
+                showFloatingText("余额不足", style: .warning)
             }
         }
         return false
