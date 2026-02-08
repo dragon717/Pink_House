@@ -3,6 +3,7 @@ import PhotosUI
 
 struct GeneralSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
+    @ObservedObject private var audioManager = AudioManager.shared
     @State private var languageManager = LanguageManager.shared
     @State private var showingRestartAlert = false
     @State private var showingMissingOriginalAlert = false
@@ -149,6 +150,21 @@ struct GeneralSettingsView: View {
             }
              
             Section(header: Text("个性化")) {
+                // 萌宠音源设置
+                HStack {
+                    Image(systemName: "mic.and.signal.meter.fill")
+                        .foregroundStyle(.purple)
+                    Text("萌宠音源")
+                    Spacer()
+                    Picker("", selection: $audioManager.selectedVoiceType) {
+                        ForEach(PetVoiceType.allCases) { type in
+                            Text(type.displayName).tag(type)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                }
+                
                 NavigationLink(destination: WealthCustomizationView()) {
                     HStack {
                         Image(systemName: "banknote")

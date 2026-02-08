@@ -12,6 +12,21 @@ enum PetInteractionState: String {
     case playing        // 播放中（变音复述）
 }
 
+/// 萌宠音色类型
+enum PetVoiceType: String, CaseIterable, Identifiable {
+    case funny = "funny"       // 搞怪变声
+    case youngBoy = "youngBoy" // 正太音
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .funny: return "搞怪变声"
+        case .youngBoy: return "正太音"
+        }
+    }
+}
+
 /// 总的萌宠声音管理器
 /// 负责控制背景音乐、麦克风监听、语音识别和回声模式
 @MainActor
@@ -34,6 +49,13 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             UserDefaults.standard.set(petVoiceVolume, forKey: "petVoiceVolume")
             // 实时更新播放节点音量
             playerNode.volume = Float(petVoiceVolume)
+        }
+    }
+    
+    /// 萌宠音色选择
+    @Published var selectedVoiceType: PetVoiceType {
+        didSet {
+            UserDefaults.standard.set(selectedVoiceType.rawValue, forKey: "petVoiceType")
         }
     }
     
@@ -95,6 +117,13 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private override init() {
         self.bgmVolume = UserDefaults.standard.object(forKey: "bgmVolume") as? Double ?? 0.3
         self.petVoiceVolume = UserDefaults.standard.object(forKey: "petVoiceVolume") as? Double ?? 1.0
+        // 默认使用正太音
+        if let savedType = UserDefaults.standard.string(forKey: "petVoiceType"),
+           let type = PetVoiceType(rawValue: savedType) {
+            self.selectedVoiceType = type
+        } else {
+            self.selectedVoiceType = .youngBoy
+        }
         
         super.init()
         speechRecognizer?.delegate = self
@@ -531,7 +560,12 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         playerNode.volume = Float(petVoiceVolume)
         
         // 变音设置
-        timePitch.pitch = 800 // 提高音调
+        switch selectedVoiceType {
+        case .funny:
+            timePitch.pitch = 800 // 搞怪变声 (高音调)
+        case .youngBoy:
+            timePitch.pitch = 300 // 正太音 (稍高音调，但比搞怪低)
+        }
         
         let output = engine.mainMixerNode
         
