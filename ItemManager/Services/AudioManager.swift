@@ -97,6 +97,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private var engine = AVAudioEngine()
     private var playerNode = AVAudioPlayerNode()
     private var timePitch = AVAudioUnitTimePitch()
+    private var eqNode = AVAudioUnitEQ(numberOfBands: 4) // 增加到4个频段以进行更精细的控制
     private var mixerNode = AVAudioMixerNode() // 用于将输入写入文件
     
     // VAD (Voice Activity Detection)
@@ -544,7 +545,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // 保持 playAndRecord 模式，不切换 Session
         setupAudioSession(isRecording: false)
         
-        // 重建引擎连接：Player -> TimePitch -> MainMixer
+        // 重建引擎连接：Player -> TimePitch -> EQ -> MainMixer
         engine.stop()
         
         // 移除可能存在的 Input Tap，防止 I/O 冲突
@@ -552,9 +553,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         engine.detach(playerNode)
         engine.detach(timePitch)
+        engine.detach(eqNode) // Detach EQ
         
         engine.attach(playerNode)
         engine.attach(timePitch)
+        engine.attach(eqNode) // Attach EQ
         
         // 设置播放节点音量
         playerNode.volume = Float(petVoiceVolume)
@@ -563,8 +566,51 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         switch selectedVoiceType {
         case .funny:
             timePitch.pitch = 800 // 搞怪变声 (高音调)
+            timePitch.overlap = 8.0 // 默认重叠
+            
+            // 搞怪模式不需要特殊 EQ，或者可以重置
+            eqNode.globalGain = 0
+            eqNode.bypass = true
+            
         case .youngBoy:
-            timePitch.pitch = 300 // 正太音 (稍高音调，但比搞怪低)
+            // 优化参数 V2:
+            // 1. 稍微提高 Pitch 到 +600 (半个八度)
+            timePitch.pitch = 600
+            // 2. 增加 Overlap 以获得更平滑的语音效果
+            timePitch.overlap = 20.0
+            
+            // 正太音 EQ 设置：模拟 Formant Shifting
+            eqNode.bypass = false
+            eqNode.globalGain = 0
+            
+            // Band 0: Low Cut (High Pass) - 更激进地削减低频，去除成年男性胸腔共鸣
+            let lowCut = eqNode.bands[0]
+            lowCut.filterType = .highPass
+            lowCut.frequency = 220.0 // 提高截止频率到 220Hz
+            lowCut.bypass = false
+            
+            // Band 1: Mid Cut (Parametric) - 挖掉中低频厚度 (500-800Hz)，这是成年男性声音特征明显的区域
+            let midCut = eqNode.bands[1]
+            midCut.filterType = .parametric
+            midCut.frequency = 600.0
+            midCut.bandwidth = 1.5
+            midCut.gain = -4.0 // 衰减 4dB
+            midCut.bypass = false
+            
+            // Band 2: High Boost (Parametric) - 提升中高频，增加清脆感和穿透力
+            let highBoost = eqNode.bands[2]
+            highBoost.filterType = .parametric
+            highBoost.frequency = 3200.0
+            highBoost.bandwidth = 1.0
+            highBoost.gain = 5.0 // 增益 +5dB
+            highBoost.bypass = false
+            
+            // Band 3: High Shelf - 稍微压一下极高频，防止变调后的齿音刺耳
+            let highShelf = eqNode.bands[3]
+            highShelf.filterType = .highShelf
+            highShelf.frequency = 8000.0
+            highShelf.gain = -3.0
+            highShelf.bypass = false
         }
         
         let output = engine.mainMixerNode
@@ -572,8 +618,10 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         do {
             let file = try AVAudioFile(forReading: url)
             
+            // 连接链路：Player -> TimePitch -> EQ -> Output
             engine.connect(playerNode, to: timePitch, format: file.processingFormat)
-            engine.connect(timePitch, to: output, format: file.processingFormat)
+            engine.connect(timePitch, to: eqNode, format: file.processingFormat)
+            engine.connect(eqNode, to: output, format: file.processingFormat)
             
             try engine.start()
             

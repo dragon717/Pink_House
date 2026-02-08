@@ -242,13 +242,25 @@ struct StandardFloatingText: View {
     let text: String
     let color: Color
     
+    @AppStorage("petBubbleSize") private var bubbleSize: PetBubbleSize = .medium
+    @AppStorage("petBubbleUseCustomFont") private var useCustomFont: Bool = true
+    @ObservedObject private var fontManager = FontManager.shared
+    
+    var font: Font {
+        if useCustomFont, let fontName = fontManager.getCustomFontName() {
+            return .custom(fontName, size: bubbleSize.fontSize)
+        } else {
+            return .system(size: bubbleSize.fontSize, weight: .black, design: .rounded)
+        }
+    }
+    
     var body: some View {
         // 优化：使用 Shadow 替代 8向 Text 描边，大幅减少视图节点数量 (10 -> 2)
         // 虽然阴影稍微柔和一点，但性能提升巨大，适合小内存设备
         ZStack {
             // 主体 + 描边 (通过多重阴影模拟)
             Text(text)
-                .font(.system(size: 36, weight: .black, design: .rounded))
+                .font(font)
                 .foregroundStyle(
                     LinearGradient(
                         colors: [color, color.opacity(0.8)],
@@ -266,7 +278,7 @@ struct StandardFloatingText: View {
             
             // 顶部高光 (保留，增加精致感)
             Text(text)
-                .font(.system(size: 36, weight: .black, design: .rounded))
+                .font(font)
                 .foregroundStyle(
                     LinearGradient(
                         colors: [.white.opacity(0.6), .clear],
@@ -276,7 +288,7 @@ struct StandardFloatingText: View {
                 )
                 .mask(
                     Text(text)
-                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .font(font)
                 )
                 .offset(y: -1)
                 .allowsHitTesting(false)
@@ -289,6 +301,7 @@ struct SparklingCurrencyText: View {
     let style: FloatingTextStyle
     
     @State private var shineOffset: CGFloat = -1.0
+    @AppStorage("petBubbleSize") private var bubbleSize: PetBubbleSize = .medium
     
     var config: (icon: String, color: Color, gradient: [Color]) {
         switch style {
@@ -316,7 +329,7 @@ struct SparklingCurrencyText: View {
             
             // 图标部分
             Image(systemName: config.icon)
-                .font(.system(size: 36, weight: .bold))
+                .font(.system(size: bubbleSize.fontSize, weight: .bold))
                 .foregroundStyle(
                     LinearGradient(
                         colors: config.gradient,

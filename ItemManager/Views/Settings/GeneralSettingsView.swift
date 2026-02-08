@@ -165,6 +165,18 @@ struct GeneralSettingsView: View {
                     .labelsHidden()
                 }
                 
+                NavigationLink(destination: PetCustomizationView()) {
+                    HStack {
+                        Image(systemName: "bubble.left.and.bubble.right.fill")
+                            .foregroundStyle(.blue)
+                        Text("萌宠气泡")
+                        Spacer()
+                        Text("大小与字体")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+                
                 NavigationLink(destination: WealthCustomizationView()) {
                     HStack {
                         Image(systemName: "banknote")
