@@ -5,72 +5,140 @@ import Combine
 struct PetVideoPlayer: UIViewControllerRepresentable {
     var videoName: String
     var isLooping: Bool
+    var isMuted: Bool = false
+    var volume: Float = 0.6 // 默认降低音量，防止与 BGM 叠加破音
     var onFinished: (() -> Void)?
     
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.showsPlaybackControls = false
         controller.videoGravity = .resizeAspectFill
-        controller.view.backgroundColor = .clear // 尝试透明背景
+        controller.view.backgroundColor = .clear 
         
-        // 默认不播放声音
-        // 注意：AVPlayerViewController 本身没有 isMuted 属性，需要通过 player 设置
-        // 这里只是初始化 controller，player 在 updateUIViewController 中设置
+        // 预先创建 AVQueuePlayer 并赋值
+        // 使用 AVQueuePlayer 兼容 AVPlayerLooper
+        let player = AVQueuePlayer()
+        player.isMuted = isMuted
+        player.volume = volume
+        controller.player = player
+        
+        // 保存到 coordinator 以便后续操作
+        context.coordinator.queuePlayer = player
+        
         return controller
     }
     
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        // 尝试在根目录或 asserts 子目录查找视频
-        var url = Bundle.main.url(forResource: videoName, withExtension: "mp4")
+        // 更新音量和静音状态
+        if let player = uiViewController.player {
+            if player.volume != volume {
+                player.volume = volume
+            }
+            if player.isMuted != isMuted {
+                player.isMuted = isMuted
+            }
+        }
+
+        // 1. 尝试直接作为绝对路径加载 (用户指定路径)
+        var url: URL?
+        if videoName.hasPrefix("/") {
+            url = URL(fileURLWithPath: videoName)
+        }
+        
+        // 2. 尝试在 Bundle 根目录查找
+        if url == nil {
+            url = Bundle.main.url(forResource: videoName, withExtension: "mp4")
+        }
+        
+        // 3. 尝试在 asserts 子目录查找
         if url == nil {
             url = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: "mp4")
         }
+        
+        // 4. 尝试查找无后缀的文件 (如果 videoName 已经包含后缀)
+        if url == nil {
+             if let bundleUrl = Bundle.main.url(forResource: videoName, withExtension: nil) {
+                 url = bundleUrl
+             } else if let bundleUrl = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: nil) {
+                 url = bundleUrl
+             }
+        }
+
         // 如果找不到目标视频，回退到 idle
         if url == nil {
+            print("Error: Could not find video resource: \(videoName). Trying idle fallback.")
             url = Bundle.main.url(forResource: "idle", withExtension: "mp4")
         }
         if url == nil {
             url = Bundle.main.url(forResource: "asserts/idle", withExtension: "mp4")
         }
         
-        let currentUrl = (uiViewController.player?.currentItem?.asset as? AVURLAsset)?.url
+        guard let validUrl = url else {
+            print("Error: Could not find video resource: \(videoName) OR fallback idle.mp4")
+            return
+        }
         
-        // 如果 URL 变了，或者当前没有播放器
-        if uiViewController.player == nil || (url != nil && currentUrl != url) {
-            guard let validUrl = url else {
-                print("Error: Could not find video resource: \(videoName) or idle.mp4")
-                return
-            }
+        // 检查是否需要更新视频
+        // 通过 context.coordinator 记录当前正在播放的 URL，避免依赖 uiViewController.player 状态
+        if context.coordinator.currentUrl != validUrl {
             
-            // 清理旧的状态
-            context.coordinator.cleanup()
+            // 准备新的 Item
+            let newItem = AVPlayerItem(url: validUrl)
+            
+            // 获取之前保存的 queuePlayer
+            guard let player = context.coordinator.queuePlayer else { return }
+            
+            // 清理旧的状态（如 Looper、Observer）
+            context.coordinator.cleanupOldState()
             
             if isLooping {
-                // 使用 AVQueuePlayer + AVPlayerLooper 实现无缝循环
-                let item = AVPlayerItem(url: validUrl)
-                let player = AVQueuePlayer(playerItem: item)
-                player.isMuted = true // 默认静音
-                uiViewController.player = player
-                
-                context.coordinator.setupLooper(player: player, item: item, url: validUrl)
-                player.play()
+                // 设置循环
+                context.coordinator.setupLooper(item: newItem, url: validUrl)
             } else {
-                // 使用普通 AVPlayer 实现一次性播放
-                let item = AVPlayerItem(url: validUrl)
-                let player = AVPlayer(playerItem: item)
-                player.isMuted = true // 默认静音
-                uiViewController.player = player
-                
-                context.coordinator.setupObserver(player: player, item: item, onFinished: onFinished)
-                player.play()
+                // 设置单次播放监听
+                player.replaceCurrentItem(with: newItem)
+                context.coordinator.setupObserver(item: newItem, onFinished: onFinished)
             }
             
+            // 确保播放
+            player.play()
+            
         } else {
+            // URL 没变，但 isLooping 可能变了
+            // 这种情况通常发生在长按松手时：视频还在播放，但需要从循环切换到单次结束
+            if context.coordinator.isLooping != isLooping {
+                guard let player = context.coordinator.queuePlayer else { return }
+                
+                // 如果从循环 -> 不循环
+                if !isLooping {
+                    print("PetVideoPlayer: Switching from Loop to Single Play (Stop Looping)")
+                    // 禁用 Looper
+                    context.coordinator.looper?.disableLooping()
+                    context.coordinator.looper = nil
+                    
+                    // 添加结束监听，以便播放完当前遍后调用 onFinished
+                    if let currentItem = player.currentItem {
+                        context.coordinator.setupObserver(item: currentItem, onFinished: onFinished)
+                    }
+                } 
+                // 如果从不循环 -> 循环 (通常是重新开始互动，这通常会伴随 URL 变化，所以可能不会走到这分支，但处理一下也无妨)
+                else {
+                    print("PetVideoPlayer: Switching from Single Play to Loop")
+                    if let currentItem = player.currentItem {
+                         context.coordinator.removeObserver()
+                         context.coordinator.setupLooper(item: currentItem, url: validUrl)
+                    }
+                }
+            }
+            
             // 如果视频没变，确保正在播放
             if uiViewController.player?.timeControlStatus != .playing {
                 uiViewController.player?.play()
             }
         }
+        
+        // 更新记录的状态
+        context.coordinator.isLooping = isLooping
     }
     
     func makeCoordinator() -> Coordinator {
@@ -78,25 +146,25 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
     }
     
     class Coordinator: NSObject {
-        var player: AVPlayer?
-        var item: AVPlayerItem?
-        var looper: AVPlayerLooper?
         var queuePlayer: AVQueuePlayer?
+        var currentUrl: URL?
+        var isLooping: Bool = false // 记录当前 Coordinator 的循环状态
+        var looper: AVPlayerLooper?
         var onFinished: (() -> Void)?
         var observer: Any?
         
-        func setupLooper(player: AVQueuePlayer, item: AVPlayerItem, url: URL) {
-            self.player = player
-            self.queuePlayer = player
-            self.item = item
+        func setupLooper(item: AVPlayerItem, url: URL) {
+            guard let player = queuePlayer else { return }
+            
             // 创建 Looper，这会自动处理循环
+            // 注意：AVPlayerLooper 需要传入 templateItem
             self.looper = AVPlayerLooper(player: player, templateItem: item)
+            self.currentUrl = url
         }
         
-        func setupObserver(player: AVPlayer, item: AVPlayerItem, onFinished: (() -> Void)?) {
-            self.player = player
-            self.item = item
+        func setupObserver(item: AVPlayerItem, onFinished: (() -> Void)?) {
             self.onFinished = onFinished
+            self.currentUrl = (item.asset as? AVURLAsset)?.url
             
             // 移除旧的（如果有）
             removeObserver()
@@ -118,18 +186,22 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             }
         }
         
-        func cleanup() {
+        func cleanupOldState() {
             removeObserver()
             looper?.disableLooping()
             looper = nil
+            // 注意：不要把 queuePlayer 置空，因为它是复用的
+        }
+        
+        // 彻底清理（deinit 用）
+        func cleanupAll() {
+            cleanupOldState()
             queuePlayer?.removeAllItems()
             queuePlayer = nil
-            player = nil
-            item = nil
         }
         
         deinit {
-            cleanup()
+            cleanupAll()
         }
     }
 }

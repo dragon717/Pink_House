@@ -3,6 +3,7 @@ import SwiftUI
 struct PetInteractionAreaView: View {
     @ObservedObject var viewModel: PetViewModel
     @ObservedObject var audioManager: AudioManager
+    @ObservedObject var soundManager = SoundManager.shared // 引入 SoundManager
     let videoHeight: CGFloat
     var isLandscape: Bool = false
     
@@ -10,9 +11,11 @@ struct PetInteractionAreaView: View {
     
     var body: some View {
         ZStack {
-            PetVideoPlayer(
-                videoName: viewModel.currentState.videoFileName(for: viewModel.status.currentJob),
-                isLooping: viewModel.currentState.isLooping,
+            SeamlessVideoPlayer(
+                videoName: viewModel.currentVideoName,
+                isLooping: viewModel.isCurrentLooping, // 使用动态控制的 looping 属性
+                isMuted: !soundManager.isSoundEnabled,
+                volume: 0.6,
                 onFinished: {
                     viewModel.onAnimationFinished()
                 }
@@ -23,6 +26,18 @@ struct PetInteractionAreaView: View {
             .overlay(
                 Color.clear
                     .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                // 按下或移动时触发
+                                // 限制频率，或者 viewModel 内部有状态锁 (isTouching)
+                                viewModel.startTouching(at: value.location, in: CGSize(width: videoHeight, height: videoHeight))
+                            }
+                            .onEnded { _ in
+                                // 松开时触发
+                                viewModel.stopTouching()
+                            }
+                    )
                     .dropDestination(for: String.self) { items, location in
                         print("DEBUG: Drop at \(location)")
                         guard let itemString = items.first else { return false }

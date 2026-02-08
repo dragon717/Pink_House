@@ -5,3 +5,4 @@ ItemManager/asserts/*.mp4
 ItemManager/asserts/*.mp3
 .DS_Store
 ItemManager/asserts/*.ttf
+temp/*

@@ -9,6 +9,7 @@ enum PetState: String, CaseIterable {
     case playing = "playing" // 玩耍状态
     case sleeping = "sleeping" // 睡觉状态
     case working = "working" // 工作状态
+    case interacting = "interacting" // 互动状态 (点击反馈)
     
     // 对应的视频文件名（不含扩展名）
     func videoFileName(for job: PetJob = .none) -> String {
@@ -20,6 +21,7 @@ enum PetState: String, CaseIterable {
         case .expecting: return "idle" // 暂时复用 idle，通过 UI 区分
         case .playing: return "idle" // 暂时复用 idle，后续添加专属动画
         case .sleeping: return "idle" // 暂时复用 idle，后续添加 sleep 视频
+        case .interacting: return "idle" // 由 ViewModel 动态控制
         case .working:
             switch job {
             case .none: return "idle"
@@ -42,6 +44,8 @@ enum PetState: String, CaseIterable {
         default: return false
         }
     }
+    
+    var id: String { rawValue }
 }
 
 // 萌宠货币类型

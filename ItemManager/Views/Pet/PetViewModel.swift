@@ -37,6 +37,8 @@ enum FloatingTextStyle {
 class PetViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var currentState: PetState = .idle
+    @Published var currentVideoName: String = "idle"
+    @Published var isCurrentLooping: Bool = true // 新增：动态控制当前视频是否循环
     @Published var status: PetStatus
     @Published var floatingTexts: [FloatingTextData] = []
     @Published var recognizedSpeechText: String = ""
@@ -52,6 +54,21 @@ class PetViewModel: ObservableObject {
     private let statusKey = "PetStatus_Data"
     
     // MARK: - Constants
+    struct PetVideoPaths {
+        static let angry = "angry_click"
+        static let rolling = "rolling"
+        static let bathingBoring = "bathing_boring"
+        static let bathingHappy = "bathing_happy"
+        static let drinking = "drinking_glass"
+        static let eatingCanned = "eating_cannedFood"
+        static let eatingCatFood = "eating_catFood"
+        static let enjoy = "enjoy_click"
+        static let grooming = "grooming"
+        static let listening = "listening"
+        static let playing = "playing"
+        static let sleeping = "sleeping"
+    }
+
     private let sleepThreshold: Double = 20.0
     private let forceSleepMinuteStart: Int = 45 // 每小时 45 分开始 (保留 15 分钟休息)
     private let forceSleepMinuteEnd: Int = 0    // 整点结束
@@ -128,7 +145,7 @@ class PetViewModel: ObservableObject {
         case .recording:
             // 如果有专门的倾听动画，可以在这里切换
              if currentState == .idle {
-                 changeState(to: .expecting) // 使用 expecting 模拟倾听
+                 changeState(to: .expecting, videoName: PetVideoPaths.listening) // 使用 expecting 模拟倾听
              }
         case .playing:
             // 说话时（播放变音）
@@ -278,7 +295,7 @@ class PetViewModel: ObservableObject {
             let energyCost = Double(item.energyCost ?? 0)
             status.energy = max(0, status.energy - energyCost)
             status.mood = min(100, status.mood + item.recoveryValue)
-            changeState(to: .playing)
+            changeState(to: .playing, videoName: PetVideoPaths.playing)
             
             // 提示
             if energyCost > 0 {
@@ -293,10 +310,19 @@ class PetViewModel: ObservableObject {
             
             if item.isDrink {
                 status.hunger = min(100, status.hunger + item.recoveryValue)
-                changeState(to: .drinking)
+                changeState(to: .drinking, videoName: PetVideoPaths.drinking)
             } else {
                 status.hunger = min(100, status.hunger + item.recoveryValue)
-                changeState(to: .eating)
+                
+                // 默认使用 eatingCatFood 作为通用进食动画
+                var video = PetVideoPaths.eatingCatFood
+                
+                if item.id == "cannedFood" {
+                    video = PetVideoPaths.eatingCanned
+                } 
+                // 其他食物 (如 catRice, catStrip, rawMeat 等) 都使用默认的 eatingCatFood
+                
+                changeState(to: .eating, videoName: video)
             }
             
             // 提示属性增加
@@ -324,12 +350,106 @@ class PetViewModel: ObservableObject {
         }
     }
     
-    // 抚摸互动
+    // MARK: - Touch Interaction (Long Press Support)
+    
+    private var isTouching = false
+    private var touchStartTime: Date?
+    
+    // 开始触摸（按下）
+    // 长按时一直播放对应动画，循环播放
+    func startTouching(at location: CGPoint, in size: CGSize) {
+        guard !isTouching else { return }
+        isTouching = true
+        touchStartTime = Date()
+        
+        let isUpper = location.y < size.height / 2
+        var videoName: String = PetVideoPaths.enjoy
+        
+        if isUpper {
+            // Touch Head
+            if status.mood < 50 {
+                // 心情差，大概率生气
+                if Double.random(in: 0...1) < 0.6 {
+                    videoName = PetVideoPaths.angry
+                } else {
+                    videoName = PetVideoPaths.enjoy
+                }
+            } else {
+                // 心情好，大概率享受
+                if Double.random(in: 0...1) < 0.9 {
+                    videoName = PetVideoPaths.enjoy
+                } else {
+                    videoName = PetVideoPaths.angry
+                }
+            }
+        } else {
+            // Touch Belly
+            if status.mood < 50 {
+                if Double.random(in: 0...1) < 0.6 {
+                    videoName = PetVideoPaths.angry
+                    // 只有在开始触摸时提示一次，或者不提示避免刷屏
+                    // showFloatingText("别碰我！", style: .warning) 
+                } else {
+                    videoName = PetVideoPaths.rolling
+                }
+            } else {
+                if Double.random(in: 0...1) < 0.9 {
+                    videoName = PetVideoPaths.rolling
+                } else {
+                    videoName = PetVideoPaths.angry
+                }
+            }
+        }
+        
+        // 关键：强制设为循环播放
+        changeState(to: .interacting, videoName: videoName, forceLoop: true)
+    }
+    
+    // 结束触摸（松开）
+    // 结算算一次点击，停止循环（自然播放完当前次后切回 idle）
+    func stopTouching() {
+        guard isTouching else { return }
+        isTouching = false
+        
+        // 计算按下时长
+        let duration = Date().timeIntervalSince(touchStartTime ?? Date())
+        
+        // 只有短按 (< 0.3s) 才触发点击反馈 (心情+5)
+        if duration < 0.3 {
+            // 结算心情 (每次完整的短按算一次)
+            let moodIncrease = 5.0
+            status.mood = min(100, status.mood + moodIncrease)
+            showFloatingText("心情 +\(Int(moodIncrease))", style: .mood)
+            
+            // 如果触发了生气视频，额外提示
+            if currentVideoName == PetVideoPaths.angry {
+                 showFloatingText("别碰我！", style: .warning)
+            }
+            
+            saveStatus()
+        }
+        
+        // 关键：取消循环。
+        // PetVideoPlayer 监听到 isCurrentLooping 变 false 后，会停止 Looper，并监听播放结束通知。
+        // 当视频播放结束时，会调用 onAnimationFinished，从而切回 idle。
+        isCurrentLooping = false
+    }
+
+    // 兼容旧代码
+    func handleTouch(at location: CGPoint, in size: CGSize) {
+        // 旧的一次性点击逻辑，现在改为短按触发 start + stop
+        startTouching(at: location, in: size)
+        
+        // 延迟一小段时间模拟短按，确保动画能开始
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.stopTouching()
+        }
+    }
+    
+    // 兼容旧代码
     func pet() {
-        let moodIncrease = 5.0
-        status.mood = min(100, status.mood + moodIncrease)
-        showFloatingText("心情 +\(Int(moodIncrease))", style: .mood)
-        saveStatus()
+        // 默认模拟摸头
+        handleTouch(at: CGPoint(x: 0, y: 0), in: CGSize(width: 100, height: 100))
     }
     
     func clean() {
@@ -380,7 +500,28 @@ class PetViewModel: ObservableObject {
             saveStatus()
             
             // 切换状态
-            changeState(to: .cleaning)
+            var video = PetVideoPaths.bathingHappy
+            if status.mood < 50 {
+                if Double.random(in: 0...1) < 0.6 {
+                    video = PetVideoPaths.bathingBoring
+                } else {
+                    video = PetVideoPaths.bathingHappy
+                }
+            } else if status.mood > 90 {
+                if Double.random(in: 0...1) < 0.9 {
+                    video = PetVideoPaths.bathingHappy
+                } else {
+                    video = PetVideoPaths.bathingBoring
+                }
+            } else {
+                // 50 <= mood <= 90
+                if Double.random(in: 0...1) < 0.6 {
+                    video = PetVideoPaths.bathingHappy
+                } else {
+                    video = PetVideoPaths.bathingBoring
+                }
+            }
+            changeState(to: .cleaning, videoName: video)
             
             // 提示属性变化
             if addedHygiene > 0 {
@@ -398,14 +539,36 @@ class PetViewModel: ObservableObject {
     func onAnimationFinished() {
         // Return to idle after action finished
         // 只有非循环动画才自动切回 idle
-        if !currentState.isLooping && currentState != .idle {
+        if !isCurrentLooping && currentState != .idle {
             changeState(to: .idle)
         }
     }
     
-    private func changeState(to newState: PetState) {
+    private func changeState(to newState: PetState, videoName: String? = nil, forceLoop: Bool? = nil) {
         withAnimation {
             currentState = newState
+            
+            // 确定是否循环
+            if let force = forceLoop {
+                isCurrentLooping = force
+            } else {
+                isCurrentLooping = newState.isLooping
+            }
+            
+            if let v = videoName {
+                currentVideoName = v
+            } else {
+                // Default mapping or logic
+                if newState == .idle {
+                     currentVideoName = "idle" 
+                } else if newState == .sleeping {
+                     currentVideoName = PetVideoPaths.sleeping
+                } else if newState == .working {
+                     currentVideoName = newState.videoFileName(for: status.currentJob)
+                } else {
+                     currentVideoName = newState.videoFileName()
+                }
+            }
         }
     }
     
@@ -635,17 +798,9 @@ class PetViewModel: ObservableObject {
                     status.jobStartTime = nil
                 }
             }
-        } else if isFixedSleepTime {
-            // 如果正在进行用户交互（洗澡、吃饭、喝水、玩耍），且精力尚可，则不强制睡觉
-            // 注意：isExhausted (energy <= 0) 在上面已经被处理，所以这里能进来的肯定是 energy > 0
-            // 但为了保险起见，我们还是检查一下是否处于交互状态
-            if (currentState == .cleaning || currentState == .eating || currentState == .drinking || currentState == .playing) {
-                isSleeping = false
-            } else {
-                isSleeping = true
-            }
-            // 强制休息时间，暂时中断工作状态（但不辞职），转为睡觉恢复精力
-            // isWorking 默认为 false，不产生收益，不消耗工作精力
+        } else if isFixedSleepTime && (currentState == .idle || currentState == .sleeping) {
+            // 强制休息时间：仅在空闲或已睡觉时触发，不打断其他动画（工作、互动等）
+            isSleeping = true
         } else if status.currentJob != .none {
             // 正常工作时间
             isWorking = true
@@ -661,8 +816,8 @@ class PetViewModel: ObservableObject {
                     status.jobStartTime = nil
                 }
             }
-        } else if isLowEnergy {
-            // 没有工作，精力低 -> 自动睡觉
+        } else if isLowEnergy && (currentState == .idle || currentState == .sleeping) {
+            // 没有工作，精力低 -> 自动睡觉 (仅在空闲时触发)
             isSleeping = true
         }
         
@@ -730,6 +885,18 @@ class PetViewModel: ObservableObject {
             
             status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate * timeInterval)
             status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate * timeInterval)
+            
+            // 随机洗脸 (仅在 idle 状态且非离线模拟)
+            if !isOfflineSimulation && currentState == .idle {
+                // 0.5% probability per second -> avg 200s (3 min)
+                if Double.random(in: 0...1) < 0.005 {
+                     // 播放洗脸
+                     changeState(to: .interacting, videoName: PetVideoPaths.grooming)
+                     // 增加少量清洁
+                     status.hygiene = min(100, status.hygiene + 5)
+                     showFloatingText("清洁 +5", style: .hygiene)
+                }
+            }
         }
         
         status.lastUpdateTime = now
