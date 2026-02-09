@@ -42,6 +42,24 @@ enum SortOption: String, CaseIterable, Identifiable {
     }
 }
 
+// Helper view for Calendar Day Icon compatibility
+struct CalendarDayIcon: View {
+    let day: Int
+    
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            Image(systemName: "\(day).calendar")
+        } else {
+            Image(systemName: "calendar")
+                .overlay {
+                    Text("\(day)")
+                        .font(.system(size: 10, weight: .bold))
+                        .offset(y: 1)
+                }
+        }
+    }
+}
+
 enum HomeTab {
     case wardrobe
     case depositPlan
@@ -220,12 +238,12 @@ struct HomeView: View {
                         if let indicator = depositMonthIndicator {
                             switch indicator {
                             case .current(let day):
-                                Image(systemName: "\(day).calendar")
+                                CalendarDayIcon(day: day)
                                     .font(.system(size: 18))
                                     .foregroundStyle(Color.pink)
                                     .frame(width: 24, height: 24)
                             case .next(let day):
-                                Image(systemName: "\(day).calendar")
+                                CalendarDayIcon(day: day)
                                     .font(.system(size: 18))
                                     .foregroundStyle(Color.brown)
                                 .frame(width: 24, height: 24)
