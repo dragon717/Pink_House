@@ -22,7 +22,7 @@ struct PetHomeView: View {
             } else {
                 GeometryReader { geo in
                     let isLandscape = geo.size.width > geo.size.height
-                    let videoHeight = isLandscape ? min(geo.size.width, geo.size.height) * 0.8 : 400
+                    let videoHeight = isLandscape ? min(geo.size.width, geo.size.height) * 0.8 : 360
                     
                     ZStack {
                         // 背景
