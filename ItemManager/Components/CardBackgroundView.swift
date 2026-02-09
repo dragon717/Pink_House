@@ -19,9 +19,17 @@ struct CardBackgroundView: View {
                     } else {
                         // Fallback: Lighten slightly in both modes to simulate glass
                         #if DEBUG
-                        Color.white.opacity(colorScheme == .dark ? themeManager.dbg_glass_fallback_dark : themeManager.dbg_glass_fallback_light)
+                        if colorScheme == .dark {
+                            Color.black.opacity(themeManager.dbg_glass_fallback_dark)
+                        } else {
+                            Color.white.opacity(themeManager.dbg_glass_fallback_light)
+                        }
                         #else
-                        Color.white.opacity(colorScheme == .dark ? 0.05 : 0.1)
+                        if colorScheme == .dark {
+                            Color.black.opacity(0.5) // 黑色半透明
+                        } else {
+                            Color.white.opacity(0.5)
+                        }
                         #endif
                     }
                 }
