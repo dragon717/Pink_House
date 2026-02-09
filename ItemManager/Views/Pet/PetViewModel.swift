@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import AVFoundation
+import GameplayKit
 
 struct FloatingTextData: Identifiable {
     let id = UUID()
@@ -43,6 +44,9 @@ class PetViewModel: ObservableObject {
     @Published var floatingTexts: [FloatingTextData] = []
     @Published var recognizedSpeechText: String = ""
     
+    // MARK: - Video State Machine
+    var videoStateMachine: GKStateMachine!
+    
     private var audioSubscription: AnyCancellable?
     
     // MARK: - Settings
@@ -82,6 +86,8 @@ class PetViewModel: ObservableObject {
         // Initial load
         self.status = PetViewModel.loadStatusFromDisk()
         
+        setupStateMachine()
+        
         // Calculate offline decay
         calculateOfflineDecay()
         checkDailyReset()
@@ -113,6 +119,33 @@ class PetViewModel: ObservableObject {
         }
     }
     
+    private func setupStateMachine() {
+        let states: [GKState] = [
+            IdleState(viewModel: self),
+            ExpectingState(viewModel: self),
+            InteractionState(viewModel: self),
+            GroomingState(viewModel: self),
+            FeedingState(viewModel: self),
+            DrinkingState(viewModel: self),
+            PlayingState(viewModel: self),
+            CleaningState(viewModel: self),
+            SleepingState(viewModel: self),
+            WorkingState(viewModel: self)
+        ]
+        videoStateMachine = GKStateMachine(states: states)
+        // 初始状态
+        videoStateMachine.enter(IdleState.self)
+    }
+    
+    func updateVideoState(videoName: String, isLooping: Bool) {
+        if self.currentVideoName != videoName || self.isCurrentLooping != isLooping {
+            withAnimation {
+                self.currentVideoName = videoName
+                self.isCurrentLooping = isLooping
+            }
+        }
+    }
+
     private func setupNotificationObserver() {
         NotificationCenter.default.addObserver(forName: Notification.Name("PetStatusDidUpdateExternally"), object: nil, queue: .main) { [weak self] _ in
             self?.reloadStatus()
@@ -370,48 +403,16 @@ class PetViewModel: ObservableObject {
         touchStartTime = Date()
         
         let isUpper = location.y < size.height / 2
-        var videoName: String = PetVideoPaths.enjoy
         
-        if isUpper {
-            // Touch Head
-            if status.mood < 50 {
-                // 心情差，大概率生气
-                if Double.random(in: 0...1) < 0.6 {
-                    videoName = PetVideoPaths.angry
-                } else {
-                    videoName = PetVideoPaths.enjoy
-                }
-            } else {
-                // 心情好，大概率享受
-                if Double.random(in: 0...1) < 0.9 {
-                    videoName = PetVideoPaths.enjoy
-                } else {
-                    videoName = PetVideoPaths.angry
-                }
-            }
-        } else {
-            // Touch Belly
-            if status.mood < 50 {
-                if Double.random(in: 0...1) < 0.6 {
-                    videoName = PetVideoPaths.angry
-                    // 只有在开始触摸时提示一次，或者不提示避免刷屏
-                    // showFloatingText("别碰我！", style: .warning) 
-                } else {
-                    videoName = PetVideoPaths.rolling
-                }
-            } else {
-                if Double.random(in: 0...1) < 0.9 {
-                    videoName = PetVideoPaths.rolling
-                } else {
-                    videoName = PetVideoPaths.angry
-                }
-            }
+        // 设置 State Context
+        if let state = videoStateMachine.state(forClass: InteractionState.self) {
+            state.setContext(isHead: isUpper, mood: status.mood)
         }
         
         // 关键：强制设为循环播放
         // 注意：如果是连续点击，changeState 内部会判断如果 videoName 没变，不会重新加载，
         // 并且 forceLoop 为 true 会保持/重新设置为循环模式。
-        changeState(to: .interacting, videoName: videoName, forceLoop: true)
+        changeState(to: .interacting, forceLoop: true)
     }
     
     // 结束触摸（松开）
@@ -566,26 +567,51 @@ class PetViewModel: ObservableObject {
         withAnimation {
             currentState = newState
             
-            // 确定是否循环
-            if let force = forceLoop {
-                isCurrentLooping = force
-            } else {
-                isCurrentLooping = newState.isLooping
+            // 更新 Animation State Machine
+            switch newState {
+            case .idle:
+                videoStateMachine.enter(IdleState.self)
+                
+            case .expecting:
+                videoStateMachine.enter(ExpectingState.self)
+                
+            case .interacting:
+                if videoName == PetVideoPaths.grooming {
+                    videoStateMachine.enter(GroomingState.self)
+                } else {
+                    // 假设 context 已经在 startTouching 里设置好了
+                    videoStateMachine.enter(InteractionState.self)
+                }
+                
+            case .eating:
+                 if let v = videoName, let state = videoStateMachine.state(forClass: FeedingState.self) {
+                     if v == PetVideoPaths.eatingCanned {
+                         state.setFoodType("cannedFood")
+                     } else {
+                         state.setFoodType("catFood")
+                     }
+                 }
+                 videoStateMachine.enter(FeedingState.self)
+                 
+            case .drinking:
+                videoStateMachine.enter(DrinkingState.self)
+                
+            case .playing:
+                videoStateMachine.enter(PlayingState.self)
+                
+            case .sleeping:
+                videoStateMachine.enter(SleepingState.self)
+                
+            case .cleaning:
+                videoStateMachine.enter(CleaningState.self)
+                
+            case .working:
+                videoStateMachine.enter(WorkingState.self)
             }
             
-            if let v = videoName {
-                currentVideoName = v
-            } else {
-                // Default mapping or logic
-                if newState == .idle {
-                     currentVideoName = "idle" 
-                } else if newState == .sleeping {
-                     currentVideoName = PetVideoPaths.sleeping
-                } else if newState == .working {
-                     currentVideoName = newState.videoFileName(for: status.currentJob)
-                } else {
-                     currentVideoName = newState.videoFileName()
-                }
+            // 兼容 forceLoop (如果外部强制指定，覆盖 State 的默认设置)
+            if let force = forceLoop {
+                isCurrentLooping = force
             }
         }
     }
@@ -723,7 +749,10 @@ class PetViewModel: ObservableObject {
     
     private func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateStatus()
+            guard let self = self else { return }
+            self.updateStatus()
+            // 更新状态机 (deltaTime: 1.0)
+            self.videoStateMachine.update(deltaTime: 1.0)
         }
     }
     
@@ -906,17 +935,7 @@ class PetViewModel: ObservableObject {
             status.hunger = max(0, status.hunger - PetStatus.hungerDecayRate * timeInterval)
             status.hygiene = max(0, status.hygiene - PetStatus.hygieneDecayRate * timeInterval)
             
-            // 随机洗脸 (仅在 idle 状态且非离线模拟)
-            if !isOfflineSimulation && currentState == .idle {
-                // 0.5% probability per second -> avg 200s (3 min)
-                if Double.random(in: 0...1) < 0.005 {
-                     // 播放洗脸
-                     changeState(to: .interacting, videoName: PetVideoPaths.grooming)
-                     // 增加少量清洁
-                     status.hygiene = min(100, status.hygiene + 5)
-                     showFloatingText("清洁 +5", style: .hygiene)
-                }
-            }
+            // 随机洗脸逻辑已移至 IdleState.update
         }
         
         status.lastUpdateTime = now

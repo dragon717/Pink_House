@@ -16,6 +16,9 @@ class FontManager: ObservableObject {
     @Published var registeredFontName: String?
     @Published var isUsingUserFont: Bool = false
     
+    // 缓存已注册的字体 URL，避免重复注册导致系统日志报错
+    private var registeredURLs = Set<URL>()
+    
     private init() {
         // 初始化时检查是否在使用用户字体
         if let _ = UserDefaults.standard.string(forKey: kUserFontFileName) {
@@ -146,6 +149,15 @@ class FontManager: ObservableObject {
             return nil
         }
         
+        // 检查是否已经注册过该 URL
+        if registeredURLs.contains(url) {
+            // print("FontManager: Font already registered (cached URL): \(postScriptName)")
+            DispatchQueue.main.async {
+                self.registeredFontName = postScriptName
+            }
+            return postScriptName
+        }
+        
         // 如果已经注册过这个名字，直接返回
         // 这里的 registeredFontName 是为了避免重复调用 CTFontManagerRegisterFontsForURL
         // 但如果切换了字体文件，我们需要允许重新注册流程（虽然 CTFontManager 可能会报错说已注册）
@@ -154,14 +166,28 @@ class FontManager: ObservableObject {
         var error: Unmanaged<CFError>?
         if CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
             print("FontManager: Successfully registered font: \(postScriptName)")
+            registeredURLs.insert(url)
             DispatchQueue.main.async {
                 self.registeredFontName = postScriptName
             }
             return postScriptName
         } else {
-            let errorDesc = error?.takeUnretainedValue().localizedDescription ?? "Unknown error"
+            var errorDesc = "Unknown error"
+            var errorCode = 0
+            
+            if let errorRef = error {
+                 let nsError = errorRef.takeUnretainedValue() as Error as NSError
+                 errorDesc = nsError.localizedDescription
+                 errorCode = nsError.code
+             }
+            
             // CoreText error code 105 means "Already registered"
             print("FontManager: Error registering font (might be already registered): \(errorDesc)")
+            
+            // 如果是因为已注册导致的错误，我们将其标记为已注册，避免下次再报错
+            if errorCode == 105 {
+                registeredURLs.insert(url)
+            }
             
             DispatchQueue.main.async {
                 self.registeredFontName = postScriptName

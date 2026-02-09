@@ -1,6 +1,8 @@
 import SwiftUI
+import UIKit
 import AVFoundation
 import Combine
+import CoreVideo
 
 /// 一个支持无缝切换的双缓冲视频播放器视图 (UIView)
 class SeamlessVideoPlayerView: UIView {
@@ -85,6 +87,9 @@ class SeamlessVideoPlayerView: UIView {
         // 配置 Layer A
         playerLayerA.player = playerA
         playerLayerA.videoGravity = .resizeAspectFill
+        // 这里的 pixelFormatType 设置是不必要的，甚至是有害的。
+        // kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange (NV12) 不支持 Alpha 通道。
+        // AVPlayerLayer 会自动识别 HEVC with Alpha 视频并使用正确的格式。
         playerLayerA.backgroundColor = UIColor.clear.cgColor
         playerLayerA.frame = bounds
         playerLayerA.opacity = 0 // 初始隐藏
@@ -93,6 +98,7 @@ class SeamlessVideoPlayerView: UIView {
         // 配置 Layer B
         playerLayerB.player = playerB
         playerLayerB.videoGravity = .resizeAspectFill
+        // 同上，移除显式的像素格式指定，让系统自动处理 Alpha
         playerLayerB.backgroundColor = UIColor.clear.cgColor
         playerLayerB.frame = bounds
         playerLayerB.opacity = 0 // 初始隐藏
