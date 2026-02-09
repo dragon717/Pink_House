@@ -264,17 +264,22 @@ struct ImageCropView: View {
     private func cropImage(image: UIImage, width: CGFloat, height: CGFloat, multiplier: CGFloat) {
         // Render the view at high resolution
         let renderer = ImageRenderer(content:
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .scaleEffect(scale)
-                .offset(x: offset.width * multiplier, y: offset.height * multiplier)
-                .frame(width: width, height: height)
-                .clipped()
+            ZStack {
+                Color.clear // Ensure background is transparent
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(scale)
+                    .offset(x: offset.width * multiplier, y: offset.height * multiplier)
+                    .frame(width: width, height: height)
+                    .clipped()
+            }
+            .frame(width: width, height: height)
         )
         
         // Ensure we get a good quality image
         renderer.scale = 1.0 
+        renderer.isOpaque = false // Enable transparency support
         
         if let cropped = renderer.uiImage {
             onCrop(cropped)

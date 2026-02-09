@@ -293,6 +293,7 @@ struct ClothingDetailView: View {
                         
                         CarouselItemView(imagePath: clothing.imagePaths[index], targetSize: targetSize)
                             .tag(index)
+                            .id(clothing.imagePaths[index]) // Ensure view refreshes when image path changes
                             .onTapGesture {
                                 showingImageViewer = true
                             }

@@ -32,6 +32,9 @@ struct ImagePickerGrid: View {
     @State private var errorMessage = ""
     @State private var showingActionSheet = false
     @State private var showingPhotosPicker = false
+    @State private var showingCropper = false
+    @State private var imageToCrop: UIImage?
+    @State private var shouldDismissSheet = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -179,7 +182,7 @@ struct ImagePickerGrid: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding()
                     
-                    HStack(spacing: 20) {
+                    HStack(spacing: 10) {
                         let index = selection.index
                         if index < imagePaths.count {
                             if index > 0 {
@@ -188,23 +191,42 @@ struct ImagePickerGrid: View {
                                     editingSelection = nil
                                 }) {
                                     Label("设为主图", systemImage: "star.fill")
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.5)
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(.pink)
                             }
                             
+                            Button(action: {
+                                imageToCrop = selection.image
+                                shouldDismissSheet = true
+                                showingCropper = true
+                            }) {
+                                Label("编辑为主图", systemImage: "crop")
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            
                             Button(role: .destructive, action: {
                                 deleteImage(at: index)
                                 editingSelection = nil
                             }) {
-                                Label("删除图片", systemImage: "trash")
+                                Label("删除", systemImage: "trash")
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 12)
                     .padding(.bottom, 20)
                 }
                 .navigationTitle("图片预览")
@@ -216,8 +238,31 @@ struct ImagePickerGrid: View {
                         }
                     }
                 }
+                .fullScreenCover(isPresented: $showingCropper) {
+                    if let image = imageToCrop {
+                        ImageCropView(image: image, aspectRatio: 1.0) { croppedImage in
+                            saveImageAsMain(croppedImage)
+                            showingCropper = false
+                            // Do not dismiss editingSelection immediately to avoid conflict
+                            imageToCrop = nil
+                        } onCancel: {
+                            showingCropper = false
+                            shouldDismissSheet = false // Cancel dismiss if user cancelled crop
+                            imageToCrop = nil
+                        }
+                    }
+                }
             }
             .presentationDetents([.medium, .large])
+            .onChange(of: showingCropper) { _, isShowing in
+                if !isShowing && shouldDismissSheet {
+                    // Wait for cover to dismiss before dismissing sheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        editingSelection = nil
+                        shouldDismissSheet = false
+                    }
+                }
+            }
         }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraPicker(image: $cameraImage)
@@ -282,6 +327,16 @@ struct ImagePickerGrid: View {
     private func saveImage(_ image: UIImage) {
         if let fileName = ImageManager.shared.saveImage(image, context: modelContext) {
             imagePaths.append(fileName)
+        } else {
+            errorMessage = "保存图片失败"
+            showingErrorAlert = true
+        }
+    }
+    
+    private func saveImageAsMain(_ image: UIImage) {
+        // Use PNG to preserve transparency for cropped images
+        if let fileName = ImageManager.shared.saveImage(image, context: modelContext, format: .png) {
+            imagePaths.insert(fileName, at: 0)
         } else {
             errorMessage = "保存图片失败"
             showingErrorAlert = true
