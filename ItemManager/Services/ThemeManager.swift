@@ -292,6 +292,7 @@ class ThemeManager {
         self.isBlurEnabled = UserDefaults.standard.bool(forKey: "theme_is_blur_enabled")
         
         // Load Debug Parameters
+        #if DEBUG
         if UserDefaults.standard.object(forKey: "dbg_glass_fallback_light") != nil { self.dbg_glass_fallback_light = UserDefaults.standard.double(forKey: "dbg_glass_fallback_light") }
         if UserDefaults.standard.object(forKey: "dbg_glass_fallback_dark") != nil { self.dbg_glass_fallback_dark = UserDefaults.standard.double(forKey: "dbg_glass_fallback_dark") }
         
@@ -304,6 +305,7 @@ class ThemeManager {
         if UserDefaults.standard.object(forKey: "dbg_mica_border_light_end") != nil { self.dbg_mica_border_light_end = UserDefaults.standard.double(forKey: "dbg_mica_border_light_end") }
         if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_start") != nil { self.dbg_mica_border_dark_start = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_start") }
         if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_end") != nil { self.dbg_mica_border_dark_end = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_end") }
+        #endif
     }
     
     private func loadBackgroundImage() {
