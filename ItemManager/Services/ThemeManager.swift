@@ -116,6 +116,23 @@ class ThemeManager {
     var textColorHex: String = "#000000"
     var selectionColorHex: String = "#A52A2A" // Brown
     
+    // MARK: - Debug Parameters (Liquid Glass)
+    #if DEBUG
+    var dbg_glass_fallback_light: Double = 0.1 { didSet { UserDefaults.standard.set(dbg_glass_fallback_light, forKey: "dbg_glass_fallback_light") } }
+    var dbg_glass_fallback_dark: Double = 0.05 { didSet { UserDefaults.standard.set(dbg_glass_fallback_dark, forKey: "dbg_glass_fallback_dark") } }
+    
+    var dbg_glass_border_light_start: Double = 0.4 { didSet { UserDefaults.standard.set(dbg_glass_border_light_start, forKey: "dbg_glass_border_light_start") } }
+    var dbg_glass_border_light_end: Double = 0.1 { didSet { UserDefaults.standard.set(dbg_glass_border_light_end, forKey: "dbg_glass_border_light_end") } }
+    var dbg_glass_border_dark_start: Double = 0.25 { didSet { UserDefaults.standard.set(dbg_glass_border_dark_start, forKey: "dbg_glass_border_dark_start") } }
+    var dbg_glass_border_dark_end: Double = 0.05 { didSet { UserDefaults.standard.set(dbg_glass_border_dark_end, forKey: "dbg_glass_border_dark_end") } }
+    
+    // MARK: - Debug Parameters (Mica Tint)
+    var dbg_mica_border_light_start: Double = 0.5 { didSet { UserDefaults.standard.set(dbg_mica_border_light_start, forKey: "dbg_mica_border_light_start") } }
+    var dbg_mica_border_light_end: Double = 0.1 { didSet { UserDefaults.standard.set(dbg_mica_border_light_end, forKey: "dbg_mica_border_light_end") } }
+    var dbg_mica_border_dark_start: Double = 0.3 { didSet { UserDefaults.standard.set(dbg_mica_border_dark_start, forKey: "dbg_mica_border_dark_start") } }
+    var dbg_mica_border_dark_end: Double = 0.05 { didSet { UserDefaults.standard.set(dbg_mica_border_dark_end, forKey: "dbg_mica_border_dark_end") } }
+    #endif
+    
     init() {
         if let savedColor = UserDefaults.standard.string(forKey: "theme_background_color") {
             self.backgroundColorHex = savedColor
@@ -150,6 +167,22 @@ class ThemeManager {
         }
         
         self.isBlurEnabled = UserDefaults.standard.bool(forKey: "theme_is_blur_enabled")
+        
+        // Load Debug Parameters
+        #if DEBUG
+        if UserDefaults.standard.object(forKey: "dbg_glass_fallback_light") != nil { self.dbg_glass_fallback_light = UserDefaults.standard.double(forKey: "dbg_glass_fallback_light") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_fallback_dark") != nil { self.dbg_glass_fallback_dark = UserDefaults.standard.double(forKey: "dbg_glass_fallback_dark") }
+        
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_light_start") != nil { self.dbg_glass_border_light_start = UserDefaults.standard.double(forKey: "dbg_glass_border_light_start") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_light_end") != nil { self.dbg_glass_border_light_end = UserDefaults.standard.double(forKey: "dbg_glass_border_light_end") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_dark_start") != nil { self.dbg_glass_border_dark_start = UserDefaults.standard.double(forKey: "dbg_glass_border_dark_start") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_dark_end") != nil { self.dbg_glass_border_dark_end = UserDefaults.standard.double(forKey: "dbg_glass_border_dark_end") }
+        
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_light_start") != nil { self.dbg_mica_border_light_start = UserDefaults.standard.double(forKey: "dbg_mica_border_light_start") }
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_light_end") != nil { self.dbg_mica_border_light_end = UserDefaults.standard.double(forKey: "dbg_mica_border_light_end") }
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_start") != nil { self.dbg_mica_border_dark_start = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_start") }
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_end") != nil { self.dbg_mica_border_dark_end = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_end") }
+        #endif
         
         // Load image
         loadBackgroundImage()
@@ -257,6 +290,20 @@ class ThemeManager {
         }
         
         self.isBlurEnabled = UserDefaults.standard.bool(forKey: "theme_is_blur_enabled")
+        
+        // Load Debug Parameters
+        if UserDefaults.standard.object(forKey: "dbg_glass_fallback_light") != nil { self.dbg_glass_fallback_light = UserDefaults.standard.double(forKey: "dbg_glass_fallback_light") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_fallback_dark") != nil { self.dbg_glass_fallback_dark = UserDefaults.standard.double(forKey: "dbg_glass_fallback_dark") }
+        
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_light_start") != nil { self.dbg_glass_border_light_start = UserDefaults.standard.double(forKey: "dbg_glass_border_light_start") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_light_end") != nil { self.dbg_glass_border_light_end = UserDefaults.standard.double(forKey: "dbg_glass_border_light_end") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_dark_start") != nil { self.dbg_glass_border_dark_start = UserDefaults.standard.double(forKey: "dbg_glass_border_dark_start") }
+        if UserDefaults.standard.object(forKey: "dbg_glass_border_dark_end") != nil { self.dbg_glass_border_dark_end = UserDefaults.standard.double(forKey: "dbg_glass_border_dark_end") }
+        
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_light_start") != nil { self.dbg_mica_border_light_start = UserDefaults.standard.double(forKey: "dbg_mica_border_light_start") }
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_light_end") != nil { self.dbg_mica_border_light_end = UserDefaults.standard.double(forKey: "dbg_mica_border_light_end") }
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_start") != nil { self.dbg_mica_border_dark_start = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_start") }
+        if UserDefaults.standard.object(forKey: "dbg_mica_border_dark_end") != nil { self.dbg_mica_border_dark_end = UserDefaults.standard.double(forKey: "dbg_mica_border_dark_end") }
     }
     
     private func loadBackgroundImage() {

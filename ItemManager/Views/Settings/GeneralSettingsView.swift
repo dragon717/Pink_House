@@ -230,6 +230,80 @@ struct GeneralSettingsView: View {
                             set: { theme.cardTintColorHex = $0.toHex() }
                         ))
                     }
+                    
+                    #if DEBUG
+                    DisclosureGroup("开发者调试参数 (微调)") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("当前模式: \(theme.cardStyle == .transparent ? "液态玻璃" : "亚克力云母")")
+                                .font(.caption).bold()
+                            
+                            if theme.cardStyle == .transparent {
+                                Group {
+                                    Text("回退背景不透明度 (无模糊时)")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    HStack {
+                                        Text("浅色: \(theme.dbg_glass_fallback_light, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_glass_fallback_light, in: 0...0.5)
+                                    }
+                                    HStack {
+                                        Text("深色: \(theme.dbg_glass_fallback_dark, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_glass_fallback_dark, in: 0...0.5)
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Text("边框渐变 (Light Mode)")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    HStack {
+                                        Text("起始: \(theme.dbg_glass_border_light_start, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_glass_border_light_start, in: 0...1)
+                                    }
+                                    HStack {
+                                        Text("结束: \(theme.dbg_glass_border_light_end, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_glass_border_light_end, in: 0...1)
+                                    }
+                                    
+                                    Text("边框渐变 (Dark Mode)")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    HStack {
+                                        Text("起始: \(theme.dbg_glass_border_dark_start, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_glass_border_dark_start, in: 0...1)
+                                    }
+                                    HStack {
+                                        Text("结束: \(theme.dbg_glass_border_dark_end, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_glass_border_dark_end, in: 0...1)
+                                    }
+                                }
+                            } else if theme.cardStyle == .tinted {
+                                Group {
+                                    Text("边框渐变 (Light Mode)")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    HStack {
+                                        Text("起始: \(theme.dbg_mica_border_light_start, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_mica_border_light_start, in: 0...1)
+                                    }
+                                    HStack {
+                                        Text("结束: \(theme.dbg_mica_border_light_end, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_mica_border_light_end, in: 0...1)
+                                    }
+                                    
+                                    Text("边框渐变 (Dark Mode)")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    HStack {
+                                        Text("起始: \(theme.dbg_mica_border_dark_start, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_mica_border_dark_start, in: 0...1)
+                                    }
+                                    HStack {
+                                        Text("结束: \(theme.dbg_mica_border_dark_end, format: .number.precision(.fractionLength(2)))")
+                                        Slider(value: $theme.dbg_mica_border_dark_end, in: 0...1)
+                                    }
+                                }
+                            }
+                        }
+                        .font(.caption)
+                        .padding(.vertical, 8)
+                    }
+                    #endif
                 }
             }
              

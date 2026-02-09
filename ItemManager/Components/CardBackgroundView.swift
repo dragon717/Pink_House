@@ -18,7 +18,11 @@ struct CardBackgroundView: View {
                             .fill(.ultraThinMaterial)
                     } else {
                         // Fallback: Lighten slightly in both modes to simulate glass
+                        #if DEBUG
+                        Color.white.opacity(colorScheme == .dark ? themeManager.dbg_glass_fallback_dark : themeManager.dbg_glass_fallback_light)
+                        #else
                         Color.white.opacity(colorScheme == .dark ? 0.05 : 0.1)
+                        #endif
                     }
                 }
                 .opacity(themeManager.transparentOpacity)
@@ -26,10 +30,19 @@ struct CardBackgroundView: View {
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .strokeBorder(
                             LinearGradient(
-                                colors: [
-                                    .white.opacity(colorScheme == .dark ? 0.25 : 0.4),
-                                    .white.opacity(colorScheme == .dark ? 0.05 : 0.1)
-                                ],
+                                colors: {
+                                    #if DEBUG
+                                    return [
+                                        .white.opacity(colorScheme == .dark ? themeManager.dbg_glass_border_dark_start : themeManager.dbg_glass_border_light_start),
+                                        .white.opacity(colorScheme == .dark ? themeManager.dbg_glass_border_dark_end : themeManager.dbg_glass_border_light_end)
+                                    ]
+                                    #else
+                                    return [
+                                        .white.opacity(colorScheme == .dark ? 0.25 : 0.4),
+                                        .white.opacity(colorScheme == .dark ? 0.05 : 0.1)
+                                    ]
+                                    #endif
+                                }(),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -55,10 +68,19 @@ struct CardBackgroundView: View {
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .strokeBorder(
                             LinearGradient(
-                                colors: [
-                                    themeManager.cardTintColor.opacity(colorScheme == .dark ? 0.3 : 0.5),
-                                    themeManager.cardTintColor.opacity(colorScheme == .dark ? 0.05 : 0.1)
-                                ],
+                                colors: {
+                                    #if DEBUG
+                                    return [
+                                        themeManager.cardTintColor.opacity(colorScheme == .dark ? themeManager.dbg_mica_border_dark_start : themeManager.dbg_mica_border_light_start),
+                                        themeManager.cardTintColor.opacity(colorScheme == .dark ? themeManager.dbg_mica_border_dark_end : themeManager.dbg_mica_border_light_end)
+                                    ]
+                                    #else
+                                    return [
+                                        themeManager.cardTintColor.opacity(colorScheme == .dark ? 0.3 : 0.5),
+                                        themeManager.cardTintColor.opacity(colorScheme == .dark ? 0.05 : 0.1)
+                                    ]
+                                    #endif
+                                }(),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
