@@ -37,8 +37,7 @@ struct GeneralSettingsView: View {
                 }
             }
             
-            Section(header: Text("外观主题")) {    
-                Picker("背景类型", selection: $theme.backgroundStyle) {
+            Picker("背景类型", selection: $theme.backgroundStyle) {
                     ForEach(BackgroundStyle.allCases) { style in
                         Text(style.displayName).tag(style)
                     }
@@ -46,6 +45,8 @@ struct GeneralSettingsView: View {
                 .pickerStyle(.segmented)
                 .listRowBackground(Color.clear)
                 .padding(.vertical, 8)
+
+            Section(header: Text("外观主题")) {    
                 
                 if theme.backgroundStyle == .color {
                     ColorPicker("背景颜色", selection: Binding(
@@ -147,6 +148,89 @@ struct GeneralSettingsView: View {
                 }
                 
                 Toggle("启用高斯模糊", isOn: $theme.isBlurEnabled)
+            }
+            
+            Picker("卡片样式", selection: $theme.cardStyle) {
+                ForEach(CardStyle.allCases) { style in
+                    Text(style.displayName).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+            .listRowBackground(Color.clear)
+            .padding(.vertical, 8)
+
+            // 实时预览区域
+            HStack {
+                Spacer()
+                VStack(spacing: 8) {
+                    ZStack {
+                        VStack(alignment: .leading, spacing: 8) {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 80)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 80, height: 12)
+                                
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.pink.opacity(0.3))
+                                    .frame(width: 60, height: 12)
+                            }
+                        }
+                        .padding(10)
+                        .background(CardBackgroundView())
+                        .frame(width: 140, height: 150)
+                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+                    }
+                    .padding()
+                    .background(
+                        ZStack {
+                            if theme.backgroundStyle == .image, let image = theme.backgroundImage {
+                                    Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                theme.backgroundColor
+                            }
+                        }
+                        .frame(width: 180, height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                    )
+                    
+                    Text("实时预览")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .listRowBackground(Color.clear)
+
+            Section(header: Text("裙子卡片")) {
+                if theme.cardStyle != .solid {
+                    VStack(alignment: .leading) {
+                        if theme.cardStyle == .transparent {
+                            Text("卡片不透明度: \(Int(theme.transparentOpacity * 100))%")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Slider(value: $theme.transparentOpacity, in: 0...1.0)
+                        } else {
+                            Text("卡片色调浓度: \(Int(theme.tintOpacity * 100))%")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Slider(value: $theme.tintOpacity, in: 0.1...0.8)
+                        }
+                    }
+                    
+                    if theme.cardStyle == .tinted {
+                        ColorPicker("色调颜色", selection: Binding(
+                            get: { theme.cardTintColor },
+                            set: { theme.cardTintColorHex = $0.toHex() }
+                        ))
+                    }
+                }
             }
              
             Section(header: Text("个性化")) {

@@ -15,9 +15,72 @@ enum BackgroundStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum CardStyle: String, CaseIterable, Identifiable {
+    case transparent
+    case tinted
+    case solid
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .transparent: return "透明"
+        case .tinted: return "色调"
+        case .solid: return "经典"
+        }
+    }
+}
+
 @Observable
 class ThemeManager {
     static let shared = ThemeManager()
+    
+    // MARK: - Card Settings
+    var cardStyle: CardStyle = .solid {
+        didSet {
+            UserDefaults.standard.set(cardStyle.rawValue, forKey: "theme_card_style")
+        }
+    }
+    
+    var transparentOpacity: Double = 1.0 {
+        didSet {
+            UserDefaults.standard.set(transparentOpacity, forKey: "theme_transparent_opacity")
+        }
+    }
+    
+    var tintOpacity: Double = 0.2 {
+        didSet {
+            UserDefaults.standard.set(tintOpacity, forKey: "theme_tint_opacity")
+        }
+    }
+    
+    // Legacy property for compatibility or if needed
+    var cardOpacity: Double {
+        get {
+            switch cardStyle {
+            case .transparent: return transparentOpacity
+            case .tinted: return tintOpacity
+            default: return 1.0
+            }
+        }
+        set {
+            switch cardStyle {
+            case .transparent: transparentOpacity = newValue
+            case .tinted: tintOpacity = newValue
+            default: break
+            }
+        }
+    }
+    
+    var cardTintColorHex: String = "#FFB6C1" { // Default Light Pink
+        didSet {
+            UserDefaults.standard.set(cardTintColorHex, forKey: "theme_card_tint_color")
+        }
+    }
+    
+    var cardTintColor: Color {
+        Color(hex: cardTintColorHex)
+    }
     
     // MARK: - Color Settings
     var backgroundColorHex: String = "#F2F2F7" { // Default system grouped background
@@ -61,6 +124,24 @@ class ThemeManager {
         if let savedStyle = UserDefaults.standard.string(forKey: "theme_background_style"),
            let style = BackgroundStyle(rawValue: savedStyle) {
             self.backgroundStyle = style
+        }
+        
+        // Load card settings
+        if let savedCardStyle = UserDefaults.standard.string(forKey: "theme_card_style"),
+           let style = CardStyle(rawValue: savedCardStyle) {
+            self.cardStyle = style
+        }
+        
+        if UserDefaults.standard.object(forKey: "theme_transparent_opacity") != nil {
+            self.transparentOpacity = UserDefaults.standard.double(forKey: "theme_transparent_opacity")
+        }
+        
+        if UserDefaults.standard.object(forKey: "theme_tint_opacity") != nil {
+            self.tintOpacity = UserDefaults.standard.double(forKey: "theme_tint_opacity")
+        }
+        
+        if let savedCardTint = UserDefaults.standard.string(forKey: "theme_card_tint_color") {
+            self.cardTintColorHex = savedCardTint
         }
         
         // Load opacity, default to 1.0 if not set (register defaults would be better, but this works)
@@ -148,6 +229,24 @@ class ThemeManager {
         if let savedStyle = UserDefaults.standard.string(forKey: "theme_background_style"),
            let style = BackgroundStyle(rawValue: savedStyle) {
             self.backgroundStyle = style
+        }
+        
+        // Reload card settings
+        if let savedCardStyle = UserDefaults.standard.string(forKey: "theme_card_style"),
+           let style = CardStyle(rawValue: savedCardStyle) {
+            self.cardStyle = style
+        }
+        
+        if UserDefaults.standard.object(forKey: "theme_transparent_opacity") != nil {
+            self.transparentOpacity = UserDefaults.standard.double(forKey: "theme_transparent_opacity")
+        }
+        
+        if UserDefaults.standard.object(forKey: "theme_tint_opacity") != nil {
+            self.tintOpacity = UserDefaults.standard.double(forKey: "theme_tint_opacity")
+        }
+        
+        if let savedCardTint = UserDefaults.standard.string(forKey: "theme_card_tint_color") {
+            self.cardTintColorHex = savedCardTint
         }
         
         self.backgroundOpacity = UserDefaults.standard.double(forKey: "theme_background_opacity")

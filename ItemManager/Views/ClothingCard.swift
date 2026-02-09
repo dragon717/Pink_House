@@ -33,6 +33,7 @@ struct ClothingCard: View, Equatable {
     
     let clothing: Clothing
     
+    @Environment(ThemeManager.self) private var themeManager
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
@@ -147,7 +148,9 @@ struct ClothingCard: View, Equatable {
             .padding(.vertical, 10)
             .frame(height: 60) // 固定高度，确保网格整齐
         }
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .background {
+            CardBackgroundView(cornerRadius: 16)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         // 卡片整体阴影和悬浮动画 - 针对低端设备优化阴影
         .shadow(
