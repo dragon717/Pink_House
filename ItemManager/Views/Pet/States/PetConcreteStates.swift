@@ -18,9 +18,14 @@ class IdleState: PetVideoState {
 
 // MARK: - Expecting State (期待/拖拽中)
 class ExpectingState: PetVideoState {
-    override var videoName: String { PetViewModel.PetVideoPaths.listening }
+    private var _videoName: String = PetViewModel.PetVideoPaths.attention
+    override var videoName: String { _videoName }
     override var logicalState: PetState { .expecting }
     override var isLooping: Bool { true }
+    
+    func setVideoName(_ name: String) {
+        _videoName = name
+    }
 }
 
 // MARK: - Interaction State (抚摸)
@@ -30,6 +35,10 @@ class InteractionState: PetVideoState {
     override var videoName: String { _videoName }
     override var logicalState: PetState { .interacting }
     override var isLooping: Bool { true } // 抚摸是循环的（按住时）
+    
+    func setExplicitVideoName(_ name: String) {
+        _videoName = name
+    }
     
     func setContext(isHead: Bool, mood: Double) {
         // 根据上下文决定视频
@@ -124,19 +133,14 @@ class SleepingState: PetVideoState {
 // MARK: - Working State
 class WorkingState: PetVideoState {
     override var videoName: String {
-        // 根据当前工作获取视频
-        return WorkingState.getJobVideoName(job: viewModel.status.currentJob)
+        // 工作状态下默认播放 idle (视觉上看起来是普通待机，但逻辑上在打工)
+        return "idle"
     }
     override var logicalState: PetState { .working }
     override var isLooping: Bool { true }
     
-    // Helper to map job to video
+    // Helper to map job to video (Deprecated: 现在统一使用 idle)
     static func getJobVideoName(job: PetJob) -> String {
-        switch job {
-        case .none: return "idle"
-        case .waiter: return "waiter"
-        case .security: return "security"
-        case .streamer: return "streamer"
-        }
+        return "idle"
     }
 }

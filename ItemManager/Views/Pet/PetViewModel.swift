@@ -71,6 +71,10 @@ class PetViewModel: ObservableObject {
         static let listening = "listening"
         static let playing = "playing"
         static let sleeping = "sleeping"
+        
+        static let attention = "attention"
+        static let talking = "talking"
+        static let dressingWork = "dressing_work"
     }
 
     private let sleepThreshold: Double = 20.0
@@ -176,16 +180,19 @@ class PetViewModel: ObservableObject {
         // 根据音频状态更新宠物动画
         switch state {
         case .recording:
-            // 如果有专门的倾听动画，可以在这里切换
+            // 倾听
              if currentState == .idle {
-                 changeState(to: .expecting, videoName: PetVideoPaths.listening) // 使用 expecting 模拟倾听
+                 changeState(to: .expecting, videoName: PetVideoPaths.listening)
              }
         case .playing:
             // 说话时（播放变音）
-            // 如果有说话动画，可以在这里切换
-            break
+            changeState(to: .interacting, videoName: PetVideoPaths.talking, forceLoop: true)
         case .idle, .listening, .processing:
             if currentState == .expecting && state == .processing {
+                changeState(to: .idle)
+            }
+            // 结束说话状态
+            if currentState == .interacting && currentVideoName == PetVideoPaths.talking {
                 changeState(to: .idle)
             }
         }
@@ -207,7 +214,7 @@ class PetViewModel: ObservableObject {
     // 拖拽物品开始
     func onDragStarted() {
         if currentState == .idle {
-            changeState(to: .expecting)
+            changeState(to: .expecting, videoName: PetVideoPaths.attention)
         }
     }
     
@@ -556,6 +563,13 @@ class PetViewModel: ObservableObject {
     }
     
     func onAnimationFinished() {
+        // 保护逻辑：特定状态下忽略播放结束信号，并强制维持循环
+        // 这可以防止因视频文件问题或播放器状态异常导致的意外切回 idle
+        if currentState == .working || currentState == .sleeping {
+            print("Warning: Video finished in \(currentState) state. Ignoring finish signal.")
+            return
+        }
+
         // Return to idle after action finished
         // 只有非循环动画才自动切回 idle
         if !isCurrentLooping && currentState != .idle {
@@ -573,12 +587,18 @@ class PetViewModel: ObservableObject {
                 videoStateMachine.enter(IdleState.self)
                 
             case .expecting:
+                if let v = videoName, let state = videoStateMachine.state(forClass: ExpectingState.self) {
+                    state.setVideoName(v)
+                }
                 videoStateMachine.enter(ExpectingState.self)
                 
             case .interacting:
                 if videoName == PetVideoPaths.grooming {
                     videoStateMachine.enter(GroomingState.self)
                 } else {
+                    if let v = videoName, let state = videoStateMachine.state(forClass: InteractionState.self) {
+                         state.setExplicitVideoName(v)
+                    }
                     // 假设 context 已经在 startTouching 里设置好了
                     videoStateMachine.enter(InteractionState.self)
                 }
@@ -773,8 +793,9 @@ class PetViewModel: ObservableObject {
         status.jobStartTime = Date()
         jobIncomeAccumulator = 0.0
         
-        // 切换到工作状态
-        changeState(to: .working)
+        // 播放换装动画（一次性），使用 interacting 状态作为临时载体
+        // 播放完后会自动切回 idle，然后 processTimePassage 会检测到 isWorking 并切到 WorkingState (播放 idle)
+        changeState(to: .interacting, videoName: PetVideoPaths.dressingWork, forceLoop: false)
         
         saveStatus()
         
@@ -882,8 +903,9 @@ class PetViewModel: ObservableObject {
                     // 只有在非工作状态下，才需要精力门槛避免反复横跳
                     changeState(to: .idle)
                 }
-            } else if isWorking && currentState != .working && !isSleeping {
-                // 确保工作时处于工作状态（除非正在睡觉）
+            } else if isWorking && currentState != .working && currentState != .interacting && !isSleeping {
+                // 确保工作时处于工作状态（除非正在睡觉或正在交互/换装）
+                // 这里的 .interacting 包括了换装动画，避免强制打断
                 changeState(to: .working)
             } else if !isWorking && currentState == .working {
                 // 如果不再工作但状态还是 working，切回 idle

@@ -502,24 +502,36 @@ class SeamlessVideoPlayerView: UIView {
         if name.hasPrefix("/") {
             return URL(fileURLWithPath: name)
         }
-        // 2. Bundle 根目录
+        
+        // 2. Bundle 根目录查找
         if let url = Bundle.main.url(forResource: name, withExtension: "mp4") {
             return url
         }
-        // 3. asserts 子目录
+        
+        // 3. asserts 子目录查找 (使用 subdirectory 参数)
+        if let url = Bundle.main.url(forResource: name, withExtension: "mp4", subdirectory: "asserts") {
+            return url
+        }
+        
+        // 4. asserts 子目录查找 (旧方式兼容)
         if let url = Bundle.main.url(forResource: "asserts/\(name)", withExtension: "mp4") {
             return url
         }
-        // 4. 无后缀尝试
+        
+        // 5. 无后缀尝试 (Bundle 根目录)
         if let url = Bundle.main.url(forResource: name, withExtension: nil) {
             return url
         }
-        if let url = Bundle.main.url(forResource: "asserts/\(name)", withExtension: nil) {
+        
+        // 6. 无后缀尝试 (asserts 子目录)
+        if let url = Bundle.main.url(forResource: name, withExtension: nil, subdirectory: "asserts") {
             return url
         }
-        // 5. Fallback idle
-        print("SeamlessPlayer: Fallback to idle")
+
+        // 7. Fallback idle
+        print("SeamlessPlayer: Failed to find video '\(name)'. Fallback to idle.")
         return Bundle.main.url(forResource: "idle", withExtension: "mp4") ?? 
+               Bundle.main.url(forResource: "idle", withExtension: "mp4", subdirectory: "asserts") ??
                Bundle.main.url(forResource: "asserts/idle", withExtension: "mp4")
     }
     

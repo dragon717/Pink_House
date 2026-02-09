@@ -1,6 +1,6 @@
 # 视频去水印工具说明
 
-本文档介绍了如何使用 `ItemManager/scripts/remove_watermark.py` 脚本来批量去除视频右下角的水印（针对 "小云雀AI生成" 等固定位置水印）。
+本文档介绍了如何使用 `scripts/remove_watermark.py` 脚本来批量去除视频右下角的水印（针对 "小云雀AI生成" 等固定位置水印）。
 
 ## 1. 依赖安装
 
@@ -37,7 +37,7 @@ brew install ffmpeg
 cd /path/to/Pink_House
 
 # 运行脚本
-python3 ItemManager/scripts/remove_watermark.py [目标路径]
+python3 scripts/remove_watermark.py [目标路径]
 ```
 
 ### 场景示例
@@ -47,7 +47,7 @@ python3 ItemManager/scripts/remove_watermark.py [目标路径]
 如果你只想处理某一个特定的视频文件：
 
 ```bash
-python3 ItemManager/scripts/remove_watermark.py "/Users/username/path/to/video.mp4"
+python3 scripts/remove_watermark.py "/Users/username/path/to/video.mp4"
 ```
 
 **场景 B：批量处理文件夹**
@@ -55,15 +55,15 @@ python3 ItemManager/scripts/remove_watermark.py "/Users/username/path/to/video.m
 如果你想处理 `asserts` 目录下的所有视频：
 
 ```bash
-python3 ItemManager/scripts/remove_watermark.py "/Users/username/path/to/asserts_folder"
+python3 scripts/remove_watermark.py "/Users/username/path/to/asserts_folder"
 ```
 
 **场景 C：默认行为**
 
-如果不带参数直接运行脚本，默认会尝试寻找脚本上一级目录的同级 `asserts` 目录（即 `ItemManager/asserts`）进行处理。
+如果不带参数直接运行脚本，默认会尝试寻找脚本上一级目录的同级 `asserts` 目录（即 `ItemManager/asserts`，*注意：如果脚本位置改变，默认路径可能需要调整*）进行处理。
 
 ```bash
-python3 ItemManager/scripts/remove_watermark.py
+python3 scripts/remove_watermark.py
 ```
 
 ## 4. 参数配置
@@ -86,3 +86,31 @@ MARGIN_BOTTOM = 10
 *   **找不到 ffmpeg**: 请确认已安装并在终端能直接运行 `ffmpeg -version`。
 *   **Permission denied**: 确保你有读取源文件和写入目标文件夹的权限。
 *   **去不干净/去多了**: 请根据实际视频的分辨率和水印大小，微调脚本中的 `WATERMARK_WIDTH`, `WATERMARK_HEIGHT` 以及边距参数。
+
+## 6. 音视频分离工具
+
+提供了两个脚本用于将视频文件分离为无声视频和音频文件。
+
+### 选项 A: Swift 脚本 (原生，无需 ffmpeg)
+
+适用于未安装 ffmpeg 的环境。使用 macOS 原生 AVFoundation 框架。
+
+**使用方法**:
+```bash
+swift scripts/extract_av.swift "/path/to/video.mp4"
+```
+
+*   **输出**: 生成 `[文件名]_video.mov` (无声) 和 `[文件名]_audio.m4a`。
+*   **注意**: 视频会进行重新编码，处理大文件时速度可能较慢。
+
+### 选项 B: Python 脚本 (推荐，依赖 ffmpeg)
+
+如果你已经安装了 ffmpeg（如上文所述），推荐使用此脚本，速度极快且无损（视频流）。
+
+**使用方法**:
+```bash
+python3 scripts/separate_av.py "/path/to/video.mp4"
+```
+
+*   **输出**: 生成 `[文件名]_video.mp4` (无声) 和 `[文件名]_audio.m4a`。
+*   **特点**: 视频流直接复制（Copy），无需重编码，速度极快。

@@ -36,6 +36,9 @@ KEYWORD_MAPPING = [
     (r"Sleeping|睡觉", "sleeping"),
     (r"浴缸|洗澡", "bathing"),
     (r"玩小球", "playing"),
+    (r"Dressing|换装", "dressing"),
+    (r"Talking|说话", "talking"),
+    (r"吸引注意", "attention"),
 ]
 
 def check_ffmpeg():

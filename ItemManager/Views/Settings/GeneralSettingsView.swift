@@ -158,6 +158,7 @@ struct GeneralSettingsView: View {
             .pickerStyle(.segmented)
             .listRowBackground(Color.clear)
             .padding(.vertical, 8)
+            .listRowSeparator(.hidden)
 
             // 实时预览区域
             HStack {

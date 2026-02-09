@@ -50,14 +50,21 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             url = Bundle.main.url(forResource: videoName, withExtension: "mp4")
         }
         
-        // 3. 尝试在 asserts 子目录查找
+        // 3. 尝试在 asserts 子目录查找 (标准方式)
+        if url == nil {
+            url = Bundle.main.url(forResource: videoName, withExtension: "mp4", subdirectory: "asserts")
+        }
+        
+        // 4. 尝试在 asserts 子目录查找 (兼容方式)
         if url == nil {
             url = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: "mp4")
         }
         
-        // 4. 尝试查找无后缀的文件 (如果 videoName 已经包含后缀)
+        // 5. 尝试查找无后缀的文件
         if url == nil {
              if let bundleUrl = Bundle.main.url(forResource: videoName, withExtension: nil) {
+                 url = bundleUrl
+             } else if let bundleUrl = Bundle.main.url(forResource: videoName, withExtension: nil, subdirectory: "asserts") {
                  url = bundleUrl
              } else if let bundleUrl = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: nil) {
                  url = bundleUrl
@@ -68,6 +75,9 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
         if url == nil {
             print("Error: Could not find video resource: \(videoName). Trying idle fallback.")
             url = Bundle.main.url(forResource: "idle", withExtension: "mp4")
+        }
+        if url == nil {
+            url = Bundle.main.url(forResource: "idle", withExtension: "mp4", subdirectory: "asserts")
         }
         if url == nil {
             url = Bundle.main.url(forResource: "asserts/idle", withExtension: "mp4")
