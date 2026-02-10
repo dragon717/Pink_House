@@ -12,6 +12,7 @@ enum SmallWorldDestination {
     case ootd
     case pet
     case wealth
+    case calendar
 }
 
 struct SmallWorldView: View {
@@ -35,17 +36,22 @@ struct SmallWorldView: View {
                         selectedTab = 0
                     }
                     
-                    // 3. OOTD
+                    // 3. 梦裙日历 (New)
+                    SmallWorldCard(title: "梦裙日历", icon: "calendar", color: .purple) {
+                        destination = .calendar
+                    }
+                    
+                    // 4. OOTD
                     SmallWorldCard(title: "OOTD", icon: "tshirt.fill", color: .purple) {
                         destination = .ootd
                     }
                     
-                    // 4. 萌宠
+                    // 5. 萌宠
                     SmallWorldCard(title: "萌宠", icon: "pawprint.fill", color: .orange) {
                         destination = .pet
                     }
                     
-                    // 5. 来财
+                    // 6. 来财
                     SmallWorldCard(title: "来财", icon: "yensign.circle.fill", color: .yellow) {
                         destination = .wealth
                     }

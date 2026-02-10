@@ -20,6 +20,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct ItemManagerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var themeManager = ThemeManager.shared
+    @State private var calendarThemeManager = CalendarThemeManager.shared
     @Environment(\.scenePhase) private var scenePhase
     
     // Splash Screen State
@@ -35,6 +36,7 @@ struct ItemManagerApp: App {
             ZStack {
                 MainTabView()
                     .environment(themeManager)
+                    .environment(calendarThemeManager)
                     .zIndex(0)
                 
                 if showSplash {

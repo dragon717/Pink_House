@@ -359,6 +359,16 @@ struct GeneralSettingsView: View {
                             .font(.caption)
                     }
                 }
+
+
+                NavigationLink(destination: CalendarSettingsView()) {
+                    HStack {
+                        Text("梦裙日历个性化")
+                        Spacer()
+                        Text(CalendarThemeManager.shared.currentTheme.displayName)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 
                 HStack {
                     Text("文字颜色")

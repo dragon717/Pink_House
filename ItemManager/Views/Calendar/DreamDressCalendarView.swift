@@ -1,0 +1,537 @@
+//
+//  DreamDressCalendarView.swift
+//  ItemManager
+//
+//  Created by Pink House Dev on 2/10/26.
+//
+
+import SwiftUI
+import SwiftData
+import UIKit
+
+struct DreamDressCalendarView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(CalendarThemeManager.self) private var themeManager
+    
+    // Data Query
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
+    
+    // State
+    @State private var viewMode: CalendarViewMode = .monthly
+    @State private var currentDate = Date() // Anchor date for Month/Year view
+    @State private var showingDayPopup: Date? // Date for the popup
+    @State private var showingMonthPreview: Date? // Month for the large preview popup
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Background
+                if colorScheme == .dark {
+                    Color.black.ignoresSafeArea()
+                } else {
+                    Color(uiColor: themeManager.currentTheme.backgroundColor)
+                        .ignoresSafeArea()
+                }
+                
+                VStack(spacing: 0) {
+                    // 1. Header with Mode Switcher
+                    headerView
+                    
+                    // 2. Main Content
+                    TabView(selection: $viewMode) {
+                        RecentTimelineView(clothings: allClothings, onDayTap: { date in showingDayPopup = date })
+                            .tag(CalendarViewMode.recent)
+                        
+                        DualMonthScrollView(anchorDate: $currentDate, clothings: allClothings, onDayTap: { date in showingDayPopup = date })
+                            .tag(CalendarViewMode.monthly)
+                        
+                        YearlyHeatmapView(
+                            currentDate: $currentDate,
+                            clothings: allClothings,
+                            onMonthTap: { monthDate in showingMonthPreview = monthDate }
+                        )
+                        .tag(CalendarViewMode.yearly)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(.easeInOut, value: viewMode)
+                }
+                
+                // 3. Popup Overlay (Day & Month)
+                if let date = showingDayPopup {
+                    UnifiedEventsPopup(
+                        title: date.formatted(date: .complete, time: .omitted),
+                        clothings: clothingsForDate(date),
+                        onClose: { showingDayPopup = nil }
+                    )
+                    .transition(.opacity)
+                    .zIndex(100)
+                }
+                
+                if let monthDate = showingMonthPreview {
+                    UnifiedEventsPopup(
+                        title: CalendarHelper.shared.monthYearString(monthDate),
+                        clothings: clothingsForMonth(monthDate),
+                        onClose: { showingMonthPreview = nil },
+                        onDayTap: { date in 
+                            showingMonthPreview = nil
+                            showingDayPopup = date 
+                        }
+                    )
+                    .transition(.opacity)
+                    .zIndex(110)
+                }
+            }
+            .navigationBarHidden(true)
+        }
+    }
+    
+    private var headerView: some View {
+        HStack {
+            Spacer()
+            
+            // Mode Segmented Control (Version Aware)
+            if #available(iOS 26.0, *) {
+                // iOS 26+ Native Segmented Control
+                Picker("视图模式", selection: $viewMode) {
+                    ForEach(CalendarViewMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 300)
+            } else {
+                // Custom Segmented Control for older versions
+                HStack(spacing: 0) {
+                    ForEach(CalendarViewMode.allCases) { mode in
+                        Text(mode.rawValue)
+                            .font(.custom(themeManager.currentTheme.fontName, size: 14))
+                            .fontWeight(viewMode == mode ? .bold : .regular)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 16)
+                            .background(viewMode == mode ? Color(uiColor: themeManager.currentTheme.accentColor) : Color.clear)
+                            .foregroundStyle(viewMode == mode ? .white : Color(uiColor: themeManager.currentTheme.accentColor))
+                            .clipShape(Capsule())
+                            .onTapGesture {
+                                withAnimation {
+                                    viewMode = mode
+                                }
+                            }
+                    }
+                }
+                .padding(4)
+                .background(Color(uiColor: themeManager.currentTheme.accentColor).opacity(0.1))
+                .clipShape(Capsule())
+            }
+            
+            Spacer()
+        }
+        .padding()
+    }
+    
+    private func clothingsForDate(_ date: Date) -> [Clothing] {
+        let calendar = Calendar.current
+        return allClothings.filter { clothing in
+            if let depositDate = clothing.depositDate, calendar.isDate(depositDate, inSameDayAs: date) { return true }
+            if let finalDate = clothing.finalPaymentDate, calendar.isDate(finalDate, inSameDayAs: date) { return true }
+            if let finalEnd = clothing.finalPaymentEndDate, calendar.isDate(finalEnd, inSameDayAs: date) { return true }
+            return false
+        }
+    }
+    
+    private func clothingsForMonth(_ date: Date) -> [Clothing] {
+        let calendar = Calendar.current
+        return allClothings.filter { clothing in
+            let components = calendar.dateComponents([.year, .month], from: date)
+            
+            if let d = clothing.depositDate, 
+               let dComp = calendar.dateComponents([.year, .month], from: d) as DateComponents?,
+               dComp.year == components.year && dComp.month == components.month { return true }
+            
+            if let f = clothing.finalPaymentDate,
+               let fComp = calendar.dateComponents([.year, .month], from: f) as DateComponents?,
+               fComp.year == components.year && fComp.month == components.month { return true }
+               
+            return false
+        }
+    }
+}
+
+// MARK: - 1. Recent View (Yesterday / Today / Tomorrow)
+struct RecentTimelineView: View {
+    let clothings: [Clothing]
+    let onDayTap: (Date) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(CalendarThemeManager.self) private var themeManager
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                daySection(offset: -1, title: "昨天")
+                daySection(offset: 0, title: "今天")
+                daySection(offset: 1, title: "明天")
+                
+                // Future Lookahead (Next 7 days)
+                Text("未来一周")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top)
+                
+                ForEach(2...7, id: \.self) { offset in
+                    if let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) {
+                        let events = clothingsForDate(date)
+                        if !events.isEmpty {
+                            CompactDayRow(date: date, clothings: events, theme: themeManager.currentTheme) {
+                                onDayTap(date)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+        }
+    }
+    
+    @ViewBuilder
+    private func daySection(offset: Int, title: String) -> some View {
+        if let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(title)
+                        .font(.title2)
+                        .bold()
+                        .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                    
+                    Text(date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                }
+                
+                let events = clothingsForDate(date)
+                if events.isEmpty {
+                    Text("无特殊安排")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(events) { clothing in
+                                ClothingCardTiny(clothing: clothing, date: date, theme: themeManager.currentTheme)
+                                    .onTapGesture {
+                                        onDayTap(date)
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.03), radius: 5, x: 0, y: 2)
+        }
+    }
+    
+    private func clothingsForDate(_ date: Date) -> [Clothing] {
+        let calendar = Calendar.current
+        return clothings.filter { clothing in
+            if let depositDate = clothing.depositDate, calendar.isDate(depositDate, inSameDayAs: date) { return true }
+            if let finalDate = clothing.finalPaymentDate, calendar.isDate(finalDate, inSameDayAs: date) { return true }
+            if let finalEnd = clothing.finalPaymentEndDate, calendar.isDate(finalEnd, inSameDayAs: date) { return true }
+            return false
+        }
+    }
+}
+
+struct ClothingCardTiny: View {
+    let clothing: Clothing
+    let date: Date
+    let theme: CalendarTheme
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let imagePath = clothing.imagePaths.first, let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 80, height: 80)
+                    .clipped()
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 80, height: 80)
+                    .overlay(Image(systemName: "tshirt").foregroundStyle(.secondary))
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(clothing.name)
+                    .font(.caption)
+                    .lineLimit(1)
+                
+                HStack(spacing: 2) {
+                    if let depositDate = clothing.depositDate, Calendar.current.isDate(depositDate, inSameDayAs: date) {
+                        Circle().fill(Color(uiColor: theme.depositColor)).frame(width: 6, height: 6)
+                        Text("定金").font(.caption2).foregroundStyle(.secondary)
+                    } else if let finalDate = clothing.finalPaymentDate, Calendar.current.isDate(finalDate, inSameDayAs: date) {
+                        Circle().fill(Color(uiColor: theme.finalPaymentColor)).frame(width: 6, height: 6)
+                        Text("尾款").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(6)
+            .frame(width: 80)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(radius: 1)
+    }
+}
+
+struct CompactDayRow: View {
+    let date: Date
+    let clothings: [Clothing]
+    let theme: CalendarTheme
+    let onTap: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack {
+                Text(date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 80, alignment: .leading)
+                
+                // Visual indicators
+                HStack(spacing: -8) {
+                    ForEach(clothings.prefix(5)) { clothing in
+                        if let imagePath = clothing.imagePaths.first, let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 30, height: 30)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                        } else {
+                            Circle()
+                                .fill(Color(uiColor: theme.accentColor))
+                                .frame(width: 30, height: 30)
+                                .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                                .overlay(Text(clothing.name.prefix(1)).font(.caption2).foregroundStyle(.white))
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+
+// MARK: - 2. Monthly View (Dual Month Scroll)
+struct DualMonthScrollView: View {
+    @Binding var anchorDate: Date
+    let clothings: [Clothing]
+    let onDayTap: (Date) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(CalendarThemeManager.self) private var themeManager
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Current Month
+                monthSection(for: anchorDate)
+                
+                // Next Month
+                if let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: anchorDate) {
+                    monthSection(for: nextMonth)
+                }
+            }
+            .padding(.bottom, 40)
+        }
+    }
+    
+    @ViewBuilder
+    private func monthSection(for date: Date) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(CalendarHelper.shared.monthYearString(date))
+                .font(.custom(themeManager.currentTheme.fontName, size: 20))
+                .bold()
+                .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                .padding(.horizontal)
+                .padding(.top)
+            
+            WeekHeaderView(theme: themeManager.currentTheme)
+                .padding(.horizontal)
+            
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+                ForEach(CalendarHelper.shared.generateDates(for: date)) { dateObj in
+                    DreamCalendarCell(
+                        dateObj: dateObj,
+                        clothings: clothingsForDate(dateObj.date),
+                        isSelected: false,
+                        theme: themeManager.currentTheme
+                    ) {
+                        onDayTap(dateObj.date)
+                    }
+                    // Removed fixed height to allow square aspect ratio from DreamCalendarCell
+                }
+            }
+            .padding(.horizontal)
+        }
+        .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .padding(.horizontal)
+    }
+    
+    private func clothingsForDate(_ date: Date) -> [Clothing] {
+        let calendar = Calendar.current
+        return clothings.filter { clothing in
+            if let depositDate = clothing.depositDate, calendar.isDate(depositDate, inSameDayAs: date) { return true }
+            if let finalDate = clothing.finalPaymentDate, calendar.isDate(finalDate, inSameDayAs: date) { return true }
+            if let finalEnd = clothing.finalPaymentEndDate, calendar.isDate(finalEnd, inSameDayAs: date) { return true }
+            return false
+        }
+    }
+}
+
+// MARK: - 3. Yearly View (Heatmap)
+struct YearlyHeatmapView: View {
+    @Binding var currentDate: Date
+    let clothings: [Clothing]
+    let onMonthTap: (Date) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(CalendarThemeManager.self) private var themeManager
+    
+    private var year: Int {
+        Calendar.current.component(.year, from: currentDate)
+    }
+    
+    let months = 1...12
+    let columns = [GridItem(.adaptive(minimum: 100), spacing: 16)]
+    
+    var body: some View {
+        ScrollView {
+            VStack {
+                HStack {
+                    Button {
+                        withAnimation {
+                            currentDate = Calendar.current.date(byAdding: .year, value: -1, to: currentDate) ?? currentDate
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                            .padding()
+                    }
+                    
+                    Text("\(String(year))年 概览")
+                        .font(.title2)
+                        .bold()
+                        .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                    
+                    Button {
+                        withAnimation {
+                            currentDate = Calendar.current.date(byAdding: .year, value: 1, to: currentDate) ?? currentDate
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                            .padding()
+                    }
+                }
+                .padding(.top)
+                
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(months, id: \.self) { month in
+                        Button {
+                            if let monthDate = Calendar.current.date(from: DateComponents(year: year, month: month)) {
+                                onMonthTap(monthDate)
+                            }
+                        } label: {
+                            VStack {
+                                Text("\(month)月")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                                
+                                Spacer()
+                                
+                                // Mini Heatmap Grid
+                                if let monthDate = Calendar.current.date(from: DateComponents(year: year, month: month)) {
+                                    MiniMonthGrid(monthDate: monthDate, clothings: clothings, theme: themeManager.currentTheme)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                Spacer()
+                            }
+                            .padding(8)
+                            .frame(maxWidth: .infinity)
+                            .aspectRatio(1.0, contentMode: .fit)
+                            .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding()
+            }
+        }
+    }
+}
+
+struct MiniMonthGrid: View {
+    let monthDate: Date
+    let clothings: [Clothing]
+    let theme: CalendarTheme
+    
+    var body: some View {
+        let days = CalendarHelper.shared.daysInMonth(monthDate)
+        let cols = Array(repeating: GridItem(.fixed(6), spacing: 2), count: 7)
+        
+        LazyVGrid(columns: cols, spacing: 2) {
+            // Empty prefix
+            let firstDay = CalendarHelper.shared.firstOfMonth(monthDate)
+            let weekday = CalendarHelper.shared.weekDay(firstDay)
+            ForEach(0..<weekday, id: \.self) { _ in
+                Color.clear.frame(width: 6, height: 6)
+            }
+            
+            ForEach(1...days, id: \.self) { day in
+                if let date = Calendar.current.date(byAdding: .day, value: day - 1, to: firstDay) {
+                    let intensity = heatIntensity(for: date)
+                    Circle()
+                        .fill(intensityColor(intensity))
+                        .frame(width: 6, height: 6)
+                }
+            }
+        }
+    }
+    
+    private func heatIntensity(for date: Date) -> Double {
+        let count = clothings.filter { clothing in
+            let calendar = Calendar.current
+            if let d = clothing.depositDate, calendar.isDate(d, inSameDayAs: date) { return true }
+            if let f = clothing.finalPaymentDate, calendar.isDate(f, inSameDayAs: date) { return true }
+            return false
+        }.count
+        return min(Double(count) / 3.0, 1.0) // Max intensity at 3 items
+    }
+    
+    private func intensityColor(_ intensity: Double) -> Color {
+        if intensity == 0 { return Color.gray.opacity(0.1) }
+        return Color(uiColor: theme.accentColor).opacity(0.2 + intensity * 0.8)
+    }
+}

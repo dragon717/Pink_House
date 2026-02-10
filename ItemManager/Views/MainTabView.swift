@@ -46,6 +46,8 @@ struct MainTabView: View {
                         PetHomeView()
                     case .wealth:
                         WealthView()
+                    case .calendar:
+                        DreamDressCalendarView()
                     }
                 }
                 .tabItem {
@@ -53,11 +55,13 @@ struct MainTabView: View {
                     case .menu:
                         Label("小世界", systemImage: "map")
                     case .ootd:
-                        Label("OOTD", systemImage: "tshirt.fill")
+                        Label("今日穿搭", systemImage: "tshirt")
                     case .pet:
-                        Label("萌宠", systemImage: "pawprint.fill")
+                        Label("萌宠", systemImage: "pawprint")
                     case .wealth:
-                        Label("来财", systemImage: "yensign.circle.fill")
+                        Label("马上来财", systemImage: "yensign.circle")
+                    case .calendar:
+                        Label("梦裙日历", systemImage: "calendar")
                     }
                 }
                 .tag(1)
