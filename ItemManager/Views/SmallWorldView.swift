@@ -30,7 +30,7 @@ struct SmallWorldView: View {
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
-        // return false
+        return false
 //        return true // canvas调整用
         #if DEBUG
         return true
@@ -235,10 +235,15 @@ struct CalendarHotspot: View {
         // 获取当月日期数据
         let days = CalendarHelper.shared.generateDates(for: today)
         
+        // 获取当前月的时间范围，用于过滤数据
+        let startOfMonth = CalendarHelper.shared.firstOfMonth(today)
+        let daysInMonth = CalendarHelper.shared.daysInMonth(today)
+        let endOfMonth = calendar.date(byAdding: .day, value: daysInMonth, to: startOfMonth)!
+        
         // 数据结构定义：记录每天应该显示什么
         enum DayContent {
             case thumbnail(Clothing) // 显示裙子缩略图
-            case dot // 显示中间圆点
+            case circleNumber // 显示带圈数字
         }
         
         // 预处理有事件的日期 -> 裙子
@@ -256,25 +261,30 @@ struct CalendarHotspot: View {
                     if let end = clothing.finalPaymentEndDate {
                         let endDate = calendar.startOfDay(for: end)
                         
+                        // 优化：如果整个时间段都不在当前月范围内，直接跳过
+                        // 只要有一部分在当前月，就需要处理
+                        if endDate < startOfMonth || startDate > endOfMonth {
+                            continue
+                        }
+                        
                         // 优先级1：尾款结束日期 (显示缩略图)
-                        // 如果同一天已经被别的裙子占用，这里采用“覆盖”策略，或者“不覆盖”策略？
-                        // 假设：我们希望看到尽可能多的裙子，如果 EndDate 被占了，可能就没办法了。
-                        // 这里我们简单粗暴：直接覆盖。因为用户说“结束日期优先”。
                         map[endDate] = .thumbnail(clothing)
                         
                         // 优先级2：尾款开始日期 (显示缩略图)
-                        // 只有当开始日期没有被占用（例如被别的结束日期占用）时，才设置
                         if startDate != endDate {
                             if map[startDate] == nil {
                                 map[startDate] = .thumbnail(clothing)
                             }
                             
-                            // 处理中间日期 (显示圆点)
-                            // 只有当该日期没有被占用（缩略图）时，才显示圆点
+                            // 处理中间日期 (显示带圈数字)
                             var curr = calendar.date(byAdding: .day, value: 1, to: startDate)!
                             while curr < endDate {
-                                if map[curr] == nil {
-                                    map[curr] = .dot
+                                // 性能优化：只记录当前月范围内的日期
+                                // 虽然 map 存了也没事，但过滤一下更稳妥
+                                if curr >= startOfMonth && curr <= endOfMonth {
+                                    if map[curr] == nil {
+                                        map[curr] = .circleNumber
+                                    }
                                 }
                                 curr = calendar.date(byAdding: .day, value: 1, to: curr)!
                             }
@@ -282,8 +292,10 @@ struct CalendarHotspot: View {
                         
                     } else {
                         // 只有开始日期（没有结束日期），视为单点事件
-                        if map[startDate] == nil {
-                            map[startDate] = .thumbnail(clothing)
+                        if startDate >= startOfMonth && startDate <= endOfMonth {
+                            if map[startDate] == nil {
+                                map[startDate] = .thumbnail(clothing)
+                            }
                         }
                     }
                 }
@@ -307,6 +319,8 @@ struct CalendarHotspot: View {
                 let cols = 7
                 let cellWidth = geo.size.width / CGFloat(cols)
                 let cellHeight = (geo.size.height * 0.88) / CGFloat(rows)
+                // 字体大小自适应
+                let fontSize = min(cellWidth, cellHeight) * 0.35
                 
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(cellWidth), spacing: 0), count: 7), spacing: 0) {
                     ForEach(days) { dayObj in
@@ -314,6 +328,7 @@ struct CalendarHotspot: View {
                             let dateStart = calendar.startOfDay(for: dayObj.date)
                             let content = eventMap[dateStart]
                             let isToday = dayObj.isToday
+                            let dayNum = CalendarHelper.shared.dayOfMonth(dayObj.date)
                             
                             ZStack {
                                 // 背景网格线
@@ -339,24 +354,47 @@ struct CalendarHotspot: View {
                                         .frame(width: cellWidth * 0.9, height: cellHeight * 0.9)
                                         .clipped()
                                         .cornerRadius(2)
+                                        .overlay(
+                                            // 如果是今天，添加深莫奈儿粉色加粗方框
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .stroke(monetDarkPink, lineWidth: isToday ? 2 : 0)
+                                        )
                                     } else {
                                         // 有数据但无图，显示莫奈儿粉方块
                                         RoundedRectangle(cornerRadius: 2)
                                             .fill(monetPink)
                                             .frame(width: cellWidth * 0.8, height: cellHeight * 0.8)
+                                            .overlay(
+                                                // 如果是今天，添加深莫奈儿粉色加粗方框
+                                                RoundedRectangle(cornerRadius: 2)
+                                                    .stroke(monetDarkPink, lineWidth: isToday ? 2 : 0)
+                                            )
                                     }
                                     
-                                case .dot:
-                                    // 显示中间圆点
+                                case .circleNumber:
+                                    // 显示带圈数字 (中间日期)
                                     Circle()
                                         .fill(monetPink)
-                                        .frame(width: min(cellWidth, cellHeight) * 0.3)
+                                        .frame(width: min(cellWidth, cellHeight) * 0.7)
+                                    
+                                    Text("\(dayNum)")
+                                        .font(.system(size: fontSize, weight: .bold))
+                                        .foregroundColor(.white)
                                     
                                 case nil:
+                                    // 正常数字
                                     if isToday {
                                         Circle()
-                                            .fill(monetDarkPink) // 今天用深一点的颜色区分
-                                            .frame(width: min(cellWidth, cellHeight) * 0.4)
+                                            .fill(monetDarkPink)
+                                            .frame(width: min(cellWidth, cellHeight) * 0.7)
+                                        
+                                        Text("\(dayNum)")
+                                            .font(.system(size: fontSize, weight: .bold))
+                                            .foregroundColor(.white)
+                                    } else {
+                                        Text("\(dayNum)")
+                                            .font(.system(size: fontSize))
+                                            .foregroundColor(.gray)
                                     }
                                 }
                             }
