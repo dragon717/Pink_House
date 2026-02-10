@@ -23,7 +23,18 @@ struct PetOverlayView: View {
     // 我们希望宠物趴在 TabBar 上缘。
     // 可以通过 offset y 来微调垂直位置
     private let verticalOffset: CGFloat = -49 // 向上偏移，使其位于 TabBar 上方
+    private let catWidth: CGFloat = 70 // 小猫图片宽度
     
+    // 底部导航栏每个按钮的预估宽度 (假设3个Tab)
+    // 系统 TabBar 默认是均匀分布，但在 iPad 或大屏上可能不同。
+    // 这里我们假设 TabBar 的有效交互区域主要集中在中间或均匀分布。
+    // 根据用户反馈 "底部导航栏宽度不是屏幕宽度，是根据底部导航栏的所有按钮实际占用宽度"
+    // 我们需要估算一个合理的有效宽度。
+    // 假设每个 TabItem 宽度约为 80-100pt，间距 20pt，3个 Tab 大约 300-360pt。
+    // 或者更保守一点，只限制在左右两侧的一定范围内。
+    // 这里我们定义一个可配置的 TabBar 有效宽度。
+    private let tabBarEffectiveWidth: CGFloat = 320 // 3个Tab的大致宽度
+
     var body: some View {
         GeometryReader { geometry in
             VStack {
@@ -35,7 +46,7 @@ struct PetOverlayView: View {
                     Image("PetPeekingIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 100) // 根据实际图片比例调整大小
+                        .frame(width: catWidth) // 根据实际图片比例调整大小
                         // 呼吸动画
                         .scaleEffect(isBreathing ? 1.05 : 1.0, anchor: .bottom)
                         .animation(
@@ -65,7 +76,11 @@ struct PetOverlayView: View {
                                     
                                     // 边界限制：不要拖出屏幕太远
                                     let screenWidth = geometry.size.width
-                                    let maxOffset = (screenWidth / 2) - 40
+                                    
+                                    // 根据用户需求：吸附范围限制在 TabBar 的实际内容宽度内
+                                    // 假设 TabBar 居中，那么最大偏移量应该是 (TabBar宽度 / 2) - (猫宽度 / 2)
+                                    // 这样猫的中心点最远只能到达 TabBar 的边缘内侧
+                                    let maxOffset = (min(screenWidth, tabBarEffectiveWidth) / 2) - (catWidth / 2)
                                     
                                     withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0)) {
                                         // X轴：限制在屏幕内
