@@ -20,12 +20,14 @@ struct SmallWorldView: View {
     @Binding var selectedTab: Int // MainTabView selection
     @Binding var homeTab: HomeTab // HomeView selection
     @Binding var destination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
     
     // 图片原始尺寸 1919x1079
     private let imageSize = CGSize(width: 1919, height: 1079)
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
+        return false
 //        return true
         #if DEBUG
         return true
@@ -35,76 +37,78 @@ struct SmallWorldView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            ScrollViewReader { scrollProxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    ZStack(alignment: .topLeading) {
-                        Image("small_world_bg") // 确保图片已添加至 Assets
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: geometry.size.height * (imageSize.width / imageSize.height), height: geometry.size.height)
-                            .overlay(
-                                ZStack(alignment: .topLeading) {
-                                    // 1. OOTD (今日穿搭) - 最左侧
-                                    InteractionHotspot(rect: CGRect(x: 0.2, y: 0.2, width: 0.15, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
-                                        destination = .ootd
+        ZStack {
+            GeometryReader { geometry in
+                ScrollViewReader { scrollProxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        ZStack(alignment: .topLeading) {
+                            Image("small_world_bg") // 确保图片已添加至 Assets
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geometry.size.height * (imageSize.width / imageSize.height), height: geometry.size.height)
+                                .overlay(
+                                    ZStack(alignment: .topLeading) {
+                                        // 1. OOTD (今日穿搭) - 最左侧
+                                        InteractionHotspot(rect: CGRect(x: 0.2, y: 0.2, width: 0.15, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
+                                            destination = .ootd
+                                        }
+                                        
+                                        // 2. 衣橱 (少女衣橱)
+                                        InteractionHotspot(rect: CGRect(x: 0.39, y: 0.1, width: 0.2, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                            withAnimation(.easeIn(duration: 0.5)) {
+                                                isPlayingOpeningAnimation = true
+                                            }
+                                        }
+                                        
+                                        // 3. 猪 (来财)
+                                        InteractionHotspot(rect: CGRect(x: 0.7, y: 0.45, width: 0.18, height: 0.22), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                            destination = .wealth
+                                        }
+                                        
+                                        // 4. 墙上的日历 (梦裙日历)
+                                        CalendarHotspot(rect: CGRect(x: 0.64, y: 0.19, width: 0.13, height: 0.21), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                            destination = .calendar
+                                        }
+                                        
+                                        // 中心锚点，用于初始定位
+                                        Color.clear
+                                            .frame(width: 1, height: 1)
+                                            .position(x: (geometry.size.height * (imageSize.width / imageSize.height)) / 2,
+                                                      y: geometry.size.height / 2)
+                                            .id("centerAnchor")
                                     }
-                                    
-                                    // 2. 衣橱 (少女衣橱)
-                                    InteractionHotspot(rect: CGRect(x: 0.39, y: 0.1, width: 0.2, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
-                                        homeTab = .wardrobe
-                                        selectedTab = 0
-                                    }
-                                    
-                                    // 3. 猪 (来财)
-                                    InteractionHotspot(rect: CGRect(x: 0.7, y: 0.45, width: 0.18, height: 0.22), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
-                                        destination = .wealth
-                                    }
-                                    
-                                    // 4. 墙上的日历 (梦裙日历)
-                                    CalendarHotspot(rect: CGRect(x: 0.64, y: 0.19, width: 0.13, height: 0.21), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
-                                        destination = .calendar
-                                    }
-                                    
-                                    // 中心锚点，用于初始定位
-                                    Color.clear
-                                        .frame(width: 1, height: 1)
-                                        .position(x: (geometry.size.height * (imageSize.width / imageSize.height)) / 2,
-                                                  y: geometry.size.height / 2)
-                                        .id("centerAnchor")
-                                }
-                            )
+                                )
+                        }
+                        .disableScrollBounce() // 禁用边缘回弹，必须放在 ScrollView 内容视图上
                     }
-                    .disableScrollBounce() // 禁用边缘回弹，必须放在 ScrollView 内容视图上
-                }
-                .ignoresSafeArea()
-                .onAppear {
-                    // 延迟滚动以确保视图加载完成
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation {
-                            scrollProxy.scrollTo("centerAnchor", anchor: .center)
+                    .ignoresSafeArea()
+                    .onAppear {
+                        // 延迟滚动以确保视图加载完成
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation {
+                                scrollProxy.scrollTo("centerAnchor", anchor: .center)
+                            }
                         }
                     }
                 }
             }
-        }
-        .background(Color.black) // 防止滑动穿透露出底层背景
-        .ignoresSafeArea() // 确保 GeometryReader 获取全屏尺寸
-        .toolbarBackground(.hidden, for: .tabBar) // 尝试 SwiftUI 原生隐藏
-        .onAppear {
-            // 强制设置 UITabBar 为完全透明
-            let appearance = UITabBarAppearance()
-            appearance.configureWithTransparentBackground()
-            appearance.backgroundColor = .clear
-            appearance.shadowImage = UIImage()
-            appearance.backgroundImage = UIImage()
-            
-            UITabBar.appearance().standardAppearance = appearance
-            if #available(iOS 15.0, *) {
-                UITabBar.appearance().scrollEdgeAppearance = appearance
+            .background(Color.black) // 防止滑动穿透露出底层背景
+            .ignoresSafeArea() // 确保 GeometryReader 获取全屏尺寸
+            .toolbarBackground(.hidden, for: .tabBar) // 尝试 SwiftUI 原生隐藏
+            .onAppear {
+                // 强制设置 UITabBar 为完全透明
+                let appearance = UITabBarAppearance()
+                appearance.configureWithTransparentBackground()
+                appearance.backgroundColor = .clear
+                appearance.shadowImage = UIImage()
+                appearance.backgroundImage = UIImage()
+                
+                UITabBar.appearance().standardAppearance = appearance
+                if #available(iOS 15.0, *) {
+                    UITabBar.appearance().scrollEdgeAppearance = appearance
+                }
             }
-        }
-        .onDisappear {
+            .onDisappear {
             // 恢复默认的半透明背景
             let appearance = UITabBarAppearance()
             appearance.configureWithDefaultBackground()
@@ -115,6 +119,7 @@ struct SmallWorldView: View {
             }
         }
     }
+}
 }
 
 /// 交互热区组件
@@ -205,12 +210,14 @@ struct CalendarHotspot: View {
         @State var selectedTab = 1
         @State var homeTab: HomeTab = .wardrobe
         @State var destination: SmallWorldDestination = .menu
+        @State var isPlayingOpeningAnimation = false
         
         var body: some View {
             SmallWorldView(
                 selectedTab: $selectedTab,
                 homeTab: $homeTab,
-                destination: $destination
+                destination: $destination,
+                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
             )
         }
     }

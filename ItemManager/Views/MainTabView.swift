@@ -22,6 +22,7 @@ struct MainTabView: View {
     @State private var selectedTab: Int = 0
     @State private var homeTabSelection: HomeTab = .wardrobe
     @State private var smallWorldDestination: SmallWorldDestination = .menu
+    @State private var isPlayingOpeningAnimation = false
     
     var body: some View {
         ZStack {
@@ -39,7 +40,12 @@ struct MainTabView: View {
                 Group {
                     switch smallWorldDestination {
                     case .menu:
-                        SmallWorldView(selectedTab: $selectedTab, homeTab: $homeTabSelection, destination: $smallWorldDestination)
+                        SmallWorldView(
+                            selectedTab: $selectedTab,
+                            homeTab: $homeTabSelection,
+                            destination: $smallWorldDestination,
+                            isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                        )
                     case .ootd:
                         OOTDView()
                     case .pet:
@@ -86,6 +92,46 @@ struct MainTabView: View {
             
             // Small World Long Press Menu Overlay
             SmallWorldMenuOverlay(selectedTab: $selectedTab, smallWorldDestination: $smallWorldDestination)
+            
+            // Video Player Overlay
+            if isPlayingOpeningAnimation {
+                ZStack(alignment: .topTrailing) {
+                    Color.black.ignoresSafeArea()
+                    
+                    PetVideoPlayer(videoName: "open_dress", isLooping: false, onFinished: {
+                        // 1. Switch Tab behind the scene
+                        homeTabSelection = .wardrobe
+                        selectedTab = 0
+                        
+                        // 2. Fade out video
+                        withAnimation(.easeOut(duration: 0.8)) {
+                            isPlayingOpeningAnimation = false
+                        }
+                    })
+                    .ignoresSafeArea()
+                    
+                    // Skip Button
+                    Button {
+                        homeTabSelection = .wardrobe
+                        selectedTab = 0
+                        withAnimation(.easeOut(duration: 0.5)) {
+                            isPlayingOpeningAnimation = false
+                        }
+                    } label: {
+                        Text("跳过")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.black.opacity(0.4))
+                            .clipShape(Capsule())
+                    }
+                    .padding(.top, 50)
+                    .padding(.trailing, 20)
+                }
+                .transition(.opacity)
+                .zIndex(200) // Ensure it's on top of everything
+            }
         }
     }
     

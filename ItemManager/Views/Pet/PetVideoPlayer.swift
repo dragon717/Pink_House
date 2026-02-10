@@ -104,9 +104,11 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             if isLooping {
                 // 设置循环
                 context.coordinator.setupLooper(item: newItem, url: validUrl)
+                player.actionAtItemEnd = .advance // 循环播放需要自动推进
             } else {
                 // 设置单次播放监听
                 player.replaceCurrentItem(with: newItem)
+                player.actionAtItemEnd = .pause // 单次播放结束暂停在最后一帧，防止黑屏
                 context.coordinator.setupObserver(item: newItem, onFinished: onFinished)
             }
             
@@ -126,6 +128,8 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                     context.coordinator.looper?.disableLooping()
                     context.coordinator.looper = nil
                     
+                    player.actionAtItemEnd = .pause // 切换到单次播放时，也要确保结束暂停
+                    
                     // 添加结束监听，以便播放完当前遍后调用 onFinished
                     if let currentItem = player.currentItem {
                         context.coordinator.setupObserver(item: currentItem, onFinished: onFinished)
@@ -137,6 +141,7 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                     if let currentItem = player.currentItem {
                          context.coordinator.removeObserver()
                          context.coordinator.setupLooper(item: currentItem, url: validUrl)
+                         player.actionAtItemEnd = .advance // 恢复循环播放行为
                     }
                 }
             }
