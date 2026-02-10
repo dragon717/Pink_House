@@ -54,6 +54,14 @@ struct ItemManagerApp: App {
                 
                 // Initialization Buffer & Peak Shaving
                 Task {
+                    // 0. Preload Spatial Assets (iOS 26+ only)
+                    // 仅在支持的系统上预加载，避免旧设备浪费资源
+                    if #available(iOS 26.0, *) {
+                        await MainActor.run {
+                            SpatialAssetManager.shared.preload(imageName: "small_world_bg", extension: "png")
+                        }
+                    }
+                    
                     // 1. Minimum splash duration (aesthetic + buffer)
                     try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
                     

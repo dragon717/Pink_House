@@ -20,6 +20,8 @@
 	<string>我们需要访问您的相册以保存图片。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>我们需要使用麦克风来与您的萌宠进行语音互动。</string>
+	<key>NSMotionUsageDescription</key>
+	<string>我们需要访问运动数据以实现主屏幕的 3D 视差背景效果。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>我们需要语音识别功能来将您的语音转化为文字，与萌宠互动。</string>
 </dict>

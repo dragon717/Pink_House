@@ -47,7 +47,7 @@ struct WealthView: View {
                     }
                 }
             }
-            .navigationTitle("来财")
+            .navigationTitle("🐎上来财")
             .toolbar {
                 toolbarContent
             }
