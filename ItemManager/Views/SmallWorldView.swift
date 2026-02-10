@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit // 导入 UIKit 以使用 UITabBar 等 API
 
 enum SmallWorldDestination {
     case menu
@@ -73,9 +74,9 @@ struct SmallWorldView: View {
                                 }
                             )
                     }
+                    .disableScrollBounce() // 禁用边缘回弹，必须放在 ScrollView 内容视图上
                 }
                 .ignoresSafeArea()
-                .disableScrollBounce() // 禁用边缘回弹
                 .onAppear {
                     // 延迟滚动以确保视图加载完成
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -86,8 +87,8 @@ struct SmallWorldView: View {
                 }
             }
         }
+        .background(Color.black) // 防止滑动穿透露出底层背景
         .ignoresSafeArea() // 确保 GeometryReader 获取全屏尺寸
-        // .background(Color.black) // z-index 问题，确保在 ScrollView 之上
         .toolbarBackground(.hidden, for: .tabBar) // 尝试 SwiftUI 原生隐藏
         .onAppear {
             // 强制设置 UITabBar 为完全透明
