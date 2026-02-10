@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PetOverlayView: View {
     // 点击动作
@@ -43,18 +44,33 @@ struct PetOverlayView: View {
                 HStack {
                     Spacer()
                     // 宠物图标
-                    Image("PetPeekingIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: catWidth) // 根据实际图片比例调整大小
-                        // 呼吸动画
-                        .scaleEffect(isBreathing ? 1.05 : 1.0, anchor: .bottom)
-                        .animation(
-                            Animation.easeInOut(duration: 2.0)
-                                .repeatForever(autoreverses: true),
-                            value: isBreathing
-                        )
-                        // 位置偏移 (拖动 + 固定偏移)
+                    ZStack {
+                        // 1. 静止/呼吸状态的猫 (趴着)
+                        Image("PetPeekingIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: catWidth)
+                            .scaleEffect(isBreathing ? 1.05 : 1.0, anchor: .bottom)
+                            .opacity(isDragging ? 0 : 1)
+                            .animation(
+                                isDragging ? .easeOut(duration: 0.15) : Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                                value: isBreathing
+                            )
+                        
+                        // 2. 拖拽状态的猫 (拎起)
+                        Image("PetDraggingIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: catWidth)
+                            // 2.5倍缩放，使用顶部锚点 (因为是拎起动作，手指捏住顶部，身体向下垂)
+                            // 同时给予一定的垂直偏移，确保手指位置对应猫的颈部区域
+                            .scaleEffect(2.5, anchor: .top)
+                            .offset(y: 30) // 向下偏移，让猫身体垂下来，而不是头部顶上去
+                            .opacity(isDragging ? 1 : 0)
+                    }
+                    // 统一处理拖拽状态变化的过渡动画
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDragging)
+                    // 位置偏移 (拖动 + 固定偏移)
                         .offset(x: positionX + dragOffset.width, y: verticalOffset + positionY + dragOffset.height)
                         .gesture(
                             DragGesture(minimumDistance: 10) // 设置最小距离以区分点击

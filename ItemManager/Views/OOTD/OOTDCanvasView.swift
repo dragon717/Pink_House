@@ -47,7 +47,7 @@ struct OOTDCanvasView: View {
                         .frame(width: canvasWidth, height: canvasHeight)
                         .clipped()
                 } else {
-                    Image("ootd_background")
+                    Image("ootd")
                         .resizable()
                         .scaledToFill()
                         .frame(width: canvasWidth, height: canvasHeight)
