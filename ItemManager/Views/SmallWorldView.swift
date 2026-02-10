@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import UIKit // 导入 UIKit 以使用 UITabBar 等 API
 import RealityKit
 import CoreMotion
@@ -29,7 +30,7 @@ struct SmallWorldView: View {
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
-        return false
+        // return false
 //        return true // canvas调整用
         #if DEBUG
         return true
@@ -185,11 +186,28 @@ struct CalendarHotspot: View {
     var showDebug: Bool = false
     let action: () -> Void
     
+    // 监听数据变化
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
+    
     var body: some View {
         let width = geometry.size.height * (imageSize.width / imageSize.height)
         let height = geometry.size.height
         
-        ZStack(alignment: .topLeading) {
+        // 计算热区实际尺寸
+        let hotspotWidth = rect.width * width
+        let hotspotHeight = rect.height * height
+        
+        ZStack {
+            // 随动内容：当月界面预览
+            // 使用白色半透明背景模拟纸张质感
+            calendarContent
+                .frame(width: hotspotWidth, height: hotspotHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.85))
+                        .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                )
+            
             // 点击跳转
             Button(action: action) {
                 if showDebug {
@@ -201,34 +219,159 @@ struct CalendarHotspot: View {
                         .contentShape(Rectangle())
                 }
             }
+        }
+        .frame(width: hotspotWidth, height: hotspotHeight)
+        .offset(x: rect.minX * width, y: rect.minY * height)
+    }
+    
+    // 莫奈儿粉色系
+    private let monetPink = Color(red: 0.96, green: 0.82, blue: 0.84)
+    private let monetDarkPink = Color(red: 0.85, green: 0.65, blue: 0.68)
+    
+    private var calendarContent: some View {
+        let today = Date()
+        let calendar = Calendar.current
+        let month = calendar.component(.month, from: today)
+        // 获取当月日期数据
+        let days = CalendarHelper.shared.generateDates(for: today)
+        
+        // 数据结构定义：记录每天应该显示什么
+        enum DayContent {
+            case thumbnail(Clothing) // 显示裙子缩略图
+            case dot // 显示中间圆点
+        }
+        
+        // 预处理有事件的日期 -> 裙子
+        let eventMap: [Date: DayContent] = {
+            var map = [Date: DayContent]()
             
-            // 随动内容：当月界面预览
-            VStack(spacing: 2) {
-                Text("\(Calendar.current.component(.month, from: Date()))月")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.pink)
+            for clothing in allClothings {
+                // 1. 只看尾款天使
+                guard clothing.isDepositPlan else { continue }
                 
-                // 简单的网格模拟
-                let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 7)
-                LazyVGrid(columns: columns, spacing: 1) {
-                    ForEach(0..<28) { _ in
-                        Circle()
-                            .fill(Color.pink.opacity(0.3))
-                            .frame(width: 2, height: 2)
+                // 2. 必须有尾款日期
+                if let start = clothing.finalPaymentDate {
+                    let startDate = calendar.startOfDay(for: start)
+                    
+                    if let end = clothing.finalPaymentEndDate {
+                        let endDate = calendar.startOfDay(for: end)
+                        
+                        // 优先级1：尾款结束日期 (显示缩略图)
+                        // 如果同一天已经被别的裙子占用，这里采用“覆盖”策略，或者“不覆盖”策略？
+                        // 假设：我们希望看到尽可能多的裙子，如果 EndDate 被占了，可能就没办法了。
+                        // 这里我们简单粗暴：直接覆盖。因为用户说“结束日期优先”。
+                        map[endDate] = .thumbnail(clothing)
+                        
+                        // 优先级2：尾款开始日期 (显示缩略图)
+                        // 只有当开始日期没有被占用（例如被别的结束日期占用）时，才设置
+                        if startDate != endDate {
+                            if map[startDate] == nil {
+                                map[startDate] = .thumbnail(clothing)
+                            }
+                            
+                            // 处理中间日期 (显示圆点)
+                            // 只有当该日期没有被占用（缩略图）时，才显示圆点
+                            var curr = calendar.date(byAdding: .day, value: 1, to: startDate)!
+                            while curr < endDate {
+                                if map[curr] == nil {
+                                    map[curr] = .dot
+                                }
+                                curr = calendar.date(byAdding: .day, value: 1, to: curr)!
+                            }
+                        }
+                        
+                    } else {
+                        // 只有开始日期（没有结束日期），视为单点事件
+                        if map[startDate] == nil {
+                            map[startDate] = .thumbnail(clothing)
+                        }
                     }
                 }
             }
-            .padding(4)
-            .background(Color.white.opacity(0.8))
-            .cornerRadius(4)
-            .frame(width: rect.width * width * 0.8, height: rect.height * height * 0.6)
-            .position(x: rect.midX * width, y: rect.midY * height)
-            .allowsHitTesting(false) // 让点击穿透到下层 Button
+            return map
+        }()
+        
+        return GeometryReader { geo in
+            VStack(spacing: 0) {
+                // 莫奈儿粉月份标题条
+                Text("\(month)月")
+                    .font(.system(size: max(6, geo.size.height * 0.08), weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: geo.size.height * 0.12)
+                    .background(monetDarkPink.opacity(0.9)) // 使用深一点的莫奈儿粉
+                    .cornerRadius(2, corners: [.topLeft, .topRight])
+                
+                // 日期网格
+                let rows = 6
+                let cols = 7
+                let cellWidth = geo.size.width / CGFloat(cols)
+                let cellHeight = (geo.size.height * 0.88) / CGFloat(rows)
+                
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(cellWidth), spacing: 0), count: 7), spacing: 0) {
+                    ForEach(days) { dayObj in
+                        if dayObj.isCurrentMonth {
+                            let dateStart = calendar.startOfDay(for: dayObj.date)
+                            let content = eventMap[dateStart]
+                            let isToday = dayObj.isToday
+                            
+                            ZStack {
+                                // 背景网格线
+                                Rectangle()
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 0.5)
+                                
+                                switch content {
+                                case .thumbnail(let clothing):
+                                    if let imagePath = clothing.imagePaths.first {
+                                        // 显示缩略图
+                                        AsyncDownsampledImage(
+                                            fileName: imagePath,
+                                            targetSize: CGSize(width: 20, height: 20), // 小图
+                                            content: { uiImage in
+                                                Image(uiImage: uiImage)
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fill)
+                                            },
+                                            placeholder: {
+                                                monetPink.opacity(0.5)
+                                            }
+                                        )
+                                        .frame(width: cellWidth * 0.9, height: cellHeight * 0.9)
+                                        .clipped()
+                                        .cornerRadius(2)
+                                    } else {
+                                        // 有数据但无图，显示莫奈儿粉方块
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(monetPink)
+                                            .frame(width: cellWidth * 0.8, height: cellHeight * 0.8)
+                                    }
+                                    
+                                case .dot:
+                                    // 显示中间圆点
+                                    Circle()
+                                        .fill(monetPink)
+                                        .frame(width: min(cellWidth, cellHeight) * 0.3)
+                                    
+                                case nil:
+                                    if isToday {
+                                        Circle()
+                                            .fill(monetDarkPink) // 今天用深一点的颜色区分
+                                            .frame(width: min(cellWidth, cellHeight) * 0.4)
+                                    }
+                                }
+                            }
+                            .frame(width: cellWidth, height: cellHeight)
+                        } else {
+                            Color.clear
+                                .frame(width: cellWidth, height: cellHeight)
+                        }
+                    }
+                }
+            }
         }
-        .frame(width: rect.width * width, height: rect.height * height)
-        .offset(x: rect.minX * width, y: rect.minY * height)
     }
 }
+
 
 #Preview {
     struct PreviewWrapper: View {
