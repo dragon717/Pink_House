@@ -26,6 +26,7 @@ struct SmallWorldView: View {
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
+//        return true
         #if DEBUG
         return true
         #else
@@ -45,23 +46,23 @@ struct SmallWorldView: View {
                             .overlay(
                                 ZStack(alignment: .topLeading) {
                                     // 1. OOTD (今日穿搭) - 最左侧
-                                    InteractionHotspot(rect: CGRect(x: 0.1, y: 0.5, width: 0.15, height: 0.2), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
+                                    InteractionHotspot(rect: CGRect(x: 0.2, y: 0.2, width: 0.15, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
                                         destination = .ootd
                                     }
                                     
                                     // 2. 衣橱 (少女衣橱)
-                                    InteractionHotspot(rect: CGRect(x: 0.3, y: 0.2, width: 0.25, height: 0.6), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                    InteractionHotspot(rect: CGRect(x: 0.39, y: 0.1, width: 0.2, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                         homeTab = .wardrobe
                                         selectedTab = 0
                                     }
                                     
                                     // 3. 猪 (来财)
-                                    InteractionHotspot(rect: CGRect(x: 0.75, y: 0.55, width: 0.12, height: 0.2), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                    InteractionHotspot(rect: CGRect(x: 0.7, y: 0.45, width: 0.18, height: 0.22), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                         destination = .wealth
                                     }
                                     
                                     // 4. 墙上的日历 (梦裙日历)
-                                    CalendarHotspot(rect: CGRect(x: 0.6, y: 0.15, width: 0.1, height: 0.2), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                    CalendarHotspot(rect: CGRect(x: 0.64, y: 0.19, width: 0.13, height: 0.21), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                         destination = .calendar
                                     }
                                     
@@ -144,6 +145,8 @@ struct InteractionHotspot: View {
     }
 }
 
+
+
 /// 日历专属热区，带容器跟随效果
 struct CalendarHotspot: View {
     let rect: CGRect
@@ -195,5 +198,22 @@ struct CalendarHotspot: View {
         .frame(width: rect.width * width, height: rect.height * height)
         .offset(x: rect.minX * width, y: rect.minY * height)
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @State var selectedTab = 1
+        @State var homeTab: HomeTab = .wardrobe
+        @State var destination: SmallWorldDestination = .menu
+        
+        var body: some View {
+            SmallWorldView(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        }
+    }
+    return PreviewWrapper()
 }
 
