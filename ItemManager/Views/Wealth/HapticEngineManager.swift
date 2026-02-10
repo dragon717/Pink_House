@@ -231,6 +231,48 @@ final class HapticEngineManager: ObservableObject {
         }
     }
     
+    /// 触发一次纯触觉反馈（用于 UI 交互，无强制音效）
+    /// - Parameters:
+    ///   - intensity: Core Haptics 强度 (0.0 - 1.0)
+    ///   - sharpness: Core Haptics 锐度 (0.0 - 1.0)
+    ///   - fallbackStyle: 降级方案使用的 UIKit 震动风格
+    func playUIFeedback(intensity: Float, sharpness: Float, fallbackStyle: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+        guard isHapticsEnabled else { return }
+        
+        // 如果不支持 Core Haptics 或引擎未就绪，使用 UIKit Fallback
+        if !supportsCoreHaptics || engine == nil {
+            let generator = UIImpactFeedbackGenerator(style: fallbackStyle)
+            generator.prepare()
+            generator.impactOccurred()
+            return
+        }
+        
+        // 确保引擎正在运行
+        startEngineIfNeeded()
+        
+        // Core Haptics 逻辑
+        let clampedIntensity = max(0.01, min(intensity, 1.0))
+        let clampedSharpness = max(0.0, min(sharpness, 1.0))
+        
+        // 非线性提升低强度震感，确保感知度
+        let boostedIntensity = pow(clampedIntensity, 0.5)
+        
+        let parameters: [CHHapticEventParameter] = [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: boostedIntensity),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: clampedSharpness)
+        ]
+        
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: parameters, relativeTime: 0)
+        
+        do {
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let player = try engine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play UI haptic: \(error)")
+        }
+    }
+
     /// 触发一次碰撞震动（模拟金豆撞击）
     /// - Parameters:
     ///   - intensity: 震动强度 (0.0 - 1.0)，通常基于碰撞速度

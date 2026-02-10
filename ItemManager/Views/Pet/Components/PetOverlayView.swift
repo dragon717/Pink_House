@@ -6,7 +6,8 @@ struct PetOverlayView: View {
     
     // 位置状态
     @State private var positionX: CGFloat = 0
-    @GestureState private var dragOffset: CGFloat = 0
+    @State private var positionY: CGFloat = 0
+    @GestureState private var dragOffset: CGSize = .zero
     
     // 动画状态
     @State private var isBreathing: Bool = false
@@ -14,8 +15,8 @@ struct PetOverlayView: View {
     // 交互状态
     @State private var isDragging: Bool = false
     
-    // 触觉反馈
-    private let impactGenerator = UIImpactFeedbackGenerator(style: .light)
+    // 触觉反馈管理器
+    @ObservedObject private var hapticManager = HapticEngineManager.shared
     
     // 配置参数
     // 假设 TabBar 高度约为 49pt (标准) + Safe Area
@@ -42,48 +43,55 @@ struct PetOverlayView: View {
                                 .repeatForever(autoreverses: true),
                             value: isBreathing
                         )
-                        // 水平位置偏移 (拖动)
-                        .offset(x: positionX + dragOffset)
-                        // 垂直位置偏移 (趴在导航栏上)
-                        .offset(y: verticalOffset)
+                        // 位置偏移 (拖动 + 固定偏移)
+                        .offset(x: positionX + dragOffset.width, y: verticalOffset + positionY + dragOffset.height)
                         .gesture(
                             DragGesture(minimumDistance: 10) // 设置最小距离以区分点击
                                 .updating($dragOffset) { value, state, _ in
-                                    state = value.translation.width
+                                    state = value.translation
                                 }
                                 .onChanged { _ in
                                     if !isDragging {
                                         isDragging = true
+                                        // 拖动开始时的震动反馈：中等强度，稍硬
+                                        hapticManager.playUIFeedback(intensity: 0.6, sharpness: 0.7, fallbackStyle: .medium)
                                     }
                                 }
                                 .onEnded { value in
                                     isDragging = false
                                     // 更新最终位置
-                                    let newPosition = positionX + value.translation.width
+                                    let newPositionX = positionX + value.translation.width
+                                    let newPositionY = positionY + value.translation.height
                                     
                                     // 边界限制：不要拖出屏幕太远
                                     let screenWidth = geometry.size.width
                                     let maxOffset = (screenWidth / 2) - 40
                                     
-                                    withAnimation(.spring()) {
-                                        if newPosition > maxOffset {
+                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0)) {
+                                        // X轴：限制在屏幕内
+                                        if newPositionX > maxOffset {
                                             positionX = maxOffset
-                                        } else if newPosition < -maxOffset {
+                                        } else if newPositionX < -maxOffset {
                                             positionX = -maxOffset
                                         } else {
-                                            positionX = newPosition
+                                            positionX = newPositionX
                                         }
+                                        
+                                        // Y轴：回弹到底部 (positionY 重置为 0)
+                                        // 无论拖到哪里，松手都吸附回底部
+                                        positionY = 0
                                     }
                                     
-                                    // 触觉反馈
-                                    impactGenerator.impactOccurred()
+                                    // 结束时的轻微触觉反馈：轻微强度，柔和
+                                    hapticManager.playUIFeedback(intensity: 0.3, sharpness: 0.3, fallbackStyle: .light)
                                 }
                         )
                         // 点击交互：点击时进入萌宠 Tab
                         .onTapGesture {
                             // 只有在非拖动状态下才触发
                             if !isDragging {
-                                impactGenerator.impactOccurred()
+                                // 点击反馈：中等强度
+                                hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
                                 withAnimation {
                                     action()
                                 }

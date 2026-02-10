@@ -329,7 +329,7 @@ struct HomeView: View {
             }
         } label: {
             if isEditing {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: "list.number.badge.ellipsis")
                     .font(.system(size: 20))
                     .foregroundStyle(.pink)
             } else {

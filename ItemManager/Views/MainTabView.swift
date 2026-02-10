@@ -51,7 +51,7 @@ struct MainTabView: View {
                 .tabItem {
                     switch smallWorldDestination {
                     case .menu:
-                        Label("小世界", systemImage: "globe")
+                        Label("小世界", systemImage: "map")
                     case .ootd:
                         Label("OOTD", systemImage: "tshirt.fill")
                     case .pet:
