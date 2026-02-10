@@ -31,13 +31,21 @@ struct SmallWorldView: View {
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
-        return false
+        // return false
 //        return true // canvas调整用
         #if DEBUG
         return true
         #else
         return false
         #endif
+    }
+    
+    // 是否显示日历热区 (3D场景开启时隐藏)
+    private var shouldShowCalendar: Bool {
+        if #available(iOS 26.0, *) {
+            return !isSpatialSceneEnabled
+        }
+        return true
     }
     
     var body: some View {
@@ -88,8 +96,10 @@ struct SmallWorldView: View {
                                         }
                                         
                                         // 4. 墙上的日历 (梦裙日历)
-                                        CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
-                                            destination = .calendar
+                                        if shouldShowCalendar {
+                                            CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                                destination = .calendar
+                                            }
                                         }
                                         
                                         // 中心锚点，用于初始定位
