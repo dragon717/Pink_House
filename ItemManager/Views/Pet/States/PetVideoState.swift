@@ -26,12 +26,19 @@ class PetVideoState: GKState {
         print("PetStateMachine: Entering \(type(of: self)) (Video: \(videoName), Loop: \(isLooping))")
         
         // 驱动 ViewModel 更新视频
-        // 使用 DispatchQueue.main.async 确保 UI 更新在主线程
-        DispatchQueue.main.async { [weak self] in
+        // 如果当前已经在主线程，直接执行以保持执行顺序（这对 forceLoop 等覆盖逻辑很重要）
+        // 否则 dispatch 到主线程
+        let updateBlock = { [weak self] in
             guard let self = self else { return }
             self.viewModel.updateVideoState(videoName: self.videoName, isLooping: self.isLooping)
             // 同步更新逻辑状态
             self.viewModel.currentState = self.logicalState
+        }
+        
+        if Thread.isMainThread {
+            updateBlock()
+        } else {
+            DispatchQueue.main.async(execute: updateBlock)
         }
     }
 }
