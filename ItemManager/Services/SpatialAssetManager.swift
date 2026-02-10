@@ -125,6 +125,22 @@ class SpatialAssetManager: ObservableObject {
         }
     }
     
+    func clearCache(for name: String) {
+        UserDefaults.standard.removeObject(forKey: "spatial_cache_\(name)")
+        isReady = false
+        spatialImage = nil
+    }
+    
+    func rebuild(imageName: String, extension: String) {
+        clearCache(for: imageName)
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let fileURL = tempDirectory.appendingPathComponent("\(imageName).\(`extension`)" )
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+        preload(imageName: imageName, extension: `extension`)
+    }
+    
     // 准备资源文件：如果 Bundle 里找不到文件（可能在 Asset Catalog），则尝试导出到临时文件
     // 声明为 nonisolated 以允许在后台线程运行
     nonisolated private func prepareAssetFile(name: String, ext: String) async -> URL? {

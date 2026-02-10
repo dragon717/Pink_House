@@ -69,24 +69,24 @@ struct SmallWorldView: View {
                             .overlay(
                                     ZStack(alignment: .topLeading) {
                                         // 1. OOTD (今日穿搭) - 最左侧
-                                        InteractionHotspot(rect: CGRect(x: 0.2, y: 0.2, width: 0.15, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
+                                        InteractionHotspot(rect: CGRect(x: 0.22, y: 0.3, width: 0.12, height: 0.6), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
                                             destination = .ootd
                                         }
                                         
                                         // 2. 衣橱 (少女衣橱)
-                                        InteractionHotspot(rect: CGRect(x: 0.39, y: 0.1, width: 0.2, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.38, y: 0.26, width: 0.175, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             withAnimation(.easeIn(duration: 0.5)) {
                                                 isPlayingOpeningAnimation = true
                                             }
                                         }
                                         
                                         // 3. 猪 (来财)
-                                        InteractionHotspot(rect: CGRect(x: 0.7, y: 0.45, width: 0.18, height: 0.22), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.63, y: 0.55, width: 0.15, height: 0.16), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             destination = .wealth
                                         }
                                         
                                         // 4. 墙上的日历 (梦裙日历)
-                                        CalendarHotspot(rect: CGRect(x: 0.64, y: 0.19, width: 0.13, height: 0.21), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        CalendarHotspot(rect: CGRect(x: 0.585, y: 0.35, width: 0.102, height: 0.155), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             destination = .calendar
                                         }
                                         
