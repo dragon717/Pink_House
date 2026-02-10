@@ -25,6 +25,11 @@ struct SmallWorldMenuOverlay: View {
     
     // 震动管理器
     @ObservedObject private var hapticManager = HapticEngineManager.shared
+
+    // 性能优化：检测低内存设备 (小于 4GB 内存)
+    private let isLowMemoryDevice: Bool = {
+        return ProcessInfo.processInfo.physicalMemory < 4 * 1024 * 1024 * 1024
+    }()
     
     // 菜单项数据
     struct MenuItem: Identifiable {
@@ -104,7 +109,7 @@ struct SmallWorldMenuOverlay: View {
                         let xOffset = currentRadius * cos(radians)
                         let yOffset = currentRadius * sin(radians)
                         
-                        MenuBubbleView(item: item) {
+                        MenuBubbleView(item: item, isLowMemoryDevice: isLowMemoryDevice) {
                             selectItem(item.destination)
                         }
                         // 调整修饰符顺序：
@@ -286,19 +291,17 @@ struct SmallWorldMenuOverlay: View {
     // 抽取单击逻辑
     private func handleTapAction() {
         print("SmallWorldMenuOverlay: handleTapAction executed")
-        // 强制在主线程执行
-        DispatchQueue.main.async {
-            if self.selectedTab == 1 {
-                if self.smallWorldDestination != .menu {
-                    print("SmallWorldMenuOverlay: Switching Destination to .menu")
-                    self.smallWorldDestination = .menu
-                } else {
-                    print("SmallWorldMenuOverlay: Already at .menu")
-                }
+        // 直接在当前循环执行，提升响应速度
+        if self.selectedTab == 1 {
+            if self.smallWorldDestination != .menu {
+                print("SmallWorldMenuOverlay: Switching Destination to .menu")
+                self.smallWorldDestination = .menu
             } else {
-                print("SmallWorldMenuOverlay: Switching Tab to 1")
-                self.selectedTab = 1
+                print("SmallWorldMenuOverlay: Already at .menu")
             }
+        } else {
+            print("SmallWorldMenuOverlay: Switching Tab to 1")
+            self.selectedTab = 1
         }
     }
     
@@ -379,11 +382,17 @@ struct SmallWorldMenuOverlay: View {
     }
     
     private func selectItem(_ dest: SmallWorldDestination) {
-        // 先关闭菜单
-        closeMenu()
+        // 性能优化：立即跳转，减少等待感
+        // 关闭菜单
+        withAnimation(.easeOut(duration: 0.15)) {
+            showMenu = false
+        }
         
-        // 延迟跳转，让动画先播放一点
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // 立即切换状态，不使用延迟
+        // 使用 Transaction 禁用动画或加速过渡，提升“跟手”感
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             selectedTab = 1
             smallWorldDestination = dest
         }
@@ -392,6 +401,8 @@ struct SmallWorldMenuOverlay: View {
 
 struct MenuBubbleView: View {
     let item: SmallWorldMenuOverlay.MenuItem
+    // 传入低内存模式标志
+    var isLowMemoryDevice: Bool = false
     let action: () -> Void
     
     var body: some View {
@@ -401,7 +412,8 @@ struct MenuBubbleView: View {
                     Circle()
                         .fill(item.color)
                         .frame(width: 56, height: 56)
-                        .shadow(color: item.color.opacity(0.4), radius: 8, x: 0, y: 4)
+                        // 性能优化：低内存设备移除阴影
+                        .shadow(color: item.color.opacity(isLowMemoryDevice ? 0 : 0.4), radius: isLowMemoryDevice ? 0 : 8, x: 0, y: 4)
                     
                     Image(systemName: item.icon)
                         .font(.title2)
@@ -413,9 +425,17 @@ struct MenuBubbleView: View {
                     .foregroundColor(.primary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(.regularMaterial)
+                    // 性能优化：低内存设备使用普通颜色代替 Material 模糊效果
+                    .background {
+                        if isLowMemoryDevice {
+                            Color.white.opacity(0.95)
+                        } else {
+                            Rectangle().fill(.regularMaterial)
+                        }
+                    }
                     .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    // 性能优化：低内存设备移除文字阴影
+                    .shadow(color: .black.opacity(isLowMemoryDevice ? 0 : 0.1), radius: isLowMemoryDevice ? 0 : 2, x: 0, y: 1)
             }
         }
         .buttonStyle(ScaleButtonStyle())

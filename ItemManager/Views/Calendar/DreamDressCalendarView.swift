@@ -23,6 +23,7 @@ struct DreamDressCalendarView: View {
     @State private var currentDate = Date() // Anchor date for Month/Year view
     @State private var showingDayPopup: Date? // Date for the popup
     @State private var showingMonthPreview: Date? // Month for the large preview popup
+    @State private var viewModel = CalendarViewModel()
 
     var body: some View {
         NavigationStack {
@@ -37,15 +38,15 @@ struct DreamDressCalendarView: View {
                     
                     // 2. Main Content
                     TabView(selection: $viewMode) {
-                        RecentTimelineView(clothings: allClothings, onDayTap: { date in showingDayPopup = date })
+                        RecentTimelineView(viewModel: viewModel, onDayTap: { date in showingDayPopup = date })
                             .tag(CalendarViewMode.recent)
                         
-                        DualMonthScrollView(anchorDate: $currentDate, clothings: allClothings, onDayTap: { date in showingDayPopup = date })
+                        DualMonthScrollView(anchorDate: $currentDate, viewModel: viewModel, onDayTap: { date in showingDayPopup = date })
                             .tag(CalendarViewMode.monthly)
                         
                         YearlyHeatmapView(
                             currentDate: $currentDate,
-                            clothings: allClothings,
+                            viewModel: viewModel,
                             onMonthTap: { monthDate in showingMonthPreview = monthDate }
                         )
                         .tag(CalendarViewMode.yearly)
@@ -58,7 +59,7 @@ struct DreamDressCalendarView: View {
                 if let date = showingDayPopup {
                     UnifiedEventsPopup(
                         title: date.formatted(date: .complete, time: .omitted),
-                        clothings: clothingsForDate(date),
+                        clothings: viewModel.clothings(for: date),
                         onClose: { showingDayPopup = nil }
                     )
                     .transition(.opacity)
@@ -68,7 +69,7 @@ struct DreamDressCalendarView: View {
                 if let monthDate = showingMonthPreview {
                     UnifiedEventsPopup(
                         title: CalendarHelper.shared.monthYearString(monthDate),
-                        clothings: clothingsForMonth(monthDate),
+                        clothings: viewModel.clothings(forMonth: monthDate),
                         onClose: { showingMonthPreview = nil },
                         onDayTap: { date in 
                             showingMonthPreview = nil
@@ -80,6 +81,14 @@ struct DreamDressCalendarView: View {
                 }
             }
             .navigationBarHidden(true)
+            .task {
+                await viewModel.processClothings(allClothings)
+            }
+            .onChange(of: allClothings) { _, newValue in
+                Task {
+                    await viewModel.processClothings(newValue)
+                }
+            }
         }
     }
     
@@ -125,38 +134,11 @@ struct DreamDressCalendarView: View {
         }
         .padding()
     }
-    
-    private func clothingsForDate(_ date: Date) -> [Clothing] {
-        let calendar = Calendar.current
-        return allClothings.filter { clothing in
-            if let depositDate = clothing.depositDate, calendar.isDate(depositDate, inSameDayAs: date) { return true }
-            if let finalDate = clothing.finalPaymentDate, calendar.isDate(finalDate, inSameDayAs: date) { return true }
-            if let finalEnd = clothing.finalPaymentEndDate, calendar.isDate(finalEnd, inSameDayAs: date) { return true }
-            return false
-        }
-    }
-    
-    private func clothingsForMonth(_ date: Date) -> [Clothing] {
-        let calendar = Calendar.current
-        return allClothings.filter { clothing in
-            let components = calendar.dateComponents([.year, .month], from: date)
-            
-            if let d = clothing.depositDate, 
-               let dComp = calendar.dateComponents([.year, .month], from: d) as DateComponents?,
-               dComp.year == components.year && dComp.month == components.month { return true }
-            
-            if let f = clothing.finalPaymentDate,
-               let fComp = calendar.dateComponents([.year, .month], from: f) as DateComponents?,
-               fComp.year == components.year && fComp.month == components.month { return true }
-               
-            return false
-        }
-    }
 }
 
 // MARK: - 1. Recent View (Yesterday / Today / Tomorrow)
 struct RecentTimelineView: View {
-    let clothings: [Clothing]
+    let viewModel: CalendarViewModel
     let onDayTap: (Date) -> Void
     @Environment(\.colorScheme) private var colorScheme
     @Environment(CalendarThemeManager.self) private var themeManager
@@ -177,7 +159,7 @@ struct RecentTimelineView: View {
                 
                 ForEach(2...7, id: \.self) { offset in
                     if let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) {
-                        let events = clothingsForDate(date)
+                        let events = viewModel.clothings(for: date)
                         if !events.isEmpty {
                             CompactDayRow(date: date, clothings: events, theme: themeManager.currentTheme) {
                                 onDayTap(date)
@@ -207,7 +189,7 @@ struct RecentTimelineView: View {
                     Spacer()
                 }
                 
-                let events = clothingsForDate(date)
+                let events = viewModel.clothings(for: date)
                 if events.isEmpty {
                     Text("无特殊安排")
                         .font(.caption)
@@ -237,16 +219,6 @@ struct RecentTimelineView: View {
             .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
     }
-    
-    private func clothingsForDate(_ date: Date) -> [Clothing] {
-        let calendar = Calendar.current
-        return clothings.filter { clothing in
-            if let depositDate = clothing.depositDate, calendar.isDate(depositDate, inSameDayAs: date) { return true }
-            if let finalDate = clothing.finalPaymentDate, calendar.isDate(finalDate, inSameDayAs: date) { return true }
-            if let finalEnd = clothing.finalPaymentEndDate, calendar.isDate(finalEnd, inSameDayAs: date) { return true }
-            return false
-        }
-    }
 }
 
 struct ClothingCardTiny: View {
@@ -256,12 +228,24 @@ struct ClothingCardTiny: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let imagePath = clothing.imagePaths.first, let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 80, height: 80)
-                    .clipped()
+            if let imagePath = clothing.imagePaths.first {
+                AsyncDownsampledImage(
+                    fileName: imagePath,
+                    targetSize: CGSize(width: 80, height: 80),
+                    content: { uiImage in
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 80, height: 80)
+                            .clipped()
+                    },
+                    placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.1))
+                            .frame(width: 80, height: 80)
+                            .overlay(Image(systemName: "tshirt").foregroundStyle(.secondary))
+                    }
+                )
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.1))
@@ -311,13 +295,26 @@ struct CompactDayRow: View {
                 // Visual indicators
                 HStack(spacing: -8) {
                     ForEach(clothings.prefix(5)) { clothing in
-                        if let imagePath = clothing.imagePaths.first, let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 30, height: 30)
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                        if let imagePath = clothing.imagePaths.first {
+                            AsyncDownsampledImage(
+                                fileName: imagePath,
+                                targetSize: CGSize(width: 30, height: 30),
+                                content: { uiImage in
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 30, height: 30)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                                },
+                                placeholder: {
+                                    Circle()
+                                        .fill(Color(uiColor: theme.accentColor))
+                                        .frame(width: 30, height: 30)
+                                        .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                                        .overlay(Text(clothing.name.prefix(1)).font(.caption2).foregroundStyle(.white))
+                                }
+                            )
                         } else {
                             Circle()
                                 .fill(Color(uiColor: theme.accentColor))
@@ -346,7 +343,7 @@ struct CompactDayRow: View {
 // MARK: - 2. Monthly View (Dual Month Scroll)
 struct DualMonthScrollView: View {
     @Binding var anchorDate: Date
-    let clothings: [Clothing]
+    let viewModel: CalendarViewModel
     let onDayTap: (Date) -> Void
     @Environment(\.colorScheme) private var colorScheme
     @Environment(CalendarThemeManager.self) private var themeManager
@@ -383,7 +380,7 @@ struct DualMonthScrollView: View {
                 ForEach(CalendarHelper.shared.generateDates(for: date)) { dateObj in
                     DreamCalendarCell(
                         dateObj: dateObj,
-                        clothings: clothingsForDate(dateObj.date),
+                        clothings: viewModel.clothings(for: dateObj.date),
                         isSelected: false,
                         theme: themeManager.currentTheme
                     ) {
@@ -402,22 +399,12 @@ struct DualMonthScrollView: View {
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .padding(.horizontal)
     }
-    
-    private func clothingsForDate(_ date: Date) -> [Clothing] {
-        let calendar = Calendar.current
-        return clothings.filter { clothing in
-            if let depositDate = clothing.depositDate, calendar.isDate(depositDate, inSameDayAs: date) { return true }
-            if let finalDate = clothing.finalPaymentDate, calendar.isDate(finalDate, inSameDayAs: date) { return true }
-            if let finalEnd = clothing.finalPaymentEndDate, calendar.isDate(finalEnd, inSameDayAs: date) { return true }
-            return false
-        }
-    }
 }
 
 // MARK: - 3. Yearly View (Heatmap)
 struct YearlyHeatmapView: View {
     @Binding var currentDate: Date
-    let clothings: [Clothing]
+    let viewModel: CalendarViewModel
     let onMonthTap: (Date) -> Void
     @Environment(\.colorScheme) private var colorScheme
     @Environment(CalendarThemeManager.self) private var themeManager
@@ -476,7 +463,7 @@ struct YearlyHeatmapView: View {
                                 
                                 // Mini Heatmap Grid
                                 if let monthDate = Calendar.current.date(from: DateComponents(year: year, month: month)) {
-                                    MiniMonthGrid(monthDate: monthDate, clothings: clothings, theme: themeManager.currentTheme)
+                                    MiniMonthGrid(monthDate: monthDate, viewModel: viewModel, theme: themeManager.currentTheme)
                                         .frame(maxWidth: .infinity)
                                 }
                                 Spacer()
@@ -503,7 +490,7 @@ struct YearlyHeatmapView: View {
 
 struct MiniMonthGrid: View {
     let monthDate: Date
-    let clothings: [Clothing]
+    let viewModel: CalendarViewModel
     let theme: CalendarTheme
     @Environment(\.colorScheme) private var colorScheme
     
@@ -531,12 +518,7 @@ struct MiniMonthGrid: View {
     }
     
     private func heatIntensity(for date: Date) -> Double {
-        let count = clothings.filter { clothing in
-            let calendar = Calendar.current
-            if let d = clothing.depositDate, calendar.isDate(d, inSameDayAs: date) { return true }
-            if let f = clothing.finalPaymentDate, calendar.isDate(f, inSameDayAs: date) { return true }
-            return false
-        }.count
+        let count = viewModel.clothings(for: date).count
         return min(Double(count) / 3.0, 1.0) // Max intensity at 3 items
     }
     

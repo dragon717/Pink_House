@@ -36,60 +36,66 @@ struct DreamCalendarCell: View {
                     .aspectRatio(1.0, contentMode: .fit)
                 
                 // Content Layer
-                GeometryReader { geo in
-                    ZStack(alignment: .bottomTrailing) {
-                        if let firstImage = clothings.first(where: { !$0.imagePaths.isEmpty })?.imagePaths.first,
-                           let uiImage = ImageManager.shared.loadImage(fileName: firstImage) {
-                            
-                            // Image Mode: Full cell image
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: geo.size.width, height: geo.size.height)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.5), lineWidth: 1))
-                            
-                            // Count Badge if > 1
-                            if clothings.count > 1 {
-                                Text("\(clothings.count)")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(3)
-                                    .background(Color(uiColor: theme.accentColor))
-                                    .clipShape(Circle())
-                                    .overlay(Circle().stroke(Color.white, lineWidth: 1))
-                                    .position(x: 10, y: 10) // Top left corner relative to cell
+                ZStack(alignment: .bottomTrailing) {
+                    if let firstImage = clothings.first(where: { !$0.imagePaths.isEmpty })?.imagePaths.first {
+                        AsyncDownsampledImage(
+                            fileName: firstImage,
+                            targetSize: CGSize(width: 100, height: 100),
+                            content: { uiImage in
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.5), lineWidth: 1))
+                            },
+                            placeholder: {
+                                Color.gray.opacity(0.1)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            
-                        } else {
-                            // Standard Mode: No image
-                            // Visual Indicators (Dots) centered
-                            if !clothings.isEmpty {
-                                ZStack {
-                                    eventVisualFallback
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            }
+                        )
+                        
+                        // Count Badge if > 1
+                        if clothings.count > 1 {
+                            Text("\(clothings.count)")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(3)
+                                .background(Color(uiColor: theme.accentColor))
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                                .position(x: 10, y: 10) // Top left corner relative to cell
                         }
                         
-                        // Day Number (Unified Position: Bottom Right)
-                        let hasImage = !clothings.isEmpty && clothings.contains(where: { !$0.imagePaths.isEmpty })
-                        Text("\(CalendarHelper.shared.dayOfMonth(dateObj.date))")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(dateTextColor(hasImage: hasImage))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background {
-                                if hasImage {
-                                    Capsule()
-                                        .fill(.regularMaterial)
-                                        .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
-                                }
+                    } else {
+                        // Standard Mode: No image
+                        // Visual Indicators (Dots) centered
+                        if !clothings.isEmpty {
+                            ZStack {
+                                eventVisualFallback
                             }
-                            .shadow(color: .black.opacity(hasImage ? 0 : 0.3), radius: 1, x: 0, y: 0.5)
-                            .padding(2)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
                     }
+                    
+                    // Day Number (Unified Position: Bottom Right)
+                    let hasImage = !clothings.isEmpty && clothings.contains(where: { !$0.imagePaths.isEmpty })
+                    Text("\(CalendarHelper.shared.dayOfMonth(dateObj.date))")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(dateTextColor(hasImage: hasImage))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background {
+                            if hasImage {
+                                Capsule()
+                                    .fill(.regularMaterial)
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
+                            }
+                        }
+                        .shadow(color: .black.opacity(hasImage ? 0 : 0.3), radius: 1, x: 0, y: 0.5)
+                        .padding(2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 }
             }
             .contentShape(Rectangle())
@@ -154,12 +160,24 @@ struct ClothingCardMonthly: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Large Image
-            if let imagePath = clothing.imagePaths.first, let uiImage = ImageManager.shared.loadImage(fileName: imagePath) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(1.0, contentMode: .fill)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
+            if let imagePath = clothing.imagePaths.first {
+                AsyncDownsampledImage(
+                    fileName: imagePath,
+                    targetSize: CGSize(width: 200, height: 200),
+                    content: { uiImage in
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(1.0, contentMode: .fill)
+                            .frame(maxWidth: .infinity)
+                            .clipped()
+                    },
+                    placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.1))
+                            .aspectRatio(1.0, contentMode: .fit)
+                            .overlay(Image(systemName: "tshirt").font(.largeTitle).foregroundStyle(.secondary))
+                    }
+                )
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.1))
