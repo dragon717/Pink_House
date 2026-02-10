@@ -83,6 +83,9 @@ struct MainTabView: View {
                 selectedTab = 1
                 smallWorldDestination = .pet
             })
+            
+            // Small World Long Press Menu Overlay
+            SmallWorldMenuOverlay(selectedTab: $selectedTab, smallWorldDestination: $smallWorldDestination)
         }
     }
     
@@ -92,6 +95,9 @@ struct MainTabView: View {
             get: { selectedTab },
             set: { newValue in
                 // 如果用户再次点击当前的 Tab 1 (且不在菜单页)，则返回菜单
+                // 注意：由于我们在 SmallWorldMenuOverlay 中已经处理了 Tab 1 的点击逻辑，
+                // 这里的逻辑主要用于原生 TabBarItem 的点击。
+                // 如果 Overlay 拦截了点击，这里可能不会触发。
                 if newValue == selectedTab && newValue == 1 {
                     if smallWorldDestination != .menu {
                         smallWorldDestination = .menu
