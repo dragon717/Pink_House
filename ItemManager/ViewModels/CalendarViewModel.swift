@@ -43,11 +43,22 @@ class CalendarViewModel {
                 }
                 
                 if let finalDate = clothing.finalPaymentDate {
+                    // Add start date
                     addToCache(date: finalDate)
-                }
-                
-                if let finalEnd = clothing.finalPaymentEndDate {
-                    addToCache(date: finalEnd)
+                    
+                    // Add range if end date exists
+                    if let finalEnd = clothing.finalPaymentEndDate {
+                        let start = calendar.startOfDay(for: finalDate)
+                        let end = calendar.startOfDay(for: finalEnd)
+                        
+                        if end > start {
+                            var d = calendar.date(byAdding: .day, value: 1, to: start)!
+                            while d <= end {
+                                addToCache(date: d)
+                                d = calendar.date(byAdding: .day, value: 1, to: d)!
+                            }
+                        }
+                    }
                 }
             }
             

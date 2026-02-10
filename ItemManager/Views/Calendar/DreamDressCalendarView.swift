@@ -24,6 +24,7 @@ struct DreamDressCalendarView: View {
     @State private var showingDayPopup: Date? // Date for the popup
     @State private var showingMonthPreview: Date? // Month for the large preview popup
     @State private var viewModel = CalendarViewModel()
+    @State private var showDepositPlanOnly: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -34,7 +35,11 @@ struct DreamDressCalendarView: View {
                 
                 VStack(spacing: 0) {
                     // 1. Header with Mode Switcher
-                    headerView
+                    if #available(iOS 26.0, *) {
+                        // Native Navigation Bar handles this
+                    } else {
+                        headerView
+                    }
                     
                     // 2. Main Content
                     TabView(selection: $viewMode) {
@@ -60,6 +65,7 @@ struct DreamDressCalendarView: View {
                     UnifiedEventsPopup(
                         title: date.formatted(date: .complete, time: .omitted),
                         clothings: viewModel.clothings(for: date),
+                        filterDate: date, // Pass context date to filter irrelevant events
                         onClose: { showingDayPopup = nil }
                     )
                     .transition(.opacity)
@@ -80,33 +86,32 @@ struct DreamDressCalendarView: View {
                     .zIndex(110)
                 }
             }
-            .navigationBarHidden(true)
+            .applyNavigationConfig(viewMode: $viewMode, showFilter: $showDepositPlanOnly, themeManager: themeManager)
             .task {
-                await viewModel.processClothings(allClothings)
+                await updateData()
             }
-            .onChange(of: allClothings) { _, newValue in
-                Task {
-                    await viewModel.processClothings(newValue)
-                }
+            .onChange(of: allClothings) { _, _ in
+                Task { await updateData() }
+            }
+            .onChange(of: showDepositPlanOnly) { _, _ in
+                Task { await updateData() }
             }
         }
     }
     
+    @MainActor
+    private func updateData() async {
+        let filtered = showDepositPlanOnly ? allClothings.filter { $0.isDepositPlan } : allClothings
+        await viewModel.processClothings(filtered)
+    }
+    
+    // MARK: - Legacy Header for < iOS 26
     private var headerView: some View {
-        HStack {
-            Spacer()
-            
-            // Mode Segmented Control (Version Aware)
-            if #available(iOS 26.0, *) {
-                // iOS 26+ Native Segmented Control
-                Picker("视图模式", selection: $viewMode) {
-                    ForEach(CalendarViewMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 300)
-            } else {
+        ZStack {
+            // Center: Picker
+            HStack {
+                Spacer()
+                
                 // Custom Segmented Control for older versions
                 HStack(spacing: 0) {
                     ForEach(CalendarViewMode.allCases) { mode in
@@ -128,11 +133,70 @@ struct DreamDressCalendarView: View {
                 .padding(4)
                 .background(Color(uiColor: themeManager.currentTheme.accentColor).opacity(0.1))
                 .clipShape(Capsule())
+                
+                Spacer()
             }
             
-            Spacer()
+            // Right: Filter Button
+            HStack {
+                Spacer()
+                
+                Button {
+                    withAnimation {
+                        showDepositPlanOnly.toggle()
+                    }
+                } label: {
+                    Image(systemName: showDepositPlanOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.title2)
+                        .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                        .padding(.trailing, 8)
+                }
+            }
         }
         .padding()
+    }
+}
+
+// MARK: - Navigation Config Helper
+extension View {
+    @ViewBuilder
+    func applyNavigationConfig(viewMode: Binding<CalendarViewMode>, showFilter: Binding<Bool>, themeManager: CalendarThemeManager) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .navigationBarHidden(false)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Picker("视图模式", selection: viewMode) {
+                            ForEach(CalendarViewMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 240)
+                    }
+                    
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Toggle(isOn: Binding(
+                                get: { showFilter.wrappedValue },
+                                set: { newValue in
+                                    withAnimation {
+                                        showFilter.wrappedValue = newValue
+                                    }
+                                }
+                            )) {
+                                Label("只看尾款天使", systemImage: "star")
+                            }
+                        } label: {
+                            Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                        }
+                    }
+                }
+        } else {
+            self.navigationBarHidden(true)
+        }
     }
 }
 
@@ -386,7 +450,7 @@ struct DualMonthScrollView: View {
                     ) {
                         onDayTap(dateObj.date)
                     }
-                    // Removed fixed height to allow square aspect ratio from DreamCalendarCell
+                    .aspectRatio(1.0, contentMode: .fit) // 强制正方形
                 }
             }
             .padding(.horizontal)

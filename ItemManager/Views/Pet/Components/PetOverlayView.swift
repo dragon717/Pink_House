@@ -15,6 +15,7 @@ struct PetOverlayView: View {
     
     // 交互状态
     @State private var isDragging: Bool = false
+    @State private var hasSetInitialPosition: Bool = false
     
     // 触觉反馈管理器
     @ObservedObject private var hapticManager = HapticEngineManager.shared
@@ -23,7 +24,6 @@ struct PetOverlayView: View {
     // 假设 TabBar 高度约为 49pt (标准) + Safe Area
     // 我们希望宠物趴在 TabBar 上缘。
     // 可以通过 offset y 来微调垂直位置
-    private let verticalOffset: CGFloat = -49 // 向上偏移，使其位于 TabBar 上方
     private let catWidth: CGFloat = 70 // 小猫图片宽度
     
     // 底部导航栏每个按钮的预估宽度 (假设3个Tab)
@@ -43,108 +43,117 @@ struct PetOverlayView: View {
                 
                 HStack {
                     Spacer()
-                    // 宠物图标
-                    ZStack {
-                        // 1. 静止/呼吸状态的猫 (趴着)
-                        Image("PetPeekingIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: catWidth)
-                            .scaleEffect(isBreathing ? 1.05 : 1.0, anchor: .bottom)
-                            .opacity(isDragging ? 0 : 1)
-                            .animation(
-                                isDragging ? .easeOut(duration: 0.15) : Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true),
-                                value: isBreathing
-                            )
-                        
-                        // 2. 拖拽状态的猫 (拎起)
-                        Image("PetDraggingIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: catWidth)
-                            // 2.5倍缩放，使用顶部锚点 (因为是拎起动作，手指捏住顶部，身体向下垂)
-                            // 同时给予一定的垂直偏移，确保手指位置对应猫的颈部区域
-                            .scaleEffect(2.5, anchor: .top)
-                            .offset(y: 30) // 向下偏移，让猫身体垂下来，而不是头部顶上去
-                            .opacity(isDragging ? 1 : 0)
-                    }
-                    // 统一处理拖拽状态变化的过渡动画
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDragging)
-                    // 位置偏移 (拖动 + 固定偏移)
-                        .offset(x: positionX + dragOffset.width, y: verticalOffset + positionY + dragOffset.height)
-                        .gesture(
-                            DragGesture(minimumDistance: 10) // 设置最小距离以区分点击
-                                .updating($dragOffset) { value, state, _ in
-                                    state = value.translation
-                                }
-                                .onChanged { _ in
-                                    if !isDragging {
-                                        isDragging = true
-                                        // 拖动开始时的震动反馈：中等强度，稍硬
-                                        hapticManager.playUIFeedback(intensity: 0.6, sharpness: 0.7, fallbackStyle: .medium)
-                                    }
-                                }
-                                .onEnded { value in
-                                    isDragging = false
-                                    // 更新最终位置
-                                    let newPositionX = positionX + value.translation.width
-                                    let newPositionY = positionY + value.translation.height
-                                    
-                                    // 边界限制：不要拖出屏幕太远
-                                    let screenWidth = geometry.size.width
-                                    
-                                    // 根据用户需求：吸附范围限制在 TabBar 的实际内容宽度内
-                                    // 假设 TabBar 居中，那么最大偏移量应该是 (TabBar宽度 / 2) - (猫宽度 / 2)
-                                    // 这样猫的中心点最远只能到达 TabBar 的边缘内侧
-                                    let maxOffset = (min(screenWidth, tabBarEffectiveWidth) / 2) - (catWidth / 2)
-                                    
-                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0)) {
-                                        // X轴：限制在屏幕内
-                                        if newPositionX > maxOffset {
-                                            positionX = maxOffset
-                                        } else if newPositionX < -maxOffset {
-                                            positionX = -maxOffset
-                                        } else {
-                                            positionX = newPositionX
-                                        }
-                                        
-                                        // Y轴：回弹到底部 (positionY 重置为 0)
-                                        // 无论拖到哪里，松手都吸附回底部
-                                        positionY = 0
-                                    }
-                                    
-                                    // 结束时的轻微触觉反馈：轻微强度，柔和
-                                    hapticManager.playUIFeedback(intensity: 0.3, sharpness: 0.3, fallbackStyle: .light)
-                                }
-                        )
-                        // 点击交互：点击时进入萌宠 Tab
-                        .onTapGesture {
-                            // 只有在非拖动状态下才触发
-                            if !isDragging {
-                                // 点击反馈：中等强度
-                                hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
-                                withAnimation {
-                                    action()
-                                }
-                            }
-                        }
-                    
+                    petView(geometry: geometry)
                     Spacer()
                 }
-                // 确保底部有一定的空间，不完全覆盖 TabBar 的操作区域（除非拖动过去）
-                // 这里我们利用 offset(y: verticalOffset) 已经向上提了
             }
-            // 确保不阻挡其他区域的点击
-            .allowsHitTesting(true) 
+            .allowsHitTesting(true)
+            .onAppear {
+                isBreathing = true
+            }
+            .onChange(of: geometry.size) { newSize in
+                if !hasSetInitialPosition && UIDevice.current.userInterfaceIdiom == .pad {
+                    let rightOffset = (newSize.width / 2) - (catWidth / 2) - 40
+                    positionX = rightOffset
+                    hasSetInitialPosition = true
+                }
+            }
         }
-        // 整个 Overlay 容器不应该阻挡点击，只有图片部分阻挡
-        // GeometryReader 默认会占满空间。
-        // 我们需要设置 contentShape 或者只让 Image 响应
-        // 但是 GeometryReader 本身是透明的，如果不设置 background，通常是透过的。
-        // 不过为了保险，我们可以不用 GeometryReader 包裹整个屏幕，
-        // 而是只在底部放一个 Overlay。
-        .onAppear {
-            isBreathing = true
+    }
+    
+    private func petView(geometry: GeometryProxy) -> some View {
+        let safeAreaBottom = geometry.safeAreaInsets.bottom
+        
+        return ZStack {
+            // 1. 静止/呼吸状态的猫 (趴着)
+            Image("PetPeekingIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: catWidth)
+                .scaleEffect(isBreathing ? 1.05 : 1.0, anchor: .bottom)
+                .opacity(isDragging ? 0 : 1)
+                .animation(
+                    isDragging ? .easeOut(duration: 0.15) : Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                    value: isBreathing
+                )
+            
+            // 2. 拖拽状态的猫 (拎起)
+            Image("PetDraggingIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(width: catWidth)
+                .scaleEffect(2.5, anchor: .top)
+                .offset(y: 30)
+                .opacity(isDragging ? 1 : 0)
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isDragging)
+        .offset(x: positionX + dragOffset.width, y: getVerticalOffset(safeAreaBottom: safeAreaBottom) + positionY + dragOffset.height)
+        .gesture(
+            DragGesture(minimumDistance: 10)
+                .updating($dragOffset) { value, state, _ in
+                    state = value.translation
+                }
+                .onChanged { _ in
+                    if !isDragging {
+                        isDragging = true
+                        hapticManager.playUIFeedback(intensity: 0.6, sharpness: 0.7, fallbackStyle: .medium)
+                    }
+                }
+                .onEnded { value in
+                    isDragging = false
+                    let newPositionX = positionX + value.translation.width
+                    let newPositionY = positionY + value.translation.height
+                    
+                    let screenWidth = geometry.size.width
+                    
+                    let effectiveWidth: CGFloat
+                    if UIDevice.current.userInterfaceIdiom == .pad {
+                        effectiveWidth = screenWidth - 40
+                    } else {
+                        effectiveWidth = min(screenWidth, tabBarEffectiveWidth)
+                    }
+                    
+                    let maxOffset = (effectiveWidth / 2) - (catWidth / 2)
+                    
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0)) {
+                        if newPositionX > maxOffset {
+                            positionX = maxOffset
+                        } else if newPositionX < -maxOffset {
+                            positionX = -maxOffset
+                        } else {
+                            positionX = newPositionX
+                        }
+                        positionY = 0
+                    }
+                    
+                    hapticManager.playUIFeedback(intensity: 0.3, sharpness: 0.3, fallbackStyle: .light)
+                }
+        )
+        .onTapGesture {
+            if !isDragging {
+                hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
+                withAnimation {
+                    action()
+                }
+            }
+        }
+    }
+    
+    private func getVerticalOffset(safeAreaBottom: CGFloat) -> CGFloat {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            // iPad: 趴在底部屏幕（稍微有点空隙）
+            // 目标：距离屏幕底部约 15pt。
+            // 当前基准线：屏幕底部 - safeAreaBottom
+            // 如果 safeAreaBottom > 15，我们需要向下偏移 (正值)
+            // 如果 safeAreaBottom < 15，我们需要向上偏移 (负值)
+            // Offset = safeAreaBottom - 15
+            // 例：Safe Area 20 -> Offset +5 -> 距离底部 15
+            return safeAreaBottom - 15
+        } else {
+            // iPhone: 紧密贴在原生底部导航栏上
+            // TabBar 高度 49。
+            // 目标：位于 Safe Area 顶部上方 49pt 处
+            return -35 // 49pt - 14pt padding
         }
     }
 }

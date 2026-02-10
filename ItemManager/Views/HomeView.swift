@@ -329,9 +329,15 @@ struct HomeView: View {
             }
         } label: {
             if isEditing {
-                Image(systemName: "list.number.badge.ellipsis")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.pink)
+                if #available(iOS 26.0, *) {
+                    Image(systemName: "list.number.badge.ellipsis")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.pink)
+                } else {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.pink)
+                }
             } else {
                 Image(systemName: "list.number")
                     .font(.system(size: 20))

@@ -25,12 +25,12 @@ struct SmallWorldView: View {
     @Binding var isPlayingOpeningAnimation: Bool
     
     // 图片原始尺寸 1919x1079
-    private let imageSize = CGSize(width: 1919, height: 1079)
+    @State private var imageSize = CGSize(width: 1919, height: 1079)
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
         return false
-//        return true
+//        return true // canvas调整用
         #if DEBUG
         return true
         #else
@@ -69,24 +69,24 @@ struct SmallWorldView: View {
                             .overlay(
                                     ZStack(alignment: .topLeading) {
                                         // 1. OOTD (今日穿搭) - 最左侧
-                                        InteractionHotspot(rect: CGRect(x: 0.22, y: 0.3, width: 0.12, height: 0.6), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
+                                        InteractionHotspot(rect: CGRect(x: 0.01, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
                                             destination = .ootd
                                         }
                                         
                                         // 2. 衣橱 (少女衣橱)
-                                        InteractionHotspot(rect: CGRect(x: 0.38, y: 0.26, width: 0.175, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.39, y: 0.06, width: 0.175, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             withAnimation(.easeIn(duration: 0.5)) {
                                                 isPlayingOpeningAnimation = true
                                             }
                                         }
                                         
                                         // 3. 猪 (来财)
-                                        InteractionHotspot(rect: CGRect(x: 0.63, y: 0.55, width: 0.15, height: 0.16), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.71, y: 0.5, width: 0.2, height: 0.28), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             destination = .wealth
                                         }
                                         
                                         // 4. 墙上的日历 (梦裙日历)
-                                        CalendarHotspot(rect: CGRect(x: 0.585, y: 0.35, width: 0.102, height: 0.155), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        CalendarHotspot(rect: CGRect(x: 0.62, y: 0.1, width: 0.166, height: 0.26), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             destination = .calendar
                                         }
                                         
@@ -116,6 +116,11 @@ struct SmallWorldView: View {
             .ignoresSafeArea() // 确保 GeometryReader 获取全屏尺寸
             .toolbarBackground(.hidden, for: .tabBar) // 尝试 SwiftUI 原生隐藏
             .onAppear {
+                // 动态获取背景图尺寸，适配宽屏图片
+                if let image = UIImage(named: "small_world_bg") {
+                    self.imageSize = image.size
+                }
+                
                 // 强制设置 UITabBar 为完全透明
                 let appearance = UITabBarAppearance()
                 appearance.configureWithTransparentBackground()
@@ -239,6 +244,10 @@ struct CalendarHotspot: View {
                 destination: $destination,
                 isPlayingOpeningAnimation: $isPlayingOpeningAnimation
             )
+            .task {
+                // 预览模式下强制重置资源状态，确保看到最新图片
+                SpatialAssetManager.shared.clearCache(for: "small_world_bg")
+            }
         }
     }
     return PreviewWrapper()

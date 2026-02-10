@@ -437,6 +437,9 @@ class BackupService {
             // Pet Status
             let petStatusData = UserDefaults.standard.data(forKey: "PetStatus_Data")
             
+            // App Version
+            let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            
             let manifest = BackupManifest(
                 version: "1.2",
                 timestamp: Date(),
@@ -457,6 +460,7 @@ class BackupService {
                 hasLargeWidgetBackground: hasLargeWidgetBackground,
                 externalFileHashes: externalHashes,
                 petStatusData: petStatusData,
+                appVersion: appVersion,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: snapshotDTOs.count
@@ -1014,6 +1018,16 @@ class BackupService {
         }
         
         WidgetCenter.shared.reloadAllTimelines()
+        
+        // Version Check & Cache Clearing
+        // 若 app版本不一致，则清理缓存（尤其是小世界空间照片缓存）
+        if let backupAppVersion = manifest.appVersion {
+            let currentAppVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            if backupAppVersion != currentAppVersion {
+                print("Restore: App Version Mismatch (Backup: \(backupAppVersion), Current: \(currentAppVersion ?? "Unknown")). Clearing Spatial Cache...")
+                SpatialAssetManager.shared.clearAllCache()
+            }
+        }
         
         print("--- Import Successful! ---")
     }

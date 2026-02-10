@@ -31,6 +31,15 @@ struct SmallWorldMenuOverlay: View {
         return ProcessInfo.processInfo.physicalMemory < 4 * 1024 * 1024 * 1024
     }()
     
+    // 检测 iPad
+    private var isIPad: Bool {
+        #if canImport(UIKit)
+        return UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        return false
+        #endif
+    }
+    
     // 菜单项数据
     struct MenuItem: Identifiable {
         let id = UUID()
@@ -72,9 +81,16 @@ struct SmallWorldMenuOverlay: View {
     var body: some View {
         GeometryReader { geometry in
             let safeAreaBottom = geometry.safeAreaInsets.bottom
-            // 动态计算 TabBar 交互区域高度 (标准高度 49 + 安全区域)
-            // 增加高度以确保覆盖图标区域 (从 49 增加到 65)
+            let safeAreaTop = geometry.safeAreaInsets.top
+            
+            // 动态计算交互区域高度
+            // iPhone: 底部 TabBar (标准高度 49 + 安全区域)，增加到 65 以覆盖图标
+            // iPad: 顶部区域，同样使用 65 + 安全区域
             let tabBarHeight = 65.0 + safeAreaBottom
+            let topBarHeight = 65.0 + safeAreaTop
+            
+            let triggerHeight = isIPad ? topBarHeight : tabBarHeight
+            
             // 动态计算触发区域宽度 (限制最大宽度以适配 iPad)
             let triggerAreaWidth = min(geometry.size.width / 3, 150)
             
@@ -94,10 +110,11 @@ struct SmallWorldMenuOverlay: View {
                     ForEach(menuItems.indices, id: \.self) { index in
                         let item = menuItems[index]
                         
-                        // 计算角度: 分布在 -160 (左下) 到 -20 (右下) 之间，上方是 -90
-                        // 4个项目，区间跨度 140度
-                        let totalAngle: Double = 140
-                        let startAngle: Double = -160
+                        // 计算角度
+                        // iPhone: 分布在 -160 (左下) 到 -20 (右下) 之间，上方是 -90 (向上发射)
+                        // iPad: 分布在 160 (左上) 到 20 (右上) 之间，下方是 90 (向下发射)
+                        let totalAngle: Double = isIPad ? -140 : 140
+                        let startAngle: Double = isIPad ? 160 : -160
                         let step = totalAngle / Double(menuItems.count - 1)
                         let degrees = startAngle + Double(index) * step
                         
@@ -165,13 +182,16 @@ struct SmallWorldMenuOverlay: View {
                     }
                     .position(
                         x: touchLocation == .zero ? geometry.size.width / 2 : touchLocation.x,
-                        y: touchLocation == .zero ? geometry.size.height - (tabBarHeight / 2) : touchLocation.y
+                        y: touchLocation == .zero ? (isIPad ? triggerHeight / 2 : geometry.size.height - (triggerHeight / 2)) : touchLocation.y
                     )
                 }
                 
-                // 4. 触发区域 (覆盖在 TabBar 中间按钮上)
+                // 4. 触发区域 (iPad 在顶部，iPhone 在底部)
                 VStack {
-                    Spacer()
+                    if !isIPad {
+                        Spacer()
+                    }
+                    
                     HStack {
                         Spacer()
                         // 中间区域
@@ -179,7 +199,7 @@ struct SmallWorldMenuOverlay: View {
                         // 使用 Color.black.opacity(0.001) 更稳妥
                         Color.black.opacity(0.001)
                             .contentShape(Rectangle())
-                            .frame(width: triggerAreaWidth, height: tabBarHeight) // 动态高度和宽度
+                            .frame(width: triggerAreaWidth, height: triggerHeight) // 动态高度和宽度
                             // 替换为同时支持点击和长按的组合手势
                             // DragGesture(minimumDistance: 0) 会独占事件，导致极短的点击可能被误判或不触发
                             // 更好的方式是使用 simultaneousGesture 组合 LongPress 和 Tap，
@@ -244,8 +264,12 @@ struct SmallWorldMenuOverlay: View {
                             )
                         Spacer()
                     }
+                    
+                    if isIPad {
+                        Spacer()
+                    }
                 }
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea(edges: isIPad ? .top : .bottom)
                 // 确保遮罩层出现时，触发区不阻挡遮罩层的点击（虽然这里触发区在最上层，但它只覆盖底部）
                 // 当菜单显示时，点击底部触发区也应该关闭菜单吗？
                 // 通常长按呼出后，如果不选，松手不消失（微信是松手消失还是点击消失？）

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - Models
 enum CalendarViewMode: String, CaseIterable, Identifiable {
@@ -26,82 +27,162 @@ struct DreamCalendarCell: View {
     
     var body: some View {
         Button(action: action) {
-            ZStack {
-                // Background
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color(uiColor: theme.accentColor).opacity(0.1) : Color.clear)
-                
-                // Force Square Aspect Ratio container
-                Color.clear
-                    .aspectRatio(1.0, contentMode: .fit)
-                
-                // Content Layer
-                ZStack(alignment: .bottomTrailing) {
-                    if let firstImage = clothings.first(where: { !$0.imagePaths.isEmpty })?.imagePaths.first {
-                        AsyncDownsampledImage(
-                            fileName: firstImage,
-                            targetSize: CGSize(width: 100, height: 100),
-                            content: { uiImage in
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Color.clear
+                .aspectRatio(1.0, contentMode: .fit)
+                .overlay(
+                    GeometryReader { geo in
+                        let size = geo.size
+                        ZStack {
+                            // Background
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(isSelected ? Color(uiColor: theme.accentColor).opacity(0.1) : Color.clear)
+                            
+                            // Content Layer
+                            ZStack(alignment: .bottomTrailing) {
+                                if let displayClothing = clothings.first(where: { shouldShowImage(for: $0) }),
+                                   let firstImage = displayClothing.imagePaths.first {
+                                    AsyncDownsampledImage(
+                                        fileName: firstImage,
+                                        targetSize: CGSize(width: 100, height: 100),
+                                        content: { uiImage in
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: size.width, height: size.height)
+                                                .clipped()
+                                                .onAppear {
+                                                    #if DEBUG
+                                                    print("CalendarCell [\(CalendarHelper.shared.dayOfMonth(dateObj.date))]: Cell Size: \(size), Image Size: \(uiImage.size)")
+                                                    #endif
+                                                }
+                                        },
+                                        placeholder: {
+                                            Color.gray.opacity(0.1)
+                                        }
+                                    )
+                                    .frame(width: size.width, height: size.height)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.5), lineWidth: 1))
-                            },
-                            placeholder: {
-                                Color.gray.opacity(0.1)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    
+                                    // Count Badge if > 1
+                                    if clothings.count > 1 {
+                                        Text("\(clothings.count)")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .padding(3)
+                                            .background(Color(uiColor: theme.accentColor))
+                                            .clipShape(Circle())
+                                            .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                                            .position(x: 10, y: 10) // Top left corner relative to cell
+                                    }
+                                    
+                                } else {
+                                    // Standard Mode: No image
+                                    // Visual Indicators (Dots) centered
+                                    if !clothings.isEmpty {
+                                        ZStack {
+                                            eventVisualFallback
+                                        }
+                                        .frame(width: size.width, height: size.height)
+                                    }
+                                }
+                                
+                                // Status Label (Rendered only if NOT bottomTrailing, or handled separately)
+                                if let statusInfo = getStatusInfo(), statusInfo.alignment != .bottomTrailing {
+                                    Text(statusInfo.text)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .background(Color(uiColor: statusInfo.color))
+                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        .padding(2)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: statusInfo.alignment)
+                                }
+                                
+                                // Day Number (Unified Position: Bottom Right)
+                                let hasImage = !clothings.isEmpty && clothings.contains(where: { shouldShowImage(for: $0) })
+                                HStack(spacing: 2) {
+                                    // Inject Status Label here if alignment is bottomTrailing
+                                    if let statusInfo = getStatusInfo(), statusInfo.alignment == .bottomTrailing {
+                                        Text(statusInfo.text)
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 2)
+                                            .background(Color(uiColor: statusInfo.color))
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    }
+                                    
+                                    Text("\(CalendarHelper.shared.dayOfMonth(dateObj.date))")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(dateTextColor(hasImage: hasImage))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background {
+                                            if hasImage {
+                                                Capsule()
+                                                    .fill(.regularMaterial)
+                                                    .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
+                                            }
+                                        }
+                                        .shadow(color: .black.opacity(hasImage ? 0 : 0.3), radius: 1, x: 0, y: 0.5)
+                                }
+                                .padding(2)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             }
-                        )
-                        
-                        // Count Badge if > 1
-                        if clothings.count > 1 {
-                            Text("\(clothings.count)")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(3)
-                                .background(Color(uiColor: theme.accentColor))
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.white, lineWidth: 1))
-                                .position(x: 10, y: 10) // Top left corner relative to cell
                         }
-                        
-                    } else {
-                        // Standard Mode: No image
-                        // Visual Indicators (Dots) centered
-                        if !clothings.isEmpty {
-                            ZStack {
-                                eventVisualFallback
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
+                        .frame(width: size.width, height: size.height)
                     }
-                    
-                    // Day Number (Unified Position: Bottom Right)
-                    let hasImage = !clothings.isEmpty && clothings.contains(where: { !$0.imagePaths.isEmpty })
-                    Text("\(CalendarHelper.shared.dayOfMonth(dateObj.date))")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(dateTextColor(hasImage: hasImage))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background {
-                            if hasImage {
-                                Capsule()
-                                    .fill(.regularMaterial)
-                                    .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
-                            }
-                        }
-                        .shadow(color: .black.opacity(hasImage ? 0 : 0.3), radius: 1, x: 0, y: 0.5)
-                        .padding(2)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                }
-            }
-            .contentShape(Rectangle())
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .opacity(dateObj.isCurrentMonth ? 1.0 : 0.3)
+    }
+    
+    private func getStatusInfo() -> (text: String, color: UIColor, alignment: Alignment)? {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        
+        // 1. Check for Deposit (Highest Priority)
+        if clothings.contains(where: { isDepositDay($0, on: dateObj.date) }) {
+            // Deposit is also a "Start" event, so we put it bottomTrailing
+            return (isPad ? "定金" : "定", theme.depositColor, .bottomTrailing)
+        }
+        
+        // 2. Check for Final Payment
+        if let clothing = clothings.first(where: { isFinalPaymentStartOrEnd($0, on: dateObj.date) }) {
+            // Check if it is start or end
+            if let start = clothing.finalPaymentDate, Calendar.current.isDate(start, inSameDayAs: dateObj.date) {
+                // Start -> Bottom Right
+                return (isPad ? "尾款" : "尾", theme.finalPaymentColor, .bottomTrailing)
+            } else {
+                // End -> Bottom Left
+                return (isPad ? "尾款" : "尾", theme.finalPaymentColor, .bottomLeading)
+            }
+        }
+        
+        return nil
+    }
+    
+    private func shouldShowImage(for clothing: Clothing) -> Bool {
+        // 1. Must have image
+        guard !clothing.imagePaths.isEmpty else { return false }
+        
+        let date = dateObj.date
+        let calendar = Calendar.current
+        
+        // 2. Deposit Day -> Show
+        if let d = clothing.depositDate, calendar.isDate(d, inSameDayAs: date) { return true }
+        
+        // 3. Final Payment Start -> Show
+        if let f = clothing.finalPaymentDate, calendar.isDate(f, inSameDayAs: date) { return true }
+        
+        // 4. Final Payment End -> Show
+        if let e = clothing.finalPaymentEndDate, calendar.isDate(e, inSameDayAs: date) { return true }
+        
+        // 5. Otherwise (Middle days) -> Hide
+        return false
     }
     
     private func dateTextColor(hasImage: Bool) -> Color {
@@ -145,84 +226,143 @@ struct DreamCalendarCell: View {
     
     private func isFinalPaymentDay(_ clothing: Clothing, on date: Date) -> Bool {
         guard let fDate = clothing.finalPaymentDate else { return false }
-        return Calendar.current.isDate(fDate, inSameDayAs: date)
+        let calendar = Calendar.current
+        if calendar.isDate(fDate, inSameDayAs: date) { return true }
+        
+        if let endDate = clothing.finalPaymentEndDate {
+            let target = calendar.startOfDay(for: date)
+            let start = calendar.startOfDay(for: fDate)
+            let end = calendar.startOfDay(for: endDate)
+            return target > start && target <= end
+        }
+        return false
+    }
+    
+    private func isFinalPaymentStartOrEnd(_ clothing: Clothing, on date: Date) -> Bool {
+        guard let start = clothing.finalPaymentDate else { return false }
+        let calendar = Calendar.current
+        
+        // Check start
+        if calendar.isDate(start, inSameDayAs: date) { return true }
+        
+        // Check end
+        if let end = clothing.finalPaymentEndDate, calendar.isDate(end, inSameDayAs: date) { return true }
+        
+        return false
     }
 }
 
 
 
-struct ClothingCardMonthly: View {
+struct CalendarEventRow: View {
     let clothing: Clothing
     let date: Date
     let theme: CalendarTheme
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Large Image
-            if let imagePath = clothing.imagePaths.first {
-                AsyncDownsampledImage(
-                    fileName: imagePath,
-                    targetSize: CGSize(width: 200, height: 200),
-                    content: { uiImage in
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(1.0, contentMode: .fill)
-                            .frame(maxWidth: .infinity)
-                            .clipped()
-                    },
-                    placeholder: {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .aspectRatio(1.0, contentMode: .fit)
-                            .overlay(Image(systemName: "tshirt").font(.largeTitle).foregroundStyle(.secondary))
-                    }
-                )
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.1))
-                    .aspectRatio(1.0, contentMode: .fit)
-                    .overlay(Image(systemName: "tshirt").font(.largeTitle).foregroundStyle(.secondary))
-            }
-            
-            // Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(clothing.name)
-                    .font(.caption)
-                    .bold()
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
+        GlassCard {
+            HStack(spacing: 12) {
+                // 1. Image
+                if let imagePath = clothing.imagePaths.first {
+                    AsyncDownsampledImage(
+                        fileName: imagePath,
+                        targetSize: CGSize(width: 60, height: 60),
+                        content: { uiImage in
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        },
+                        placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(Image(systemName: "tshirt").foregroundStyle(.secondary))
+                        }
+                    )
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(Image(systemName: "tshirt").foregroundStyle(.secondary))
+                }
                 
-                HStack {
-                    if let depositDate = clothing.depositDate, Calendar.current.isDate(depositDate, inSameDayAs: date) {
-                        Text("定金")
-                            .font(.caption2)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color(uiColor: theme.depositColor).opacity(0.2))
+                // 2. Info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(clothing.name)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 6) {
+                        if let brand = clothing.brand {
+                            Text(brand.name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        // Event Status Label
+                        if isDepositDay {
+                            Text("定金日")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color(uiColor: theme.depositColor).opacity(0.2))
+                                .foregroundStyle(Color(uiColor: theme.depositColor))
+                                .clipShape(Capsule())
+                        } else if isFinalPaymentDay {
+                            Text("预计尾款日")
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color(uiColor: theme.finalPaymentColor).opacity(0.2))
+                                .foregroundStyle(Color(uiColor: theme.finalPaymentColor))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                // 3. Price Info
+                VStack(alignment: .trailing, spacing: 2) {
+                    if clothing.isDepositPlan {
+                        Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                            .font(.caption)
+                            .bold()
                             .foregroundStyle(Color(uiColor: theme.depositColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    } else if let finalDate = clothing.finalPaymentDate, Calendar.current.isDate(finalDate, inSameDayAs: date) {
-                        Text("尾款")
-                            .font(.caption2)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color(uiColor: theme.finalPaymentColor).opacity(0.2))
+                        
+                        Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                            .font(.caption)
+                            .bold()
                             .foregroundStyle(Color(uiColor: theme.finalPaymentColor))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                 }
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                colorScheme == .dark
-                    ? Color(uiColor: .secondarySystemGroupedBackground)
-                    : Color.white.opacity(0.8)
-            )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
+    }
+    
+    private var isDepositDay: Bool {
+        guard let d = clothing.depositDate else { return false }
+        return Calendar.current.isDate(d, inSameDayAs: date)
+    }
+    
+    private var isFinalPaymentDay: Bool {
+        guard let f = clothing.finalPaymentDate else { return false }
+        let calendar = Calendar.current
+        if calendar.isDate(f, inSameDayAs: date) { return true }
+        
+        if let endDate = clothing.finalPaymentEndDate {
+            let target = calendar.startOfDay(for: date)
+            let start = calendar.startOfDay(for: f)
+            let end = calendar.startOfDay(for: endDate)
+            return target > start && target <= end
+        }
+        return false
     }
 }
 
@@ -248,6 +388,7 @@ struct WeekHeaderView: View {
 struct UnifiedEventsPopup: View {
     let title: String
     let clothings: [Clothing]
+    var filterDate: Date? = nil // Optional: If set, only shows events for this specific date
     var onClose: () -> Void
     var onDayTap: ((Date) -> Void)? = nil // Optional drill-down
     
@@ -257,25 +398,64 @@ struct UnifiedEventsPopup: View {
     // Group clothings by day
     private var groupedClothings: [(Date, [Clothing])] {
         let calendar = Calendar.current
-        let grouped = Dictionary(grouping: clothings) { clothing -> Date in
-            // Try to group by deposit date first, then final payment date
-            // This is a heuristic; if a clothing has both, it might appear in one.
-            // For a single day view, they will all be on the same day.
-            // For a month view, we want to place them on the relevant day in that month.
-            
-            // Check if deposit date is relevant (e.g. if we are showing a month, is it in this month?)
-            // Since we don't pass the "context date" here easily for filtering, we assume 'clothings' is already filtered.
-            // We just need to find WHICH date it belongs to.
-            
+        var events: [(Date, Clothing)] = []
+        
+        for clothing in clothings {
+            // 1. Check Deposit Date
             if let d = clothing.depositDate {
-                return calendar.startOfDay(for: d)
+                let date = calendar.startOfDay(for: d)
+                // Filter logic
+                if let filter = filterDate {
+                    if calendar.isDate(date, inSameDayAs: filter) {
+                        events.append((date, clothing))
+                    }
+                } else {
+                    events.append((date, clothing))
+                }
             }
+            
+            // 2. Check Final Payment Date Range
             if let f = clothing.finalPaymentDate {
-                return calendar.startOfDay(for: f)
+                let start = calendar.startOfDay(for: f)
+                let end = clothing.finalPaymentEndDate.map { calendar.startOfDay(for: $0) } ?? start
+                
+                // Determine the range of dates to check
+                var datesToCheck: [Date] = []
+                
+                if let filter = filterDate {
+                    // Optimization: Only check the filter date if it falls within range
+                    let filterDay = calendar.startOfDay(for: filter)
+                    if filterDay >= start && filterDay <= end {
+                        datesToCheck.append(filterDay)
+                    }
+                } else {
+                    // Add all dates in range
+                    var d = start
+                    while d <= end {
+                        datesToCheck.append(d)
+                        d = calendar.date(byAdding: .day, value: 1, to: d)!
+                    }
+                }
+                
+                for date in datesToCheck {
+                    // Avoid duplicate if deposit and final payment are on the same day
+                    // Only need to check if we are on the deposit day
+                    if let d = clothing.depositDate, calendar.isDate(d, inSameDayAs: date) {
+                        // Already processed in step 1 (Deposit check)
+                        continue
+                    }
+                    events.append((date, clothing))
+                }
             }
-            return calendar.startOfDay(for: Date())
         }
-        return grouped.sorted { $0.key < $1.key }
+        
+        // Group by Date
+        let groupedDict = Dictionary(grouping: events, by: { $0.0 })
+        
+        // Convert to [(Date, [Clothing])] and Sort
+        return groupedDict.map { (key, value) in
+            (key, value.map { $0.1 })
+        }.sorted { $0.0 < $1.0 }
     }
     
     var body: some View {
@@ -329,7 +509,7 @@ struct UnifiedEventsPopup: View {
                                     }
                                     
                                     // Items Grid
-                                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
+                                    LazyVStack(spacing: 12) {
                                         ForEach(items) { clothing in
                                             Button {
                                                 // If we have a drill-down action (e.g. Month -> Day), use it.
@@ -341,10 +521,10 @@ struct UnifiedEventsPopup: View {
                                                 // Link to detail view directly if no drill-down
                                                 if onDayTap == nil {
                                                     NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                                        ClothingCardMonthly(clothing: clothing, date: date, theme: themeManager.currentTheme)
+                                                        CalendarEventRow(clothing: clothing, date: date, theme: themeManager.currentTheme)
                                                     }
                                                 } else {
-                                                    ClothingCardMonthly(clothing: clothing, date: date, theme: themeManager.currentTheme)
+                                                    CalendarEventRow(clothing: clothing, date: date, theme: themeManager.currentTheme)
                                                 }
                                             }
                                             .buttonStyle(.plain)

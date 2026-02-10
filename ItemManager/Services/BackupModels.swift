@@ -39,6 +39,9 @@ struct BackupManifest: Codable {
     // Pet Module
     let petStatusData: Data?
     
+    // App Version Persistence
+    let appVersion: String?
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int

@@ -131,6 +131,32 @@ class SpatialAssetManager: ObservableObject {
         spatialImage = nil
     }
     
+    /// 清理所有小世界空间照片缓存
+    /// 当 App 版本更新或从备份恢复且版本不一致时调用
+    func clearAllCache() {
+        print("[SpatialAssetManager] 执行全量缓存清理...")
+        
+        // 1. 清理 UserDefaults 标记
+        let defaults = UserDefaults.standard
+        let dictionary = defaults.dictionaryRepresentation()
+        
+        for (key, _) in dictionary {
+            if key.hasPrefix("spatial_cache_") {
+                defaults.removeObject(forKey: key)
+                print("[SpatialAssetManager] 移除缓存记录: \(key)")
+            }
+        }
+        
+        // 2. 重置内存状态
+        isReady = false
+        spatialImage = nil
+        
+        // 3. (可选) 清理临时文件
+        // 由于文件名不可知，且临时目录由系统管理，我们主要依赖移除 UserDefaults 标记来强制重新生成。
+        // 如果需要更彻底的清理，可以尝试清空临时目录中我们自己生成的文件，但需要小心误删。
+        // 目前策略：依赖覆盖写入。
+    }
+    
     func rebuild(imageName: String, extension: String) {
         clearCache(for: imageName)
         let tempDirectory = FileManager.default.temporaryDirectory
@@ -164,10 +190,13 @@ class SpatialAssetManager: ObservableObject {
         let fileURL = tempDirectory.appendingPathComponent("\(name).\(ext)")
         
         // 如果文件已存在，直接返回 (简单的文件缓存)
+        // 注意：在开发阶段(DEBUG)，为了支持热替换图片，我们跳过此缓存检查，总是重新写入
+        #if !DEBUG // 仅在调试模式下适当不启用缓存检查, 换了图片用-否
         if FileManager.default.fileExists(atPath: fileURL.path) {
             print("[SpatialAssetManager] 使用已存在的临时文件: \(fileURL.path)")
             return fileURL
         }
+        #endif
         
         // 耗时操作：图片编码和写入 (在后台线程运行)
         print("[SpatialAssetManager] 开始后台编码图片...")
