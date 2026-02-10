@@ -7,6 +7,9 @@ struct SmallWorldMenuOverlay: View {
     @Binding var selectedTab: Int
     @Binding var smallWorldDestination: SmallWorldDestination
     
+    // 环境遍历，用于监听 App 生命周期
+    @Environment(\.scenePhase) private var scenePhase
+    
     // 菜单状态
     @State private var showMenu = false
     
@@ -15,6 +18,7 @@ struct SmallWorldMenuOverlay: View {
     @State private var isPressing: Bool = false
     @State private var didLongPressTrigger: Bool = false
     @State private var touchLocation: CGPoint = .zero
+    @State private var startLocation: CGPoint = .zero // 记录拖动起始位置
     @State private var menuOrigin: CGPoint = .zero // 菜单发射源点
     @State private var timer: Timer?
     private let longPressDuration: TimeInterval = 0.35 // 缩短长按时间，提升响应速度，缓解系统手势冲突
@@ -64,7 +68,8 @@ struct SmallWorldMenuOverlay: View {
         GeometryReader { geometry in
             let safeAreaBottom = geometry.safeAreaInsets.bottom
             // 动态计算 TabBar 交互区域高度 (标准高度 49 + 安全区域)
-            let tabBarHeight = 49.0 + safeAreaBottom
+            // 增加高度以确保覆盖图标区域 (从 49 增加到 65)
+            let tabBarHeight = 65.0 + safeAreaBottom
             // 动态计算触发区域宽度 (限制最大宽度以适配 iPad)
             let triggerAreaWidth = min(geometry.size.width / 3, 150)
             
@@ -187,6 +192,7 @@ struct SmallWorldMenuOverlay: View {
                                         if !isPressing {
                                             print("SmallWorldMenuOverlay: Drag started at \(value.location)")
                                             isPressing = true
+                                            startLocation = value.location // 记录起始位置
                                             
                                             // 触发轻微震动反馈，提示用户已开始按压
                                             #if canImport(UIKit)
@@ -195,6 +201,13 @@ struct SmallWorldMenuOverlay: View {
                                             #endif
                                             
                                             startLongPressTimer()
+                                        } else {
+                                            // 检测位移，如果移动距离过大，则取消长按（防止滑动误触）
+                                            let distance = hypot(value.location.x - startLocation.x, value.location.y - startLocation.y)
+                                            if distance > 20 { // 阈值设为 20
+                                                print("SmallWorldMenuOverlay: Drag distance \(distance) > 20, cancelling long press")
+                                                cancelLongPress()
+                                            }
                                         }
                                     }
                                     .onEnded { value in
@@ -239,6 +252,17 @@ struct SmallWorldMenuOverlay: View {
             .coordinateSpace(name: "MenuOverlay")
         }
         .ignoresSafeArea() // 让 GeometryReader 获取全屏尺寸
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .background || newPhase == .inactive {
+                closeMenu()
+            }
+        }
+        .onChange(of: selectedTab) { newValue in
+            // 如果切换到其他 Tab，关闭菜单
+            if newValue != 1 {
+                closeMenu()
+            }
+        }
     }
     
     private func startLongPressTimer() {
@@ -276,6 +300,16 @@ struct SmallWorldMenuOverlay: View {
                 self.selectedTab = 1
             }
         }
+    }
+    
+    private func cancelLongPress() {
+        timer?.invalidate()
+        timer = nil
+        isPressing = false
+        withAnimation(.easeOut(duration: 0.2)) {
+            pressProgress = 0.0
+        }
+        didLongPressTrigger = false
     }
     
     private func handlePressEnded() {
