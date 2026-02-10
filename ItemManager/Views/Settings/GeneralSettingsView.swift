@@ -16,6 +16,8 @@ struct GeneralSettingsView: View {
     @State private var showingRedeemResultAlert = false
     @State private var redeemResultMessage = ""
     
+    @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
+    
     var body: some View {
         @Bindable var theme = themeManager
         
@@ -323,7 +325,7 @@ struct GeneralSettingsView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                 }
-                
+              
                 NavigationLink(destination: PetCustomizationView()) {
                     HStack {
                         Image(systemName: "bubble.left.and.bubble.right.fill")
@@ -368,6 +370,22 @@ struct GeneralSettingsView: View {
                         Text(CalendarThemeManager.shared.currentTheme.displayName)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                // 限制 iOS 26 生效
+                if #available(iOS 26.0, *) {
+                    Toggle(isOn: $isSpatialSceneEnabled) {
+                        VStack(alignment: .leading) {
+                            Text("开启3d景深空间场景")
+                            Text("iOS 26 专属特性")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Text("仅支持 iOS 26 及以上版本")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 
                 HStack {

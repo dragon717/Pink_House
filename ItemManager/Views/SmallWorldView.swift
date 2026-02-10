@@ -27,6 +27,7 @@ struct SmallWorldView: View {
     
     // 图片原始尺寸 1919x1079
     @State private var imageSize = CGSize(width: 1919, height: 1079)
+    @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
@@ -46,8 +47,8 @@ struct SmallWorldView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         ZStack(alignment: .topLeading) {
                             Group {
-                                // 限制 iOS 26 生效
-                                if #available(iOS 26.0, *) {
+                                // 根据设置决定是否开启 3D 景深空间场景 (iOS 26 专属特性模拟)
+                                if #available(iOS 26.0, *), isSpatialSceneEnabled {
                                     SpatialBackgroundView(
                                         imageName: "small_world_bg",
                                         imageExtension: "png",
@@ -70,24 +71,24 @@ struct SmallWorldView: View {
                             .overlay(
                                     ZStack(alignment: .topLeading) {
                                         // 1. OOTD (今日穿搭) - 最左侧
-                                        InteractionHotspot(rect: CGRect(x: 0.01, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
+                                        InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
                                             destination = .ootd
                                         }
                                         
                                         // 2. 衣橱 (少女衣橱)
-                                        InteractionHotspot(rect: CGRect(x: 0.39, y: 0.06, width: 0.175, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.41, y: 0.06, width: 0.155, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             withAnimation(.easeIn(duration: 0.5)) {
                                                 isPlayingOpeningAnimation = true
                                             }
                                         }
                                         
                                         // 3. 猪 (来财)
-                                        InteractionHotspot(rect: CGRect(x: 0.71, y: 0.5, width: 0.2, height: 0.28), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.68, y: 0.48, width: 0.2, height: 0.28), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             destination = .wealth
                                         }
                                         
                                         // 4. 墙上的日历 (梦裙日历)
-                                        CalendarHotspot(rect: CGRect(x: 0.62, y: 0.1, width: 0.166, height: 0.26), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             destination = .calendar
                                         }
                                         
@@ -130,7 +131,7 @@ struct SmallWorldView: View {
                 appearance.backgroundImage = UIImage()
                 
                 UITabBar.appearance().standardAppearance = appearance
-                if #available(iOS 15.0, *) {
+                if #available(iOS 26.0, *) {
                     UITabBar.appearance().scrollEdgeAppearance = appearance
                 }
             }
@@ -140,7 +141,7 @@ struct SmallWorldView: View {
             appearance.configureWithDefaultBackground()
             
             UITabBar.appearance().standardAppearance = appearance
-            if #available(iOS 15.0, *) {
+            if #available(iOS 26.0, *) {
                 UITabBar.appearance().scrollEdgeAppearance = appearance
             }
         }
