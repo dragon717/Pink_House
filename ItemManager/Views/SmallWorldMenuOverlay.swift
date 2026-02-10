@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 struct SmallWorldMenuOverlay: View {
     @Binding var selectedTab: Int
@@ -11,9 +13,11 @@ struct SmallWorldMenuOverlay: View {
     // 长按动画状态
     @State private var pressProgress: CGFloat = 0.0
     @State private var isPressing: Bool = false
+    @State private var didLongPressTrigger: Bool = false
     @State private var touchLocation: CGPoint = .zero
+    @State private var menuOrigin: CGPoint = .zero // 菜单发射源点
     @State private var timer: Timer?
-    private let longPressDuration: TimeInterval = 0.5
+    private let longPressDuration: TimeInterval = 0.35 // 缩短长按时间，提升响应速度，缓解系统手势冲突
     
     // 震动管理器
     @ObservedObject private var hapticManager = HapticEngineManager.shared
@@ -75,52 +79,55 @@ struct SmallWorldMenuOverlay: View {
                         .transition(.opacity)
                 }
                 
-                // 2. 菜单气泡
-                if showMenu {
-                    ZStack {
-                        ForEach(menuItems.indices, id: \.self) { index in
-                            let item = menuItems[index]
-                            
-                            // 计算角度: 分布在 -160 (左下) 到 -20 (右下) 之间，上方是 -90
-                            // 4个项目，区间跨度 140度
-                            let totalAngle: Double = 140
-                            let startAngle: Double = -160
-                            let step = totalAngle / Double(menuItems.count - 1)
-                            let degrees = startAngle + Double(index) * step
-                            
-                            // 转换为弧度
-                            let radians = degrees * .pi / 180
-                            
-                            // 计算相对于中心的偏移
-                            let currentRadius = getRadius(geometry: geometry)
-                            let xOffset = currentRadius * cos(radians)
-                            let yOffset = currentRadius * sin(radians)
-                            
-                            MenuBubbleView(item: item) {
-                                selectItem(item.destination)
-                            }
-                            // 初始位置设为发射源点 (触摸位置或默认位置)
-                            // 默认位置使用动态计算的 TabBar 中心
-                            .position(
-                                x: touchLocation == .zero ? geometry.size.width / 2 : touchLocation.x,
-                                y: touchLocation == .zero ? geometry.size.height - (tabBarHeight / 2) : touchLocation.y
-                            )
-                            // 通过 offset 动画实现飞出效果
-                            .offset(
-                                x: showMenu ? xOffset : 0,
-                                y: showMenu ? yOffset : 0
-                            )
-                            .scaleEffect(showMenu ? 1.0 : 0.1)
-                            .opacity(showMenu ? 1.0 : 0.0)
-                            // 使用插值弹簧动画实现灵动效果
-                            .animation(
-                                .spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.5)
-                                .delay(Double(index) * 0.03),
-                                value: showMenu
-                            )
+                        // 2. 菜单气泡
+                ZStack(alignment: .topLeading) {
+                    ForEach(menuItems.indices, id: \.self) { index in
+                        let item = menuItems[index]
+                        
+                        // 计算角度: 分布在 -160 (左下) 到 -20 (右下) 之间，上方是 -90
+                        // 4个项目，区间跨度 140度
+                        let totalAngle: Double = 140
+                        let startAngle: Double = -160
+                        let step = totalAngle / Double(menuItems.count - 1)
+                        let degrees = startAngle + Double(index) * step
+                        
+                        // 转换为弧度
+                        let radians = degrees * .pi / 180
+                        
+                        // 计算相对于中心的偏移
+                        let currentRadius = getRadius(geometry: geometry)
+                        let xOffset = currentRadius * cos(radians)
+                        let yOffset = currentRadius * sin(radians)
+                        
+                        MenuBubbleView(item: item) {
+                            selectItem(item.destination)
                         }
+                        // 调整修饰符顺序：
+                        // 1. 先应用缩放和透明度 (作用于气泡自身)
+                        .scaleEffect(showMenu ? 1.0 : 0.1)
+                        .opacity(showMenu ? 1.0 : 0.0)
+                        // 2. 应用展开位移 (相对于中心点)
+                        .offset(
+                            x: showMenu ? xOffset : 0,
+                            y: showMenu ? yOffset : 0
+                        )
+                        // 3. 配置动画 (作用于上述属性)
+                        .animation(
+                            .spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.5)
+                            .delay(showMenu ? Double(index) * 0.03 : 0),
+                            value: showMenu
+                        )
+                        // 4. 最后进行绝对定位 (将气泡中心放置在发射源点)
+                        // 注意：position 必须放在最后，因为它会改变视图大小为占满父视图，
+                        // 如果放在 scaleEffect 之前，会导致缩放中心变为屏幕中心。
+                        .position(
+                            x: menuOrigin.x,
+                            y: menuOrigin.y
+                        )
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity) // 确保 ZStack 占满全屏，使内部 position 坐标系与全屏一致
+                .allowsHitTesting(showMenu) // 只有显示时才允许点击，避免隐藏时遮挡
                 
                 // 3. 长按进度指示器
                 if isPressing && !showMenu {
@@ -172,10 +179,21 @@ struct SmallWorldMenuOverlay: View {
                             .highPriorityGesture(
                                 DragGesture(minimumDistance: 0, coordinateSpace: .named("MenuOverlay"))
                                     .onChanged { value in
+                                        if showMenu { return } // 菜单打开时忽略长按逻辑
+                                        
+                                        // 始终更新触摸位置，确保圆环跟随手指
+                                        touchLocation = value.location
+                                        
                                         if !isPressing {
                                             print("SmallWorldMenuOverlay: Drag started at \(value.location)")
                                             isPressing = true
-                                            touchLocation = value.location
+                                            
+                                            // 触发轻微震动反馈，提示用户已开始按压
+                                            #if canImport(UIKit)
+                                            let generator = UIImpactFeedbackGenerator(style: .light)
+                                            generator.impactOccurred()
+                                            #endif
+                                            
                                             startLongPressTimer()
                                         }
                                     }
@@ -199,7 +217,9 @@ struct SmallWorldMenuOverlay: View {
                                 TapGesture()
                                     .onEnded {
                                         print("SmallWorldMenuOverlay: Explicit TapGesture triggered")
-                                        if !showMenu { // 只有菜单没显示时才响应
+                                        if showMenu {
+                                            closeMenu()
+                                        } else {
                                             handleTapAction()
                                         }
                                     }
@@ -215,13 +235,16 @@ struct SmallWorldMenuOverlay: View {
                 // 如果用户想取消，点击空白处（背景遮罩）即可。
                 // 如果再次点击触发区，也应该是关闭或者无效。
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity) // 确保外层 ZStack 占满全屏
             .coordinateSpace(name: "MenuOverlay")
         }
+        .ignoresSafeArea() // 让 GeometryReader 获取全屏尺寸
     }
     
     private func startLongPressTimer() {
         // 重置状态
         pressProgress = 0.0
+        didLongPressTrigger = false
         
         // 进度条动画
         withAnimation(.linear(duration: longPressDuration)) {
@@ -259,6 +282,14 @@ struct SmallWorldMenuOverlay: View {
         timer?.invalidate()
         timer = nil
         
+        // 如果是长按刚刚触发了菜单，则忽略此次抬起事件
+        if didLongPressTrigger {
+            didLongPressTrigger = false
+            isPressing = false
+            pressProgress = 0.0
+            return
+        }
+        
         // 如果进度没满，视为点击
         if pressProgress < 1.0 {
             // 立即停止长按动画
@@ -268,16 +299,14 @@ struct SmallWorldMenuOverlay: View {
             }
             
             // 执行单击逻辑
-            // 务必确保这里的逻辑是正确的，并且 selectedTab 和 smallWorldDestination 是有效的 Binding
             print("SmallWorldMenuOverlay: Tap detected in handlePressEnded")
-            handleTapAction()
+            if showMenu {
+                closeMenu()
+            } else {
+                handleTapAction()
+            }
         } else {
-            // 已经触发了菜单，这里只需要重置进度显示（如果菜单没出来的话）
-            // 但通常 triggerMenu 已经处理了 UI
-            // isPressing = false // 不要在这里设为 false，这会导致动画瞬间消失，应该在 triggerMenu 里处理
-            // 但如果用户长按后移动手指导致 menu 没触发（比如取消），这里需要处理
-            // 实际上我们的逻辑是只要时间到了就触发，不关心是否松手。
-            // 松手后清理状态
+            // 已经触发了菜单（理论上会被 didLongPressTrigger 拦截，但以防万一）
             isPressing = false
             pressProgress = 0.0
         }
@@ -287,6 +316,17 @@ struct SmallWorldMenuOverlay: View {
         // 使用 HapticEngineManager 播放强震动 (模拟 Heavy Impact)
         // Intensity: 0.8 (强烈), Sharpness: 0.7 (较脆), Fallback: .heavy
         hapticManager.playUIFeedback(intensity: 0.8, sharpness: 0.7, fallbackStyle: .heavy)
+        
+        // 标记长按已触发
+        didLongPressTrigger = true
+        
+        // 锁定当前触摸位置为菜单发射源点，并禁用动画防止位置跳变
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            menuOrigin = touchLocation
+            print("SmallWorldMenuOverlay: Trigger Menu. menuOrigin locked at: \(menuOrigin)")
+        }
         
         // 显示菜单
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
