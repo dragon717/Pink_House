@@ -1,12 +1,18 @@
 import SwiftUI
 
 struct PetOverlayView: View {
+    // 点击动作
+    var action: () -> Void
+    
     // 位置状态
     @State private var positionX: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
     
     // 动画状态
     @State private var isBreathing: Bool = false
+    
+    // 交互状态
+    @State private var isDragging: Bool = false
     
     // 触觉反馈
     private let impactGenerator = UIImpactFeedbackGenerator(style: .light)
@@ -41,11 +47,17 @@ struct PetOverlayView: View {
                         // 垂直位置偏移 (趴在导航栏上)
                         .offset(y: verticalOffset)
                         .gesture(
-                            DragGesture()
+                            DragGesture(minimumDistance: 10) // 设置最小距离以区分点击
                                 .updating($dragOffset) { value, state, _ in
                                     state = value.translation.width
                                 }
+                                .onChanged { _ in
+                                    if !isDragging {
+                                        isDragging = true
+                                    }
+                                }
                                 .onEnded { value in
+                                    isDragging = false
                                     // 更新最终位置
                                     let newPosition = positionX + value.translation.width
                                     
@@ -67,11 +79,15 @@ struct PetOverlayView: View {
                                     impactGenerator.impactOccurred()
                                 }
                         )
-                        // 点击交互（作为萌宠入口，可以在这里添加点击事件）
+                        // 点击交互：点击时进入萌宠 Tab
                         .onTapGesture {
-                            impactGenerator.impactOccurred()
-                            // 这里可以处理点击事件，例如跳转到萌宠 Tab 或弹出对话
-                            print("Pet tapped")
+                            // 只有在非拖动状态下才触发
+                            if !isDragging {
+                                impactGenerator.impactOccurred()
+                                withAnimation {
+                                    action()
+                                }
+                            }
                         }
                     
                     Spacer()
@@ -101,6 +117,6 @@ struct PetOverlayView: View {
             Spacer()
             Color.gray.frame(height: 83) // 模拟 TabBar
         }
-        PetOverlayView()
+        PetOverlayView(action: {})
     }
 }

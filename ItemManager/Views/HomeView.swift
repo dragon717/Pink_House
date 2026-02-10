@@ -71,7 +71,7 @@ struct HomeView: View {
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
 
-    @State private var selectedTab: HomeTab = .wardrobe
+    @Binding var selectedTab: HomeTab
     @State private var showingAddSheet = false
     @State private var showingBatchImportSheet = false
     @State private var isSelectionMode = false
@@ -728,7 +728,7 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(selectedTab: .constant(.wardrobe))
 }
 
 extension HomeView {
