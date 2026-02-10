@@ -61,7 +61,7 @@ struct PetHomeView: View {
                         }
                         
                         // 3. 顶层 UI：底部操作面板 (可展开)
-                        PetBottomPanel(viewModel: viewModel, panelState: $panelState, isLandscape: isLandscape)
+                        PetBottomPanel(viewModel: viewModel, panelState: $panelState, showRenameAlert: $showRenameAlert, isLandscape: isLandscape)
                         
                         // 4. 悬浮按钮 (仅在隐藏状态且竖屏显示)
                         if !isLandscape && panelState == .hidden {

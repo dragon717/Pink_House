@@ -13,6 +13,7 @@ enum PanelState {
 struct PetBottomPanel: View {
     @ObservedObject var viewModel: PetViewModel
     @Binding var panelState: PanelState
+    @Binding var showRenameAlert: Bool // 新增绑定
     var isLandscape: Bool = false
     @State private var selectedTab: Int = 0 // 0: 背包, 1: 商店
     
@@ -262,7 +263,7 @@ struct PetBottomPanel: View {
             
             if selectedTab == 0 {
                 // 背包视图
-                InventoryView(viewModel: viewModel, panelState: panelState, isLandscape: isLandscape)
+                InventoryView(viewModel: viewModel, panelState: panelState, showRenameAlert: $showRenameAlert, isLandscape: isLandscape)
             } else {
                 // 商店视图
                 ShopView(viewModel: viewModel, panelState: panelState, isLandscape: isLandscape)
@@ -277,10 +278,15 @@ struct InventoryView: View {
     @ObservedObject var viewModel: PetViewModel
     @ObservedObject var config = PetConfigManager.shared
     var panelState: PanelState
+    @Binding var showRenameAlert: Bool // 新增绑定
     var isLandscape: Bool = false
     
     @State private var searchText = ""
     @State private var selectedCategoryId = "all"
+    
+    // Alert State
+    @State private var selectedItemToUse: PetItemDefinition?
+    @State private var showUseAlert = false
     
     // 过滤出拥有的物品
     var filteredItems: [PetItemDefinition] {
@@ -375,6 +381,14 @@ struct InventoryView: View {
                             ForEach(filteredItems) { item in
                                 InventoryItemView(item: item, count: viewModel.status.inventory[item.id] ?? 0)
                                     .draggable("inventory:\(item.id)")
+                                    .onTapGesture {
+                                        if item.id == "renameCard" {
+                                            showRenameAlert = true
+                                        } else {
+                                            selectedItemToUse = item
+                                            showUseAlert = true
+                                        }
+                                    }
                             }
                         }
                         .padding(20)
@@ -387,6 +401,14 @@ struct InventoryView: View {
                             ForEach(filteredItems) { item in
                                 InventoryItemView(item: item, count: viewModel.status.inventory[item.id] ?? 0)
                                     .draggable("inventory:\(item.id)")
+                                    .onTapGesture {
+                                        if item.id == "renameCard" {
+                                            showRenameAlert = true
+                                        } else {
+                                            selectedItemToUse = item
+                                            showUseAlert = true
+                                        }
+                                    }
                             }
                         }
                         .padding(.horizontal, 20)
@@ -394,6 +416,37 @@ struct InventoryView: View {
                     }
                 }
             }
+        }
+        .alert(isPresented: $showUseAlert) {
+            if let item = selectedItemToUse {
+                return Alert(
+                    title: Text("使用 \(item.name)"),
+                    message: Text(getUsageMessage(for: item)),
+                    primaryButton: .default(Text("使用")) {
+                        viewModel.consumeItem(item)
+                    },
+                    secondaryButton: .cancel(Text("取消"))
+                )
+            } else {
+                return Alert(title: Text("错误"), message: Text("未选择物品"), dismissButton: .cancel())
+            }
+        }
+    }
+    
+    private func getUsageMessage(for item: PetItemDefinition) -> String {
+        let petName = viewModel.status.petName ?? "萌宠"
+        if item.isToy {
+            return "确定要让\(petName)玩 \(item.name) 吗？\n将消耗 \(item.energyCost ?? 0) 点精力，增加心情。"
+        } else if item.isDrink {
+            return "确定要给\(petName)喝 \(item.name) 吗？"
+        } else if item.category == "food" {
+            return "确定要给\(petName)喂食 \(item.name) 吗？"
+        } else if item.id == "energyPill" {
+            return "确定要使用 \(item.name) 吗？\n将快速恢复精力。"
+        } else if item.id == "renameCard" {
+            return "确定要使用 \(item.name) 吗？"
+        } else {
+            return "确定要使用 \(item.name) 吗？"
         }
     }
 }
