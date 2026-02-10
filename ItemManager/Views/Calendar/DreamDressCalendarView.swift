@@ -13,6 +13,7 @@ struct DreamDressCalendarView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(CalendarThemeManager.self) private var themeManager
+    @Environment(ThemeManager.self) private var appThemeManager
     
     // Data Query
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
@@ -27,12 +28,8 @@ struct DreamDressCalendarView: View {
         NavigationStack {
             ZStack {
                 // Background
-                if colorScheme == .dark {
-                    Color.black.ignoresSafeArea()
-                } else {
-                    Color(uiColor: themeManager.currentTheme.backgroundColor)
-                        .ignoresSafeArea()
-                }
+                LiquidBackground()
+                    .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // 1. Header with Mode Switcher
@@ -231,9 +228,13 @@ struct RecentTimelineView: View {
                 }
             }
             .padding()
-            .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white)
+            .background(
+                colorScheme == .dark
+                    ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
+                    : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.9)
+            )
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.03), radius: 5, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
     }
     
@@ -285,7 +286,7 @@ struct ClothingCardTiny: View {
             }
             .padding(6)
             .frame(width: 80)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .background(Color.white.opacity(0.7))
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(radius: 1)
@@ -334,7 +335,7 @@ struct CompactDayRow: View {
                     .foregroundStyle(.tertiary)
             }
             .padding()
-            .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white)
+            .background(Color(uiColor: theme.backgroundColor).opacity(0.9))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
@@ -393,7 +394,11 @@ struct DualMonthScrollView: View {
             }
             .padding(.horizontal)
         }
-        .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white.opacity(0.5))
+        .background(
+            colorScheme == .dark
+                ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
+                : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.85)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .padding(.horizontal)
     }
@@ -479,7 +484,11 @@ struct YearlyHeatmapView: View {
                             .padding(8)
                             .frame(maxWidth: .infinity)
                             .aspectRatio(1.0, contentMode: .fit)
-                            .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white)
+                            .background(
+                                colorScheme == .dark
+                                    ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
+                                    : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.85)
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                         }
@@ -496,6 +505,7 @@ struct MiniMonthGrid: View {
     let monthDate: Date
     let clothings: [Clothing]
     let theme: CalendarTheme
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         let days = CalendarHelper.shared.daysInMonth(monthDate)
@@ -531,7 +541,11 @@ struct MiniMonthGrid: View {
     }
     
     private func intensityColor(_ intensity: Double) -> Color {
-        if intensity == 0 { return Color.gray.opacity(0.1) }
-        return Color(uiColor: theme.accentColor).opacity(0.2 + intensity * 0.8)
+        if intensity == 0 { 
+            return colorScheme == .dark ? Color.white.opacity(0.1) : Color.gray.opacity(0.1) 
+        }
+        let baseColor = Color(uiColor: theme.accentColor)
+        // 在黑暗模式下，让颜色更亮一点
+        return baseColor.opacity(colorScheme == .dark ? (0.3 + intensity * 0.7) : (0.2 + intensity * 0.8))
     }
 }

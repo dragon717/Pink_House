@@ -99,10 +99,10 @@ struct DreamCalendarCell: View {
     }
     
     private func dateTextColor(hasImage: Bool) -> Color {
-        if hasImage {
-            return .primary // Use primary color on material background
-        } else if dateObj.isToday {
+        if dateObj.isToday {
             return Color(uiColor: theme.accentColor)
+        } else if hasImage {
+            return .primary // Use primary color on material background
         } else {
             return .primary
         }
@@ -149,6 +149,7 @@ struct ClothingCardMonthly: View {
     let clothing: Clothing
     let date: Date
     let theme: CalendarTheme
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -172,6 +173,7 @@ struct ClothingCardMonthly: View {
                     .font(.caption)
                     .bold()
                     .lineLimit(1)
+                    .foregroundStyle(.primary)
                 
                 HStack {
                     if let depositDate = clothing.depositDate, Calendar.current.isDate(depositDate, inSameDayAs: date) {
@@ -195,7 +197,11 @@ struct ClothingCardMonthly: View {
             }
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .background(
+                colorScheme == .dark
+                    ? Color(uiColor: .secondarySystemGroupedBackground)
+                    : Color.white.opacity(0.8)
+            )
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
@@ -216,7 +222,7 @@ struct WeekHeaderView: View {
             }
         }
         .padding(.vertical, 8)
-        .background(Color(uiColor: .systemBackground).opacity(0.5))
+        .background(Color.white.opacity(0.1))
     }
 }
 
@@ -277,7 +283,11 @@ struct UnifiedEventsPopup: View {
                     }
                 }
                 .padding()
-                .background(colorScheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : Color.white)
+                .background(
+                    colorScheme == .dark
+                        ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.95)
+                        : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.95)
+                )
                 
                 Divider()
                 
@@ -325,7 +335,11 @@ struct UnifiedEventsPopup: View {
                                     .padding(.horizontal)
                                 }
                                 .padding(.vertical, 8)
-                                .background(colorScheme == .dark ? Color(uiColor: .tertiarySystemGroupedBackground) : Color.white)
+                                .background(
+                                    colorScheme == .dark
+                                        ? Color(uiColor: .tertiarySystemGroupedBackground).opacity(0.6)
+                                        : Color.white.opacity(0.5)
+                                )
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .padding(.horizontal)
                             }
@@ -335,7 +349,11 @@ struct UnifiedEventsPopup: View {
                     .frame(maxHeight: 500)
                 }
             }
-            .background(colorScheme == .dark ? Color(uiColor: .systemGroupedBackground) : Color(uiColor: .secondarySystemBackground))
+            .background(
+                colorScheme == .dark
+                    ? Color(uiColor: .secondarySystemGroupedBackground).opacity(0.95)
+                    : Color(uiColor: themeManager.currentTheme.backgroundColor).opacity(0.95)
+            )
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .shadow(radius: 20)
             .padding(20)
