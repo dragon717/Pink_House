@@ -48,6 +48,23 @@ struct SmallWorldView: View {
         return true
     }
     
+    // 根据时间动态获取背景图片名称
+    private var currentBackgroundImageName: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        
+        // 清晨: 5:00 - 9:00 (不包含 9:00)
+        let isMorning = hour >= 5 && hour < 9
+        
+        // 黄昏: 16:00 - 19:00 (不包含 19:00)
+        let isDusk = hour >= 16 && hour < 19
+        
+        if isMorning || isDusk {
+            return "small_world_bg_sun"
+        } else {
+            return "small_world_bg_normal"
+        }
+    }
+    
     var body: some View {
         ZStack {
             GeometryReader { geometry in
@@ -58,7 +75,7 @@ struct SmallWorldView: View {
                                 // 根据设置决定是否开启 3D 景深空间场景 (iOS 26 专属特性模拟)
                                 if #available(iOS 26.0, *), isSpatialSceneEnabled {
                                     SpatialBackgroundView(
-                                        imageName: "small_world_bg",
+                                        imageName: currentBackgroundImageName,
                                         imageExtension: "png",
                                         onSelectOOTD: { destination = .ootd },
                                         onSelectWardrobe: {
@@ -74,7 +91,7 @@ struct SmallWorldView: View {
                                         }
                                     )
                                 } else {
-                                    Image("small_world_bg") // 确保图片已添加至 Assets
+                                    Image(currentBackgroundImageName) // 确保图片已添加至 Assets
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
                                 }
@@ -139,7 +156,7 @@ struct SmallWorldView: View {
             .toolbarBackground(.hidden, for: .tabBar) // 尝试 SwiftUI 原生隐藏
             .onAppear {
                 // 动态获取背景图尺寸，适配宽屏图片
-                if let image = UIImage(named: "small_world_bg") {
+                if let image = UIImage(named: currentBackgroundImageName) {
                     self.imageSize = image.size
                 }
                 
@@ -448,7 +465,8 @@ struct CalendarHotspot: View {
             )
             .task {
                 // 预览模式下强制重置资源状态，确保看到最新图片
-                SpatialAssetManager.shared.clearCache(for: "small_world_bg")
+                SpatialAssetManager.shared.clearCache(for: "small_world_bg_normal")
+                SpatialAssetManager.shared.clearCache(for: "small_world_bg_sun")
             }
         }
     }

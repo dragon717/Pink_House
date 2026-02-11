@@ -58,7 +58,8 @@ struct ItemManagerApp: App {
                     // 仅在支持的系统上预加载，避免旧设备浪费资源
                     if #available(iOS 26.0, *) {
                         await MainActor.run {
-                            SpatialAssetManager.shared.preload(imageName: "small_world_bg", extension: "png")
+                            SpatialAssetManager.shared.preload(imageName: "small_world_bg_normal", extension: "png")
+                            SpatialAssetManager.shared.preload(imageName: "small_world_bg_sun", extension: "png")
                         }
                     }
                     

@@ -189,7 +189,8 @@ struct DataManagementView: View {
         isLoading = true
         loadingMessage = "正在重建空间场景..."
         Task {
-            SpatialAssetManager.shared.rebuild(imageName: "small_world_bg", extension: "png")
+            SpatialAssetManager.shared.rebuild(imageName: "small_world_bg_normal", extension: "png")
+            SpatialAssetManager.shared.rebuild(imageName: "small_world_bg_sun", extension: "png")
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             await MainActor.run {
                 self.isLoading = false
