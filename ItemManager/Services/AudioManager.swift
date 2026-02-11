@@ -43,13 +43,45 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
     }
     
+    // MARK: - Audio Route Detection
+    
+    private func isHeadphonesConnected() -> Bool {
+        let route = AVAudioSession.sharedInstance().currentRoute
+        return route.outputs.contains { desc in
+            // 检查常见的耳机类型
+            return desc.portType == .headphones ||
+                   desc.portType == .bluetoothA2DP ||
+                   desc.portType == .bluetoothHFP ||
+                   desc.portType == .bluetoothLE
+        }
+    }
+
     /// 萌宠语音音量 (0.0 - 1.0)
     @Published var petVoiceVolume: Double {
         didSet {
             UserDefaults.standard.set(petVoiceVolume, forKey: "petVoiceVolume")
-            // 实时更新播放节点音量，并应用增益系数 3.0
-            playerNode.volume = Float(petVoiceVolume) * 3.0
+            updatePlayerVolume()
         }
+    }
+    
+    private func updatePlayerVolume() {
+        // 根据是否连接耳机动态调整增益
+        // 耳机通常更贴耳，不需要像扬声器那样激进的增益 (4.0 -> 1.5)
+        // 扬声器因为距离和硬件限制，需要更高的增益 (4.0)
+        let isHeadphones = isHeadphonesConnected()
+        let gain: Float = isHeadphones ? 1.5 : 4.0
+        
+        // 确保在主线程更新
+        if Thread.isMainThread {
+            playerNode.volume = Float(petVoiceVolume) * gain
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.playerNode.volume = Float(self.petVoiceVolume) * gain
+            }
+        }
+        
+        print("AudioManager: Updated volume with gain: \(gain) (Headphones: \(isHeadphones))")
     }
     
     /// 萌宠音色选择
@@ -144,6 +176,26 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         nc.addObserver(self, selector: #selector(handleInterruption), name: AVAudioSession.interruptionNotification, object: nil)
         nc.addObserver(self, selector: #selector(handleAppDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         nc.addObserver(self, selector: #selector(handleAppWillEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+        // 监听音频路由变化
+        nc.addObserver(self, selector: #selector(handleRouteChange), name: AVAudioSession.routeChangeNotification, object: nil)
+    }
+    
+    @objc private func handleRouteChange(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+        
+        print("AudioManager: Route changed, reason: \(reason)")
+        
+        DispatchQueue.main.async { [weak self] in
+            // 路由变化时，重新应用音量设置
+            self?.updatePlayerVolume()
+        }
+        
+        // 如果是新设备接入（例如连接了蓝牙耳机），可能需要检查是否需要重启互动以适应新的采样率或I/O
+        // 这里暂时只处理音量适配
     }
     
     @objc private func handleAppDidEnterBackground() {
@@ -202,10 +254,10 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             if isInteractionEnabled {
                 // 互动模式下始终保持 playAndRecord，避免切换开销和 I/O 错误
                 // 使用 .voiceChat 模式以启用回声消除 (AEC)，防止 BGM 触发 VAD
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
-                
-                // 强制使用扬声器（解决 voiceChat 模式下声音可能走听筒导致声音小的问题）
-                try session.overrideOutputAudioPort(.speaker)
+                // 添加 .allowBluetoothA2DP 以支持更广泛的蓝牙设备
+                // 关键修正：移除 overrideOutputAudioPort(.speaker)，否则会导致蓝牙耳机失效
+                // .defaultToSpeaker 选项足以保证在没有耳机时使用扬声器，有耳机时自动切换
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .mixWithOthers])
             } else if isRecording {
                 // 仅录音（虽然目前逻辑不会走到这里，除非有其他录音需求）
                 try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
