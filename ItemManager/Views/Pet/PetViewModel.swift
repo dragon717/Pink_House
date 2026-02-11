@@ -75,11 +75,46 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Pet Adoption & Switching
     
-    // 领养宠物
-    func adoptPet(_ pet: PetCharacter, name: String? = nil) {
-        if !status.ownedPetIds.contains(pet.id) {
-            status.ownedPetIds.append(pet.id)
+    // 获取领养价格
+    func getAdoptionPrice(for pet: PetCharacter) -> (price: Int, currency: PetCurrency) {
+        switch pet {
+        case .maomao:
+            return (60, .meowCoin)
+        default:
+            return (0, .fishCoin) // 默认免费
         }
+    }
+    
+    // 领养宠物 (返回是否成功)
+    @discardableResult
+    func adoptPet(_ pet: PetCharacter, name: String? = nil) -> Bool {
+        if status.ownedPetIds.contains(pet.id) {
+            // 已经拥有，只更新名字和切换
+            if let name = name, !name.isEmpty {
+                status.petNames[pet.id] = name
+            }
+            switchPet(pet)
+            saveStatus()
+            return true
+        }
+        
+        // 检查费用
+        let (price, currency) = getAdoptionPrice(for: pet)
+        if price > 0 {
+            switch currency {
+            case .meowCoin:
+                if status.meowCoin < price { return false }
+                status.meowCoin -= price
+            case .fishCoin:
+                if status.fishCoin < price { return false }
+                status.fishCoin -= price
+            case .boneCoin:
+                if status.boneCoin < price { return false }
+                status.boneCoin -= price
+            }
+        }
+        
+        status.ownedPetIds.append(pet.id)
         
         if let name = name, !name.isEmpty {
             status.petNames[pet.id] = name
@@ -89,6 +124,7 @@ class PetViewModel: ObservableObject {
         switchPet(pet)
         
         saveStatus()
+        return true
     }
     
     // 切换宠物

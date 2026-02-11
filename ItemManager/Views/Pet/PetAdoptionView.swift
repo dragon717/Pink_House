@@ -11,6 +11,10 @@ struct PetAdoptionView: View {
     @State private var inputName = ""
     @State private var selectedPet: PetCharacter?
     
+    // Alert state
+    @State private var showInsufficientFundsAlert = false
+    @State private var missingCurrencyName = ""
+    
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -25,10 +29,30 @@ struct PetAdoptionView: View {
                     TabView(selection: $currentSelection) {
                         ForEach(0..<PetCharacter.allCases.count, id: \.self) { index in
                             let pet = PetCharacter.allCases[index]
+                            let (price, currency) = viewModel.getAdoptionPrice(for: pet)
+                            
                             PetAdoptionCard(
                                 pet: pet,
                                 isOwned: viewModel.status.ownedPetIds.contains(pet.id),
+                                price: price,
+                                currency: currency,
                                 onAdopt: {
+                                    // Check balance
+                                    if price > 0 {
+                                        var canAfford = false
+                                        switch currency {
+                                        case .meowCoin: canAfford = viewModel.status.meowCoin >= price
+                                        case .fishCoin: canAfford = viewModel.status.fishCoin >= price
+                                        case .boneCoin: canAfford = viewModel.status.boneCoin >= price
+                                        }
+                                        
+                                        if !canAfford {
+                                            missingCurrencyName = currency.rawValue
+                                            showInsufficientFundsAlert = true
+                                            return
+                                        }
+                                    }
+                                    
                                     selectedPet = pet
                                     inputName = "" // Reset name
                                     showNameInput = true
@@ -60,12 +84,19 @@ struct PetAdoptionView: View {
         } message: {
             Text("给你的小伙伴起个独特的名字吧！")
         }
+        .alert("余额不足", isPresented: $showInsufficientFundsAlert) {
+            Button("好的", role: .cancel) { }
+        } message: {
+            Text("您需要更多的 \(missingCurrencyName) 才能领养这只萌宠。")
+        }
     }
 }
 
 struct PetAdoptionCard: View {
     let pet: PetCharacter
     let isOwned: Bool
+    let price: Int
+    let currency: PetCurrency
     let onAdopt: () -> Void
     
     var body: some View {
@@ -125,15 +156,23 @@ struct PetAdoptionCard: View {
                         .padding(.bottom, 20)
                     } else {
                         Button(action: onAdopt) {
-                            Text("领养")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(LinearGradient(colors: [.pink, .purple], startPoint: .leading, endPoint: .trailing))
-                                .clipShape(Capsule())
-                                .shadow(radius: 5)
+                            HStack(spacing: 4) {
+                                Text("领养")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                
+                                if price > 0 {
+                                    Text("(\(price)\(currency.rawValue))")
+                                        .font(.body)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(LinearGradient(colors: [.pink, .purple], startPoint: .leading, endPoint: .trailing))
+                            .clipShape(Capsule())
+                            .shadow(radius: 5)
                         }
                         .padding(.horizontal, 40)
                         .padding(.bottom, 20)
