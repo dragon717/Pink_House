@@ -134,6 +134,7 @@ struct DataManagementView: View {
                     EditButton()
                 }
             }
+            .scrollContentBackground(.hidden)
             .sheet(isPresented: $showingShareSheet) {
                 ShareSheet(items: shareItems)
             }
@@ -178,6 +179,9 @@ struct DataManagementView: View {
                 .background(Color(.systemGray6).opacity(0.9))
                 .cornerRadius(12)
             }
+        }
+        .background {
+            LiquidBackground()
         }
     }
     

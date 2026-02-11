@@ -95,6 +95,10 @@ struct PrivacySettingsView: View {
                 Text("如果您无法使用拍照或选择照片功能，请检查是否允许应用访问相机和照片。")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("隐私设置")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

@@ -24,8 +24,7 @@ struct TestEffectsView: View {
     
     var body: some View {
         ZStack {
-            Color(uiColor: .systemGroupedBackground)
-                .ignoresSafeArea()
+            LiquidBackground()
             
             VStack(spacing: 20) {
                 

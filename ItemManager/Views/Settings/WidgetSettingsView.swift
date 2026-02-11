@@ -177,6 +177,10 @@ struct WidgetSettingsView: View {
                 Text("帮助与教程")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("小组件设置")
         // Hidden PhotosPicker to be triggered programmatically
         .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)

@@ -71,6 +71,10 @@ struct NotificationSettingsView: View {
             //     Text("调试")
             // }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("通知设置")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

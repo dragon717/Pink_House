@@ -422,6 +422,10 @@ struct GeneralSettingsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("通用设置")
         .alert("需要重启", isPresented: $showingRestartAlert) {
             Button("稍后") { }

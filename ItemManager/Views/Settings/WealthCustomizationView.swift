@@ -42,6 +42,10 @@ struct WealthCustomizationView: View {
                 Text("自定义图片将应用到对应面额的纸币显示中。")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("来财个性化")
         .navigationBarTitleDisplayMode(.inline)
     }

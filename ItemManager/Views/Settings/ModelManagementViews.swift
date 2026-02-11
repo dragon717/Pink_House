@@ -58,6 +58,10 @@ struct BrandManagementView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("品牌管理")
         .sheet(item: $selectedBrand) { brand in
              BrandEditSheet(brand: brand)
@@ -143,6 +147,10 @@ struct BrandEditSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background {
+                LiquidBackground()
+            }
             .navigationTitle("编辑品牌")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -199,6 +207,10 @@ struct TagModelManagementView: View {
                     .buttonStyle(BorderlessButtonStyle())
                 }
             }
+        }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
         }
         .navigationTitle("标签管理")
         .alert("修改标签名称", isPresented: $isEditing) {

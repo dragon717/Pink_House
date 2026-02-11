@@ -20,6 +20,10 @@ struct CelebrationSettingsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("彩蛋设置")
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -106,6 +106,10 @@ struct PetCustomizationView: View {
                 // 占位
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("萌宠个性化")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(

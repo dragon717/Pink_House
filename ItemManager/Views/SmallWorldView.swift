@@ -31,7 +31,7 @@ struct SmallWorldView: View {
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
-        return false
+         return false
 //        return true // canvas调整用
         #if DEBUG
         return true
@@ -67,7 +67,11 @@ struct SmallWorldView: View {
                                             }
                                         },
                                         onSelectWealth: { destination = .wealth },
-                                        onSelectCalendar: { destination = .calendar }
+                                        onSelectCalendar: { destination = .calendar },
+                                        onSelectBalanceAngel: {
+                                            selectedTab = 0
+                                            homeTab = .depositPlan
+                                        }
                                     )
                                 } else {
                                     Image("small_world_bg") // 确保图片已添加至 Assets
@@ -100,6 +104,12 @@ struct SmallWorldView: View {
                                             CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                                 destination = .calendar
                                             }
+                                        }
+                                        
+                                        // 5. 尾款天使 (衣橱右边)
+                                        InteractionHotspot(rect: CGRect(x: 0.6, y: 0.42, width: 0.07, height: 0.12), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .purple) {
+                                            selectedTab = 0
+                                            homeTab = .depositPlan
                                         }
                                         
                                         // 中心锚点，用于初始定位
@@ -462,6 +472,7 @@ struct SpatialBackgroundView: View {
     var onSelectWardrobe: () -> Void
     var onSelectWealth: () -> Void
     var onSelectCalendar: () -> Void
+    var onSelectBalanceAngel: () -> Void
     
     // 模拟陀螺仪视差效果（Mock 环境增强版）
     // 即使在 Mock 模式下，我们也希望看到背景的动态反馈
@@ -567,6 +578,13 @@ struct SpatialBackgroundView: View {
                                             .frame(width: geo.size.width * 0.13, height: geo.size.height * 0.21)
                                             .position(x: geo.size.width * 0.705, y: geo.size.height * 0.295)
                                             .onTapGesture(perform: onSelectCalendar)
+
+                                        // 5. 尾款天使
+                                        Color.clear
+                                            .contentShape(Rectangle())
+                                            .frame(width: geo.size.width * 0.14, height: geo.size.height * 0.25)
+                                            .position(x: geo.size.width * 0.64, y: geo.size.height * 0.525) // 0.57 + 0.14/2 = 0.64, 0.40 + 0.25/2 = 0.525
+                                            .onTapGesture(perform: onSelectBalanceAngel)
                                     }
                                 )
                         } else {

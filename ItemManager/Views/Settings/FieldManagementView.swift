@@ -50,6 +50,10 @@ struct FieldManagementView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle(title)
         .onAppear {
             loadItems()

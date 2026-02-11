@@ -54,6 +54,10 @@ struct CalendarSettingsView: View {
                 .padding(.vertical)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("日历设置")
     }
 }

@@ -521,6 +521,10 @@ struct HapticSettingsView: View {
                 Text("系统设置")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            LiquidBackground()
+        }
         .navigationTitle("音效和触感反馈设置")
         .navigationBarTitleDisplayMode(.inline)
     }
