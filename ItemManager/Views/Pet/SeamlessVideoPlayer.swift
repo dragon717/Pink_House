@@ -184,21 +184,35 @@ class SeamlessVideoPlayerView: UIView {
         
         updateVolumeAndMute()
         
-        // 检查视频是否变化
+        // 优化：先检查视频名字是否真正改变
+        // 如果名字相同，则认为视频源相同，无需调用昂贵的 findVideoURL
+        if self.currentVideoName == videoName {
+            // 视频没变，但循环状态可能变了
+            if self.isLooping != isLooping {
+                print("SeamlessPlayer: Loop state changed to \(isLooping)")
+                self.isLooping = isLooping
+                updateLoopingState(isLooping: isLooping)
+            }
+            
+            // 确保正在播放
+            if activePlayer?.timeControlStatus != .playing {
+                activePlayer?.play()
+            }
+            return
+        }
+        
+        // 只有名字不同时，才查找新 URL
         let newURL = findVideoURL(name: videoName)
         var shouldReload = false
         
-        if self.currentVideoName != videoName {
-            // 名字不同，检查 URL 是否也不同
-            if let currentURL = self.currentVideoURL, let new = newURL, currentURL == new {
-                print("SeamlessPlayer: Video name changed but URL is same. Ignoring reload. (\(videoName))")
-                self.currentVideoName = videoName
-                shouldReload = false
-            } else {
-                shouldReload = true
-            }
-        } else {
+        // 再次检查（以防 findVideoURL 期间状态变化，或者为了处理 URL 相同的情况）
+        // 虽然上面已经 check 过了名字，但这里处理 URL 逻辑
+        if let currentURL = self.currentVideoURL, let new = newURL, currentURL == new {
+            print("SeamlessPlayer: Video name changed but URL is same. Ignoring reload. (\(videoName))")
+            self.currentVideoName = videoName
             shouldReload = false
+        } else {
+            shouldReload = true
         }
         
         if shouldReload {
@@ -208,14 +222,12 @@ class SeamlessVideoPlayerView: UIView {
             self.isLooping = isLooping // 记录新视频的循环状态
             loadAndSwitch(to: videoName, url: newURL, looping: isLooping)
         } else {
-            // 视频没变，但循环状态可能变了 (例如长按松手)
+            // 视频没变 (URL 相同)
             if self.isLooping != isLooping {
                 print("SeamlessPlayer: Loop state changed to \(isLooping)")
                 self.isLooping = isLooping
                 updateLoopingState(isLooping: isLooping)
             }
-            
-            // 确保正在播放
             if activePlayer?.timeControlStatus != .playing {
                 activePlayer?.play()
             }
@@ -517,36 +529,30 @@ class SeamlessVideoPlayerView: UIView {
     }
     
     private func findVideoURL(name: String) -> URL? {
-        // 1. 绝对路径
-        if name.hasPrefix("/") {
-            return URL(fileURLWithPath: name)
+        // 提取查找逻辑为闭包，方便复用
+        let lookup: (String) -> URL? = { videoName in
+            // 1. 绝对路径
+            if videoName.hasPrefix("/") {
+                return URL(fileURLWithPath: videoName)
+            }
+            // 2. Bundle 根目录查找
+            if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4") { return url }
+            // 3. asserts 子目录查找
+            if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4", subdirectory: "asserts") { return url }
+            // 4. asserts 子目录查找 (旧方式)
+            if let url = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: "mp4") { return url }
+            // 5. 无后缀尝试 (Bundle 根目录)
+            if let url = Bundle.main.url(forResource: videoName, withExtension: nil) { return url }
+            // 6. 无后缀尝试 (asserts 子目录)
+            if let url = Bundle.main.url(forResource: videoName, withExtension: nil, subdirectory: "asserts") { return url }
+            return nil
         }
         
-        // 2. Bundle 根目录查找
-        if let url = Bundle.main.url(forResource: name, withExtension: "mp4") {
+        // 尝试查找原始名称
+        if let url = lookup(name) {
             return url
         }
         
-        // 3. asserts 子目录查找 (使用 subdirectory 参数)
-        if let url = Bundle.main.url(forResource: name, withExtension: "mp4", subdirectory: "asserts") {
-            return url
-        }
-        
-        // 4. asserts 子目录查找 (旧方式兼容)
-        if let url = Bundle.main.url(forResource: "asserts/\(name)", withExtension: "mp4") {
-            return url
-        }
-        
-        // 5. 无后缀尝试 (Bundle 根目录)
-        if let url = Bundle.main.url(forResource: name, withExtension: nil) {
-            return url
-        }
-        
-        // 6. 无后缀尝试 (asserts 子目录)
-        if let url = Bundle.main.url(forResource: name, withExtension: nil, subdirectory: "asserts") {
-            return url
-        }
-
         // 7. Fallback logic
         print("SeamlessPlayer: Failed to find video '\(name)'. Trying fallbacks.")
         
@@ -554,20 +560,21 @@ class SeamlessVideoPlayerView: UIView {
         if let underscoreIndex = name.firstIndex(of: "_") {
             let prefix = name.prefix(upTo: underscoreIndex)
             let fallbackName = "\(prefix)_idle"
-            if fallbackName != name, let url = Bundle.main.url(forResource: fallbackName, withExtension: "mp4", subdirectory: "asserts") {
-                return url
+            if fallbackName != name {
+                if let url = lookup(fallbackName) {
+                    print("SeamlessPlayer: Fallback found: \(fallbackName)")
+                    return url
+                }
             }
         }
         
         // Try naicha_idle (Default)
-        if let url = Bundle.main.url(forResource: "naicha_idle", withExtension: "mp4", subdirectory: "asserts") {
+        if let url = lookup("naicha_idle") {
              return url
         }
         
         // Fallback to legacy idle
-        return Bundle.main.url(forResource: "idle", withExtension: "mp4") ?? 
-               Bundle.main.url(forResource: "idle", withExtension: "mp4", subdirectory: "asserts") ??
-               Bundle.main.url(forResource: "asserts/idle", withExtension: "mp4")
+        return lookup("idle")
     }
     
     deinit {

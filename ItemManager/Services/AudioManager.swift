@@ -93,7 +93,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             }
         }
         
-        print("AudioManager: Updated volume with gain: \(gain) (Headphones: \(isHeadphones))")
+        // print("AudioManager: Updated volume with gain: \(gain) (Headphones: \(isHeadphones))")
     }
     
     /// 萌宠音色选择
@@ -131,11 +131,17 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         didSet {
             // 更新非隔离标志供音频线程读取，避免访问 MainActor 属性
             _isRecording = (interactionState == .recording)
+            _isListening = (interactionState == .listening)
         }
     }
     
     // 供音频线程读取的标志 (简单 Bool，忽略严格并发检查以保持最简)
     private var _isRecording: Bool = false
+    private var _isListening: Bool = false
+    
+    // Ring Buffer for Pre-recording (修复吞字问题)
+    private var preRecordBuffer: [AVAudioPCMBuffer] = []
+    private let maxPreRecordBuffers = 20 // 约 400-500ms
     
     /// 语音识别的文字
     @Published var recognizedText: String = ""
@@ -284,6 +290,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             return
         }
         
+        // 忽略 CategoryChange，因为这通常是我们自己调用 setCategory 触发的，处理它会导致死循环
+        if reason == .categoryChange {
+            return
+        }
+        
         print("AudioManager: Route changed, reason: \(reason)")
         
         DispatchQueue.main.async { [weak self] in
@@ -293,7 +304,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             
             // 如果开启了互动，并且需要强制使用手机麦克风，则重新应用设置
             if self.isInteractionEnabled && self.useiPhoneMicWithHeadphones {
-                self.setupAudioSession(isRecording: true)
+                // 只有当原因是新设备连接或旧设备断开时，才积极重置 AudioSession
+                // 避免在其他无关路由变化时频繁重置
+                if reason == .newDeviceAvailable || reason == .oldDeviceUnavailable {
+                    self.setupAudioSession(isRecording: true)
+                }
             }
         }
         
@@ -354,44 +369,68 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private func setupAudioSession(isRecording: Bool = false) {
         do {
             let session = AVAudioSession.sharedInstance()
+            
+            // 检查当前 Category 和 Mode 是否已经正确，避免重复设置
+            // 注意：AVAudioSession 的属性读取也可能有开销，但通常比 set 便宜
+            let currentCategory = session.category
+            let currentMode = session.mode
+            
             if isInteractionEnabled {
-                // 互动模式下始终保持 playAndRecord，避免切换开销和 I/O 错误
-                // 使用 .voiceChat 模式以启用回声消除 (AEC)，防止 BGM 触发 VAD
-                // 添加 .allowBluetoothA2DP 以支持更广泛的蓝牙设备
-                // 关键修正：移除 overrideOutputAudioPort(.speaker)，否则会导致蓝牙耳机失效
-                // .defaultToSpeaker 选项足以保证在没有耳机时使用扬声器，有耳机时自动切换
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .mixWithOthers])
+                // 目标: PlayAndRecord, VoiceChat
+                if currentCategory != .playAndRecord || currentMode != .voiceChat {
+                    // 互动模式下始终保持 playAndRecord，避免切换开销和 I/O 错误
+                    // 使用 .voiceChat 模式以启用回声消除 (AEC)，防止 BGM 触发 VAD
+                    // 添加 .allowBluetoothA2DP 以支持更广泛的蓝牙设备
+                    // 关键修正：移除 overrideOutputAudioPort(.speaker)，否则会导致蓝牙耳机失效
+                    // .defaultToSpeaker 选项足以保证在没有耳机时使用扬声器，有耳机时自动切换
+                    try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .mixWithOthers])
+                }
                 
                 // 强制使用 iPhone 麦克风逻辑
                 if useiPhoneMicWithHeadphones {
-                    // 查找内置麦克风
-                    if let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
-                        try session.setPreferredInput(builtInMic)
-                        print("AudioManager: [Setup] Forced input to Built-In Mic")
-                    } else {
-                        print("AudioManager: [Setup] Built-In Mic not found in availableInputs: \(session.availableInputs?.map { $0.portType } ?? [])")
+                    // 检查当前是否已经是内置麦克风，如果是，跳过设置
+                    let currentInput = session.currentRoute.inputs.first
+                    if currentInput?.portType != .builtInMic {
+                        // 查找内置麦克风
+                        if let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                            try session.setPreferredInput(builtInMic)
+                            print("AudioManager: [Setup] Forced input to Built-In Mic")
+                        } else {
+                            // print("AudioManager: [Setup] Built-In Mic not found in availableInputs: \(session.availableInputs?.map { $0.portType } ?? [])")
+                        }
                     }
                 } else {
                     // 清除首选输入（允许系统自动选择，如耳机麦克风）
-                    try session.setPreferredInput(nil)
+                    // 只有当当前有首选输入时才清除
+                    if session.preferredInput != nil {
+                        try session.setPreferredInput(nil)
+                    }
                 }
             } else if isRecording {
-                // 仅录音（虽然目前逻辑不会走到这里，除非有其他录音需求）
-                try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+                if currentCategory != .playAndRecord || currentMode != .default {
+                    // 仅录音（虽然目前逻辑不会走到这里，除非有其他录音需求）
+                    try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
+                }
             } else {
-                // 普通播放模式（背景音乐）
-                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+                if currentCategory != .playback || currentMode != .default {
+                    // 普通播放模式（背景音乐）
+                    try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+                }
             }
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            
+            // 只有在未激活时才激活，避免中断
+            // 注意：某些配置更改需要重新激活才能生效，但简单的 route 切换通常不需要
+            // 这里为了稳妥，保持 setActive，但可以考虑优化
+             try session.setActive(true, options: .notifyOthersOnDeactivation)
             
             // 再次检查并强制设置 Input (有些情况下 Active 后会被系统重置)
             if isInteractionEnabled && useiPhoneMicWithHeadphones {
                 if let currentInput = session.currentRoute.inputs.first {
-                    print("AudioManager: [Check] Current Input after activation: \(currentInput.portType)")
+                    // print("AudioManager: [Check] Current Input after activation: \(currentInput.portType)")
                     if currentInput.portType != .builtInMic {
                         if let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
                             try session.setPreferredInput(builtInMic)
-                            print("AudioManager: [Retry] Re-forcing input to Built-In Mic after activation")
+                            // print("AudioManager: [Retry] Re-forcing input to Built-In Mic after activation")
                         }
                     }
                 }
@@ -512,15 +551,27 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             bgmPlayerNode.volume = 0
         }
         
+        // 重置 Ring Buffer
+        preRecordBuffer.removeAll()
+        
         // 简易版：直接在主线程配置 AudioSession 和 Engine
-        // 虽然可能卡 UI，但能确保逻辑的原子性和稳定性，避免异步竞争导致的资源抢占
         setupAudioSession(isRecording: true)
+        
+        // 关键：Session 配置改变后，重置 Engine 以刷新硬件格式
+        if engine.isRunning {
+            engine.stop()
+        }
+        engine.reset()
         
         // 移除旧的 Tap
         engine.inputNode.removeTap(onBus: 0)
         
         let inputNode = engine.inputNode
-        let format = inputNode.inputFormat(forBus: 0)
+        // 使用 outputFormat 而不是 inputFormat，因为这是 InputNode 输出给 Tap 的数据格式
+        let format = inputNode.outputFormat(forBus: 0)
+        
+        // 打印调试信息，确认采样率
+        print("AudioManager: Input format: \(format)")
         
         if format.sampleRate == 0 || format.channelCount == 0 {
             print("AudioManager: Invalid input format: \(format)")
@@ -565,15 +616,35 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
                 }
             }
             
-            // 2. 写入文件 & 语音识别
+            // 2. Ring Buffer Management
+            // 始终维护最近的 buffer，用于回溯
+            self.preRecordBuffer.append(buffer)
+            if self.preRecordBuffer.count > self.maxPreRecordBuffers {
+                self.preRecordBuffer.removeFirst()
+            }
+            
+            // 3. 写入文件 & 语音识别
             if self._isRecording {
                 autoreleasepool {
-                    try? self.audioFile?.write(from: buffer)
-                    self.recognitionRequest?.append(buffer)
+                    // 如果 Ring Buffer 中有积压的数据（说明刚开始录音），先全部写入
+                    if !self.preRecordBuffer.isEmpty {
+                        for oldBuffer in self.preRecordBuffer {
+                            try? self.audioFile?.write(from: oldBuffer)
+                            self.recognitionRequest?.append(oldBuffer)
+                        }
+                        // 写入后清空，避免重复写入
+                        self.preRecordBuffer.removeAll()
+                    }
+                    
+                    // 注意：由于上面已经把 current buffer (刚刚 append 进去的) 也写进去了，
+                    // 所以这里不需要再单独写 buffer。
+                    // 只要 preRecordBuffer.removeAll() 执行了，下一次回调进来时，
+                    // preRecordBuffer 会是空的（然后 append 1 个），然后进入这个 block 写这 1 个。
+                    // 逻辑是自洽的。
                 }
             }
             
-            // 3. VAD 检测 (主线程去抖动)
+            // 4. VAD 检测 (主线程去抖动)
             self.processVAD(buffer: buffer)
         }
         
@@ -618,6 +689,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // 使用简单的阈值判断
         let isLoud = db > silenceThreshold
         let isVoice = isLoud && (isHumanSpeech || db > -35.0)
+        
+        // 优化：使用本地标志判断，减少主线程调度
+        if !_isListening && !_isRecording {
+            return
+        }
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -785,14 +861,28 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         // 简易版：直接在主线程配置
         setupAudioSession(isRecording: false)
+        
+        // 关键：重置 Engine 以清除旧的连接格式缓存
+        if engine.isRunning {
+            engine.stop()
+        }
+        // engine.reset() // 注意：reset 可能会断开所有连接，需要谨慎。这里我们手动断开重连。
+        
         engine.inputNode.removeTap(onBus: 0)
         
-        // 重置连接
+        // 断开所有相关节点，防止格式冲突
+        engine.disconnectNodeOutput(playerNode)
+        engine.disconnectNodeOutput(timePitch)
+        engine.disconnectNodeOutput(eqNode)
+        
+        // 确保节点已 Attach
         if engine.attachedNodes.contains(playerNode) == false { engine.attach(playerNode) }
         if engine.attachedNodes.contains(timePitch) == false { engine.attach(timePitch) }
         if engine.attachedNodes.contains(eqNode) == false { engine.attach(eqNode) }
         
-        engine.connect(bgmPlayerNode, to: engine.mainMixerNode, format: nil)
+        // BGM 重新连接 (如果需要)
+        // engine.connect(bgmPlayerNode, to: engine.mainMixerNode, format: nil) 
+        // BGM 通常一直连接着，不需要动
         
         playerNode.volume = Float(petVoiceVolume) * 3.0
         
@@ -841,10 +931,15 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         do {
             let file = try AVAudioFile(forReading: url)
+            let format = file.processingFormat
             
-            engine.connect(playerNode, to: timePitch, format: file.processingFormat)
-            engine.connect(timePitch, to: eqNode, format: file.processingFormat)
-            engine.connect(eqNode, to: output, format: file.processingFormat)
+            print("AudioManager: Playing format: \(format)")
+            
+            // 连接链：Player -> TimePitch -> EQ -> MainMixer
+            engine.connect(playerNode, to: timePitch, format: format)
+            engine.connect(timePitch, to: eqNode, format: format)
+            // 连接到 Mixer 时，允许格式转换 (AudioEngine 会自动处理，只要不是不支持的格式)
+            engine.connect(eqNode, to: output, format: format)
             
             if !engine.isRunning {
                 try engine.start()
@@ -858,15 +953,24 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             
             interactionState = .playing
             
-            playerNode.scheduleFile(file, at: nil) { [weak self] in
-                DispatchQueue.main.async {
-                    print("AudioManager: Playback finished")
-                    self?.stopPlayback()
-                    self?.restartListening()
-                }
+            // 计算音频时长
+            let duration = Double(file.length) / file.processingFormat.sampleRate
+            // 加上 0.3 秒缓冲时间，确保尾音完整
+            let playbackDuration = duration + 0.3
+            
+            print("AudioManager: Scheduled playback for \(duration) seconds")
+            
+            playerNode.scheduleFile(file, at: nil, completionHandler: nil)
+            playerNode.play()
+            
+            // 使用 asyncAfter 控制结束，而不是 completion handler
+            // 这样更稳定，避免 completion handler 过早触发
+            DispatchQueue.main.asyncAfter(deadline: .now() + playbackDuration) { [weak self] in
+                print("AudioManager: Playback time ended")
+                self?.stopPlayback()
+                self?.restartListening()
             }
             
-            playerNode.play()
             print("AudioManager: Started playing recording")
             
         } catch {

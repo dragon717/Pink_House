@@ -91,7 +91,7 @@ struct SmallWorldView: View {
                                         }
                                         
                                         // 3. 猪 (来财)
-                                        InteractionHotspot(rect: CGRect(x: 0.68, y: 0.48, width: 0.2, height: 0.28), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
                                             destination = .wealth
                                         }
                                         

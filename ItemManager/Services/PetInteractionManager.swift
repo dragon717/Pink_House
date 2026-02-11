@@ -27,11 +27,8 @@ class PetInteractionManager: ObservableObject {
     
     // 获取当前宠物 ID (从 UserDefaults 读取，确保多处状态一致)
     var currentPetId: String {
-        if let data = UserDefaults.standard.data(forKey: "PetStatus_Data"),
-           let decoded = try? JSONDecoder().decode(PetStatus.self, from: data) {
-            return decoded.selectedPetId ?? "naicha"
-        }
-        return "naicha"
+        // 优化：直接从 PetDataManager 获取内存中的状态，避免频繁读取 UserDefaults 和 JSON 解码
+        return PetDataManager.shared.status.selectedPetId ?? "naicha"
     }
     
     // Actions
