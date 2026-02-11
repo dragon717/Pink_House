@@ -390,19 +390,19 @@ struct HapticSettingsView: View {
             // 2. 音量调节 (新增)
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(.purple)
-                            .frame(width: 24)
-                        Text("彩蛋音量: \(Int(soundManager.celebrationVolume * 100))%")
+                    
+                    
+                    Toggle(isOn: $audioManager.useiPhoneMicWithHeadphones) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("耳机模式使用手机收音")
+                                .font(.body)
+                                .foregroundStyle(.primary)
+                            Text("佩戴耳机时，强制使用手机麦克风以获得更好音质")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    Slider(value: $soundManager.celebrationVolume, in: 0...1) {
-                        Text("彩蛋音量")
-                    } minimumValueLabel: {
-                        Image(systemName: "speaker.fill").font(.caption)
-                    } maximumValueLabel: {
-                        Image(systemName: "speaker.wave.3.fill").font(.caption)
-                    }
+                    .padding(.top, 8)
                 }
                 .padding(.vertical, 4)
                 
@@ -473,6 +473,22 @@ struct HapticSettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                }
+                VStack {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.purple)
+                            .frame(width: 24)
+                        Text("彩蛋音量: \(Int(soundManager.celebrationVolume * 100))%")
+                        Spacer()
+                    }
+                    Slider(value: $soundManager.celebrationVolume, in: 0...1) {
+                        Text("彩蛋音量")
+                    } minimumValueLabel: {
+                        Image(systemName: "speaker.fill").font(.caption)
+                    } maximumValueLabel: {
+                        Image(systemName: "speaker.wave.3.fill").font(.caption)
                     }
                 }
             } header: {

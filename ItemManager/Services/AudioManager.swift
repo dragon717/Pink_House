@@ -65,6 +65,17 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
     }
     
+    /// 是否在连接耳机时强制使用 iPhone 麦克风
+    @Published var useiPhoneMicWithHeadphones: Bool {
+        didSet {
+            UserDefaults.standard.set(useiPhoneMicWithHeadphones, forKey: "useiPhoneMicWithHeadphones")
+            // 如果正在互动中，需要重新配置音频会话以应用更改
+            if isInteractionEnabled {
+                setupAudioSession(isRecording: true)
+            }
+        }
+    }
+    
     private func updatePlayerVolume() {
         // 根据是否连接耳机动态调整增益
         // 耳机通常更贴耳，不需要像扬声器那样激进的增益 (4.0 -> 1.5)
@@ -157,6 +168,8 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private override init() {
         self.bgmVolume = UserDefaults.standard.object(forKey: "bgmVolume") as? Double ?? 0.3
         self.petVoiceVolume = UserDefaults.standard.object(forKey: "petVoiceVolume") as? Double ?? 1.0
+        self.useiPhoneMicWithHeadphones = UserDefaults.standard.bool(forKey: "useiPhoneMicWithHeadphones")
+        
         // 默认使用正太音
         if let savedType = UserDefaults.standard.string(forKey: "petVoiceType"),
            let type = PetVoiceType(rawValue: savedType) {
@@ -261,8 +274,14 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         print("AudioManager: Route changed, reason: \(reason)")
         
         DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             // 路由变化时，重新应用音量设置
-            self?.updatePlayerVolume()
+            self.updatePlayerVolume()
+            
+            // 如果开启了互动，并且需要强制使用手机麦克风，则重新应用设置
+            if self.isInteractionEnabled && self.useiPhoneMicWithHeadphones {
+                self.setupAudioSession(isRecording: true)
+            }
         }
         
         // 如果是新设备接入（例如连接了蓝牙耳机），可能需要检查是否需要重启互动以适应新的采样率或I/O
@@ -329,6 +348,20 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
                 // 关键修正：移除 overrideOutputAudioPort(.speaker)，否则会导致蓝牙耳机失效
                 // .defaultToSpeaker 选项足以保证在没有耳机时使用扬声器，有耳机时自动切换
                 try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .mixWithOthers])
+                
+                // 强制使用 iPhone 麦克风逻辑
+                if useiPhoneMicWithHeadphones {
+                    // 查找内置麦克风
+                    if let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                        try session.setPreferredInput(builtInMic)
+                        print("AudioManager: [Setup] Forced input to Built-In Mic")
+                    } else {
+                        print("AudioManager: [Setup] Built-In Mic not found in availableInputs: \(session.availableInputs?.map { $0.portType } ?? [])")
+                    }
+                } else {
+                    // 清除首选输入（允许系统自动选择，如耳机麦克风）
+                    try session.setPreferredInput(nil)
+                }
             } else if isRecording {
                 // 仅录音（虽然目前逻辑不会走到这里，除非有其他录音需求）
                 try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers])
@@ -337,6 +370,19 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
                 try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             }
             try session.setActive(true, options: .notifyOthersOnDeactivation)
+            
+            // 再次检查并强制设置 Input (有些情况下 Active 后会被系统重置)
+            if isInteractionEnabled && useiPhoneMicWithHeadphones {
+                if let currentInput = session.currentRoute.inputs.first {
+                    print("AudioManager: [Check] Current Input after activation: \(currentInput.portType)")
+                    if currentInput.portType != .builtInMic {
+                        if let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                            try session.setPreferredInput(builtInMic)
+                            print("AudioManager: [Retry] Re-forcing input to Built-In Mic after activation")
+                        }
+                    }
+                }
+            }
         } catch {
             print("AudioManager: Failed to set audio session: \(error)")
         }
