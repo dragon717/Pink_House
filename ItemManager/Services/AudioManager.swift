@@ -47,8 +47,8 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     @Published var petVoiceVolume: Double {
         didSet {
             UserDefaults.standard.set(petVoiceVolume, forKey: "petVoiceVolume")
-            // 实时更新播放节点音量
-            playerNode.volume = Float(petVoiceVolume)
+            // 实时更新播放节点音量，并应用增益系数 3.0
+            playerNode.volume = Float(petVoiceVolume) * 3.0
         }
     }
     
@@ -560,7 +560,8 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         engine.attach(eqNode) // Attach EQ
         
         // 设置播放节点音量
-        playerNode.volume = Float(petVoiceVolume)
+        // 应用增益系数 3.0，解决声音小的问题
+        playerNode.volume = Float(petVoiceVolume) * 3.0
         
         // 变音设置
         switch selectedVoiceType {
@@ -568,9 +569,13 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             timePitch.pitch = 800 // 搞怪变声 (高音调)
             timePitch.overlap = 8.0 // 默认重叠
             
-            // 搞怪模式不需要特殊 EQ，或者可以重置
-            eqNode.globalGain = 0
-            eqNode.bypass = true
+            // 搞怪模式也开启 EQ 以获得 Gain 提升
+            eqNode.bypass = false
+            eqNode.globalGain = 5.0
+            // 重置 EQ Bands (不需要特殊滤波)
+            for i in 0..<eqNode.bands.count {
+                eqNode.bands[i].bypass = true
+            }
             
         case .youngBoy:
             // 优化参数 V2:
@@ -581,7 +586,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             
             // 正太音 EQ 设置：模拟 Formant Shifting
             eqNode.bypass = false
-            eqNode.globalGain = 0
+            eqNode.globalGain = 10.0 // 大幅提升增益，补偿滤波带来的衰减
             
             // Band 0: Low Cut (High Pass) - 更激进地削减低频，去除成年男性胸腔共鸣
             let lowCut = eqNode.bands[0]

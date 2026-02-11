@@ -179,20 +179,19 @@ class PetViewModel: ObservableObject {
     private func handleAudioStateChange(_ state: PetInteractionState) {
         // 根据音频状态更新宠物动画
         switch state {
-        case .recording:
-            // 倾听
-             if currentState == .idle {
+        case .listening, .recording, .processing:
+            // 倾听、录音、处理中都保持倾听状态
+            // 允许从 idle 或 说话状态(talking) 切换过来，形成闭环
+             if currentState == .idle || (currentState == .interacting && currentVideoName == PetVideoPaths.talking) {
                  changeState(to: .expecting, videoName: PetVideoPaths.listening)
              }
         case .playing:
             // 说话时（播放变音）
             changeState(to: .interacting, videoName: PetVideoPaths.talking, forceLoop: true)
-        case .idle, .listening, .processing:
-            if currentState == .expecting && state == .processing {
-                changeState(to: .idle)
-            }
-            // 结束说话状态
-            if currentState == .interacting && currentVideoName == PetVideoPaths.talking {
+        case .idle:
+            // 只有当当前是倾听或说话状态时，才切回 idle
+            // 避免打断其他状态（如吃饭、睡觉）
+            if currentState == .expecting || (currentState == .interacting && currentVideoName == PetVideoPaths.talking) {
                 changeState(to: .idle)
             }
         }

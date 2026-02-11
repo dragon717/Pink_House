@@ -31,7 +31,8 @@ struct PetInteractionAreaView: View {
             SeamlessVideoPlayer(
                 videoName: viewModel.currentVideoName,
                 isLooping: viewModel.isCurrentLooping, // 使用动态控制的 looping 属性
-                isMuted: !soundManager.isSoundEnabled,
+                // listening 视频强制静音，避免录音时录入视频声音
+                isMuted: !soundManager.isSoundEnabled || viewModel.currentVideoName == PetViewModel.PetVideoPaths.listening,
                 volume: 0.6,
                 onFinished: {
                     viewModel.onAnimationFinished()
