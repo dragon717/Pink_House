@@ -22,6 +22,10 @@ struct PetOverlayView: View {
     @State private var isDragging: Bool = false
     @State private var hasSetInitialPosition: Bool = false
     
+    // State for tap handling logic (to distinguish from drag)
+    @State private var isPressing = false
+    @State private var dragStartTime: Date?
+    
     // 触觉反馈管理器
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     
@@ -260,41 +264,61 @@ struct PetOverlayView: View {
             DragGesture(minimumDistance: 0, coordinateSpace: .named("PetOverlaySpace"))
                 .onChanged { value in
                     if !isDragging {
-                        isDragging = true
-                        interactionManager.startDragging(at: value.location)
-                        hapticManager.playUIFeedback(intensity: 0.6, sharpness: 0.7, fallbackStyle: .medium)
-                        
-                        // Initial Vision detection
-                        if let image = captureScreen(scale: screenshotScale) {
-                             let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
-                             self.currentROI = roi
-                             visionManager.detectLines(in: image, roi: roi)
+                        // Potential tap or start of drag
+                        if !isPressing {
+                            isPressing = true
+                            dragStartTime = Date()
                         }
-                    }
-                    
-                    interactionManager.updateDragPosition(value.location)
-                    
-                    // Throttle vision detection
-                    if let image = captureScreen(scale: screenshotScale) {
-                        let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
-                        self.currentROI = roi
-                        visionManager.detectLines(in: image, roi: roi)
+                        
+                        // Check if movement exceeds threshold to be considered a drag
+                        // Small movements are ignored to allow for tap detection
+                        if value.translation.width * value.translation.width + value.translation.height * value.translation.height > 100 { // > 10pt distance squared
+                            isDragging = true
+                            isPressing = false // It's confirmed as drag, not tap
+                            interactionManager.startDragging(at: value.location)
+                            hapticManager.playUIFeedback(intensity: 0.6, sharpness: 0.7, fallbackStyle: .medium)
+                            
+                            // Initial Vision detection
+                            if let image = captureScreen(scale: screenshotScale) {
+                                 let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
+                                 self.currentROI = roi
+                                 visionManager.detectLines(in: image, roi: roi)
+                            }
+                        }
+                    } else {
+                        // Continuing drag
+                        interactionManager.updateDragPosition(value.location)
+                        
+                        // Throttle vision detection
+                        if let image = captureScreen(scale: screenshotScale) {
+                            let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
+                            self.currentROI = roi
+                            visionManager.detectLines(in: image, roi: roi)
+                        }
                     }
                 }
                 .onEnded { value in
-                    isDragging = false
-                    self.currentROI = nil
-                    interactionManager.endDragging(at: value.location, screenSize: geometry.size)
+                    if isDragging {
+                        // Drag ended
+                        isDragging = false
+                        self.currentROI = nil
+                        interactionManager.endDragging(at: value.location, screenSize: geometry.size)
+                    } else if isPressing {
+                        // Tap confirmed (drag didn't start)
+                        // Verify duration to ensure it's a tap, not a held press without movement
+                        if let start = dragStartTime, Date().timeIntervalSince(start) < 0.3 {
+                            if interactionManager.state == .idle {
+                                hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
+                                withAnimation {
+                                    action()
+                                }
+                            }
+                        }
+                    }
+                    isPressing = false
+                    dragStartTime = nil
                 }
         )
-        .onTapGesture {
-            if !isDragging && interactionManager.state == .idle {
-                hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
-                withAnimation {
-                    action()
-                }
-            }
-        }
     }
     
     private func calculateVisionROI(center: CGPoint, screenSize: CGSize) -> CGRect {
