@@ -11,10 +11,11 @@ struct FloatingTextData: Identifiable {
     // 移除 opacity，由 View 层动画控制
 }
 
-enum FloatingTextStyle {
+enum FloatingTextStyle: Equatable {
     case warning    // 红色
     case meowCoin   // 闪光的金色，带喵币icon
     case fishCoin   // 闪光的铜色，带鱼币icon
+    case boneCoin   // 骨头色
     case hunger     // 橙色
     case hygiene    // 蓝色
     case energy     // 绿色
@@ -26,6 +27,7 @@ enum FloatingTextStyle {
         case .warning: return .red
         case .meowCoin: return .yellow // 基础色，View层会做特殊处理
         case .fishCoin: return .orange // 基础色，View层会做特殊处理
+        case .boneCoin: return .brown  // 基础色，View层会做特殊处理
         case .hunger: return .orange
         case .hygiene: return .blue
         case .energy: return .green
@@ -56,7 +58,7 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private var timer: Timer?
-    private let statusKey = "PetStatus_Data"
+    // private let statusKey = "PetStatus_Data" // Moved to PetDataManager
     
     var currentPet: PetCharacter {
         // 如果 selectedPetId 为 nil，默认使用 naicha
@@ -69,6 +71,58 @@ class PetViewModel: ObservableObject {
         // 简单规则：角色ID_动作名
         // 例如：naicha_idle, maomao_eating
         return "\(currentPet.rawValue)_\(action)"
+    }
+    
+    // MARK: - Pet Adoption & Switching
+    
+    // 领养宠物
+    func adoptPet(_ pet: PetCharacter, name: String? = nil) {
+        if !status.ownedPetIds.contains(pet.id) {
+            status.ownedPetIds.append(pet.id)
+        }
+        
+        if let name = name, !name.isEmpty {
+            status.petName = name
+        }
+        
+        // 自动切换到新领养的宠物
+        switchPet(pet)
+        
+        saveStatus()
+    }
+    
+    // 切换宠物
+    func switchPet(_ pet: PetCharacter) {
+        guard status.ownedPetIds.contains(pet.id) else { return }
+        
+        // 更新状态
+        status.selectedPetId = pet.id
+        
+        // 强制刷新视频状态
+        // 这里我们需要重置一些状态，以确保 UI 刷新
+        let currentAction = currentVideoName // e.g. "idle"
+        let newFileName = getCharacterVideoName(action: currentAction)
+        
+        withAnimation {
+            self.currentVideoFileName = newFileName
+            // 如果需要，也可以重置回 idle
+            if currentAction != "idle" {
+                changeState(to: .idle)
+            }
+        }
+        
+        saveStatus()
+    }
+    
+    // 获取下一个“胎”数中文名 (用于“再要x胎”)
+    var nextAdoptionNumberText: String {
+        let count = status.ownedPetIds.count
+        // 简单映射，支持到 10 胎够用了吧...
+        let numbers = ["", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
+        if count < numbers.count {
+            return numbers[count]
+        }
+        return "\(count + 1)"
     }
     
     // MARK: - Constants
@@ -101,8 +155,8 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Initialization
     init() {
-        // Initial load
-        self.status = PetViewModel.loadStatusFromDisk()
+        // Initial load from DataManager
+        self.status = PetDataManager.shared.status
         
         setupStateMachine()
         
@@ -129,49 +183,8 @@ class PetViewModel: ObservableObject {
         }
     }
     
-    static func loadStatusFromDisk() -> PetStatus {
-        let statusKey = "PetStatus_Data"
-        guard let data = UserDefaults.standard.data(forKey: statusKey) else {
-            print("PetViewModel: No saved data found. Creating new status.")
-            return PetStatus()
-        }
-        
-        do {
-            var decoded = try JSONDecoder().decode(PetStatus.self, from: data)
-            
-            // 数据清理：只保留在新配置中存在的物品，遗弃老数据
-            var validInv: [String: Int] = [:]
-            for (key, count) in decoded.inventory {
-                if PetConfigManager.shared.getItem(byId: key) != nil {
-                    validInv[key] = count
-                }
-            }
-            decoded.inventory = validInv
-            
-            print("PetViewModel: Successfully loaded status. Pet: \(decoded.petName ?? "unnamed")")
-            return decoded
-        } catch {
-            print("PetViewModel: Failed to decode saved status: \(error)")
-            // 尝试打印 JSON 字符串以便调试
-            if let jsonStr = String(data: data, encoding: .utf8) {
-                print("PetViewModel: Raw JSON data: \(jsonStr)")
-            }
-            
-            // 关键修改：如果解码失败，不要直接返回新的空 Status（这会导致下次保存时覆盖旧数据）
-            // 而是尝试进行“部分恢复”或者“迁移”，或者至少保留旧数据不被破坏。
-            // 但由于 PetStatus 是 Struct，我们无法部分加载。
-            // 策略：
-            // 1. 尝试使用宽松的解码策略（如果可能）
-            // 2. 如果彻底失败，我们应该警告用户，或者尝试备份旧数据再创建新的。
-            
-            // 这里我们采取“备份旧数据”的策略，防止数据永久丢失
-            let backupKey = "\(statusKey)_backup_\(Int(Date().timeIntervalSince1970))"
-            UserDefaults.standard.set(data, forKey: backupKey)
-            print("PetViewModel: Corrupted data backed up to key: \(backupKey)")
-            
-            return PetStatus()
-        }
-    }
+    // Deprecated: Logic moved to PetDataManager
+    // static func loadStatusFromDisk() -> PetStatus { ... }
     
     private func setupStateMachine() {
         let states: [GKState] = [
@@ -210,10 +223,12 @@ class PetViewModel: ObservableObject {
     }
     
     func reloadStatus() {
-        let newStatus = PetViewModel.loadStatusFromDisk()
+        // Reload from Manager (Source of Truth)
+        let newStatus = PetDataManager.shared.status
         // 只更新货币，避免覆盖运行时的其他状态（如饥饿度等瞬时变化）
         self.status.fishCoin = newStatus.fishCoin
         self.status.meowCoin = newStatus.meowCoin
+        self.status.boneCoin = newStatus.boneCoin
         // 也可以选择完全重载，视需求而定
     }
     
@@ -294,6 +309,8 @@ class PetViewModel: ObservableObject {
             canAfford = status.fishCoin >= item.price
         case .meowCoin:
             canAfford = status.meowCoin >= item.price
+        case .boneCoin:
+            canAfford = status.boneCoin >= item.price
         }
         
         guard canAfford else {
@@ -307,11 +324,15 @@ class PetViewModel: ObservableObject {
             status.fishCoin -= item.price
         case .meowCoin:
             status.meowCoin -= item.price
+        case .boneCoin:
+            status.boneCoin -= item.price
         }
         
         // 显示扣款提示 (先显示扣款，再显示属性增加)
         if item.petCurrency == .meowCoin {
             showFloatingText("-\(item.price)", style: .meowCoin)
+        } else if item.petCurrency == .boneCoin {
+            showFloatingText("-\(item.price)", style: .boneCoin)
         } else {
             showFloatingText("-\(item.price)", style: .fishCoin)
         }
@@ -712,8 +733,50 @@ class PetViewModel: ObservableObject {
             } else {
                 showFloatingText("余额不足", style: .warning)
             }
+        case .boneCoin:
+            if status.boneCoin >= item.price {
+                status.boneCoin -= item.price
+                status.inventory[item.id, default: 0] += 1
+                saveStatus()
+                showFloatingText("-\(item.price)", style: .boneCoin)
+                return true
+            } else {
+                showFloatingText("余额不足", style: .warning)
+            }
         }
         return false
+    }
+    
+    // 货币兑换：鱼币 -> 骨头币
+    func exchangeFishToBone(amount: Int) -> Bool {
+        guard status.fishCoin >= amount else {
+            showFloatingText("鱼币不足", style: .warning)
+            return false
+        }
+        
+        status.fishCoin -= amount
+        status.boneCoin += amount // 1:1 汇率
+        saveStatus()
+        
+        showFloatingText("-\(amount)", style: .fishCoin)
+        showFloatingText("+\(amount)", style: .boneCoin)
+        return true
+    }
+    
+    // 货币兑换：骨头币 -> 鱼币 (可选，虽然需求没明确说要换回去，但通常互通是双向的)
+    func exchangeBoneToFish(amount: Int) -> Bool {
+        guard status.boneCoin >= amount else {
+            showFloatingText("骨头币不足", style: .warning)
+            return false
+        }
+        
+        status.boneCoin -= amount
+        status.fishCoin += amount // 1:1 汇率
+        saveStatus()
+        
+        showFloatingText("-\(amount)", style: .boneCoin)
+        showFloatingText("+\(amount)", style: .fishCoin)
+        return true
     }
     
     func purchaseItem(_ itemType: PetItemType) -> Bool {
@@ -1042,9 +1105,7 @@ class PetViewModel: ObservableObject {
     }
     
     func saveStatus() {
-        if let encoded = try? JSONEncoder().encode(status) {
-            UserDefaults.standard.set(encoded, forKey: statusKey)
-        }
+        PetDataManager.shared.saveStatus(self.status)
     }
     
     func setPetName(_ name: String) {

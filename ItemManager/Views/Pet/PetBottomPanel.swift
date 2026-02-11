@@ -108,6 +108,7 @@ struct PetBottomPanel: View {
                         contentArea
                     }
                     .frame(width: sidebarWidth)
+                    .padding(.bottom, 100) // 增加底部内边距，避开 TabBar
                 }
                 // 位置控制
                 .offset(x: panelState == .expanded ? dragOffset : (sidebarWidth - collapsedWidth) + dragOffset)

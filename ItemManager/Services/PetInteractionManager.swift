@@ -25,6 +25,15 @@ class PetInteractionManager: ObservableObject {
     // Configuration
     let snapThreshold: CGFloat = 50.0 // Points
     
+    // 获取当前宠物 ID (从 UserDefaults 读取，确保多处状态一致)
+    var currentPetId: String {
+        if let data = UserDefaults.standard.data(forKey: "PetStatus_Data"),
+           let decoded = try? JSONDecoder().decode(PetStatus.self, from: data) {
+            return decoded.selectedPetId ?? "naicha"
+        }
+        return "naicha"
+    }
+    
     // Actions
     func startDragging(at location: CGPoint) {
         state = .dragging
@@ -61,8 +70,9 @@ class PetInteractionManager: ObservableObject {
         snappedLine = line
         isHorizontalSnap = isHorizontal
         
-        // Select video based on orientation
-        currentVideoName = isHorizontal ? "cat_horizontal_interaction" : "cat_vertical_interaction"
+        // Select video based on orientation and current pet
+        let petPrefix = currentPetId
+        currentVideoName = isHorizontal ? "\(petPrefix)_horizontal_interaction" : "\(petPrefix)_vertical_interaction"
         isPlayingVideo = false // TEMPORARY: Disable video, use image rotation
         
         // TEMPORARY: Auto return after delay since video is disabled

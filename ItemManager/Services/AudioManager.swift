@@ -127,7 +127,15 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     }
     
     /// 当前互动状态
-    @Published var interactionState: PetInteractionState = .idle
+    @Published var interactionState: PetInteractionState = .idle {
+        didSet {
+            // 更新非隔离标志供音频线程读取，避免访问 MainActor 属性
+            _isRecording = (interactionState == .recording)
+        }
+    }
+    
+    // 供音频线程读取的标志 (简单 Bool，忽略严格并发检查以保持最简)
+    private var _isRecording: Bool = false
     
     /// 语音识别的文字
     @Published var recognizedText: String = ""
@@ -146,14 +154,19 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     
     // VAD (Voice Activity Detection)
     private var silenceTimer: Timer?
-    // 提高静音阈值以过滤远处声音 (原 -40.0)
-    private let silenceThreshold: Float = -25.0 // dB
-    private let silenceDuration: TimeInterval = 1.2 // 持续静音多久视为结束
+    // 提高静音阈值以过滤远处声音 (原 -40.0) -> 现在的需求是轻声说话也能识别，调低阈值
+    // -25.0 dB -> -45.0 dB (更灵敏)
+    private let silenceThreshold: Float = -45.0 // dB
+    private let silenceDuration: TimeInterval = 0.6 // 持续静音多久视为结束 (原 1.2 -> 0.6 提升响应速度)
     private var isSpeechDetected = false
+    private var analysisThrottleCounter: Int = 0 // 用于限制 SoundAnalysis 的频率，节省 CPU
     
-    // Sound Analysis
+    // Audio Processing Queue (Serial) - Removed in simplified version
+    // private let audioProcessingQueue = DispatchQueue(label: "com.pinkhouse.AudioProcessingQueue", qos: .userInteractive)
+    // private let audioSessionQueue = DispatchQueue(label: "com.pinkhouse.AudioSessionQueue", qos: .userInitiated)
+
+    // Sound Analysis (Moved below to keep properties grouped)
     private var streamAnalyzer: SNAudioStreamAnalyzer?
-    private let analysisQueue = DispatchQueue(label: "com.pinkhouse.AnalysisQueue")
     private var isHumanSpeech = false
     
     // Recording
@@ -499,34 +512,29 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             bgmPlayerNode.volume = 0
         }
         
+        // 简易版：直接在主线程配置 AudioSession 和 Engine
+        // 虽然可能卡 UI，但能确保逻辑的原子性和稳定性，避免异步竞争导致的资源抢占
         setupAudioSession(isRecording: true)
         
-        // 配置引擎进行录音
-        // Input -> Mixer (Tap for VAD & File Write) -> Main Mixer (Muted to avoid feedback)
-        
-        // 确保引擎停止以便重置
-        engine.stop()
+        // 移除旧的 Tap
         engine.inputNode.removeTap(onBus: 0)
         
         let inputNode = engine.inputNode
         let format = inputNode.inputFormat(forBus: 0)
         
-        // 崩溃修复：检查格式有效性，防止后台进入或设备状态异常时崩溃
         if format.sampleRate == 0 || format.channelCount == 0 {
             print("AudioManager: Invalid input format: \(format)")
             stopInteraction()
             return
         }
         
-        // 准备语音识别
         prepareSpeechRecognition()
         
-        // 准备 SoundAnalysis
+        // Sound Analysis
         streamAnalyzer = SNAudioStreamAnalyzer(format: format)
         do {
             let request = try SNClassifySoundRequest(classifierIdentifier: .version1)
             try streamAnalyzer?.add(request, withObserver: self)
-            print("AudioManager: Sound Analysis request added")
         } catch {
             print("AudioManager: Failed to create Sound Analysis request: \(error)")
         }
@@ -534,9 +542,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // 准备写入文件
         do {
             if let url = recordingURL {
-                // 删除旧文件
                 try? FileManager.default.removeItem(at: url)
-                // 创建新文件
                 audioFile = try AVAudioFile(forWriting: url, settings: format.settings)
             }
         } catch {
@@ -547,26 +553,35 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] (buffer, time) in
             guard let self = self else { return }
             
-            // 0. Sound Analysis
-            self.analysisQueue.async {
-                self.streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
+            // 简单处理：直接写文件和分析，不进行复杂的异步拷贝
+            // 注意：这可能会在低端设备上引起一点爆音，但逻辑最简单
+            
+            // 1. Sound Analysis (Throttled)
+            self.analysisThrottleCounter += 1
+            if self.analysisThrottleCounter % 6 == 0 {
+                // 使用 autoreleasepool 优化内存
+                autoreleasepool {
+                    self.streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
+                }
             }
             
-            // 1. 写入文件 (如果在录音状态)
-            if self.interactionState == .recording {
-                try? self.audioFile?.write(from: buffer)
-                
-                // 2. 发送给语音识别
-                self.recognitionRequest?.append(buffer)
+            // 2. 写入文件 & 语音识别
+            if self._isRecording {
+                autoreleasepool {
+                    try? self.audioFile?.write(from: buffer)
+                    self.recognitionRequest?.append(buffer)
+                }
             }
             
-            // 3. VAD 检测
+            // 3. VAD 检测 (主线程去抖动)
             self.processVAD(buffer: buffer)
         }
         
         do {
-            try engine.start()
-            // 如果 BGM 启用，重新播放（因为 engine 重启了）
+            if !engine.isRunning {
+                try engine.start()
+            }
+            // 恢复 BGM
             if isBackgroundMusicEnabled && !bgmPlayerNode.isPlaying {
                 if let buffer = bgmBuffer {
                     bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
@@ -578,8 +593,46 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             recognizedText = ""
             print("AudioManager: Started listening...")
         } catch {
-            print("AudioManager: Failed to start engine for listening: \(error)")
+            print("AudioManager: Failed to start engine: \(error)")
             stopInteraction()
+        }
+    }
+    
+    // 简易版 VAD 处理
+    private func processVAD(buffer: AVAudioPCMBuffer) {
+        // 计算音量
+        guard let channelData = buffer.floatChannelData else { return }
+        let channelDataValue = channelData.pointee
+        let frameLength = Int(buffer.frameLength)
+        let stride = buffer.stride
+        
+        var sum: Float = 0.0
+        for i in 0..<frameLength {
+            let sample = channelDataValue[i * stride]
+            sum += sample * sample
+        }
+        let rms = sqrt(sum / Float(frameLength))
+        let db = 20 * log10(rms)
+        
+        // 只有当状态真正改变时才去主线程
+        // 使用简单的阈值判断
+        let isLoud = db > silenceThreshold
+        let isVoice = isLoud && (isHumanSpeech || db > -35.0)
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            if self.interactionState == .listening {
+                if isVoice {
+                    self.onSpeechDetected()
+                }
+            } else if self.interactionState == .recording {
+                if !isVoice {
+                    self.onSilenceDetected() // 内部有 timer 防抖
+                } else {
+                    self.onSpeechDetected() // 重置 timer
+                }
+            }
         }
     }
     
@@ -617,7 +670,8 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         // 只有 Speech 且置信度较高时才认为是人声
         // 过滤掉 music, noise, laughter 等
-        let isSpeech = classification.identifier == "speech" && classification.confidence > 0.85
+        // 降低置信度阈值以支持轻声说话 (0.85 -> 0.5)
+        let isSpeech = classification.identifier == "speech" && classification.confidence > 0.5
         
         // 在主线程更新状态（或者使用原子属性）
         DispatchQueue.main.async {
@@ -636,46 +690,10 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         self.isHumanSpeech = isSpeech
     }
     
-    // Voice Activity Detection
-    private func processVAD(buffer: AVAudioPCMBuffer) {
-        guard let channelData = buffer.floatChannelData else { return }
-        let channelDataValue = channelData.pointee
-        let channelDataValueArray = stride(from: 0, to: Int(buffer.frameLength), by: buffer.stride).map { channelDataValue[$0] }
-        
-        let rms = sqrt(channelDataValueArray.map { $0 * $0 }.reduce(0, +) / Float(buffer.frameLength))
-        let db = 20 * log10(rms)
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            // 结合 音量阈值 和 SoundAnalysis 结果
-            // 只有当 音量足够大 且 识别为人声 时，才触发
-            // 如果正在录音中，则稍微放宽条件（防止说话中间断掉）
-            
-            let isLoudEnough = db > self.silenceThreshold
-            let isSpeechType = self.isHumanSpeech
-            
-            // 如果已经在录音，我们更宽容一点，只要音量够大或者持续是人声
-            let isVoiceActive: Bool
-            if self.interactionState == .recording {
-                // 录音中：只要音量不极低，或者检测到人声，就继续
-                // 这里我们稍微降低阈值以保持录音连续性
-                isVoiceActive = (db > self.silenceThreshold - 5.0) || isSpeechType
-            } else {
-                // 监听中：必须是高音量且是人声
-                isVoiceActive = isLoudEnough && isSpeechType
-            }
-            
-            if isVoiceActive {
-                // 检测到声音
-                self.onSpeechDetected()
-            } else {
-                // 静音
-
-                self.onSilenceDetected()
-            }
-        }
-    }
+    // 状态缓存，用于减少不必要的主线程调度
+    // private var lastReportedSpeechState: Bool = false
+    
+    // Voice Activity Detection - Removed dead logic in simplified version
     
     private func onSpeechDetected() {
         // 取消静音计时器
@@ -749,8 +767,6 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     // MARK: - Playback (Pitch Shift)
     
     private func playRecordedAudio() {
-        // 检查全局音效开关 (复用 SoundManager 的开关状态)
-        // 如果音效关闭，则不播放复述，直接重新开始监听
         if !SoundManager.shared.isSoundEnabled {
             print("AudioManager: Sound is disabled (SoundManager), skipping playback")
             restartListening()
@@ -763,87 +779,57 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             return
         }
         
-        // 播放回复时，恢复 BGM (但不要太大声，以免盖过语音)
         if isBackgroundMusicEnabled {
             bgmPlayerNode.volume = Float(bgmVolume) * 0.5
         }
         
-        // 保持 playAndRecord 模式，不切换 Session
+        // 简易版：直接在主线程配置
         setupAudioSession(isRecording: false)
-        
-        // 重建引擎连接：Player -> TimePitch -> EQ -> MainMixer
-        engine.stop()
-        
-        // 移除可能存在的 Input Tap，防止 I/O 冲突
         engine.inputNode.removeTap(onBus: 0)
         
-        // 重新连接所有节点
-        // 1. Voice Chain
-        engine.detach(playerNode)
-        engine.detach(timePitch)
-        engine.detach(eqNode)
+        // 重置连接
+        if engine.attachedNodes.contains(playerNode) == false { engine.attach(playerNode) }
+        if engine.attachedNodes.contains(timePitch) == false { engine.attach(timePitch) }
+        if engine.attachedNodes.contains(eqNode) == false { engine.attach(eqNode) }
         
-        engine.attach(playerNode)
-        engine.attach(timePitch)
-        engine.attach(eqNode)
-        
-        // 2. BGM Chain (确保 BGM 节点也在)
-        // 注意：bgmPlayerNode 一直 attach 在 engine 上，不需要 detach/attach
-        // 但需要重新 connect
         engine.connect(bgmPlayerNode, to: engine.mainMixerNode, format: nil)
         
-        // 设置播放节点音量
-        // 应用增益系数 3.0，解决声音小的问题
         playerNode.volume = Float(petVoiceVolume) * 3.0
         
         // 变音设置
         switch selectedVoiceType {
         case .funny:
-            timePitch.pitch = 800 // 搞怪变声 (高音调)
-            timePitch.overlap = 8.0 // 默认重叠
-            
-            // 搞怪模式也开启 EQ 以获得 Gain 提升
+            timePitch.pitch = 800
+            timePitch.overlap = 8.0
             eqNode.bypass = false
             eqNode.globalGain = 5.0
-            // 重置 EQ Bands (不需要特殊滤波)
-            for i in 0..<eqNode.bands.count {
-                eqNode.bands[i].bypass = true
-            }
+            for i in 0..<eqNode.bands.count { eqNode.bands[i].bypass = true }
             
         case .youngBoy:
-            // 优化参数 V2:
-            // 1. 稍微提高 Pitch 到 +600 (半个八度)
             timePitch.pitch = 600
-            // 2. 增加 Overlap 以获得更平滑的语音效果
             timePitch.overlap = 20.0
-            
-            // 正太音 EQ 设置：模拟 Formant Shifting
             eqNode.bypass = false
-            eqNode.globalGain = 10.0 // 大幅提升增益，补偿滤波带来的衰减
+            eqNode.globalGain = 10.0
             
-            // Band 0: Low Cut (High Pass) - 更激进地削减低频，去除成年男性胸腔共鸣
             let lowCut = eqNode.bands[0]
             lowCut.filterType = .highPass
-            lowCut.frequency = 220.0 // 提高截止频率到 220Hz
+            lowCut.frequency = 220.0
             lowCut.bypass = false
             
-            // Band 1: Mid Cut (Parametric) - 挖掉中低频厚度 (500-800Hz)，这是成年男性声音特征明显的区域
             let midCut = eqNode.bands[1]
             midCut.filterType = .parametric
             midCut.frequency = 600.0
             midCut.bandwidth = 1.5
-            midCut.gain = -4.0 // 衰减 4dB
+            midCut.gain = -4.0
             midCut.bypass = false
             
-            // Band 2: High Boost (Parametric) - 提升中高频，增加清脆感和穿透力
             let highBoost = eqNode.bands[2]
             highBoost.filterType = .parametric
             highBoost.frequency = 3200.0
             highBoost.bandwidth = 1.0
-            highBoost.gain = 5.0 // 增益 +5dB
+            highBoost.gain = 5.0
             highBoost.bypass = false
             
-            // Band 3: High Shelf - 稍微压一下极高频，防止变调后的齿音刺耳
             let highShelf = eqNode.bands[3]
             highShelf.filterType = .highShelf
             highShelf.frequency = 8000.0
@@ -856,25 +842,23 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         do {
             let file = try AVAudioFile(forReading: url)
             
-            // 连接链路：Player -> TimePitch -> EQ -> Output
             engine.connect(playerNode, to: timePitch, format: file.processingFormat)
             engine.connect(timePitch, to: eqNode, format: file.processingFormat)
             engine.connect(eqNode, to: output, format: file.processingFormat)
             
-            try engine.start()
-            
-            // 恢复 BGM 播放 (Engine 重启后需要重新 schedule)
-            if isBackgroundMusicEnabled && !bgmPlayerNode.isPlaying {
-                if let buffer = bgmBuffer {
-                    bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
-                    bgmPlayerNode.play()
+            if !engine.isRunning {
+                try engine.start()
+                if isBackgroundMusicEnabled && !bgmPlayerNode.isPlaying {
+                    if let buffer = bgmBuffer {
+                        bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+                        bgmPlayerNode.play()
+                    }
                 }
             }
             
             interactionState = .playing
             
             playerNode.scheduleFile(file, at: nil) { [weak self] in
-                // 播放完成回调
                 DispatchQueue.main.async {
                     print("AudioManager: Playback finished")
                     self?.stopPlayback()

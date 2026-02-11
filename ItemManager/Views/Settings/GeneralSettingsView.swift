@@ -492,14 +492,9 @@ struct GeneralSettingsView: View {
             } else {
                 UserDefaults.standard.set(true, forKey: key)
                 
-                var status = PetViewModel.loadStatusFromDisk()
-                status.meowCoin += 666
-                status.fishCoin += 88888
-                
-                if let encoded = try? JSONEncoder().encode(status) {
-                    UserDefaults.standard.set(encoded, forKey: "PetStatus_Data")
-                    NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
-                }
+                // Use PetDataManager to update currency
+                _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 666)
+                _ = PetDataManager.shared.updateCurrency(type: .fishCoin, delta: 88888)
                 
                 redeemResultMessage = "兑换成功！\n获得 666 喵币\n88888 鱼币"
                 showingRedeemResultAlert = true

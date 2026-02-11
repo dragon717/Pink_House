@@ -52,6 +52,7 @@ enum PetState: String, CaseIterable {
 enum PetCurrency: String, CaseIterable, Identifiable {
     case meowCoin = "喵币"
     case fishCoin = "鱼币"
+    case boneCoin = "骨头币"
     
     var id: String { rawValue }
     
@@ -59,6 +60,27 @@ enum PetCurrency: String, CaseIterable, Identifiable {
         switch self {
         case .meowCoin: return "pawprint.circle.fill"
         case .fishCoin: return "fish.circle.fill"
+        case .boneCoin: return "circle.fill" // 使用 circle.fill 作为背景，然后在 View 层叠加骨头图标，或者寻找更合适的组合。但用户要求“圈里面是骨头”。SF Symbols 没有直接的 circle.bone.fill。
+        // 修正：实际上，我们可以直接在 UI 层使用 Overlay 组合。
+        // 但为了保持接口一致性，这里返回 "bone.circle.fill" 如果有的话。
+        // SF Symbols 查证：目前没有 bone.circle.fill。只有 bone.fill。
+        // 所以我们暂时返回 "pawprint.circle.fill" 作为占位？不，用户明确要骨头。
+        // 更好的做法是：在 View 层特殊处理 boneCoin，或者这里返回一个特殊的标识。
+        // 暂时先返回 "bone.fill"，然后在 UI 层加圈。
+        // 或者，我们可以使用 "circle.circle.fill" 这种？
+        // 让我们看看 UI 代码。
+        // UI 代码是 Image(systemName: type.iconName)
+        
+        // 如果我们想简单点，可以用 "dog.circle.fill" ? 不太对。
+        // 鉴于系统限制，我们这里返回 "bone.fill"，然后在 UI 层检测如果是 boneCoin 就加个圈背景。
+        // 或者，我们可以尝试 "dog.circle" ?
+        
+        // 既然用户明确说“圈里面是骨头icon”，最直接的办法是：
+        // 1. 找一个近似的 symbol。
+        // 2. 如果没有，就得改 UI 代码支持组合图标。
+        
+        // 让我们先试试直接返回 "bone.fill"，然后在 PetComponents.swift 里修改 UI。
+        return "bone.fill"
         }
     }
     
@@ -66,6 +88,7 @@ enum PetCurrency: String, CaseIterable, Identifiable {
         switch self {
         case .meowCoin: return "yellow" // SwiftUI Color name or hex
         case .fishCoin: return "orange"
+        case .boneCoin: return "brown"
         }
     }
 }
@@ -144,7 +167,7 @@ struct PetItemDefinition: Codable, Identifiable, Hashable {
     let name: String
     let category: String
     let price: Int
-    let currency: String // "fishCoin" or "meowCoin"
+    let currency: String // "fishCoin", "meowCoin", or "boneCoin"
     let recoveryValue: Double
     let energyCost: Int? // 消耗精力
     let icon: String
@@ -152,7 +175,11 @@ struct PetItemDefinition: Codable, Identifiable, Hashable {
     let sortIndex: Int
     
     var petCurrency: PetCurrency {
-        return currency == "meowCoin" ? .meowCoin : .fishCoin
+        switch currency {
+        case "meowCoin": return .meowCoin
+        case "boneCoin": return .boneCoin
+        default: return .fishCoin
+        }
     }
     
     var isDrink: Bool {
@@ -231,11 +258,23 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
         case .maomao: return "毛毛"
         }
     }
+    
+    var description: String {
+        switch self {
+        case .naicha: return "一只喜欢喝奶茶的橘猫，\n性格温顺，最爱撒娇。"
+        case .maomao: return "活泼可爱的金毛犬，\n精力充沛，忠诚粘人。"
+        }
+    }
+    
+    var portraitImageName: String {
+        return "\(rawValue)_portrait"
+    }
 }
 
 struct PetStatus: Codable {
     var petName: String? // 萌宠名字 (用户自定义昵称)
-    var selectedPetId: String? = PetCharacter.naicha.rawValue // 当前选择的宠物角色 ID (Optional for backward compatibility)
+    var selectedPetId: String? = nil // 当前选择的宠物角色 ID
+    var ownedPetIds: [String] = [] // 已拥有的宠物列表，默认为空，进入领养流程
     var hunger: Double = 100.0 // 饱食度 0-100
     var hygiene: Double = 100.0 // 清洁度 0-100
     var energy: Double = 100.0 // 精力 0-100
@@ -243,8 +282,9 @@ struct PetStatus: Codable {
     var lastUpdateTime: Date = Date()
     
     // 货币系统
-    var meowCoin: Int = 0 // 喵币
-    var fishCoin: Int = 1000 // 鱼币 (初始赠送一些)
+    var meowCoin: Int = 0 // 喵币 (通用高级货币)
+    var fishCoin: Int = 1000 // 鱼币 (猫专用/通用基础货币)
+    var boneCoin: Int = 0 // 骨头币 (狗专用基础货币)
     
     // 每日限制
     var dailyFishCoinEarned: Int = 0
@@ -264,4 +304,75 @@ struct PetStatus: Codable {
     static let moodDecayRate: Double = 12.0 / 3600.0 // 每小时减少12点
     
     static let dailyFishCoinLimit: Int = 10000
+    
+    // MARK: - Initialization
+    init() {
+        // Default init (new user)
+    }
+    
+    // MARK: - Codable Implementation for Backward Compatibility
+    enum CodingKeys: String, CodingKey {
+        case petName, selectedPetId, ownedPetIds
+        case hunger, hygiene, energy, mood, lastUpdateTime
+        case meowCoin, fishCoin, boneCoin
+        case dailyFishCoinEarned, lastDailyResetDate
+        case inventory
+        case currentJob, jobStartTime
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Basic properties (some might be missing in very old versions, provide defaults)
+        petName = try container.decodeIfPresent(String.self, forKey: .petName)
+        hunger = try container.decodeIfPresent(Double.self, forKey: .hunger) ?? 100.0
+        hygiene = try container.decodeIfPresent(Double.self, forKey: .hygiene) ?? 100.0
+        energy = try container.decodeIfPresent(Double.self, forKey: .energy) ?? 100.0
+        mood = try container.decodeIfPresent(Double.self, forKey: .mood) ?? 100.0
+        lastUpdateTime = try container.decodeIfPresent(Date.self, forKey: .lastUpdateTime) ?? Date()
+        
+        // Currency & Inventory
+        meowCoin = try container.decodeIfPresent(Int.self, forKey: .meowCoin) ?? 0
+        fishCoin = try container.decodeIfPresent(Int.self, forKey: .fishCoin) ?? 1000
+        boneCoin = try container.decodeIfPresent(Int.self, forKey: .boneCoin) ?? 0
+        dailyFishCoinEarned = try container.decodeIfPresent(Int.self, forKey: .dailyFishCoinEarned) ?? 0
+        lastDailyResetDate = try container.decodeIfPresent(Date.self, forKey: .lastDailyResetDate) ?? Date()
+        inventory = try container.decodeIfPresent([String: Int].self, forKey: .inventory) ?? [:]
+        
+        // Job
+        currentJob = try container.decodeIfPresent(PetJob.self, forKey: .currentJob) ?? .none
+        jobStartTime = try container.decodeIfPresent(Date.self, forKey: .jobStartTime)
+        
+        // Compatibility Logic for Pet IDs
+        // 旧版本没有 ownedPetIds，默认只有一只奶茶
+        if let ids = try container.decodeIfPresent([String].self, forKey: .ownedPetIds) {
+            ownedPetIds = ids
+            selectedPetId = try container.decodeIfPresent(String.self, forKey: .selectedPetId)
+        } else {
+            // 这是旧版本数据！
+            ownedPetIds = [PetCharacter.naicha.rawValue]
+            // 如果旧版本有 selectedPetId 就用，没有就默认奶茶
+            selectedPetId = try container.decodeIfPresent(String.self, forKey: .selectedPetId) ?? PetCharacter.naicha.rawValue
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(petName, forKey: .petName)
+        try container.encode(selectedPetId, forKey: .selectedPetId)
+        try container.encode(ownedPetIds, forKey: .ownedPetIds)
+        try container.encode(hunger, forKey: .hunger)
+        try container.encode(hygiene, forKey: .hygiene)
+        try container.encode(energy, forKey: .energy)
+        try container.encode(mood, forKey: .mood)
+        try container.encode(lastUpdateTime, forKey: .lastUpdateTime)
+        try container.encode(meowCoin, forKey: .meowCoin)
+        try container.encode(fishCoin, forKey: .fishCoin)
+        try container.encode(boneCoin, forKey: .boneCoin)
+        try container.encode(dailyFishCoinEarned, forKey: .dailyFishCoinEarned)
+        try container.encode(lastDailyResetDate, forKey: .lastDailyResetDate)
+        try container.encode(inventory, forKey: .inventory)
+        try container.encode(currentJob, forKey: .currentJob)
+        try container.encodeIfPresent(jobStartTime, forKey: .jobStartTime)
+    }
 }

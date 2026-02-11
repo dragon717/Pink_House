@@ -12,90 +12,95 @@ struct PetHomeView: View {
     @State private var showJobSelection = false
     @State private var showMicAlert = false
     @State private var newName = ""
+    @State private var showAdoptionView = false // 领养界面
     
     var body: some View {
-        NavigationStack {
-            if viewModel.status.petName == nil {
-                PetNamingView(petName: Binding(
-                    get: { viewModel.status.petName },
-                    set: { viewModel.setPetName($0 ?? "") }
-                )) { }
+        Group {
+            // 如果没有领养任何宠物，直接显示领养界面
+            if viewModel.status.ownedPetIds.isEmpty {
+                NavigationStack {
+                    PetAdoptionView(viewModel: viewModel)
+                }
             } else {
-                GeometryReader { geo in
-                    let isLandscape = geo.size.width > geo.size.height
-                    let videoHeight = isLandscape ? min(geo.size.width, geo.size.height) * 0.8 : 360
-                    
+                NavigationStack {
+                    // 原有内容包裹在 ZStack 中
                     ZStack {
-                        // 背景
-                        LiquidBackground()
-                            .ignoresSafeArea()
-                        
-                        // 通用布局逻辑：
-                        // 1. 底层：视频区域 (绝对居中)
-                        PetInteractionAreaView(
-                            viewModel: viewModel,
-                            audioManager: audioManager,
-                            videoHeight: videoHeight,
-                            isLandscape: isLandscape
-                        )
-                        .frame(width: videoHeight, height: videoHeight)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .offset(y: -40) // 整体向上偏移，避免视觉重心过低或被底部遮挡
-                        
-                        // 2. 上层 UI：Header
-                        if isLandscape {
-                            HStack(spacing: 0) {
-                                // 左侧：状态栏和货币栏
-                                PetStatusHeaderView(viewModel: viewModel, isLandscape: true)
-                                    .frame(width: 120)
-                                    .padding(.leading, 10)
+                        GeometryReader { geo in
+                            let isLandscape = geo.size.width > geo.size.height
+                            let videoHeight = isLandscape ? min(geo.size.width, geo.size.height) * 0.8 : 360
+                            
+                            ZStack {
+                                // 背景
+                                LiquidBackground()
+                                    .ignoresSafeArea()
                                 
-                                Spacer()
-                            }
-                        } else {
-                            VStack(spacing: 0) {
-                                // 顶部状态栏和货币栏
-                                PetStatusHeaderView(viewModel: viewModel, isLandscape: false)
+                                // 通用布局逻辑：
+                                // 1. 底层：视频区域 (绝对居中)
+                                PetInteractionAreaView(
+                                    viewModel: viewModel,
+                                    audioManager: audioManager,
+                                    videoHeight: videoHeight,
+                                    isLandscape: isLandscape
+                                )
+                                .frame(width: videoHeight, height: videoHeight)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .offset(y: -40) // 整体向上偏移，避免视觉重心过低或被底部遮挡
                                 
-                                Spacer()
-                            }
-                        }
-                        
-                        // 3. 顶层 UI：底部操作面板 (可展开)
-                        PetBottomPanel(viewModel: viewModel, panelState: $panelState, showRenameAlert: $showRenameAlert, isLandscape: isLandscape)
-                        
-                        // 4. 悬浮按钮 (仅在隐藏状态且竖屏显示)
-                        if !isLandscape && panelState == .hidden {
-                            VStack {
-                                Spacer()
-                                HStack {
-                                    Spacer()
-                                    Button(action: {
-                                        withAnimation(.spring()) {
-                                            panelState = .collapsed
-                                        }
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "backpack.fill")
-                                                .font(.system(size: 20))
-                                            Text("背包")
-                                                .font(.system(size: 16, weight: .bold))
-                                        }
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(Color.blue)
-                                        .clipShape(Capsule())
-                                        .shadow(radius: 4, x: 0, y: 2)
+                                // 2. 上层 UI：Header
+                                if isLandscape {
+                                    HStack(spacing: 0) {
+                                        // 左侧：状态栏和货币栏
+                                        PetStatusHeaderView(viewModel: viewModel, isLandscape: true)
+                                            .frame(width: 120)
+                                            .padding(.leading, 10)
+                                        
+                                        Spacer()
                                     }
-                                    .padding(.trailing, 20)
-                                    .padding(.bottom, 40) // 稍微高一点，避免被 HomeIndicator 遮挡
+                                } else {
+                                    VStack(spacing: 0) {
+                                        // 顶部状态栏和货币栏
+                                        PetStatusHeaderView(viewModel: viewModel, isLandscape: false)
+                                        
+                                        Spacer()
+                                    }
+                                }
+                                
+                                // 3. 顶层 UI：底部操作面板 (可展开)
+                                PetBottomPanel(viewModel: viewModel, panelState: $panelState, showRenameAlert: $showRenameAlert, isLandscape: isLandscape)
+                                
+                                // 4. 悬浮按钮 (仅在隐藏状态且竖屏显示)
+                                if !isLandscape && panelState == .hidden {
+                                    VStack {
+                                        Spacer()
+                                        HStack {
+                                            Spacer()
+                                            Button(action: {
+                                                withAnimation(.spring()) {
+                                                    panelState = .collapsed
+                                                }
+                                            }) {
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "backpack.fill")
+                                                        .font(.system(size: 20))
+                                                    Text("背包")
+                                                        .font(.system(size: 16, weight: .bold))
+                                                }
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 12)
+                                                .background(Color.blue)
+                                                .clipShape(Capsule())
+                                                .shadow(radius: 4, x: 0, y: 2)
+                                            }
+                                            .padding(.trailing, 20)
+                                            .padding(.bottom, 100) // 稍微高一点，避免被 HomeIndicator 遮挡
+                                        }
+                                    }
+                                    .transition(.opacity)
                                 }
                             }
-                            .transition(.opacity)
                         }
                     }
-                }
                 .alert("修改萌宠名字", isPresented: $showRenameAlert) {
                     TextField("输入新名字", text: $newName)
                     Button("取消", role: .cancel) { }
@@ -123,12 +128,44 @@ struct PetHomeView: View {
                 }
                 .sheet(isPresented: $showJobSelection) {
                     PetJobSelectionView(viewModel: viewModel, isPresented: $showJobSelection)
+                        .presentationDetents([.medium])
                 }
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Menu {
+                            // 切换萌宠 (如果有2只及以上)
+                            if viewModel.status.ownedPetIds.count >= 2 {
+                                Menu("切换萌宠") {
+                                    ForEach(PetCharacter.allCases) { pet in
+                                        if viewModel.status.ownedPetIds.contains(pet.id) {
+                                            Button {
+                                                viewModel.switchPet(pet)
+                                            } label: {
+                                                HStack {
+                                                    Text(pet.displayName)
+                                                    if viewModel.status.selectedPetId == pet.id {
+                                                        Image(systemName: "checkmark")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 再要x胎
+                            if viewModel.status.ownedPetIds.count < PetCharacter.allCases.count {
+                                Button {
+                                    showAdoptionView = true
+                                } label: {
+                                    Label("再要\(viewModel.nextAdoptionNumberText)胎", systemImage: "plus.circle")
+                                }
+                                
+                                Divider()
+                            }
+                            
                             Button {
                                 if viewModel.hasRenameCard() {
                                     newName = viewModel.status.petName ?? ""
@@ -155,7 +192,7 @@ struct PetHomeView: View {
                             }
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "cat.fill")
+                                Image(systemName: viewModel.currentPet == .maomao ? "dog.fill" : "cat.fill")
                                     .font(.system(size: 16))
                                     .foregroundStyle(.orange)
                                 
@@ -224,7 +261,11 @@ struct PetHomeView: View {
                         }
                     }
                 }
+                .navigationDestination(isPresented: $showAdoptionView) {
+                    PetAdoptionView(viewModel: viewModel)
+                }
             }
+        }
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .background {

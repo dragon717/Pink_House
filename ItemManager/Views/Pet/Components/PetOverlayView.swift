@@ -43,6 +43,11 @@ struct PetOverlayView: View {
     // Vision works well on lower resolutions for line detection
     private let screenshotScale: CGFloat = 0.5
     
+    // 获取当前宠物图片前缀
+    private var petImagePrefix: String {
+        return interactionManager.currentPetId
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -230,7 +235,7 @@ struct PetOverlayView: View {
         return ZStack {
             // 1. 静止/呼吸状态的猫 (趴着) - 也就是"悬浮猫头"
             // 显示条件：静止态 OR 归位态 (归位时渐显)
-            Image("PetPeekingIcon")
+            Image("\(petImagePrefix)_peeking") // 动态图片名: naicha_peeking / maomao_peeking
                 .resizable()
                 .scaledToFit()
                 .frame(width: catWidth)
@@ -245,7 +250,7 @@ struct PetOverlayView: View {
             
             // 2. 拖拽/吸附状态的猫 (拎起/旋转) - 也就是"表演图片"
             // 显示条件：拖拽态 OR 吸附态 OR 归位态 (归位时渐隐)
-            Image("PetDraggingIcon")
+            Image("\(petImagePrefix)_dragging") // 动态图片名: naicha_dragging / maomao_dragging
                 .resizable()
                 .scaledToFit()
                 .frame(width: catWidth)

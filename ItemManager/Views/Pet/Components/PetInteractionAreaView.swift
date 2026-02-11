@@ -292,7 +292,7 @@ struct StyledFloatingText: View {
     
     var body: some View {
         switch style {
-        case .meowCoin, .fishCoin:
+        case .meowCoin, .fishCoin, .boneCoin:
             SparklingCurrencyText(text: text, style: style)
         default:
             StandardFloatingText(text: text, color: style.color)
@@ -379,6 +379,12 @@ struct SparklingCurrencyText: View {
                 color: .orange, // 铜色近似
                 gradient: [Color(hex: "CD7F32"), Color(hex: "8B4513"), Color(hex: "CD7F32")] // 铜色渐变
             )
+        case .boneCoin:
+            return (
+                icon: "circle.fill", // 基础图标，后面会特殊处理骨头
+                color: Color(hex: "CD7F32"), // Bronze
+                gradient: [Color(hex: "CD7F32"), Color(hex: "8B4513"), Color(hex: "CD7F32")]
+            )
         default:
             return ("circle.fill", .white, [.white, .gray])
         }
@@ -390,32 +396,50 @@ struct SparklingCurrencyText: View {
             StandardFloatingText(text: text, color: config.color)
             
             // 图标部分
-            Image(systemName: config.icon)
-                .font(.system(size: bubbleSize.fontSize, weight: .bold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: config.gradient,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: .black, radius: 1, x: 1, y: 1)
-                .overlay(
-                    // 闪光效果
-                    GeometryReader { geo in
-                        Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.clear, .white.opacity(0.8), .clear],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+            if style == .boneCoin {
+                ZStack {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: bubbleSize.fontSize, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: config.gradient,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                            .rotationEffect(.degrees(30))
-                            .offset(x: shineOffset * geo.size.width * 2)
-                    }
-                    .mask(Image(systemName: config.icon).font(.system(size: 36, weight: .bold)))
-                )
+                        )
+                    Text("🦴")
+                        .font(.system(size: bubbleSize.fontSize * 0.6)) // 稍微小一点适配圆圈
+                        .shadow(radius: 1)
+                }
+                .shadow(color: .black, radius: 1, x: 1, y: 1)
+            } else {
+                Image(systemName: config.icon)
+                    .font(.system(size: bubbleSize.fontSize, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: config.gradient,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .black, radius: 1, x: 1, y: 1)
+                    .overlay(
+                        // 闪光效果
+                        GeometryReader { geo in
+                            Rectangle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.clear, .white.opacity(0.8), .clear],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .rotationEffect(.degrees(30))
+                                .offset(x: shineOffset * geo.size.width * 2)
+                        }
+                        .mask(Image(systemName: config.icon).font(.system(size: 36, weight: .bold)))
+                    )
+            }
         }
         .onAppear {
             withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {

@@ -51,9 +51,30 @@ struct CurrencyView: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: type.iconName)
-                    .foregroundColor(type == .meowCoin ? .yellow : .orange)
-                    .font(.system(size: 20))
+                // 货币图标
+                if type == .boneCoin {
+                    // 骨头币特殊处理：圈里有骨头
+                    ZStack {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(hex: "CD7F32")) // Bronze color
+                        // 修正：SF Symbols 有 "carrot.fill" 等，但确实没有 bone。
+                        // 如果系统版本支持，可能有。但为了保险，我们用 Text("🦴") 或者 Image(systemName: "dog.fill") ?
+                        // 不，用户说要 🦴。
+                        // 既然是 iOS 开发，我们也可以用 Emoji 🦴 放在圈里。
+                        // 或者使用 "pawprint.fill" 代替？不，用户指定要骨头。
+                        // 让我们尝试组合：circle.fill + 🦴
+                        
+                        // 实际上，SF Symbols 6.0 有 "dog.fill"，"pawprint.fill"。
+                        // 如果没有 bone symbol，我们用 Text("🦴") 缩小一点放在中间。
+                        Text("🦴")
+                            .font(.system(size: 12))
+                    }
+                } else {
+                    Image(systemName: type.iconName)
+                        .foregroundColor(colorForCurrency(type))
+                        .font(.system(size: 20))
+                }
                 
                 RollingNumberView(value: amount)
                     .foregroundColor(.primary)
@@ -69,6 +90,14 @@ struct CurrencyView: View {
             .background(.regularMaterial)
             .cornerRadius(20)
             .shadow(radius: 1)
+        }
+    }
+    
+    private func colorForCurrency(_ type: PetCurrency) -> Color {
+        switch type {
+        case .meowCoin: return .yellow
+        case .fishCoin: return .orange
+        case .boneCoin: return Color(hex: "CD7F32") // Bronze color
         }
     }
 }
@@ -125,7 +154,7 @@ struct ShopItemView: View {
                 HStack(spacing: 2) {
                     Image(systemName: item.petCurrency.iconName) // 动态图标
                         .font(.caption2)
-                        .foregroundColor(item.petCurrency == .meowCoin ? .yellow : .orange)
+                        .foregroundColor(colorForCurrency(item.petCurrency))
                     Text("\(item.price)")
                         .font(.caption2)
                         .fontWeight(.bold)
@@ -137,6 +166,14 @@ struct ShopItemView: View {
                 .clipShape(Capsule())
             }
             .frame(width: 80)
+        }
+    }
+    
+    private func colorForCurrency(_ type: PetCurrency) -> Color {
+        switch type {
+        case .meowCoin: return .yellow
+        case .fishCoin: return .orange
+        case .boneCoin: return Color(hex: "CD7F32") // Bronze color
         }
     }
 }
