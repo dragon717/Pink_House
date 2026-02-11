@@ -19,6 +19,8 @@ class SeamlessVideoPlayerView: UIView {
     private var activePlayer: AVQueuePlayer?
     // private var activeLooper: AVPlayerLooper? // 彻底移除 Looper
     private var currentLoadingID: UUID? // 增加 Loading ID 防止 Race Condition
+    private var activeLoadingID: UUID? // 当前正在播放的 Loading ID
+
     
     // 当前配置
     private var currentVideoName: String?
@@ -91,6 +93,13 @@ class SeamlessVideoPlayerView: UIView {
     private func checkPlaybackStatus() {
         // 如果应用在后台，直接跳过检查，避免触发 err=-19431 (FigApplicationStateMonitor)
         guard isAppActive else { return }
+        
+        // 如果正在加载新视频 (currentLoadingID != activeLoadingID)，则跳过完成检查
+        // 避免在切换过程中旧视频触发 Watchdog
+        if currentLoadingID != activeLoadingID {
+             // print("SeamlessPlayer Watchdog: Skipping check during transition")
+             return 
+        }
         
         guard let player = activePlayer else { return }
         
@@ -236,6 +245,10 @@ class SeamlessVideoPlayerView: UIView {
             print("SeamlessPlayer: Failed to find video \(videoName)")
             return
         }
+        
+        // 防止旧视频在加载新视频期间触发结束回调，导致状态错乱
+        removeFinishObserver()
+        
         self.currentVideoURL = url
         
         // 生成新的 Loading ID
@@ -368,6 +381,8 @@ class SeamlessVideoPlayerView: UIView {
         // 3. 更新状态 (立即更新 active 指针，这样后续的逻辑都知道谁是新的)
         activeLayer = context.layer
         activePlayer = context.player
+        activeLoadingID = context.loadingID
+
         
         // 处理 Race Condition: 检查当前的 isLooping 是否与 context.isLooping 一致
         // 如果在加载过程中用户改变了循环状态（例如快速松手），这里需要修正
