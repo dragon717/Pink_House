@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import Speech
 import UIKit
+import SoundAnalysis
 
 /// 萌宠互动状态
 enum PetInteractionState: String {
@@ -30,7 +31,7 @@ enum PetVoiceType: String, CaseIterable, Identifiable {
 /// 总的萌宠声音管理器
 /// 负责控制背景音乐、麦克风监听、语音识别和回声模式
 @MainActor
-final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
+final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate, SNResultsObserving {
     static let shared = AudioManager()
     
     // MARK: - Published Properties
@@ -39,7 +40,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     @Published var bgmVolume: Double {
         didSet {
             UserDefaults.standard.set(bgmVolume, forKey: "bgmVolume")
-            bgmPlayer?.volume = Float(bgmVolume)
+            bgmPlayerNode.volume = Float(bgmVolume)
         }
     }
     
@@ -122,8 +123,8 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     
     // MARK: - Private Properties
     
-    private var bgmPlayer: AVAudioPlayer?
-    // private let defaultBGMVolume: Float = 0.3 // Use bgmVolume instead
+    private var bgmPlayerNode = AVAudioPlayerNode()
+    private var bgmBuffer: AVAudioPCMBuffer?
     
     // Audio Engine & Nodes
     private var engine = AVAudioEngine()
@@ -134,9 +135,15 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     
     // VAD (Voice Activity Detection)
     private var silenceTimer: Timer?
-    private let silenceThreshold: Float = -40.0 // dB
+    // 提高静音阈值以过滤远处声音 (原 -40.0)
+    private let silenceThreshold: Float = -25.0 // dB
     private let silenceDuration: TimeInterval = 1.2 // 持续静音多久视为结束
     private var isSpeechDetected = false
+    
+    // Sound Analysis
+    private var streamAnalyzer: SNAudioStreamAnalyzer?
+    private let analysisQueue = DispatchQueue(label: "com.pinkhouse.AnalysisQueue")
+    private var isHumanSpeech = false
     
     // Recording
     private var audioFile: AVAudioFile?
@@ -162,6 +169,70 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         speechRecognizer?.delegate = self
         setupRecordingURL()
         setupNotifications()
+        setupAudioEngine()
+    }
+    
+    private func setupAudioEngine() {
+        // Attach nodes
+        engine.attach(bgmPlayerNode)
+        engine.attach(playerNode)
+        engine.attach(timePitch)
+        engine.attach(eqNode)
+        
+        // Connect BGM directly to main mixer
+        engine.connect(bgmPlayerNode, to: engine.mainMixerNode, format: nil)
+        
+        // Connect Voice Effects Chain
+        // Player -> TimePitch -> EQ -> MainMixer
+        let format = engine.outputNode.inputFormat(forBus: 0)
+        engine.connect(playerNode, to: timePitch, format: format)
+        engine.connect(timePitch, to: eqNode, format: format)
+        engine.connect(eqNode, to: engine.mainMixerNode, format: format)
+        
+        // Prepare BGM Buffer
+        prepareBGMBuffer()
+    }
+    
+    private func prepareBGMBuffer() {
+        let bgmNames = ["pet_bgm", "bgm", "background_music", "music"]
+        var url: URL?
+        
+        for name in bgmNames {
+            // 1. 尝试直接查找 (Root)
+            if let u = Bundle.main.url(forResource: name, withExtension: "mp3") ?? Bundle.main.url(forResource: name, withExtension: "wav") {
+                url = u
+                break
+            }
+            // 2. 尝试在 asserts 子目录查找
+            if let u = Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "asserts") ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "asserts") {
+                url = u
+                break
+            }
+            // 3. 尝试手动拼接路径
+            if let u = Bundle.main.url(forResource: "asserts/\(name)", withExtension: "mp3") ?? Bundle.main.url(forResource: "asserts/\(name)", withExtension: "wav") {
+                url = u
+                break
+            }
+            // 4. 尝试 ItemManager/asserts (以防万一)
+            if let u = Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "ItemManager/asserts") ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "ItemManager/asserts") {
+                url = u
+                break
+            }
+        }
+        
+        guard let validUrl = url else {
+            print("AudioManager: No BGM found.")
+            return
+        }
+        
+        do {
+            let file = try AVAudioFile(forReading: validUrl)
+            let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
+            try file.read(into: buffer!)
+            self.bgmBuffer = buffer
+        } catch {
+            print("AudioManager: Failed to load BGM file: \(error)")
+        }
     }
     
     private func setupRecordingURL() {
@@ -279,59 +350,36 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             setupAudioSession(isRecording: false)
         }
         
-        let bgmNames = ["pet_bgm", "bgm", "background_music", "music"]
-        var url: URL?
-        
-        for name in bgmNames {
-            // 1. 尝试直接查找 (Root)
-            if let u = Bundle.main.url(forResource: name, withExtension: "mp3") ?? Bundle.main.url(forResource: name, withExtension: "wav") {
-                url = u
-                break
-            }
-            // 2. 尝试在 asserts 子目录查找
-            if let u = Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "asserts") ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "asserts") {
-                url = u
-                break
-            }
-            // 3. 尝试手动拼接路径
-            if let u = Bundle.main.url(forResource: "asserts/\(name)", withExtension: "mp3") ?? Bundle.main.url(forResource: "asserts/\(name)", withExtension: "wav") {
-                url = u
-                break
-            }
-            // 4. 尝试 ItemManager/asserts (以防万一)
-            if let u = Bundle.main.url(forResource: name, withExtension: "mp3", subdirectory: "ItemManager/asserts") ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "ItemManager/asserts") {
-                url = u
-                break
+        // 确保引擎正在运行
+        if !engine.isRunning {
+            do {
+                try engine.start()
+            } catch {
+                print("AudioManager: Failed to start engine for BGM: \(error)")
+                return
             }
         }
         
-        guard let validUrl = url else {
-            print("AudioManager: No BGM found. Searched for: \(bgmNames) in root and asserts/")
+        guard let buffer = bgmBuffer else {
+            print("AudioManager: No BGM buffer available")
             return
         }
         
-        do {
-            if bgmPlayer == nil {
-                bgmPlayer = try AVAudioPlayer(contentsOf: validUrl)
-                bgmPlayer?.numberOfLoops = -1
-                bgmPlayer?.prepareToPlay()
-            }
-            
-            // 如果处于倾听状态，静音播放
-            if interactionState == .listening || interactionState == .recording {
-                bgmPlayer?.volume = 0
-            } else {
-                bgmPlayer?.volume = Float(bgmVolume)
-            }
-            
-            bgmPlayer?.play()
-        } catch {
-            print("AudioManager: Failed to play BGM: \(error)")
+        if !bgmPlayerNode.isPlaying {
+            bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+            bgmPlayerNode.play()
+        }
+        
+        // 如果处于倾听状态，静音播放
+        if interactionState == .listening || interactionState == .recording {
+            bgmPlayerNode.volume = 0
+        } else {
+            bgmPlayerNode.volume = Float(bgmVolume)
         }
     }
     
     private func stopBackgroundMusic() {
-        bgmPlayer?.stop()
+        bgmPlayerNode.stop()
     }
     
     // MARK: - Interaction Control
@@ -362,7 +410,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         // 互动结束，恢复 BGM
         if isBackgroundMusicEnabled {
-            bgmPlayer?.setVolume(Float(bgmVolume), fadeDuration: 0.5)
+            // 使用 fade 效果恢复音量
+            // AVAudioPlayerNode 不支持内置 fade，这里简单设置
+            // 如果需要 fade，可以使用 timer 或 SCNAudioPlayer (如果是 SceneKit)
+            // 这里为了简单直接设置
+            bgmPlayerNode.volume = Float(bgmVolume)
         }
     }
     
@@ -398,7 +450,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         // 倾听时，暂时将 BGM 静音
         if isBackgroundMusicEnabled {
-            bgmPlayer?.setVolume(0, fadeDuration: 0.5)
+            bgmPlayerNode.volume = 0
         }
         
         setupAudioSession(isRecording: true)
@@ -406,7 +458,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // 配置引擎进行录音
         // Input -> Mixer (Tap for VAD & File Write) -> Main Mixer (Muted to avoid feedback)
         
-        // 清理引擎
+        // 确保引擎停止以便重置
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         
@@ -422,6 +474,16 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         // 准备语音识别
         prepareSpeechRecognition()
+        
+        // 准备 SoundAnalysis
+        streamAnalyzer = SNAudioStreamAnalyzer(format: format)
+        do {
+            let request = try SNClassifySoundRequest(classifierIdentifier: .version1)
+            try streamAnalyzer?.add(request, withObserver: self)
+            print("AudioManager: Sound Analysis request added")
+        } catch {
+            print("AudioManager: Failed to create Sound Analysis request: \(error)")
+        }
         
         // 准备写入文件
         do {
@@ -439,6 +501,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] (buffer, time) in
             guard let self = self else { return }
             
+            // 0. Sound Analysis
+            self.analysisQueue.async {
+                self.streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
+            }
+            
             // 1. 写入文件 (如果在录音状态)
             if self.interactionState == .recording {
                 try? self.audioFile?.write(from: buffer)
@@ -453,6 +520,14 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         do {
             try engine.start()
+            // 如果 BGM 启用，重新播放（因为 engine 重启了）
+            if isBackgroundMusicEnabled && !bgmPlayerNode.isPlaying {
+                if let buffer = bgmBuffer {
+                    bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+                    bgmPlayerNode.play()
+                }
+            }
+            
             interactionState = .listening
             recognizedText = ""
             print("AudioManager: Started listening...")
@@ -463,8 +538,13 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     }
     
     private func stopListening() {
-        engine.stop()
+        // 不要完全 stop engine，因为可能还需要播放 BGM
+        // engine.stop()
         engine.inputNode.removeTap(onBus: 0)
+        
+        // 结束 Sound Analysis
+        streamAnalyzer = nil
+        isHumanSpeech = false
         
         // 结束语音识别
         recognitionRequest?.endAudio()
@@ -481,6 +561,35 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         print("AudioManager: Stopped listening")
     }
     
+    // MARK: - SNResultsObserving
+    
+    nonisolated func request(_ request: SNRequest, didProduce result: SNResult) {
+        guard let result = result as? SNClassificationResult else { return }
+        
+        // 获取置信度最高的分类
+        guard let classification = result.classifications.first else { return }
+        
+        // 只有 Speech 且置信度较高时才认为是人声
+        // 过滤掉 music, noise, laughter 等
+        let isSpeech = classification.identifier == "speech" && classification.confidence > 0.85
+        
+        // 在主线程更新状态（或者使用原子属性）
+        DispatchQueue.main.async {
+            // 这里我们更新一个属性供 VAD 使用
+            // 注意：这可能有点频繁，但考虑到我们只是设置一个 Bool，应该还好
+            // 也可以加个防抖
+            AudioManager.shared.updateSpeechStatus(isSpeech)
+        }
+    }
+    
+    nonisolated func request(_ request: SNRequest, didFailWithError error: Error) {
+        print("AudioManager: Sound analysis failed: \(error)")
+    }
+    
+    private func updateSpeechStatus(_ isSpeech: Bool) {
+        self.isHumanSpeech = isSpeech
+    }
+    
     // Voice Activity Detection
     private func processVAD(buffer: AVAudioPCMBuffer) {
         guard let channelData = buffer.floatChannelData else { return }
@@ -493,11 +602,30 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            if db > self.silenceThreshold {
+            // 结合 音量阈值 和 SoundAnalysis 结果
+            // 只有当 音量足够大 且 识别为人声 时，才触发
+            // 如果正在录音中，则稍微放宽条件（防止说话中间断掉）
+            
+            let isLoudEnough = db > self.silenceThreshold
+            let isSpeechType = self.isHumanSpeech
+            
+            // 如果已经在录音，我们更宽容一点，只要音量够大或者持续是人声
+            let isVoiceActive: Bool
+            if self.interactionState == .recording {
+                // 录音中：只要音量不极低，或者检测到人声，就继续
+                // 这里我们稍微降低阈值以保持录音连续性
+                isVoiceActive = (db > self.silenceThreshold - 5.0) || isSpeechType
+            } else {
+                // 监听中：必须是高音量且是人声
+                isVoiceActive = isLoudEnough && isSpeechType
+            }
+            
+            if isVoiceActive {
                 // 检测到声音
                 self.onSpeechDetected()
             } else {
                 // 静音
+
                 self.onSilenceDetected()
             }
         }
@@ -589,9 +717,9 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             return
         }
         
-        // 播放回复时，恢复 BGM
+        // 播放回复时，恢复 BGM (但不要太大声，以免盖过语音)
         if isBackgroundMusicEnabled {
-            bgmPlayer?.setVolume(Float(bgmVolume), fadeDuration: 0.5)
+            bgmPlayerNode.volume = Float(bgmVolume) * 0.5
         }
         
         // 保持 playAndRecord 模式，不切换 Session
@@ -603,13 +731,20 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // 移除可能存在的 Input Tap，防止 I/O 冲突
         engine.inputNode.removeTap(onBus: 0)
         
+        // 重新连接所有节点
+        // 1. Voice Chain
         engine.detach(playerNode)
         engine.detach(timePitch)
-        engine.detach(eqNode) // Detach EQ
+        engine.detach(eqNode)
         
         engine.attach(playerNode)
         engine.attach(timePitch)
-        engine.attach(eqNode) // Attach EQ
+        engine.attach(eqNode)
+        
+        // 2. BGM Chain (确保 BGM 节点也在)
+        // 注意：bgmPlayerNode 一直 attach 在 engine 上，不需要 detach/attach
+        // 但需要重新 connect
+        engine.connect(bgmPlayerNode, to: engine.mainMixerNode, format: nil)
         
         // 设置播放节点音量
         // 应用增益系数 3.0，解决声音小的问题
@@ -681,6 +816,14 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             engine.connect(eqNode, to: output, format: file.processingFormat)
             
             try engine.start()
+            
+            // 恢复 BGM 播放 (Engine 重启后需要重新 schedule)
+            if isBackgroundMusicEnabled && !bgmPlayerNode.isPlaying {
+                if let buffer = bgmBuffer {
+                    bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+                    bgmPlayerNode.play()
+                }
+            }
             
             interactionState = .playing
             
