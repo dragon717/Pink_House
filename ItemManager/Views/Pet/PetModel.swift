@@ -287,6 +287,16 @@ struct PetStatus: Codable {
         }
     }
     
+    // 供 UI 显示用的名字（经过清洗）
+    var displayName: String {
+        guard let name = petName else { return "萌宠" }
+        let clean = name.replacingOccurrences(of: "\"", with: "")
+                        .replacingOccurrences(of: "“", with: "")
+                        .replacingOccurrences(of: "”", with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? "萌宠" : clean
+    }
+    
     var ownedPetIds: [String] = [] // 已拥有的宠物列表，默认为空，进入领养流程
     var hunger: Double = 100.0 // 饱食度 0-100
     var hygiene: Double = 100.0 // 清洁度 0-100

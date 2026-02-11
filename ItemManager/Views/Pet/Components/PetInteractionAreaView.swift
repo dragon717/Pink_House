@@ -10,6 +10,7 @@ struct PetInteractionAreaView: View {
     @State private var showStatusIcon = false
     @State private var videoProgress: Double = 0.0
     @State private var videoDuration: Double = 1.0
+    @State private var isVisible: Bool = true // 追踪视图可见性以优化内存
     
     // 需要显示进度条的状态
     var shouldShowProgressBar: Bool {
@@ -28,20 +29,26 @@ struct PetInteractionAreaView: View {
     
     var body: some View {
         ZStack {
-            SeamlessVideoPlayer(
-                videoName: viewModel.currentVideoFileName, // 使用实际文件名前缀
-                isLooping: viewModel.isCurrentLooping, // 使用动态控制的 looping 属性
-                // listening 视频强制静音，避免录音时录入视频声音
-                isMuted: !soundManager.isSoundEnabled || viewModel.currentVideoName == PetViewModel.PetVideoPaths.listening,
-                volume: 0.6,
-                onFinished: {
-                    viewModel.onAnimationFinished()
-                },
-                onProgress: { current, duration in
-                    self.videoProgress = current
-                    self.videoDuration = duration
+            Group {
+                if isVisible {
+                    SeamlessVideoPlayer(
+                        videoName: viewModel.currentVideoFileName, // 使用实际文件名前缀
+                        isLooping: viewModel.isCurrentLooping, // 使用动态控制的 looping 属性
+                        // listening 视频强制静音，避免录音时录入视频声音
+                        isMuted: !soundManager.isSoundEnabled || viewModel.currentVideoName == PetViewModel.PetVideoPaths.listening,
+                        volume: 0.6,
+                        onFinished: {
+                            viewModel.onAnimationFinished()
+                        },
+                        onProgress: { current, duration in
+                            self.videoProgress = current
+                            self.videoDuration = duration
+                        }
+                    )
+                } else {
+                    Color.clear
                 }
-            )
+            }
             .frame(height: videoHeight) // 动态高度
             .clipShape(RoundedRectangle(cornerRadius: 20))
             // 接收拖拽区域 (作为 Overlay 确保尺寸一致)
@@ -247,6 +254,12 @@ struct PetInteractionAreaView: View {
                     showStatusIcon = false
                 }
             }
+        }
+        .onAppear {
+            isVisible = true
+        }
+        .onDisappear {
+            isVisible = false
         }
     }
     

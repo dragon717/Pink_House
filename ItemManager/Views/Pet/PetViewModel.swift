@@ -288,9 +288,32 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Lifecycle
     
+    private var isViewVisible: Bool = true
+    
+    func onViewAppear() {
+        isViewVisible = true
+        startTimer()
+        calculateOfflineDecay()
+        checkDailyReset()
+    }
+    
+    func onViewDisappear() {
+        isViewVisible = false
+        stopTimer()
+        saveStatus() // 离开页面时保存
+    }
+    
     func onAppDidBecomeActive() {
         calculateOfflineDecay()
         checkDailyReset()
+        if isViewVisible {
+            startTimer()
+        }
+    }
+    
+    func onAppDidEnterBackground() {
+        saveStatus()
+        stopTimer()
     }
     
     // MARK: - State Management

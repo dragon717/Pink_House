@@ -56,39 +56,30 @@ struct CurrencyView: View {
                     // 骨头币特殊处理：圈里有骨头
                     ZStack {
                         Image(systemName: "circle.fill")
-                            .font(.system(size: 20))
+                            .font(.system(size: 16)) // 缩小图标
                             .foregroundColor(Color(hex: "CD7F32")) // Bronze color
-                        // 修正：SF Symbols 有 "carrot.fill" 等，但确实没有 bone。
-                        // 如果系统版本支持，可能有。但为了保险，我们用 Text("🦴") 或者 Image(systemName: "dog.fill") ?
-                        // 不，用户说要 🦴。
-                        // 既然是 iOS 开发，我们也可以用 Emoji 🦴 放在圈里。
-                        // 或者使用 "pawprint.fill" 代替？不，用户指定要骨头。
-                        // 让我们尝试组合：circle.fill + 🦴
-                        
-                        // 实际上，SF Symbols 6.0 有 "dog.fill"，"pawprint.fill"。
-                        // 如果没有 bone symbol，我们用 Text("🦴") 缩小一点放在中间。
                         Text("🦴")
-                            .font(.system(size: 12))
+                            .font(.system(size: 10)) // 缩小骨头emoji
                     }
                 } else {
                     Image(systemName: type.iconName)
                         .foregroundColor(colorForCurrency(type))
-                        .font(.system(size: 20))
+                        .font(.system(size: 16)) // 缩小图标
                 }
                 
-                RollingNumberView(value: amount)
+                RollingNumberView(value: amount, font: .system(size: 12, weight: .bold)) // 缩小字体
                     .foregroundColor(.primary)
                 
                 #if DEBUG
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 12))
+                    .font(.system(size: 10))
                     .foregroundColor(.blue)
                 #endif
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10) // 减小水平内边距
+            .padding(.vertical, 6)   // 减小垂直内边距
             .background(.regularMaterial)
-            .cornerRadius(20)
+            .cornerRadius(16)        // 调整圆角
             .shadow(radius: 1)
         }
     }

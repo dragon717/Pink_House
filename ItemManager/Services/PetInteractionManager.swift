@@ -27,8 +27,7 @@ class PetInteractionManager: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     
-    override init() {
-        super.init()
+    private init() {
         setupObservers()
     }
     

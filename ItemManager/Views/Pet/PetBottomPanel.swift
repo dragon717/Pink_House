@@ -19,8 +19,9 @@ struct PetBottomPanel: View {
     
     // 面板尺寸配置 (改为基于 GeometryProxy 计算)
     private func getCollapsedHeight(screenHeight: CGFloat) -> CGFloat {
-        // 动态计算：屏幕高度的 25%，但不超过 220，不小于 140 (确保能容纳 Tab 和一行物品)
-        return min(max(screenHeight * 0.25, 140), 220)
+        // 动态计算：屏幕高度的 22%，但不超过 220，不小于 130 (确保能容纳 Tab 和一行物品)
+        // 稍微降低比例和下限，为小屏幕腾出更多空间
+        return min(max(screenHeight * 0.22, 130), 220)
     }
     
     private func getExpandedHeight(screenHeight: CGFloat) -> CGFloat {
@@ -112,7 +113,7 @@ struct PetBottomPanel: View {
                         contentArea
                     }
                     .frame(width: sidebarWidth)
-                    .padding(.bottom, 100) // 增加底部内边距，避开 TabBar
+                    .ignoresSafeArea(.container, edges: .bottom) // 确保延伸到底部，不留白
                 }
                 // 位置控制
                 .offset(x: panelState == .expanded ? dragOffset : (sidebarWidth - collapsedWidth) + dragOffset)

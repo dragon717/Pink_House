@@ -30,7 +30,14 @@ struct PetStatusHeaderView: View {
                     // 状态栏 - 单行显示
                     statusRow(isVertical: false)
                     
-                    currencyRow(isVertical: false)
+                    // 货币栏 - 自动适配宽度
+                    ViewThatFits(in: .horizontal) {
+                        currencyRow(isVertical: false)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            currencyRow(isVertical: false)
+                        }
+                    }
                 }
                 .padding(.top, 10)
                 .padding(.horizontal)

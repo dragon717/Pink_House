@@ -61,11 +61,18 @@ class PetDataManager: ObservableObject {
             self.status = newStatus
         }
         
-        if let encoded = try? JSONEncoder().encode(status) {
-            UserDefaults.standard.set(encoded, forKey: statusKey)
-            
-            // Auto backup check (daily)
-            checkAutoBackup()
+        let statusToSave = self.status
+        
+        // 异步保存，避免阻塞主线程
+        // 针对小内存设备优化：将序列化和IO操作移出主线程
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            if let encoded = try? JSONEncoder().encode(statusToSave) {
+                UserDefaults.standard.set(encoded, forKey: self.statusKey)
+                
+                // Auto backup check (daily)
+                self.checkAutoBackup()
+            }
         }
     }
     

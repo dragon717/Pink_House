@@ -37,9 +37,11 @@ struct PetHomeView: View {
                                 if isLandscape {
                                     return min(screenWidth, screenHeight) * 0.8
                                 } else {
-                                    // 预留顶部 Header (约100) 和底部 Panel Collapsed (约200) 的空间
-                                    let availableHeight = screenHeight - 300
-                                    let idealSize = screenWidth * 0.9
+                                    // 预留顶部 Header (约120) 和底部 Panel Collapsed (约220) 的空间
+                                    // 增加预留空间，避免小屏幕太挤
+                                    let availableHeight = screenHeight - 340
+                                    // 稍微减小宽度占比，避免左右太满
+                                    let idealSize = screenWidth * 0.85
                                     // 取 宽度适配 和 高度适配 的较小值，确保不溢出
                                     return min(idealSize, availableHeight, 450)
                                 }
@@ -60,7 +62,8 @@ struct PetHomeView: View {
                                 )
                                 .frame(width: videoHeight, height: videoHeight)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .offset(y: -40) // 整体向上偏移，避免视觉重心过低或被底部遮挡
+                                // 动态调整偏移，小屏幕减少偏移
+                                .offset(y: isLandscape ? -20 : -screenHeight * 0.05)
                                 
                                 // 2. 上层 UI：Header
                                 if isLandscape {
@@ -214,13 +217,7 @@ struct PetHomeView: View {
                                     .font(.system(size: 16))
                                     .foregroundStyle(.orange)
                                 
-                                let petName = viewModel.status.petName
-                                let rawName = petName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? petName! : "萌宠"
-                                // 移除所有可能的引号
-                                let cleanName = rawName.replacingOccurrences(of: "\"", with: "")
-                                    .replacingOccurrences(of: "“", with: "")
-                                    .replacingOccurrences(of: "”", with: "")
-                                let displayName = cleanName.isEmpty ? "萌宠" : cleanName
+                                let displayName = viewModel.status.displayName
                                 
                                 VStack(alignment: .leading, spacing: 0) {
                                     Text(displayName)
@@ -287,10 +284,16 @@ struct PetHomeView: View {
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .background {
-                viewModel.saveStatus()
+                viewModel.onAppDidEnterBackground()
             } else if newPhase == .active {
                 viewModel.onAppDidBecomeActive()
             }
+        }
+        .onAppear {
+            viewModel.onViewAppear()
+        }
+        .onDisappear {
+            viewModel.onViewDisappear()
         }
     }
 }
