@@ -29,7 +29,7 @@ struct PetInteractionAreaView: View {
     var body: some View {
         ZStack {
             SeamlessVideoPlayer(
-                videoName: viewModel.currentVideoName,
+                videoName: viewModel.currentVideoFileName, // 使用实际文件名前缀
                 isLooping: viewModel.isCurrentLooping, // 使用动态控制的 looping 属性
                 // listening 视频强制静音，避免录音时录入视频声音
                 isMuted: !soundManager.isSoundEnabled || viewModel.currentVideoName == PetViewModel.PetVideoPaths.listening,

@@ -38,7 +38,8 @@ enum FloatingTextStyle {
 class PetViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var currentState: PetState = .idle
-    @Published var currentVideoName: String = "idle"
+    @Published var currentVideoName: String = "idle" // 逻辑视频名 (e.g. "idle", "eating")
+    @Published var currentVideoFileName: String = "idle" // 实际文件名前缀 (e.g. "naicha_idle", "naicha_eating")
     @Published var isCurrentLooping: Bool = true // 新增：动态控制当前视频是否循环
     @Published var status: PetStatus
     @Published var floatingTexts: [FloatingTextData] = []
@@ -56,6 +57,19 @@ class PetViewModel: ObservableObject {
     // MARK: - Private Properties
     private var timer: Timer?
     private let statusKey = "PetStatus_Data"
+    
+    var currentPet: PetCharacter {
+        // 如果 selectedPetId 为 nil，默认使用 naicha
+        return PetCharacter(rawValue: status.selectedPetId ?? "") ?? .naicha
+    }
+    
+    // 获取带角色前缀的视频文件名
+    func getCharacterVideoName(action: String) -> String {
+        // 如果 action 已经包含了路径分隔符（如 "asserts/"），可能需要特殊处理，但目前 action 都是纯文件名
+        // 简单规则：角色ID_动作名
+        // 例如：naicha_idle, maomao_eating
+        return "\(currentPet.rawValue)_\(action)"
+    }
     
     // MARK: - Constants
     struct PetVideoPaths {
@@ -117,8 +131,13 @@ class PetViewModel: ObservableObject {
     
     static func loadStatusFromDisk() -> PetStatus {
         let statusKey = "PetStatus_Data"
-        if let data = UserDefaults.standard.data(forKey: statusKey),
-           var decoded = try? JSONDecoder().decode(PetStatus.self, from: data) {
+        guard let data = UserDefaults.standard.data(forKey: statusKey) else {
+            print("PetViewModel: No saved data found. Creating new status.")
+            return PetStatus()
+        }
+        
+        do {
+            var decoded = try JSONDecoder().decode(PetStatus.self, from: data)
             
             // 数据清理：只保留在新配置中存在的物品，遗弃老数据
             var validInv: [String: Int] = [:]
@@ -129,8 +148,27 @@ class PetViewModel: ObservableObject {
             }
             decoded.inventory = validInv
             
+            print("PetViewModel: Successfully loaded status. Pet: \(decoded.petName ?? "unnamed")")
             return decoded
-        } else {
+        } catch {
+            print("PetViewModel: Failed to decode saved status: \(error)")
+            // 尝试打印 JSON 字符串以便调试
+            if let jsonStr = String(data: data, encoding: .utf8) {
+                print("PetViewModel: Raw JSON data: \(jsonStr)")
+            }
+            
+            // 关键修改：如果解码失败，不要直接返回新的空 Status（这会导致下次保存时覆盖旧数据）
+            // 而是尝试进行“部分恢复”或者“迁移”，或者至少保留旧数据不被破坏。
+            // 但由于 PetStatus 是 Struct，我们无法部分加载。
+            // 策略：
+            // 1. 尝试使用宽松的解码策略（如果可能）
+            // 2. 如果彻底失败，我们应该警告用户，或者尝试备份旧数据再创建新的。
+            
+            // 这里我们采取“备份旧数据”的策略，防止数据永久丢失
+            let backupKey = "\(statusKey)_backup_\(Int(Date().timeIntervalSince1970))"
+            UserDefaults.standard.set(data, forKey: backupKey)
+            print("PetViewModel: Corrupted data backed up to key: \(backupKey)")
+            
             return PetStatus()
         }
     }
@@ -154,9 +192,12 @@ class PetViewModel: ObservableObject {
     }
     
     func updateVideoState(videoName: String, isLooping: Bool) {
-        if self.currentVideoName != videoName || self.isCurrentLooping != isLooping {
+        let actualFileName = getCharacterVideoName(action: videoName)
+        
+        if self.currentVideoName != videoName || self.currentVideoFileName != actualFileName || self.isCurrentLooping != isLooping {
             withAnimation {
                 self.currentVideoName = videoName
+                self.currentVideoFileName = actualFileName
                 self.isCurrentLooping = isLooping
             }
         }

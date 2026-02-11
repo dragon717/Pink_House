@@ -219,8 +219,23 @@ struct PetItem: Codable, Identifiable {
     var count: Int
 }
 
+enum PetCharacter: String, Codable, CaseIterable, Identifiable {
+    case naicha = "naicha"
+    case maomao = "maomao"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .naicha: return "奶茶"
+        case .maomao: return "毛毛"
+        }
+    }
+}
+
 struct PetStatus: Codable {
-    var petName: String? // 萌宠名字
+    var petName: String? // 萌宠名字 (用户自定义昵称)
+    var selectedPetId: String? = PetCharacter.naicha.rawValue // 当前选择的宠物角色 ID (Optional for backward compatibility)
     var hunger: Double = 100.0 // 饱食度 0-100
     var hygiene: Double = 100.0 // 清洁度 0-100
     var energy: Double = 100.0 // 精力 0-100

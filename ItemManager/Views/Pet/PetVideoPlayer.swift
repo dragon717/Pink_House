@@ -71,16 +71,31 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
              }
         }
 
-        // 如果找不到目标视频，回退到 idle
+        // 如果找不到目标视频，尝试回退逻辑
         if url == nil {
-            print("Error: Could not find video resource: \(videoName). Trying idle fallback.")
-            url = Bundle.main.url(forResource: "idle", withExtension: "mp4")
-        }
-        if url == nil {
-            url = Bundle.main.url(forResource: "idle", withExtension: "mp4", subdirectory: "asserts")
-        }
-        if url == nil {
-            url = Bundle.main.url(forResource: "asserts/idle", withExtension: "mp4")
+            print("Error: Could not find video resource: \(videoName). Trying fallbacks.")
+            
+            // 1. 尝试根据前缀回退到 idle (例如 maomao_eating -> maomao_idle)
+            if let underscoreIndex = videoName.firstIndex(of: "_") {
+                let prefix = videoName.prefix(upTo: underscoreIndex)
+                let fallbackName = "\(prefix)_idle"
+                if fallbackName != videoName {
+                     url = Bundle.main.url(forResource: fallbackName, withExtension: "mp4", subdirectory: "asserts")
+                }
+            }
+            
+            // 2. 尝试默认角色 (奶茶) 的 idle
+            if url == nil {
+                url = Bundle.main.url(forResource: "naicha_idle", withExtension: "mp4", subdirectory: "asserts")
+            }
+            
+            // 3. 尝试旧版 idle (兼容)
+            if url == nil {
+                url = Bundle.main.url(forResource: "idle", withExtension: "mp4")
+            }
+            if url == nil {
+                url = Bundle.main.url(forResource: "idle", withExtension: "mp4", subdirectory: "asserts")
+            }
         }
         
         guard let validUrl = url else {

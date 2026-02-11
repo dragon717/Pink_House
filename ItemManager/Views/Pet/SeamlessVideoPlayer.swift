@@ -547,8 +547,24 @@ class SeamlessVideoPlayerView: UIView {
             return url
         }
 
-        // 7. Fallback idle
-        print("SeamlessPlayer: Failed to find video '\(name)'. Fallback to idle.")
+        // 7. Fallback logic
+        print("SeamlessPlayer: Failed to find video '\(name)'. Trying fallbacks.")
+        
+        // Try prefix fallback (e.g. maomao_eating -> maomao_idle)
+        if let underscoreIndex = name.firstIndex(of: "_") {
+            let prefix = name.prefix(upTo: underscoreIndex)
+            let fallbackName = "\(prefix)_idle"
+            if fallbackName != name, let url = Bundle.main.url(forResource: fallbackName, withExtension: "mp4", subdirectory: "asserts") {
+                return url
+            }
+        }
+        
+        // Try naicha_idle (Default)
+        if let url = Bundle.main.url(forResource: "naicha_idle", withExtension: "mp4", subdirectory: "asserts") {
+             return url
+        }
+        
+        // Fallback to legacy idle
         return Bundle.main.url(forResource: "idle", withExtension: "mp4") ?? 
                Bundle.main.url(forResource: "idle", withExtension: "mp4", subdirectory: "asserts") ??
                Bundle.main.url(forResource: "asserts/idle", withExtension: "mp4")
