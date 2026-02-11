@@ -44,6 +44,43 @@ final class SoundManager: ObservableObject {
         self.celebrationVolume = UserDefaults.standard.object(forKey: "celebrationVolume") as? Double ?? 1.0
         prepareAudioSession()
         loadSounds()
+        setupLifecycleObservers()
+    }
+    
+    private func setupLifecycleObservers() {
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.stopAllSounds()
+        }
+    }
+    
+    /// 停止所有音效（包括循环音效）
+    func stopAllSounds() {
+        // 停止滚动音效
+        if let player = rollingPlayer, player.isPlaying {
+            player.stop()
+            player.volume = 0
+        }
+        
+        // 停止所有碰撞音效
+        players.forEach { player in
+            if player.isPlaying {
+                player.stop()
+                player.currentTime = 0
+            }
+        }
+        
+        // 停止其他特效音
+        if let player = fireworksPlayer, player.isPlaying {
+            player.stop()
+            player.currentTime = 0
+        }
+        
+        if let player = pewPlayer, player.isPlaying {
+            player.stop()
+            player.currentTime = 0
+        }
+        
+        isRolling = false
     }
     
     private func prepareAudioSession() {
@@ -249,20 +286,5 @@ final class SoundManager: ObservableObject {
         }
     }
     
-    /// 停止所有音效（包括循环音效）
-    func stopAllSounds() {
-        // 停止滚动音效
-        if let player = rollingPlayer, player.isPlaying {
-            player.stop()
-            player.volume = 0
-        }
-        
-        // 停止所有碰撞音效
-        for player in players {
-            if player.isPlaying {
-                player.stop()
-                player.currentTime = 0
-            }
-        }
-    }
+
 }

@@ -101,6 +101,18 @@ class PetViewModel: ObservableObject {
         
         setupAudioBindings()
         setupNotificationObserver()
+        setupLifecycleObservers()
+    }
+    
+    private func setupLifecycleObservers() {
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.stopTimer()
+        }
+        
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.startTimer()
+            self?.onAppDidBecomeActive()
+        }
     }
     
     static func loadStatusFromDisk() -> PetStatus {

@@ -67,12 +67,16 @@ class SeamlessVideoPlayerView: UIView {
         print("SeamlessPlayer: App entered background, pausing playback and watchdog")
         isAppActive = false
         activePlayer?.pause()
-        // 暂停 Watchdog (虽然 Timer 还在跑，但我们在 checkPlaybackStatus 里拦截)
+        // Stop watchdog timer to save energy
+        watchdogTimer?.invalidate()
+        watchdogTimer = nil
     }
     
     private func handleAppForeground() {
         print("SeamlessPlayer: App entered foreground, resuming watchdog")
         isAppActive = true
+        // Restart watchdog
+        setupWatchdog()
         // 立即检查一次
         checkPlaybackStatus()
     }

@@ -14,6 +14,7 @@ class VisionManager: ObservableObject {
     private var lastDetectionTime: Date = Date.distantPast
     private let throttleInterval: TimeInterval = 0.5
     private var isDetecting = false
+    private var isAppInBackground = false
     
     // Cache for normalized coordinates
     private var cachedImageSize: CGSize = .zero
@@ -21,7 +22,23 @@ class VisionManager: ObservableObject {
     // Performance: Context reuse
     private let context = CIContext(options: [.useSoftwareRenderer: false])
     
+    private init() {
+        setupLifecycleObservers()
+    }
+    
+    private func setupLifecycleObservers() {
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.isAppInBackground = true
+        }
+        
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.isAppInBackground = false
+        }
+    }
+    
     func detectLines(in image: UIImage, roi: CGRect? = nil) {
+        if isAppInBackground { return }
+        
         let now = Date()
         guard now.timeIntervalSince(lastDetectionTime) >= throttleInterval else { return }
         guard !isDetecting else { return }

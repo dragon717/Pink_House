@@ -73,6 +73,11 @@ final class HapticEngineManager: ObservableObject {
             self?.isEngineRunning = false
             self?.startEngineIfNeeded()
         }
+        
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            print("App entering background, stopping Haptic Engine...")
+            self?.stopHaptics()
+        }
     }
     
     /// 初始化触觉引擎
