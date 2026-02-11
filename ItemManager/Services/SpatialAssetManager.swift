@@ -67,15 +67,27 @@ class SpatialAssetManager: ObservableObject {
     @Published var isReady = false
     @Published var isLoading = false
     
+    private var currentLoadedImageName: String?
     private var preloadTask: Task<Void, Never>?
     
     // 预加载特定资源
     func preload(imageName: String, extension: String) {
-        // 如果已经加载或正在加载，忽略
-        guard !isReady && !isLoading else { return }
+        // 如果正在加载当前请求的图片，忽略
+        if isLoading && currentLoadedImageName == imageName { return }
         
-        print("[SpatialAssetManager] 触发预加载: \(imageName)")
+        // 如果已经准备好，且是同一张图片，忽略
+        if isReady && currentLoadedImageName == imageName { return }
+        
+        print("[SpatialAssetManager] 触发预加载: \(imageName) (当前: \(currentLoadedImageName ?? "nil"))")
+        
+        // 重置状态
         isLoading = true
+        isReady = false
+        spatialImage = nil
+        currentLoadedImageName = imageName
+        
+        // 取消之前的任务（如果有）
+        preloadTask?.cancel()
         
         // 使用 detached 任务避免阻塞 MainActor
         preloadTask = Task.detached(priority: .userInitiated) {

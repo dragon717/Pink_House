@@ -28,6 +28,11 @@ struct SmallWorldView: View {
     // 图片原始尺寸 1919x1079
     @State private var imageSize = CGSize(width: 1919, height: 1079)
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
+    @AppStorage("smallWorldSceneMode") private var sceneModeRaw: Int = SmallWorldSceneMode.auto.rawValue
+    
+    private var sceneMode: SmallWorldSceneMode {
+        SmallWorldSceneMode(rawValue: sceneModeRaw) ?? .auto
+    }
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
@@ -48,21 +53,9 @@ struct SmallWorldView: View {
         return true
     }
     
-    // 根据时间动态获取背景图片名称
+    // 根据设置动态获取背景图片名称
     private var currentBackgroundImageName: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        
-        // 清晨: 5:00 - 9:00 (不包含 9:00)
-        let isMorning = hour >= 5 && hour < 9
-        
-        // 黄昏: 16:00 - 19:00 (不包含 19:00)
-        let isDusk = hour >= 16 && hour < 19
-        
-        if isMorning || isDusk {
-            return "small_world_bg_sun"
-        } else {
-            return "small_world_bg_normal"
-        }
+        sceneMode.backgroundImageName()
     }
     
     var body: some View {
@@ -97,6 +90,7 @@ struct SmallWorldView: View {
                                 }
                             }
                             .frame(width: geometry.size.height * (imageSize.width / imageSize.height), height: geometry.size.height)
+                            .overlay(sceneMode.overlayColor())
                             .overlay(
                                     ZStack(alignment: .topLeading) {
                                         // 1. OOTD (今日穿搭) - 最左侧
@@ -650,9 +644,10 @@ struct SpatialBackgroundView: View {
         }
         .task {
             // 视图出现时，如果还没准备好，尝试再次触发预加载（防止 App 启动时没触发成功）
-            if !assetManager.isReady {
-                assetManager.preload(imageName: imageName, extension: imageExtension)
-            }
+            assetManager.preload(imageName: imageName, extension: imageExtension)
+        }
+        .onChange(of: imageName) { _, newValue in
+             assetManager.preload(imageName: newValue, extension: imageExtension)
         }
     }
     

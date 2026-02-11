@@ -17,6 +17,7 @@ struct GeneralSettingsView: View {
     @State private var redeemResultMessage = ""
     
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
+    @AppStorage("smallWorldSceneMode") private var smallWorldSceneMode = SmallWorldSceneMode.auto.rawValue
     
     var body: some View {
         @Bindable var theme = themeManager
@@ -311,101 +312,7 @@ struct GeneralSettingsView: View {
             }
              
             Section(header: Text("个性化")) {
-                // 萌宠音源设置
-                HStack {
-                    Image(systemName: "mic.and.signal.meter.fill")
-                        .foregroundStyle(.purple)
-                    Text("萌宠音源")
-                    Spacer()
-                    Picker("", selection: $audioManager.selectedVoiceType) {
-                        ForEach(PetVoiceType.allCases) { type in
-                            Text(type.displayName).tag(type)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                }
-              
-                NavigationLink(destination: PetCustomizationView()) {
-                    HStack {
-                        Image(systemName: "bubble.left.and.bubble.right.fill")
-                            .foregroundStyle(.blue)
-                        Text("萌宠气泡")
-                        Spacer()
-                        Text("大小与字体")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                }
-                
-                NavigationLink(destination: WealthCustomizationView()) {
-                    HStack {
-                        Image(systemName: "banknote")
-                            .foregroundStyle(.green)
-                        Text("来财设置")
-                        Spacer()
-                        Text("自定义纸币样式")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                }
-                
-                NavigationLink(destination: CelebrationSettingsView()) {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(.pink)
-                        Text("彩蛋设置")
-                        Spacer()
-                        Text("付尾款特效")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                }
-
-
-                NavigationLink(destination: CalendarSettingsView()) {
-                    HStack {
-                        Text("梦裙日历个性化")
-                        Spacer()
-                        Text(CalendarThemeManager.shared.currentTheme.displayName)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                // 限制 iOS 26 生效
-                if #available(iOS 26.0, *) {
-                    Toggle(isOn: $isSpatialSceneEnabled) {
-                        VStack(alignment: .leading) {
-                            Text("开启3d景深空间场景")
-                            Text("iOS 26 专属特性")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } else {
-                    Text("仅支持 iOS 26 及以上版本")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                HStack {
-                    Text("文字颜色")
-                    Spacer()
-                    Text("预留")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("选中色")
-                    Spacer()
-                    Text("预留")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("App图标")
-                    Spacer()
-                    Text("预留")
-                        .foregroundStyle(.secondary)
-                }
+                personalizationSectionContent
             }
         
             Section(header: Text("VIP")) {   
@@ -506,6 +413,154 @@ struct GeneralSettingsView: View {
         } else {
             redeemResultMessage = "兑换码无效"
             showingRedeemResultAlert = true
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    @ViewBuilder
+    private var personalizationSectionContent: some View {
+        // 萌宠音源设置
+        HStack {
+            Image(systemName: "mic.and.signal.meter.fill")
+                .foregroundStyle(.purple)
+            Text("萌宠音源")
+            Spacer()
+            Picker("", selection: $audioManager.selectedVoiceType) {
+                ForEach(PetVoiceType.allCases) { type in
+                    Text(type.displayName).tag(type)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+        }
+      
+        NavigationLink(destination: PetCustomizationView()) {
+            HStack {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .foregroundStyle(.blue)
+                Text("萌宠气泡")
+                Spacer()
+                Text("大小与字体")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+        }
+        
+        NavigationLink(destination: WealthCustomizationView()) {
+            HStack {
+                Image(systemName: "banknote")
+                    .foregroundStyle(.green)
+                Text("来财设置")
+                Spacer()
+                Text("自定义纸币样式")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+        }
+        
+        NavigationLink(destination: CelebrationSettingsView()) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(.pink)
+                Text("彩蛋设置")
+                Spacer()
+                Text("付尾款特效")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+        }
+
+
+        NavigationLink(destination: CalendarSettingsView()) {
+            HStack {
+                Text("梦裙日历个性化")
+                Spacer()
+                Text(CalendarThemeManager.shared.currentTheme.displayName)
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        // 小世界场景设置
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "sun.haze.fill")
+                    .foregroundStyle(.orange)
+                Text("小世界场景")
+            }
+            
+            VStack(spacing: 8) {
+                Slider(value: Binding(
+                    get: { Double(smallWorldSceneMode) },
+                    set: { smallWorldSceneMode = Int($0) }
+                ), in: 0...2, step: 1) {
+                    Text("场景选择")
+                } minimumValueLabel: {
+                    Text("")
+                } maximumValueLabel: {
+                    Text("")
+                }
+                .tint(.pink)
+                
+                HStack(spacing: 0) {
+                    ForEach(SmallWorldSceneMode.allCases) { mode in
+                        Text(mode.displayName)
+                            .font(.system(size: 10))
+                            .foregroundStyle(mode.rawValue == smallWorldSceneMode ? .primary : .secondary)
+                            .frame(maxWidth: .infinity)
+                            .onTapGesture {
+                                withAnimation {
+                                    smallWorldSceneMode = mode.rawValue
+                                }
+                            }
+                    }
+                }
+                
+                if smallWorldSceneMode == SmallWorldSceneMode.auto.rawValue {
+                    Text("自动模式下：\n清晨 (5:00-9:00) 与 黄昏 (16:00-19:00) 显示晨曦/夕阳场景\n其他时间显示白天场景")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .padding(.top, 4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.vertical, 6)
+
+        // 限制 iOS 26 生效
+        if #available(iOS 26.0, *) {
+            Toggle(isOn: $isSpatialSceneEnabled) {
+                VStack(alignment: .leading) {
+                    Text("开启3d景深空间场景")
+                    Text("iOS 26 专属特性")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } else {
+            Text("仅支持 iOS 26 及以上版本")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        
+        HStack {
+            Text("文字颜色")
+            Spacer()
+            Text("预留")
+                .foregroundStyle(.secondary)
+        }
+        HStack {
+            Text("选中色")
+            Spacer()
+            Text("预留")
+                .foregroundStyle(.secondary)
+        }
+        HStack {
+            Text("App图标")
+            Spacer()
+            Text("预留")
+                .foregroundStyle(.secondary)
         }
     }
 }
