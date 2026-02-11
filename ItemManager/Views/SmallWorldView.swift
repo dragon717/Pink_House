@@ -31,7 +31,7 @@ struct SmallWorldView: View {
     
     // 调试模式：开启后显示热区范围 (仅在 Debug 模式下生效)
     private var showDebugHotspots: Bool {
-        // return false
+        return false
 //        return true // canvas调整用
         #if DEBUG
         return true
