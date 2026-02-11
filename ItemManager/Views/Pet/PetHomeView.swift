@@ -10,6 +10,7 @@ struct PetHomeView: View {
     @State private var showRenameAlert = false
     @State private var showNoCardAlert = false
     @State private var showJobSelection = false
+    @State private var showMicAlert = false
     @State private var newName = ""
     
     var body: some View {
@@ -112,6 +113,14 @@ struct PetHomeView: View {
                 } message: {
                     Text("修改名字需要消耗改名项圈，请前往商店购买喵～")
                 }
+                .alert("开启萌宠麦克风", isPresented: $showMicAlert) {
+                    Button("确认", role: .none) {
+                        audioManager.isInteractionEnabled = true
+                    }
+                    Button("取消", role: .cancel) { }
+                } message: {
+                    Text("安静环境使用以获得最佳体验")
+                }
                 .sheet(isPresented: $showJobSelection) {
                     PetJobSelectionView(viewModel: viewModel, isPresented: $showJobSelection)
                 }
@@ -203,7 +212,11 @@ struct PetHomeView: View {
                             
                             // Voice Interaction Toggle
                             Button {
-                                audioManager.isInteractionEnabled.toggle()
+                                if audioManager.isInteractionEnabled {
+                                    audioManager.isInteractionEnabled = false
+                                } else {
+                                    showMicAlert = true
+                                }
                             } label: {
                                 Image(systemName: audioManager.isInteractionEnabled ? "mic.fill" : "mic.slash.fill")
                                     .foregroundStyle(audioManager.isInteractionEnabled ? .green : .gray)
