@@ -25,6 +25,23 @@ class PetInteractionManager: ObservableObject {
     // Configuration
     let snapThreshold: CGFloat = 50.0 // Points
     
+    private var cancellables = Set<AnyCancellable>()
+    
+    override init() {
+        super.init()
+        setupObservers()
+    }
+    
+    private func setupObservers() {
+        // 监听宠物切换通知
+        NotificationCenter.default.publisher(for: Notification.Name("PetDidSwitch"))
+            .sink { [weak self] _ in
+                // 触发 UI 刷新
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
+    
     // 获取当前宠物 ID (从 UserDefaults 读取，确保多处状态一致)
     var currentPetId: String {
         // 优化：直接从 PetDataManager 获取内存中的状态，避免频繁读取 UserDefaults 和 JSON 解码

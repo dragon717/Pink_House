@@ -19,7 +19,7 @@ struct ClothingDetailView: View {
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
     
-    @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = true
+    @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = false
     
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     

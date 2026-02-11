@@ -272,8 +272,21 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
 }
 
 struct PetStatus: Codable {
-    var petName: String? // 萌宠名字 (用户自定义昵称)
+    var petNames: [String: String] = [:] // 萌宠名字集合 (Key: PetID, Value: Name)
     var selectedPetId: String? = nil // 当前选择的宠物角色 ID
+    
+    // 兼容旧属性，计算属性
+    var petName: String? {
+        get {
+            guard let id = selectedPetId else { return nil }
+            return petNames[id]
+        }
+        set {
+            guard let id = selectedPetId else { return }
+            petNames[id] = newValue
+        }
+    }
+    
     var ownedPetIds: [String] = [] // 已拥有的宠物列表，默认为空，进入领养流程
     var hunger: Double = 100.0 // 饱食度 0-100
     var hygiene: Double = 100.0 // 清洁度 0-100
@@ -312,7 +325,7 @@ struct PetStatus: Codable {
     
     // MARK: - Codable Implementation for Backward Compatibility
     enum CodingKeys: String, CodingKey {
-        case petName, selectedPetId, ownedPetIds
+        case petName, petNames, selectedPetId, ownedPetIds
         case hunger, hygiene, energy, mood, lastUpdateTime
         case meowCoin, fishCoin, boneCoin
         case dailyFishCoinEarned, lastDailyResetDate
@@ -324,7 +337,7 @@ struct PetStatus: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         // Basic properties (some might be missing in very old versions, provide defaults)
-        petName = try container.decodeIfPresent(String.self, forKey: .petName)
+        let legacyPetName = try container.decodeIfPresent(String.self, forKey: .petName)
         hunger = try container.decodeIfPresent(Double.self, forKey: .hunger) ?? 100.0
         hygiene = try container.decodeIfPresent(Double.self, forKey: .hygiene) ?? 100.0
         energy = try container.decodeIfPresent(Double.self, forKey: .energy) ?? 100.0
@@ -354,11 +367,23 @@ struct PetStatus: Codable {
             // 如果旧版本有 selectedPetId 就用，没有就默认奶茶
             selectedPetId = try container.decodeIfPresent(String.self, forKey: .selectedPetId) ?? PetCharacter.naicha.rawValue
         }
+        
+        // Decode petNames or migrate
+        if let names = try container.decodeIfPresent([String: String].self, forKey: .petNames) {
+            petNames = names
+        } else {
+            petNames = [:]
+            // Migration: If we have a legacy name and a selected pet ID, map it
+            if let oldName = legacyPetName, let id = selectedPetId {
+                petNames[id] = oldName
+            }
+        }
     }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(petName, forKey: .petName)
+        try container.encodeIfPresent(petName, forKey: .petName) // Store current name for legacy compat
+        try container.encode(petNames, forKey: .petNames)
         try container.encode(selectedPetId, forKey: .selectedPetId)
         try container.encode(ownedPetIds, forKey: .ownedPetIds)
         try container.encode(hunger, forKey: .hunger)

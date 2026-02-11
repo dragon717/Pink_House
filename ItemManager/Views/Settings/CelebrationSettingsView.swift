@@ -2,7 +2,7 @@
 import SwiftUI
 
 struct CelebrationSettingsView: View {
-    @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = true
+    @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = false
     @AppStorage("isFireworksEnabled") private var isFireworksEnabled = true
     @AppStorage("isButterfliesEnabled") private var isButterfliesEnabled = false
     

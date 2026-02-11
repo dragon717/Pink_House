@@ -27,7 +27,23 @@ struct PetHomeView: View {
                     ZStack {
                         GeometryReader { geo in
                             let isLandscape = geo.size.width > geo.size.height
-                            let videoHeight = isLandscape ? min(geo.size.width, geo.size.height) * 0.8 : 360
+                            // 动态计算视频高度：
+                            // 横屏：取屏幕短边的 80%
+                            // 竖屏：取屏幕宽度的 90%，但限制最大值（450）和最小值（280），同时考虑到屏幕高度的限制，避免遮挡
+                            let screenHeight = geo.size.height
+                            let screenWidth = geo.size.width
+                            
+                            let videoHeight: CGFloat = {
+                                if isLandscape {
+                                    return min(screenWidth, screenHeight) * 0.8
+                                } else {
+                                    // 预留顶部 Header (约100) 和底部 Panel Collapsed (约200) 的空间
+                                    let availableHeight = screenHeight - 300
+                                    let idealSize = screenWidth * 0.9
+                                    // 取 宽度适配 和 高度适配 的较小值，确保不溢出
+                                    return min(idealSize, availableHeight, 450)
+                                }
+                            }()
                             
                             ZStack {
                                 // 背景
@@ -144,7 +160,9 @@ struct PetHomeView: View {
                                                 viewModel.switchPet(pet)
                                             } label: {
                                                 HStack {
-                                                    Text(pet.displayName)
+                                                    let pName = viewModel.status.petNames[pet.id] ?? ""
+                                                    let nameText = pName.isEmpty ? "" : " - \"\(pName)\""
+                                                    Text("\(pet.displayName)\(nameText)")
                                                     if viewModel.status.selectedPetId == pet.id {
                                                         Image(systemName: "checkmark")
                                                     }

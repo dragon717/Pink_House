@@ -82,7 +82,7 @@ class PetViewModel: ObservableObject {
         }
         
         if let name = name, !name.isEmpty {
-            status.petName = name
+            status.petNames[pet.id] = name
         }
         
         // 自动切换到新领养的宠物
@@ -98,6 +98,25 @@ class PetViewModel: ObservableObject {
         // 更新状态
         status.selectedPetId = pet.id
         
+        // 通知 PetInteractionManager 更新宠物 ID
+        // 注意：PetInteractionManager.currentPetId 是计算属性，依赖 PetDataManager.shared.status
+        // 所以我们必须先保存状态，或者手动触发更新通知
+        saveStatus()
+        
+        // 发送通知，强制 InteractionManager 刷新（如果它是观察者）
+        // 或者直接调用它的更新方法
+        // 由于 PetInteractionManager 也是单例且依赖 DataManager，
+        // 我们需要确保 DataManager 已经有了最新的 status
+        // saveStatus() 已经做了这件事
+        
+        // 显式通知 PetInteractionManager (如果它监听特定通知)
+        // 或者因为 PetInteractionManager 是 ObservableObject，如果它被 View 观察，View 会重绘。
+        // 但 OverlayView 中的 petImagePrefix 是计算属性，依赖 interactionManager.currentPetId
+        // 而 interactionManager.currentPetId 依赖 PetDataManager.shared.status
+        // 所以理论上只要 View 重绘，就会获取到新的 ID。
+        // 为了确保万无一失，我们可以发布一个 Notification
+        NotificationCenter.default.post(name: Notification.Name("PetDidSwitch"), object: nil)
+        
         // 强制刷新视频状态
         // 这里我们需要重置一些状态，以确保 UI 刷新
         let currentAction = currentVideoName // e.g. "idle"
@@ -110,8 +129,6 @@ class PetViewModel: ObservableObject {
                 changeState(to: .idle)
             }
         }
-        
-        saveStatus()
     }
     
     // 获取下一个“胎”数中文名 (用于“再要x胎”)

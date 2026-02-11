@@ -17,15 +17,15 @@ struct PetBottomPanel: View {
     var isLandscape: Bool = false
     @State private var selectedTab: Int = 0 // 0: 背包, 1: 商店
     
-    // 面板尺寸配置
-    private var collapsedHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        return screenHeight < 500 ? 80 : 200
+    // 面板尺寸配置 (改为基于 GeometryProxy 计算)
+    private func getCollapsedHeight(screenHeight: CGFloat) -> CGFloat {
+        // 动态计算：屏幕高度的 25%，但不超过 220，不小于 140 (确保能容纳 Tab 和一行物品)
+        return min(max(screenHeight * 0.25, 140), 220)
     }
     
-    private var expandedHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        return screenHeight < 500 ? screenHeight * 0.8 : 600
+    private func getExpandedHeight(screenHeight: CGFloat) -> CGFloat {
+        // 屏幕高度的 75%
+        return screenHeight * 0.75
     }
     
     // 横屏模式下的宽度配置
@@ -41,6 +41,10 @@ struct PetBottomPanel: View {
     
     var body: some View {
         GeometryReader { geometry in
+            let screenHeight = geometry.size.height
+            let collapsedH = getCollapsedHeight(screenHeight: screenHeight)
+            let expandedH = getExpandedHeight(screenHeight: screenHeight)
+            
             if isLandscape {
                 // 横屏布局：右侧侧边栏 (暂时保持原有逻辑，映射 state)
                 HStack(spacing: 0) {
@@ -139,12 +143,12 @@ struct PetBottomPanel: View {
                 .background(.regularMaterial)
                 .cornerRadius(20, corners: [.topLeft, .topRight])
                 .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
-                .frame(height: panelState == .expanded ? expandedHeight : collapsedHeight)
+                .frame(height: panelState == .expanded ? expandedH : collapsedH)
                 // 关键修改：根据状态控制 offset y
                 // Hidden: offset = height (完全移出屏幕)
                 // Collapsed/Expanded: offset = 0 (正常显示，高度由 frame 控制)
                 // 加上 dragOffset 实现拖拽跟手
-                .offset(y: calculateVerticalOffset(geometry: geometry))
+                .offset(y: calculateVerticalOffset(geometry: geometry, collapsedH: collapsedH, expandedH: expandedH))
                 .animation(.spring(response: 0.35, dampingFraction: 0.8), value: panelState)
                 .gesture(
                     DragGesture()
@@ -184,13 +188,15 @@ struct PetBottomPanel: View {
         }
     }
     
-    private func calculateVerticalOffset(geometry: GeometryProxy) -> CGFloat {
+    private func calculateVerticalOffset(geometry: GeometryProxy, collapsedH: CGFloat, expandedH: CGFloat) -> CGFloat {
         if panelState == .hidden {
             return geometry.size.height + 200 // 增加额外偏移，确保完全移出可视区域
         }
         
         // 基础位置是底部对齐
-        let currentHeight = panelState == .expanded ? expandedHeight : collapsedHeight
+        // GeometryReader 内部元素默认左上对齐 (0,0)
+        // 我们需要把它推到底部
+        let currentHeight = panelState == .expanded ? expandedH : collapsedH
         let baseOffset = geometry.size.height - currentHeight
         
         // 增加拖拽时的弹性效果或跟手
