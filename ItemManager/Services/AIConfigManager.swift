@@ -4,6 +4,7 @@ class AIConfigManager {
     static let shared = AIConfigManager()
     
     private(set) var apiKey: String?
+    private(set) var dsApiKey: String?
     
     private init() {
         loadConfig()
@@ -12,10 +13,15 @@ class AIConfigManager {
     private func loadConfig() {
         // 尝试从 Bundle 读取
         if let path = Bundle.main.path(forResource: "GenerativeAI-Info", ofType: "plist"),
-           let dict = NSDictionary(contentsOfFile: path) as? [String: Any],
-           let key = dict["API_KEY"] as? String,
-           !key.isEmpty {
-            self.apiKey = key
+           let dict = NSDictionary(contentsOfFile: path) as? [String: Any] {
+            
+            if let key = dict["API_KEY"] as? String, !key.isEmpty {
+                self.apiKey = key
+            }
+            
+            if let dsKey = dict["DS_API_KEY"] as? String, !dsKey.isEmpty {
+                self.dsApiKey = dsKey
+            }
             return
         }
         
@@ -31,6 +37,6 @@ class AIConfigManager {
     }
     
     var isAIEnabled: Bool {
-        return apiKey != nil
+        return apiKey != nil || dsApiKey != nil
     }
 }

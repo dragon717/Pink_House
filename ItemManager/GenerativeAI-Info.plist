@@ -4,5 +4,7 @@
 <dict>
 	<key>API_KEY</key>
 	<string>AIzaSyApTkDy0rUQluVlp2aNUMrIj028UJd3lRM</string>
+	<key>DS_API_KEY</key>
+	<string>sk-0c0ef7e6cc2245c2b768d927279f43c1</string>
 </dict>
 </plist>

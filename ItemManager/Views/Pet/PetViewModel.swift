@@ -81,9 +81,12 @@ class PetViewModel: ObservableObject {
     // MARK: - Helper Methods
     
     private func setupAIService() {
-        if let apiKey = AIConfigManager.shared.apiKey {
+        // 优先使用 DS_API_KEY，其次是 API_KEY
+        if let dsApiKey = AIConfigManager.shared.dsApiKey {
             let petName = status.petName ?? currentPet.displayName
-            // 注意：这里需要确保 PetAIService 可用。如果报错，请检查文件是否包含在 Target 中。
+            self.aiService = PetAIService(role: currentPet.aiRole, petName: petName, apiKey: dsApiKey)
+        } else if let apiKey = AIConfigManager.shared.apiKey {
+            let petName = status.petName ?? currentPet.displayName
             self.aiService = PetAIService(role: currentPet.aiRole, petName: petName, apiKey: apiKey)
         }
     }
