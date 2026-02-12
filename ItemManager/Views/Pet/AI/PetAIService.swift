@@ -1,9 +1,12 @@
 import Foundation
+import Combine
 import GoogleGenerativeAI
 
-class PetAIService {
+class PetAIService: ObservableObject {
+    @Published var isProcessing: Bool = false
+    
     private let model: GenerativeModel
-    private var chat: ChatSession
+    private var chat: Chat
     private let role: PetRole
     private let petName: String
 
@@ -12,9 +15,9 @@ class PetAIService {
         self.petName = petName
         
         // 注意：请确保你的 API Key 有权限访问该模型
-        // 如果 "gemini-3-flash" 不可用，请尝试 "gemini-1.5-flash" 或 "gemini-2.0-flash-exp"
+        // 目前稳定版本是 "gemini-1.5-flash"
         self.model = GenerativeModel(
-            name: "gemini-3-flash", // 修正为当前可用的稳定版本，如果确实有 gemini-3-flash 权限可修改
+            name: "gemini-1.5-flash", 
             apiKey: apiKey,
             systemInstruction: ModelContent(role: "system", parts: [.text(role.systemPrompt(petName: petName))])
         )
@@ -29,14 +32,20 @@ class PetAIService {
     }
 
     func sendMessage(_ text: String) async -> ChatMessage {
+        print("🐾 [Debug] 准备发送消息给大橘: \(text)")
+        await MainActor.run { self.isProcessing = true }
+        defer { Task { await MainActor.run { self.isProcessing = false } } }
+        
         do {
             let response = try await chat.sendMessage(text)
+            print("✅ [Debug] 收到 Gemini 响应: \(response.text ?? "空内容")")
             let rawText = response.text ?? "（歪头摇尾巴，不知道你在说什么喵...）"
             
             let (cleanText, imageName) = parseResponse(rawText)
             return ChatMessage(text: cleanText, imageName: imageName, isUser: false)
             
         } catch {
+            print("❌ [Debug] 请求发生错误: \(error)")
             return ChatMessage(text: "错误: \(error.localizedDescription) (请检查网络或API Key)", isUser: false)
         }
     }

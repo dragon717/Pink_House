@@ -70,6 +70,7 @@ class PetViewModel: ObservableObject {
     private var timer: Timer?
     private var speechBubbleWorkItem: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
+    private var aiService: PetAIService?
     // private let statusKey = "PetStatus_Data" // Moved to PetDataManager
     
     var currentPet: PetCharacter {
@@ -78,6 +79,14 @@ class PetViewModel: ObservableObject {
     }
     
     // MARK: - Helper Methods
+    
+    private func setupAIService() {
+        if let apiKey = AIConfigManager.shared.apiKey {
+            let petName = status.petName ?? currentPet.displayName
+            // 注意：这里需要确保 PetAIService 可用。如果报错，请检查文件是否包含在 Target 中。
+            self.aiService = PetAIService(role: currentPet.aiRole, petName: petName, apiKey: apiKey)
+        }
+    }
     
     private func scheduleSpeechBubbleClear() {
         // 取消之前的任务
@@ -171,6 +180,7 @@ class PetViewModel: ObservableObject {
         
         // 更新行为
         self.currentBehavior = Self.getBehavior(for: pet)
+        setupAIService()
         
         // 通知 PetInteractionManager 更新宠物 ID
         // 注意：PetInteractionManager.currentPetId 是计算属性，依赖 PetDataManager.shared.status
@@ -253,6 +263,7 @@ class PetViewModel: ObservableObject {
         let initialPet = PetCharacter(rawValue: status.selectedPetId ?? "") ?? .naicha
         self.currentBehavior = Self.getBehavior(for: initialPet)
         
+        setupAIService()
         setupStateMachine()
         
         // Calculate offline decay
@@ -413,11 +424,59 @@ class PetViewModel: ObservableObject {
         self.recognizedSpeechText = text
         scheduleSpeechBubbleClear()
         
+        // 尝试使用 AI 回复
+        if let ai = aiService {
+            Task {
+                // 显示加载状态 (可选)
+                // await MainActor.run { self.recognizedSpeechText += "..." }
+                
+                let response = await ai.sendMessage(text)
+                
+                await MainActor.run {
+                    // 更新字幕为 AI 的回复
+                    self.recognizedSpeechText = response.text
+                    scheduleSpeechBubbleClear()
+                    
+                    // 处理 AI 指令
+                    if let action = response.imageName {
+                         handleAIAction(action)
+                    }
+                }
+            }
+            return
+        }
+        
         // 检查回音彩蛋
         if let eggVideo = currentBehavior.getEchoEgg(text: text) {
             // 播放彩蛋
             changeState(to: .interacting, videoName: eggVideo, forceLoop: false)
         } else {
+        }
+    }
+    
+    private func handleAIAction(_ action: String) {
+        var videoName: String?
+        
+        switch action {
+        case "happy_cat", "happy_dog":
+            videoName = PetVideoPaths.enjoy
+        case "playful_cat", "playful_dog":
+            videoName = PetVideoPaths.playing
+        case "sad_cat", "sad_dog":
+            videoName = PetVideoPaths.listening // 暂时用聆听替代委屈
+        case "angry_cat", "angry_dog":
+            videoName = PetVideoPaths.angry
+        case "sleepy_cat":
+            videoName = PetVideoPaths.sleeping
+        case "curious_cat":
+             videoName = PetVideoPaths.attention
+        default:
+            // 尝试直接匹配
+            videoName = action
+        }
+        
+        if let v = videoName {
+             changeState(to: .interacting, videoName: v, forceLoop: false)
         }
     }
     #endif
