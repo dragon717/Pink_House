@@ -247,6 +247,7 @@ class PetViewModel: ObservableObject {
         static let attention = "attention"
         static let talking = "talking"
         static let dressingWork = "dressing_work"
+        static let coronation = "coronation"
     }
 
     private let sleepThreshold: Double = 20.0
@@ -426,7 +427,14 @@ class PetViewModel: ObservableObject {
         self.recognizedSpeechText = text
         scheduleSpeechBubbleClear()
         
-        // 尝试使用 AI 回复
+        // 1. 优先检查回音彩蛋 (Priority Check for Easter Eggs)
+        // 如果触发了彩蛋，直接播放并跳过 AI 请求
+        if let eggVideo = currentBehavior.getEchoEgg(text: text) {
+            changeState(to: .interacting, videoName: eggVideo, forceLoop: false)
+            return
+        }
+        
+        // 2. 尝试使用 AI 回复
         if let ai = aiService {
             Task {
                 // 显示加载状态 (可选)
@@ -448,12 +456,9 @@ class PetViewModel: ObservableObject {
             return
         }
         
-        // 检查回音彩蛋
-        if let eggVideo = currentBehavior.getEchoEgg(text: text) {
-            // 播放彩蛋
-            changeState(to: .interacting, videoName: eggVideo, forceLoop: false)
-        } else {
-        }
+        // (Fallback) 如果没有 AI 服务，再次检查彩蛋（虽然上面已经检查过了，但为了逻辑完整保留或移除）
+        // 这里可以直接移除，因为上面已经 return 了。
+        // 但为了保持原有结构，我们假设如果走到这里，说明既没有彩蛋也没有 AI。
     }
     
     private func handleAIAction(_ action: String) {

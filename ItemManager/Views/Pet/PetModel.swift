@@ -319,13 +319,13 @@ struct NaichaBehavior: PetBehavior {
             // 直接读取累积的打工收益
             let earned = status.currentJobEarnedFishCoin
             return (
-                "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_work_success.mp4",
+                "work_success",
                 "打工赚了 \(earned) 鱼币!",
                 true
             )
         } else {
              return (
-                "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_work_exhausted.mp4",
+                "work_exhausted",
                 "累死宝宝了...",
                 false
             )
@@ -333,13 +333,17 @@ struct NaichaBehavior: PetBehavior {
     }
     
     func getWorkInterruptedVideo() -> String {
-        return "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_work_exhausted.mp4"
+        return "work_exhausted"
     }
     
     func getEchoEgg(text: String) -> String? {
-        // 简单的关键词匹配
-        if text.contains("登基") || text.contains("登记") {
-             return "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_coronation.mp4"
+        // 关键词匹配（包含谐音）
+        let keywords = ["登基", "登记", "等级", "登机", "灯基"]
+        for keyword in keywords {
+            if text.contains(keyword) {
+                // 返回逻辑名，PetViewModel 会自动加上角色前缀 (e.g. naicha_coronation)
+                return "coronation"
+            }
         }
         return nil
     }
@@ -347,7 +351,7 @@ struct NaichaBehavior: PetBehavior {
     func getFeedingEgg(item: PetItemDefinition) -> String? {
         // 5% 概率触发
         if Int.random(in: 1...100) <= 5 {
-             return "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_eat_rush.mp4"
+             return "eat_rush"
         }
         return nil
     }

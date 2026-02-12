@@ -21,13 +21,13 @@
 ```swift
 protocol PetBehavior {
     var character: PetCharacter { get }
-    // 打工结算逻辑
+    // 打工结算逻辑 (返回逻辑名)
     func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool)
-    // 打工中断视频
+    // 打工中断视频 (返回逻辑名)
     func getWorkInterruptedVideo() -> String
-    // 回音彩蛋 (语音触发)
+    // 回音彩蛋 (语音触发，返回逻辑名)
     func getEchoEgg(text: String) -> String?
-    // 喂食彩蛋 (道具触发)
+    // 喂食彩蛋 (道具触发，返回逻辑名)
     func getFeedingEgg(item: PetItemDefinition) -> String?
 }
 ```
@@ -76,32 +76,60 @@ protocol PetBehavior {
     *   在 `processTimePassage` 中检查中断条件（精力<=0, 饱食<=0）。
     *   调用 `stopJob(isInterrupted: true)`，该方法会调用 `Behavior.getWorkInterruptedVideo()` 获取中断动画。
 
-### 3.4 如何添加彩蛋
+### 3.4 如何添加彩蛋 (Easter Eggs)
 
-*   **语音彩蛋**:
-    *   在 `Behavior.getEchoEgg(text:)` 中判断关键词。
-    *   返回**绝对路径**或**文件名**。
-    *   *示例*: `if text.contains("登基") { return "naicha_coronation.mp4" }`
-*   **道具彩蛋**:
-    *   在 `Behavior.getFeedingEgg(item:)` 中判断道具 ID 和概率。
-    *   *示例*: `if item.id == "catFood" && probability < 0.05 { return "naicha_eat_rush.mp4" }`
+彩蛋功能通过 `PetBehavior` 协议与 `PetViewModel` 的协同工作实现。
+
+#### A. 语音/文本彩蛋 (Echo Egg)
+1.  **实现检测逻辑**:
+    在 `Behavior.getEchoEgg(text:)` 中实现关键词检测。
+    ```swift
+    func getEchoEgg(text: String) -> String? {
+        // 支持关键词及谐音
+        let keywords = ["登基", "登记", "等级"]
+        for keyword in keywords {
+            if text.contains(keyword) {
+                // 返回逻辑名，系统会自动拼接前缀 (e.g. "coronation" -> "naicha_coronation")
+                return "coronation"
+            }
+        }
+        return nil
+    }
+    ```
+2.  **注册视频常量**:
+    在 `PetViewModel.PetVideoPaths` 中添加对应的逻辑常量名。
+    ```swift
+    struct PetVideoPaths {
+        static let coronation = "coronation"
+    }
+    ```
+3.  **优先级处理 (Local First)**:
+    在 `PetViewModel.debugTriggerDialogue` 中，系统会**优先检查本地彩蛋**。
+    *   如果 `getEchoEgg` 返回了视频路径，则直接播放，**跳过** AI 请求。
+    *   如果没有触发彩蛋，才请求 AI 服务进行通用回复。
+
+#### B. 道具彩蛋 (Feeding Egg)
+*   在 `Behavior.getFeedingEgg(item:)` 中判断道具 ID 和概率。
+*   *示例*: `if item.id == "catFood" && probability < 0.05 { return "eat_rush" }`
 
 ---
 
-## 4. 最佳实践与避坑指南
+## 4. 最佳实践与避坑指南 (Critical)
 
-### 4.1 视频资源路径 (Crucial!)
-*   **Bundle 资源**: 推荐使用文件名（不带后缀或带后缀），如 `naicha_idle`。播放器会自动在 Bundle 根目录和 `asserts` 子目录查找。
-*   **绝对路径**: 
-    *   **开发时**: 如果使用 macOS 绝对路径（`/Users/...`），必须确保播放器有 **Sandbox Fallback** 机制。
-    *   **机制**: `SeamlessVideoPlayer` 会检测绝对路径是否可读。如果不可读（权限/沙盒问题），它会自动提取**文件名**并在 Bundle 中重新查找。
-    *   **结论**: 你可以直接传入策划给的绝对路径，只要确保同名文件已打入 Bundle，代码能自动兼容。
+### 4.1 视频资源路径 (No Absolute Paths!)
+*   **禁止使用绝对路径**: 严禁在代码中硬编码 `/Users/xxx/...` 形式的绝对路径。这会导致在真机或沙盒环境下（TestFlight/Release）无法找到文件。
+*   **推荐做法**: 使用**逻辑文件名**（不带后缀或带后缀）。
+    *   *Correct*: `return "work_success"`
+    *   *Wrong*: `return "/Users/muniao/.../naicha_work_success.mp4"`
+*   **自动查找机制**: 
+    `PetViewModel` 会自动将逻辑名转换为 `[Character]_[Action]` 格式（如 `naicha_work_success`）。
+    `SeamlessVideoPlayer` 会自动在 Bundle 根目录及 `asserts` 子目录查找该文件。
 
 ### 4.2 状态切换与打断
 *   **forceLoop**: `changeState` 支持 `forceLoop` 参数。
     *   **彩蛋视频**: 通常设置 `forceLoop: false`。播放结束后，`onAnimationFinished` 会自动切回 `idle`。
     *   **状态保持**: 如 `talking` 状态，设置 `forceLoop: true` 确保一直播放直到语音结束。
-*   **优先级**: `changeState` 中传入的 `videoName` 参数优先级 **高于** State 类的默认 `videoName`。这允许灵活复用同一个 State 播放不同视频（如通用 InteractionState 播放不同的抚摸反馈）。
+*   **优先级**: `changeState` 中传入的 `videoName` 参数优先级 **高于** State 类的默认 `videoName`。这允许灵活复用同一个 State 播放不同视频。
 
 ### 4.3 数据一致性
 *   **Codable**: 所有需要持久化的状态（包括 `currentJobEarnedFishCoin`）必须遵循 `Codable` 并加入 `CodingKeys`。
@@ -115,13 +143,7 @@ protocol PetBehavior {
 
 ## 5. 常用代码片段
 
-**调用播放绝对路径视频（自动回退）：**
-```swift
-// 即使在沙盒内，只要 Bundle 里有同名文件，这也能工作
-changeState(to: .interacting, videoName: "/Users/dev/Desktop/asserts/special_video.mp4", forceLoop: false)
-```
-
-**触发一次性动画（播放完自动回 Idle）：**
+**调用一次性动画（播放完自动回 Idle）：**
 ```swift
 // forceLoop: false 是关键
 changeState(to: .interacting, videoName: "some_one_shot_animation", forceLoop: false)
@@ -131,8 +153,16 @@ changeState(to: .interacting, videoName: "some_one_shot_animation", forceLoop: f
 ```swift
 struct MaomaoBehavior: PetBehavior {
     let character: PetCharacter = .maomao
-    func getWorkFinishResult(...) -> ... { ... }
-    func getWorkInterruptedVideo() -> String { "maomao_tired" }
+    
+    // 使用逻辑名，不要用绝对路径
+    func getWorkFinishResult(...) -> ... { 
+        return ("work_success", "打工完成", true) 
+    }
+    
+    func getWorkInterruptedVideo() -> String { 
+        return "work_exhausted" 
+    }
+    
     func getEchoEgg(...) -> String? { nil }
     func getFeedingEgg(...) -> String? { nil }
 }

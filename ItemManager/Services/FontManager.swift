@@ -5,8 +5,8 @@ import Combine
 class FontManager: ObservableObject {
     static let shared = FontManager()
     
-    // 硬编码路径 (仅供特定开发环境调试使用)
-    static let defaultCustomFontPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/也字工厂小石头.ttf"
+    // 硬编码路径 (仅供特定开发环境调试使用，真机环境应留空)
+    static let defaultCustomFontPath = ""
     static let debugPath = defaultCustomFontPath
     
     // UserDefaults Keys
