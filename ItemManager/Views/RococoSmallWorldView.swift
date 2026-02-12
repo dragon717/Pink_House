@@ -13,8 +13,6 @@ struct RococoSmallWorldView: View {
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
     
-    @Namespace private var animation
-    
     enum ViewMode: String, CaseIterable, Identifiable {
         case both = "并排显示"
         case upper = "显示上层"
@@ -77,86 +75,86 @@ struct RococoSmallWorldView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            GeometryReader { geometry in
-                let isLandscape = geometry.size.width > geometry.size.height
+        GeometryReader { geometry in
+            let isLandscape = geometry.size.width > geometry.size.height
+            
+            ZStack(alignment: .topLeading) {
+                // App Global Background
+                LiquidBackground()
                 
-                ZStack {
-                    // App Global Background
-                    LiquidBackground()
+                Group {
+                    switch viewMode {
+                    case .both:
+                        if isLandscape {
+                            // Landscape: Side by Side (Left: Floor 1, Right: Floor 2)
+                            HStack(spacing: 0) {
+                                roomView(imageName: "small_world_rococo_1", geometry: geometry, width: geometry.size.width / 2, height: geometry.size.height)
+                                roomView(imageName: "small_world_rococo_2", geometry: geometry, width: geometry.size.width / 2, height: geometry.size.height)
+                            }
+                        } else {
+                            // Portrait: Stacked (Top: Floor 1, Bottom: Floor 2)
+                            VStack(spacing: -80) { // Negative spacing to bring them closer
+                                roomView(imageName: "small_world_rococo_1", geometry: geometry, width: geometry.size.width, height: geometry.size.height / 2)
+                                roomView(imageName: "small_world_rococo_2", geometry: geometry, width: geometry.size.width, height: geometry.size.height / 2)
+                            }
+                        }
+                    case .upper:
+                        roomView(imageName: "small_world_rococo_1", geometry: geometry, width: geometry.size.width, height: geometry.size.height)
+                    case .lower:
+                        roomView(imageName: "small_world_rococo_2", geometry: geometry, width: geometry.size.width, height: geometry.size.height)
+                    }
+                }
+                .transition(.opacity)
+                
+                // View Mode Menu Button (Top Left)
+                Menu {
+                    Picker("视图模式", selection: $viewMode) {
+                        ForEach(ViewMode.allCases) { mode in
+                            Label(mode.rawValue, systemImage: iconForMode(mode)).tag(mode)
+                        }
+                    }
                     
-                    Group {
-                        switch viewMode {
-                        case .both:
-                            if isLandscape {
-                                // Landscape: Side by Side (Left: Floor 1, Right: Floor 2)
-                                HStack(spacing: 0) {
-                                    roomView(imageName: "small_world_rococo_1", geometry: geometry, width: geometry.size.width / 2, height: geometry.size.height)
-                                        .matchedGeometryEffect(id: "room1", in: animation)
-                                    roomView(imageName: "small_world_rococo_2", geometry: geometry, width: geometry.size.width / 2, height: geometry.size.height)
-                                        .matchedGeometryEffect(id: "room2", in: animation)
-                                }
-                            } else {
-                                // Portrait: Stacked (Top: Floor 1, Bottom: Floor 2)
-                                VStack(spacing: -80) { // Negative spacing to bring them closer
-                                    roomView(imageName: "small_world_rococo_1", geometry: geometry, width: geometry.size.width, height: geometry.size.height / 2)
-                                        .matchedGeometryEffect(id: "room1", in: animation)
-                                    roomView(imageName: "small_world_rococo_2", geometry: geometry, width: geometry.size.width, height: geometry.size.height / 2)
-                                        .matchedGeometryEffect(id: "room2", in: animation)
-                                }
-                            }
-                        case .upper:
-                            roomView(imageName: "small_world_rococo_1", geometry: geometry, width: geometry.size.width, height: geometry.size.height)
-                                .matchedGeometryEffect(id: "room1", in: animation)
-                        case .lower:
-                            roomView(imageName: "small_world_rococo_2", geometry: geometry, width: geometry.size.width, height: geometry.size.height)
-                                .matchedGeometryEffect(id: "room2", in: animation)
-                        }
+                    Divider()
+                    
+                    #if DEBUG
+                    Button(action: {
+                        showDebugHotspots.toggle()
+                    }) {
+                        Label("显示热区调试", systemImage: showDebugHotspots ? "checkmark.rectangle.stack" : "rectangle.dashed")
                     }
-                    .transition(.opacity)
-                }
-                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isLandscape)
-                .animation(.easeInOut, value: viewMode)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Menu {
-                            Picker("视图模式", selection: $viewMode) {
-                                ForEach(ViewMode.allCases) { mode in
-                                    Label(mode.rawValue, systemImage: iconForMode(mode)).tag(mode)
-                                }
-                            }
-                            
-                            Divider()
-                            
-                            #if DEBUG
-                            Button(action: {
-                                showDebugHotspots.toggle()
-                            }) {
-                                Label("显示热区调试", systemImage: showDebugHotspots ? "checkmark.rectangle.stack" : "rectangle.dashed")
-                            }
-                            
-                            Button(action: {
-                                petViewModel.isDebugMode.toggle()
-                            }) {
-                                Label("显示路径调试", systemImage: petViewModel.isDebugMode ? "checkmark.circle" : "arrow.triangle.swap")
-                            }
-                            #endif
-                        } label: {
-                            if #available(iOS 26.0, *) {
-                                Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
-                                    .font(.title2)
-                                    .foregroundStyle(.primary)
-                            } else {
-                                Image(systemName: "line.3.horizontal.circle")
-                                    .font(.title2)
-                                    .foregroundStyle(.primary)
-                            }
-                        }
+                    
+                    Button(action: {
+                        petViewModel.isDebugMode.toggle()
+                    }) {
+                        Label("显示路径调试", systemImage: petViewModel.isDebugMode ? "checkmark.circle" : "arrow.triangle.swap")
+                    }
+                    #endif
+                } label: {
+                    if #available(iOS 26.0, *) {
+                        Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 2)
+                            .padding(12)
+                            .background(Material.thin)
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: "line.3.horizontal.circle")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 2)
+                            .padding(12)
+                            .background(Material.thin)
+                            .clipShape(Circle())
                     }
                 }
+                .padding(.leading, 16)
+                .padding(.top, 50) // Adjust for safe area
             }
-            .ignoresSafeArea()
+            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: isLandscape)
+            .animation(.easeInOut, value: viewMode)
         }
+        .ignoresSafeArea()
     }
     
     private func iconForMode(_ mode: ViewMode) -> String {
@@ -197,6 +195,7 @@ struct RococoSmallWorldView: View {
                                             .background(.black.opacity(0.6))
                                             .cornerRadius(4)
                                     }
+                                    .contentShape(Rectangle())
                                 } else {
                                     Color.clear
                                         .contentShape(Rectangle())
