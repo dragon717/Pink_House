@@ -133,6 +133,12 @@ class PetAIService: ObservableObject {
                     await MainActor.run { self.isProcessing = false }
                     
                     let (cleanText, imageName) = parseResponse(replyContent)
+                    
+                    // 触发语音朗读 (TTS)
+                    await MainActor.run {
+                        PetVoiceManager.shared.speak(cleanText, for: self.role)
+                    }
+                    
                     safeResume(with: ChatMessage(text: cleanText, imageName: imageName, isUser: false))
                     
                 } catch {

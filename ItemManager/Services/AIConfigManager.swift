@@ -5,6 +5,8 @@ class AIConfigManager {
     
     private(set) var apiKey: String?
     private(set) var dsApiKey: String?
+    private(set) var dbApiKey: String?
+    private(set) var ttsAppId: String?
     
     private init() {
         loadConfig()
@@ -22,6 +24,14 @@ class AIConfigManager {
             if let dsKey = dict["DS_API_KEY"] as? String, !dsKey.isEmpty {
                 self.dsApiKey = dsKey
             }
+            
+            if let dbKey = dict["DB_API_KEY"] as? String, !dbKey.isEmpty {
+                self.dbApiKey = dbKey
+            }
+            
+            if let appId = dict["TTS_APP_ID"] as? String, !appId.isEmpty {
+                self.ttsAppId = appId
+            }
             return
         }
         
@@ -37,6 +47,6 @@ class AIConfigManager {
     }
     
     var isAIEnabled: Bool {
-        return apiKey != nil || dsApiKey != nil
+        return apiKey != nil || dsApiKey != nil || dbApiKey != nil
     }
 }

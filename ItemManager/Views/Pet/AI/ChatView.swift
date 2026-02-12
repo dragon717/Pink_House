@@ -59,6 +59,10 @@ struct ChatView: View {
             .background(Color.white)
             .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: -5)
         }
+        .onDisappear {
+            // 离开页面时停止语音播放
+            PetVoiceManager.shared.stop()
+        }
     }
     
     private func sendMessage() {

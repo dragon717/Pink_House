@@ -89,3 +89,41 @@ extension PetCharacter {
         }
     }
 }
+
+// 语音配置结构体
+struct PetVoiceConfig {
+    // 原生 TTS 配置
+    let pitchMultiplier: Float
+    let rate: Float
+    let volume: Float
+    let voiceIdentifier: String? // 留空则使用默认中文语音
+    
+    // 第三方 TTS 配置 (预留)
+    let thirdPartyVoiceId: String? // 例如火山引擎的 "zh_male_zhengtai_emotional"
+}
+
+extension PetRole {
+    var voiceConfig: PetVoiceConfig {
+        switch self {
+        case .kitten:
+            // 正太音配置
+            // Pitch 1.2-1.3 能较好模拟幼年男性声音
+            return PetVoiceConfig(
+                pitchMultiplier: 1.25,
+                rate: 0.52,
+                volume: 1.0,
+                voiceIdentifier: nil,
+                thirdPartyVoiceId: "S_v7xollyj1"
+            )
+        case .goldenRetriever:
+            // 金毛：憨厚低沉
+            return PetVoiceConfig(
+                pitchMultiplier: 0.85,
+                rate: 0.45,
+                volume: 1.0,
+                voiceIdentifier: nil,
+                thirdPartyVoiceId: "zh_male_gentle"
+            )
+        }
+    }
+}
