@@ -147,7 +147,7 @@ struct PetHomeView: View {
                                 }
                                 
                                 #if DEBUG
-                                // Debug: 粉色气泡对话输入框
+                                // Debug: 粉色气泡对话输入框 或 AI 聊天窗口
                                 if showDebugDialogueInput {
                                     Color.black.opacity(0.3)
                                         .ignoresSafeArea()
@@ -156,20 +156,37 @@ struct PetHomeView: View {
                                         }
                                         .transition(.opacity)
                                     
-                                    VStack {
-                                        Spacer()
-                                        PetDialogueInputView(text: $debugInputText, onSend: {
-                                            if !debugInputText.isEmpty {
-                                                viewModel.debugTriggerDialogue(text: debugInputText)
-                                                debugInputText = ""
-                                                showDebugDialogueInput = false
-                                            }
-                                        })
-                                        .padding(.bottom, 20)
-                                        .padding(.horizontal, 16)
+                                    // 检查是否有 API Key
+                                    if let apiKey = AIConfigManager.shared.apiKey {
+                                        // 显示 AI 聊天界面
+                                        VStack {
+                                            Spacer()
+                                            // 使用卡片样式展示 ChatView，高度设为屏幕的 70%
+                                            ChatView(role: viewModel.currentPet.aiRole, petName: viewModel.status.petName ?? "萌宠", apiKey: apiKey)
+                                                .frame(height: UIScreen.main.bounds.height * 0.7)
+                                                .cornerRadius(20)
+                                                .padding()
+                                                .shadow(radius: 10)
+                                        }
+                                        .transition(.move(edge: .bottom))
+                                        .zIndex(100)
+                                    } else {
+                                        // 原有的本地调试输入框
+                                        VStack {
+                                            Spacer()
+                                            PetDialogueInputView(text: $debugInputText, onSend: {
+                                                if !debugInputText.isEmpty {
+                                                    viewModel.debugTriggerDialogue(text: debugInputText)
+                                                    debugInputText = ""
+                                                    showDebugDialogueInput = false
+                                                }
+                                            })
+                                            .padding(.bottom, 20)
+                                            .padding(.horizontal, 16)
+                                        }
+                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                        .zIndex(100) // 确保在最上层
                                     }
-                                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                                    .zIndex(100) // 确保在最上层
                                 }
                                 #endif
                             }
