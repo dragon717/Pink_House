@@ -15,3 +15,8 @@ enum WidgetSize: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
+enum HomeTab {
+    case wardrobe
+    case depositPlan
+}
+

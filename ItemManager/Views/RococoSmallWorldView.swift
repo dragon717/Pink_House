@@ -24,6 +24,57 @@ struct RococoSmallWorldView: View {
     }
     
     @State private var viewMode: ViewMode = .both
+    @State private var showDebugHotspots: Bool = false
+    @StateObject private var petViewModel = SmallWorldPetViewModel()
+    
+    // MARK: - Hotspot Data
+    private struct HotspotData: Identifiable {
+        let id = UUID()
+        let name: String
+        let rect: CGRect // Normalized 0-1
+        let color: Color
+        let action: () -> Void
+    }
+    
+    // Room 1 (Floor 1) Hotspots
+    private var room1Hotspots: [HotspotData] {
+        [
+            HotspotData(name: "OOTD", rect: CGRect(x: 0.35, y: 0.53, width: 0.08, height: 0.19), color: .orange) {
+                destination = .ootd
+            },
+            HotspotData(name: "来财", rect: CGRect(x: 0.46, y: 0.68, width: 0.06, height: 0.08), color: .yellow) {
+                destination = .wealth
+            },
+            HotspotData(name: "衣橱", rect: CGRect(x: 0.45, y: 0.12, width: 0.24, height: 0.24), color: .blue) {
+                withAnimation(.easeIn(duration: 0.5)) {
+                    isPlayingOpeningAnimation = true
+                }
+            },
+        ]
+    }
+    
+    // Room 2 (Floor 2) Hotspots
+    private var room2Hotspots: [HotspotData] {
+        [
+            HotspotData(name: "衣橱", rect: CGRect(x: 0.05, y: 0.25, width: 0.125, height: 0.29), color: .blue) {
+                withAnimation(.easeIn(duration: 0.5)) {
+                    isPlayingOpeningAnimation = true
+                }
+            },
+            HotspotData(name: "尾款天使", rect: CGRect(x: 0.08, y: 0.54, width: 0.1, height: 0.11), color: .blue) {
+                selectedTab = 0
+                homeTab = .depositPlan
+            },
+            // 萌宠会动
+//            HotspotData(name: "萌宠", rect: CGRect(x: 0.45, y: 0.48, width: 0.13, height: 0.21), color: .pink) {
+//                destination = .pet
+//            },
+            
+            HotspotData(name: "日历", rect: CGRect(x: 0.44, y: 0.77, width: 0.082, height: 0.121), color: .purple) {
+                destination = .calendar
+            }
+        ]
+    }
     
     var body: some View {
         NavigationStack {
@@ -74,6 +125,22 @@ struct RococoSmallWorldView: View {
                                     Label(mode.rawValue, systemImage: iconForMode(mode)).tag(mode)
                                 }
                             }
+                            
+                            Divider()
+                            
+                            #if DEBUG
+                            Button(action: {
+                                showDebugHotspots.toggle()
+                            }) {
+                                Label("显示热区调试", systemImage: showDebugHotspots ? "checkmark.rectangle.stack" : "rectangle.dashed")
+                            }
+                            
+                            Button(action: {
+                                petViewModel.isDebugMode.toggle()
+                            }) {
+                                Label("显示路径调试", systemImage: petViewModel.isDebugMode ? "checkmark.circle" : "arrow.triangle.swap")
+                            }
+                            #endif
                         } label: {
                             if #available(iOS 26.0, *) {
                                 Image(systemName: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left")
@@ -102,19 +169,73 @@ struct RococoSmallWorldView: View {
     
     @ViewBuilder
     private func roomView(imageName: String, geometry: GeometryProxy, width: CGFloat, height: CGFloat) -> some View {
+        let hotspots = imageName.contains("rococo_1") ? room1Hotspots : room2Hotspots
+        
         Image(imageName)
             .resizable()
             .aspectRatio(contentMode: .fit)
+            .overlay(
+                GeometryReader { geo in
+                    ZStack(alignment: .topLeading) {
+                        SmallWorldPetOverlay(
+                            viewModel: petViewModel,
+                            roomIndex: imageName.contains("rococo_1") ? 0 : 1,
+                            geometry: geo
+                        )
+                        
+                        ForEach(hotspots) { hotspot in
+                            Button(action: hotspot.action) {
+                                if showDebugHotspots {
+                                    ZStack {
+                                        Rectangle()
+                                            .fill(hotspot.color.opacity(0.3))
+                                            .border(hotspot.color, width: 2)
+                                        Text(hotspot.name)
+                                            .font(.caption)
+                                            .foregroundStyle(.white)
+                                            .padding(4)
+                                            .background(.black.opacity(0.6))
+                                            .cornerRadius(4)
+                                    }
+                                } else {
+                                    Color.clear
+                                        .contentShape(Rectangle())
+                                }
+                            }
+                            .frame(
+                                width: hotspot.rect.width * geo.size.width,
+                                height: hotspot.rect.height * geo.size.height
+                            )
+                            .position(
+                                x: (hotspot.rect.minX + hotspot.rect.width/2) * geo.size.width,
+                                y: (hotspot.rect.minY + hotspot.rect.height/2) * geo.size.height
+                            )
+                        }
+                    }
+                }
+            )
             .frame(width: width, height: height)
             .clipped()
-            // Placeholder for future interactions
-            .overlay(
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        // Handle tap
-                        print("Tapped on \(imageName)")
-                    }
-            )
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @State var selectedTab = 1
+        @State var homeTab: HomeTab = .wardrobe
+        @State var destination: SmallWorldDestination = .menu
+        @State var isPlayingOpeningAnimation = false
+        @State var themeManager = ThemeManager.shared
+        
+        var body: some View {
+            RococoSmallWorldView(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination,
+                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+            )
+            .environment(themeManager)
+        }
+    }
+    return PreviewWrapper()
 }

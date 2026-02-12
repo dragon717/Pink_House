@@ -60,11 +60,6 @@ struct CalendarDayIcon: View {
     }
 }
 
-enum HomeTab {
-    case wardrobe
-    case depositPlan
-}
-
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
