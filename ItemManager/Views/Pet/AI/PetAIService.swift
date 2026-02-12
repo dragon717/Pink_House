@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-// import GoogleGenerativeAI
+import os.lock
 
 // DeepSeek API Request/Response Structures
 struct DSMessage: Codable {
@@ -22,40 +22,24 @@ struct DSChoice: Codable {
     let message: DSMessage
 }
 
+// 定义超时错误
+struct TimeoutError: Error {}
+
+@MainActor
 class PetAIService: ObservableObject {
     @Published var isProcessing: Bool = false
     
-    // private let model: GenerativeModel
-    // private var chat: Chat
     private let role: PetRole
     private let petName: String
     private let apiKey: String
     
     // Maintain simple history for DeepSeek
     private var history: [DSMessage] = []
-
+    
     init(role: PetRole, petName: String, apiKey: String) {
         self.role = role
         self.petName = petName
         self.apiKey = apiKey
-        
-        /*
-        // 注意：请确保你的 API Key 有权限访问该模型
-        // 用户确认支持 "gemini-2.5-flash"
-        self.model = GenerativeModel(
-            name: "gemini-2.5-flash", 
-            apiKey: apiKey,
-            systemInstruction: ModelContent(role: "system", parts: [.text(role.systemPrompt(petName: petName))])
-        )
-        
-        // 开启历史记录相关的配置
-        let history = [
-            ModelContent(role: "user", parts: [.text("你好，我是你的主人。")]),
-            ModelContent(role: "model", parts: [.text("（蹭蹭你的手）主人好呀喵！[IMAGE:happy_cat]")])
-        ]
-        
-        self.chat = model.startChat(history: history)
-        */
         
         // Initialize DeepSeek History
         self.history = [
@@ -68,87 +52,81 @@ class PetAIService: ObservableObject {
     func sendMessage(_ text: String) async -> ChatMessage {
         print("🐾 [Debug] 准备发送消息给奶茶猫 (DeepSeek): \(text)")
         
-        // 使用原子锁来防止多次 resume
-        return await withCheckedContinuation { continuation in
-            Task {
-                await MainActor.run { self.isProcessing = true }
-                
-                // 标记是否已经 resume，防止多次调用
-                var hasResumed = false
-                let lock = NSLock()
-                
-                func safeResume(with result: ChatMessage) {
-                    lock.lock()
-                    defer { lock.unlock() }
-                    if !hasResumed {
-                        hasResumed = true
-                        continuation.resume(returning: result)
-                    }
-                }
-                
-                // 创建一个 30秒 的超时任务 (DeepSeek 可能比 Gemini 慢一点)
-                let timeoutTask = Task {
-                    try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
-                    if !Task.isCancelled {
-                        print("❌ [Debug] 请求超时 (30s)")
-                        await MainActor.run { self.isProcessing = false }
-                        safeResume(with: ChatMessage(text: "（打呼噜...）DeepSeek 好像有点慢喵...", imageName: "sleepy_cat", isUser: false))
-                    }
-                }
-                
-                do {
-                    // 1. 构造请求
-                    self.history.append(DSMessage(role: "user", content: text))
+        self.isProcessing = true
+        defer { self.isProcessing = false }
+        
+        // 捕获必要的上下文以传递给后台任务
+        let currentHistory = self.history
+        let apiKey = self.apiKey
+        let role = self.role
+        
+        do {
+            // 使用 TaskGroup 实现并发和超时控制，避免 unsafeForcedSync
+            let replyContent = try await withThrowingTaskGroup(of: String.self) { group in
+                // 1. 网络请求任务
+                group.addTask {
+                    // 构造请求
+                    // 注意：这里是在后台线程执行，不能访问 self 上的可变属性
+                    var historyToSend = currentHistory
+                    historyToSend.append(DSMessage(role: "user", content: text))
                     
                     let url = URL(string: "https://api.deepseek.com/chat/completions")!
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
-                    request.addValue("Bearer \(self.apiKey)", forHTTPHeaderField: "Authorization")
+                    request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                     request.addValue("application/json", forHTTPHeaderField: "Content-Type")
                     
-                    // 只发送最近的 N 条历史，避免 token 溢出 (例如保留 System + 最近 10 条)
-                    let messagesToSend = [self.history.first!] + self.history.suffix(10)
+                    // 只发送最近的 N 条历史
+                    let messagesToSend = [historyToSend.first!] + historyToSend.suffix(10)
                     
                     let body = DSRequest(model: "deepseek-chat", messages: messagesToSend, stream: false)
                     request.httpBody = try JSONEncoder().encode(body)
                     
-                    // 2. 发送请求
+                    // 发送请求
                     let (data, response) = try await URLSession.shared.data(for: request)
-                    timeoutTask.cancel()
                     
                     guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                         let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
                         throw NSError(domain: "DeepSeekError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
                     }
                     
-                    // 3. 解析响应
+                    // 解析响应
                     let dsResponse = try JSONDecoder().decode(DSResponse.self, from: data)
-                    let replyContent = dsResponse.choices.first?.message.content ?? "（歪头摇尾巴，不知道你在说什么喵...）"
-                    
-                    print("✅ [Debug] 收到 DeepSeek 响应: \(replyContent)")
-                    
-                    // 更新历史
-                    self.history.append(DSMessage(role: "assistant", content: replyContent))
-                    
-                    await MainActor.run { self.isProcessing = false }
-                    
-                    let (cleanText, imageName) = parseResponse(replyContent)
-                    
-                    // 触发语音朗读 (TTS)
-                    await MainActor.run {
-                        PetVoiceManager.shared.speak(cleanText, for: self.role)
-                    }
-                    
-                    safeResume(with: ChatMessage(text: cleanText, imageName: imageName, isUser: false))
-                    
-                } catch {
-                    timeoutTask.cancel()
-                    print("❌ [Debug] 请求发生错误: \(error)")
-                    
-                    await MainActor.run { self.isProcessing = false }
-                    safeResume(with: ChatMessage(text: "错误: \(error.localizedDescription) (请检查 DS_API_KEY)", isUser: false))
+                    return dsResponse.choices.first?.message.content ?? "（歪头摇尾巴，不知道你在说什么喵...）"
                 }
+                
+                // 2. 超时任务 (30s)
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                    throw TimeoutError()
+                }
+                
+                // 等待第一个完成的任务（成功或抛出异常）
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
             }
+            
+            // 成功处理 (回到 MainActor)
+            print("✅ [Debug] 收到 DeepSeek 响应: \(replyContent)")
+            
+            // 更新历史
+            self.history.append(DSMessage(role: "user", content: text))
+            self.history.append(DSMessage(role: "assistant", content: replyContent))
+            
+            let (cleanText, imageName) = parseResponse(replyContent)
+            
+            // 触发语音朗读 (TTS)
+            PetVoiceManager.shared.speak(cleanText, for: self.role)
+            
+            return ChatMessage(text: cleanText, imageName: imageName, isUser: false)
+            
+        } catch is TimeoutError {
+            print("❌ [Debug] 请求超时 (30s)")
+            return ChatMessage(text: "（打呼噜...）DeepSeek 好像有点慢喵...", imageName: "sleepy_cat", isUser: false)
+        } catch {
+            print("❌ [Debug] 请求发生错误: \(error)")
+            return ChatMessage(text: "错误: \(error.localizedDescription) (请检查 DS_API_KEY)", isUser: false)
         }
     }
     
