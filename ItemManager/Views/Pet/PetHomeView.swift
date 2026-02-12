@@ -14,10 +14,8 @@ struct PetHomeView: View {
     @State private var newName = ""
     @State private var showAdoptionView = false // 领养界面
     
-    #if DEBUG
     @State private var showDebugDialogueInput = false
     @State private var debugInputText = ""
-    #endif
     
     var body: some View {
         Group {
@@ -98,7 +96,6 @@ struct PetHomeView: View {
                                     VStack {
                                         Spacer()
                                         HStack {
-                                            #if DEBUG
                                             Button(action: {
                                                 showDebugDialogueInput = true
                                             }) {
@@ -117,7 +114,6 @@ struct PetHomeView: View {
                                             }
                                             .padding(.leading, 20)
                                             .padding(.bottom, 100)
-                                            #endif
                                             
                                             Spacer()
                                             
@@ -146,7 +142,6 @@ struct PetHomeView: View {
                                     .transition(.opacity)
                                 }
                                 
-                                #if DEBUG
                                 // Debug: 粉色气泡对话输入框
                                 if showDebugDialogueInput {
                                     Color.black.opacity(0.3)
@@ -171,7 +166,6 @@ struct PetHomeView: View {
                                     .transition(.move(edge: .bottom).combined(with: .opacity))
                                     .zIndex(100) // 确保在最上层
                                 }
-                                #endif
                             }
                         }
                     }

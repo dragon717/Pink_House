@@ -420,7 +420,6 @@ class PetViewModel: ObservableObject {
         stopTimer()
     }
     
-    #if DEBUG
     // MARK: - Debug
     func debugTriggerDialogue(text: String) {
         // 模拟语音识别结果
@@ -482,7 +481,6 @@ class PetViewModel: ObservableObject {
              changeState(to: .interacting, videoName: v, forceLoop: false)
         }
     }
-    #endif
     
     // MARK: - State Management
     
