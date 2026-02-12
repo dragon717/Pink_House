@@ -47,6 +47,16 @@ class PetViewModel: ObservableObject {
     @Published var floatingTexts: [FloatingTextData] = []
     @Published var recognizedSpeechText: String = ""
     
+    // MARK: - Behavior
+    var currentBehavior: PetBehavior = DefaultPetBehavior(character: .naicha)
+    
+    static func getBehavior(for pet: PetCharacter) -> PetBehavior {
+        switch pet {
+        case .naicha: return NaichaBehavior()
+        default: return DefaultPetBehavior(character: pet)
+        }
+    }
+    
     // MARK: - Video State Machine
     var videoStateMachine: GKStateMachine!
     
@@ -58,6 +68,8 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private var timer: Timer?
+    private var speechBubbleWorkItem: DispatchWorkItem?
+    private var cancellables = Set<AnyCancellable>()
     // private let statusKey = "PetStatus_Data" // Moved to PetDataManager
     
     var currentPet: PetCharacter {
@@ -65,9 +77,32 @@ class PetViewModel: ObservableObject {
         return PetCharacter(rawValue: status.selectedPetId ?? "") ?? .naicha
     }
     
+    // MARK: - Helper Methods
+    
+    private func scheduleSpeechBubbleClear() {
+        // 取消之前的任务
+        speechBubbleWorkItem?.cancel()
+        
+        // 创建新任务
+        let workItem = DispatchWorkItem { [weak self] in
+            withAnimation(.easeOut(duration: 0.5)) {
+                self?.recognizedSpeechText = ""
+            }
+        }
+        
+        speechBubbleWorkItem = workItem
+        
+        // 3秒后执行
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
+    }
+
     // 获取带角色前缀的视频文件名
     func getCharacterVideoName(action: String) -> String {
-        // 如果 action 已经包含了路径分隔符（如 "asserts/"），可能需要特殊处理，但目前 action 都是纯文件名
+        // 如果 action 已经包含了路径分隔符（如 "asserts/"），或者是绝对路径，直接返回
+        if action.hasPrefix("/") {
+            return action
+        }
+        
         // 简单规则：角色ID_动作名
         // 例如：naicha_idle, maomao_eating
         return "\(currentPet.rawValue)_\(action)"
@@ -133,6 +168,9 @@ class PetViewModel: ObservableObject {
         
         // 更新状态
         status.selectedPetId = pet.id
+        
+        // 更新行为
+        self.currentBehavior = Self.getBehavior(for: pet)
         
         // 通知 PetInteractionManager 更新宠物 ID
         // 注意：PetInteractionManager.currentPetId 是计算属性，依赖 PetDataManager.shared.status
@@ -210,6 +248,10 @@ class PetViewModel: ObservableObject {
     init() {
         // Initial load from DataManager
         self.status = PetDataManager.shared.status
+        
+        // Initialize behavior
+        let initialPet = PetCharacter(rawValue: status.selectedPetId ?? "") ?? .naicha
+        self.currentBehavior = Self.getBehavior(for: initialPet)
         
         setupStateMachine()
         
@@ -294,7 +336,13 @@ class PetViewModel: ObservableObject {
         
         AudioManager.shared.$recognizedText
             .receive(on: DispatchQueue.main)
-            .assign(to: &$recognizedSpeechText)
+            .sink { [weak self] text in
+                self?.recognizedSpeechText = text
+                if !text.isEmpty {
+                    self?.scheduleSpeechBubbleClear()
+                }
+            }
+            .store(in: &cancellables)
     }
     
     private func handleAudioStateChange(_ state: PetInteractionState) {
@@ -307,8 +355,14 @@ class PetViewModel: ObservableObject {
                  changeState(to: .expecting, videoName: PetVideoPaths.listening)
              }
         case .playing:
-            // 说话时（播放变音）
-            changeState(to: .interacting, videoName: PetVideoPaths.talking, forceLoop: true)
+            // 检查回音彩蛋
+            if let eggVideo = currentBehavior.getEchoEgg(text: recognizedSpeechText) {
+                // 播放彩蛋 (不可打断由 forceLoop=false + 非 talking 状态保证)
+                changeState(to: .interacting, videoName: eggVideo, forceLoop: false)
+            } else {
+                // 说话时（播放变音）
+                changeState(to: .interacting, videoName: PetVideoPaths.talking, forceLoop: true)
+            }
         case .idle:
             // 只有当当前是倾听或说话状态时，才切回 idle
             // 避免打断其他状态（如吃饭、睡觉）
@@ -351,6 +405,22 @@ class PetViewModel: ObservableObject {
         saveStatus()
         stopTimer()
     }
+    
+    #if DEBUG
+    // MARK: - Debug
+    func debugTriggerDialogue(text: String) {
+        // 模拟语音识别结果
+        self.recognizedSpeechText = text
+        scheduleSpeechBubbleClear()
+        
+        // 检查回音彩蛋
+        if let eggVideo = currentBehavior.getEchoEgg(text: text) {
+            // 播放彩蛋
+            changeState(to: .interacting, videoName: eggVideo, forceLoop: false)
+        } else {
+        }
+    }
+    #endif
     
     // MARK: - State Management
     
@@ -503,15 +573,20 @@ class PetViewModel: ObservableObject {
             } else {
                 status.hunger = min(100, status.hunger + item.recoveryValue)
                 
-                // 默认使用 eatingCatFood 作为通用进食动画
-                var video = PetVideoPaths.eatingCatFood
-                
-                if item.id == "cannedFood" {
-                    video = PetVideoPaths.eatingCanned
-                } 
-                // 其他食物 (如 catRice, catStrip, rawMeat 等) 都使用默认的 eatingCatFood
-                
-                changeState(to: .eating, videoName: video)
+                // 检查喂食彩蛋
+                if let eggVideo = currentBehavior.getFeedingEgg(item: item) {
+                    changeState(to: .eating, videoName: eggVideo, forceLoop: false)
+                } else {
+                    // 默认使用 eatingCatFood 作为通用进食动画
+                    var video = PetVideoPaths.eatingCatFood
+                    
+                    if item.id == "cannedFood" {
+                        video = PetVideoPaths.eatingCanned
+                    }
+                    // 其他食物 (如 catRice, catStrip, rawMeat 等) 都使用默认的 eatingCatFood
+                    
+                    changeState(to: .eating, videoName: video)
+                }
             }
             
             // 提示属性增加
@@ -754,7 +829,17 @@ class PetViewModel: ObservableObject {
                 
             case .eating:
                  if let v = videoName, let state = videoStateMachine.state(forClass: FeedingState.self) {
-                     if v == PetVideoPaths.eatingCanned {
+                     // 检查是否是绝对路径
+                     if v.hasPrefix("/") {
+                         // 如果是绝对路径，我们可能需要一个新的方法来设置，或者利用现有的
+                         // 这里 FeedingState.setFoodType 只接受简单的类型字符串
+                         // 我们可以临时扩展 FeedingState 或者直接在这里强制设置 currentVideoName
+                         // 但 StateMachine 会覆盖它。
+                         // 最好的办法是让 FeedingState 支持显式视频路径
+                         // 不过现在 StateMachine 已经有点复杂了。
+                         // 让我们看下面 changeState 结束后的处理。
+                         // 实际上，videoName 参数会被传递给 currentVideoName
+                     } else if v == PetVideoPaths.eatingCanned {
                          state.setFoodType("cannedFood")
                      } else {
                          state.setFoodType("catFood")
@@ -778,9 +863,22 @@ class PetViewModel: ObservableObject {
                 videoStateMachine.enter(WorkingState.self)
             }
             
+            // 关键修正：确保 videoName 优先级最高，覆盖 StateMachine 的默认值
+            // StateMachine.enter 会设置 videoName，但我们传入的 videoName 应该是最终决定的
+            if let v = videoName {
+                self.currentVideoName = v
+            }
+            
             // 兼容 forceLoop (如果外部强制指定，覆盖 State 的默认设置)
             if let force = forceLoop {
                 isCurrentLooping = force
+            }
+            
+            // 重新计算文件名 (处理前缀)
+            if self.currentVideoName.hasPrefix("/") {
+                self.currentVideoFileName = self.currentVideoName
+            } else {
+                self.currentVideoFileName = getCharacterVideoName(action: self.currentVideoName)
             }
         }
     }
@@ -982,6 +1080,7 @@ class PetViewModel: ObservableObject {
         
         status.currentJob = job
         status.jobStartTime = Date()
+        status.currentJobEarnedFishCoin = 0 // 重置打工收益计数器
         jobIncomeAccumulator = 0.0
         
         // 播放换装动画（一次性），使用 interacting 状态作为临时载体
@@ -995,22 +1094,30 @@ class PetViewModel: ObservableObject {
         }
     }
     
-    func stopJob() {
+    func stopJob(isInterrupted: Bool = false) {
         guard status.currentJob != .none else { return }
         
-        let jobName = status.currentJob.rawValue
+        let job = status.currentJob
         status.currentJob = .none
         status.jobStartTime = nil
         jobIncomeAccumulator = 0.0
-        
-        // 如果当前是工作状态，停止工作后切回 idle
-        if currentState == .working {
-            changeState(to: .idle)
-        }
-        
         saveStatus()
         
-        showFloatingText("结束打工: \(jobName)", style: .custom(.green))
+        if isInterrupted {
+            let video = currentBehavior.getWorkInterruptedVideo()
+            // 播放中断视频
+            changeState(to: .interacting, videoName: video, forceLoop: false)
+            showFloatingText("被迫停止打工...", style: .warning)
+        } else {
+            // 正常结束
+            let result = currentBehavior.getWorkFinishResult(job: job, status: status)
+            
+            // 播放结算视频
+            changeState(to: .interacting, videoName: result.video, forceLoop: false)
+            
+            // 显示文案
+            showFloatingText(result.message, style: result.success ? .fishCoin : .warning)
+        }
     }
     
     private func updateStatus() {
@@ -1045,38 +1152,33 @@ class PetViewModel: ObservableObject {
         var isSleeping = false
         var isWorking = false
         
-        // 状态判定优先级：精力耗尽 > 强制休息 > 工作 > 低精力自动休息
+        // 打工中断检查：精力或者饱食归0则立即停止打工
+        let shouldStopWork = status.currentJob != .none && (status.energy <= 0 || status.hunger <= 0)
         
-        if isExhausted {
-            isSleeping = true
-            // 精力耗尽，强制停止工作（彻底罢工）
-            if status.currentJob != .none {
-                if !isOfflineSimulation {
-                    stopJob()
-                    showFloatingText("精力耗尽，强制昏睡！", style: .warning)
-                } else {
-                    status.currentJob = .none
-                    status.jobStartTime = nil
-                }
+        // 状态判定优先级：打工中断 > 精力耗尽 > 强制休息 > 工作 > 低精力自动休息
+        
+        if shouldStopWork {
+            // 强制停止工作
+            if !isOfflineSimulation {
+                stopJob(isInterrupted: true)
+            } else {
+                status.currentJob = .none
+                status.jobStartTime = nil
             }
+            
+            // 如果是因为精力耗尽，则进入睡眠状态
+            if isExhausted {
+                isSleeping = true
+            }
+        } else if isExhausted {
+            isSleeping = true
         } else if isFixedSleepTime && (currentState == .idle || currentState == .sleeping) {
             // 强制休息时间：仅在空闲或已睡觉时触发，不打断其他动画（工作、互动等）
             isSleeping = true
         } else if status.currentJob != .none {
             // 正常工作时间
             isWorking = true
-            
-            // 检查状态是否过低导致停止工作 (罢工)
-            if status.hunger < 10 || status.hygiene < 10 || status.mood < 10 {
-                isWorking = false
-                if !isOfflineSimulation {
-                    stopJob()
-                    showFloatingText("状态不好，不干了！", style: .warning)
-                } else {
-                    status.currentJob = .none
-                    status.jobStartTime = nil
-                }
-            }
+            // 注意：之前的状态不好判定逻辑已被 shouldStopWork 替代
         } else if isLowEnergy && (currentState == .idle || currentState == .sleeping) {
             // 没有工作，精力低 -> 自动睡觉 (仅在空闲时触发)
             isSleeping = true
@@ -1127,7 +1229,24 @@ class PetViewModel: ObservableObject {
             if jobIncomeAccumulator >= 1.0 {
                 let coinToAdd = Int(jobIncomeAccumulator)
                 if !isOfflineSimulation {
-                     earnFishCoin(amount: coinToAdd)
+                     // 在线模式：调用 earnFishCoin (含每日上限检查)
+                     // 注意：我们需要在 earnFishCoin 成功后再累加 currentJobEarnedFishCoin
+                     // 但 earnFishCoin 目前没有返回值告诉我们要不要加
+                     // 所以我们在这里手动处理上限逻辑，或者修改 earnFishCoin 返回实际增加量
+                     // 为了简单且安全，我们复用 earnFishCoin 的逻辑，但假设它会处理上限
+                     // 这里我们只记录"尝试"增加的量，或者更准确地，我们需要知道实际增加了多少
+                     // 让我们直接在这里处理，因为 earnFishCoin 逻辑也比较简单
+                     
+                     checkDailyReset()
+                     let remainingQuota = PetStatus.dailyFishCoinLimit - status.dailyFishCoinEarned
+                     let actualEarned = min(coinToAdd, remainingQuota)
+                     
+                     if actualEarned > 0 {
+                         status.fishCoin += actualEarned
+                         status.dailyFishCoinEarned += actualEarned
+                         status.currentJobEarnedFishCoin += actualEarned // 累加打工收益
+                         saveStatus()
+                     }
                 } else {
                      // 离线模拟直接加，不触发保存
                      let remainingQuota = PetStatus.dailyFishCoinLimit - status.dailyFishCoinEarned
@@ -1135,6 +1254,7 @@ class PetViewModel: ObservableObject {
                      if actualEarned > 0 {
                          status.fishCoin += actualEarned
                          status.dailyFishCoinEarned += actualEarned
+                         status.currentJobEarnedFishCoin += actualEarned // 累加打工收益
                      }
                 }
                 jobIncomeAccumulator -= Double(coinToAdd)

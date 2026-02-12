@@ -271,6 +271,88 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Pet Behavior Protocol
+protocol PetBehavior {
+    var character: PetCharacter { get }
+    
+    // 工作结束结果
+    func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool)
+    
+    // 工作强制中断视频
+    func getWorkInterruptedVideo() -> String
+    
+    // 回音彩蛋 (返回视频路径)
+    func getEchoEgg(text: String) -> String?
+    
+    // 喂食彩蛋 (返回视频路径)
+    func getFeedingEgg(item: PetItemDefinition) -> String?
+}
+
+// 默认行为 (兼容旧逻辑/通用逻辑)
+struct DefaultPetBehavior: PetBehavior {
+    let character: PetCharacter
+    
+    func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool) {
+        // 默认逻辑：没有特殊视频，只返回文案
+        return ("idle", "打工结束", true)
+    }
+    
+    func getWorkInterruptedVideo() -> String {
+        return "idle"
+    }
+    
+    func getEchoEgg(text: String) -> String? {
+        return nil
+    }
+    
+    func getFeedingEgg(item: PetItemDefinition) -> String? {
+        return nil
+    }
+}
+
+// Naicha 专属行为
+struct NaichaBehavior: PetBehavior {
+    let character: PetCharacter = .naicha
+    
+    func getWorkFinishResult(job: PetJob, status: PetStatus) -> (video: String, message: String, success: Bool) {
+        if status.energy > 50 {
+            // 直接读取累积的打工收益
+            let earned = status.currentJobEarnedFishCoin
+            return (
+                "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_work_success.mp4",
+                "打工赚了 \(earned) 鱼币!",
+                true
+            )
+        } else {
+             return (
+                "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_work_exhausted.mp4",
+                "累死宝宝了...",
+                false
+            )
+        }
+    }
+    
+    func getWorkInterruptedVideo() -> String {
+        return "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_work_exhausted.mp4"
+    }
+    
+    func getEchoEgg(text: String) -> String? {
+        // 简单的关键词匹配
+        if text.contains("登基") || text.contains("登记") {
+             return "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_coronation.mp4"
+        }
+        return nil
+    }
+    
+    func getFeedingEgg(item: PetItemDefinition) -> String? {
+        // 5% 概率触发
+        if Int.random(in: 1...100) <= 5 {
+             return "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/naicha_eat_rush.mp4"
+        }
+        return nil
+    }
+}
+
 struct PetStatus: Codable {
     var petNames: [String: String] = [:] // 萌宠名字集合 (Key: PetID, Value: Name)
     var selectedPetId: String? = nil // 当前选择的宠物角色 ID
@@ -319,6 +401,7 @@ struct PetStatus: Codable {
     // 工作系统
     var currentJob: PetJob = .none
     var jobStartTime: Date?
+    var currentJobEarnedFishCoin: Int = 0 // 本次打工累计赚取的鱼币 (非存档属性，仅用于显示)
     
     // 衰减速率 (每秒减少多少)
     static let hungerDecayRate: Double = 10.0 / 3600.0 // 每小时减少10点
@@ -340,7 +423,7 @@ struct PetStatus: Codable {
         case meowCoin, fishCoin, boneCoin
         case dailyFishCoinEarned, lastDailyResetDate
         case inventory
-        case currentJob, jobStartTime
+        case currentJob, jobStartTime, currentJobEarnedFishCoin
     }
     
     init(from decoder: Decoder) throws {
@@ -365,6 +448,7 @@ struct PetStatus: Codable {
         // Job
         currentJob = try container.decodeIfPresent(PetJob.self, forKey: .currentJob) ?? .none
         jobStartTime = try container.decodeIfPresent(Date.self, forKey: .jobStartTime)
+        currentJobEarnedFishCoin = try container.decodeIfPresent(Int.self, forKey: .currentJobEarnedFishCoin) ?? 0
         
         // Compatibility Logic for Pet IDs
         // 旧版本没有 ownedPetIds，默认只有一只奶茶

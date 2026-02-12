@@ -6,13 +6,18 @@ struct PetHomeView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
     @Environment(\.scenePhase) var scenePhase
-    @State private var panelState: PanelState = .collapsed
+    @State private var panelState: PanelState = .hidden
     @State private var showRenameAlert = false
     @State private var showNoCardAlert = false
     @State private var showJobSelection = false
     @State private var showMicAlert = false
     @State private var newName = ""
     @State private var showAdoptionView = false // 领养界面
+    
+    #if DEBUG
+    @State private var showDebugDialogueInput = false
+    @State private var debugInputText = ""
+    #endif
     
     var body: some View {
         Group {
@@ -35,7 +40,7 @@ struct PetHomeView: View {
                             
                             let videoHeight: CGFloat = {
                                 if isLandscape {
-                                    return min(screenWidth, screenHeight) * 0.8
+                                    return max(100, min(screenWidth, screenHeight) * 0.8)
                                 } else {
                                     // 预留顶部 Header (约120) 和底部 Panel Collapsed (约220) 的空间
                                     // 增加预留空间，避免小屏幕太挤
@@ -43,7 +48,8 @@ struct PetHomeView: View {
                                     // 稍微减小宽度占比，避免左右太满
                                     let idealSize = screenWidth * 0.85
                                     // 取 宽度适配 和 高度适配 的较小值，确保不溢出
-                                    return min(idealSize, availableHeight, 450)
+                                    // 确保不小于 100，避免负数导致 Crash
+                                    return max(100, min(idealSize, availableHeight, 450))
                                 }
                             }()
                             
@@ -92,7 +98,29 @@ struct PetHomeView: View {
                                     VStack {
                                         Spacer()
                                         HStack {
+                                            #if DEBUG
+                                            Button(action: {
+                                                showDebugDialogueInput = true
+                                            }) {
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                                                        .font(.system(size: 20))
+                                                    Text("对话")
+                                                        .font(.system(size: 16, weight: .bold))
+                                                }
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 12)
+                                                .background(Color.purple)
+                                                .clipShape(Capsule())
+                                                .shadow(radius: 4, x: 0, y: 2)
+                                            }
+                                            .padding(.leading, 20)
+                                            .padding(.bottom, 100)
+                                            #endif
+                                            
                                             Spacer()
+                                            
                                             Button(action: {
                                                 withAnimation(.spring()) {
                                                     panelState = .collapsed
@@ -117,6 +145,33 @@ struct PetHomeView: View {
                                     }
                                     .transition(.opacity)
                                 }
+                                
+                                #if DEBUG
+                                // Debug: 粉色气泡对话输入框
+                                if showDebugDialogueInput {
+                                    Color.black.opacity(0.3)
+                                        .ignoresSafeArea()
+                                        .onTapGesture {
+                                            showDebugDialogueInput = false
+                                        }
+                                        .transition(.opacity)
+                                    
+                                    VStack {
+                                        Spacer()
+                                        PetDialogueInputView(text: $debugInputText, onSend: {
+                                            if !debugInputText.isEmpty {
+                                                viewModel.debugTriggerDialogue(text: debugInputText)
+                                                debugInputText = ""
+                                                showDebugDialogueInput = false
+                                            }
+                                        })
+                                        .padding(.bottom, 20)
+                                        .padding(.horizontal, 16)
+                                    }
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                                    .zIndex(100) // 确保在最上层
+                                }
+                                #endif
                             }
                         }
                     }

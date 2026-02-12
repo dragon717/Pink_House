@@ -169,8 +169,18 @@ class SeamlessVideoPlayerView: UIView {
     
     override func layoutSubviews() {
         super.layoutSubviews()
+        
+        // 保护：防止无效 frame 导致 CoreAnimation 报错 (Invalid frame dimension)
+        guard bounds.width > 0, bounds.height > 0, 
+              bounds.width.isFinite, bounds.height.isFinite else {
+            return
+        }
+        
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         playerLayerA.frame = bounds
         playerLayerB.frame = bounds
+        CATransaction.commit()
     }
     
     // MARK: - Public Interface
@@ -530,11 +540,32 @@ class SeamlessVideoPlayerView: UIView {
     
     private func findVideoURL(name: String) -> URL? {
         // 提取查找逻辑为闭包，方便复用
-        let lookup: (String) -> URL? = { videoName in
+        // 注意：lookup 是递归安全的，但我们这里不需要递归
+        func lookup(_ videoName: String) -> URL? {
             // 1. 绝对路径
             if videoName.hasPrefix("/") {
-                return URL(fileURLWithPath: videoName)
+                let url = URL(fileURLWithPath: videoName)
+                // 检查文件是否存在且可读
+                // 注意：在沙盒环境或模拟器中，直接访问宿主机绝对路径通常会失败
+                if (try? url.checkResourceIsReachable()) == true {
+                    return url
+                }
+                
+                print("SeamlessPlayer: Absolute path not reachable: \(videoName). Trying to extract filename.")
+                // 如果绝对路径不可达，提取文件名继续查找 (Fallback)
+                let filename = url.lastPathComponent
+                let nameWithoutExt = url.deletingPathExtension().lastPathComponent
+                
+                // 尝试用提取出的文件名在 Bundle 中查找
+                if let bundleUrl = lookup(nameWithoutExt) {
+                    return bundleUrl
+                }
+                
+                // 如果带后缀的文件名也没找到，尝试不带后缀的（lookup内部会处理后缀）
+                // 上面的 lookup(nameWithoutExt) 已经涵盖了大部分情况
+                return nil
             }
+            
             // 2. Bundle 根目录查找
             if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4") { return url }
             // 3. asserts 子目录查找
@@ -545,6 +576,7 @@ class SeamlessVideoPlayerView: UIView {
             if let url = Bundle.main.url(forResource: videoName, withExtension: nil) { return url }
             // 6. 无后缀尝试 (asserts 子目录)
             if let url = Bundle.main.url(forResource: videoName, withExtension: nil, subdirectory: "asserts") { return url }
+            
             return nil
         }
         
