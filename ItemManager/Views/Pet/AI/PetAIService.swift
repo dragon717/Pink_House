@@ -3,6 +3,36 @@ import Combine
 import os.lock
 import UIKit
 
+// AI Provider Enum
+enum AIProvider {
+    case deepSeek
+    case minimax
+}
+
+// Minimax API Request/Response Structures (Anthropic Compatible)
+struct MinimaxMessage: Codable {
+    let role: String
+    let content: String
+}
+
+struct MinimaxRequest: Codable {
+    let model: String
+    let messages: [MinimaxMessage]
+    let max_tokens: Int
+    let stream: Bool
+    let system: String?
+}
+
+struct MinimaxResponse: Codable {
+    let content: [MinimaxContentBlock]
+}
+
+struct MinimaxContentBlock: Codable {
+    let type: String
+    let text: String?
+    let thinking: String?
+}
+
 // DeepSeek API Request/Response Structures
 struct DSMessage: Codable {
     let role: String
@@ -28,32 +58,27 @@ struct TimeoutError: Error {}
 
 @MainActor
 class PetAIService: ObservableObject {
-    static let shared = PetAIService(role: .kitten, petName: "奶茶", apiKey: AIConfigManager.shared.dsApiKey ?? "") // Default init
+    static let shared = PetAIService()
     
     @Published var isProcessing: Bool = false
     @Published var uiMessages: [ChatMessage] = [] // UI 展示用的消息历史 (分页加载)
     private var allMessages: [ChatMessage] = [] // 完整的本地聊天记录
     
-    private var role: PetRole
-    private var petName: String
-    private var apiKey: String
+    private var role: PetRole = .kitten
+    private var petName: String = "奶茶"
+    private var apiKey: String = ""
+    private var provider: AIProvider = .deepSeek
     
-    // Maintain simple history for DeepSeek
+    // Maintain simple history for API context
     private var history: [DSMessage] = []
     
-    private init(role: PetRole, petName: String, apiKey: String, wardrobeContext: String = "") {
-        self.role = role
-        self.petName = petName
-        self.apiKey = apiKey
-        
+    private init() {
         // Initialize with placeholder history
         self.history = [
             DSMessage(role: "system", content: ""),
             DSMessage(role: "user", content: "你好，我是你的主人。"),
             DSMessage(role: "assistant", content: "（蹭蹭你的手）主人好呀喵！[IMAGE:happy_cat]")
         ]
-        
-        self.updateSystemContext(wardrobeContext: wardrobeContext)
         self.loadMessages()
     }
     
@@ -172,11 +197,26 @@ class PetAIService: ObservableObject {
         return nil
     }
     
-    func updateConfiguration(role: PetRole, petName: String, apiKey: String, wardrobeContext: String) {
+    func updateConfiguration(role: PetRole, petName: String, apiKey: String, provider: AIProvider = .deepSeek, wardrobeContext: String) {
         self.role = role
         self.petName = petName
-        self.apiKey = apiKey
+        
+        // 清洗 API Key (移除可能的 Bearer 前缀和空白)
+        var cleanKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanKey.lowercased().hasPrefix("bearer ") {
+            cleanKey = String(cleanKey.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        self.apiKey = cleanKey
+        
+        self.provider = provider
         self.updateSystemContext(wardrobeContext: wardrobeContext)
+        
+        print("🔧 [PetAIService] Config Updated - Provider: \(provider), Role: \(role), KeyLen: \(cleanKey.count)")
+        if !cleanKey.isEmpty {
+            print("🔑 [PetAIService] Key Prefix: \(cleanKey.prefix(4))...")
+        } else {
+            print("⚠️ [PetAIService] Warning: API Key is empty!")
+        }
     }
     
     // 动态更新上下文 (例如衣橱数据变化或识别了新图片)
@@ -204,7 +244,46 @@ class PetAIService: ObservableObject {
         }
     }
     
+    // 确保已配置 (用于在关键操作前进行防御性检查)
+    func ensureConfiguration(role: PetRole, petName: String, wardrobeContext: String) {
+        if self.apiKey.isEmpty {
+            print("⚠️ [PetAIService] API Key is empty. Attempting to reload from AIConfigManager...")
+            // 尝试重新加载配置
+            // 这里我们无法直接获取 PetViewModel 的逻辑 (因为它在 ViewModel 层)
+            // 但我们可以尝试从 ConfigManager 获取 Key
+            
+            // 读取用户设置的优先级
+            let priorityString = UserDefaults.standard.string(forKey: "textModelPriority") ?? "DeepSeek,Minimax"
+            let priorityList = priorityString.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            
+            for model in priorityList {
+                switch model {
+                case "DeepSeek":
+                    if let key = AIConfigManager.shared.dsApiKey, !key.isEmpty {
+                        self.updateConfiguration(role: role, petName: petName, apiKey: key, provider: .deepSeek, wardrobeContext: wardrobeContext)
+                        return
+                    }
+                case "Minimax":
+                    if let key = AIConfigManager.shared.minimaxApiKey, !key.isEmpty {
+                        self.updateConfiguration(role: role, petName: petName, apiKey: key, provider: .minimax, wardrobeContext: wardrobeContext)
+                        return
+                    }
+                default: break
+                }
+            }
+        }
+    }
+    
     func sendImageAnalysisRequest(text: String, imageContext: String, image: UIImage? = nil) async -> ChatMessage {
+        // 防御性检查：确保配置已加载
+        // 由于 PetAIService 是单例，我们可能丢失了当前的 role/petName 上下文
+        // 但我们可以使用当前的 self.role 和 self.petName (如果不为空)
+        // 或者使用默认值
+        if self.apiKey.isEmpty {
+             print("⚠️ [PetAIService] sendImageAnalysisRequest: Key is empty, trying to reload...")
+             self.ensureConfiguration(role: self.role, petName: self.petName, wardrobeContext: "")
+        }
+        
         var imagePath: String?
         if let image = image {
             imagePath = saveImageToDisk(image: image)
@@ -212,16 +291,15 @@ class PetAIService: ObservableObject {
         
         // 将图片识别结果作为临时上下文插入，或者直接作为用户消息的一部分
         // 强制强调角色设定和字数限制
+        // 使用 role 特定的提醒
+        let reminder = role.visionAnalysisReminder
+        
         let messageWithContext = """
         \(imageContext)
         
         用户问题：\(text)
         
-        (重要提示：请务必保持萌宠的角色设定（喵/汪），不要只是枯燥地描述图片。
-        1. 用主人的贴心闺蜜的口吻，字数严格控制在50字以内！
-        2. 请结合【视觉描述】回答用户的问题。
-        3. 可以参考【猜你想问】中的问题，在回复末尾自然地抛出一个相关话题，引导主人继续聊天。
-        4. 请不要出现"根据图片"、"AI"、"视觉分析"等字眼。)
+        \(reminder)
         """
         // Pass 'text' as displayText so the UI shows the clean question, not the prompt dump
         return await sendMessage(messageWithContext, userImagePath: imagePath, displayText: text)
@@ -243,6 +321,18 @@ class PetAIService: ObservableObject {
         let currentHistory = self.history
         let apiKey = self.apiKey
         let role = self.role
+        let provider = self.provider
+        
+        print("🔍 [PetAIService] 发送请求 - Provider: \(provider)")
+        if apiKey.isEmpty {
+            print("❌ [PetAIService] Error: API Key is empty! Cannot send request.")
+            let errorMsg = ChatMessage(text: "配置错误：API Key 为空。请检查 GenerativeAI-Info.plist。", isUser: false)
+            self.allMessages.append(errorMsg)
+            self.uiMessages.append(errorMsg)
+            self.saveMessages()
+            return errorMsg
+        }
+        print("🔑 [PetAIService] API Key (Masked): \(apiKey.prefix(6))...\(apiKey.suffix(4))")
         
         do {
             // ... (TaskGroup logic)
@@ -250,34 +340,94 @@ class PetAIService: ObservableObject {
             let replyContent = try await withThrowingTaskGroup(of: String.self) { group in
                 // 1. 网络请求任务
                 group.addTask {
-                    // 构造请求
-                    // 注意：这里是在后台线程执行，不能访问 self 上的可变属性
-                    var historyToSend = currentHistory
-                    historyToSend.append(DSMessage(role: "user", content: text))
-                    
-                    let url = URL(string: "https://api.deepseek.com/chat/completions")!
-                    var request = URLRequest(url: url)
-                    request.httpMethod = "POST"
-                    request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-                    
-                    // 只发送最近的 N 条历史
-                    let messagesToSend = [historyToSend.first!] + historyToSend.suffix(10)
-                    
-                    let body = DSRequest(model: "deepseek-chat", messages: messagesToSend, stream: false)
-                    request.httpBody = try JSONEncoder().encode(body)
-                    
-                    // 发送请求
-                    let (data, response) = try await URLSession.shared.data(for: request)
-                    
-                    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                        let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-                        throw NSError(domain: "DeepSeekError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+                    if provider == .minimax {
+                        // Minimax (Anthropic Compatible)
+                        print("🚀 [PetAIService] Using Minimax (Anthropic) Provider")
+                        // 确保 URL 正确，Minimax 的 Anthropic 兼容接口需要严格匹配
+                        let url = URL(string: "https://api.minimaxi.com/anthropic/v1/messages")!
+                        var request = URLRequest(url: url)
+                        request.httpMethod = "POST"
+                        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+                        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") // 同时添加 Bearer 头作为兼容
+                        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+                        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                        
+                        // Extract system prompt
+                        let systemPrompt = currentHistory.first { $0.role == "system" }?.content
+                        
+                        // Filter history (exclude system) and map to MinimaxMessage
+                        // DeepSeek history uses "assistant", Anthropic uses "assistant" too.
+                        var messagesToSend = currentHistory
+                            .filter { $0.role != "system" }
+                            .suffix(10)
+                            .map { MinimaxMessage(role: $0.role, content: $0.content) }
+                        
+                        messagesToSend.append(MinimaxMessage(role: "user", content: text))
+                        
+                        let body = MinimaxRequest(
+                            model: "MiniMax-M2.5",
+                            messages: messagesToSend,
+                            max_tokens: 1000,
+                            stream: false,
+                            system: systemPrompt // Optional
+                        )
+                        
+                        print("📡 [PetAIService] Minimax Request Body: \(String(data: try JSONEncoder().encode(body), encoding: .utf8) ?? "")")
+                        
+                        request.httpBody = try JSONEncoder().encode(body)
+                        
+                        let (data, response) = try await URLSession.shared.data(for: request)
+                        
+                        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
+                            print("❌ [PetAIService] Minimax Error: \(errorMsg)")
+                            throw NSError(domain: "MinimaxError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+                        }
+                        
+                        // print("Minimax Response: \(String(data: data, encoding: .utf8) ?? "")") // Debug log
+                        
+                        let mmResponse = try JSONDecoder().decode(MinimaxResponse.self, from: data)
+                        // Prefer text content
+                        let textBlock = mmResponse.content.first { $0.type == "text" }
+                        return textBlock?.text ?? "（歪头摇尾巴，不知道你在说什么喵...）"
+                        
+                    } else if provider == .deepSeek {
+                        // DeepSeek Logic
+                        print("🚀 [PetAIService] Using DeepSeek Provider")
+                        // 构造请求
+                        // ...
+                        var historyToSend = currentHistory
+                        historyToSend.append(DSMessage(role: "user", content: text))
+                        
+                        let url = URL(string: "https://api.deepseek.com/chat/completions")!
+                        var request = URLRequest(url: url)
+                        request.httpMethod = "POST"
+                        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                        
+                        // 只发送最近的 N 条历史
+                        let messagesToSend = [historyToSend.first!] + historyToSend.suffix(10)
+                        
+                        let body = DSRequest(model: "deepseek-chat", messages: messagesToSend, stream: false)
+                        print("📡 [PetAIService] DeepSeek Request Body: \(String(data: try JSONEncoder().encode(body), encoding: .utf8) ?? "")")
+                        
+                        request.httpBody = try JSONEncoder().encode(body)
+                        
+                        // 发送请求
+                        let (data, response) = try await URLSession.shared.data(for: request)
+                        
+                        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
+                            print("❌ [PetAIService] DeepSeek Error: \(errorMsg)")
+                            throw NSError(domain: "DeepSeekError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+                        }
+                        
+                        // 解析响应
+                        let dsResponse = try JSONDecoder().decode(DSResponse.self, from: data)
+                        return dsResponse.choices.first?.message.content ?? "（歪头摇尾巴，不知道你在说什么喵...）"
+                    } else {
+                        throw NSError(domain: "PetAIService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Unsupported AI Provider: \(provider)"])
                     }
-                    
-                    // 解析响应
-                    let dsResponse = try JSONDecoder().decode(DSResponse.self, from: data)
-                    return dsResponse.choices.first?.message.content ?? "（歪头摇尾巴，不知道你在说什么喵...）"
                 }
                 
                 // 2. 超时任务 (30s)
@@ -293,7 +443,7 @@ class PetAIService: ObservableObject {
             }
             
             // 成功处理 (回到 MainActor)
-            print("✅ [Debug] 收到 DeepSeek 响应: \(replyContent)")
+            print("✅ [Debug] 收到 \(provider) 响应: \(replyContent)")
             
             // 更新历史
             self.history.append(DSMessage(role: "user", content: text))
@@ -312,14 +462,14 @@ class PetAIService: ObservableObject {
             
         } catch is TimeoutError {
             print("❌ [Debug] 请求超时 (30s)")
-            let errorMsg = ChatMessage(text: "（打呼噜...）DeepSeek 好像有点慢喵...", imageName: "sleepy_cat", isUser: false)
+            let errorMsg = ChatMessage(text: "（打呼噜...）\(provider) 好像有点慢喵...", imageName: "sleepy_cat", isUser: false)
             self.allMessages.append(errorMsg)
             self.uiMessages.append(errorMsg)
             self.saveMessages()
             return errorMsg
         } catch {
             print("❌ [Debug] 请求发生错误: \(error)")
-            let errorMsg = ChatMessage(text: "错误: \(error.localizedDescription) (请检查 DS_API_KEY)", isUser: false)
+            let errorMsg = ChatMessage(text: "错误: \(error.localizedDescription) (请检查 \(provider) API_KEY)", isUser: false)
             self.allMessages.append(errorMsg)
             self.uiMessages.append(errorMsg)
             self.saveMessages()

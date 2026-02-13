@@ -70,8 +70,6 @@ class VisionAnalysisService: ObservableObject {
                     用户向你展示了一张图片，Qwen3-VL 的分析结果如下：
                     
                     \(result)
-                    
-                    请基于【视觉描述】与用户互动，并可以参考【猜你想问】中的内容引导话题。
                     """
                     
                     await MainActor.run {

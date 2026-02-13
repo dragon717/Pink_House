@@ -7,6 +7,7 @@ class AIConfigManager {
     private(set) var dsApiKey: String?
     private(set) var dbApiKey: String?
     private(set) var qwenApiKey: String?
+    private(set) var minimaxApiKey: String?
     private(set) var ttsAppId: String?
     
     private init() {
@@ -19,23 +20,27 @@ class AIConfigManager {
            let dict = NSDictionary(contentsOfFile: path) as? [String: Any] {
             
             if let key = dict["API_KEY"] as? String, !key.isEmpty {
-                self.apiKey = key
+                self.apiKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             
             if let dsKey = dict["DS_API_KEY"] as? String, !dsKey.isEmpty {
-                self.dsApiKey = dsKey
+                self.dsApiKey = dsKey.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             
             if let dbKey = dict["DB_API_KEY"] as? String, !dbKey.isEmpty {
-                self.dbApiKey = dbKey
+                self.dbApiKey = dbKey.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             
             if let qwenKey = dict["QWEN_API_KEY"] as? String, !qwenKey.isEmpty {
-                self.qwenApiKey = qwenKey
+                self.qwenApiKey = qwenKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            
+            if let minimaxKey = dict["MINIMAX_API_KEY"] as? String, !minimaxKey.isEmpty {
+                self.minimaxApiKey = minimaxKey.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             
             if let appId = dict["TTS_APP_ID"] as? String, !appId.isEmpty {
-                self.ttsAppId = appId
+                self.ttsAppId = appId.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             return
         }
@@ -52,6 +57,6 @@ class AIConfigManager {
     }
     
     var isAIEnabled: Bool {
-        return apiKey != nil || dsApiKey != nil || dbApiKey != nil
+        return apiKey != nil || dsApiKey != nil || dbApiKey != nil || minimaxApiKey != nil
     }
 }

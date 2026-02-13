@@ -284,18 +284,15 @@ struct PetOverlayView: View {
                             detectCircle(screenSize: geometry.size)
                             
                             // Prune old trail points
-                            // Also prune points for circle detection to keep memory usage low, 
-                            // but circle detection needs the whole path? 
-                            // Actually circle detection needs "recent" path if we want to detect circle gesture.
-                            // But user might draw circle slowly. Let's keep dragPoints as is for now.
-                            
-                            let now = Date()
-                            // trailPoints = trailPoints.filter { now.timeIntervalSince($0.timestamp) < 2.0 }
-                            // Filter inside TimelineView instead to avoid stuttering?
-                            // No, we need to filter here too to avoid array growing indefinitely.
                             if trailPoints.count > 100 { // Limit max points for performance
                                  trailPoints.removeFirst(trailPoints.count - 100)
                             }
+                            
+                            // Prune dragPoints to avoid infinite growth
+                            if dragPoints.count > 300 {
+                                dragPoints.removeFirst(dragPoints.count - 300)
+                            }
+
                             
                             // Throttle vision detection
                             if let image = captureScreen(scale: screenshotScale) {
@@ -376,62 +373,85 @@ struct PetOverlayView: View {
     }
     
     private func detectCircle(screenSize: CGSize) {
-        guard !isCircleTriggered else { return }
-        guard dragPoints.count >= circleMinPoints else { return }
+        // Need at least some points to form a loop
+        guard dragPoints.count >= circleMinPoints else {
+            isCircleTriggered = false
+            circleBoundingBox = nil
+            return
+        }
         
-        // 1. Calculate Bounding Box
+        let currentPoint = dragPoints.last!
+        let closeThreshold: CGFloat = 80
+        
+        // Search backwards for a point that closes the loop
+        let minLoopIndex = dragPoints.count - circleMinPoints
+        
+        if minLoopIndex >= 0 {
+            // Iterate backwards from minLoopIndex down to 0
+            for i in stride(from: minLoopIndex, through: 0, by: -1) {
+                let p = dragPoints[i]
+                let dx = currentPoint.x - p.x
+                let dy = currentPoint.y - p.y
+                let distance = sqrt(dx*dx + dy*dy)
+                
+                if distance < closeThreshold {
+                    // Found a potential loop closure
+                    let loopPoints = Array(dragPoints[i..<dragPoints.count])
+                    
+                    if validateLoop(loopPoints) {
+                        // Circle Detected!
+                        if !isCircleTriggered {
+                            hapticManager.playUIFeedback(intensity: 1.0, sharpness: 1.0, fallbackStyle: .heavy)
+                        }
+                        
+                        isCircleTriggered = true
+                        circleBoundingBox = calculateBoundingBox(for: loopPoints)
+                        return
+                    }
+                }
+            }
+        }
+        
+        // If we reach here, no valid loop was found
+        isCircleTriggered = false
+        circleBoundingBox = nil
+    }
+    
+    private func validateLoop(_ points: [CGPoint]) -> Bool {
+        // 1. Check Path Length
+        var totalDistance: CGFloat = 0
+        for k in 1..<points.count {
+            let p1 = points[k-1]
+            let p2 = points[k]
+            let dx = p2.x - p1.x
+            let dy = p2.y - p1.y
+            totalDistance += sqrt(dx*dx + dy*dy)
+        }
+        
+        // Relaxed distance threshold slightly to be more forgiving
+        if totalDistance < 250 { return false }
+        
+        // 2. Check Bounding Box Area
+        let bbox = calculateBoundingBox(for: points)
+        if bbox.width * bbox.height < circleMinArea { return false }
+        
+        return true
+    }
+    
+    private func calculateBoundingBox(for points: [CGPoint]) -> CGRect {
         var minX: CGFloat = CGFloat.infinity
         var minY: CGFloat = CGFloat.infinity
         var maxX: CGFloat = -CGFloat.infinity
         var maxY: CGFloat = -CGFloat.infinity
         
-        for point in dragPoints {
+        for point in points {
             if point.x < minX { minX = point.x }
             if point.x > maxX { maxX = point.x }
             if point.y < minY { minY = point.y }
             if point.y > maxY { maxY = point.y }
         }
         
-        let width = maxX - minX
-        let height = maxY - minY
-        
-        // 2. Check Area Size (Avoid small jitters)
-        guard width * height > circleMinArea else { return }
-        
-        // 3. Check Total Path Length (Avoid straight lines back and forth)
-        var totalDistance: CGFloat = 0
-        for i in 1..<dragPoints.count {
-            let p1 = dragPoints[i-1]
-            let p2 = dragPoints[i]
-            let dx = p2.x - p1.x
-            let dy = p2.y - p1.y
-            totalDistance += sqrt(dx*dx + dy*dy)
-        }
-        
-        guard totalDistance > circleMinDistance else { return }
-        
-        // 4. Check Closure (Start and End points are close)
-        // We check the last few points against the first few points
-        // Or simply check if current point is close to start point?
-        // Dragging is continuous, so current point is always last.
-        // Start point is index 0.
-        
-        let currentPoint = dragPoints.last!
-        let startPoint = dragPoints.first!
-        
-        let closeThreshold: CGFloat = 80 // Tolerance for closure
-        let dx = currentPoint.x - startPoint.x
-        let dy = currentPoint.y - startPoint.y
-        let distanceToStart = sqrt(dx*dx + dy*dy)
-        
-        if distanceToStart < closeThreshold {
-            // Circle Detected!
-            isCircleTriggered = true
-            circleBoundingBox = CGRect(x: minX, y: minY, width: width, height: height)
-            
-            // Haptic Feedback
-            hapticManager.playUIFeedback(intensity: 1.0, sharpness: 1.0, fallbackStyle: .heavy)
-        }
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
     
     // MARK: - Vision Analysis

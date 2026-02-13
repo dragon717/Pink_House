@@ -3,7 +3,7 @@ import SwiftUI
 struct SmartManagementView: View {
     // 存储模型优先级，以逗号分隔的字符串存储
     @AppStorage("visualModelPriority") private var visualModelPriorityRaw: String = "Qwen3-VL,Apple Vision"
-    @AppStorage("textModelPriority") private var textModelPriorityRaw: String = "DeepSeek,Doubao,Gemini"
+    @AppStorage("textModelPriority") private var textModelPriorityRaw: String = "DeepSeek,Minimax"
     
     // 语音设置
     @AppStorage("voiceModelId") private var voiceModelId: String = "Volcengine" // 默认火山引擎
@@ -105,8 +105,32 @@ struct SmartManagementView: View {
             visualModels = ["Qwen3-VL", "Apple Vision"]
             saveVisualPriority()
         }
+        
+        // 确保必要的模型都在列表中
+        let requiredTextModels = ["DeepSeek", "Minimax"]
+        var needSave = false
+        
+        for model in requiredTextModels {
+            if !textModels.contains(model) {
+                textModels.append(model)
+                needSave = true
+            }
+        }
+        
+        // 移除不再支持的模型 (Gemini, Doubao)
+        let supportedModels = Set(requiredTextModels)
+        let originalCount = textModels.count
+        textModels.removeAll { !supportedModels.contains($0) }
+        if textModels.count != originalCount {
+            needSave = true
+        }
+        
         if textModels.isEmpty {
-            textModels = ["DeepSeek", "Doubao", "Gemini"]
+            textModels = ["DeepSeek", "Minimax"]
+            needSave = true
+        }
+        
+        if needSave {
             saveTextPriority()
         }
     }
@@ -127,6 +151,8 @@ struct SmartManagementView: View {
     
     private func saveTextPriority() {
         textModelPriorityRaw = textModels.joined(separator: ",")
+        // 发送通知，告知其他模块配置已更新
+        NotificationCenter.default.post(name: Notification.Name("AISettingsChanged"), object: nil)
     }
 }
 
@@ -156,9 +182,9 @@ struct APIKeyInfoView: View {
                 }
                 
                 VStack(alignment: .leading) {
-                    Text("DB_API_KEY")
+                    Text("MINIMAX_API_KEY")
                         .font(.headline)
-                    Text("用于豆包模型")
+                    Text("用于 Minimax 文字思考")
                         .font(.caption)
                 }
             }

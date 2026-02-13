@@ -79,6 +79,25 @@ class PetViewModel: ObservableObject {
         return PetCharacter(rawValue: status.selectedPetId ?? "") ?? .naicha
     }
     
+    init(status: PetStatus) {
+        self.status = status
+        
+        // 监听设置变化通知
+        NotificationCenter.default.addObserver(self, selector: #selector(handleSettingsChange), name: Notification.Name("AISettingsChanged"), object: nil)
+        
+        setupAIService()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        stopTimer()
+    }
+    
+    @objc private func handleSettingsChange() {
+        print("🔄 [PetViewModel] 检测到 AI 设置变更，正在重新加载配置...")
+        setupAIService()
+    }
+    
     // MARK: - Helper Methods
     
     // 存储衣橱上下文
@@ -98,16 +117,46 @@ class PetViewModel: ObservableObject {
     }
     
     private func setupAIService() {
-        // 优先使用 DS_API_KEY，其次是 API_KEY
-        if let dsApiKey = AIConfigManager.shared.dsApiKey {
-            let petName = status.petName ?? currentPet.displayName
-            PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: dsApiKey, wardrobeContext: self.wardrobeContext)
-            self.aiService = PetAIService.shared
-        } else if let apiKey = AIConfigManager.shared.apiKey {
-            let petName = status.petName ?? currentPet.displayName
-            PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: apiKey, wardrobeContext: self.wardrobeContext)
-            self.aiService = PetAIService.shared
+        let petName = status.petName ?? currentPet.displayName
+        
+        // 读取用户设置的优先级 (默认为 DeepSeek > Minimax)
+        let priorityString = UserDefaults.standard.string(forKey: "textModelPriority") ?? "DeepSeek,Minimax"
+        let priorityList = priorityString.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        
+        print("🔍 [PetViewModel] AI 模型优先级: \(priorityList)")
+        
+        for model in priorityList {
+            print("  - Checking model: \(model)")
+            switch model {
+            case "DeepSeek":
+                if let dsApiKey = AIConfigManager.shared.dsApiKey {
+                    print("    -> DeepSeek Key found: \(dsApiKey.prefix(4))...")
+                    PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: dsApiKey, provider: .deepSeek, wardrobeContext: self.wardrobeContext)
+                    self.aiService = PetAIService.shared
+                    print("✅ [PetViewModel] 已启用 DeepSeek 模型")
+                    return
+                } else {
+                     print("    -> DeepSeek Key NOT found")
+                }
+                
+            case "Minimax":
+                if let minimaxKey = AIConfigManager.shared.minimaxApiKey {
+                    print("    -> Minimax Key found: \(minimaxKey.prefix(4))...")
+                    PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: minimaxKey, provider: .minimax, wardrobeContext: self.wardrobeContext)
+                    self.aiService = PetAIService.shared
+                    print("✅ [PetViewModel] 已启用 Minimax 模型")
+                    return
+                } else {
+                     print("    -> Minimax Key NOT found")
+                }
+                
+            default:
+                print("    -> Unknown model: \(model)")
+                break
+            }
         }
+        
+        print("⚠️ [PetViewModel] 未找到可用的 AI 模型配置")
     }
     
     private func scheduleSpeechBubbleClear() {
@@ -441,9 +490,7 @@ class PetViewModel: ObservableObject {
         }
     }
     
-    deinit {
-        stopTimer()
-    }
+
     
     // MARK: - Lifecycle
     

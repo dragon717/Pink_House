@@ -5,11 +5,13 @@
 	<key>API_KEY</key>
 	<string>AIzaSyApTkDy0rUQluVlp2aNUMrIj028UJd3lRM</string>
 	<key>DS_API_KEY</key>
-	<string>sk-0c0ef7e6cc2245c2b768d927279f43c1</string>
+	<string>sk-889ebda1573947f696c4fd84cb1581f8</string>
 	<key>DB_API_KEY</key>
 	<string>DO4rTD2bKsn3Wi36cZqWQszh10u1OJxt</string>
 	<key>QWEN_API_KEY</key>
 	<string>sk-9fcb9fee38e64e18b1cd099e7eb42846</string>
+	<key>MINIMAX_API_KEY</key>
+	<string>sk-api-lcRWqzb_OWgFernHtdfXfVSDLh0KR9eK3DZUhDhRncgL5jEFDv-TpUpVnc8iYIqBtpHnGlqAQAqep-EmfrGbcO_yROQqUkr_Ekr35R1Jg89tNEOzvb1Ue2o</string>
 	<key>TTS_APP_ID</key>
 	<string>6933155935</string>
 </dict>
