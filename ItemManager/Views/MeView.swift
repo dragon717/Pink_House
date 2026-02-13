@@ -10,6 +10,7 @@ struct MeView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @StateObject private var authManager = AuthenticationManager.shared
     @StateObject private var cloudManager = CloudSyncManager.shared
+    @ObservedObject private var vipManager = VIPManager.shared
     
     @State private var isImporting = false
     @State private var showingImportAlert = false
@@ -66,8 +67,51 @@ struct MeView: View {
                     Text("云端数据已成功恢复到本地。")
                 }
 
+                // VIP 会员中心
+                if vipManager.isVIP {
+                    ZStack {
+                        VIPCardView(
+                            vipNumber: vipManager.vipNumber ?? "88888888",
+                            expireDate: vipManager.vipExpireDate,
+                            isVIP: true
+                        )
+                        .padding(.vertical, 4)
+                        
+                        NavigationLink(destination: VIPCenterView()) {
+                            EmptyView()
+                        }
+                        .opacity(0)
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+                } 
+
                 // Section 3: Feature Settings
                 Section {
+                    if !vipManager.isVIP  {
+                        NavigationLink(destination: VIPCenterView()) {
+                            HStack {
+                                Image(systemName: "crown.fill")
+                                    .foregroundStyle(Color(hex: "FFD700"))
+                                    .font(.body)
+                                    .frame(width: 24)
+                                
+                                VStack(alignment: .leading) {
+                                    Text("会员中心")
+                                        .font(.body)
+                                        .foregroundStyle(.primary)
+                                    Text("尊享智能对话特权")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    
+                    
                     NavigationLink(destination: GeneralSettingsView()) {
                         SettingsRow(icon: "slider.horizontal.3", title: "通用设置", subtitle: "语言、主题、个性化等")
                     }
@@ -77,6 +121,10 @@ struct MeView: View {
                     
                     NavigationLink(destination: PrivacySettingsView()) {
                         SettingsRow(icon: "hand.raised", title: "隐私设置", subtitle: "管理价格显示与权限")
+                    }
+
+                    NavigationLink(destination: SmartManagementView()) {
+                        SettingsRow(icon: "brain.head.profile", title: "智能管理", subtitle: "AI 模型、语音与识别设置")
                     }
                     
                     NavigationLink(destination: WidgetSettingsView()) {
@@ -88,6 +136,9 @@ struct MeView: View {
                     NavigationLink(destination: RecycleBinView()) {
                         SettingsRow(icon: "trash", title: "回收站", subtitle: "恢复已删除的裙子")
                     }
+                    
+                    
+                    
                     // 触感反馈设置 (跳转详情页)
                     NavigationLink(destination: HapticSettingsView()) {
                         SettingsRow(icon: "waveform.path.ecg", title: "音效和触感反馈", subtitle: "震动开关与系统设置引导")

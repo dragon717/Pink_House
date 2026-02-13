@@ -6,6 +6,7 @@ class AIConfigManager {
     private(set) var apiKey: String?
     private(set) var dsApiKey: String?
     private(set) var dbApiKey: String?
+    private(set) var qwenApiKey: String?
     private(set) var ttsAppId: String?
     
     private init() {
@@ -27,6 +28,10 @@ class AIConfigManager {
             
             if let dbKey = dict["DB_API_KEY"] as? String, !dbKey.isEmpty {
                 self.dbApiKey = dbKey
+            }
+            
+            if let qwenKey = dict["QWEN_API_KEY"] as? String, !qwenKey.isEmpty {
+                self.qwenApiKey = qwenKey
             }
             
             if let appId = dict["TTS_APP_ID"] as? String, !appId.isEmpty {

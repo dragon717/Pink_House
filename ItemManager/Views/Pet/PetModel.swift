@@ -357,9 +357,24 @@ struct NaichaBehavior: PetBehavior {
     }
 }
 
+// MARK: - VIP Status
+struct VIPStatus: Codable {
+    var isActive: Bool = false
+    var expireDate: Date? = nil
+    var vipNumber: String? = nil // 特殊编号
+    
+    var isExpired: Bool {
+        guard let date = expireDate else { return true }
+        return date < Date()
+    }
+}
+
 struct PetStatus: Codable {
     var petNames: [String: String] = [:] // 萌宠名字集合 (Key: PetID, Value: Name)
     var selectedPetId: String? = nil // 当前选择的宠物角色 ID
+    
+    // VIP Status
+    var vipStatus: VIPStatus = VIPStatus()
     
     // 兼容旧属性，计算属性
     var petName: String? {
@@ -428,6 +443,7 @@ struct PetStatus: Codable {
         case dailyFishCoinEarned, lastDailyResetDate
         case inventory
         case currentJob, jobStartTime, currentJobEarnedFishCoin
+        case vipStatus
     }
     
     init(from decoder: Decoder) throws {
@@ -453,6 +469,9 @@ struct PetStatus: Codable {
         currentJob = try container.decodeIfPresent(PetJob.self, forKey: .currentJob) ?? .none
         jobStartTime = try container.decodeIfPresent(Date.self, forKey: .jobStartTime)
         currentJobEarnedFishCoin = try container.decodeIfPresent(Int.self, forKey: .currentJobEarnedFishCoin) ?? 0
+        
+        // VIP
+        vipStatus = try container.decodeIfPresent(VIPStatus.self, forKey: .vipStatus) ?? VIPStatus()
         
         // Compatibility Logic for Pet IDs
         // 旧版本没有 ownedPetIds，默认只有一只奶茶
@@ -497,5 +516,6 @@ struct PetStatus: Codable {
         try container.encode(inventory, forKey: .inventory)
         try container.encode(currentJob, forKey: .currentJob)
         try container.encodeIfPresent(jobStartTime, forKey: .jobStartTime)
+        try container.encode(vipStatus, forKey: .vipStatus)
     }
 }

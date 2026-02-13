@@ -69,7 +69,7 @@ struct PetAdoptionView: View {
                 }
             }
         }
-        .navigationTitle("萌宠领养")
+        .navigationTitle("领养伙伴")
         .navigationBarTitleDisplayMode(.inline)
         .alert("为它起个名字", isPresented: $showNameInput) {
             TextField("名字", text: $inputName)
@@ -87,7 +87,7 @@ struct PetAdoptionView: View {
         .alert("余额不足", isPresented: $showInsufficientFundsAlert) {
             Button("好的", role: .cancel) { }
         } message: {
-            Text("您需要更多的 \(missingCurrencyName) 才能领养这只萌宠。")
+            Text("您需要更多的 \(missingCurrencyName) 才能领养这只小可爱。")
         }
     }
 }

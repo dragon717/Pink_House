@@ -18,7 +18,7 @@ struct PetNamingView: View {
                 
                 // 欢迎标题
                 VStack(spacing: 16) {
-                    Text("欢迎来到萌宠之家")
+                    Text("欢迎来到温馨小屋")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundStyle(

@@ -1,7 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct PetHomeView: View {
     @StateObject private var viewModel = PetViewModel()
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var clothings: [Clothing]
+    
     @StateObject private var audioManager = AudioManager.shared
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
@@ -16,6 +20,9 @@ struct PetHomeView: View {
     
     @State private var showDebugDialogueInput = false
     @State private var debugInputText = ""
+    @State private var showChatView = false // ChatView State
+    @State private var showMicMenu = false // Mic Menu State
+    @State private var showVIPView = false // VIP View State
     
     var body: some View {
         Group {
@@ -103,37 +110,37 @@ struct PetHomeView: View {
                                                     Image(systemName: "bubble.left.and.bubble.right.fill")
                                                         .font(.system(size: 20))
                                                     Text("对话")
-                                                        .font(.system(size: 16, weight: .bold))
-                                                }
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 12)
-                                                .background(Color.purple)
-                                                .clipShape(Capsule())
-                                                .shadow(radius: 4, x: 0, y: 2)
+                                                    .font(.system(size: 16, weight: .bold))
                                             }
-                                            .padding(.leading, 20)
-                                            .padding(.bottom, 100)
-                                            
-                                            Spacer()
-                                            
-                                            Button(action: {
-                                                withAnimation(.spring()) {
-                                                    panelState = .collapsed
-                                                }
-                                            }) {
-                                                HStack(spacing: 4) {
-                                                    Image(systemName: "backpack.fill")
-                                                        .font(.system(size: 20))
-                                                    Text("背包")
-                                                        .font(.system(size: 16, weight: .bold))
-                                                }
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 12)
-                                                .background(Color.blue)
-                                                .clipShape(Capsule())
-                                                .shadow(radius: 4, x: 0, y: 2)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 12)
+                                            .background(Color(red: 0.80, green: 0.65, blue: 0.80)) // 莫妮卡紫
+                                            .clipShape(Capsule())
+                                            .shadow(radius: 4, x: 0, y: 2)
+                                        }
+                                        .padding(.leading, 20)
+                                        .padding(.bottom, 100)
+                                        
+                                        Spacer()
+                                        
+                                        Button(action: {
+                                            withAnimation(.spring()) {
+                                                panelState = .collapsed
+                                            }
+                                        }) {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "backpack.fill")
+                                                    .font(.system(size: 20))
+                                                Text("背包")
+                                                    .font(.system(size: 16, weight: .bold))
+                                            }
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 12)
+                                            .background(Color(red: 0.62, green: 0.74, blue: 0.82)) // 莫妮卡蓝
+                                            .clipShape(Capsule())
+                                            .shadow(radius: 4, x: 0, y: 2)
                                             }
                                             .padding(.trailing, 20)
                                             .padding(.bottom, 100) // 稍微高一点，避免被 HomeIndicator 遮挡
@@ -169,7 +176,7 @@ struct PetHomeView: View {
                             }
                         }
                     }
-                .alert("修改萌宠名字", isPresented: $showRenameAlert) {
+                .alert("修改名字", isPresented: $showRenameAlert) {
                     TextField("输入新名字", text: $newName)
                     Button("取消", role: .cancel) { }
                     Button("确定") {
@@ -186,13 +193,18 @@ struct PetHomeView: View {
                 } message: {
                     Text("修改名字需要消耗改名项圈，请前往商店购买喵～")
                 }
-                .alert("开启萌宠麦克风", isPresented: $showMicAlert) {
+                .alert("开启麦克风", isPresented: $showMicAlert) {
                     Button("确认", role: .none) {
                         audioManager.isInteractionEnabled = true
                     }
                     Button("取消", role: .cancel) { }
                 } message: {
                     Text("安静环境使用以获得最佳体验")
+                }
+                .sheet(isPresented: $showVIPView) {
+                    NavigationStack {
+                        VIPCenterView()
+                    }
                 }
                 .sheet(isPresented: $showJobSelection) {
                     PetJobSelectionView(viewModel: viewModel, isPresented: $showJobSelection)
@@ -205,7 +217,7 @@ struct PetHomeView: View {
                         Menu {
                             // 切换萌宠 (如果有2只及以上)
                             if viewModel.status.ownedPetIds.count >= 2 {
-                                Menu("切换萌宠") {
+                                Menu("切换伙伴") {
                                     ForEach(PetCharacter.allCases) { pet in
                                         if viewModel.status.ownedPetIds.contains(pet.id) {
                                             Button {
@@ -286,7 +298,15 @@ struct PetHomeView: View {
                     }
                     
                     ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 16) {
+                        HStack(spacing: 8) {
+                            // Chat Button (New)
+                        Button {
+                            showChatView = true
+                        } label: {
+                            Image(systemName: "book.closed")
+                                .foregroundStyle(.purple)
+                        }
+                            
                             // Background Music Toggle (新增)
                             Button {
                                 audioManager.isBackgroundMusicEnabled.toggle()
@@ -316,17 +336,49 @@ struct PetHomeView: View {
                                 if audioManager.isInteractionEnabled {
                                     audioManager.isInteractionEnabled = false
                                 } else {
-                                    showMicAlert = true
+                                    showMicMenu = true
                                 }
                             } label: {
                                 Image(systemName: audioManager.isInteractionEnabled ? "mic.fill" : "mic.slash.fill")
                                     .foregroundStyle(audioManager.isInteractionEnabled ? .green : .gray)
                             }
+                            .confirmationDialog("选择互动模式", isPresented: $showMicMenu, titleVisibility: .visible) {
+                                Button("模仿复述") {
+                                    viewModel.isAIMode = false
+                                    AudioManager.shared.isEchoModeEnabled = true // Enable Echo
+                                    showMicAlert = true
+                                }
+                                
+                                Button("智能对话 (VIP)") {
+                                    if VIPManager.shared.isVIP {
+                                        viewModel.isAIMode = true
+                                        AudioManager.shared.isEchoModeEnabled = false // Disable Echo, AI will speak
+                                        showMicAlert = true
+                                    } else {
+                                        showVIPView = true
+                                    }
+                                }
+                                
+                                Button("取消", role: .cancel) {}
+                            } message: {
+                                Text("请在安静环境下使用，以获得最佳体验～")
+                            }
                         }
+                        .font(.system(size: 14)) // Smaller icons
                     }
                 }
                 .navigationDestination(isPresented: $showAdoptionView) {
                     PetAdoptionView(viewModel: viewModel)
+                }
+                .navigationDestination(isPresented: $showChatView) {
+                    if let service = viewModel.aiService {
+                        ChatView(service: service)
+                    } else {
+                        ProgressView("初始化\(viewModel.status.displayName)大脑...")
+                            .onAppear {
+                                viewModel.updateWardrobeContext(clothings: clothings)
+                            }
+                    }
                 }
             }
         }
@@ -338,8 +390,12 @@ struct PetHomeView: View {
                 viewModel.onAppDidBecomeActive()
             }
         }
+        .onChange(of: clothings) { _, newClothings in
+            viewModel.updateWardrobeContext(clothings: newClothings)
+        }
         .onAppear {
             viewModel.onViewAppear()
+            viewModel.updateWardrobeContext(clothings: clothings)
         }
         .onDisappear {
             viewModel.onViewDisappear()

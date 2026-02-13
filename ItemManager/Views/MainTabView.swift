@@ -23,6 +23,7 @@ struct MainTabView: View {
     @State private var homeTabSelection: HomeTab = .wardrobe
     @State private var smallWorldDestination: SmallWorldDestination = .menu
     @State private var isPlayingOpeningAnimation = false
+    @ObservedObject private var petDataManager = PetDataManager.shared
     
     var body: some View {
         ZStack {
@@ -63,7 +64,7 @@ struct MainTabView: View {
                     case .ootd:
                         Label("今日穿搭", systemImage: "tshirt")
                     case .pet:
-                        Label("萌宠", systemImage: "pawprint")
+                        Label(petDataManager.status.displayName, systemImage: "pawprint")
                     case .wealth:
                         Label("马上来财", systemImage: "yensign.circle")
                     case .calendar:
@@ -88,7 +89,7 @@ struct MainTabView: View {
             PetOverlayView(action: {
                 selectedTab = 1
                 smallWorldDestination = .pet
-            })
+            }, petName: petDataManager.status.displayName)
             
             // Small World Long Press Menu Overlay
             SmallWorldMenuOverlay(selectedTab: $selectedTab, smallWorldDestination: $smallWorldDestination)

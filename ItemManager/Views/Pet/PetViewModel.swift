@@ -46,6 +46,7 @@ class PetViewModel: ObservableObject {
     @Published var status: PetStatus
     @Published var floatingTexts: [FloatingTextData] = []
     @Published var recognizedSpeechText: String = ""
+    @Published var isAIMode: Bool = false // 是否开启 AI 对话模式
     
     // MARK: - Behavior
     var currentBehavior: PetBehavior = DefaultPetBehavior(character: .naicha)
@@ -70,7 +71,7 @@ class PetViewModel: ObservableObject {
     private var timer: Timer?
     private var speechBubbleWorkItem: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
-    private var aiService: PetAIService?
+    @Published var aiService: PetAIService? // Changed to public published
     // private let statusKey = "PetStatus_Data" // Moved to PetDataManager
     
     var currentPet: PetCharacter {
@@ -80,14 +81,32 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Helper Methods
     
+    // 存储衣橱上下文
+    var wardrobeContext: String = ""
+    
+    func updateWardrobeContext(clothings: [Clothing]) {
+        let summary = WardrobeContextManager.shared.generateWardrobeSummary(clothings: clothings)
+        self.wardrobeContext = summary
+        
+        // 更新共享服务的上下文
+        PetAIService.shared.updateSystemContext(wardrobeContext: summary)
+        
+        // 确保 aiService 指向共享实例
+        if self.aiService == nil {
+            setupAIService()
+        }
+    }
+    
     private func setupAIService() {
         // 优先使用 DS_API_KEY，其次是 API_KEY
         if let dsApiKey = AIConfigManager.shared.dsApiKey {
             let petName = status.petName ?? currentPet.displayName
-            self.aiService = PetAIService(role: currentPet.aiRole, petName: petName, apiKey: dsApiKey)
+            PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: dsApiKey, wardrobeContext: self.wardrobeContext)
+            self.aiService = PetAIService.shared
         } else if let apiKey = AIConfigManager.shared.apiKey {
             let petName = status.petName ?? currentPet.displayName
-            self.aiService = PetAIService(role: currentPet.aiRole, petName: petName, apiKey: apiKey)
+            PetAIService.shared.updateConfiguration(role: currentPet.aiRole, petName: petName, apiKey: apiKey, wardrobeContext: self.wardrobeContext)
+            self.aiService = PetAIService.shared
         }
     }
     
@@ -358,6 +377,41 @@ class PetViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+            
+        // Handle Speech Completion (Wait for TTS to finish before listening again)
+        PetVoiceManager.shared.$isSpeaking
+            .receive(on: DispatchQueue.main)
+            .dropFirst() // Ignore initial value
+            .sink { [weak self] isSpeaking in
+                if !isSpeaking {
+                    // TTS Finished -> Restart Listening if Interaction is enabled
+                    if AudioManager.shared.isInteractionEnabled {
+                        // Delay slightly to avoid picking up trailing audio
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            AudioManager.shared.restartListening()
+                        }
+                    }
+                } else {
+                    // TTS Started -> Update state to Playing (Show speaking animation)
+                    AudioManager.shared.interactionState = .playing
+                }
+            }
+            .store(in: &cancellables)
+            
+        // Handle Recording Finish (Trigger AI or Echo)
+        AudioManager.shared.onRecordingFinished = { [weak self] text in
+            guard let self = self else { return }
+            
+            if self.isAIMode {
+                // AI 模式：发送给 DeepSeek
+                self.debugTriggerDialogue(text: text)
+            } else {
+                // 复述模式：默认行为 (已在 AudioManager 中处理)
+                // 这里不需要做任何事，因为 AudioManager 会自动播放录音
+                // 但我们可以在这里更新字幕
+                // 实际上 AudioManager 已经更新了 recognizedSpeechText
+            }
+        }
     }
     
     private func handleAudioStateChange(_ state: PetInteractionState) {

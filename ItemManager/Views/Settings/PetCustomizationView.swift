@@ -6,6 +6,7 @@ struct PetCustomizationView: View {
     @AppStorage("petBubbleUseCustomFont") private var useCustomFont: Bool = true
     
     @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var petDataManager = PetDataManager.shared
     @State private var isImporting = false
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -41,7 +42,7 @@ struct PetCustomizationView: View {
             }
             
             Section(header: Text("字体设置")) {
-                Toggle("使用萌宠专属字体", isOn: $useCustomFont)
+                Toggle("使用\(petDataManager.status.displayName)专属字体", isOn: $useCustomFont)
                 
                 if useCustomFont {
                     if fontManager.isUsingUserFont {
@@ -64,7 +65,7 @@ struct PetCustomizationView: View {
                             Button(role: .destructive) {
                                 fontManager.resetToDefaultFont()
                             } label: {
-                                Label("恢复默认萌宠字体", systemImage: "arrow.counterclockwise")
+                                Label("恢复默认\(petDataManager.status.displayName)字体", systemImage: "arrow.counterclockwise")
                             }
                             .padding(.top, 4)
                         }
@@ -102,7 +103,7 @@ struct PetCustomizationView: View {
                 }
             }
             
-            Section(footer: Text("设置将立即应用到所有萌宠互动气泡中。")) {
+            Section(footer: Text("设置将立即应用到所有\(petDataManager.status.displayName)互动气泡中。")) {
                 // 占位
             }
         }
@@ -110,7 +111,7 @@ struct PetCustomizationView: View {
         .background {
             LiquidBackground()
         }
-        .navigationTitle("萌宠个性化")
+        .navigationTitle("\(petDataManager.status.displayName)个性化")
         .navigationBarTitleDisplayMode(.inline)
         .fileImporter(
             isPresented: $isImporting,

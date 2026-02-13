@@ -48,9 +48,13 @@ final class PetVoiceManager: NSObject, ObservableObject {
         let cleanText = cleanTextForSpeech(text)
         guard !cleanText.isEmpty else { return }
         
+        // 获取用户设置的语音模型优先级
+        let voiceModelId = UserDefaults.standard.string(forKey: "voiceModelId") ?? "Volcengine"
+        let useThirdParty = (voiceModelId == "Volcengine")
+        
         Task {
             // 3. 尝试第三方 TTS
-            if preferThirdPartyTTS {
+            if useThirdParty {
                 let success = await speakWithThirdParty(text: cleanText, role: role)
                 if success {
                     return
@@ -108,10 +112,24 @@ final class PetVoiceManager: NSObject, ObservableObject {
     /// 模拟/预留第三方 TTS 调用
     /// 返回 true 表示成功处理，false 表示需要回退
     private func speakWithThirdParty(text: String, role: PetRole) async -> Bool {
-        guard let voiceId = role.voiceConfig.thirdPartyVoiceId,
+        // 获取用户设置的音色
+        let selectedTone = UserDefaults.standard.string(forKey: "voiceToneId") ?? "SweetGirl"
+        var voiceId = role.voiceConfig.thirdPartyVoiceId // 默认为角色配置
+        
+        // 映射用户选择的音色
+        switch selectedTone {
+        case "SweetGirl": voiceId = "zh_female_tianmei"
+        case "GentleSister": voiceId = "zh_female_zhixing"
+        case "LivelyGirl": voiceId = "zh_female_yuanqi"
+        case "CoolLady": voiceId = "zh_female_kefu"
+        default: break
+        }
+        
+        // 如果没有有效的 voiceId，回退
+        guard let finalVoiceId = voiceId,
               let appId = AIConfigManager.shared.ttsAppId,
               let token = AIConfigManager.shared.dbApiKey else {
-            print("TTS Config Missing: voiceId=\(role.voiceConfig.thirdPartyVoiceId ?? "nil"), appId=\(AIConfigManager.shared.ttsAppId ?? "nil"), token=\(AIConfigManager.shared.dbApiKey == nil ? "nil" : "masked")")
+            print("TTS Config Missing or voiceId nil")
             return false
         }
         
@@ -133,7 +151,7 @@ final class PetVoiceManager: NSObject, ObservableObject {
                 "uid": UIDevice.current.identifierForVendor?.uuidString ?? "user_1"
             ],
             "audio": [
-                "voice_type": voiceId,
+                "voice_type": finalVoiceId,
                 "encoding": "mp3",
                 "speed_ratio": 1.0, // API 参数范围可能不同，先使用默认
                 "volume_ratio": 1.0,

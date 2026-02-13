@@ -794,6 +794,9 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
     }
     
+    // Callback for AI processing
+    var onRecordingFinished: ((String) -> Void)?
+    
     private func finishRecording() {
         guard interactionState == .recording else { return }
         
@@ -802,11 +805,39 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         interactionState = .processing
         
+        // If external handler is set (AI Mode), delegate to it
+        // BUT wait, for Echo mode, we don't want to delegate, we want to play recording.
+        // The issue is PetViewModel always sets this handler now.
+        // We need a way to distinguish modes OR let the handler decide whether to play recording.
+        
+        if let handler = onRecordingFinished {
+            let text = recognizedText
+            DispatchQueue.main.async {
+                handler(text)
+            }
+            
+            // If it's NOT AI mode (how do we know?), we should play recording.
+            // Actually, PetViewModel controls the mode.
+            // Let's change the contract: if handler is set, we ALWAYS call it.
+            // But we also need to know if we should play audio.
+            // Let's add a property `isEchoModeEnabled`.
+            if isEchoModeEnabled {
+                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                     self.playRecordedAudio()
+                 }
+            }
+            return
+        }
+        
+        // Default Echo Mode (Legacy fallback)
         // 延迟一点点播放，让状态流转更自然
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.playRecordedAudio()
         }
     }
+    
+    // Mode Control
+    var isEchoModeEnabled: Bool = true // Default to true
     
     // MARK: - Speech Recognition
     
@@ -988,7 +1019,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
     }
     
-    private func restartListening() {
+    func restartListening() {
         // 只有当总开关开启时才重新监听
         if isInteractionEnabled {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

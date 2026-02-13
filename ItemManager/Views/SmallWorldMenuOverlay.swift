@@ -25,6 +25,7 @@ struct SmallWorldMenuOverlay: View {
     
     // 震动管理器
     @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @ObservedObject private var petDataManager = PetDataManager.shared
 
     // 性能优化：检测低内存设备 (小于 4GB 内存)
     private let isLowMemoryDevice: Bool = {
@@ -49,16 +50,18 @@ struct SmallWorldMenuOverlay: View {
         let color: Color
     }
     
-    private let menuItems: [MenuItem] = [
-        // 萌宠: 莫妮卡珊瑚 (自定义暖色，对应萌宠活力)
-        MenuItem(title: "萌宠", icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55)),
-        // 穿搭: 莫妮卡热粉 (对应 MonicaTheme FinalPayment)
-        MenuItem(title: "穿搭", icon: "tshirt", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
-        // 来财: 莫妮卡金 (对应 MonicaTheme Deposit)
-        MenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
-        // 日历: 莫妮卡紫 (对应 MonicaTheme Accent，略加深以提升白色图标对比度)
-        MenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80))
-    ]
+    private var menuItems: [MenuItem] {
+        [
+            // 萌宠: 莫妮卡珊瑚 (自定义暖色，对应萌宠活力)
+            MenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55)),
+            // 穿搭: 莫妮卡热粉 (对应 MonicaTheme FinalPayment)
+            MenuItem(title: "穿搭", icon: "tshirt", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
+            // 来财: 莫妮卡金 (对应 MonicaTheme Deposit)
+            MenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
+            // 日历: 莫妮卡紫 (对应 MonicaTheme Accent，略加深以提升白色图标对比度)
+            MenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80))
+        ]
+    }
     
     // 布局参数
     // 根据屏幕宽度动态计算半径，适配小屏设备 (如 iPhone SE) 和 iPad

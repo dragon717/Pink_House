@@ -5,6 +5,7 @@ struct GeneralSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     @ObservedObject private var audioManager = AudioManager.shared
     @State private var languageManager = LanguageManager.shared
+    @ObservedObject private var petDataManager = PetDataManager.shared
     @State private var showingRestartAlert = false
     @State private var showingMissingOriginalAlert = false
     @State private var selectedItem: PhotosPickerItem?
@@ -425,7 +426,7 @@ struct GeneralSettingsView: View {
         HStack {
             Image(systemName: "mic.and.signal.meter.fill")
                 .foregroundStyle(.purple)
-            Text("萌宠音源")
+            Text("\(petDataManager.status.displayName)音源")
             Spacer()
             Picker("", selection: $audioManager.selectedVoiceType) {
                 ForEach(PetVoiceType.allCases) { type in
@@ -440,7 +441,7 @@ struct GeneralSettingsView: View {
             HStack {
                 Image(systemName: "bubble.left.and.bubble.right.fill")
                     .foregroundStyle(.blue)
-                Text("萌宠气泡")
+                Text("\(petDataManager.status.displayName)气泡")
                 Spacer()
                 Text("大小与字体")
                     .foregroundStyle(.secondary)
