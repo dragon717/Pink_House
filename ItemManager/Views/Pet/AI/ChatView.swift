@@ -125,7 +125,7 @@ struct ChatView: View {
                 .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: -5)
             }
         }
-        .navigationTitle("萌宠日记")
+        .navigationTitle("\(petAI.petName)的日记")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

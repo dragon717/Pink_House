@@ -70,6 +70,7 @@ class PetViewModel: ObservableObject {
     // MARK: - Private Properties
     private var timer: Timer?
     private var speechBubbleWorkItem: DispatchWorkItem?
+    private var silenceFeedbackTimer: Timer? // 用于处理沉默/噪声的延迟计时器
     private var cancellables = Set<AnyCancellable>()
     @Published var aiService: PetAIService? // Changed to public published
     // private let statusKey = "PetStatus_Data" // Moved to PetDataManager
@@ -91,6 +92,7 @@ class PetViewModel: ObservableObject {
     deinit {
         NotificationCenter.default.removeObserver(self)
         stopTimer()
+        silenceFeedbackTimer?.invalidate()
     }
     
     @objc private func handleSettingsChange() {
@@ -442,7 +444,9 @@ class PetViewModel: ObservableObject {
                     }
                 } else {
                     // TTS Started -> Update state to Playing (Show speaking animation)
-                    AudioManager.shared.interactionState = .playing
+                    // 修改：只有 Echo 模式（AudioManager 驱动）才播放说话动画
+                    // TTS（AI 对话、随机互动）不触发 Playing 状态，从而不播放说话动画
+                    // AudioManager.shared.interactionState = .playing
                 }
             }
             .store(in: &cancellables)
@@ -524,6 +528,22 @@ class PetViewModel: ObservableObject {
     
     // MARK: - Debug
     func debugTriggerDialogue(text: String) {
+        // 取消旧的沉默计时器
+        silenceFeedbackTimer?.invalidate()
+        silenceFeedbackTimer = nil
+        
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 检查是否为有效语音（过滤空字符串和仅包含标点符号的情况）
+        if cleanText.isEmpty {
+            print("Detected silence/noise. Waiting 30s before triggering feedback...")
+            // 30s 后触发“怎么不说话”逻辑
+            silenceFeedbackTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { [weak self] _ in
+                self?.handleSilenceTimeout()
+            }
+            return
+        }
+        
         // 模拟语音识别结果
         self.recognizedSpeechText = text
         scheduleSpeechBubbleClear()
@@ -560,6 +580,29 @@ class PetViewModel: ObservableObject {
         // (Fallback) 如果没有 AI 服务，再次检查彩蛋（虽然上面已经检查过了，但为了逻辑完整保留或移除）
         // 这里可以直接移除，因为上面已经 return 了。
         // 但为了保持原有结构，我们假设如果走到这里，说明既没有彩蛋也没有 AI。
+    }
+    
+    // 处理长时间沉默
+    private func handleSilenceTimeout() {
+        print("Silence timeout triggered.")
+        guard let ai = aiService else { return }
+        
+        Task {
+            // 发送一个特殊的提示给 AI，让它主动发起对话
+            let prompt = "（用户一直看着你，但没有说话，看起来在发呆，或者是环境太吵了听不清。请用你的语气问他怎么不说话了，或者卖个萌。）"
+            
+            // 这里的 displayText 会显示在聊天记录中，显示 "..." 表示沉默
+            let response = await ai.sendMessage(prompt, displayText: "...")
+            
+            await MainActor.run {
+                self.recognizedSpeechText = response.text
+                scheduleSpeechBubbleClear()
+                
+                if let action = response.imageName {
+                     handleAIAction(action)
+                }
+            }
+        }
     }
     
     private func handleAIAction(_ action: String) {

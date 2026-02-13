@@ -82,9 +82,7 @@ struct PetDialogueInputView: View {
             RoundedRectangle(cornerRadius: 30)
                 .stroke(Color.white.opacity(0.4), lineWidth: 1)
         )
-        .onAppear {
-            isFocused = true
-        }
+
     }
 }
 

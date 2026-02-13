@@ -14,7 +14,6 @@ struct PetHomeView: View {
     @State private var showRenameAlert = false
     @State private var showNoCardAlert = false
     @State private var showJobSelection = false
-    @State private var showMicAlert = false
     @State private var newName = ""
     @State private var showAdoptionView = false // 领养界面
     
@@ -193,14 +192,7 @@ struct PetHomeView: View {
                 } message: {
                     Text("修改名字需要消耗改名项圈，请前往商店购买喵～")
                 }
-                .alert("开启麦克风", isPresented: $showMicAlert) {
-                    Button("确认", role: .none) {
-                        audioManager.isInteractionEnabled = true
-                    }
-                    Button("取消", role: .cancel) { }
-                } message: {
-                    Text("安静环境使用以获得最佳体验")
-                }
+
                 .sheet(isPresented: $showVIPView) {
                     NavigationStack {
                         VIPCenterView()
@@ -343,10 +335,10 @@ struct PetHomeView: View {
                                     .foregroundStyle(audioManager.isInteractionEnabled ? .green : .gray)
                             }
                             .confirmationDialog("选择互动模式", isPresented: $showMicMenu, titleVisibility: .visible) {
-                                Button("模仿复述") {
+                                Button("模仿你说话") {
                                     viewModel.isAIMode = false
                                     AudioManager.shared.isEchoModeEnabled = true // Enable Echo
-                                    showMicAlert = true
+                                    audioManager.isInteractionEnabled = true
                                 }
                                 
                                 Button("跟“\(viewModel.status.displayName)”聊天") {

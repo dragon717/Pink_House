@@ -117,6 +117,7 @@ final class PetVoiceManager: NSObject, ObservableObject {
         var voiceId = role.voiceConfig.thirdPartyVoiceId // 默认为角色配置
         
         // 映射用户选择的音色
+        print("🔍 [PetVoiceManager] Selected tone from UserDefaults: \(selectedTone)")
         switch selectedTone {
         case "Shota": voiceId = "ICL_zh_male_fengfashaonian_tob"
         case "SweetGirl": voiceId = "zh_female_vv_jupiter_bigtts"
@@ -128,11 +129,13 @@ final class PetVoiceManager: NSObject, ObservableObject {
         default: break
         }
         
+        print("🔍 [PetVoiceManager] Resolved Voice ID: \(voiceId ?? "nil")")
+        
         // 如果没有有效的 voiceId，回退
         guard let finalVoiceId = voiceId,
               let appId = AIConfigManager.shared.ttsAppId,
               let token = AIConfigManager.shared.dbApiKey else {
-            print("TTS Config Missing or voiceId nil")
+            print("TTS Config Missing or voiceId nil. AppID: \(AIConfigManager.shared.ttsAppId ?? "nil"), Token: \(AIConfigManager.shared.dbApiKey != nil ? "Exists" : "nil"), VoiceID: \(voiceId ?? "nil")")
             return false
         }
         
@@ -168,6 +171,8 @@ final class PetVoiceManager: NSObject, ObservableObject {
             ]
         ]
         
+        print("🔍 [PetVoiceManager] TTS Request Body: \(body)")
+        
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -182,17 +187,21 @@ final class PetVoiceManager: NSObject, ObservableObject {
             }
             
             // 解析 JSON
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let code = json["code"] as? Int, code == 3000,
-                  let base64Data = json["data"] as? String,
-                  let audioData = Data(base64Encoded: base64Data) else {
-                print("TTS Response Error or Decode Failed: \(String(data: data, encoding: .utf8) ?? "")")
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                print("TTS Response Decode Failed")
                 return false
             }
             
-            // 播放音频
-            return await MainActor.run {
-                return playAudioData(audioData)
+            if let code = json["code"] as? Int, code == 3000,
+               let base64Data = json["data"] as? String,
+               let audioData = Data(base64Encoded: base64Data) {
+                   // 播放音频
+                   return await MainActor.run {
+                       return playAudioData(audioData)
+                   }
+            } else {
+                print("TTS API Error. Code: \(json["code"] ?? "nil"), Message: \(json["message"] ?? "nil")")
+                return false
             }
             
         } catch {

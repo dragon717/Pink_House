@@ -65,7 +65,7 @@ class PetAIService: ObservableObject {
     private var allMessages: [ChatMessage] = [] // 完整的本地聊天记录
     
     private var role: PetRole = .kitten
-    private var petName: String = "奶茶"
+    @Published public private(set) var petName: String = "奶茶"
     private var apiKey: String = ""
     private var provider: AIProvider = .deepSeek
     
