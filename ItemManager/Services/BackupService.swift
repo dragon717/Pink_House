@@ -52,12 +52,25 @@ class BackupService {
         "theme_background_style",
         "theme_background_opacity",
         "theme_is_blur_enabled",
+        "theme_card_style",
+        "theme_transparent_opacity",
+        "theme_tint_opacity",
+        "theme_card_tint_color",
         "isDepositNotificationEnabled",
         "depositNotificationDaysBefore",
+        "depositNotificationDaysList",
         "depositNotificationTime",
         "AppleLanguages",
         "UserPreference_SortOption",
-        "UserPreference_ViewLayout"
+        "UserPreference_ViewLayout",
+        "UserPreference_DepositDisplayMode",
+        "shouldShowWealthContainerBackground",
+        "visualModelPriority",
+        "textModelPriority",
+        "voiceModelId",
+        "voiceToneId",
+        "UserCustomFontFileName",
+        "HasRedeemedVIP_Prince"
     ]
     
     // MARK: - Internal Helpers
@@ -132,6 +145,8 @@ class BackupService {
                     settings[key] = ISO8601DateFormatter().string(from: dateVal)
                 } else if let arrayVal = value as? [String] {
                     settings[key] = arrayVal.joined(separator: ",")
+                } else if let intArrayVal = value as? [Int] {
+                    settings[key] = intArrayVal.map { String($0) }.joined(separator: ",")
                 }
             }
         }
@@ -983,18 +998,22 @@ class BackupService {
             for (key, value) in settings {
                 print("Restore Setting: \(key) = \(value)")
                 switch key {
-                case "theme_background_opacity":
+                case "theme_background_opacity", "theme_transparent_opacity", "theme_tint_opacity":
                     // Fix: Handle both String (legacy backup) and Number types
                     if let doubleVal = Double(value) {
                         UserDefaults.standard.set(doubleVal, forKey: key)
-                    } else if let doubleVal = value as? Double { // unlikely given [String:String] dict but good practice
+                    } else if let doubleVal = value as? Double {
                          UserDefaults.standard.set(doubleVal, forKey: key)
                     }
-                case "theme_is_blur_enabled", "isDepositNotificationEnabled":
+                case "theme_is_blur_enabled", "isDepositNotificationEnabled", "shouldShowWealthContainerBackground", "HasRedeemedVIP_Prince":
                     if let boolVal = Bool(value) { UserDefaults.standard.set(boolVal, forKey: key) }
                     else if let intVal = Int(value) { UserDefaults.standard.set(intVal == 1, forKey: key) }
                 case "depositNotificationDaysBefore":
                     if let intVal = Int(value) { UserDefaults.standard.set(intVal, forKey: key) }
+                case "depositNotificationDaysList":
+                    let stringValues = value.components(separatedBy: ",")
+                    let intValues = stringValues.compactMap { Int($0) }
+                    UserDefaults.standard.set(intValues, forKey: key)
                 case "depositNotificationTime":
                     if let date = ISO8601DateFormatter().date(from: value) { UserDefaults.standard.set(date, forKey: key) }
                 case "AppleLanguages":

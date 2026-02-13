@@ -831,6 +831,17 @@ class PetViewModel: ObservableObject {
             // 如果触发了生气视频，额外提示
             if currentVideoName == PetVideoPaths.angry {
                  showFloatingText("别碰我！", style: .warning)
+                 // 生气语音
+                 Task { @MainActor in
+                     PetVoiceManager.shared.speak("别碰我！", for: self.currentPet.aiRole)
+                 }
+            } else {
+                // 随机撒娇语音 (增加互动感)
+                let interactions = ["蹭蹭~", "喵~", "主人最好了", "好舒服喵", "还要摸摸"]
+                let randomText = interactions.randomElement() ?? "喵~"
+                Task { @MainActor in
+                    PetVoiceManager.shared.speak(randomText, for: self.currentPet.aiRole)
+                }
             }
             
             saveStatus()

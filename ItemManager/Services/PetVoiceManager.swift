@@ -113,15 +113,18 @@ final class PetVoiceManager: NSObject, ObservableObject {
     /// 返回 true 表示成功处理，false 表示需要回退
     private func speakWithThirdParty(text: String, role: PetRole) async -> Bool {
         // 获取用户设置的音色
-        let selectedTone = UserDefaults.standard.string(forKey: "voiceToneId") ?? "SweetGirl"
+        let selectedTone = UserDefaults.standard.string(forKey: "voiceToneId") ?? "Shota"
         var voiceId = role.voiceConfig.thirdPartyVoiceId // 默认为角色配置
         
         // 映射用户选择的音色
         switch selectedTone {
-        case "SweetGirl": voiceId = "zh_female_tianmei"
-        case "GentleSister": voiceId = "zh_female_zhixing"
-        case "LivelyGirl": voiceId = "zh_female_yuanqi"
-        case "CoolLady": voiceId = "zh_female_kefu"
+        case "Shota": voiceId = "ICL_zh_male_fengfashaonian_tob"
+        case "SweetGirl": voiceId = "zh_female_vv_jupiter_bigtts"
+        case "GentleSister": voiceId = "ICL_zh_female_wenrouwenya_tob"
+        case "LivelyGirl": voiceId = "zh_female_xiaohe_jupiter_bigtts"
+        case "CoolLady": voiceId = "ICL_zh_female_chengshujiejie_tob"
+        case "GentleMale": voiceId = "zh_male_yunzhou_jupiter_bigtts"
+        case "MagneticMale": voiceId = "zh_male_xiaotian_jupiter_bigtts"
         default: break
         }
         

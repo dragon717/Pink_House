@@ -7,7 +7,7 @@ struct SmartManagementView: View {
     
     // 语音设置
     @AppStorage("voiceModelId") private var voiceModelId: String = "Volcengine" // 默认火山引擎
-    @AppStorage("voiceToneId") private var voiceToneId: String = "SweetGirl" // 默认甜美女生
+    @AppStorage("voiceToneId") private var voiceToneId: String = "Shota" // 默认正太音
     
     @State private var visualModels: [String] = []
     @State private var textModels: [String] = []
@@ -72,10 +72,13 @@ struct SmartManagementView: View {
                 }
                 
                 Picker("音色选择", selection: $voiceToneId) {
-                    Text("甜美女生 (灿灿)").tag("SweetGirl")
-                    Text("温柔姐姐 (亲切)").tag("GentleSister")
-                    Text("活泼少女 (元气)").tag("LivelyGirl")
-                    Text("高冷御姐 (成熟)").tag("CoolLady")
+                    Text("阳光正太 (默认)").tag("Shota")
+                    Text("甜美女生 (VV)").tag("SweetGirl")
+                    Text("温柔姐姐 (文雅)").tag("GentleSister")
+                    Text("活泼少女 (小和)").tag("LivelyGirl")
+                    Text("成熟御姐 (高冷)").tag("CoolLady")
+                    Text("清爽男声 (云舟)").tag("GentleMale")
+                    Text("磁性男声 (小天)").tag("MagneticMale")
                 }
             }
             

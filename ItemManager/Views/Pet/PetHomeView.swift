@@ -349,11 +349,12 @@ struct PetHomeView: View {
                                     showMicAlert = true
                                 }
                                 
-                                Button("智能对话 (VIP)") {
+                                Button("跟“\(viewModel.status.displayName)”聊天") {
                                     if VIPManager.shared.isVIP {
                                         viewModel.isAIMode = true
                                         AudioManager.shared.isEchoModeEnabled = false // Disable Echo, AI will speak
-                                        showMicAlert = true
+                                        // 直接开启，不再弹二次确认
+                                        audioManager.isInteractionEnabled = true
                                     } else {
                                         showVIPView = true
                                     }

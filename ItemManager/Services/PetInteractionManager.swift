@@ -53,6 +53,16 @@ class PetInteractionManager: ObservableObject {
         state = .dragging
         dragPosition = location
         isTabBarIconHidden = true
+        
+        // 拖拽开始语音
+        Task { @MainActor in
+            let texts = ["哇~飞起来了！", "去哪里玩呀？", "抓紧我哦！"]
+            let randomText = texts.randomElement() ?? "出发！"
+            // 获取当前角色
+            let petId = PetDataManager.shared.status.selectedPetId ?? "naicha"
+            let role = PetCharacter(rawValue: petId)?.aiRole ?? .kitten
+            PetVoiceManager.shared.speak(randomText, for: role)
+        }
     }
     
     func updateDragPosition(_ location: CGPoint) {
