@@ -73,7 +73,8 @@ struct MeView: View {
                         VIPCardView(
                             vipNumber: vipManager.vipNumber ?? "88888888",
                             expireDate: vipManager.vipExpireDate,
-                            isVIP: true
+                            isVIP: true,
+                            cardStyle: vipManager.cardStyle
                         )
                         .padding(.vertical, 4)
                         

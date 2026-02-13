@@ -12,11 +12,6 @@ struct GeneralSettingsView: View {
     @State private var cropRequest: CropRequest?
     @State private var isLoadingImage = false // Loading state
     
-    @State private var showingVIPRedeemAlert = false
-    @State private var vipCodeInput = ""
-    @State private var showingRedeemResultAlert = false
-    @State private var redeemResultMessage = ""
-    
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     @AppStorage("smallWorldSceneMode") private var smallWorldSceneMode = SmallWorldSceneMode.auto.rawValue
     @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.frenchRetro.rawValue
@@ -316,20 +311,6 @@ struct GeneralSettingsView: View {
             Section(header: Text("个性化")) {
                 personalizationSectionContent
             }
-        
-            Section(header: Text("VIP")) {   
-                Button {
-                    vipCodeInput = ""
-                    showingVIPRedeemAlert = true
-                } label: {
-                    HStack {
-                        Image(systemName: "crown.fill")
-                            .foregroundStyle(.yellow)
-                        Text("兑换码")
-                        Spacer()
-                    }
-                }
-            }
         }
         .scrollContentBackground(.hidden)
         .background {
@@ -340,20 +321,6 @@ struct GeneralSettingsView: View {
             Button("稍后") { }
         } message: {
             Text("语言更改将在下次启动应用时生效。")
-        }
-        .alert("VIP 兑换", isPresented: $showingVIPRedeemAlert) {
-            TextField("请输入兑换码", text: $vipCodeInput)
-            Button("取消", role: .cancel) { }
-            Button("兑换") {
-                redeemVIPCode()
-            }
-        } message: {
-            Text("输入神秘代码获取奖励")
-        }
-        .alert("兑换结果", isPresented: $showingRedeemResultAlert) {
-            Button("确定", role: .cancel) { }
-        } message: {
-            Text(redeemResultMessage)
         }
         .alert("无法调整当前图片", isPresented: $showingMissingOriginalAlert) {
             Button("选择新图片") {
@@ -392,29 +359,6 @@ struct GeneralSettingsView: View {
                 } onCancel: {
                     cropRequest = nil
                 }
-        }
-    }
-    
-    private func redeemVIPCode() {
-        let code = vipCodeInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        if code == "太子爷" {
-            let key = "HasRedeemedVIP_Prince"
-            if UserDefaults.standard.bool(forKey: key) {
-                redeemResultMessage = "您已经领取过该奖励啦！"
-                showingRedeemResultAlert = true
-            } else {
-                UserDefaults.standard.set(true, forKey: key)
-                
-                // Use PetDataManager to update currency
-                _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 666)
-                _ = PetDataManager.shared.updateCurrency(type: .fishCoin, delta: 88888)
-                
-                redeemResultMessage = "兑换成功！\n获得 666 喵币\n88888 鱼币"
-                showingRedeemResultAlert = true
-            }
-        } else {
-            redeemResultMessage = "兑换码无效"
-            showingRedeemResultAlert = true
         }
     }
     

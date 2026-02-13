@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Pattern Background
 struct PatternBackground: View {

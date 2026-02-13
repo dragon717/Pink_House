@@ -4,63 +4,147 @@ struct VIPCardView: View {
     let vipNumber: String
     let expireDate: Date?
     let isVIP: Bool
+    var cardStyle: VIPCardStyle = .blackGold
     
     @State private var shimmerOffset: CGFloat = -300
+    @State private var isAnimatingChange = false
+    
+    // MARK: - Style Helpers
+    private var backgroundColors: [Color] {
+        switch cardStyle {
+        case .blackGold:
+            return [
+                Color(hex: "2C2C2C"), // Charcoal
+                Color(hex: "121212"), // Almost Black
+                Color(hex: "000000")  // Pure Black
+            ]
+        case .monicaPink:
+            return [
+                Color(hex: "FFB6C1"), // Light Pink
+                Color(hex: "FFC0CB"), // Pink
+                Color(hex: "FF69B4")  // Hot Pink
+            ]
+        }
+    }
+    
+    private var shimmerColors: [Color] {
+        switch cardStyle {
+        case .blackGold:
+            return [
+                .clear,
+                Color(hex: "FFD700").opacity(0.2),
+                Color(hex: "FFFACD").opacity(0.4),
+                Color(hex: "FFD700").opacity(0.2),
+                .clear
+            ]
+        case .monicaPink:
+            return [
+                .clear,
+                Color.white.opacity(0.2),
+                Color.white.opacity(0.6),
+                Color.white.opacity(0.2),
+                .clear
+            ]
+        }
+    }
+    
+    private var borderColors: [Color] {
+        switch cardStyle {
+        case .blackGold:
+            return [Color(hex: "B8860B"), Color(hex: "FFD700"), Color(hex: "B8860B")]
+        case .monicaPink:
+            return [Color.white.opacity(0.5), Color.white, Color.white.opacity(0.5)]
+        }
+    }
+    
+    private var textGradientColors: [Color] {
+        switch cardStyle {
+        case .blackGold:
+            return [Color(hex: "FFD700"), Color(hex: "FFFACD"), Color(hex: "B8860B")]
+        case .monicaPink:
+            return [Color.white, Color(hex: "FFF0F5"), Color(hex: "FFE4E1")]
+        }
+    }
+    
+    private var tagText: String {
+        switch cardStyle {
+        case .blackGold: return "黑金尊享"
+        case .monicaPink: return "莫妮卡限定"
+        }
+    }
+    
+    private var tagColors: (bg: Color, border: Color, text: Color) {
+        switch cardStyle {
+        case .blackGold:
+            return (Color.black.opacity(0.6), Color(hex: "FFD700"), Color(hex: "FFD700"))
+        case .monicaPink:
+            return (Color.pink.opacity(0.3), Color.white, Color.white)
+        }
+    }
+    
+    private var numberColors: [Color] {
+        switch cardStyle {
+        case .blackGold:
+            return [Color(hex: "FFFACD"), Color(hex: "FFD700"), Color(hex: "B8860B")]
+        case .monicaPink:
+            return [Color.white, Color.white.opacity(0.8), Color.white]
+        }
+    }
+    
+    private var validThruColor: Color {
+        switch cardStyle {
+        case .blackGold: return Color(hex: "B8860B")
+        case .monicaPink: return Color.white.opacity(0.8)
+        }
+    }
     
     var body: some View {
         ZStack {
-            // 1. Base Background: Deep Matte Black/Grey
+            // 1. Base Background
             RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
-                        colors: [
-                            Color(hex: "2C2C2C"), // Charcoal
-                            Color(hex: "121212"), // Almost Black
-                            Color(hex: "000000")  // Pure Black
-                        ],
+                        colors: backgroundColors,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 5)
+                .shadow(color: cardStyle == .monicaPink ? Color.pink.opacity(0.3) : .black.opacity(0.4), radius: 10, x: 0, y: 5)
             
-            // 2. Subtle Texture (Optional - noise can be simulated with overlay if needed, keeping it clean for now)
+            // 2. Subtle Texture (Optional)
             
-            // 3. Golden Flow Effect (Shimmer)
+            // 3. Shimmer Effect
             GeometryReader { geometry in
                 LinearGradient(
-                    colors: [
-                        .clear,
-                        Color(hex: "FFD700").opacity(0.2), // Faint Gold
-                        Color(hex: "FFFACD").opacity(0.4), // Bright Highlight
-                        Color(hex: "FFD700").opacity(0.2), // Faint Gold
-                        .clear
-                    ],
+                    colors: shimmerColors,
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-                .frame(width: 150) // Width of the shimmer beam
-                .rotationEffect(.degrees(20)) // Slight angle
+                .frame(width: geometry.size.width * 0.4) // Width relative to card width
+                .rotationEffect(.degrees(20))
                 .offset(x: shimmerOffset)
                 .blur(radius: 5)
                 .blendMode(.overlay)
-                .mask(RoundedRectangle(cornerRadius: 20))
                 .onAppear {
+                    // Start from outside left to outside right
+                    // The offset range needs to be large enough to cover the rotation
+                    let startX = -geometry.size.width * 0.8
+                    let endX = geometry.size.width * 1.5
+                    
+                    shimmerOffset = startX
+                    
                     withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                        shimmerOffset = geometry.size.width + 300
+                        shimmerOffset = endX
                     }
                 }
             }
+            .mask(RoundedRectangle(cornerRadius: 20))
             
-            // 4. Refined Golden Border
+            // 4. Border
             RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(
                     LinearGradient(
-                        colors: [
-                            Color(hex: "B8860B"), // Dark Gold
-                            Color(hex: "FFD700"), // Bright Gold
-                            Color(hex: "B8860B")  // Dark Gold
-                        ],
+                        colors: borderColors,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -74,7 +158,7 @@ struct VIPCardView: View {
                         .font(.title)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Color(hex: "FFD700"), Color(hex: "FFFACD")],
+                                colors: textGradientColors,
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -86,29 +170,29 @@ struct VIPCardView: View {
                         .italic()
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Color(hex: "FFD700"), Color(hex: "FFFACD"), Color(hex: "B8860B")],
+                                colors: textGradientColors,
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 1, y: 1)
                     
                     Spacer()
                     
                     if isVIP {
-                        Text("黑金尊享")
+                        Text(tagText)
                             .font(.system(size: 10, weight: .bold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(
                                 ZStack {
                                     Capsule()
-                                        .fill(Color.black.opacity(0.6))
+                                        .fill(tagColors.bg)
                                     Capsule()
-                                        .stroke(Color(hex: "FFD700"), lineWidth: 1)
+                                        .stroke(tagColors.border, lineWidth: 1)
                                 }
                             )
-                            .foregroundStyle(Color(hex: "FFD700"))
+                            .foregroundStyle(tagColors.text)
                     }
                 }
                 .padding(.top, 24)
@@ -122,17 +206,17 @@ struct VIPCardView: View {
                         .font(.system(size: 32, weight: .bold, design: .monospaced))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Color(hex: "FFFACD"), Color(hex: "FFD700"), Color(hex: "B8860B")],
+                                colors: numberColors,
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
-                        .shadow(color: Color.black.opacity(0.5), radius: 2, x: 1, y: 1)
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 1, y: 1)
                         .padding(.horizontal, 24)
                 } else {
                     Text("加入尊贵会员，解锁专属特权")
                         .font(.subheadline)
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(cardStyle == .monicaPink ? .white.opacity(0.8) : .gray)
                         .padding(.horizontal, 24)
                 }
                 
@@ -143,7 +227,7 @@ struct VIPCardView: View {
                     VStack(alignment: .leading) {
                         Text("VALID THRU")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color(hex: "B8860B"))
+                            .foregroundStyle(validThruColor)
                         
                         if let date = expireDate, isVIP {
                             Text(date.formatted(date: .numeric, time: .omitted))
@@ -153,7 +237,7 @@ struct VIPCardView: View {
                         } else {
                             Text("--/--")
                                 .font(.caption)
-                                .foregroundStyle(.gray)
+                                .foregroundStyle(cardStyle == .monicaPink ? .white.opacity(0.6) : .gray)
                         }
                     }
                     
@@ -184,6 +268,19 @@ struct VIPCardView: View {
             }
         }
         .frame(height: 220)
+        .frame(maxWidth: .infinity)
+        .scaleEffect(x: isAnimatingChange ? 1.02 : 1.0, y: 1.0)
+        .onChange(of: cardStyle) { _ in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
+                isAnimatingChange = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
+                    isAnimatingChange = false
+                }
+            }
+        }
     }
     
     private func formatVIPNumber(_ number: String) -> String {
@@ -198,4 +295,3 @@ struct VIPCardView: View {
         return result
     }
 }
-

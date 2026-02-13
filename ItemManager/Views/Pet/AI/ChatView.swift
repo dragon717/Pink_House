@@ -5,6 +5,10 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var isSending = false
     
+    // Pagination State
+    @State private var isLoadingHistory = false
+    @State private var previousTopMessageId: UUID?
+    
     // Edit Mode State
     @State private var isEditing = false
     @State private var selectedMessageIds = Set<UUID>()
@@ -21,55 +25,64 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 聊天记录区域
-            ScrollView {
-                // 使用 LazyVStack 且翻转，实现倒序列表 (底部对齐)
-                // 列表逻辑顺序：Index 0 (最新) -> Index N (最旧)
-                // 视觉顺序：Index 0 在最底部，Index N 在最顶部
-                LazyVStack(spacing: 20) {
-                    ForEach(petAI.uiMessages) { msg in
-                        HStack {
-                            if isEditing {
-                                Image(systemName: selectedMessageIds.contains(msg.id) ? "checkmark.circle.fill" : "circle")
-                                    .font(.title2)
-                                    .foregroundStyle(selectedMessageIds.contains(msg.id) ? .pink : .gray.opacity(0.5))
-                                    .onTapGesture {
-                                        toggleSelection(for: msg.id)
-                                    }
-                            }
-                            
-                            MessageBubble(message: msg, onImageTap: { image in
-                                if isEditing {
-                                    toggleSelection(for: msg.id)
-                                } else {
-                                    selectedImageWrapper = ImageWrapper(image: image)
-                                }
-                            })
-                                .id(msg.id)
-                                .onTapGesture {
-                                    if isEditing {
-                                        toggleSelection(for: msg.id)
-                                    }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 20) {
+                        // Loading Trigger (Pagination)
+                        if !petAI.uiMessages.isEmpty {
+                            Color.clear
+                                .frame(height: 20)
+                                .onAppear {
+                                    loadMore()
                                 }
                         }
-                        .padding(.horizontal)
-                        .scaleEffect(y: -1) // 翻转每个 Item 内容，使其正向显示
-                    }
-                    
-                    // 加载更多触发器 (放在列表末尾 = 视觉顶部)
-                    if petAI.hasMoreMessages {
-                        ProgressView()
-                            .frame(height: 40)
-                            .scaleEffect(y: -1) // 翻转加载圈
-                            .onAppear {
-                                loadMoreHistory()
+                        
+                        ForEach(petAI.uiMessages) { msg in
+                            HStack {
+                                if isEditing {
+                                    Image(systemName: selectedMessageIds.contains(msg.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.title2)
+                                        .foregroundStyle(selectedMessageIds.contains(msg.id) ? .pink : .gray.opacity(0.5))
+                                        .onTapGesture {
+                                            toggleSelection(for: msg.id)
+                                        }
+                                }
+                                
+                                MessageBubble(message: msg, onImageTap: { image in
+                                    if isEditing {
+                                        toggleSelection(for: msg.id)
+                                    } else {
+                                        selectedImageWrapper = ImageWrapper(image: image)
+                                    }
+                                })
+                                    .id(msg.id)
+                                    .onTapGesture {
+                                        if isEditing {
+                                            toggleSelection(for: msg.id)
+                                        }
+                                    }
                             }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical)
+                }
+                .onChange(of: petAI.uiMessages) { _ in
+                    if isLoadingHistory, let oldId = previousTopMessageId {
+                        // Maintain scroll position (keep old top message visible at top)
+                        proxy.scrollTo(oldId, anchor: .top)
+                        
+                        // Reset state
+                        isLoadingHistory = false
+                        previousTopMessageId = nil
+                    } else if !isEditing, let lastId = petAI.uiMessages.last?.id {
+                        // Auto-scroll to bottom for new messages
+                        withAnimation {
+                            proxy.scrollTo(lastId, anchor: .bottom)
+                        }
                     }
                 }
-                .padding(.vertical)
-                // 视觉底部（逻辑顶部）增加额外间距，防止内容紧贴输入框
-                .padding(.top, 10)
             }
-            .scaleEffect(y: -1) // 翻转整个 ScrollView，使其从底部开始
             .background(
                 ZStack {
                     Color(hex: "FFF0F5").opacity(0.3) // Light base
@@ -138,11 +151,12 @@ struct ChatView: View {
         .onDisappear {
             // 离开页面时停止语音播放
             PetVoiceManager.shared.stop()
+            // 释放内存并重置 UI 状态
+            petAI.resetToLatest()
         }
         .fullScreenCover(item: $selectedImageWrapper) { wrapper in
             FullScreenImageViewer(image: wrapper.image)
         }
-        .toolbar(.hidden, for: .tabBar) // 隐藏底部 TabBar，避免遮挡输入框，并提供沉浸式体验
     }
     
     private func toggleSelection(for id: UUID) {
@@ -161,13 +175,26 @@ struct ChatView: View {
         }
     }
     
-    private func loadMoreHistory() {
-        // 简单的触发加载，无需处理滚动位置，因为追加到末尾（视觉顶部）不会影响当前视口
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            _ = petAI.loadMoreMessages()
+    private func loadMore() {
+        guard !isLoadingHistory else { return }
+        
+        if let firstId = petAI.uiMessages.first?.id {
+            previousTopMessageId = firstId
+            isLoadingHistory = true
+            
+            // Give UI a moment
+            DispatchQueue.main.async {
+                petAI.loadMoreHistory()
+                
+                // If no change (end of history), reset state
+                if let newFirstId = petAI.uiMessages.first?.id, newFirstId == firstId {
+                    isLoadingHistory = false
+                    previousTopMessageId = nil
+                }
+            }
         }
     }
-    
+
     private func sendMessage() {
         let userText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty else { return }
@@ -193,5 +220,6 @@ struct ChatView: View {
     }
 }
 
-// End of ChatView
+
+
 

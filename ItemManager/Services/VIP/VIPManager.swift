@@ -11,6 +11,7 @@ class VIPManager: ObservableObject {
     @Published var isVIP: Bool = false
     @Published var vipExpireDate: Date? = nil
     @Published var vipNumber: String? = nil
+    @Published var cardStyle: VIPCardStyle = .blackGold
     
     private init() {
         // Initial load
@@ -25,6 +26,14 @@ class VIPManager: ObservableObject {
         self.isVIP = status.vipStatus.isActive && !status.vipStatus.isExpired
         self.vipExpireDate = status.vipStatus.expireDate
         self.vipNumber = status.vipStatus.vipNumber
+        self.cardStyle = status.vipStatus.cardStyle
+    }
+    
+    func updateCardStyle(_ style: VIPCardStyle) {
+        var status = PetDataManager.shared.status
+        status.vipStatus.cardStyle = style
+        PetDataManager.shared.saveStatus(status)
+        reloadStatus()
     }
     
     // Purchase or Renew VIP

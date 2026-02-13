@@ -358,10 +358,25 @@ struct NaichaBehavior: PetBehavior {
 }
 
 // MARK: - VIP Status
+enum VIPCardStyle: String, Codable, CaseIterable, Identifiable {
+    case blackGold = "blackGold"
+    case monicaPink = "monicaPink"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .blackGold: return "黑金尊享"
+        case .monicaPink: return "莫妮卡粉色萌梦幻"
+        }
+    }
+}
+
 struct VIPStatus: Codable {
     var isActive: Bool = false
     var expireDate: Date? = nil
     var vipNumber: String? = nil // 特殊编号
+    var cardStyle: VIPCardStyle = .blackGold // Default style
     
     var isExpired: Bool {
         guard let date = expireDate else { return true }

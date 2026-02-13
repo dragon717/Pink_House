@@ -31,12 +31,8 @@ class PetAIService: ObservableObject {
     static let shared = PetAIService(role: .kitten, petName: "奶茶", apiKey: AIConfigManager.shared.dsApiKey ?? "") // Default init
     
     @Published var isProcessing: Bool = false
-    @Published var uiMessages: [ChatMessage] = [] // UI 展示用的消息历史
-    private var allMessages: [ChatMessage] = [] // 所有消息历史 (内存缓存)
-    
-    var hasMoreMessages: Bool {
-        return allMessages.count > uiMessages.count
-    }
+    @Published var uiMessages: [ChatMessage] = [] // UI 展示用的消息历史 (分页加载)
+    private var allMessages: [ChatMessage] = [] // 完整的本地聊天记录
     
     private var role: PetRole
     private var petName: String
@@ -68,73 +64,89 @@ class PetAIService: ObservableObject {
         return documents.appendingPathComponent("chat_history.json")
     }
     
+    private var isHistoryLoaded = false // 标记历史记录是否成功加载，防止覆盖旧数据
+
     private func saveMessages() {
-        // 在后台线程保存，避免阻塞主线程
-        Task.detached(priority: .background) {
-            do {
-                // allMessages 是倒序的 (最新的在前)，为了兼容性和可读性，保存时转回正序 (旧 -> 新)
-                let messagesToSave = Array(await self.allMessages.reversed())
-                let data = try JSONEncoder().encode(messagesToSave)
-                let url = await self.messagesFileURL
-                try data.write(to: url)
-            } catch {
-                print("Failed to save chat history: \(error)")
-            }
+        // 如果历史记录从未成功加载，且文件存在（说明解析失败），则不要覆盖，以免丢失数据
+        if !isHistoryLoaded && FileManager.default.fileExists(atPath: messagesFileURL.path) {
+            print("⚠️ [PetAIService] History load failed previously. Skipping save to prevent data loss.")
+            return
+        }
+        
+        do {
+            let data = try JSONEncoder().encode(allMessages)
+            try data.write(to: messagesFileURL)
+        } catch {
+            print("Failed to save chat history: \(error)")
         }
     }
     
     private func loadMessages() {
-        // 异步加载
-        Task.detached(priority: .userInitiated) {
-            let url = await self.messagesFileURL
-            guard FileManager.default.fileExists(atPath: url.path) else { return }
+        guard FileManager.default.fileExists(atPath: messagesFileURL.path) else {
+            isHistoryLoaded = true // 文件不存在，视为新用户，允许保存
+            return
+        }
+        
+        do {
+            let data = try Data(contentsOf: messagesFileURL)
+            let messages = try JSONDecoder().decode([ChatMessage].self, from: data)
+            self.allMessages = messages
             
-            do {
-                let data = try Data(contentsOf: url)
-                // 读出来是正序 (旧 -> 新)
-                let messages = try JSONDecoder().decode([ChatMessage].self, from: data)
-                
-                // 转为倒序 (新 -> 旧)
-                let reversedMessages = Array(messages.reversed())
-                
-                await MainActor.run {
-                    self.allMessages = reversedMessages
-                    
-                    // Initial load: show latest 10 messages
-                    let initialLoadCount = 10
-                    if reversedMessages.count > initialLoadCount {
-                        self.uiMessages = Array(reversedMessages.prefix(initialLoadCount))
-                    } else {
-                        self.uiMessages = reversedMessages
-                    }
-                }
-            } catch {
-                print("Failed to load chat history: \(error)")
-            }
+            // 初始只加载最后 2 条，提升进入速度
+            let count = messages.count
+            let loadCount = min(count, 2)
+            let startIndex = count - loadCount
+            self.uiMessages = Array(messages[startIndex..<count])
+            
+            isHistoryLoaded = true
+            print("✅ [PetAIService] Successfully loaded \(count) messages.")
+        } catch {
+            print("❌ [PetAIService] Failed to load chat history: \(error)")
+            
+            // 尝试备份损坏的数据，以便后续分析
+            let backupURL = messagesFileURL.deletingPathExtension().appendingPathExtension("corrupted.json")
+            try? FileManager.default.copyItem(at: messagesFileURL, to: backupURL)
+            print("⚠️ [PetAIService] Corrupted data backed up to: \(backupURL.lastPathComponent)")
+            
+            // 在这里我们可以选择：
+            // 1. 依然设为 true，允许用户重新开始（旧数据已备份）
+            // 2. 保持 false，禁止保存（保护旧文件，但用户无法使用聊天功能）
+            // 考虑到已备份，设为 true 让用户能继续使用可能更好，但为了安全起见，我们先保持 false 并让用户知道。
+            // 或者，我们可以尝试用更宽松的方式解析？
+            
+            // 临时策略：不标记为 loaded，防止 saveMessages 覆盖原文件。
+            // 但这样会导致新消息无法保存。
+            // 改进策略：既然已经备份了，那就允许重置。
+            isHistoryLoaded = true 
         }
     }
     
-    // 加载更多历史记录
-    // 返回值: Bool, 表示是否有更多数据被加载
-    func loadMoreMessages(count: Int = 10) -> Bool {
-        guard allMessages.count > uiMessages.count else { return false }
-        
+    // 加载更多历史记录 (分页)
+    func loadMoreHistory() {
         let currentCount = uiMessages.count
-        let remainingCount = allMessages.count - currentCount
-        let loadCount = min(count, remainingCount)
+        let totalCount = allMessages.count
         
-        guard loadCount > 0 else { return false }
+        guard currentCount < totalCount else { return }
         
-        // allMessages 和 uiMessages 现在都是倒序存储（index 0 是最新的）
-        // 所以加载更多就是取 allMessages 中接下来的元素，追加到 uiMessages 末尾
-        let startIndex = currentCount
-        let endIndex = currentCount + loadCount
+        let remaining = totalCount - currentCount
+        let pageSize = 20
+        let loadCount = min(pageSize, remaining)
+        
+        let endIndex = totalCount - currentCount
+        let startIndex = endIndex - loadCount
         
         let newMessages = Array(allMessages[startIndex..<endIndex])
         
-        // 追加到末尾 (UI上显示在顶部，因为列表倒序了)
-        self.uiMessages.append(contentsOf: newMessages)
-        return true
+        // 插入到开头
+        self.uiMessages.insert(contentsOf: newMessages, at: 0)
+    }
+    
+    // 重置 UI 显示为最新的 2 条 (用于退出页面时释放内存)
+    func resetToLatest() {
+        let count = allMessages.count
+        let loadCount = min(count, 2)
+        let startIndex = count - loadCount
+        self.uiMessages = Array(allMessages[startIndex..<count])
     }
     
     private func saveImageToDisk(image: UIImage) -> String? {
@@ -214,10 +226,8 @@ class PetAIService: ObservableObject {
         
         // 1. 记录用户消息 (Use displayText if available, otherwise raw text)
         let userMsg = ChatMessage(text: displayText ?? text, imagePath: userImagePath, isUser: true)
-        
-        // 插入到开头 (因为是倒序，最新的在最前)
-        self.allMessages.insert(userMsg, at: 0)
-        self.uiMessages.insert(userMsg, at: 0)
+        self.allMessages.append(userMsg)
+        self.uiMessages.append(userMsg)
         self.saveMessages()
         
         self.isProcessing = true
@@ -289,23 +299,23 @@ class PetAIService: ObservableObject {
             PetVoiceManager.shared.speak(cleanText, for: self.role)
             
             let aiMsg = ChatMessage(text: cleanText, imageName: imageName, isUser: false)
-            self.allMessages.insert(aiMsg, at: 0)
-            self.uiMessages.insert(aiMsg, at: 0)
+            self.allMessages.append(aiMsg)
+            self.uiMessages.append(aiMsg)
             self.saveMessages()
             return aiMsg
             
         } catch is TimeoutError {
             print("❌ [Debug] 请求超时 (30s)")
             let errorMsg = ChatMessage(text: "（打呼噜...）DeepSeek 好像有点慢喵...", imageName: "sleepy_cat", isUser: false)
-            self.allMessages.insert(errorMsg, at: 0)
-            self.uiMessages.insert(errorMsg, at: 0)
+            self.allMessages.append(errorMsg)
+            self.uiMessages.append(errorMsg)
             self.saveMessages()
             return errorMsg
         } catch {
             print("❌ [Debug] 请求发生错误: \(error)")
             let errorMsg = ChatMessage(text: "错误: \(error.localizedDescription) (请检查 DS_API_KEY)", isUser: false)
-            self.allMessages.insert(errorMsg, at: 0)
-            self.uiMessages.insert(errorMsg, at: 0)
+            self.allMessages.append(errorMsg)
+            self.uiMessages.append(errorMsg)
             self.saveMessages()
             return errorMsg
         }
@@ -342,8 +352,8 @@ class PetAIService: ObservableObject {
     }
     
     func deleteMessages(ids: Set<UUID>) {
-        uiMessages.removeAll { ids.contains($0.id) }
         allMessages.removeAll { ids.contains($0.id) }
+        uiMessages.removeAll { ids.contains($0.id) }
         saveMessages()
     }
 }
