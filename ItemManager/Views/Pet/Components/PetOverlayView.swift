@@ -62,6 +62,10 @@ struct PetOverlayView: View {
     @State private var isPressing = false
     @State private var dragStartTime: Date?
     
+    // Throttle for Vision Check
+    @State private var lastVisionCheckTime: Date = .distantPast
+    private let visionCheckInterval: TimeInterval = 0.3
+    
     // 触觉反馈管理器
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     
@@ -295,10 +299,14 @@ struct PetOverlayView: View {
 
                             
                             // Throttle vision detection
-                            if let image = captureScreen(scale: screenshotScale) {
-                                let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
-                                self.currentROI = roi
-                                visionManager.detectLines(in: image, roi: roi)
+                            let now = Date()
+                            if now.timeIntervalSince(lastVisionCheckTime) >= visionCheckInterval {
+                                if let image = captureScreen(scale: screenshotScale) {
+                                    lastVisionCheckTime = now
+                                    let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
+                                    self.currentROI = roi
+                                    visionManager.detectLines(in: image, roi: roi)
+                                }
                             }
                         }
                     }
@@ -471,8 +479,8 @@ struct PetOverlayView: View {
             let padding: CGFloat = 20
             let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
             
-            // Capture
-            guard let croppedImage = self.captureCroppedImage(rect: paddedRect) else {
+            // Capture with reduced scale (0.5) to avoid UI lag
+            guard let croppedImage = self.captureCroppedImage(rect: paddedRect, scale: self.screenshotScale) else {
                 self.isHiddenForSnapshot = false
                 interactionManager.endAnalyzing()
                 return
@@ -547,8 +555,8 @@ struct PetOverlayView: View {
         }
     }
     
-    private func captureCroppedImage(rect: CGRect) -> UIImage? {
-        guard let fullScreen = captureScreen(scale: 1.0), let cgImage = fullScreen.cgImage else { return nil }
+    private func captureCroppedImage(rect: CGRect, scale: CGFloat = 1.0) -> UIImage? {
+        guard let fullScreen = captureScreen(scale: scale), let cgImage = fullScreen.cgImage else { return nil }
         
         let scale = fullScreen.scale
         let x = rect.minX * scale
