@@ -383,11 +383,11 @@ struct GeneralSettingsView: View {
       
         NavigationLink(destination: PetCustomizationView()) {
             HStack {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
+                Image(systemName: "paintpalette.fill")
                     .foregroundStyle(.blue)
-                Text("\(petDataManager.status.displayName)气泡")
+                Text("\(petDataManager.status.displayName)个性化")
                 Spacer()
-                Text("大小与字体")
+                Text("气泡与轨迹")
                     .foregroundStyle(.secondary)
                     .font(.caption)
             }

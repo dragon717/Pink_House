@@ -5,6 +5,12 @@ struct PetCustomizationView: View {
     @AppStorage("petBubbleSize") private var bubbleSize: PetBubbleSize = .medium
     @AppStorage("petBubbleUseCustomFont") private var useCustomFont: Bool = true
     
+    // Trail Settings
+    @AppStorage("petTrailTheme") private var trailTheme: PetTrailTheme = .defaultPink
+    @AppStorage("petTrailCustomColor1") private var customColor1Hex: String = "FFC0CB"
+    @AppStorage("petTrailCustomColor2") private var customColor2Hex: String = "D87093"
+    @AppStorage("petTrailCustomColor3") private var customColor3Hex: String = "F5F5DC"
+    
     @ObservedObject private var fontManager = FontManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
     @State private var isImporting = false
@@ -101,6 +107,61 @@ struct PetCustomizationView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+            
+            Section(header: Text("拖拽轨迹")) {
+                Picker("色彩方案", selection: $trailTheme) {
+                    ForEach(PetTrailTheme.allCases) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
+                }
+                
+                if trailTheme == .custom {
+                    ColorPicker("颜色 1 (起点)", selection: Binding(
+                        get: { Color(hex: customColor1Hex) },
+                        set: { customColor1Hex = $0.toHex() }
+                    ))
+                    ColorPicker("颜色 2 (中段)", selection: Binding(
+                        get: { Color(hex: customColor2Hex) },
+                        set: { customColor2Hex = $0.toHex() }
+                    ))
+                    ColorPicker("颜色 3 (终点)", selection: Binding(
+                        get: { Color(hex: customColor3Hex) },
+                        set: { customColor3Hex = $0.toHex() }
+                    ))
+                }
+                
+                // Preview
+                HStack {
+                    Spacer()
+                    VStack {
+                        Text("轨迹预览")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        GeometryReader { geo in
+                            Path { path in
+                                path.move(to: CGPoint(x: 20, y: geo.size.height / 2))
+                                path.addCurve(
+                                    to: CGPoint(x: geo.size.width - 20, y: geo.size.height / 2),
+                                    control1: CGPoint(x: geo.size.width / 3, y: -20),
+                                    control2: CGPoint(x: geo.size.width * 2 / 3, y: geo.size.height + 20)
+                                )
+                            }
+                            .stroke(
+                                LinearGradient(
+                                    colors: trailTheme.colors(custom1: customColor1Hex, custom2: customColor2Hex, custom3: customColor3Hex) + [.clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                            )
+                        }
+                        .frame(height: 60)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical)
             }
             
             Section(footer: Text("设置将立即应用到所有\(petDataManager.status.displayName)互动气泡中。")) {

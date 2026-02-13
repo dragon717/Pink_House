@@ -30,6 +30,11 @@ struct PetOverlayView: View {
     @State private var isCircleTriggered: Bool = false
     
     // Trail Effect State
+    @AppStorage("petTrailTheme") private var trailTheme: PetTrailTheme = .defaultPink
+    @AppStorage("petTrailCustomColor1") private var customColor1Hex: String = "FFC0CB"
+    @AppStorage("petTrailCustomColor2") private var customColor2Hex: String = "D87093"
+    @AppStorage("petTrailCustomColor3") private var customColor3Hex: String = "F5F5DC"
+    
     @State private var trailPoints: [TrailPoint] = []
     
     struct TrailPoint: Identifiable {
@@ -125,10 +130,13 @@ struct PetOverlayView: View {
                                     }
                                     
                                     // Gradient Stroke
+                                    var gradientColors = trailTheme.colors(custom1: customColor1Hex, custom2: customColor2Hex, custom3: customColor3Hex)
+                                    gradientColors.append(.clear) // Always fade out at the end
+                                    
                                     context.stroke(
                                         path,
                                         with: .linearGradient(
-                                            Gradient(colors: [.pink, .purple, .blue, .clear]),
+                                            Gradient(colors: gradientColors),
                                             startPoint: validPoints.last!.location,
                                             endPoint: validPoints.first!.location
                                         ),
