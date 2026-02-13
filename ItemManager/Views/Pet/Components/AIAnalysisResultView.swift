@@ -8,7 +8,8 @@ struct AIAnalysisResultView: View {
     var petName: String = "萌宠" // 动态名字
     let onClose: () -> Void
     
-    @State private var isExpanded = false
+    @State private var isChatMode = false
+    @State private var appearAnimation = false
     @State private var localMessages: [ChatMessage] = []
     @State private var inputText: String = ""
     @State private var isSending: Bool = false
@@ -17,135 +18,243 @@ struct AIAnalysisResultView: View {
     @State private var selectedImageWrapper: ImageWrapper?
     
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            // 1. Expanded View (Full Chat Interface)
-            if isExpanded {
-                // Dimmed Background
-                Color.black.opacity(0.4)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            isExpanded = false
-                        }
-                    }
+        ZStack {
+            // Background Blur/Dim
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    closeWithAnimation()
+                }
+            
+            // Main Card
+            VStack(spacing: 0) {
+                // Header (Common)
+                if !isChatMode {
+                    headerView
+                } else {
+                    chatHeaderView
+                }
                 
-                // Chat Card
-                VStack(spacing: 0) {
-                    // Header
-                    HStack {
-                        Text("\(petName)的观察日记")
-                            .font(.headline)
-                            .foregroundStyle(.pink)
-                        Spacer()
+                // Content Area
+                if !isChatMode {
+                    // 1. Result Display Mode
+                    resultContentView
+                } else {
+                    // 2. Chat Mode
+                    chatContentView
+                }
+                
+                // Footer Area
+                if !isChatMode {
+                    // Result Actions
+                    HStack(spacing: 20) {
+                        Button(action: closeWithAnimation) {
+                            Text("收到啦 💖")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(hex: "FFB6C1"), Color(hex: "FF69B4")],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .clipShape(Capsule())
+                                .shadow(color: Color(hex: "FF69B4").opacity(0.4), radius: 8, x: 0, y: 4)
+                        }
+                        
                         Button(action: {
-                            withAnimation {
-                                onClose()
+                            withAnimation(.spring()) {
+                                isChatMode = true
                             }
                         }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(.gray.opacity(0.5))
+                            HStack {
+                                Image(systemName: "pawprint.fill")
+                                Text("继续问问")
+                            }
+                            .font(.headline)
+                            .foregroundStyle(.pink)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.white)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(Color.pink, lineWidth: 2)
+                            )
                         }
                     }
-                    .padding()
-                    .background(Color.white.opacity(0.9))
-                    
-                    // Message List
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(spacing: 20) {
-                                ForEach(localMessages) { msg in
-                                    MessageBubble(message: msg, onImageTap: { image in
-                                        selectedImageWrapper = ImageWrapper(image: image)
-                                    })
-                                    .id(msg.id)
-                                }
-                                
-                                if isSending {
-                                    HStack {
-                                        Spacer() // AI typing indicator on left? No, usually left.
-                                        TypingIndicator()
-                                        Spacer()
-                                    }
-                                    .id("typing")
-                                }
-                            }
-                            .padding()
-                        }
-                        .onChange(of: localMessages.count) { _ in
-                            if let lastId = localMessages.last?.id {
-                                withAnimation {
-                                    proxy.scrollTo(lastId, anchor: .bottom)
-                                }
-                            }
-                        }
-                    }
-                    .background(
-                        ZStack {
-                            Color(hex: "FFF0F5").opacity(0.5)
-                            PatternBackground()
-                        }
-                    )
-                    
-                    // Input Area
+                    .padding(24)
+                } else {
+                    // Chat Input
                     PetDialogueInputView(
                         text: $inputText,
                         onSend: sendMessage
                     )
                     .disabled(isSending)
                 }
-                .frame(maxWidth: 500, maxHeight: 600) // Max size for iPad/Desktop
-                .cornerRadius(24)
-                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
-                .padding(20)
-                .transition(.scale(scale: 0.8).combined(with: .opacity))
-                .zIndex(1)
             }
-            
-            // 2. Collapsed View (Cat Paw Icon)
-            if !isExpanded {
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        isExpanded = true
-                    }
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(colors: [.pink, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
-                            .frame(width: 60, height: 60)
-                            .shadow(color: .pink.opacity(0.4), radius: 8, x: 0, y: 4)
-                        
-                        Image(systemName: "pawprint.fill")
-                            .font(.title)
-                            .foregroundStyle(.white)
-                        
-                        // Badge or Indicator?
-                        Circle()
-                            .stroke(Color.white, lineWidth: 2)
-                            .frame(width: 64, height: 64)
-                            .scaleEffect(1.1)
-                            .opacity(0.5)
-                            .overlay(
-                                Circle()
-                                    .trim(from: 0, to: 0.7)
-                                    .stroke(Color.pink, lineWidth: 2)
-                                    .rotationEffect(.degrees(Date().timeIntervalSince1970 * 90))
-                            )
-                    }
+            .background(
+                ZStack {
+                    Color(hex: "FFF0F5") // Base background
+                    PatternBackground()  // Texture
                 }
-                .padding(.bottom, 100) // Adjust based on position requirements
-                .padding(.trailing, 30)
-                .transition(.scale.combined(with: .opacity))
-                .zIndex(2)
-            }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.white.opacity(0.8), lineWidth: 2)
+            )
+            .shadow(color: Color(hex: "FF69B4").opacity(0.2), radius: 20, x: 0, y: 10)
+            .padding(.horizontal, isChatMode ? 20 : 40)
+            .padding(.vertical, isChatMode ? 40 : 20)
+            .frame(maxWidth: 500)
+            .scaleEffect(appearAnimation ? 1.0 : 0.8)
+            .opacity(appearAnimation ? 1.0 : 0.0)
         }
         .onAppear {
             initializeMessages()
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                appearAnimation = true
+            }
         }
         .fullScreenCover(item: $selectedImageWrapper) { wrapper in
             FullScreenImageViewer(image: wrapper.image)
+        }
+    }
+    
+    // MARK: - Subviews
+    
+    private var headerView: some View {
+        VStack(spacing: 0) {
+            if let image = analyzedImage {
+                ZStack {
+                    Color.white
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 200)
+                        .clipped()
+                }
+                .frame(height: 200)
+                .overlay(
+                    LinearGradient(
+                        colors: [.clear, Color(hex: "FFF0F5")],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                )
+                .overlay(alignment: .bottomTrailing) {
+                    StampView()
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 8)
+                        .rotationEffect(.degrees(-15))
+                }
+            }
+            
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(Color(hex: "FF69B4"))
+                Text("\(petName)观察日记")
+                    .font(.headline)
+                    .foregroundStyle(Color(hex: "DB7093"))
+                Image(systemName: "sparkles")
+                    .foregroundStyle(Color(hex: "FF69B4"))
+            }
+            .padding(.top, analyzedImage == nil ? 20 : 10)
+            .padding(.bottom, 10)
+        }
+    }
+    
+    private var chatHeaderView: some View {
+        HStack {
+            Text("\(petName)的观察日记")
+                .font(.headline)
+                .foregroundStyle(.pink)
+            Spacer()
+            Button(action: {
+                closeWithAnimation()
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.gray.opacity(0.5))
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.5))
+    }
+    
+    private var resultContentView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // User Question (Collapsed style)
+            HStack {
+                Text("你问了\(petName):")
+                    .font(.caption)
+                    .foregroundStyle(.gray)
+                Text(userQuestion)
+                    .font(.caption)
+                    .foregroundStyle(Color(hex: "DB7093"))
+                    .lineLimit(1)
+            }
+            .padding(10)
+            .background(Color.white.opacity(0.5))
+            .cornerRadius(8)
+            .padding(.horizontal)
+            
+            ScrollView(showsIndicators: false) {
+                Text(resultText)
+                    .font(.system(.body, design: .rounded))
+                    .lineSpacing(6)
+                    .foregroundStyle(Color(hex: "4A4A4A"))
+                    .padding(.horizontal)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 200)
+        }
+    }
+    
+    private var chatContentView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 20) {
+                    ForEach(localMessages) { msg in
+                        MessageBubble(message: msg, onImageTap: { image in
+                            selectedImageWrapper = ImageWrapper(image: image)
+                        })
+                        .id(msg.id)
+                    }
+                    
+                    if isSending {
+                        HStack {
+                            Spacer()
+                            TypingIndicator()
+                            Spacer()
+                        }
+                        .id("typing")
+                    }
+                }
+                .padding()
+            }
+            .onChange(of: localMessages.count) { _ in
+                if let lastId = localMessages.last?.id {
+                    withAnimation {
+                        proxy.scrollTo(lastId, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Logic
+    
+    private func closeWithAnimation() {
+        withAnimation(.easeIn(duration: 0.2)) {
+            appearAnimation = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            onClose()
         }
     }
     
@@ -177,21 +286,15 @@ struct AIAnalysisResultView: View {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         
-        // Add User Message locally
         let userMsg = ChatMessage(text: text, isUser: true)
         withAnimation {
             localMessages.append(userMsg)
-            // inputText = "" // PetDialogueInputView doesn't clear binding automatically? 
-            // Usually InputView binds to text, so clearing it here clears the view.
             inputText = ""
             isSending = true
         }
         
         Task {
-            // Call AI Service
-            // Note: This adds to global history too
             let aiMsg = await PetAIService.shared.sendMessage(text)
-            
             await MainActor.run {
                 withAnimation {
                     localMessages.append(aiMsg)

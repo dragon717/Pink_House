@@ -6,8 +6,9 @@ struct VIPCardSkinSelectionView: View {
     @Environment(ThemeManager.self) private var themeManager
     
     var body: some View {
-        ZStack {
-            // Background
+        GeometryReader { geometry in
+            ZStack {
+                // Background
             if vipManager.cardStyle == .blackGold {
                 Color(hex: "121212")
                     .ignoresSafeArea()
@@ -44,7 +45,7 @@ struct VIPCardSkinSelectionView: View {
                                     isVIP: true,
                                     cardStyle: style
                                 )
-                                .frame(height: 220)
+                                .frame(width: geometry.size.width - 64, height: 220)
                                 .scaleEffect(vipManager.cardStyle == style ? 1.0 : 0.95)
                                 .opacity(vipManager.cardStyle == style ? 1.0 : 0.7)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.6), value: vipManager.cardStyle) // Elastic stretching effect
@@ -87,10 +88,14 @@ struct VIPCardSkinSelectionView: View {
                 } label: {
                     Text("完成")
                         .font(.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(vipManager.cardStyle == .monicaPink ? .white : .white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color(hex: "1E1E1E"))
+                        .background(
+                            vipManager.cardStyle == .monicaPink 
+                            ? Color(hex: "FF69B4") 
+                            : Color(hex: "1E1E1E")
+                        )
                         .cornerRadius(12)
                 }
                 .padding(.horizontal)
@@ -98,4 +103,5 @@ struct VIPCardSkinSelectionView: View {
             }
         }
     }
+}
 }

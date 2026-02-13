@@ -7,6 +7,7 @@ enum FloatingPetState {
     case dragging       // Being dragged by user
     case snapping       // Snapped to a line (video playing)
     case returning      // Animating back to TabBar
+    case analyzing      // Analyzing image content (hidden/waiting)
 }
 
 class PetInteractionManager: ObservableObject {
@@ -57,6 +58,14 @@ class PetInteractionManager: ObservableObject {
     func updateDragPosition(_ location: CGPoint) {
         guard state == .dragging else { return }
         dragPosition = location
+    }
+    
+    func startAnalyzing() {
+        state = .analyzing
+    }
+    
+    func endAnalyzing() {
+        returnToTabBar()
     }
     
     func endDragging(at location: CGPoint, screenSize: CGSize) {

@@ -69,7 +69,7 @@ struct VIPCardView: View {
     private var tagText: String {
         switch cardStyle {
         case .blackGold: return "黑金尊享"
-        case .monicaPink: return "莫妮卡限定"
+        case .monicaPink: return "梦幻限定"
         }
     }
     
@@ -125,16 +125,31 @@ struct VIPCardView: View {
                 .offset(x: shimmerOffset)
                 .blur(radius: 5)
                 .blendMode(.overlay)
-                .onAppear {
-                    // Start from outside left to outside right
-                    // The offset range needs to be large enough to cover the rotation
+                .task(id: geometry.size) {
                     let startX = -geometry.size.width * 0.8
                     let endX = geometry.size.width * 1.5
                     
+                    // 初始位置
                     shimmerOffset = startX
                     
-                    withAnimation(.linear(duration: 3).repeatForever(autoreverses: false)) {
-                        shimmerOffset = endX
+                    // 稍微延迟一点启动，避免页面刚显示就闪
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+                    
+                    while !Task.isCancelled {
+                        // 重置到起点 (无动画)
+                        shimmerOffset = startX
+                        
+                        // 确保重置生效的一小段缓冲 (可选，但在高频循环中比较稳妥)
+                        try? await Task.sleep(nanoseconds: 50_000_000) // 0.05s
+                        
+                        // 执行流光动画
+                        withAnimation(.linear(duration: 2.5)) {
+                            shimmerOffset = endX
+                        }
+                        
+                        // 等待动画结束 + 间隔时间
+                        // 动画 2.5s + 间隔 2.5s = 5.0s
+                        try? await Task.sleep(nanoseconds: 5_000_000_000)
                     }
                 }
             }

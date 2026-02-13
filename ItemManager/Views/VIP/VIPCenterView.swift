@@ -95,12 +95,14 @@ struct VIPCenterView: View {
                             .padding()
                             .background(
                                 LinearGradient(
-                                    colors: [Color(hex: "FFD700"), Color(hex: "B8860B")],
+                                    colors: vipManager.cardStyle == .monicaPink 
+                                        ? [Color(hex: "FF69B4"), Color(hex: "FFC0CB")] 
+                                        : [Color(hex: "FFD700"), Color(hex: "B8860B")],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
-                            .foregroundStyle(.black)
+                            .foregroundStyle(vipManager.cardStyle == .monicaPink ? .white : .black)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         

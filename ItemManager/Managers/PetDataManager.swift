@@ -18,6 +18,12 @@ class PetDataManager: ObservableObject {
     
     // MARK: - Persistence
     
+    func reloadFromDisk() {
+        self.status = PetDataManager.loadStatusFromDisk()
+        // Notify listeners that status has been forcefully reloaded from disk
+        NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
+    }
+    
     static func loadStatusFromDisk() -> PetStatus {
         let statusKey = "PetStatus_Data"
         guard let data = UserDefaults.standard.data(forKey: statusKey) else {

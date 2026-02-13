@@ -38,6 +38,8 @@ struct BackupManifest: Codable {
     
     // Pet Module
     let petStatusData: Data?
+    // v1.4.1: Chat History (JSON only, no images)
+    let chatHistoryData: Data?
     
     // App Version Persistence
     let appVersion: String?

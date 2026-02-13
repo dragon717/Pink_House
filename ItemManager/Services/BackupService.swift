@@ -437,6 +437,13 @@ class BackupService {
             // Pet Status
             let petStatusData = UserDefaults.standard.data(forKey: "PetStatus_Data")
             
+            // Chat History (JSON only)
+            var chatHistoryData: Data? = nil
+            let chatHistoryURL = documentsDir.appendingPathComponent("chat_history.json")
+            if fileManager.fileExists(atPath: chatHistoryURL.path) {
+                chatHistoryData = try? Data(contentsOf: chatHistoryURL)
+            }
+            
             // App Version
             let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
             
@@ -460,6 +467,7 @@ class BackupService {
                 hasLargeWidgetBackground: hasLargeWidgetBackground,
                 externalFileHashes: externalHashes,
                 petStatusData: petStatusData,
+                chatHistoryData: chatHistoryData,
                 appVersion: appVersion,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
@@ -1003,6 +1011,26 @@ class BackupService {
         if let petData = manifest.petStatusData {
             print("Restore: Restoring Pet Status...")
             UserDefaults.standard.set(petData, forKey: "PetStatus_Data")
+            
+            // Force reload data manager
+            DispatchQueue.main.async {
+                PetDataManager.shared.reloadFromDisk()
+            }
+        }
+        
+        // Restore Chat History
+        if let chatData = manifest.chatHistoryData {
+            print("Restore: Restoring Chat History (JSON)...")
+            let chatHistoryURL = documentsDir.appendingPathComponent("chat_history.json")
+            if fileManager.fileExists(atPath: chatHistoryURL.path) {
+                try? fileManager.removeItem(at: chatHistoryURL)
+            }
+            try? chatData.write(to: chatHistoryURL)
+            
+            // Reload Pet AI Service
+            DispatchQueue.main.async {
+                PetAIService.shared.reloadHistory()
+            }
         }
         
         // Refresh Theme & Widget

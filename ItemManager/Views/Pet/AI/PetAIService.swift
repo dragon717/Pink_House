@@ -81,6 +81,12 @@ class PetAIService: ObservableObject {
         }
     }
     
+    // Public reload for restore
+    func reloadHistory() {
+        self.isHistoryLoaded = false
+        self.loadMessages()
+    }
+    
     private func loadMessages() {
         guard FileManager.default.fileExists(atPath: messagesFileURL.path) else {
             isHistoryLoaded = true // 文件不存在，视为新用户，允许保存

@@ -25,13 +25,23 @@ struct PetOverlayView: View {
     @State private var idleX: CGFloat? = nil // Record last idle X position
     
     // Analysis State
-    @State private var analysisHoldTimer: Timer?
-    @State private var holdStartTime: Date?
-    @State private var holdProgress: Double = 0.0
-    @State private var isHoldTriggered: Bool = false
+    @State private var dragPoints: [CGPoint] = []
+    @State private var circleBoundingBox: CGRect? = nil
+    @State private var isCircleTriggered: Bool = false
+    
+    // Trail Effect State
+    @State private var trailPoints: [TrailPoint] = []
+    
+    struct TrailPoint: Identifiable {
+        let id = UUID()
+        let location: CGPoint
+        let timestamp: Date
+    }
     
     // Config
-    private let analysisHoldDuration: TimeInterval = 2.0
+    private let circleMinPoints: Int = 20
+    private let circleMinDistance: CGFloat = 300 // 总长度阈值
+    private let circleMinArea: CGFloat = 50 * 50 // 最小包围盒面积
     
     // ... (keep existing properties) ...
     // Analysis Result State
@@ -97,43 +107,79 @@ struct PetOverlayView: View {
                 // Cat Image Layer (Handles dragging, returning, and snapping fallback)
                 // Show if NOT snapping OR if snapping but video is disabled
                 if interactionManager.state != .snapping || !interactionManager.isPlayingVideo {
+                    
+                    // Trail Effect Layer (Behind Cat)
+                    if isDragging {
+                        TimelineView(.animation) { timeline in
+                            Canvas { context, size in
+                                var path = Path()
+                                let now = timeline.date
+                                
+                                // Filter and draw points
+                                let validPoints = trailPoints.filter { now.timeIntervalSince($0.timestamp) < 2.0 }
+                                
+                                if validPoints.count > 1 {
+                                    path.move(to: validPoints[0].location)
+                                    for i in 1..<validPoints.count {
+                                        path.addLine(to: validPoints[i].location)
+                                    }
+                                    
+                                    // Gradient Stroke
+                                    context.stroke(
+                                        path,
+                                        with: .linearGradient(
+                                            Gradient(colors: [.pink, .purple, .blue, .clear]),
+                                            startPoint: validPoints.last!.location,
+                                            endPoint: validPoints.first!.location
+                                        ),
+                                        style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                                    )
+                                    
+                                    // Sparkles
+                                    for point in validPoints {
+                                        let age = now.timeIntervalSince(point.timestamp)
+                                        let opacity = 1.0 - (age / 2.0)
+                                        
+                                        if opacity > 0 && Int.random(in: 0...10) == 0 {
+                                            let sparkleSize = Double.random(in: 2...5)
+                                            let sparkleRect = CGRect(
+                                                x: point.location.x - sparkleSize/2,
+                                                y: point.location.y - sparkleSize/2,
+                                                width: sparkleSize,
+                                                height: sparkleSize
+                                            )
+                                            context.fill(Path(ellipseIn: sparkleRect), with: .color(.white.opacity(opacity)))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
                     petView(geometry: geometry)
                         .opacity(isHiddenForSnapshot ? 0 : 1)
                 }
-                if isDragging && !isHoldTriggered && holdProgress > 0 {
+                if isDragging && isCircleTriggered, let bbox = circleBoundingBox {
                     ZStack {
-                        // Ring Background
-                        Circle()
-                            .stroke(Color.white.opacity(0.3), lineWidth: 4)
-                            .frame(width: 80, height: 80)
-                        
-                        // Ring Progress
-                        Circle()
-                            .trim(from: 0, to: holdProgress)
-                            .stroke(
-                                LinearGradient(colors: [.pink, .purple], startPoint: .top, endPoint: .bottom),
-                                style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                        // Bounding Box
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(style: StrokeStyle(lineWidth: 3, dash: [10]))
+                            .foregroundStyle(
+                                LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
                             )
-                            .frame(width: 80, height: 80)
-                            .rotationEffect(.degrees(-90))
-                            .animation(.linear(duration: 0.1), value: holdProgress)
+                            .frame(width: bbox.width, height: bbox.height)
+                            .position(x: bbox.midX, y: bbox.midY)
                         
-                        // Magnifying Glass Icon
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 30))
+                        // Checkmark Icon
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 40))
                             .foregroundStyle(.white)
-                            .shadow(radius: 2)
-                        
-                        // Cat Paw (Small decoration)
-                        Image(systemName: "pawprint.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.pink)
-                            .offset(x: 15, y: -15)
-                            .opacity(holdProgress > 0.5 ? 1 : 0)
-                            .animation(.spring(), value: holdProgress)
+                            .shadow(radius: 4)
+                            .background(Circle().fill(Color.mint))
+                            .position(x: bbox.maxX, y: bbox.minY)
+                            .offset(x: 10, y: -10)
                     }
-                    .position(interactionManager.dragPosition)
-                    .offset(y: -80) // Above finger
+                    .transition(.opacity)
                 }
                 
                 // Thinking Bubble
@@ -184,6 +230,7 @@ struct PetOverlayView: View {
                             withAnimation {
                                 showingAnalysisResult = false
                                 capturedImage = nil
+                                interactionManager.endAnalyzing()
                             }
                         }
                     )
@@ -208,40 +255,65 @@ struct PetOverlayView: View {
                                 hapticManager.playUIFeedback(intensity: 0.6, sharpness: 0.7, fallbackStyle: .medium)
                                 
                                 // Reset Hold Logic
-                                resetHoldTimer()
-                                startHoldTimer(at: value.location)
+                                // resetHoldTimer() // Removed in favor of Circle Detection
+                                // startHoldTimer(at: value.location) // Removed
+                                
+                                // Reset Circle Detection
+                                resetCircleDetection()
+                                dragPoints = [value.location]
+                                trailPoints = [TrailPoint(location: value.location, timestamp: Date())]
                             }
                         } else {
                             // Continuing Drag
                             interactionManager.updateDragPosition(value.location)
                             
                             // Check if moved significantly to reset hold timer?
-                            // User requirement: "Drag pet, hold at some place for 2s"
-                            // So if moving too much, reset.
-                            // But user might jitter finger.
-                            // Let's reset if moved > threshold from last "hold start" pos?
-                            // Simpler: Just restart timer on every move? No, that makes it impossible to trigger unless 100% still.
-                            // Better: Update position, but only reset timer if velocity is high?
-                            // Or: Just keep updating the timer logic.
+                            // Removed checkHoldPosition logic
                             
-                            // Let's implement "Hold at a place":
-                            // We need to track the position where the hold "started".
-                            // If current position deviates too much, reset.
-                            checkHoldPosition(currentLocation: value.location)
+                            // Track points for circle detection
+                            dragPoints.append(value.location)
+                            trailPoints.append(TrailPoint(location: value.location, timestamp: Date()))
+                            detectCircle(screenSize: geometry.size)
+                            
+                            // Prune old trail points
+                            // Also prune points for circle detection to keep memory usage low, 
+                            // but circle detection needs the whole path? 
+                            // Actually circle detection needs "recent" path if we want to detect circle gesture.
+                            // But user might draw circle slowly. Let's keep dragPoints as is for now.
+                            
+                            let now = Date()
+                            // trailPoints = trailPoints.filter { now.timeIntervalSince($0.timestamp) < 2.0 }
+                            // Filter inside TimelineView instead to avoid stuttering?
+                            // No, we need to filter here too to avoid array growing indefinitely.
+                            if trailPoints.count > 100 { // Limit max points for performance
+                                 trailPoints.removeFirst(trailPoints.count - 100)
+                            }
+                            
+                            // Throttle vision detection
+                            if let image = captureScreen(scale: screenshotScale) {
+                                let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
+                                self.currentROI = roi
+                                visionManager.detectLines(in: image, roi: roi)
+                            }
                         }
                     }
                     .onEnded { value in
-                        resetHoldTimer() // Cancel timer
+                        // resetHoldTimer() // Removed
                         
                         if isDragging {
+                            // Drag ended
                             isDragging = false
                             self.currentROI = nil
+                            trailPoints.removeAll()
                             
-                            if interactionManager.state != .snapping {
-                                // Only analyze if explicitly triggered by hold
-                                if isHoldTriggered {
-                                    analyzeDrop(at: value.location, screenSize: geometry.size)
-                                } else {
+                            // Check if triggered circle
+                            if isCircleTriggered, let bbox = circleBoundingBox {
+                                // If triggered, we prioritize analysis over snapping
+                                interactionManager.startAnalyzing()
+                                analyzeDrop(at: bbox, screenSize: geometry.size)
+                            } else {
+                                // Check for snapping or return
+                                if interactionManager.state != .snapping {
                                     // Update idle position (Drop)
                                     // Clamp to safe area (avoid edges)
                                     let safeMargin: CGFloat = 40
@@ -249,13 +321,12 @@ struct PetOverlayView: View {
                                     let maxX = geometry.size.width - safeMargin
                                     self.idleX = min(maxX, max(minX, value.location.x))
                                 }
+                                
+                                interactionManager.endDragging(at: value.location, screenSize: geometry.size)
                             }
                             
-                            interactionManager.endDragging(at: value.location, screenSize: geometry.size)
-                            
                             // Reset trigger state
-                            isHoldTriggered = false
-                            holdProgress = 0
+                            resetCircleDetection()
                             
                         } else if isPressing {
                             // ... (Tap logic) ...
@@ -288,70 +359,71 @@ struct PetOverlayView: View {
         }
     }
     
-    // MARK: - Hold Logic
-    @State private var holdStartLocation: CGPoint = .zero
+    // MARK: - Circle Detection
     
-    private func startHoldTimer(at location: CGPoint) {
-        holdStartLocation = location
-        holdStartTime = Date()
-        holdProgress = 0
-        isHoldTriggered = false
+    private func resetCircleDetection() {
+        dragPoints.removeAll()
+        circleBoundingBox = nil
+        isCircleTriggered = false
+    }
+    
+    private func detectCircle(screenSize: CGSize) {
+        guard !isCircleTriggered else { return }
+        guard dragPoints.count >= circleMinPoints else { return }
         
-        analysisHoldTimer?.invalidate()
-        analysisHoldTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            guard let start = holdStartTime else { return }
-            let elapsed = Date().timeIntervalSince(start)
+        // 1. Calculate Bounding Box
+        var minX: CGFloat = CGFloat.infinity
+        var minY: CGFloat = CGFloat.infinity
+        var maxX: CGFloat = -CGFloat.infinity
+        var maxY: CGFloat = -CGFloat.infinity
+        
+        for point in dragPoints {
+            if point.x < minX { minX = point.x }
+            if point.x > maxX { maxX = point.x }
+            if point.y < minY { minY = point.y }
+            if point.y > maxY { maxY = point.y }
+        }
+        
+        let width = maxX - minX
+        let height = maxY - minY
+        
+        // 2. Check Area Size (Avoid small jitters)
+        guard width * height > circleMinArea else { return }
+        
+        // 3. Check Total Path Length (Avoid straight lines back and forth)
+        var totalDistance: CGFloat = 0
+        for i in 1..<dragPoints.count {
+            let p1 = dragPoints[i-1]
+            let p2 = dragPoints[i]
+            let dx = p2.x - p1.x
+            let dy = p2.y - p1.y
+            totalDistance += sqrt(dx*dx + dy*dy)
+        }
+        
+        guard totalDistance > circleMinDistance else { return }
+        
+        // 4. Check Closure (Start and End points are close)
+        // We check the last few points against the first few points
+        // Or simply check if current point is close to start point?
+        // Dragging is continuous, so current point is always last.
+        // Start point is index 0.
+        
+        let currentPoint = dragPoints.last!
+        let startPoint = dragPoints.first!
+        
+        let closeThreshold: CGFloat = 80 // Tolerance for closure
+        let dx = currentPoint.x - startPoint.x
+        let dy = currentPoint.y - startPoint.y
+        let distanceToStart = sqrt(dx*dx + dy*dy)
+        
+        if distanceToStart < closeThreshold {
+            // Circle Detected!
+            isCircleTriggered = true
+            circleBoundingBox = CGRect(x: minX, y: minY, width: width, height: height)
             
-            withAnimation {
-                holdProgress = min(elapsed / analysisHoldDuration, 1.0)
-            }
-            
-            if elapsed >= analysisHoldDuration {
-                triggerAnalysisReady()
-            }
+            // Haptic Feedback
+            hapticManager.playUIFeedback(intensity: 1.0, sharpness: 1.0, fallbackStyle: .heavy)
         }
-    }
-    
-    private func checkHoldPosition(currentLocation: CGPoint) {
-        // Distance check
-        let dx = currentLocation.x - holdStartLocation.x
-        let dy = currentLocation.y - holdStartLocation.y
-        let distanceSquared = dx*dx + dy*dy
-        
-        // Increase tolerance to 60pt radius (3600 squared) to allow for shaky fingers
-        if distanceSquared > 3600 {
-            // Moved too far, reset hold
-            resetHoldTimer()
-            startHoldTimer(at: currentLocation)
-        }
-    }
-    
-    private func resetHoldTimer() {
-        analysisHoldTimer?.invalidate()
-        analysisHoldTimer = nil
-        holdStartTime = nil
-        // Only reset progress if not triggered. 
-        // If triggered, we might want to keep showing "Ready" state until drop?
-        // But user said "if drag < 2s, normal move".
-        // If we reset here, the visual feedback disappears.
-        // Let's reset progress to 0 unless triggered.
-        if !isHoldTriggered {
-            withAnimation {
-                holdProgress = 0
-            }
-        }
-    }
-    
-    private func triggerAnalysisReady() {
-        guard !isHoldTriggered else { return }
-        isHoldTriggered = true
-        resetHoldTimer() // Stop timer, but keep isHoldTriggered true
-        
-        // Haptic Feedback
-        hapticManager.playUIFeedback(intensity: 1.0, sharpness: 1.0, fallbackStyle: .heavy) // Strong vibration
-        
-        // Visual Feedback (Maybe change the ring to "Ready" state or just keep it full?)
-        // For now, progress stays at 1.0 (via isHoldTriggered logic if we want)
     }
     
     // MARK: - Vision Analysis
@@ -359,17 +431,22 @@ struct PetOverlayView: View {
     @ObservedObject private var visionAnalysis = VisionAnalysisService.shared
     @State private var isAnalyzing = false // Visual state for analysis
     
-    private func analyzeDrop(at location: CGPoint, screenSize: CGSize) {
+    private func analyzeDrop(at rect: CGRect, screenSize: CGSize) {
         // 1. Hide pet for snapshot
         isHiddenForSnapshot = true
         
         // 2. Delay capture to allow UI update
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            let roiSize: CGFloat = 300
+            
+            // Capture based on rect (Bounding Box of Circle)
+            // We might want to add some padding to the rect
+            let padding: CGFloat = 20
+            let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
             
             // Capture
-            guard let croppedImage = self.captureCroppedImage(at: location, size: CGSize(width: roiSize, height: roiSize)) else {
+            guard let croppedImage = self.captureCroppedImage(rect: paddedRect) else {
                 self.isHiddenForSnapshot = false
+                interactionManager.endAnalyzing()
                 return
             }
             
@@ -417,7 +494,12 @@ struct PetOverlayView: View {
                                  }
                              }
                         } else {
-                            await MainActor.run { withAnimation { self.isAnalyzing = false } }
+                            await MainActor.run { 
+                                withAnimation { 
+                                    self.isAnalyzing = false 
+                                    interactionManager.endAnalyzing()
+                                } 
+                            }
                         }
                     } else {
                         // 使用 AI 建议的问题，而不是固定的"这是什么？"
@@ -437,14 +519,14 @@ struct PetOverlayView: View {
         }
     }
     
-    private func captureCroppedImage(at center: CGPoint, size: CGSize) -> UIImage? {
+    private func captureCroppedImage(rect: CGRect) -> UIImage? {
         guard let fullScreen = captureScreen(scale: 1.0), let cgImage = fullScreen.cgImage else { return nil }
         
         let scale = fullScreen.scale
-        let x = (center.x - size.width/2) * scale
-        let y = (center.y - size.height/2) * scale
-        let width = size.width * scale
-        let height = size.height * scale
+        let x = rect.minX * scale
+        let y = rect.minY * scale
+        let width = rect.width * scale
+        let height = rect.height * scale
         
         let cropRect = CGRect(x: x, y: y, width: width, height: height)
         
@@ -545,8 +627,8 @@ struct PetOverlayView: View {
                 .frame(width: catWidth)
                 .scaleEffect(isBreathing ? 1.05 : 1.0, anchor: .bottom)
                 // 归位时: opacity 从 0 -> 1 (渐显)
-                // 拖拽/吸附时: opacity 0
-                .opacity((isDraggingActive || isSnapping) ? 0 : 1)
+                // 拖拽/吸附/分析时: opacity 0
+                .opacity((isDraggingActive || isSnapping || interactionManager.state == .analyzing) ? 0 : 1)
                 .animation(
                     isDraggingActive ? .easeOut(duration: 0.15) : Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true),
                     value: isBreathing
@@ -564,76 +646,12 @@ struct PetOverlayView: View {
                 // 归位时: opacity 从 1 -> 0 (渐隐)
                 // 静止时: opacity 0
                 // 拖拽/吸附时: opacity 1
+                // 分析时: opacity 0
                 .opacity((isDraggingActive || isSnapping) ? 1 : (isReturning ? 0 : 0))
         }
         // 状态切换动画配置
         .animation(getAnimation(for: interactionManager.state), value: interactionManager.state)
         .position(calculatePosition(geometry: geometry, safeAreaBottom: safeAreaBottom))
-        .gesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .named("PetOverlaySpace"))
-                .onChanged { value in
-                    if !isDragging {
-                        // Potential tap or start of drag
-                        if !isPressing {
-                            isPressing = true
-                            dragStartTime = Date()
-                        }
-                        
-                        // Check if movement exceeds threshold to be considered a drag
-                        // Small movements are ignored to allow for tap detection
-                        if value.translation.width * value.translation.width + value.translation.height * value.translation.height > 100 { // > 10pt distance squared
-                            isDragging = true
-                            isPressing = false // It's confirmed as drag, not tap
-                            interactionManager.startDragging(at: value.location)
-                            hapticManager.playUIFeedback(intensity: 0.6, sharpness: 0.7, fallbackStyle: .medium)
-                            
-                            // Initial Vision detection
-                            if let image = captureScreen(scale: screenshotScale) {
-                                 let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
-                                 self.currentROI = roi
-                                 visionManager.detectLines(in: image, roi: roi)
-                            }
-                        }
-                    } else {
-                        // Continuing drag
-                        interactionManager.updateDragPosition(value.location)
-                        
-                        // Throttle vision detection
-                        if let image = captureScreen(scale: screenshotScale) {
-                            let roi = calculateVisionROI(center: value.location, screenSize: geometry.size)
-                            self.currentROI = roi
-                            visionManager.detectLines(in: image, roi: roi)
-                        }
-                    }
-                }
-                .onEnded { value in
-                    if isDragging {
-                        // Drag ended
-                        isDragging = false
-                        self.currentROI = nil
-                        // Check if we are snapping. If so, let interactionManager handle it.
-                        // If NOT snapping, it means we dropped it somewhere else -> Analyze!
-                        if interactionManager.state != .snapping {
-                             analyzeDrop(at: value.location, screenSize: geometry.size)
-                        }
-                        
-                        interactionManager.endDragging(at: value.location, screenSize: geometry.size)
-                    } else if isPressing {
-                        // Tap confirmed (drag didn't start)
-                        // Verify duration to ensure it's a tap, not a held press without movement
-                        if let start = dragStartTime, Date().timeIntervalSince(start) < 0.3 {
-                            if interactionManager.state == .idle {
-                                hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
-                                withAnimation {
-                                    action()
-                                }
-                            }
-                        }
-                    }
-                    isPressing = false
-                    dragStartTime = nil
-                }
-        )
     }
     
     private func calculateVisionROI(center: CGPoint, screenSize: CGSize) -> CGRect {
@@ -668,6 +686,9 @@ struct PetOverlayView: View {
              // Return to bottom center (idle position)
              // Animation is handled by the view transition to this state
              return getIdlePosition(geometry: geometry, safeAreaBottom: safeAreaBottom)
+        } else if interactionManager.state == .analyzing {
+            // Stay at drag position (hidden)
+            return interactionManager.dragPosition
         } else {
             return getIdlePosition(geometry: geometry, safeAreaBottom: safeAreaBottom)
         }
@@ -727,6 +748,8 @@ struct PetOverlayView: View {
             return .easeInOut(duration: 1.0)
         case .idle:
             return .easeOut(duration: 0.3)
+        case .analyzing:
+            return .easeInOut(duration: 0.3)
         }
     }
 }
