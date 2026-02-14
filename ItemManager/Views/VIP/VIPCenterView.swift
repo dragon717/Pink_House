@@ -15,6 +15,27 @@ struct VIPCenterView: View {
     @State private var redeemResultMessage = ""
     @Environment(ThemeManager.self) private var themeManager
     
+    // MARK: - Style Helpers
+    private var privilegeTitleColor: Color {
+        vipManager.cardStyle == .monicaPink ? Color(hex: "FF69B4") : Color(hex: "FFD700")
+    }
+    
+    private var privilegeIconColor: Color {
+        vipManager.cardStyle == .monicaPink ? Color(hex: "FF69B4") : Color(hex: "FFD700")
+    }
+    
+    private var privilegeBgColor: Color {
+        vipManager.cardStyle == .monicaPink ? Color.white.opacity(0.9) : Color(hex: "1E1E1E")
+    }
+    
+    private var privilegeTextColor: Color {
+        vipManager.cardStyle == .monicaPink ? .black.opacity(0.8) : .white
+    }
+    
+    private var privilegeDescColor: Color {
+        vipManager.cardStyle == .monicaPink ? .black.opacity(0.6) : .gray
+    }
+    
     var body: some View {
         ZStack {
             // Background - Unified Style
@@ -50,6 +71,7 @@ struct VIPCenterView: View {
                         isVIP: vipManager.isVIP,
                         cardStyle: vipManager.cardStyle
                     )
+                    .aspectRatio(1.58, contentMode: .fit) // 保持信用卡比例
                     .padding(.horizontal)
                     .onTapGesture {
                         // Secret way to trigger redeem? Or maybe add a dedicated button.
@@ -62,14 +84,14 @@ struct VIPCenterView: View {
                         Text("会员特权")
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundStyle(Color(hex: "FFD700"))
+                            .foregroundStyle(privilegeTitleColor)
                         
                         privilegeRow(icon: "brain.head.profile", title: "智能对话", desc: "解锁基于 DeepSeek 的超强 AI 对话能力，萌宠变身贴心闺蜜。")
                         privilegeRow(icon: "mic.fill", title: "语音交互", desc: "支持自然语言语音对话，无需打字。")
                         privilegeRow(icon: "crown.fill", title: "尊贵身份", desc: getCardDescription())
                     }
                     .padding()
-                    .background(Color(hex: "1E1E1E"))
+                    .background(privilegeBgColor)
                     .cornerRadius(16)
                     .padding(.horizontal)
                     
@@ -135,6 +157,8 @@ struct VIPCenterView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 40)
                 }
+                .frame(maxWidth: 500) // iPad 适配：限制内容最大宽度
+                .frame(maxWidth: .infinity) // 确保在 ScrollView 中居中
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -196,16 +220,16 @@ struct VIPCenterView: View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(Color(hex: "FFD700"))
+                .foregroundStyle(privilegeIconColor)
                 .frame(width: 30)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(privilegeTextColor)
                 Text(desc)
                     .font(.caption)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(privilegeDescColor)
             }
         }
     }
