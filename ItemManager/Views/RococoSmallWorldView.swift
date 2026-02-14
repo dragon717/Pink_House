@@ -210,6 +210,22 @@ struct RococoSmallWorldView: View {
             .animation(.easeInOut, value: viewMode)
         }
         .ignoresSafeArea()
+        .onAppear {
+            // 修复：当从视频播放返回时，强制重置缩放和动画状态，防止交互锁死
+            if finalZoomScale != 1.0 || currentZoomScale != 1.0 {
+                withAnimation {
+                    finalZoomScale = 1.0
+                    currentZoomScale = 1.0
+                    finalDragOffset = .zero
+                    currentDragOffset = .zero
+                }
+            }
+            
+            // 确保视频播放状态已重置
+            if isPlayingOpeningAnimation {
+                isPlayingOpeningAnimation = false
+            }
+        }
     }
     
     private func iconForMode(_ mode: ViewMode) -> String {

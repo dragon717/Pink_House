@@ -168,6 +168,12 @@ struct FrenchRetroSmallWorldView: View {
                 UITabBar.appearance().scrollEdgeAppearance = appearance
             }
         }
+        .onAppear {
+            // 确保视频播放状态已重置，防止交互锁死
+            if isPlayingOpeningAnimation {
+                isPlayingOpeningAnimation = false
+            }
+        }
     }
 }
 }

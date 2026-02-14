@@ -318,17 +318,20 @@ struct SmallWorldMenuOverlay: View {
     // 抽取单击逻辑
     private func handleTapAction() {
         print("SmallWorldMenuOverlay: handleTapAction executed")
-        // 直接在当前循环执行，提升响应速度
-        if self.selectedTab == 1 {
-            if self.smallWorldDestination != .menu {
-                print("SmallWorldMenuOverlay: Switching Destination to .menu")
-                self.smallWorldDestination = .menu
+        
+        // 使用 DispatchQueue 避免在手势回调中直接触发 Tab 切换导致的层级重建问题
+        DispatchQueue.main.async {
+            if self.selectedTab == 1 {
+                if self.smallWorldDestination != .menu {
+                    print("SmallWorldMenuOverlay: Switching Destination to .menu")
+                    self.smallWorldDestination = .menu
+                } else {
+                    print("SmallWorldMenuOverlay: Already at .menu")
+                }
             } else {
-                print("SmallWorldMenuOverlay: Already at .menu")
+                print("SmallWorldMenuOverlay: Switching Tab to 1")
+                self.selectedTab = 1
             }
-        } else {
-            print("SmallWorldMenuOverlay: Switching Tab to 1")
-            self.selectedTab = 1
         }
     }
     
@@ -415,13 +418,17 @@ struct SmallWorldMenuOverlay: View {
             showMenu = false
         }
         
-        // 立即切换状态，不使用延迟
-        // 使用 Transaction 禁用动画或加速过渡，提升“跟手”感
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            selectedTab = 1
-            smallWorldDestination = dest
+        // 使用 DispatchQueue 避免在手势处理回调中直接触发布局剧烈变化
+        // 这有助于规避 '_UIReparentingView' 相关的层级错误
+        DispatchQueue.main.async {
+            // 立即切换状态，不使用延迟
+            // 使用 Transaction 禁用动画或加速过渡，提升“跟手”感
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                selectedTab = 1
+                smallWorldDestination = dest
+            }
         }
     }
 }

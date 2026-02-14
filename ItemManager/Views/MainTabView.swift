@@ -105,8 +105,11 @@ struct MainTabView: View {
                         selectedTab = 0
                         
                         // 2. Fade out video
-                        withAnimation(.easeOut(duration: 0.8)) {
-                            isPlayingOpeningAnimation = false
+                        // 延迟一点点执行，确保 Tab 切换已生效
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeOut(duration: 0.8)) {
+                                isPlayingOpeningAnimation = false
+                            }
                         }
                     })
                     .ignoresSafeArea()
@@ -132,6 +135,7 @@ struct MainTabView: View {
                 }
                 .transition(.opacity)
                 .zIndex(200) // Ensure it's on top of everything
+                .id("OpeningVideoOverlay") // 强制刷新
             }
         }
     }
