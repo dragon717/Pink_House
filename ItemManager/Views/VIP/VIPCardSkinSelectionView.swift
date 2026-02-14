@@ -29,11 +29,12 @@ struct VIPCardSkinSelectionView: View {
                     .ignoresSafeArea()
             }
             
-            VStack(spacing: 30) {
+            VStack(spacing: 0) {
                 Text("选择卡片皮肤")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .padding(.top)
+                    .padding(.bottom, 20)
                 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 32) {
@@ -45,7 +46,8 @@ struct VIPCardSkinSelectionView: View {
                                     isVIP: true,
                                     cardStyle: style
                                 )
-                                .frame(width: geometry.size.width - 64, height: 220)
+                                .aspectRatio(1.58, contentMode: .fit) // 保持信用卡比例
+                                .frame(maxWidth: .infinity)
                                 .scaleEffect(vipManager.cardStyle == style ? 1.0 : 0.95)
                                 .opacity(vipManager.cardStyle == style ? 1.0 : 0.7)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.6), value: vipManager.cardStyle) // Elastic stretching effect
@@ -79,6 +81,7 @@ struct VIPCardSkinSelectionView: View {
                     }
                     .padding(.horizontal, 32)
                     .padding(.vertical, 20)
+                    .padding(.bottom, 100) // 底部留白，避免被按钮遮挡
                 }
                 
                 Spacer()
@@ -100,6 +103,10 @@ struct VIPCardSkinSelectionView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
+                .background(
+                    LinearGradient(colors: [.black.opacity(0), .black.opacity(0.5)], startPoint: .top, endPoint: .bottom)
+                        .padding(.top, -20)
+                )
             }
         }
     }

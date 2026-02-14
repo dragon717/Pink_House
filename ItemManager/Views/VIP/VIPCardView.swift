@@ -120,13 +120,13 @@ struct VIPCardView: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-                .frame(width: geometry.size.width * 0.4) // Width relative to card width
+                .frame(width: geometry.size.width * 0.5, height: geometry.size.height * 3) // 增加高度，避免旋转后穿帮
                 .rotationEffect(.degrees(20))
-                .offset(x: shimmerOffset)
+                .offset(x: shimmerOffset, y: -geometry.size.height) // 向上偏移以居中
                 .blur(radius: 5)
                 .blendMode(.overlay)
                 .task(id: geometry.size) {
-                    let startX = -geometry.size.width * 0.8
+                    let startX = -geometry.size.width * 1.0 // 加大起始距离
                     let endX = geometry.size.width * 1.5
                     
                     // 初始位置

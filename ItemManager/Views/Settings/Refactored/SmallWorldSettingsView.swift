@@ -5,8 +5,24 @@ struct SmallWorldSettingsView: View {
     @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.frenchRetro.rawValue
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     
+    @State private var showingClearCacheAlert = false
+    
     var body: some View {
         List {
+            // 预览区域
+            Section {
+                SmallWorldPreview(
+                    style: SmallWorldStyle(rawValue: smallWorldStyle) ?? .frenchRetro,
+                    sceneMode: SmallWorldSceneMode(rawValue: smallWorldSceneMode) ?? .auto,
+                    isSpatialEnabled: isSpatialSceneEnabled
+                )
+                .frame(height: 200)
+                .listRowInsets(EdgeInsets()) // 铺满
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            } header: {
+                Text("预览")
+            }
+            
             Section(header: Text("风格选择")) {
                 Picker("小世界风格", selection: $smallWorldStyle) {
                     ForEach(SmallWorldStyle.allCases) { style in
@@ -86,10 +102,64 @@ struct SmallWorldSettingsView: View {
                     }
                 }
             }
+            
+            // 存储管理
+            Section(header: Text("存储管理")) {
+                Button(role: .destructive) {
+                    SpatialAssetManager.shared.clearAllCache()
+                    showingClearCacheAlert = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("清理 3D 场景缓存")
+                    }
+                }
+            }
         }
         .navigationTitle("小世界设置")
         .navigationBarTitleDisplayMode(.inline)
         .scrollContentBackground(.hidden)
         .background(LiquidBackground())
+        .alert("缓存清理完成", isPresented: $showingClearCacheAlert) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text("所有的 3D 场景缓存文件已被清理。下次进入小世界时将重新生成。")
+        }
+    }
+}
+
+// MARK: - Preview Component
+struct SmallWorldPreview: View {
+    let style: SmallWorldStyle
+    let sceneMode: SmallWorldSceneMode
+    let isSpatialEnabled: Bool
+    
+    private var imageName: String {
+        switch style {
+        case .frenchRetro:
+            return sceneMode.backgroundImageName()
+        case .rococo:
+            // 洛可可风格默认预览图1
+            return "small_world_rococo_1"
+        }
+    }
+    
+    var body: some View {
+        GeometryReader { geo in
+            if #available(iOS 26.0, *), isSpatialEnabled {
+                SpatialBackgroundView(
+                    imageName: imageName,
+                    imageExtension: "png"
+                ) {
+                    EmptyView()
+                }
+            } else {
+                Image(imageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+            }
+        }
     }
 }
