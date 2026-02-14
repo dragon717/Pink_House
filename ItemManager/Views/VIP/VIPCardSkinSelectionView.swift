@@ -9,11 +9,7 @@ struct VIPCardSkinSelectionView: View {
         GeometryReader { geometry in
             ZStack {
                 // Background
-            if vipManager.cardStyle == .blackGold {
-                Color(hex: "121212")
-                    .ignoresSafeArea()
-            } else {
-                // Use App Background Image or Color
+                // Always use App Background with overlay for better consistency
                 Group {
                     if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
                         Image(uiImage: image)
@@ -25,7 +21,14 @@ struct VIPCardSkinSelectionView: View {
                             .ignoresSafeArea()
                     }
                 }
-                Color.black.opacity(0.3)
+                
+                // Dark overlay to make cards pop
+                Color.black.opacity(0.6)
+                    .ignoresSafeArea()
+                
+                // Blur effect for better focus
+                Rectangle()
+                    .fill(.ultraThinMaterial)
                     .ignoresSafeArea()
             }
             
@@ -47,7 +50,7 @@ struct VIPCardSkinSelectionView: View {
                                     cardStyle: style
                                 )
                                 .aspectRatio(1.58, contentMode: .fit) // 保持信用卡比例
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: 400) // 限制最大宽度，适配 iPad
                                 .scaleEffect(vipManager.cardStyle == style ? 1.0 : 0.95)
                                 .opacity(vipManager.cardStyle == style ? 1.0 : 0.7)
                                 .animation(.spring(response: 0.5, dampingFraction: 0.6), value: vipManager.cardStyle) // Elastic stretching effect
@@ -110,5 +113,4 @@ struct VIPCardSkinSelectionView: View {
             }
         }
     }
-}
 }

@@ -120,9 +120,9 @@ struct VIPCardView: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-                .frame(width: geometry.size.width * 0.5, height: geometry.size.height * 3) // 增加高度，避免旋转后穿帮
+                .frame(width: geometry.size.width * 0.5, height: geometry.size.height * 2.5) // 增加高度
                 .rotationEffect(.degrees(20))
-                .offset(x: shimmerOffset, y: -geometry.size.height) // 向上偏移以居中
+                .offset(x: shimmerOffset) // 去掉 y 轴偏移，保持中心对齐
                 .blur(radius: 5)
                 .blendMode(.overlay)
                 .task(id: geometry.size) {

@@ -17,30 +17,23 @@ struct VIPCenterView: View {
     
     var body: some View {
         ZStack {
-            // Background
-            if vipManager.cardStyle == .blackGold {
-                Color(hex: "121212")
-                    .ignoresSafeArea()
-            } else {
-                // Use App Background Image or Color
-                Group {
-                    if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .ignoresSafeArea()
-                    } else {
-                        themeManager.backgroundColor
-                            .ignoresSafeArea()
-                    }
+            // Background - Unified Style
+            // Use App Background Image or Color
+            Group {
+                if themeManager.backgroundStyle == .image, let image = themeManager.backgroundImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
+                } else {
+                    themeManager.backgroundColor
+                        .ignoresSafeArea()
                 }
-                
-                // Add a blur/dim overlay to ensure text readability if needed
-                // But user just said "use app background image", so maybe keep it clean.
-                // Or maybe add a slight dark overlay for better contrast.
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
             }
+            
+            // Dark overlay for better contrast
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 30) {
