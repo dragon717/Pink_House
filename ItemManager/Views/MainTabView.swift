@@ -49,6 +49,8 @@ struct MainTabView: View {
                         )
                     case .ootd:
                         OOTDView()
+                    case .threeDOotd:
+                        ThreeDOOTDView()
                     case .pet:
                         PetHomeView()
                     case .wealth:
@@ -63,6 +65,8 @@ struct MainTabView: View {
                         Label("小世界", systemImage: "map")
                     case .ootd:
                         Label("今日穿搭", systemImage: "tshirt")
+                    case .threeDOotd:
+                        Label("3D 试衣间", systemImage: "cube.transparent")
                     case .pet:
                         Label(petDataManager.status.displayName, systemImage: "pawprint")
                     case .wealth:

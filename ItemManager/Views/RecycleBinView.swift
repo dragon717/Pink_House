@@ -12,22 +12,72 @@ struct RecycleBinView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
-    // 查询已删除的项目
+    // Wardrobe Query
     @Query(filter: #Predicate<Clothing> { $0.deletedAt != nil }, sort: \Clothing.deletedAt, order: .reverse)
     private var deletedClothings: [Clothing]
     
-    @State private var selectedItems: Set<UUID> = []
+    // OOTD Queries
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt != nil }, sort: \BookGroup.deletedAt, order: .reverse)
+    private var deletedBooks: [BookGroup]
+    
+    @Query(filter: #Predicate<Outfit> { $0.deletedAt != nil }, sort: \Outfit.deletedAt, order: .reverse)
+    private var allDeletedOutfits: [Outfit]
+    
+    // Filter out outfits that belong to deleted books (to avoid duplicates in the list)
+    var isolatedDeletedOutfits: [Outfit] {
+        allDeletedOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
+    }
+    
+    @State private var selectedTab: Int = 0 // 0: 衣橱, 1: 手帐
+    @State private var selectedItems: Set<UUID> = [] // For Wardrobe
     @State private var editMode: EditMode = .inactive
     
-    @State private var itemToRestore: Clothing?
-    @State private var itemToDelete: Clothing?
+    // Alerts
+    @State private var itemToDelete: Any? // Can be Clothing, BookGroup, or Outfit
     @State private var showingDeleteAlert = false
     @State private var showingDeleteAllAlert = false
     @State private var showingRestoreAllAlert = false
-    @State private var showingBatchDeleteAlert = false
-    @State private var showingBatchRestoreAlert = false
     
     var body: some View {
+        VStack(spacing: 0) {
+            Picker("分类", selection: $selectedTab) {
+                Text("衣橱").tag(0)
+                Text("手帐").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding()
+            
+            if selectedTab == 0 {
+                wardrobeList
+            } else {
+                ootdList
+            }
+        }
+        .navigationTitle("回收站")
+        .navigationBarTitleDisplayMode(.inline)
+        .background {
+            LiquidBackground()
+        }
+        .alert("彻底删除", isPresented: $showingDeleteAlert) {
+            Button("取消", role: .cancel) { itemToDelete = nil }
+            Button("删除", role: .destructive) {
+                if let clothing = itemToDelete as? Clothing {
+                    permanentlyDeleteClothing(clothing)
+                } else if let book = itemToDelete as? BookGroup {
+                    permanentlyDeleteBook(book)
+                } else if let outfit = itemToDelete as? Outfit {
+                    permanentlyDeleteOutfit(outfit)
+                }
+                itemToDelete = nil
+            }
+        } message: {
+            Text("确定要彻底删除吗？此操作无法撤销。")
+        }
+    }
+    
+    // MARK: - Wardrobe View
+    
+    var wardrobeList: some View {
         List(selection: $selectedItems) {
             if deletedClothings.isEmpty {
                 ContentUnavailableView(
@@ -43,7 +93,7 @@ struct RecycleBinView: View {
                         .listRowBackground(Color.clear)
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             Button {
-                                restoreItem(clothing)
+                                restoreClothing(clothing)
                             } label: {
                                 Label("恢复", systemImage: "arrow.uturn.backward")
                             }
@@ -57,214 +107,244 @@ struct RecycleBinView: View {
                                 Label("彻底删除", systemImage: "trash.slash")
                             }
                         }
-                        .tag(clothing.id)
                 }
             }
         }
-        .environment(\.editMode, $editMode)
         .scrollContentBackground(.hidden)
-        .background {
-            LiquidBackground()
-        }
-        .navigationTitle("回收站")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack {
-                    if !deletedClothings.isEmpty {
-                        Button {
-                            withAnimation {
-                                if editMode == .active {
-                                    editMode = .inactive
-                                    selectedItems.removeAll()
-                                } else {
-                                    editMode = .active
-                                }
-                            }
-                        } label: {
-                            Text(editMode == .active ? "完成" : "编辑")
+    }
+    
+    // MARK: - OOTD View
+    
+    var ootdList: some View {
+        List {
+            if deletedBooks.isEmpty && isolatedDeletedOutfits.isEmpty {
+                ContentUnavailableView(
+                    "回收站是空的",
+                    systemImage: "book.closed",
+                    description: Text("删除的手帐和书页会出现在这里")
+                )
+                .listRowBackground(Color.clear)
+            } else {
+                // Deleted Books Section
+                if !deletedBooks.isEmpty {
+                    Section("手帐本") {
+                        ForEach(deletedBooks) { book in
+                            DeletedBookRow(book: book, onRestore: {
+                                restoreBook(book)
+                            }, onDelete: {
+                                itemToDelete = book
+                                showingDeleteAlert = true
+                            })
+                            .listRowBackground(Color.clear)
                         }
-                        
-                        if editMode == .inactive {
-                            Menu {
-                                Button {
-                                    showingRestoreAllAlert = true
-                                } label: {
-                                    Label("全部恢复", systemImage: "arrow.uturn.backward")
-                                }
-                                
-                                Button(role: .destructive) {
-                                    showingDeleteAllAlert = true
-                                } label: {
-                                    Label("清空回收站", systemImage: "trash.slash")
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis.circle")
-                            }
+                    }
+                }
+                
+                // Deleted Pages Section
+                if !isolatedDeletedOutfits.isEmpty {
+                    Section("单独删除的书页") {
+                        ForEach(isolatedDeletedOutfits) { outfit in
+                            DeletedOutfitRow(outfit: outfit, onRestore: {
+                                restoreOutfit(outfit)
+                            }, onDelete: {
+                                itemToDelete = outfit
+                                showingDeleteAlert = true
+                            })
+                            .listRowBackground(Color.clear)
                         }
                     }
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            if editMode == .active {
-                VStack(spacing: 0) {
-                    Divider()
-                    HStack {
-                        Button {
-                            showingBatchRestoreAlert = true
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "arrow.uturn.backward")
-                                    .font(.system(size: 20))
-                                Text("恢复")
-                                    .font(.caption)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .disabled(selectedItems.isEmpty)
-                        
-                        Divider()
-                            .frame(height: 30)
-                        
-                        VStack(spacing: 2) {
-                            Text("已选择")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text("\(selectedItems.count)")
-                                .font(.headline)
-                        }
-                        .frame(maxWidth: .infinity)
-                        
-                        Divider()
-                            .frame(height: 30)
-                        
-                        Button(role: .destructive) {
-                            showingBatchDeleteAlert = true
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 20))
-                                Text("删除")
-                                    .font(.caption)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .disabled(selectedItems.isEmpty)
-                    }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal)
-                    .background(.regularMaterial)
-                }
-            }
-        }
-        .alert("彻底删除", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { itemToDelete = nil }
-            Button("删除", role: .destructive) {
-                if let item = itemToDelete {
-                    permanentlyDeleteItem(item)
-                }
-                itemToDelete = nil
-            }
-        } message: {
-            Text("确定要彻底删除这件裙子吗？此操作无法撤销。")
-        }
-        .alert("批量删除", isPresented: $showingBatchDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
-                deleteSelectedItems()
-            }
-        } message: {
-            Text("确定要彻底删除选中的 \(selectedItems.count) 项吗？此操作无法撤销。")
-        }
-        .alert("批量恢复", isPresented: $showingBatchRestoreAlert) {
-            Button("取消", role: .cancel) { }
-            Button("恢复", role: .none) {
-                restoreSelectedItems()
-            }
-        } message: {
-            Text("确定要恢复选中的 \(selectedItems.count) 项吗？")
-        }
-        .alert("清空回收站", isPresented: $showingDeleteAllAlert) {
-            Button("取消", role: .cancel) { }
-            Button("清空", role: .destructive) {
-                deleteAllItems()
-            }
-        } message: {
-            Text("确定要清空回收站吗？所有项目将被永久删除且无法撤销。")
-        }
-        .alert("全部恢复", isPresented: $showingRestoreAllAlert) {
-            Button("取消", role: .cancel) { }
-            Button("恢复", role: .none) {
-                restoreAllItems()
-            }
-        } message: {
-            Text("确定要恢复回收站中的所有项目吗？")
-        }
+        .scrollContentBackground(.hidden)
     }
     
     // MARK: - Actions
     
-    private func restoreSelectedItems() {
-        withAnimation {
-            let itemsToRestore = deletedClothings.filter { selectedItems.contains($0.id) }
-            for clothing in itemsToRestore {
-                clothing.isDeleted = false
-                clothing.deletedAt = nil
-            }
-            selectedItems.removeAll()
-            editMode = .inactive
-        }
-    }
-    
-    private func deleteSelectedItems() {
-        withAnimation {
-            let itemsToDelete = deletedClothings.filter { selectedItems.contains($0.id) }
-            for clothing in itemsToDelete {
-                NotificationManager.shared.cancelNotification(for: clothing)
-                modelContext.delete(clothing)
-            }
-            selectedItems.removeAll()
-            editMode = .inactive
-        }
-    }
-    
-    // MARK: - Actions
-    
-    private func restoreItem(_ clothing: Clothing) {
+    private func restoreClothing(_ clothing: Clothing) {
         withAnimation {
             clothing.isDeleted = false
             clothing.deletedAt = nil
         }
     }
     
-    private func permanentlyDeleteItem(_ clothing: Clothing) {
+    private func permanentlyDeleteClothing(_ clothing: Clothing) {
         withAnimation {
-            // Cancel any notifications
             NotificationManager.shared.cancelNotification(for: clothing)
-            
-            // Delete associated files if needed (e.g. images)
-            // Note: Currently image deletion is handled manually or relies on system cleanup?
-            // The original delete logic was just modelContext.delete(item)
-            
             modelContext.delete(clothing)
         }
     }
     
-    private func restoreAllItems() {
+    private func restoreBook(_ book: BookGroup) {
         withAnimation {
-            for clothing in deletedClothings {
-                clothing.isDeleted = false
-                clothing.deletedAt = nil
+            book.isDeleted = false
+            book.deletedAt = nil
+            // Restore all pages in this book
+            for page in book.pages {
+                page.isDeleted = false
+                page.deletedAt = nil
             }
         }
     }
     
-    private func deleteAllItems() {
+    private func permanentlyDeleteBook(_ book: BookGroup) {
         withAnimation {
-            for clothing in deletedClothings {
-                NotificationManager.shared.cancelNotification(for: clothing)
-                modelContext.delete(clothing)
+            // Delete snapshot files for all pages
+            for page in book.pages {
+                if let path = page.snapshotPath {
+                    ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+                }
+            }
+            modelContext.delete(book)
+        }
+    }
+    
+    private func restoreOutfit(_ outfit: Outfit) {
+        withAnimation {
+            outfit.isDeleted = false
+            outfit.deletedAt = nil
+        }
+    }
+    
+    private func permanentlyDeleteOutfit(_ outfit: Outfit) {
+        withAnimation {
+            if let path = outfit.snapshotPath {
+                ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+            }
+            modelContext.delete(outfit)
+        }
+    }
+}
+
+struct DeletedBookRow: View {
+    let book: BookGroup
+    let onRestore: () -> Void
+    let onDelete: () -> Void
+    
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button {
+                    withAnimation {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        
+                        Image(systemName: "folder.fill")
+                            .foregroundStyle(Color.accentColor)
+                        
+                        Text(book.title)
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        Text("\(book.pages.count) 页")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                // Actions
+                HStack(spacing: 16) {
+                    Button(action: onRestore) {
+                        Image(systemName: "arrow.uturn.backward.circle.fill")
+                            .foregroundStyle(.blue)
+                            .font(.title3)
+                    }
+                    
+                    Button(action: onDelete) {
+                        Image(systemName: "trash.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.title3)
+                    }
+                }
+            }
+            
+            if isExpanded {
+                ForEach(book.pages) { page in
+                    HStack {
+                        Image(systemName: "doc.text")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 28)
+                        
+                        Text(page.note.isEmpty ? "未命名书页" : page.note)
+                            .font(.subheadline)
+                        
+                        Spacer()
+                        
+                        if let snapshotPath = page.snapshotPath,
+                           let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 30, height: 30)
+                                .cornerRadius(4)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
         }
+        .padding()
+        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .cornerRadius(12)
+    }
+}
+
+struct DeletedOutfitRow: View {
+    let outfit: Outfit
+    let onRestore: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        HStack {
+            if let snapshotPath = outfit.snapshotPath,
+               let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 40)
+                    .cornerRadius(8)
+            } else {
+                Image(systemName: "tshirt")
+                    .frame(width: 40, height: 40)
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(8)
+            }
+            
+            VStack(alignment: .leading) {
+                Text(outfit.note.isEmpty ? "未命名书页" : outfit.note)
+                    .font(.body)
+                Text(outfit.deletedAt?.formatted() ?? "")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 16) {
+                Button(action: onRestore) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .foregroundStyle(.blue)
+                }
+                
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .padding()
+        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .cornerRadius(12)
     }
 }

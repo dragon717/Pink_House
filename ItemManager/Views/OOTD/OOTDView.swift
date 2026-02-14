@@ -6,9 +6,12 @@ import PhotosUI
 struct OOTDView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
-    @Query(sort: \Outfit.createdAt, order: .reverse) private var allOutfits: [Outfit]
+    @Query(filter: #Predicate<Outfit> { $0.deletedAt == nil }, sort: \Outfit.createdAt, order: .reverse) private var allOutfits: [Outfit]
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }) private var allBooks: [BookGroup]
     
     @State private var currentOutfit: Outfit?
+    @State private var currentBook: BookGroup?
+    
     @State private var isImagePickerPresented = false
     @State private var selectedItem: PhotosPickerItem?
     @State private var isProcessing = false
@@ -46,6 +49,7 @@ struct OOTDView: View {
                     // Sidebar
                     OOTDSidebarView(
                         isVisible: $isSidebarVisible,
+                        currentBook: $currentBook,
                         currentOutfit: $currentOutfit,
                         onAdd: { type in
                             if type == "custom" {
@@ -116,8 +120,11 @@ struct OOTDView: View {
                     )
                 }
             }
-            .navigationTitle("OOTD")
+            .navigationTitle("今日穿搭")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                performMigration()
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: {
@@ -153,7 +160,7 @@ struct OOTDView: View {
                                 Label("自定义图片", systemImage: "photo")
                             }
                         } label: {
-                            Label("新建搭配", systemImage: "plus")
+                            Label("新建搭配书页", systemImage: "plus")
                         }
                         
                         Button {
@@ -393,7 +400,20 @@ struct OOTDView: View {
     }
 
     private func createNewOutfit(canvasType: String = "mannequin") {
-        let newOutfit = Outfit(note: "搭配 \(Date().formatted(date: .numeric, time: .shortened))", canvasType: canvasType)
+        // Ensure we have a book to add to
+        var targetBook = currentBook
+        if targetBook == nil {
+            if let firstBook = allBooks.first {
+                targetBook = firstBook
+            } else {
+                let newBook = BookGroup(title: "默认手帐")
+                modelContext.insert(newBook)
+                targetBook = newBook
+            }
+            currentBook = targetBook
+        }
+        
+        let newOutfit = Outfit(note: "搭配 \(Date().formatted(date: .numeric, time: .shortened))", canvasType: canvasType, book: targetBook)
         modelContext.insert(newOutfit)
         try? modelContext.save() // Ensure ID is generated
         currentOutfit = newOutfit
@@ -405,10 +425,24 @@ struct OOTDView: View {
     }
     
     private func createCustomOutfit(with image: UIImage) {
+        // Ensure we have a book to add to
+        var targetBook = currentBook
+        if targetBook == nil {
+            if let firstBook = allBooks.first {
+                targetBook = firstBook
+            } else {
+                let newBook = BookGroup(title: "默认手帐")
+                modelContext.insert(newBook)
+                targetBook = newBook
+            }
+            currentBook = targetBook
+        }
+
         if let path = ImageManager.shared.saveImage(image, context: modelContext) {
             let newOutfit = Outfit(note: "搭配 \(Date().formatted(date: .numeric, time: .shortened))", 
                                    canvasType: "custom", 
-                                   backgroundImagePath: path)
+                                   backgroundImagePath: path,
+                                   book: targetBook)
             modelContext.insert(newOutfit)
             try? modelContext.save()
             currentOutfit = newOutfit
@@ -438,16 +472,15 @@ struct OOTDView: View {
             }
         }
         
-        // Clean up snapshot file
-        if let path = outfit.snapshotPath {
-             ImageManager.shared.deleteImage(fileName: path, context: modelContext)
-        }
-        
-        modelContext.delete(outfit)
+        // Soft delete
+        outfit.isDeleted = true
+        outfit.deletedAt = Date()
         try? modelContext.save()
         
         if currentOutfit == nil {
-             createNewOutfit()
+             // Do not automatically create new outfit if we just deleted the last one, 
+             // unless we really want to. But with Books, we might just show empty state.
+             // createNewOutfit() 
         }
     }
     
@@ -457,7 +490,7 @@ struct OOTDView: View {
         // Update snapshot for current before copying
         saveSnapshot(for: current)
         
-        let newOutfit = Outfit(note: current.note + " 副本", canvasType: current.canvasType)
+        let newOutfit = Outfit(note: current.note + " 副本", canvasType: current.canvasType, book: current.book)
         modelContext.insert(newOutfit)
         
         // Copy items (Reference Principle: Point to same CutoutItem)
@@ -782,6 +815,48 @@ struct OOTDView: View {
                     selectedItem = nil
                     // Show error alert
                 }
+            }
+        }
+    }
+
+    // MARK: - Migration
+    private func performMigration() {
+        // Migration strategy:
+        // 1. Identify orphan outfits (outfits without a book).
+        // 2. If any orphans exist, ensure a default book exists.
+        // 3. Move orphans to the default book.
+        
+        let orphanOutfits = allOutfits.filter { $0.book == nil }
+        
+        if !orphanOutfits.isEmpty {
+            // Find or create a default book
+            let defaultBook: BookGroup
+            if let existingDefault = allBooks.first(where: { $0.title == "默认手帐" }) {
+                defaultBook = existingDefault
+            } else if let anyBook = allBooks.first {
+                // If "Default" doesn't exist but other books do, use the first one (e.g. oldest)
+                defaultBook = anyBook
+            } else {
+                // Create new default book
+                defaultBook = BookGroup(title: "默认手帐")
+                modelContext.insert(defaultBook)
+            }
+            
+            // Assign orphans
+            for outfit in orphanOutfits {
+                outfit.book = defaultBook
+            }
+            
+            try? modelContext.save()
+            
+            // Update current book selection if needed
+            if currentBook == nil {
+                currentBook = defaultBook
+            }
+        } else {
+            // If no orphans, but we have books, maybe select one?
+            if currentBook == nil, let firstBook = allBooks.first {
+                currentBook = firstBook
             }
         }
     }

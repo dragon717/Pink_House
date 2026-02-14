@@ -190,6 +190,25 @@ final class CutoutItem {
 }
 
 @Model
+final class BookGroup {
+    @Attribute(.unique) var id: UUID = UUID()
+    var title: String = ""
+    var coverImage: String? // Optional custom cover
+    var createdAt: Date = Date()
+    var isDeleted: Bool = false
+    var deletedAt: Date? = nil
+    
+    @Relationship(deleteRule: .cascade, inverse: \Outfit.book)
+    var pages: [Outfit] = []
+    
+    init(title: String, coverImage: String? = nil) {
+        self.title = title
+        self.coverImage = coverImage
+        self.createdAt = Date()
+    }
+}
+
+@Model
 final class Outfit {
     @Attribute(.unique) var id: UUID = UUID()
     var createdAt: Date = Date()
@@ -198,14 +217,22 @@ final class Outfit {
     var canvasType: String = "mannequin" // "mannequin" or "blank"
     var backgroundImagePath: String? // Custom background image path
     
+    // Trash Bin Logic
+    var isDeleted: Bool = false
+    var deletedAt: Date? = nil
+    
+    @Relationship
+    var book: BookGroup?
+    
     @Relationship(deleteRule: .cascade)
     var items: [OutfitItem] = []
     
-    init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin", backgroundImagePath: String? = nil) {
+    init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin", backgroundImagePath: String? = nil, book: BookGroup? = nil) {
         self.note = note
         self.snapshotPath = snapshotPath
         self.canvasType = canvasType
         self.backgroundImagePath = backgroundImagePath
+        self.book = book
     }
 }
 

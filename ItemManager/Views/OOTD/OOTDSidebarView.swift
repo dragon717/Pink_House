@@ -4,55 +4,60 @@ import SwiftData
 
 struct OOTDSidebarView: View {
     @Binding var isVisible: Bool
+    @Binding var currentBook: BookGroup?
     @Binding var currentOutfit: Outfit?
-    @Query(sort: \Outfit.createdAt, order: .reverse) private var outfits: [Outfit]
+    
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.createdAt, order: .reverse) private var books: [BookGroup]
     @Environment(\.modelContext) private var modelContext
     
     var onAdd: (String) -> Void
     var onDelete: (Outfit) -> Void
     
-    // Namespace for matched geometry effect (optional, but nice for animations)
-    @Namespace private var animation
+    @State private var expandedBookIDs: Set<UUID> = []
+    @State private var showingNewBookAlert = false
+    @State private var newBookName = ""
+    @State private var showingTrash = false
     
-    @State private var outfitToDelete: Outfit?
-    @State private var showingDeleteAlert = false
+    // Delete Book State
+    @State private var bookToDelete: BookGroup?
+    @State private var showingDeleteBookAlert = false
+    
+    // Rename Book State
+    @State private var bookToRename: BookGroup?
+    @State private var showingRenameBookAlert = false
+    @State private var renameBookName = ""
     
     var body: some View {
         if isVisible {
             VStack(spacing: 0) {
                 // Header Area
                 HStack {
-                    Text("我的搭配")
+                    Text("穿搭手帐")
                         .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundStyle(.primary)
                     
                     Spacer()
+                    
+                    // Add Book Button
+                    Button {
+                        newBookName = ""
+                        showingNewBookAlert = true
+                    } label: {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.primary)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
-                // .background(.ultraThinMaterial) // iOS 18 style glass header
                 
                 ScrollView {
                     LazyVStack(spacing: 16) {
-                        // New Outfit Menu - Modern Card Style
+                        // New Outfit Menu (Create in current book)
                         Menu {
-                            Button {
-                                onAdd("mannequin")
-                            } label: {
-                                Label("人台画布", systemImage: "tshirt")
-                            }
-                            
-                            Button {
-                                onAdd("blank")
-                            } label: {
-                                Label("空白画布", systemImage: "square.dashed")
-                            }
-                            
-                            Button {
-                                onAdd("custom")
-                            } label: {
-                                Label("自定义图片", systemImage: "photo")
-                            }
+                            Button { onAdd("mannequin") } label: { Label("人台画布", systemImage: "tshirt") }
+                            Button { onAdd("blank") } label: { Label("空白画布", systemImage: "square.dashed") }
+                            Button { onAdd("custom") } label: { Label("自定义图片", systemImage: "photo") }
                         } label: {
                             HStack(spacing: 12) {
                                 ZStack {
@@ -63,11 +68,9 @@ struct OOTDSidebarView: View {
                                         .font(.system(size: 20, weight: .semibold))
                                         .foregroundStyle(Color.accentColor)
                                 }
-                                
-                                Text("新建搭配")
+                                Text("新建搭配书页")
                                     .font(.system(size: 17, weight: .medium))
                                     .foregroundStyle(.primary)
-                                
                                 Spacer()
                             }
                             .padding(12)
@@ -81,27 +84,65 @@ struct OOTDSidebarView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
                         
-                        // Outfit List
-                        ForEach(outfits) { outfit in
-                            OutfitCard(
-                                outfit: outfit,
-                                isSelected: currentOutfit?.id == outfit.id,
-                                onDelete: {
-                                    outfitToDelete = outfit
-                                    showingDeleteAlert = true
-                                }
-                            )
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.3)) {
-                                    currentOutfit = outfit
-                                }
+                        // Books List
+                        if books.isEmpty {
+                            ContentUnavailableView("暂无手帐本", systemImage: "book.closed")
+                                .padding(.top, 40)
+                        } else {
+                            ForEach(books) { book in
+                                BookGroupView(
+                                    book: book,
+                                    allBooks: books,
+                                    isExpanded: expandedBookIDs.contains(book.id),
+                                    currentOutfit: $currentOutfit,
+                                    currentBook: $currentBook,
+                                    onToggle: {
+                                        withAnimation {
+                                            if expandedBookIDs.contains(book.id) {
+                                                expandedBookIDs.remove(book.id)
+                                            } else {
+                                                expandedBookIDs.insert(book.id)
+                                                currentBook = book
+                                            }
+                                        }
+                                    },
+                                    onDeleteOutfit: onDelete,
+                                    onMoveOutfit: { outfit, targetBook in
+                                        moveOutfit(outfit, to: targetBook)
+                                    },
+                                    onDeleteBook: {
+                                        bookToDelete = book
+                                        showingDeleteBookAlert = true
+                                    },
+                                    onRenameBook: {
+                                        bookToRename = book
+                                        renameBookName = book.title
+                                        showingRenameBookAlert = true
+                                    }
+                                )
                             }
-                            .padding(.horizontal, 16)
                         }
                     }
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 80) // Space for Trash Button
                 }
                 .scrollIndicators(.hidden)
+                
+                // Trash Button Area
+                VStack {
+                    Divider()
+                    Button {
+                        showingTrash = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash")
+                            Text("回收站")
+                            Spacer()
+                        }
+                        .padding()
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .background(Color(uiColor: .systemBackground))
             }
             .frame(width: 280)
             .background(Color(uiColor: .systemBackground))
@@ -112,16 +153,173 @@ struct OOTDSidebarView: View {
                     alignment: .trailing
             )
             .transition(.move(edge: .leading).combined(with: .opacity))
-            .alert("删除搭配", isPresented: $showingDeleteAlert, presenting: outfitToDelete) { outfit in
+            // Alerts
+            .alert("新建手帐本", isPresented: $showingNewBookAlert) {
+                TextField("名称", text: $newBookName)
+                Button("取消", role: .cancel) {}
+                Button("创建") {
+                    let book = BookGroup(title: newBookName.isEmpty ? "新书本" : newBookName)
+                    modelContext.insert(book)
+                    currentBook = book
+                    expandedBookIDs.insert(book.id)
+                }
+            }
+            .alert("删除手帐本", isPresented: $showingDeleteBookAlert, presenting: bookToDelete) { book in
                 Button("删除", role: .destructive) {
-                    onDelete(outfit)
-                    outfitToDelete = nil
+                    deleteBook(book)
                 }
-                Button("取消", role: .cancel) {
-                    outfitToDelete = nil
+                Button("取消", role: .cancel) {}
+            } message: { book in
+                Text("确定要删除“\(book.title)”吗？里面的书页也会一同移入回收站。")
+            }
+            .alert("重命名", isPresented: $showingRenameBookAlert) {
+                TextField("名称", text: $renameBookName)
+                Button("取消", role: .cancel) {}
+                Button("确定") {
+                    if let book = bookToRename {
+                        book.title = renameBookName
+                        try? modelContext.save()
+                    }
                 }
-            } message: { outfit in
-                Text("确定要删除搭配“\(outfit.note.isEmpty ? "未命名" : outfit.note)”吗？此操作无法撤销。")
+            }
+            .sheet(isPresented: $showingTrash) {
+                RecycleBinView() // We need to update this view
+            }
+        }
+    }
+    
+    private func deleteBook(_ book: BookGroup) {
+        // Soft delete book
+        book.isDeleted = true
+        book.deletedAt = Date()
+        
+        // Also soft delete all pages? 
+        // Logic: If we delete a book, pages should "disappear" from active view.
+        // We can either mark them deleted, OR rely on the fact that if book is deleted, we don't fetch it.
+        // But the requirement says "recover individually or as group".
+        // So marking pages as deleted is better for consistency if we query "all deleted outfits".
+        for page in book.pages {
+            page.isDeleted = true
+            page.deletedAt = Date()
+        }
+        
+        try? modelContext.save()
+        
+        if currentBook?.id == book.id {
+            currentBook = nil
+            currentOutfit = nil
+        }
+    }
+    
+    private func moveOutfit(_ outfit: Outfit, to targetBook: BookGroup) {
+        withAnimation {
+            outfit.book = targetBook
+            try? modelContext.save()
+        }
+    }
+}
+
+struct BookGroupView: View {
+    let book: BookGroup
+    let allBooks: [BookGroup]
+    let isExpanded: Bool
+    @Binding var currentOutfit: Outfit?
+    @Binding var currentBook: BookGroup?
+    
+    var onToggle: () -> Void
+    var onDeleteOutfit: (Outfit) -> Void
+    var onMoveOutfit: (Outfit, BookGroup) -> Void
+    var onDeleteBook: () -> Void
+    var onRenameBook: () -> Void
+    
+    // We need to sort pages
+    var sortedPages: [Outfit] {
+        book.pages.filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Book Header
+            Button(action: onToggle) {
+                HStack {
+                    Image(systemName: isExpanded ? "book.fill" : "book.closed.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .font(.system(size: 18))
+                    
+                    Text(book.title)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.primary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(Angle(degrees: isExpanded ? 90 : 0))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(currentBook?.id == book.id ? Color.accentColor.opacity(0.05) : Color.clear)
+                )
+            }
+            .contextMenu {
+                Button(action: onRenameBook) {
+                    Label("重命名", systemImage: "pencil")
+                }
+                Button(role: .destructive, action: onDeleteBook) {
+                    Label("删除", systemImage: "trash")
+                }
+            }
+            .padding(.horizontal, 8)
+            
+            // Pages List
+            if isExpanded {
+                if sortedPages.isEmpty {
+                    Text("暂无书页")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                } else {
+                    LazyVStack(spacing: 12) {
+                        ForEach(sortedPages) { outfit in
+                            OutfitCard(
+                                outfit: outfit,
+                                isSelected: currentOutfit?.id == outfit.id,
+                                onDelete: {
+                                    onDeleteOutfit(outfit)
+                                }
+                            )
+                            .contextMenu {
+                                Menu {
+                                    ForEach(allBooks) { targetBook in
+                                        if targetBook.id != book.id {
+                                            Button(targetBook.title) {
+                                                onMoveOutfit(outfit, targetBook)
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    Label("移动到...", systemImage: "folder")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    onDeleteOutfit(outfit)
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            }
+                            .onTapGesture {
+                                currentOutfit = outfit
+                                currentBook = book
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                    }
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
         }
     }
@@ -159,7 +357,7 @@ struct OutfitCard: View {
                 
                 // Info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(outfit.note.isEmpty ? "未命名搭配" : outfit.note)
+                    Text(outfit.note.isEmpty ? "未命名书页" : outfit.note)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -189,7 +387,11 @@ struct OutfitCard: View {
                     .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
             )
             
-            // Delete Button (Top Right corner)
+            // Delete Button (Top Right corner) - keep this for quick action, or remove since context menu has it?
+            // User requested visual metaphor. Let's keep it but maybe subtler.
+            // Or remove it to make it look more like a book page and rely on context menu/swipe.
+            // But swipe in LazyVStack is tricky.
+            // I'll keep the button for now as it's existing behavior.
             Button(action: onDelete) {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
@@ -199,10 +401,7 @@ struct OutfitCard: View {
                     .clipShape(Circle())
                     .shadow(color: .red.opacity(0.3), radius: 2, x: 0, y: 1)
             }
-            .offset(x: 6, y: -6)
-            .opacity(isSelected || isHovering ? 1 : 0) // Show when selected or potentially hovered (though hover is macos mostly)
-            .animation(.easeInOut(duration: 0.2), value: isSelected)
+            .offset(x: 8, y: -8)
         }
-        .contentShape(Rectangle()) // Better hit testing
     }
 }

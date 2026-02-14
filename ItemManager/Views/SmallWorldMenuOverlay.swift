@@ -55,11 +55,13 @@ struct SmallWorldMenuOverlay: View {
             // 萌宠: 莫妮卡珊瑚 (自定义暖色，对应萌宠活力)
             MenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55)),
             // 穿搭: 莫妮卡热粉 (对应 MonicaTheme FinalPayment)
-            MenuItem(title: "穿搭", icon: "tshirt", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
+            MenuItem(title: "今日穿搭", icon: "tshirt", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
             // 来财: 莫妮卡金 (对应 MonicaTheme Deposit)
             MenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
             // 日历: 莫妮卡紫 (对应 MonicaTheme Accent，略加深以提升白色图标对比度)
-            MenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80))
+            MenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80)),
+            // 3D试衣: 青色
+            MenuItem(title: "3D试衣", icon: "cube.transparent", destination: .threeDOotd, color: Color.cyan)
         ]
     }
     
