@@ -37,19 +37,22 @@ struct RococoSmallWorldView: View {
         let name: String
         let rect: CGRect // Normalized 0-1
         let color: Color
+        var label: String? = nil
+        var labelStyle: SmallWorldLabelStyle = .diagonal(angle: 45)
+        var labelPosition: CGPoint? = nil // 独立的标签位置 (Normalized 0-1)
         let action: () -> Void
     }
     
     // Room 1 (Floor 1) Hotspots
     private var room1Hotspots: [HotspotData] {
         [
-            HotspotData(name: "OOTD", rect: CGRect(x: 0.35, y: 0.53, width: 0.08, height: 0.19), color: .orange) {
+            HotspotData(name: "OOTD", rect: CGRect(x: 0.35, y: 0.53, width: 0.08, height: 0.19), color: .orange, label: "今日穿搭", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.41, y: 0.725)) {
                 destination = .ootd
             },
-            HotspotData(name: "来财", rect: CGRect(x: 0.46, y: 0.68, width: 0.06, height: 0.08), color: .yellow) {
+            HotspotData(name: "来财", rect: CGRect(x: 0.46, y: 0.68, width: 0.06, height: 0.08), color: .yellow, label: "马上来财", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.52, y: 0.77)) {
                 destination = .wealth
             },
-            HotspotData(name: "衣橱", rect: CGRect(x: 0.45, y: 0.12, width: 0.24, height: 0.24), color: .blue) {
+            HotspotData(name: "衣橱", rect: CGRect(x: 0.45, y: 0.12, width: 0.24, height: 0.24), color: .blue, label: "少女衣橱", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.525, y: 0.12)) {
                 withAnimation(.easeIn(duration: 0.5)) {
                     isPlayingOpeningAnimation = true
                 }
@@ -60,12 +63,12 @@ struct RococoSmallWorldView: View {
     // Room 2 (Floor 2) Hotspots
     private var room2Hotspots: [HotspotData] {
         [
-            HotspotData(name: "衣橱", rect: CGRect(x: 0.05, y: 0.25, width: 0.125, height: 0.29), color: .blue) {
+            HotspotData(name: "衣橱", rect: CGRect(x: 0.05, y: 0.25, width: 0.125, height: 0.29), color: .blue, label: "少女衣橱", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.095, y: 0.24)) {
                 withAnimation(.easeIn(duration: 0.5)) {
                     isPlayingOpeningAnimation = true
                 }
             },
-            HotspotData(name: "尾款天使", rect: CGRect(x: 0.08, y: 0.54, width: 0.1, height: 0.11), color: .blue) {
+            HotspotData(name: "尾款天使", rect: CGRect(x: 0.08, y: 0.54, width: 0.1, height: 0.11), color: .blue, label: "尾款天使", labelStyle: .diagonal(angle: 35), labelPosition: CGPoint(x: 0.1, y: 0.66)) {
                 selectedTab = 0
                 homeTab = .depositPlan
             },
@@ -74,7 +77,7 @@ struct RococoSmallWorldView: View {
 //                destination = .pet
 //            },
             
-            HotspotData(name: "日历", rect: CGRect(x: 0.44, y: 0.77, width: 0.082, height: 0.121), color: .purple) {
+            HotspotData(name: "日历", rect: CGRect(x: 0.44, y: 0.77, width: 0.082, height: 0.121), color: .purple, label: "梦裙日历", labelStyle: .diagonal(angle: 35), labelPosition: CGPoint(x: 0.45, y: 0.92)) {
                 destination = .calendar
             }
         ]
@@ -246,41 +249,55 @@ struct RococoSmallWorldView: View {
             .overlay(
                 GeometryReader { geo in
                     ZStack(alignment: .topLeading) {
+                        ForEach(hotspots) { hotspot in
+                            ZStack {
+                                Button(action: hotspot.action) {
+                                    if showDebugHotspots {
+                                        ZStack {
+                                            Rectangle()
+                                                .fill(hotspot.color.opacity(0.3))
+                                                .border(hotspot.color, width: 2)
+                                            Text(hotspot.name)
+                                                .font(.caption)
+                                                .foregroundStyle(.white)
+                                                .padding(4)
+                                                .background(.black.opacity(0.6))
+                                                .cornerRadius(4)
+                                        }
+                                        .contentShape(Rectangle())
+                                    } else {
+                                        Color.clear
+                                            .contentShape(Rectangle())
+                                    }
+                                }
+                                .frame(
+                                    width: hotspot.rect.width * geo.size.width,
+                                    height: hotspot.rect.height * geo.size.height
+                                )
+                                .position(
+                                    x: (hotspot.rect.minX + hotspot.rect.width/2) * geo.size.width,
+                                    y: (hotspot.rect.minY + hotspot.rect.height/2) * geo.size.height
+                                )
+                                
+                                if let label = hotspot.label {
+                                    let labelPos = hotspot.labelPosition ?? CGPoint(x: hotspot.rect.midX, y: hotspot.rect.midY)
+                                    
+                                    FloatingTextLabel(text: label, style: hotspot.labelStyle)
+                                        .allowsHitTesting(false)
+                                        .position(
+                                            x: labelPos.x * geo.size.width,
+                                            y: labelPos.y * geo.size.height
+                                        )
+                                }
+                            }
+                            .frame(width: geo.size.width, height: geo.size.height)
+                        }
+                        
                         SmallWorldPetOverlay(
                             viewModel: petViewModel,
                             roomIndex: imageName.contains("rococo_1") ? 0 : 1,
                             geometry: geo
                         )
-                        
-                        ForEach(hotspots) { hotspot in
-                            Button(action: hotspot.action) {
-                                if showDebugHotspots {
-                                    ZStack {
-                                        Rectangle()
-                                            .fill(hotspot.color.opacity(0.3))
-                                            .border(hotspot.color, width: 2)
-                                        Text(hotspot.name)
-                                            .font(.caption)
-                                            .foregroundStyle(.white)
-                                            .padding(4)
-                                            .background(.black.opacity(0.6))
-                                            .cornerRadius(4)
-                                    }
-                                    .contentShape(Rectangle())
-                                } else {
-                                    Color.clear
-                                        .contentShape(Rectangle())
-                                }
-                            }
-                            .frame(
-                                width: hotspot.rect.width * geo.size.width,
-                                height: hotspot.rect.height * geo.size.height
-                            )
-                            .position(
-                                x: (hotspot.rect.minX + hotspot.rect.width/2) * geo.size.width,
-                                y: (hotspot.rect.minY + hotspot.rect.height/2) * geo.size.height
-                            )
-                        }
                     }
                 }
             )

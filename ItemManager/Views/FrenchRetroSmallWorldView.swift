@@ -22,6 +22,10 @@ struct FrenchRetroSmallWorldView: View {
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     @AppStorage("smallWorldSceneMode") private var sceneModeRaw: Int = SmallWorldSceneMode.auto.rawValue
     
+    // 法式复古场景文字旋转角度控制
+    static let horizontalLabelRotation: Double = 0
+    static let verticalLabelRotation: Double = 0
+    
     private var sceneMode: SmallWorldSceneMode {
         SmallWorldSceneMode(rawValue: sceneModeRaw) ?? .auto
     }
@@ -86,31 +90,31 @@ struct FrenchRetroSmallWorldView: View {
                             .overlay(
                                     ZStack(alignment: .topLeading) {
                                         // 1. OOTD (今日穿搭) - 最左侧
-                                        InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange) {
+                                        InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange, label: "今日穿搭", labelStyle: .horizontal(angle: -28), labelPosition: CGPoint(x: 0.17, y: 0.86)) {
                                             destination = .ootd
                                         }
                                         
                                         // 2. 衣橱 (少女衣橱)
-                                        InteractionHotspot(rect: CGRect(x: 0.41, y: 0.06, width: 0.155, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.41, y: 0.06, width: 0.155, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "少女衣橱", labelPosition: CGPoint(x: 0.4, y: 0.38)) {
                                             withAnimation(.easeIn(duration: 0.5)) {
                                                 isPlayingOpeningAnimation = true
                                             }
                                         }
                                         
                                         // 3. 猪 (来财)
-                                        InteractionHotspot(rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                        InteractionHotspot(rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "马上来财", labelPosition: CGPoint(x: 0.85, y: 0.72)) {
                                             destination = .wealth
                                         }
                                         
                                         // 4. 墙上的日历 (梦裙日历)
                                         if shouldShowCalendar {
-                                            CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots) {
+                                            CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "梦裙日历", labelPosition: CGPoint(x: 0.77, y: 0.27)) {
                                                 destination = .calendar
                                             }
                                         }
                                         
                                         // 5. 尾款天使 (衣橱右边)
-                                        InteractionHotspot(rect: CGRect(x: 0.6, y: 0.42, width: 0.07, height: 0.12), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .purple) {
+                                        InteractionHotspot(rect: CGRect(x: 0.6, y: 0.42, width: 0.07, height: 0.12), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .purple, label: "尾款天使", labelStyle: .horizontal(angle: 0), labelPosition: CGPoint(x: 0.635, y: 0.56)) {
                                             selectedTab = 0
                                             homeTab = .depositPlan
                                         }
@@ -185,24 +189,42 @@ struct InteractionHotspot: View {
     let imageSize: CGSize
     var showDebug: Bool = false
     var debugColor: Color = .red
+    var label: String? = nil
+    var labelStyle: SmallWorldLabelStyle = .vertical(angle: FrenchRetroSmallWorldView.verticalLabelRotation)
+    var labelPosition: CGPoint? = nil // 独立的标签位置 (Normalized 0-1)
     let action: () -> Void
     
     var body: some View {
         let width = geometry.size.height * (imageSize.width / imageSize.height)
         let height = geometry.size.height
         
-        Button(action: action) {
-            if showDebug {
-                Rectangle()
-                    .fill(debugColor.opacity(0.3))
-                    .border(debugColor)
-            } else {
-                Color.clear
-                    .contentShape(Rectangle())
+        ZStack {
+            // 热区本体
+            Button(action: action) {
+                if showDebug {
+                    Rectangle()
+                        .fill(debugColor.opacity(0.3))
+                        .border(debugColor)
+                } else {
+                    Color.clear
+                        .contentShape(Rectangle())
+                }
+            }
+            .frame(width: rect.width * width, height: rect.height * height)
+            .position(x: (rect.minX + rect.width/2) * width, y: (rect.minY + rect.height/2) * height)
+            
+            // 独立控制的悬浮文字
+            if let label = label {
+                // 如果没有指定 labelPosition，默认使用热区中心
+                let labelPos = labelPosition ?? CGPoint(x: rect.midX, y: rect.midY)
+                
+                FloatingTextLabel(text: label, style: labelStyle)
+                    .allowsHitTesting(false)
+                    .position(x: labelPos.x * width, y: labelPos.y * height)
             }
         }
-        .frame(width: rect.width * width, height: rect.height * height)
-        .offset(x: rect.minX * width, y: rect.minY * height)
+        // 移除外层的 frame 和 offset，改为内部绝对定位，以便热区和文字可以分离
+        .frame(width: width, height: height)
     }
 }
 
@@ -214,6 +236,9 @@ struct CalendarHotspot: View {
     let geometry: GeometryProxy
     let imageSize: CGSize
     var showDebug: Bool = false
+    var label: String? = nil
+    var labelStyle: SmallWorldLabelStyle = .vertical(angle: FrenchRetroSmallWorldView.verticalLabelRotation)
+    var labelPosition: CGPoint? = nil // 独立的标签位置 (Normalized 0-1)
     let action: () -> Void
     
     // 监听数据变化
@@ -228,30 +253,42 @@ struct CalendarHotspot: View {
         let hotspotHeight = rect.height * height
         
         ZStack {
-            // 随动内容：当月界面预览
-            // 使用白色半透明背景模拟纸张质感
-            calendarContent
-                .frame(width: hotspotWidth, height: hotspotHeight)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.white.opacity(0.85))
-                        .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
-                )
-            
-            // 点击跳转
-            Button(action: action) {
-                if showDebug {
-                    Rectangle()
-                        .fill(Color.blue.opacity(0.3))
-                        .border(Color.blue)
-                } else {
-                    Color.clear
-                        .contentShape(Rectangle())
+            // 热区本体 (包含日历内容)
+            ZStack {
+                // 随动内容：当月界面预览
+                calendarContent
+                    .frame(width: hotspotWidth, height: hotspotHeight)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.85))
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                    )
+                
+                // 点击跳转
+                Button(action: action) {
+                    if showDebug {
+                        Rectangle()
+                            .fill(Color.blue.opacity(0.3))
+                            .border(Color.blue)
+                    } else {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
                 }
             }
+            .frame(width: hotspotWidth, height: hotspotHeight)
+            .position(x: (rect.minX + rect.width/2) * width, y: (rect.minY + rect.height/2) * height)
+            
+            // 独立控制的悬浮文字
+            if let label = label {
+                let labelPos = labelPosition ?? CGPoint(x: rect.midX, y: rect.midY)
+                
+                FloatingTextLabel(text: label, style: labelStyle)
+                    .allowsHitTesting(false)
+                    .position(x: labelPos.x * width, y: labelPos.y * height)
+            }
         }
-        .frame(width: hotspotWidth, height: hotspotHeight)
-        .offset(x: rect.minX * width, y: rect.minY * height)
+        .frame(width: width, height: height)
     }
     
     // 莫奈儿粉色系
