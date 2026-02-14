@@ -150,15 +150,17 @@ struct BookDetailView: View {
                         }
                         
                         Button {
-                            showingTrash = true
-                        } label: {
-                            Label("垃圾篓", systemImage: "trash")
-                        }
-                        
-                        Button {
                             showingCoverPicker = true
                         } label: {
                             Label("修改封面", systemImage: "photo")
+                        }
+                        
+                        Divider()
+                        
+                        Button {
+                            showingTrash = true
+                        } label: {
+                            Label("垃圾篓", systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")

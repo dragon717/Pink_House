@@ -37,6 +37,10 @@ struct BookShelfView: View {
     @State private var selectedBook: BookGroup?
     @State private var navigationPath = NavigationPath()
     
+    // Animation
+    @Namespace private var animationNamespace
+    @State private var openingBook: BookGroup?
+    
     // Delete Confirmation
     @State private var bookToDelete: BookGroup?
     @State private var showingDeleteBookAlert = false
@@ -234,9 +238,28 @@ struct BookShelfView: View {
                     onDelete: { book in
                         bookToDelete = book
                         showingDeleteBookAlert = true
-                    }
+                    },
+                    namespace: animationNamespace,
+                    onBookTap: { book in
+                        withAnimation {
+                            openingBook = book
+                        }
+                    },
+                    openingBook: openingBook
                 )
                 .transition(.opacity)
+                .opacity(openingBook == nil ? 1 : 0) // 这里其实已经控制了 opacity，但内部的占位符是为了 matchedGeometryEffect 彻底失效
+            }
+            
+            // Animation Overlay
+            if let book = openingBook {
+                BookOpeningOverlay(book: book, namespace: animationNamespace) {
+                    withAnimation {
+                        selectedBook = book
+                        openingBook = nil
+                    }
+                }
+                .zIndex(100)
             }
         }
     }

@@ -12,14 +12,10 @@ struct BookSidebarView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 16) {
                 ForEach(books) { book in
-                    ThreeDBookView(book: book)
+                    ThreeDBookView(book: book, isSelected: selectedBook?.id == book.id)
                         .frame(width: 60, height: 80) // Small thumbnail
                         .scaleEffect(0.4) // Visual scaling
                         .frame(width: 60, height: 80) // Clip frame
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.accentColor, lineWidth: selectedBook?.id == book.id ? 2 : 0)
-                        )
                         .onTapGesture {
                             withAnimation {
                                 onSelect(book)
@@ -49,17 +45,30 @@ struct BookGridView: View {
     @Binding var selectedBookForCover: BookGroup?
     @Binding var showingCoverPicker: Bool
     let onDelete: (BookGroup) -> Void
+    var namespace: Namespace.ID?
+    var onBookTap: ((BookGroup) -> Void)?
+    var openingBook: BookGroup?
     
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
                 ForEach(books) { book in
                     Button {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            selectedBook = book
+                        if let onBookTap = onBookTap {
+                            onBookTap(book)
+                        } else {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                selectedBook = book
+                            }
                         }
                     } label: {
-                        ThreeDBookView(book: book)
+                        if book.id == openingBook?.id {
+                            // 占位符，保持布局但不显示内容，移除 matchedGeometryEffect
+                            Color.clear
+                                .frame(width: 160, height: 220)
+                        } else {
+                            ThreeDBookView(book: book, namespace: namespace)
+                        }
                     }
                     .buttonStyle(BouncingButtonStyle())
                     .contextMenu {
@@ -85,11 +94,12 @@ struct BookGridView: View {
 
 struct ThreeDBookView: View {
     let book: BookGroup
+    var namespace: Namespace.ID? = nil
+    var isSelected: Bool = false
     
     var body: some View {
         ZStack {
             // Thickness (Pages)
-            // Simplified to reduce compiler load
             ForEach(0..<5) { index in
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color(uiColor: .systemGray6))
@@ -100,10 +110,27 @@ struct ThreeDBookView: View {
             
             // Front Cover Visuals
             BookCoverVisuals(book: book)
+                .overlay(
+                    RoundedCorner(radius: 4, corners: [.topRight, .bottomRight])
+                        .stroke(Color.accentColor, lineWidth: isSelected ? 4 : 0)
+                )
                 .frame(width: 160, height: 220)
                 .rotation3DEffect(.degrees(-8), axis: (0, 1, 0), anchor: .leading, perspective: 0.5)
         }
         .padding(.trailing, 10) // Reserve space for 3D thickness
+        .if(namespace != nil) { view in
+            view.matchedGeometryEffect(id: "book_\(book.id)", in: namespace!)
+        }
+    }
+}
+
+extension View {
+    @ViewBuilder func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
     }
 }
 
