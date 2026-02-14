@@ -15,231 +15,288 @@ struct MeView: View {
     @State private var isImporting = false
     @State private var showingImportAlert = false
     @State private var importMessage = ""
-    @State private var showingHapticTestAlert = false
-    @State private var showingSyncAlert = false
-    @State private var syncAlertMessage = ""
-    @State private var showingLoginRequiredAlert = false
-    @State private var showingRestoreSuccessAlert = false
+    @State private var showingCloudSyncSheet = false
+    
+    // Grid Layout
+    private let columns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
     
     var body: some View {
         NavigationStack {
-            List {
-                // Section: Account & iCloud Sync
-                Section {
-                    UserInfoView(authManager: authManager, colorScheme: colorScheme)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // 1. VIP 卡片 (大卡片 1x2)
+                    vipSection
+                        .padding(.horizontal)
                     
-                    CloudSyncControlsView(
-                        authManager: authManager,
-                        cloudManager: cloudManager,
-                        showingLoginRequiredAlert: $showingLoginRequiredAlert,
-                        showingSyncAlert: $showingSyncAlert
-                    )
-                } header: {
-                    Text("账户与同步")
-                }
-                .onAppear {
-                    // 视图显示时检查云端状态
-                    if authManager.isAuthenticated {
-                        cloudManager.fetchLatestBackupMetadata()
-                    }
-                }
-                .alert("确认恢复", isPresented: $showingSyncAlert) {
-                    Button("取消", role: .cancel) { }
-                    Button("恢复", role: .destructive) {
-                        Task {
-                            let success = await cloudManager.restoreFromCloud(context: modelContext)
-                            if success {
-                                showingRestoreSuccessAlert = true
-                            }
+                    // 2. 设置网格 (豆腐块)
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        // 账户与云端 (1x1) - 聚合了登录和 iCloud
+                        AccountCard(
+                            authManager: authManager,
+                            cloudManager: cloudManager
+                        ) {
+                            showingCloudSyncSheet = true
                         }
-                    }
-                } message: {
-                    Text("从云端恢复将覆盖当前的本地数据（合并更新）。确定要继续吗？")
-                }
-                .alert("需要登录", isPresented: $showingLoginRequiredAlert) {
-                    Button("确定", role: .cancel) { }
-                } message: {
-                    Text("请先登录 iCloud 账户以使用云同步功能。")
-                }
-                .alert("恢复成功", isPresented: $showingRestoreSuccessAlert) {
-                    Button("确定", role: .cancel) { }
-                } message: {
-                    Text("云端数据已成功恢复到本地。")
-                }
-
-                // VIP 会员中心
-                if vipManager.isVIP {
-                    ZStack {
-                        VIPCardView(
-                            vipNumber: vipManager.vipNumber ?? "88888888",
-                            expireDate: vipManager.vipExpireDate,
-                            isVIP: true,
-                            cardStyle: vipManager.cardStyle
-                        )
-                        .padding(.vertical, 4)
                         
-                        NavigationLink(destination: VIPCenterView()) {
-                            EmptyView()
+                        // 梦幻衣橱
+                        NavigationLink(destination: WardrobeSettingsView()) {
+                            SettingsGridItem(
+                                title: "梦幻衣橱",
+                                subtitle: "外观 · 隐私 · 提醒",
+                                icon: "tshirt",
+                                iconColor: .pink
+                            )
                         }
-                        .opacity(0)
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                    .listRowBackground(Color.clear)
-                } 
-
-                // Section 3: Feature Settings
-                Section {
-                    if !vipManager.isVIP  {
-                        NavigationLink(destination: VIPCenterView()) {
-                            HStack {
-                                Image(systemName: "crown.fill")
-                                    .foregroundStyle(Color(hex: "FFD700"))
-                                    .font(.body)
-                                    .frame(width: 24)
-                                
-                                VStack(alignment: .leading) {
-                                    Text("会员中心")
-                                        .font(.body)
-                                        .foregroundStyle(.primary)
-                                    Text("尊享智能对话特权")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                Spacer()
-                            }
-                            .padding(.vertical, 2)
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // 小世界
+                        NavigationLink(destination: SmallWorldSettingsView()) {
+                            SettingsGridItem(
+                                title: "小世界",
+                                subtitle: "风格 · 场景 · 3D",
+                                icon: "globe.asia.australia.fill",
+                                iconColor: .indigo
+                            )
                         }
-                    }
-                    
-                    
-                    NavigationLink(destination: GeneralSettingsView()) {
-                        SettingsRow(icon: "slider.horizontal.3", title: "通用设置", subtitle: "语言、主题、个性化等")
-                    }
-                    NavigationLink(destination: NotificationSettingsView()) {
-                        SettingsRow(icon: "bell", title: "通知设置", subtitle: "管理通知提醒")
-                    }
-                    
-                    NavigationLink(destination: PrivacySettingsView()) {
-                        SettingsRow(icon: "hand.raised", title: "隐私设置", subtitle: "管理价格显示与权限")
-                    }
-
-                    NavigationLink(destination: SmartManagementView()) {
-                        SettingsRow(icon: "brain.head.profile", title: "智能管理", subtitle: "AI 模型、语音与识别设置")
-                    }
-                    
-                    NavigationLink(destination: WidgetSettingsView()) {
-                        SettingsRow(icon: "rectangle.3.group", title: "小组件设置", subtitle: "自定义背景与添加教程")
-                    }
-                    NavigationLink(destination: DataManagementView()) {
-                        SettingsRow(icon: "externaldrive", title: "数据管理", subtitle: "备份与导出及属性管理")
-                    }
-                    NavigationLink(destination: RecycleBinView()) {
-                        SettingsRow(icon: "trash", title: "回收站", subtitle: "恢复已删除的裙子")
-                    }
-                    
-                    
-                    
-                    // 触感反馈设置 (跳转详情页)
-                    NavigationLink(destination: HapticSettingsView()) {
-                        SettingsRow(icon: "waveform.path.ecg", title: "音效和触感反馈", subtitle: "震动开关与系统设置引导")
-                    }
-
-                    // 应用系统设置
-                    Button {
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(url)
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // 智能萌宠
+                        NavigationLink(destination: PetAISettingsView()) {
+                            SettingsGridItem(
+                                title: "智能萌宠",
+                                subtitle: "AI · 语音 · 形象",
+                                icon: "pawprint.fill",
+                                iconColor: .orange
+                            )
                         }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "gear.circle")
-                                .foregroundStyle(.brown)
-                                .font(.body)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading) {
-                                Text("应用系统设置")
-                                    .font(.body)
-                                    .foregroundStyle(.primary)
-                                Text("管理通知、权限与隐私")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "arrow.up.forward.app")
-                                .font(.caption)
-                                .foregroundStyle(.gray)
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // 系统与更多
+                        NavigationLink(destination: SystemSettingsView()) {
+                            SettingsGridItem(
+                                title: "系统与更多",
+                                subtitle: "组件 · 备份 · 通用",
+                                icon: "gearshape.fill",
+                                iconColor: .gray
+                            )
                         }
-                        .padding(.vertical, 2)
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // 开发测试 (仅 Debug)
+                        #if DEBUG
+                        NavigationLink(destination: TestEffectsView()) {
+                            SettingsGridItem(
+                                title: "实验室",
+                                subtitle: "特效测试",
+                                icon: "flask.fill",
+                                iconColor: .green
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        #endif
                     }
-                } header: {
-                    Label("功能设置", systemImage: "gearshape")
-                        .outlined()
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
                 }
-                
-                // Section: Test Project
-                #if DEBUG
-                Section {
-                    NavigationLink(destination: TestEffectsView()) {
-                        SettingsRow(icon: "flask", title: "特效测试实验室", subtitle: "预览特效与实验功能")
-                    }
-                } header: {
-                    Label("开发测试", systemImage: "hammer")
-                        .outlined()
-                }
-                #endif
+                .padding(.top, 10)
             }
-            .scrollContentBackground(.hidden)
             .background {
                 LiquidBackground()
             }
             .navigationTitle("我的")
+            .sheet(isPresented: $showingCloudSyncSheet) {
+                CloudSyncSheetView(
+                    authManager: authManager,
+                    cloudManager: cloudManager,
+                    modelContext: modelContext
+                )
+                .presentationDetents([.medium])
+            }
+            // 文件导入逻辑
             .fileImporter(
                 isPresented: $isImporting,
-                allowedContentTypes: [.data], // 允许所有数据类型，或者自定义类型
+                allowedContentTypes: [.data],
                 allowsMultipleSelection: false
             ) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else { return }
-                    
-                    Task {
-                        // 在 Task 内部获取权限，确保覆盖整个异步操作
-                        guard url.startAccessingSecurityScopedResource() else {
-                            importMessage = "无法访问文件，请检查权限"
-                            showingImportAlert = true
-                            return
-                        }
-                        
-                        defer { url.stopAccessingSecurityScopedResource() }
-                        
-                        do {
-                            let result = try await ImportManager.shared.importBackup(from: url, context: modelContext)
-                            importMessage = "导入完成\n成功: \(result.successCount)\n失败: \(result.failCount)"
-                            if !result.errors.isEmpty {
-                                importMessage += "\n\n错误详情:\n" + result.errors.prefix(3).joined(separator: "\n")
-                            }
-                        } catch {
-                            importMessage = "导入失败: \(error.localizedDescription)"
-                        }
-                        showingImportAlert = true
-                    }
-                    
-                case .failure(let error):
-                    importMessage = "选择文件失败: \(error.localizedDescription)"
-                    showingImportAlert = true
-                }
+                handleFileImport(result)
             }
             .alert("导入结果", isPresented: $showingImportAlert) {
                 Button("确定", role: .cancel) { }
             } message: {
                 Text(importMessage)
             }
+            .onAppear {
+                if authManager.isAuthenticated {
+                    cloudManager.fetchLatestBackupMetadata()
+                }
+            }
+        }
+    }
+    
+    // MARK: - VIP Section
+    @ViewBuilder
+    private var vipSection: some View {
+        if vipManager.isVIP {
+            ZStack {
+                VIPCardView(
+                    vipNumber: vipManager.vipNumber ?? "88888888",
+                    expireDate: vipManager.vipExpireDate,
+                    isVIP: true,
+                    cardStyle: vipManager.cardStyle
+                )
+                // 隐形链接
+                NavigationLink(destination: VIPCenterView()) {
+                    Color.clear
+                }
+            }
+            .frame(height: 180) // 保持高度一致
+            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        } else {
+            NavigationLink(destination: VIPCenterView()) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundStyle(Color(hex: "FFD700"))
+                                .font(.title2)
+                            Text("开通 VIP 会员")
+                                .font(.title3)
+                                .bold()
+                                .foregroundStyle(.primary)
+                        }
+                        
+                        Text("解锁尊享智能对话特权与专属卡片")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(.gray)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 100) // 稍微矮一点
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color(hex: "FFD700").opacity(0.3), lineWidth: 1)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+    }
+    
+    // MARK: - Import Logic
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            
+            Task {
+                guard url.startAccessingSecurityScopedResource() else {
+                    importMessage = "无法访问文件，请检查权限"
+                    showingImportAlert = true
+                    return
+                }
+                
+                defer { url.stopAccessingSecurityScopedResource() }
+                
+                do {
+                    let result = try await ImportManager.shared.importBackup(from: url, context: modelContext)
+                    importMessage = "导入完成\n成功: \(result.successCount)\n失败: \(result.failCount)"
+                    if !result.errors.isEmpty {
+                        importMessage += "\n\n错误详情:\n" + result.errors.prefix(3).joined(separator: "\n")
+                    }
+                } catch {
+                    importMessage = "导入失败: \(error.localizedDescription)"
+                }
+                showingImportAlert = true
+            }
+            
+        case .failure(let error):
+            importMessage = "选择文件失败: \(error.localizedDescription)"
+            showingImportAlert = true
         }
     }
 }
+
+// MARK: - Cloud Sync Sheet
+struct CloudSyncSheetView: View {
+    @ObservedObject var authManager: AuthenticationManager
+    @ObservedObject var cloudManager: CloudSyncManager
+    let modelContext: ModelContext
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    
+    @State private var showingLoginRequiredAlert = false
+    @State private var showingSyncAlert = false
+    @State private var showingRestoreSuccessAlert = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                // 账户部分：在此处显示登录/用户信息
+                Section {
+                    UserInfoView(authManager: authManager, colorScheme: colorScheme)
+                } header: {
+                    Text("账户信息")
+                }
+                
+                Section {
+                    CloudSyncControlsView(
+                        authManager: authManager,
+                        cloudManager: cloudManager,
+                        // 这里的 context 传递方式需要注意，CloudSyncControlsView 使用 Environment
+                        // 我们在下面 .environment(\.modelContext, modelContext) 注入
+                        showingLoginRequiredAlert: $showingLoginRequiredAlert,
+                        showingSyncAlert: $showingSyncAlert
+                    )
+                } header: {
+                    Text("iCloud 同步管理")
+                } footer: {
+                    Text("请确保您的 iCloud 空间充足。")
+                }
+            }
+            .navigationTitle("账户与同步")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            // Alert logic copied from original MeView
+            .alert("确认恢复", isPresented: $showingSyncAlert) {
+                Button("取消", role: .cancel) { }
+                Button("恢复", role: .destructive) {
+                    Task {
+                        let success = await cloudManager.restoreFromCloud(context: modelContext)
+                        if success { showingRestoreSuccessAlert = true }
+                    }
+                }
+            } message: {
+                Text("从云端恢复将覆盖当前的本地数据（合并更新）。确定要继续吗？")
+            }
+            .alert("需要登录", isPresented: $showingLoginRequiredAlert) {
+                Button("确定", role: .cancel) { }
+            } message: {
+                Text("请先登录 iCloud 账户以使用云同步功能。")
+            }
+            .alert("恢复成功", isPresented: $showingRestoreSuccessAlert) {
+                Button("确定", role: .cancel) { }
+            } message: {
+                Text("云端数据已成功恢复到本地。")
+            }
+        }
+        .environment(\.modelContext, modelContext) // Inject context
+    }
+}
+
 
 // MARK: - Subviews
 

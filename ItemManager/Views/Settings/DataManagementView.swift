@@ -10,18 +10,6 @@ import SwiftData
 import UniformTypeIdentifiers
 import UIKit
 
-// ShareSheet 包装器，用于在 SwiftUI 中使用 UIActivityViewController
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        return controller
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
 struct DataManagementView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true
@@ -157,7 +145,7 @@ struct DataManagementView: View {
                 Text("恢复操作将合并或覆盖当前数据。建议先备份当前数据。")
             }
             .alert("提示", isPresented: $showingMessage) {
-                Button("确定", role: .cancel) { }
+                Button("知道啦", role: .cancel) { }
             } message: {
                 Text(message ?? "")
             }

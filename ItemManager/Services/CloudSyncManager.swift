@@ -108,7 +108,7 @@ class CloudSyncManager: ObservableObject {
     
     // MARK: - Incremental Upload
     
-    func uploadBackup(modelContainer: ModelContainer) async {
+    func uploadBackup(modelContainer: ModelContainer) async -> Bool {
         // Force save main context to ensure pending changes are persisted to store
         // so that the new background context created in prepareBackupData can see them.
         try? modelContainer.mainContext.save()
@@ -117,7 +117,10 @@ class CloudSyncManager: ObservableObject {
         syncError = nil
         
         do {
-            // 0. Check iCloud
+            // 0. Check Disk Space (Local) - User Requirement: > 500MB
+            try checkDiskSpace(minMB: 500)
+            
+            // 0.1 Check iCloud
             let accountStatus = try await container.accountStatus()
             guard accountStatus == .available else {
                 throw NSError(domain: "CloudSync", code: 401, userInfo: [NSLocalizedDescriptionKey: "iCloud 账户不可用。"])
@@ -277,13 +280,15 @@ class CloudSyncManager: ObservableObject {
             self.lastCloudBackupDate = Date()
             self.hasSuccessfulBackup = true
             print("Cloud Backup Success!")
+            isSyncing = false
+            return true
             
         } catch {
             self.syncError = "备份失败: \(error.localizedDescription)"
             print("Cloud Backup Failed: \(error)")
+            isSyncing = false
+            return false
         }
-        
-        isSyncing = false
     }
     
     // MARK: - Incremental Restore
@@ -297,6 +302,11 @@ class CloudSyncManager: ObservableObject {
         syncError = nil
         
         do {
+            // Check Disk Space
+            if !silent {
+                try checkDiskSpace(minMB: 500)
+            }
+            
             print("CloudSync: Fetching Backup Index...")
             let indexRecordID = try await getBackupIndexRecordID()
             let indexRecord = try await database.record(for: indexRecordID)
@@ -465,6 +475,27 @@ class CloudSyncManager: ObservableObject {
             if success {
                 print("SilentRestore: Data restored successfully.")
             }
+        }
+    }
+    
+    // MARK: - Helper
+    
+    private func checkDiskSpace(minMB: Int) throws {
+        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        do {
+            let values = try fileURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            if let capacity = values.volumeAvailableCapacityForImportantUsage {
+                let minBytes = Int64(minMB) * 1024 * 1024
+                if capacity < minBytes {
+                    throw NSError(domain: "CloudSync", code: 507, userInfo: [NSLocalizedDescriptionKey: "设备剩余空间不足。请至少预留 \(minMB)MB 空间以进行备份/恢复。"])
+                }
+            }
+        } catch {
+            if (error as NSError).domain == "CloudSync" {
+                throw error
+            }
+            // Ignore other errors (e.g. unable to query)
+            print("CloudSync: Warning - Failed to check disk space: \(error)")
         }
     }
 }
