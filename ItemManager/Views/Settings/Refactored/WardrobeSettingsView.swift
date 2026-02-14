@@ -3,6 +3,7 @@ import PhotosUI
 
 struct WardrobeSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
     // Privacy
@@ -74,6 +75,19 @@ struct WardrobeSettingsView: View {
     
     // MARK: - Subviews & Actions
     
+    private func skirtFillColor(theme: ThemeManager) -> Color {
+        switch theme.skirtFillMode {
+        case .transparent:
+            return colorScheme == .dark ? Color.black.opacity(0.2) : Color.white.opacity(0.4)
+        case .fullyTransparent:
+            return Color.clear
+        case .tinted:
+            return colorScheme == .dark ? theme.cardTintColor.opacity(0.15) : theme.cardTintColor.opacity(0.3)
+        case .solid:
+            return colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.8)
+        }
+    }
+    
     @ViewBuilder
     private func appAppearanceSection(theme: ThemeManager) -> some View {
         @Bindable var theme = theme
@@ -119,9 +133,16 @@ struct WardrobeSettingsView: View {
             VStack(spacing: 8) {
                 ZStack {
                     VStack(alignment: .leading, spacing: 8) {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 80)
+                        // 模拟图片区域，应用填充模式
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(skirtFillColor(theme: theme))
+                            
+                            Image(systemName: "tshirt")
+                                .font(.system(size: 30))
+                                .foregroundStyle(.gray.opacity(0.5))
+                        }
+                        .frame(height: 80)
                         
                         VStack(alignment: .leading, spacing: 4) {
                             RoundedRectangle(cornerRadius: 4)
