@@ -24,6 +24,7 @@ struct RococoSmallWorldView: View {
     @AppStorage("rococoViewMode") private var viewMode: ViewMode = .both
     @State private var showDebugHotspots: Bool = false
     @StateObject private var petViewModel = SmallWorldPetViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     
     // Zoom & Pan State
     @State private var currentZoomScale: CGFloat = 1.0
@@ -214,20 +215,34 @@ struct RococoSmallWorldView: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            // 修复：当从视频播放返回时，强制重置缩放和动画状态，防止交互锁死
-            if finalZoomScale != 1.0 || currentZoomScale != 1.0 {
-                withAnimation {
-                    finalZoomScale = 1.0
-                    currentZoomScale = 1.0
-                    finalDragOffset = .zero
-                    currentDragOffset = .zero
-                }
+            resetState()
+        }
+        .onDisappear {
+            resetState()
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                resetState()
             }
-            
-            // 确保视频播放状态已重置
-            if isPlayingOpeningAnimation {
-                isPlayingOpeningAnimation = false
-            }
+        }
+    }
+    
+    private func resetState() {
+        // 修复：当从视频播放返回时，强制重置缩放和动画状态，防止交互锁死
+        // 使用 withAnimation 确保平滑过渡，但在某些情况下可能需要立即重置
+        withAnimation {
+            finalZoomScale = 1.0
+            currentZoomScale = 1.0
+            finalDragOffset = .zero
+            currentDragOffset = .zero
+        }
+        
+        // 停止宠物移动，确保状态重置
+        petViewModel.stopMovement()
+        
+        // 确保视频播放状态已重置
+        if isPlayingOpeningAnimation {
+            isPlayingOpeningAnimation = false
         }
     }
     
@@ -298,6 +313,7 @@ struct RococoSmallWorldView: View {
                             roomIndex: imageName.contains("rococo_1") ? 0 : 1,
                             geometry: geo
                         )
+                        .allowsHitTesting(petViewModel.isDebugMode)
                     }
                 }
             )
