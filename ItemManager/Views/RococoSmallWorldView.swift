@@ -21,9 +21,15 @@ struct RococoSmallWorldView: View {
         var id: String { rawValue }
     }
     
-    @State private var viewMode: ViewMode = .both
+    @AppStorage("rococoViewMode") private var viewMode: ViewMode = .both
     @State private var showDebugHotspots: Bool = false
     @StateObject private var petViewModel = SmallWorldPetViewModel()
+    
+    // Zoom & Pan State
+    @State private var currentZoomScale: CGFloat = 1.0
+    @State private var finalZoomScale: CGFloat = 1.0
+    @State private var currentDragOffset: CGSize = .zero
+    @State private var finalDragOffset: CGSize = .zero
     
     // MARK: - Hotspot Data
     private struct HotspotData: Identifiable {
@@ -102,6 +108,55 @@ struct RococoSmallWorldView: View {
                         roomView(imageName: "small_world_rococo_1", geometry: geometry, width: geometry.size.width, height: geometry.size.height)
                     case .lower:
                         roomView(imageName: "small_world_rococo_2", geometry: geometry, width: geometry.size.width, height: geometry.size.height)
+                    }
+                }
+                .scaleEffect(finalZoomScale * currentZoomScale)
+                .offset(x: finalDragOffset.width + currentDragOffset.width, y: finalDragOffset.height + currentDragOffset.height)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { scale in
+                            currentZoomScale = scale
+                        }
+                        .onEnded { scale in
+                            let newScale = finalZoomScale * scale
+                            withAnimation {
+                                finalZoomScale = max(1.0, min(newScale, 3.0))
+                                currentZoomScale = 1.0
+                                if finalZoomScale == 1.0 {
+                                    finalDragOffset = .zero
+                                }
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 10)
+                        .onChanged { value in
+                            if finalZoomScale > 1.0 {
+                                currentDragOffset = value.translation
+                            }
+                        }
+                        .onEnded { value in
+                            if finalZoomScale > 1.0 {
+                                finalDragOffset.width += value.translation.width
+                                finalDragOffset.height += value.translation.height
+                                currentDragOffset = .zero
+                            }
+                        }
+                )
+                .onTapGesture(count: 2) {
+                    withAnimation {
+                        finalZoomScale = 1.0
+                        currentZoomScale = 1.0
+                        finalDragOffset = .zero
+                        currentDragOffset = .zero
+                    }
+                }
+                .onChange(of: viewMode) { _ in
+                    withAnimation {
+                        finalZoomScale = 1.0
+                        currentZoomScale = 1.0
+                        finalDragOffset = .zero
+                        currentDragOffset = .zero
                     }
                 }
                 .transition(.opacity)

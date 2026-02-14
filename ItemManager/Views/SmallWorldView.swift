@@ -13,7 +13,7 @@ struct SmallWorldView: View {
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
     
-    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.frenchRetro.rawValue
+    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.rococo.rawValue
     
     var body: some View {
         Group {
