@@ -118,15 +118,25 @@ final class PetVoiceManager: NSObject, ObservableObject {
         
         // 映射用户选择的音色
         print("🔍 [PetVoiceManager] Selected tone from UserDefaults: \(selectedTone)")
+        
+        // 强制使用用户选择的音色，忽略角色默认配置（如果有选择的话）
+        // 只有当 selectedTone 为默认值且角色有特殊配置时才考虑角色配置？
+        // 或者始终让用户设置覆盖角色默认？
+        // 目前逻辑是：先取角色默认，然后 switch selectedTone 覆盖。
+        // 但 switch case 覆盖了所有已知选项，所以实际上角色配置只在 selectedTone 为未知值时生效。
+        
         switch selectedTone {
         case "Shota": voiceId = "ICL_zh_male_fengfashaonian_tob"
-        case "SweetGirl": voiceId = "zh_female_vv_jupiter_bigtts"
+        // 恢复为标准精品音色 ID (需要开通“语音合成”服务的精品音色权限)
+        case "SweetGirl": voiceId = "BV406_streaming" // VV
         case "GentleSister": voiceId = "ICL_zh_female_wenrouwenya_tob"
-        case "LivelyGirl": voiceId = "zh_female_xiaohe_jupiter_bigtts"
+        case "LivelyGirl": voiceId = "BV407_streaming" // 小和
         case "CoolLady": voiceId = "ICL_zh_female_chengshujiejie_tob"
-        case "GentleMale": voiceId = "zh_male_yunzhou_jupiter_bigtts"
-        case "MagneticMale": voiceId = "zh_male_xiaotian_jupiter_bigtts"
-        default: break
+        case "GentleMale": voiceId = "BV002_streaming" // 云舟
+        case "MagneticMale": voiceId = "BV123_streaming" // 小天
+        default: 
+            print("⚠️ [PetVoiceManager] Unknown tone: \(selectedTone), using role default: \(voiceId ?? "nil")")
+            break
         }
         
         print("🔍 [PetVoiceManager] Resolved Voice ID: \(voiceId ?? "nil")")
@@ -135,7 +145,7 @@ final class PetVoiceManager: NSObject, ObservableObject {
         guard let finalVoiceId = voiceId,
               let appId = AIConfigManager.shared.ttsAppId,
               let token = AIConfigManager.shared.dbApiKey else {
-            print("TTS Config Missing or voiceId nil. AppID: \(AIConfigManager.shared.ttsAppId ?? "nil"), Token: \(AIConfigManager.shared.dbApiKey != nil ? "Exists" : "nil"), VoiceID: \(voiceId ?? "nil")")
+            print("❌ [PetVoiceManager] Config Missing. AppID: \(AIConfigManager.shared.ttsAppId ?? "nil"), Token: \(AIConfigManager.shared.dbApiKey != nil ? "Exists" : "nil"), VoiceID: \(voiceId ?? "nil")")
             return false
         }
         
@@ -146,12 +156,23 @@ final class PetVoiceManager: NSObject, ObservableObject {
         // 火山引擎鉴权格式 Bearer; access_token (注意分号)
         request.setValue("Bearer; \(token)", forHTTPHeaderField: "Authorization")
         
+        // 确定 cluster based on voiceId prefix
+        // ICL_, S_, saturn_ 开头的为克隆音色，使用 volcano_icl
+        // 其他情况，默认为 volcano_icl 以避免 403 (假设用户只开通了 ICL)
+        var cluster = "volcano_icl"
+        if !finalVoiceId.hasPrefix("ICL_") && !finalVoiceId.hasPrefix("S_") && !finalVoiceId.hasPrefix("saturn_") {
+            // 如果 ID 不是 ICL 格式，尝试使用 volcano_tts，但很可能会失败
+             cluster = "volcano_tts"
+        }
+        
+        print("🔍 [PetVoiceManager] Determining cluster for voiceId: \(finalVoiceId) -> \(cluster)")
+        
         let reqId = UUID().uuidString
         let body: [String: Any] = [
             "app": [
                 "appid": appId,
                 "token": "access_token",
-                "cluster": "volcano_icl"
+                "cluster": cluster
             ],
             "user": [
                 "uid": UIDevice.current.identifierForVendor?.uuidString ?? "user_1"
@@ -171,41 +192,70 @@ final class PetVoiceManager: NSObject, ObservableObject {
             ]
         ]
         
-        print("🔍 [PetVoiceManager] TTS Request Body: \(body)")
+        print("🔍 [PetVoiceManager] TTS Request Body: appid=\(appId), cluster=\(cluster), voice_type=\(finalVoiceId)")
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            print("🚀 [PetVoiceManager] Sending TTS request...")
             let (data, response) = try await URLSession.shared.data(for: request)
             
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                print("TTS HTTP Error: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+            guard let httpResponse = response as? HTTPURLResponse else {
+                 print("❌ [PetVoiceManager] Invalid response type")
+                 return false
+            }
+            
+            print("📥 [PetVoiceManager] Received response: Status \(httpResponse.statusCode)")
+            
+            guard httpResponse.statusCode == 200 else {
+                print("❌ [PetVoiceManager] TTS HTTP Error: \(httpResponse.statusCode)")
                 // 尝试打印错误信息
                 if let errorMsg = String(data: data, encoding: .utf8) {
-                    print("TTS Error Body: \(errorMsg)")
+                    print("❌ [PetVoiceManager] Error Body: \(errorMsg)")
+                    
+                    // 智能提示：检测 10029 错误 (端到端服务不支持 HTTP)
+                    if errorMsg.contains("volc.service_type.10029") {
+                        print("""
+                        ⚠️ [严重错误] 您当前使用的 AppID 属于「豆包端到端实时语音大模型」服务。
+                        该服务仅支持 WebSocket 协议，不支持当前代码使用的 HTTP 协议。
+                        
+                        ✅ 解决方案：
+                        请前往火山引擎控制台 -> 语音技术 -> 语音合成 (Standard TTS)。
+                        开通「语音合成」服务，并获取对应的 AppID 和 Token 替换到项目中。
+                        """)
+                    }
                 }
                 return false
             }
             
             // 解析 JSON
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                print("TTS Response Decode Failed")
+                print("❌ [PetVoiceManager] TTS Response Decode Failed")
+                if let str = String(data: data, encoding: .utf8) {
+                     print("Raw response: \(str)")
+                }
                 return false
             }
             
-            if let code = json["code"] as? Int, code == 3000,
-               let base64Data = json["data"] as? String,
-               let audioData = Data(base64Encoded: base64Data) {
+            if let code = json["code"] as? Int, code == 3000 {
+               if let base64Data = json["data"] as? String,
+                  let audioData = Data(base64Encoded: base64Data) {
+                   print("✅ [PetVoiceManager] TTS Success. Audio data size: \(audioData.count) bytes")
                    // 播放音频
                    return await MainActor.run {
                        return playAudioData(audioData)
                    }
+               } else {
+                   print("❌ [PetVoiceManager] Code 3000 but data missing or invalid base64")
+                   return false
+               }
             } else {
-                print("TTS API Error. Code: \(json["code"] ?? "nil"), Message: \(json["message"] ?? "nil")")
+                print("❌ [PetVoiceManager] TTS API Error. Code: \(json["code"] ?? "nil"), Message: \(json["message"] ?? "nil")")
+                print("Full Response: \(json)")
                 return false
             }
             
         } catch {
-            print("TTS Request Error: \(error)")
+            print("❌ [PetVoiceManager] TTS Request Exception: \(error)")
             return false
         }
     }
