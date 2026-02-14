@@ -26,7 +26,7 @@ struct MeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 32) {
                     // 1. VIP 卡片 (大卡片 1x2)
                     vipSection
                         .padding(.horizontal)

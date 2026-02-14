@@ -21,6 +21,7 @@ struct TestEffectsView: View {
     @State private var showCelebration = false
     @State private var selectedOption: EffectOption = .random
     @State private var currentEffectToPlay: CelebrationEffect?
+    @ObservedObject private var vipManager = VIPManager.shared
     
     var body: some View {
         ZStack {
@@ -61,6 +62,29 @@ struct TestEffectsView: View {
                 }
                 .padding(.horizontal)
                 .shadow(color: .pink.opacity(0.3), radius: 8, x: 0, y: 4)
+                
+                Divider()
+                    .padding(.horizontal)
+                
+                Text("VIP 状态测试")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                
+                Button {
+                    var status = PetDataManager.shared.status
+                    status.vipStatus.isActive = false
+                    status.vipStatus.expireDate = nil
+                    PetDataManager.shared.saveStatus(status)
+                    vipManager.reloadStatus()
+                } label: {
+                    Text("清除 VIP 时间 (重置为非会员)")
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(16)
+                }
+                .padding(.horizontal)
                 
                 Spacer()
             }
