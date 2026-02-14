@@ -29,7 +29,7 @@ struct RecycleBinView: View {
     }
     
     @State private var selectedTab: Int = 0 // 0: 衣橱, 1: 手帐
-    @State private var selectedItems: Set<UUID> = [] // For Wardrobe
+    @State private var selectedItems: Set<UUID> = [] // Shared selection
     @State private var editMode: EditMode = .inactive
     
     // Alerts
@@ -37,6 +37,8 @@ struct RecycleBinView: View {
     @State private var showingDeleteAlert = false
     @State private var showingDeleteAllAlert = false
     @State private var showingRestoreAllAlert = false
+    @State private var showingBatchDeleteAlert = false
+    @State private var showingBatchRestoreAlert = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -53,10 +55,69 @@ struct RecycleBinView: View {
                 ootdList
             }
         }
+        .environment(\.editMode, $editMode)
         .navigationTitle("回收站")
         .navigationBarTitleDisplayMode(.inline)
         .background {
             LiquidBackground()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if editMode == .active {
+                    HStack(spacing: 16) {
+                        Button {
+                            showingBatchRestoreAlert = true
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward")
+                        }
+                        .disabled(selectedItems.isEmpty)
+                        
+                        Button {
+                            showingBatchDeleteAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .disabled(selectedItems.isEmpty)
+                        .foregroundStyle(.red)
+                        
+                        Button("完成") {
+                            withAnimation {
+                                editMode = .inactive
+                                selectedItems.removeAll()
+                            }
+                        }
+                        .fontWeight(.bold)
+                    }
+                } else {
+                    Menu {
+                        Button {
+                            withAnimation {
+                                editMode = .active
+                            }
+                        } label: {
+                            Label("编辑", systemImage: "pencil")
+                        }
+                        
+                        Button {
+                            showingRestoreAllAlert = true
+                        } label: {
+                            Label("全部恢复", systemImage: "arrow.uturn.backward.circle")
+                        }
+                        
+                        Button(role: .destructive) {
+                            showingDeleteAllAlert = true
+                        } label: {
+                            Label("全部删除", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .onChange(of: selectedTab) {
+            editMode = .inactive
+            selectedItems.removeAll()
         }
         .alert("彻底删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { itemToDelete = nil }
@@ -72,6 +133,40 @@ struct RecycleBinView: View {
             }
         } message: {
             Text("确定要彻底删除吗？此操作无法撤销。")
+        }
+        .alert("全部删除", isPresented: $showingDeleteAllAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                deleteAll()
+            }
+        } message: {
+            Text("确定要清空当前列表吗？此操作无法撤销。")
+        }
+        .alert("全部恢复", isPresented: $showingRestoreAllAlert) {
+            Button("取消", role: .cancel) { }
+            Button("恢复") {
+                restoreAll()
+            }
+        } message: {
+            Text("确定要恢复当前列表的所有项目吗？")
+        }
+        .alert("批量删除", isPresented: $showingBatchDeleteAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                deleteSelected()
+                editMode = .inactive
+            }
+        } message: {
+            Text("确定要删除选中的 \(selectedItems.count) 个项目吗？此操作无法撤销。")
+        }
+        .alert("批量恢复", isPresented: $showingBatchRestoreAlert) {
+            Button("取消", role: .cancel) { }
+            Button("恢复") {
+                restoreSelected()
+                editMode = .inactive
+            }
+        } message: {
+            Text("确定要恢复选中的 \(selectedItems.count) 个项目吗？")
         }
     }
     
@@ -92,19 +187,23 @@ struct RecycleBinView: View {
                         .padding(.vertical, 4)
                         .listRowBackground(Color.clear)
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                restoreClothing(clothing)
-                            } label: {
-                                Label("恢复", systemImage: "arrow.uturn.backward")
+                            if editMode == .inactive {
+                                Button {
+                                    restoreClothing(clothing)
+                                } label: {
+                                    Label("恢复", systemImage: "arrow.uturn.backward")
+                                }
+                                .tint(.blue)
                             }
-                            .tint(.blue)
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                itemToDelete = clothing
-                                showingDeleteAlert = true
-                            } label: {
-                                Label("彻底删除", systemImage: "trash.slash")
+                            if editMode == .inactive {
+                                Button(role: .destructive) {
+                                    itemToDelete = clothing
+                                    showingDeleteAlert = true
+                                } label: {
+                                    Label("彻底删除", systemImage: "trash.slash")
+                                }
                             }
                         }
                 }
@@ -116,7 +215,7 @@ struct RecycleBinView: View {
     // MARK: - OOTD View
     
     var ootdList: some View {
-        List {
+        List(selection: $selectedItems) {
             if deletedBooks.isEmpty && isolatedDeletedOutfits.isEmpty {
                 ContentUnavailableView(
                     "回收站是空的",
@@ -129,13 +228,14 @@ struct RecycleBinView: View {
                 if !deletedBooks.isEmpty {
                     Section("手帐本") {
                         ForEach(deletedBooks) { book in
-                            DeletedBookRow(book: book, onRestore: {
+                            DeletedBookRow(book: book, isEditing: editMode == .active, onRestore: {
                                 restoreBook(book)
                             }, onDelete: {
                                 itemToDelete = book
                                 showingDeleteAlert = true
                             })
                             .listRowBackground(Color.clear)
+                            .tag(book.id) // Ensure ID is captured for selection
                         }
                     }
                 }
@@ -144,13 +244,14 @@ struct RecycleBinView: View {
                 if !isolatedDeletedOutfits.isEmpty {
                     Section("单独删除的书页") {
                         ForEach(isolatedDeletedOutfits) { outfit in
-                            DeletedOutfitRow(outfit: outfit, onRestore: {
+                            DeletedOutfitRow(outfit: outfit, isEditing: editMode == .active, onRestore: {
                                 restoreOutfit(outfit)
                             }, onDelete: {
                                 itemToDelete = outfit
                                 showingDeleteAlert = true
                             })
                             .listRowBackground(Color.clear)
+                            .tag(outfit.id) // Ensure ID is captured for selection
                         }
                     }
                 }
@@ -214,10 +315,83 @@ struct RecycleBinView: View {
             modelContext.delete(outfit)
         }
     }
+    
+    // MARK: - Batch Actions
+    
+    private func restoreAll() {
+        if selectedTab == 0 {
+            for clothing in deletedClothings {
+                restoreClothing(clothing)
+            }
+        } else {
+            for book in deletedBooks {
+                restoreBook(book)
+            }
+            for outfit in isolatedDeletedOutfits {
+                restoreOutfit(outfit)
+            }
+        }
+    }
+    
+    private func deleteAll() {
+        if selectedTab == 0 {
+            for clothing in deletedClothings {
+                permanentlyDeleteClothing(clothing)
+            }
+        } else {
+            for book in deletedBooks {
+                permanentlyDeleteBook(book)
+            }
+            for outfit in isolatedDeletedOutfits {
+                permanentlyDeleteOutfit(outfit)
+            }
+        }
+    }
+    
+    private func restoreSelected() {
+        if selectedTab == 0 {
+            let itemsToRestore = deletedClothings.filter { selectedItems.contains($0.id) }
+            for item in itemsToRestore {
+                restoreClothing(item)
+            }
+        } else {
+            let booksToRestore = deletedBooks.filter { selectedItems.contains($0.id) }
+            for book in booksToRestore {
+                restoreBook(book)
+            }
+            
+            let outfitsToRestore = isolatedDeletedOutfits.filter { selectedItems.contains($0.id) }
+            for outfit in outfitsToRestore {
+                restoreOutfit(outfit)
+            }
+        }
+        selectedItems.removeAll()
+    }
+    
+    private func deleteSelected() {
+        if selectedTab == 0 {
+            let itemsToDelete = deletedClothings.filter { selectedItems.contains($0.id) }
+            for item in itemsToDelete {
+                permanentlyDeleteClothing(item)
+            }
+        } else {
+            let booksToDelete = deletedBooks.filter { selectedItems.contains($0.id) }
+            for book in booksToDelete {
+                permanentlyDeleteBook(book)
+            }
+            
+            let outfitsToDelete = isolatedDeletedOutfits.filter { selectedItems.contains($0.id) }
+            for outfit in outfitsToDelete {
+                permanentlyDeleteOutfit(outfit)
+            }
+        }
+        selectedItems.removeAll()
+    }
 }
 
 struct DeletedBookRow: View {
     let book: BookGroup
+    var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
     
@@ -251,19 +425,22 @@ struct DeletedBookRow: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(isEditing)
                 
                 // Actions
-                HStack(spacing: 16) {
-                    Button(action: onRestore) {
-                        Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .foregroundStyle(.blue)
-                            .font(.title3)
-                    }
-                    
-                    Button(action: onDelete) {
-                        Image(systemName: "trash.circle.fill")
-                            .foregroundStyle(.red)
-                            .font(.title3)
+                if !isEditing {
+                    HStack(spacing: 16) {
+                        Button(action: onRestore) {
+                            Image(systemName: "arrow.uturn.backward.circle.fill")
+                                .foregroundStyle(.blue)
+                                .font(.title3)
+                        }
+                        
+                        Button(action: onDelete) {
+                            Image(systemName: "trash.circle.fill")
+                                .foregroundStyle(.red)
+                                .font(.title3)
+                        }
                     }
                 }
             }
@@ -302,6 +479,7 @@ struct DeletedBookRow: View {
 
 struct DeletedOutfitRow: View {
     let outfit: Outfit
+    var isEditing: Bool = false
     let onRestore: () -> Void
     let onDelete: () -> Void
     
@@ -331,15 +509,17 @@ struct DeletedOutfitRow: View {
             
             Spacer()
             
-            HStack(spacing: 16) {
-                Button(action: onRestore) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .foregroundStyle(.blue)
-                }
-                
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
+            if !isEditing {
+                HStack(spacing: 16) {
+                    Button(action: onRestore) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .foregroundStyle(.blue)
+                    }
+                    
+                    Button(action: onDelete) {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
                 }
             }
         }

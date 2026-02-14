@@ -27,6 +27,11 @@ struct OOTDSidebarView: View {
     @State private var showingRenameBookAlert = false
     @State private var renameBookName = ""
     
+    // Move to New Book State
+    @State private var outfitToMove: Outfit?
+    @State private var showingMoveToNewBookAlert = false
+    @State private var newBookNameForMove = ""
+    
     var body: some View {
         if isVisible {
             VStack(spacing: 0) {
@@ -110,6 +115,11 @@ struct OOTDSidebarView: View {
                                     onMoveOutfit: { outfit, targetBook in
                                         moveOutfit(outfit, to: targetBook)
                                     },
+                                    onMoveToNewBook: { outfit in
+                                        outfitToMove = outfit
+                                        newBookNameForMove = ""
+                                        showingMoveToNewBookAlert = true
+                                    },
                                     onDeleteBook: {
                                         bookToDelete = book
                                         showingDeleteBookAlert = true
@@ -182,6 +192,22 @@ struct OOTDSidebarView: View {
                     }
                 }
             }
+            .alert("移动到新手帐本", isPresented: $showingMoveToNewBookAlert) {
+                TextField("新书本名称", text: $newBookNameForMove)
+                Button("取消", role: .cancel) {}
+                Button("创建并移动") {
+                    let newBook = BookGroup(title: newBookNameForMove.isEmpty ? "新书本" : newBookNameForMove)
+                    modelContext.insert(newBook)
+                    
+                    if let outfit = outfitToMove {
+                        moveOutfit(outfit, to: newBook)
+                        currentOutfit = outfit
+                    }
+                    
+                    expandedBookIDs.insert(newBook.id)
+                    currentBook = newBook
+                }
+            }
             .sheet(isPresented: $showingTrash) {
                 RecycleBinView() // We need to update this view
             }
@@ -229,6 +255,7 @@ struct BookGroupView: View {
     var onToggle: () -> Void
     var onDeleteOutfit: (Outfit) -> Void
     var onMoveOutfit: (Outfit, BookGroup) -> Void
+    var onMoveToNewBook: (Outfit) -> Void
     var onDeleteBook: () -> Void
     var onRenameBook: () -> Void
     
@@ -293,6 +320,16 @@ struct BookGroupView: View {
                             )
                             .contextMenu {
                                 Menu {
+                                    Button {
+                                        onMoveToNewBook(outfit)
+                                    } label: {
+                                        Label("新建手帐本...", systemImage: "plus.rectangle.on.folder")
+                                    }
+                                    
+                                    if allBooks.count > 1 {
+                                        Divider()
+                                    }
+                                    
                                     ForEach(allBooks) { targetBook in
                                         if targetBook.id != book.id {
                                             Button(targetBook.title) {
