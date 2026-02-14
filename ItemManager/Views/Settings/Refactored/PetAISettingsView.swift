@@ -21,7 +21,7 @@ struct PetAISettingsView: View {
                 HStack {
                     Image(systemName: "mic.and.signal.meter.fill")
                         .foregroundStyle(.pink)
-                    Text("\(petDataManager.status.displayName)音源")
+                    Text("\(petDataManager.status.displayName)模仿复述音源")
                     Spacer()
                     Picker("", selection: $audioManager.selectedVoiceType) {
                         ForEach(PetVoiceType.allCases) { type in

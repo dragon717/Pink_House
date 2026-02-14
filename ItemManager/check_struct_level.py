@@ -1,0 +1,32 @@
+filename = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/Views/FrenchRetroSmallWorldView.swift"
+
+with open(filename, 'r') as f:
+    lines = f.readlines()
+
+count = 0
+struct_started = False
+
+for i, line in enumerate(lines):
+    line_num = i + 1
+    
+    if "struct FrenchRetroSmallWorldView" in line:
+        struct_started = True
+    
+    if not struct_started:
+        continue
+        
+    code = line.split('//')[0]
+    
+    open_braces = code.count('{')
+    close_braces = code.count('}')
+    
+    prev_count = count
+    count += open_braces
+    count -= close_braces
+    
+    if count == 1 and prev_count > 1:
+        print(f"Dropped to struct level at line {line_num}: {line.strip()}")
+    
+    if count == 0:
+        print(f"Struct closed at line {line_num}: {line.strip()}")
+        break

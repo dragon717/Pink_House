@@ -70,7 +70,37 @@ class SpatialAssetManager: ObservableObject {
     private var currentLoadedImageName: String?
     private var preloadTask: Task<Void, Never>?
     
-    // 预加载特定资源
+    // 内存缓存池
+    private var imageCache: [String: ImagePresentationComponent.Spatial3DImage] = [:]
+    
+    // 异步加载特定资源 (支持并发与多实例)
+    func loadSpatialImage(name: String, extension: String) async -> ImagePresentationComponent.Spatial3DImage? {
+        // 1. Check Memory Cache
+        if let cached = imageCache[name] {
+            print("[SpatialAssetManager] 内存缓存命中: \(name)")
+            return cached
+        }
+        
+        // 2. Prepare File & Generate
+        guard let fileURL = await prepareAssetFile(name: name, ext: `extension`) else { return nil }
+        
+        // Check Disk Cache (Mock)
+        let hasCached = await checkCache(for: name)
+        
+        let image = ImagePresentationComponent.Spatial3DImage(contentsOf: fileURL)
+        if !hasCached {
+            try? await image.generate()
+            await markCached(for: name)
+        } else {
+            print("[SpatialAssetManager] 本地缓存命中: \(name)")
+        }
+        
+        // 3. Update Cache
+        imageCache[name] = image
+        return image
+    }
+    
+    // 预加载特定资源 (兼容旧的单例模式)
     func preload(imageName: String, extension: String) {
         // 如果正在加载当前请求的图片，忽略
         if isLoading && currentLoadedImageName == imageName { return }
@@ -91,47 +121,16 @@ class SpatialAssetManager: ObservableObject {
         
         // 使用 detached 任务避免阻塞 MainActor
         preloadTask = Task.detached(priority: .userInitiated) {
-            // 1. 获取文件 URL (处理 Asset Catalog 情况)
-            // prepareAssetFile 包含耗时的 I/O 和图片编码
-            guard let fileURL = await self.prepareAssetFile(name: imageName, ext: `extension`) else {
-                await MainActor.run {
-                    print("[SpatialAssetManager] 错误：无法准备资源文件")
-                    self.isLoading = false
-                }
-                return
-            }
+            let image = await self.loadSpatialImage(name: imageName, extension: `extension`)
             
-            // 2. 检查缓存 (模拟)
-            let hasCached = await self.checkCache(for: imageName)
-            
-            do {
-                // 3. 创建并生成
-                // 注意：在真实 iOS 26 API 中，Spatial3DImage 的初始化可能是轻量的，
-                // 但 generate() 是耗时的。如果 generate 内部阻塞，也应确保它不在 Main 运行。
-                // 我们的 Mock generate 只是 sleep，是异步非阻塞的。
-                let image = ImagePresentationComponent.Spatial3DImage(contentsOf: fileURL)
-                
-                if hasCached {
-                    await MainActor.run {
-                        print("[SpatialAssetManager] 命中本地缓存，跳过 AI 生成耗时")
-                    }
-                } else {
-                    try await image.generate()
-                    await self.markCached(for: imageName)
-                }
-                
-                // 4. 完成 - 回到主线程更新 UI
-                await MainActor.run {
+            // 4. 完成 - 回到主线程更新 UI
+            await MainActor.run {
+                // 只有当加载完成的图片仍然是当前请求的图片时才更新
+                if self.currentLoadedImageName == imageName {
                     self.spatialImage = image
-                    self.isReady = true
+                    self.isReady = (image != nil)
                     self.isLoading = false
-                    print("[SpatialAssetManager] 资源准备就绪")
-                }
-                
-            } catch {
-                await MainActor.run {
-                    print("[SpatialAssetManager] 生成失败: \(error)")
-                    self.isLoading = false
+                    print("[SpatialAssetManager] 资源准备就绪: \(imageName)")
                 }
             }
         }
@@ -139,6 +138,7 @@ class SpatialAssetManager: ObservableObject {
     
     func clearCache(for name: String) {
         UserDefaults.standard.removeObject(forKey: "spatial_cache_\(name)")
+        imageCache.removeValue(forKey: name) // 清除内存缓存
         isReady = false
         spatialImage = nil
     }

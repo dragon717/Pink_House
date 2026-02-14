@@ -22,6 +22,7 @@ struct RococoSmallWorldView: View {
     }
     
     @AppStorage("rococoViewMode") private var viewMode: ViewMode = .both
+    @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     @State private var showDebugHotspots: Bool = false
     @StateObject private var petViewModel = SmallWorldPetViewModel()
     @Environment(\.scenePhase) private var scenePhase
@@ -258,67 +259,80 @@ struct RococoSmallWorldView: View {
     private func roomView(imageName: String, geometry: GeometryProxy, width: CGFloat, height: CGFloat) -> some View {
         let hotspots = imageName.contains("rococo_1") ? room1Hotspots : room2Hotspots
         
-        Image(imageName)
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .overlay(
-                GeometryReader { geo in
-                    ZStack(alignment: .topLeading) {
-                        ForEach(hotspots) { hotspot in
-                            ZStack {
-                                Button(action: hotspot.action) {
-                                    if showDebugHotspots {
-                                        ZStack {
-                                            Rectangle()
-                                                .fill(hotspot.color.opacity(0.3))
-                                                .border(hotspot.color, width: 2)
-                                            Text(hotspot.name)
-                                                .font(.caption)
-                                                .foregroundStyle(.white)
-                                                .padding(4)
-                                                .background(.black.opacity(0.6))
-                                                .cornerRadius(4)
-                                        }
-                                        .contentShape(Rectangle())
-                                    } else {
-                                        Color.clear
-                                            .contentShape(Rectangle())
-                                    }
-                                }
-                                .frame(
-                                    width: hotspot.rect.width * geo.size.width,
-                                    height: hotspot.rect.height * geo.size.height
-                                )
-                                .position(
-                                    x: (hotspot.rect.minX + hotspot.rect.width/2) * geo.size.width,
-                                    y: (hotspot.rect.minY + hotspot.rect.height/2) * geo.size.height
-                                )
-                                
-                                if let label = hotspot.label {
-                                    let labelPos = hotspot.labelPosition ?? CGPoint(x: hotspot.rect.midX, y: hotspot.rect.midY)
-                                    
-                                    FloatingTextLabel(text: label, style: hotspot.labelStyle)
-                                        .allowsHitTesting(false)
-                                        .position(
-                                            x: labelPos.x * geo.size.width,
-                                            y: labelPos.y * geo.size.height
-                                        )
-                                }
-                            }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                        }
-                        
-                        SmallWorldPetOverlay(
-                            viewModel: petViewModel,
-                            roomIndex: imageName.contains("rococo_1") ? 0 : 1,
-                            geometry: geo
-                        )
-                        .allowsHitTesting(petViewModel.isDebugMode)
-                    }
+        Group {
+            if #available(iOS 26.0, *), isSpatialSceneEnabled {
+                SpatialBackgroundView(imageName: imageName) {
+                    roomContent(imageName: imageName, hotspots: hotspots)
                 }
-            )
-            .frame(width: width, height: height)
-            .clipped()
+            } else {
+                Image(imageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .overlay(
+                        roomContent(imageName: imageName, hotspots: hotspots)
+                    )
+            }
+        }
+        .frame(width: width, height: height)
+        .clipped()
+    }
+    
+    @ViewBuilder
+    private func roomContent(imageName: String, hotspots: [HotspotData]) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                ForEach(hotspots) { hotspot in
+                    ZStack {
+                        Button(action: hotspot.action) {
+                            if showDebugHotspots {
+                                ZStack {
+                                    Rectangle()
+                                        .fill(hotspot.color.opacity(0.3))
+                                        .border(hotspot.color, width: 2)
+                                    Text(hotspot.name)
+                                        .font(.caption)
+                                        .foregroundStyle(.white)
+                                        .padding(4)
+                                        .background(.black.opacity(0.6))
+                                        .cornerRadius(4)
+                                }
+                                .contentShape(Rectangle())
+                            } else {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                            }
+                        }
+                        .frame(
+                            width: hotspot.rect.width * geo.size.width,
+                            height: hotspot.rect.height * geo.size.height
+                        )
+                        .position(
+                            x: (hotspot.rect.minX + hotspot.rect.width/2) * geo.size.width,
+                            y: (hotspot.rect.minY + hotspot.rect.height/2) * geo.size.height
+                        )
+                        
+                        if let label = hotspot.label {
+                            let labelPos = hotspot.labelPosition ?? CGPoint(x: hotspot.rect.midX, y: hotspot.rect.midY)
+                            
+                            FloatingTextLabel(text: label, style: hotspot.labelStyle)
+                                .allowsHitTesting(false)
+                                .position(
+                                    x: labelPos.x * geo.size.width,
+                                    y: labelPos.y * geo.size.height
+                                )
+                        }
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                }
+                
+                SmallWorldPetOverlay(
+                    viewModel: petViewModel,
+                    roomIndex: imageName.contains("rococo_1") ? 0 : 1,
+                    geometry: geo
+                )
+                .allowsHitTesting(petViewModel.isDebugMode)
+            }
+        }
     }
 }
 
