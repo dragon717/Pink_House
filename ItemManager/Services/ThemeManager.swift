@@ -17,6 +17,7 @@ enum BackgroundStyle: String, CaseIterable, Identifiable {
 
 enum CardStyle: String, CaseIterable, Identifiable {
     case transparent
+    case fullyTransparent
     case tinted
     case solid
     
@@ -24,7 +25,26 @@ enum CardStyle: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .transparent: return "透明"
+        case .transparent: return "半透明"
+        case .fullyTransparent: return "全透明"
+        case .tinted: return "色调"
+        case .solid: return "经典"
+        }
+    }
+}
+
+enum SkirtFillMode: String, CaseIterable, Identifiable {
+    case transparent
+    case fullyTransparent
+    case tinted
+    case solid
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .transparent: return "半透明"
+        case .fullyTransparent: return "全透明"
         case .tinted: return "色调"
         case .solid: return "经典"
         }
@@ -39,6 +59,12 @@ class ThemeManager {
     var cardStyle: CardStyle = .solid {
         didSet {
             UserDefaults.standard.set(cardStyle.rawValue, forKey: "theme_card_style")
+        }
+    }
+    
+    var skirtFillMode: SkirtFillMode = .transparent {
+        didSet {
+            UserDefaults.standard.set(skirtFillMode.rawValue, forKey: "theme_skirt_fill_mode")
         }
     }
     
@@ -147,6 +173,11 @@ class ThemeManager {
         if let savedCardStyle = UserDefaults.standard.string(forKey: "theme_card_style"),
            let style = CardStyle(rawValue: savedCardStyle) {
             self.cardStyle = style
+        }
+        
+        if let savedSkirtFillMode = UserDefaults.standard.string(forKey: "theme_skirt_fill_mode"),
+           let mode = SkirtFillMode(rawValue: savedSkirtFillMode) {
+            self.skirtFillMode = mode
         }
         
         if UserDefaults.standard.object(forKey: "theme_transparent_opacity") != nil {

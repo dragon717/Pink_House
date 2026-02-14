@@ -174,8 +174,11 @@ class PetViewModel: ObservableObject {
         
         speechBubbleWorkItem = workItem
         
-        // 3秒后执行
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
+        // 自适应时长：基础 2s + 每字 0.2s，最长 10s
+        let duration = min(10.0, max(2.0, 2.0 + Double(recognizedSpeechText.count) * 0.2))
+        
+        // 延迟执行
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: workItem)
     }
 
     // 获取带角色前缀的视频文件名
@@ -470,7 +473,7 @@ class PetViewModel: ObservableObject {
     private func handleAudioStateChange(_ state: PetInteractionState) {
         // 根据音频状态更新宠物动画
         switch state {
-        case .listening, .recording, .processing:
+        case .preparing, .listening, .recording, .processing:
             // 倾听、录音、处理中都保持倾听状态
             // 允许从 idle 或 说话状态(talking) 切换过来，形成闭环
              if currentState == .idle || (currentState == .interacting && currentVideoName == PetVideoPaths.talking) {
@@ -1258,7 +1261,10 @@ class PetViewModel: ObservableObject {
         floatingTexts.append(newData)
         
         // 自动移除 (稍微延长一点时间，配合 View 层的进出动画)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+        // 自适应时长：基础 2s + 每字 0.2s，最长 10s
+        let duration = min(10.0, max(2.0, 2.0 + Double(text.count) * 0.2))
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
             // 只有当该 ID 还在数组中时才移除 (避免已经被 max count 移除导致的无效操作，虽无害但浪费)
             self?.floatingTexts.removeAll(where: { $0.id == newData.id })
         }

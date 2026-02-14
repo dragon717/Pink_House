@@ -279,6 +279,7 @@ struct PetInteractionAreaView: View {
     private func getInteractionIcon(for state: PetInteractionState) -> String {
         switch state {
         case .idle: return "mic.slash"
+        case .preparing: return "hourglass" // 准备中
         case .listening: return "ear"
         case .recording: return "waveform"
         case .processing: return "gear"
@@ -289,6 +290,7 @@ struct PetInteractionAreaView: View {
     private func getInteractionText(for state: PetInteractionState) -> String {
         switch state {
         case .idle: return "未开启"
+        case .preparing: return "准备中..."
         case .listening: return "倾听中..."
         case .recording: return "正在听..."
         case .processing: return "思考中..."

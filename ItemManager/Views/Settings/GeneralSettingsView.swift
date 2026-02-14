@@ -210,7 +210,13 @@ struct GeneralSettingsView: View {
             .listRowBackground(Color.clear)
 
             Section(header: Text("裙子卡片")) {
-                if theme.cardStyle != .solid {
+                Picker("填充模式", selection: $theme.skirtFillMode) {
+                    ForEach(SkirtFillMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                
+                if theme.cardStyle != .solid && theme.cardStyle != .fullyTransparent {
                     VStack(alignment: .leading) {
                         if theme.cardStyle == .transparent {
                             Text("卡片不透明度: \(Int(theme.transparentOpacity * 100))%")

@@ -10,6 +10,8 @@ struct CardBackgroundView: View {
             switch themeManager.cardStyle {
             case .solid:
                 Color(uiColor: .secondarySystemGroupedBackground)
+            case .fullyTransparent:
+                Color.clear
             case .transparent:
                 // Liquid Glass: UltraThin Material + Subtle Border
                 ZStack {

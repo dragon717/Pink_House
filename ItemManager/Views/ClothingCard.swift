@@ -34,6 +34,7 @@ struct ClothingCard: View, Equatable {
     let clothing: Clothing
     
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
@@ -43,6 +44,32 @@ struct ClothingCard: View, Equatable {
         VStack(alignment: .leading, spacing: 0) {
             // Image Area
             ZStack(alignment: .topTrailing) {
+                // Background Fill
+                Group {
+                    switch themeManager.skirtFillMode {
+                    case .transparent:
+                        if colorScheme == .dark {
+                            Color.black.opacity(0.2)
+                        } else {
+                            Color.white.opacity(0.4)
+                        }
+                    case .fullyTransparent:
+                        Color.clear
+                    case .tinted:
+                        if colorScheme == .dark {
+                            themeManager.cardTintColor.opacity(0.15)
+                        } else {
+                            themeManager.cardTintColor.opacity(0.3)
+                        }
+                    case .solid:
+                        if colorScheme == .dark {
+                            Color.black.opacity(0.6)
+                        } else {
+                            Color.white.opacity(0.8)
+                        }
+                    }
+                }
+                
                 if let uiImage = image {
                     Color.clear
                         .aspectRatio(1, contentMode: .fit)

@@ -7,6 +7,7 @@ import SoundAnalysis
 /// 萌宠互动状态
 enum PetInteractionState: String {
     case idle           // 空闲
+    case preparing      // 准备中 (新增)
     case listening      // 正在监听（等待人声）
     case recording      // 正在录音（人声输入中）
     case processing     // 处理中（录音结束，准备播放）
@@ -485,6 +486,8 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private func startInteraction() {
         guard interactionState == .idle else { return }
         
+        interactionState = .preparing
+        
         // 检查权限
         checkPermissions { [weak self] authorized in
             guard let self = self else { return }
@@ -575,6 +578,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         if format.sampleRate == 0 || format.channelCount == 0 {
             print("AudioManager: Invalid input format: \(format)")
+            isInteractionEnabled = false // 关闭开关
             stopInteraction()
             return
         }
@@ -665,6 +669,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             print("AudioManager: Started listening...")
         } catch {
             print("AudioManager: Failed to start engine: \(error)")
+            isInteractionEnabled = false // 关闭开关
             stopInteraction()
         }
     }
