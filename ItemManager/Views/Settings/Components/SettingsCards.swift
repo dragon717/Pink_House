@@ -21,7 +21,7 @@ struct WealthHapticsSettingsCard: View {
         NavigationLink(destination: WealthHapticsSettingsView()) {
             SettingsGridItem(
                 title: "马上来财",
-                subtitle: "触感 · 音量 · 麦克风",
+                subtitle: "个性化 · 触感 · 设置",
                 icon: "banknote.fill",
                 iconColor: .green
             )

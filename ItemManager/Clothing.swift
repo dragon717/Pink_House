@@ -216,6 +216,7 @@ final class Outfit {
     var snapshotPath: String? // Path to the saved OOTD image
     var canvasType: String = "mannequin" // "mannequin" or "blank"
     var backgroundImagePath: String? // Custom background image path
+    var sortIndex: Int = 0 // Custom order index
     
     // Trash Bin Logic
     var isDeleted: Bool = false

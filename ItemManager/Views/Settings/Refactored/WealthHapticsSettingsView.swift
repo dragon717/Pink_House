@@ -6,6 +6,26 @@ struct WealthHapticsSettingsView: View {
     
     var body: some View {
         AdaptiveSettingsView(title: "马上来财设置") {
+            // 0. 个性化设置
+            AdaptiveSection(header: "个性化") {
+                NavigationLink(destination: WealthCustomizationView()) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "photo.on.rectangle")
+                            .foregroundStyle(.purple)
+                            .frame(width: 24)
+                        
+                        VStack(alignment: .leading) {
+                            Text("纸币与背景样式")
+                                .foregroundStyle(.primary)
+                            Text("自定义不同面额纸币的显示图片")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .adaptiveRow(showDivider: false)
+            }
+
             // 1. 金豆银珠震动 (原应用内触感)
             AdaptiveSection(header: "触感反馈") {
                 Toggle(isOn: $hapticManager.isHapticsEnabled) {

@@ -34,7 +34,7 @@ struct ThreeDOOTDView: View {
             VStack {
                 // Header
                 HStack {
-                    Text("3D 试衣间")
+                    Text("空间穿搭")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .shadow(radius: 2)

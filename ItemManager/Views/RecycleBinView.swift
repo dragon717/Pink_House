@@ -28,7 +28,7 @@ struct RecycleBinView: View {
         allDeletedOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
     }
     
-    @State private var selectedTab: Int = 0 // 0: 衣橱, 1: 手帐
+    @State private var selectedTab: Int
     @State private var selectedItems: Set<UUID> = [] // Shared selection
     @State private var editMode: EditMode = .inactive
     
@@ -39,6 +39,13 @@ struct RecycleBinView: View {
     @State private var showingRestoreAllAlert = false
     @State private var showingBatchDeleteAlert = false
     @State private var showingBatchRestoreAlert = false
+    
+    // Recovery/Delete from Trash
+    @State private var showingRestoreAlert = false
+    
+    init(initialTab: Int = 0) {
+        _selectedTab = State(initialValue: initialTab)
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -168,6 +175,21 @@ struct RecycleBinView: View {
         } message: {
             Text("确定要恢复选中的 \(selectedItems.count) 个项目吗？")
         }
+        .alert("恢复", isPresented: $showingRestoreAlert) {
+            Button("取消", role: .cancel) { itemToDelete = nil }
+            Button("恢复") {
+                if let clothing = itemToDelete as? Clothing {
+                    restoreClothing(clothing)
+                } else if let book = itemToDelete as? BookGroup {
+                    restoreBook(book)
+                } else if let outfit = itemToDelete as? Outfit {
+                    restoreOutfit(outfit)
+                }
+                itemToDelete = nil
+            }
+        } message: {
+            Text("确定要恢复这个项目吗？")
+        }
     }
     
     // MARK: - Wardrobe View
@@ -189,7 +211,8 @@ struct RecycleBinView: View {
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             if editMode == .inactive {
                                 Button {
-                                    restoreClothing(clothing)
+                                    itemToDelete = clothing
+                                    showingRestoreAlert = true
                                 } label: {
                                     Label("恢复", systemImage: "arrow.uturn.backward")
                                 }
@@ -229,7 +252,8 @@ struct RecycleBinView: View {
                     Section("手帐本") {
                         ForEach(deletedBooks) { book in
                             DeletedBookRow(book: book, isEditing: editMode == .active, onRestore: {
-                                restoreBook(book)
+                                itemToDelete = book
+                                showingRestoreAlert = true
                             }, onDelete: {
                                 itemToDelete = book
                                 showingDeleteAlert = true
@@ -245,7 +269,8 @@ struct RecycleBinView: View {
                     Section("单独删除的书页") {
                         ForEach(isolatedDeletedOutfits) { outfit in
                             DeletedOutfitRow(outfit: outfit, isEditing: editMode == .active, onRestore: {
-                                restoreOutfit(outfit)
+                                itemToDelete = outfit
+                                showingRestoreAlert = true
                             }, onDelete: {
                                 itemToDelete = outfit
                                 showingDeleteAlert = true
