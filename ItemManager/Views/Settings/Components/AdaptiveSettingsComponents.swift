@@ -64,6 +64,7 @@ struct AdaptiveSection<Content: View>: View {
             VStack(spacing: 0) {
                 content
             }
+            .frame(maxWidth: .infinity) // 确保卡片撑满宽度
             .background(Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8))
             .cornerRadius(12)
             // 添加边框或阴影以增强豆腐块质感
@@ -98,9 +99,11 @@ struct AdaptiveRow<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             content
+                .frame(maxWidth: .infinity, alignment: .leading) // 确保内容撑满整行
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .frame(minHeight: 44)
+                .contentShape(Rectangle()) // 扩大点击区域
             
             if showDivider {
                 Divider()
