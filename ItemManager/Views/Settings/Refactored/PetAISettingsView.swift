@@ -5,8 +5,8 @@ struct PetAISettingsView: View {
     @ObservedObject private var petDataManager = PetDataManager.shared
     
     var body: some View {
-        List {
-            Section(header: Text("AI 大脑")) {
+        AdaptiveSettingsView(title: "智能萌宠设置") {
+            AdaptiveSection(header: "AI 大脑") {
                 NavigationLink(destination: SmartManagementView()) {
                     HStack {
                         Image(systemName: "brain.head.profile")
@@ -15,9 +15,10 @@ struct PetAISettingsView: View {
                         Spacer()
                     }
                 }
+                .adaptiveRow(showDivider: false)
             }
             
-            Section(header: Text("声音交互")) {
+            AdaptiveSection(header: "声音交互") {
                 HStack {
                     Image(systemName: "mic.and.signal.meter.fill")
                         .foregroundStyle(.pink)
@@ -31,18 +32,20 @@ struct PetAISettingsView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                 }
+                .adaptiveRow()
                 
                 // 链接到更详细的声音设置（音量等）
-                NavigationLink(destination: HapticSettingsView()) { // HapticSettingsView 包含音量设置
+                NavigationLink(destination: AudioSettingsView()) {
                     HStack {
                         Image(systemName: "speaker.wave.2")
                             .foregroundStyle(.blue)
                         Text("音量与音效设置")
                     }
                 }
+                .adaptiveRow(showDivider: false)
             }
             
-            Section(header: Text("萌宠形象")) {
+            AdaptiveSection(header: "萌宠形象") {
                 NavigationLink(destination: PetCustomizationView()) {
                     HStack {
                         Image(systemName: "paintpalette.fill")
@@ -51,38 +54,8 @@ struct PetAISettingsView: View {
                         Spacer()
                     }
                 }
-                
-                NavigationLink(destination: CelebrationSettingsView()) {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(.yellow)
-                        Text("彩蛋特效设置")
-                        Spacer()
-                    }
-                }
-                
-                NavigationLink(destination: CalendarSettingsView()) {
-                    HStack {
-                        Image(systemName: "calendar")
-                            .foregroundStyle(.red)
-                        Text("日历主题")
-                        Spacer()
-                    }
-                }
-                
-                NavigationLink(destination: WealthCustomizationView()) {
-                    HStack {
-                        Image(systemName: "banknote")
-                            .foregroundStyle(.green)
-                        Text("来财样式")
-                        Spacer()
-                    }
-                }
+                .adaptiveRow(showDivider: false)
             }
         }
-        .navigationTitle("智能萌宠设置")
-        .navigationBarTitleDisplayMode(.inline)
-        .scrollContentBackground(.hidden)
-        .background(LiquidBackground())
     }
 }

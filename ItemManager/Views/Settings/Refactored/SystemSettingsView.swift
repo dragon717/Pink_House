@@ -20,16 +20,19 @@ struct SystemSettingsView: View {
     @State private var showingRestartAlert = false
     
     var body: some View {
-        List {
+        AdaptiveSettingsView(title: "系统与更多") {
             // MARK: - 桌面小组件
-            Section(header: Text("桌面小组件")) {
+            AdaptiveSection(header: "桌面小组件") {
                 NavigationLink(destination: WidgetSettingsView()) {
                     Label("小组件背景与样式", systemImage: "rectangle.3.group")
                 }
+                .adaptiveRow(showDivider: false)
             }
             
             // MARK: - 通用设置
-            Section(header: Text("通用设置")) {
+            AdaptiveSection(header: "通用设置") {
+                
+                
                 Picker("界面语言", selection: $languageManager.currentLanguage) {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.displayName).tag(language)
@@ -38,14 +41,18 @@ struct SystemSettingsView: View {
                 .onChange(of: languageManager.currentLanguage) { _, _ in
                     showingRestartAlert = true
                 }
+                .pickerStyle(.menu) // 明确指定 Menu 样式以适应非 List 环境
+                .adaptiveRow()
                 
-                NavigationLink(destination: HapticSettingsView()) {
-                    Label("音效与触感反馈", systemImage: "waveform.path.ecg")
+                NavigationLink(destination: GeneralSoundHapticsSettingsView()) {
+                    Label("音效与触感", systemImage: "speaker.wave.2.fill")
                 }
+                .adaptiveRow()
                 
                 NavigationLink(destination: PrivacySettingsView()) {
                     Label("隐私与系统权限", systemImage: "hand.raised")
                 }
+                .adaptiveRow()
                 
                 Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -54,26 +61,30 @@ struct SystemSettingsView: View {
                 } label: {
                     Label("打开系统设置", systemImage: "gear")
                 }
+                .adaptiveRow(showDivider: false)
             }
             
             // MARK: - 数据备份与恢复
-            Section(header: Text("数据备份与恢复")) {
+            AdaptiveSection(header: "数据备份与恢复") {
                 Button(action: prepareCSVExport) {
                     Label("导出 CSV (Export CSV)", systemImage: "tablecells")
                 }
+                .adaptiveRow()
                 
                 Button(action: prepareBackup) {
                     Label("备份数据 (Backup Data)", systemImage: "externaldrive.badge.plus")
                 }
+                .adaptiveRow()
                 
                 Button(action: { showingRestoreImporter = true }) {
                     Label("恢复数据 (Restore Data)", systemImage: "arrow.clockwise.icloud")
                 }
                 .foregroundColor(.red)
+                .adaptiveRow(showDivider: false)
             }
             
             // MARK: - 存储与性能
-            Section(header: Text("存储与性能")) {
+            AdaptiveSection(header: "存储与性能") {
                 Button(action: performStorageCleanup) {
                     HStack {
                         Label("清理未使用的图片", systemImage: "trash")
@@ -83,6 +94,7 @@ struct SystemSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .adaptiveRow()
                 
                 Toggle(isOn: $useAggressiveMemoryOptimization) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -93,12 +105,9 @@ struct SystemSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .adaptiveRow(showDivider: false)
             }
         }
-        .navigationTitle("系统与更多")
-        .navigationBarTitleDisplayMode(.inline)
-        .scrollContentBackground(.hidden)
-        .background(LiquidBackground())
         .sheet(isPresented: $showingShareSheet) {
             ShareSheet(items: shareItems)
         }

@@ -74,6 +74,29 @@ struct MeView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         
+                        // 彩蛋设置
+                        EasterEggSettingsCard()
+                        
+                        // 马上来财设置
+                        WealthHapticsSettingsCard()
+                        
+                        // 梦裙日历
+                        CalendarSettingsCard()
+                        
+                        // 小组件
+                        WidgetSettingsCard()
+                        
+                        // 回收站
+                        NavigationLink(destination: RecycleBinView()) {
+                            SettingsGridItem(
+                                title: "回收站",
+                                subtitle: "恢复 · 清空",
+                                icon: "trash.fill",
+                                iconColor: .red
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
                         // 系统与更多
                         NavigationLink(destination: SystemSettingsView()) {
                             SettingsGridItem(
@@ -466,175 +489,3 @@ struct SettingsRow: View {
     }
 }
 
-/// 独立的触感反馈设置页
-struct HapticSettingsView: View {
-    @ObservedObject private var hapticManager = HapticEngineManager.shared
-    @ObservedObject private var audioManager = AudioManager.shared
-    @ObservedObject private var soundManager = SoundManager.shared
-    @AppStorage("isCelebrationHapticsEnabled") private var isCelebrationHapticsEnabled = true
-    @AppStorage("isCelebrationSoundEnabled") private var isCelebrationSoundEnabled = true
-    
-    var body: some View {
-        List {
-            // 1. 应用内开关
-            Section {
-                Toggle(isOn: $hapticManager.isHapticsEnabled) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                            .foregroundStyle(.brown)
-                            .frame(width: 24)
-                        VStack(alignment: .leading) {
-                            Text("应用内触感")
-                                .foregroundStyle(.primary)
-                            Text("控制金豆滚动、碰撞的震动反馈")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            } header: {
-                Text("功能开关")
-            }
-            
-            // 2. 音量调节 (新增)
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    
-                    
-                    Toggle(isOn: $audioManager.useiPhoneMicWithHeadphones) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("耳机模式使用手机收音")
-                                .font(.body)
-                                .foregroundStyle(.primary)
-                            Text("佩戴耳机时，强制使用手机麦克风以获得更好音质")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.top, 8)
-                }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "music.note")
-                            .foregroundStyle(.pink)
-                            .frame(width: 24)
-                        Text("萌宠 BGM: \(Int(audioManager.bgmVolume * 100))%")
-                    }
-                    Slider(value: $audioManager.bgmVolume, in: 0...1) {
-                        Text("BGM 音量")
-                    } minimumValueLabel: {
-                        Image(systemName: "speaker.fill").font(.caption)
-                    } maximumValueLabel: {
-                        Image(systemName: "speaker.wave.3.fill").font(.caption)
-                    }
-                }
-                .padding(.vertical, 4)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "mic.fill")
-                            .foregroundStyle(.green)
-                            .frame(width: 24)
-                        Text("萌宠语音: \(Int(audioManager.petVoiceVolume * 100))%")
-                    }
-                    Slider(value: $audioManager.petVoiceVolume, in: 0...1.5) { // 允许稍微放大一点
-                        Text("语音音量")
-                    } minimumValueLabel: {
-                        Image(systemName: "speaker.fill").font(.caption)
-                    } maximumValueLabel: {
-                        Image(systemName: "speaker.wave.3.fill").font(.caption)
-                    }
-                }
-                .padding(.vertical, 4)
-                
-            } header: {
-                Text("音量调节")
-            }
-            
-            // 3. 彩蛋特效设置
-            Section {
-                Toggle(isOn: $isCelebrationHapticsEnabled) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(.purple)
-                            .frame(width: 24)
-                        VStack(alignment: .leading) {
-                            Text("彩蛋震动")
-                                .foregroundStyle(.primary)
-                            Text("庆祝特效时的震动反馈")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                
-                Toggle(isOn: $isCelebrationSoundEnabled) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "speaker.wave.2")
-                            .foregroundStyle(.pink)
-                            .frame(width: 24)
-                        VStack(alignment: .leading) {
-                            Text("彩蛋音效")
-                                .foregroundStyle(.primary)
-                            Text("庆祝特效时的爆炸与礼花声")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                VStack {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(.purple)
-                            .frame(width: 24)
-                        Text("彩蛋音量: \(Int(soundManager.celebrationVolume * 100))%")
-                        Spacer()
-                    }
-                    Slider(value: $soundManager.celebrationVolume, in: 0...1) {
-                        Text("彩蛋音量")
-                    } minimumValueLabel: {
-                        Image(systemName: "speaker.fill").font(.caption)
-                    } maximumValueLabel: {
-                        Image(systemName: "speaker.wave.3.fill").font(.caption)
-                    }
-                }
-            } header: {
-                Text("彩蛋特效")
-            }
-            
-            // 3. 系统设置引导
-            Section {
-                Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "gear")
-                            .foregroundStyle(.blue)
-                        Text("前往系统设置")
-                        Spacer()
-                        Image(systemName: "arrow.up.forward.app")
-                            .font(.caption)
-                            .foregroundStyle(.gray)
-                    }
-                }
-                
-                Text("如果应用内开启后仍无震动，请检查：\n1. 系统设置 > 声音与触感 > 系统触感反馈 是否开启\n2. 手机是否处于静音模式（部分震动在静音下可能不工作）")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 4)
-            } header: {
-                Text("系统设置")
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background {
-            LiquidBackground()
-        }
-        .navigationTitle("音效和触感反馈设置")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}

@@ -18,14 +18,15 @@ struct PetCustomizationView: View {
     @State private var errorMessage = ""
     
     var body: some View {
-        Form {
-            Section(header: Text("气泡大小")) {
+        AdaptiveSettingsView(title: "\(petDataManager.status.displayName)个性化") {
+            AdaptiveSection(header: "气泡大小") {
                 Picker("字体大小", selection: $bubbleSize) {
                     ForEach(PetBubbleSize.allCases) { size in
                         Text(size.displayName).tag(size)
                     }
                 }
                 .pickerStyle(.segmented)
+                .adaptiveRow()
                 
                 // 预览
                 HStack {
@@ -44,11 +45,12 @@ struct PetCustomizationView: View {
                 }
                 .background(Color(uiColor: .secondarySystemBackground))
                 .cornerRadius(12)
-                .listRowInsets(EdgeInsets()) // 让背景充满
+                .adaptiveRow(showDivider: false)
             }
             
-            Section(header: Text("字体设置")) {
+            AdaptiveSection(header: "字体设置") {
                 Toggle("使用\(petDataManager.status.displayName)专属字体", isOn: $useCustomFont)
+                    .adaptiveRow(showDivider: useCustomFont)
                 
                 if useCustomFont {
                     if fontManager.isUsingUserFont {
@@ -75,7 +77,7 @@ struct PetCustomizationView: View {
                             }
                             .padding(.top, 4)
                         }
-                        .padding(.vertical, 4)
+                        .adaptiveRow()
                     } else {
                         // 默认字体状态
                         VStack(alignment: .leading, spacing: 4) {
@@ -93,7 +95,7 @@ struct PetCustomizationView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .padding(.vertical, 4)
+                        .adaptiveRow()
                     }
                     
                     // 导入按钮
@@ -102,33 +104,40 @@ struct PetCustomizationView: View {
                     } label: {
                         Label("选择本地字体文件...", systemImage: "doc.badge.plus")
                     }
+                    .adaptiveRow()
                     
                     Text("支持格式: .ttf, .otf, .ttc")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .padding(.leading, 16) // Manually add padding as it's not a row
+                        .padding(.bottom, 8)
                 }
             }
             
-            Section(header: Text("拖拽轨迹")) {
+            AdaptiveSection(header: "拖拽轨迹") {
                 Picker("色彩方案", selection: $trailTheme) {
                     ForEach(PetTrailTheme.allCases) { theme in
                         Text(theme.displayName).tag(theme)
                     }
                 }
+                .adaptiveRow(showDivider: trailTheme == .custom)
                 
                 if trailTheme == .custom {
                     ColorPicker("颜色 1 (起点)", selection: Binding(
                         get: { Color(hex: customColor1Hex) },
                         set: { customColor1Hex = $0.toHex() }
                     ))
+                    .adaptiveRow()
                     ColorPicker("颜色 2 (中段)", selection: Binding(
                         get: { Color(hex: customColor2Hex) },
                         set: { customColor2Hex = $0.toHex() }
                     ))
+                    .adaptiveRow()
                     ColorPicker("颜色 3 (终点)", selection: Binding(
                         get: { Color(hex: customColor3Hex) },
                         set: { customColor3Hex = $0.toHex() }
                     ))
+                    .adaptiveRow()
                 }
                 
                 // Preview
@@ -162,18 +171,13 @@ struct PetCustomizationView: View {
                     Spacer()
                 }
                 .padding(.vertical)
+                .adaptiveRow(showDivider: false)
             }
             
-            Section(footer: Text("设置将立即应用到所有\(petDataManager.status.displayName)互动气泡中。")) {
-                // 占位
+            AdaptiveSection(footer: "设置将立即应用到所有\(petDataManager.status.displayName)互动气泡中。") {
+                EmptyView()
             }
         }
-        .scrollContentBackground(.hidden)
-        .background {
-            LiquidBackground()
-        }
-        .navigationTitle("\(petDataManager.status.displayName)个性化")
-        .navigationBarTitleDisplayMode(.inline)
         .fileImporter(
             isPresented: $isImporting,
             allowedContentTypes: [UTType.font],

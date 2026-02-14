@@ -9,45 +9,31 @@ struct WealthCustomizationView: View {
     let jpyDenominations = [10000, 5000, 1000]
     
     var body: some View {
-        Form {
-            Section {
+        AdaptiveSettingsView(title: "来财个性化") {
+            AdaptiveSection(header: "全局设置", footer: "开启后，在黄金和白银页面显示背景图。") {
                 Toggle("显示容器背景", isOn: $viewModel.shouldShowWealthContainerBackground)
+                    .adaptiveRow(showDivider: viewModel.shouldShowWealthContainerBackground)
                 
                 if viewModel.shouldShowWealthContainerBackground {
                     ContainerBackgroundCustomizationRow(viewModel: viewModel)
+                        .adaptiveRow(showDivider: false)
                 }
-            } header: {
-                Text("全局设置")
-            } footer: {
-                Text("开启后，在黄金和白银页面显示背景图。")
             }
             
-            Section {
+            AdaptiveSection(header: "人民币样式", footer: "自定义图片将应用到对应面额的纸币显示中。建议使用横向图片。") {
                 ForEach(rmbDenominations, id: \.self) { value in
                     CustomizationRowView(currency: .rmb, denomination: value, viewModel: viewModel)
+                        .adaptiveRow(showDivider: value != rmbDenominations.last)
                 }
-            } header: {
-                Text("人民币样式")
-            } footer: {
-                Text("自定义图片将应用到对应面额的纸币显示中。建议使用横向图片。")
             }
             
-            Section {
+            AdaptiveSection(header: "日元样式", footer: "自定义图片将应用到对应面额的纸币显示中。") {
                 ForEach(jpyDenominations, id: \.self) { value in
                     CustomizationRowView(currency: .jpy, denomination: value, viewModel: viewModel)
+                        .adaptiveRow(showDivider: value != jpyDenominations.last)
                 }
-            } header: {
-                Text("日元样式")
-            } footer: {
-                Text("自定义图片将应用到对应面额的纸币显示中。")
             }
         }
-        .scrollContentBackground(.hidden)
-        .background {
-            LiquidBackground()
-        }
-        .navigationTitle("来财个性化")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -27,9 +27,9 @@ struct WidgetSettingsView: View {
     @State private var refreshID = UUID()
     
     var body: some View {
-        Form {
+        AdaptiveSettingsView(title: "小组件设置") {
             // MARK: - Multi-Size Background Section
-            Section {
+            AdaptiveSection(header: "分尺寸设置") {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("分别为不同尺寸的小组件设置背景，或设置一张通用背景。")
                         .font(.caption)
@@ -69,15 +69,15 @@ struct WidgetSettingsView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                        .padding(.horizontal, 16) // Padding inside scroll view
                     }
+                    .padding(.horizontal, -16) // Cancel out parent padding for full bleed scroll
                 }
-                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 0))
-            } header: {
-                Text("分尺寸设置")
+                .adaptiveRow(showDivider: false)
             }
             
             // MARK: - Common Background Section
-            Section {
+            AdaptiveSection(header: "通用设置", footer: isLoadingImage ? "正在处理图片..." : nil) {
                 Button {
                     startEditing(family: .common)
                 } label: {
@@ -94,6 +94,7 @@ struct WidgetSettingsView: View {
                     }
                 }
                 .disabled(isLoadingImage)
+                .adaptiveRow(showDivider: hasAnyCustomBackground)
                 
                 if hasAnyCustomBackground {
                     Button(role: .destructive) {
@@ -107,24 +108,20 @@ struct WidgetSettingsView: View {
                             Text("恢复默认背景 (清除所有)")
                         }
                     }
+                    .adaptiveRow(showDivider: false)
                 }
-            } header: {
-                Text("通用设置")
-            } footer: {
+                
                 if isLoadingImage {
                     HStack {
                         ProgressView()
                             .padding(.trailing, 8)
-                        Text("正在处理图片...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.top, 8)
+                    .adaptiveRow(showDivider: false)
                 }
             }
             
             // MARK: - Tutorial Section
-            Section {
+            AdaptiveSection(header: "帮助与教程") {
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 20) {
                         TutorialStepRow(
@@ -173,15 +170,9 @@ struct WidgetSettingsView: View {
                     Label("如何添加桌面小组件？", systemImage: "questionmark.circle")
                         .foregroundStyle(.brown)
                 }
-            } header: {
-                Text("帮助与教程")
+                .adaptiveRow(showDivider: false)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background {
-            LiquidBackground()
-        }
-        .navigationTitle("小组件设置")
         // Hidden PhotosPicker to be triggered programmatically
         .photosPicker(isPresented: $showingPhotosPicker, selection: $selectedItem, matching: .images)
         .onChange(of: selectedItem) { _, newItem in

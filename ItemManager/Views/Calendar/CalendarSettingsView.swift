@@ -11,8 +11,8 @@ struct CalendarSettingsView: View {
     @Environment(CalendarThemeManager.self) private var themeManager
     
     var body: some View {
-        Form {
-            Section(header: Text("日历主题")) {
+        AdaptiveSettingsView(title: "日历设置") {
+            AdaptiveSection(header: "日历主题") {
                 ForEach(themeManager.availableThemes, id: \.id) { theme in
                     HStack {
                         Circle()
@@ -35,10 +35,11 @@ struct CalendarSettingsView: View {
                             themeManager.setTheme(theme)
                         }
                     }
+                    .adaptiveRow(showDivider: theme.id != themeManager.availableThemes.last?.id)
                 }
             }
             
-            Section(header: Text("预览")) {
+            AdaptiveSection(header: "预览") {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("日历配色预览")
                         .font(.caption)
@@ -51,14 +52,9 @@ struct CalendarSettingsView: View {
                         ColorPreviewCircle(color: Color(uiColor: themeManager.currentTheme.finalPaymentColor), name: "尾款")
                     }
                 }
-                .padding(.vertical)
+                .adaptiveRow(showDivider: false)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background {
-            LiquidBackground()
-        }
-        .navigationTitle("日历设置")
     }
 }
 

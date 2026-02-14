@@ -8,33 +8,32 @@ struct SmallWorldSettingsView: View {
     @State private var showingClearCacheAlert = false
     
     var body: some View {
-        List {
+        AdaptiveSettingsView(title: "小世界设置") {
             // 预览区域
-            Section {
+            AdaptiveSection(header: "预览") {
                 SmallWorldPreview(
                     style: SmallWorldStyle(rawValue: smallWorldStyle) ?? .frenchRetro,
                     sceneMode: SmallWorldSceneMode(rawValue: smallWorldSceneMode) ?? .auto,
                     isSpatialEnabled: isSpatialSceneEnabled
                 )
                 .frame(height: 200)
-                .listRowInsets(EdgeInsets()) // 铺满
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-            } header: {
-                Text("预览")
+                .adaptiveRow(showDivider: false)
             }
             
-            Section(header: Text("风格选择")) {
+            AdaptiveSection(header: "风格选择") {
                 Picker("小世界风格", selection: $smallWorldStyle) {
                     ForEach(SmallWorldStyle.allCases) { style in
                         Text(style.displayName).tag(style.rawValue)
                     }
                 }
-                .pickerStyle(.inline)
+                .pickerStyle(.segmented)
+                .adaptiveRow(showDivider: false)
             }
             
             // 小世界场景设置 (仅在法式复古风格下显示)
             if smallWorldStyle == SmallWorldStyle.frenchRetro.rawValue {
-                Section(header: Text("场景环境")) {
+                AdaptiveSection(header: "场景环境") {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
                             Image(systemName: "sun.haze.fill")
@@ -79,11 +78,11 @@ struct SmallWorldSettingsView: View {
                             }
                         }
                     }
-                    .padding(.vertical, 4)
+                    .adaptiveRow(showDivider: false)
                 }
             }
             
-            Section(header: Text("高级特性")) {
+            AdaptiveSection(header: "高级特性") {
                 if #available(iOS 26.0, *) {
                     Toggle(isOn: $isSpatialSceneEnabled) {
                         VStack(alignment: .leading) {
@@ -93,6 +92,7 @@ struct SmallWorldSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .adaptiveRow(showDivider: false)
                 } else {
                     HStack {
                         Text("3D景深空间场景")
@@ -100,11 +100,12 @@ struct SmallWorldSettingsView: View {
                         Text("仅支持 iOS 26+")
                             .foregroundStyle(.secondary)
                     }
+                    .adaptiveRow(showDivider: false)
                 }
             }
             
             // 存储管理
-            Section(header: Text("存储管理")) {
+            AdaptiveSection(header: "存储管理") {
                 Button(role: .destructive) {
                     SpatialAssetManager.shared.clearAllCache()
                     showingClearCacheAlert = true
@@ -114,12 +115,9 @@ struct SmallWorldSettingsView: View {
                         Text("清理 3D 场景缓存")
                     }
                 }
+                .adaptiveRow(showDivider: false)
             }
         }
-        .navigationTitle("小世界设置")
-        .navigationBarTitleDisplayMode(.inline)
-        .scrollContentBackground(.hidden)
-        .background(LiquidBackground())
         .alert("缓存清理完成", isPresented: $showingClearCacheAlert) {
             Button("确定", role: .cancel) { }
         } message: {
