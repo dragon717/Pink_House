@@ -362,26 +362,28 @@ struct DepositStatsView: View {
     }
     
     var body: some View {
-        GlassCard {
-            HStack(spacing: 0) {
-                statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
-                
-                Divider()
-                    .frame(height: 30)
-                
-                statItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
-                
-                Divider()
-                    .frame(height: 30)
-                
-                Button {
-                    onCountMoney?(pendingBalance)
-                } label: {
-                    statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
-                }
-                .buttonStyle(.plain)
+        HStack(spacing: 0) {
+            statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
+            
+            Divider()
+                .frame(height: 30)
+            
+            statItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
+            
+            Divider()
+                .frame(height: 30)
+            
+            Button {
+                onCountMoney?(pendingBalance)
+            } label: {
+                statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
             }
+            .buttonStyle(.plain)
         }
+        .padding()
+        .background(CardBackgroundView(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
     
     private func statItem(title: String, value: String, valueColor: Color = .primary, showIcon: Bool = false) -> some View {
@@ -446,10 +448,9 @@ struct YearSelectorView: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
         .background(
-            GlassCard(cornerRadius: 16) {
-                Color.clear // Placeholder content for GlassCard
-            }
+            CardBackgroundView(cornerRadius: 16)
         )
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -548,7 +549,13 @@ struct MonthSelectorView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
-                            .background(isSelected ? Color.brown : Color(uiColor: .secondarySystemGroupedBackground))
+                            .background {
+                                if isSelected {
+                                    Color.brown
+                                } else {
+                                    CardBackgroundView(cornerRadius: 12)
+                                }
+                            }
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                             .overlay(
@@ -665,7 +672,13 @@ struct SeriesSelectorView: View {
                                             .minimumScaleFactor(0.8)
                                     }
                                     .padding(8)
-                                    .background(isSelected ? Color.brown : Color(uiColor: .secondarySystemGroupedBackground))
+                                    .background {
+                                        if isSelected {
+                                            Color.brown
+                                        } else {
+                                            CardBackgroundView(cornerRadius: 8)
+                                        }
+                                    }
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                                     .overlay(
