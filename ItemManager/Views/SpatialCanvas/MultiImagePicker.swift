@@ -516,7 +516,26 @@ struct CaptureGuideOverlay: View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.7)
+            // 移除灰色蒙版滤镜，让相机预览清晰可见
+            // 使用渐变遮罩只在边缘显示提示信息
+            VStack {
+                LinearGradient(
+                    colors: [.black.opacity(0.4), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 200)
+                
+                Spacer()
+                
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.4)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 200)
+            }
+            .ignoresSafeArea()
             
             VStack(spacing: 20) {
                 Spacer()
