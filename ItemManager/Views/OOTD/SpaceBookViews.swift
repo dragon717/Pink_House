@@ -15,13 +15,14 @@ struct SpaceBookView: View {
     let book: SpaceBookGroup
     var namespace: Namespace.ID? = nil
     var isSelected: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
             // Thickness (Pages)
             ForEach(0..<5) { index in
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(uiColor: .systemGray6))
+                    .fill(colorScheme == .dark ? Color(uiColor: .systemGray5) : Color(uiColor: .systemGray6))
                     .frame(width: 156, height: 216)
                     .offset(x: CGFloat(index) * 1.5, y: 0)
                     .shadow(color: .black.opacity(0.05), radius: 1, x: 1, y: 0)
@@ -47,6 +48,7 @@ struct SpaceBookView: View {
 
 struct SpaceBookCoverVisuals: View {
     let book: SpaceBookGroup
+    @Environment(\.colorScheme) private var colorScheme
 
     var coverImage: UIImage? {
         if let coverPath = book.coverImage,
@@ -64,7 +66,7 @@ struct SpaceBookCoverVisuals: View {
 
     var body: some View {
         ZStack {
-            Color.white
+            colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
 
             if let image = coverImage {
                 Image(uiImage: image)
@@ -143,11 +145,12 @@ struct SpaceOutfitCard: View {
 
 struct SpaceOutfitCover: View {
     let page: SpaceOutfit
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.white
+                colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
 
                 if let snapshotPath = page.snapshotPath,
                    let image = ImageManager.shared.loadImage(fileName: snapshotPath) {

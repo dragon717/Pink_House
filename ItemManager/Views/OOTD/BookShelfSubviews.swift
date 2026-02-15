@@ -10,6 +10,7 @@ struct BookSidebarView: View {
     let onSelect: (BookGroup) -> Void
     var isEditing: Bool = false
     @State private var draggingItem: BookGroup?
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -30,10 +31,10 @@ struct BookSidebarView: View {
         .frame(width: 90)
         .frame(maxHeight: .infinity)
         // Transparent UI as requested
-        .background(Color.clear)
+        .background(colorScheme == .dark ? Color(uiColor: .systemGray6).opacity(0.5) : Color.clear)
         .overlay(
             Rectangle()
-                .fill(Color.primary.opacity(0.05))
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05))
                 .frame(width: 1),
             alignment: .trailing
         )
@@ -190,13 +191,14 @@ struct ThreeDBookView: View {
     let book: BookGroup
     var namespace: Namespace.ID? = nil
     var isSelected: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         ZStack {
             // Thickness (Pages)
             ForEach(0..<5) { index in
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(uiColor: .systemGray6))
+                    .fill(colorScheme == .dark ? Color(uiColor: .systemGray5) : Color(uiColor: .systemGray6))
                     .frame(width: 156, height: 216)
                     .offset(x: CGFloat(index) * 1.5, y: 0)
                     .shadow(color: .black.opacity(0.05), radius: 1, x: 1, y: 0)
@@ -230,6 +232,7 @@ extension View {
 
 struct BookCoverVisuals: View {
     let book: BookGroup
+    @Environment(\.colorScheme) private var colorScheme
     
     var coverImage: UIImage? {
         if let coverPath = book.coverImage,
@@ -247,7 +250,7 @@ struct BookCoverVisuals: View {
     
     var body: some View {
         ZStack {
-            Color.white
+            colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
             
             if let image = coverImage {
                 Image(uiImage: image)
@@ -287,15 +290,15 @@ struct BookCoverVisuals: View {
             // Spine Hint (Left edge)
             HStack {
                 Rectangle()
-                    .fill(Color.black.opacity(0.1))
+                    .fill(Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1))
                     .frame(width: 6)
                 Spacer()
             }
         }
         .frame(width: 160, height: 220)
-        .background(Color.white)
+        .background(colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white)
         .cornerRadius(4, corners: [.topRight, .bottomRight])
-        .shadow(color: .black.opacity(0.2), radius: 5, x: 5, y: 5)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.2), radius: 5, x: 5, y: 5)
     }
 }
 

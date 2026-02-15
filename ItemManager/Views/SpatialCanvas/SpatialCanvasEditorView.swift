@@ -18,6 +18,7 @@ import Combine
 struct SpatialCanvasEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     
     var spaceOutfit: SpaceOutfit?
     var onSave: ((SpaceOutfit) -> Void)?
@@ -70,13 +71,17 @@ struct SpatialCanvasEditorView: View {
     // 加载状态
     @State private var isSceneReady = false
 
-    // 莫妮卡米白色
-    private let monicaBeige = Color(red: 0.96, green: 0.95, blue: 0.93)
+    // 背景色 - 根据暗黑模式调整
+    private var editorBackground: Color {
+        colorScheme == .dark 
+            ? Color(red: 0.15, green: 0.15, blue: 0.15) 
+            : Color(red: 0.96, green: 0.95, blue: 0.93)
+    }
 
     var body: some View {
         ZStack {
-            // 背景 - 莫妮卡米白色
-            monicaBeige.ignoresSafeArea()
+            // 背景 - 根据暗黑模式调整
+            editorBackground.ignoresSafeArea()
 
             // 3D场景视图
             GeometryReader { geometry in
@@ -101,7 +106,7 @@ struct SpatialCanvasEditorView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(monicaBeige)
+                .background(editorBackground)
             }
             
             // 变换辅助器 (Gizmo)
@@ -168,8 +173,11 @@ struct SpatialCanvasEditorView: View {
 
             // 使用多次延迟确保 SceneKit 完全准备好
             DispatchQueue.main.async {
-                // 强制场景渲染更新
-                self.scene.background.contents = UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
+                // 强制场景渲染更新 - 根据暗黑模式调整
+                let bgColor = colorScheme == .dark 
+                    ? UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
+                    : UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
+                self.scene.background.contents = bgColor
 
                 // 延迟显示，给 SceneKit 足够时间初始化
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -227,8 +235,11 @@ struct SpatialCanvasEditorView: View {
     // MARK: - Scene Setup
     
     private func setupScene() {
-        // 设置场景背景色 - 莫妮卡米白色
-        scene.background.contents = UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
+        // 设置场景背景色 - 根据暗黑模式调整
+        let bgColor = colorScheme == .dark 
+            ? UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
+            : UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
+        scene.background.contents = bgColor
         
         // 设置相机
         cameraNode.camera = SCNCamera()

@@ -10,6 +10,7 @@ import SwiftUI
 struct CanvasToolbar: View {
     @Binding var selectedTool: CanvasTool
     var onToolTap: (CanvasTool) -> Void
+    @Environment(\.colorScheme) private var colorScheme
     
     // 工具分组
     private let toolGroups: [[CanvasTool]] = [
@@ -53,13 +54,13 @@ struct CanvasToolbar: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.8))
+                .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05), lineWidth: 1)
                 )
         )
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 10, x: 0, y: 5)
         .frame(maxHeight: 600)
     }
 }

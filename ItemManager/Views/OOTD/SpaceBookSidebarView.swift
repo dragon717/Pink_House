@@ -15,6 +15,7 @@ struct SpaceBookSidebarView: View {
     let onSelect: (SpaceBookGroup) -> Void
     var isEditing: Bool = false
     @State private var draggingItem: SpaceBookGroup?
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let _ = print("[DEBUG] SpaceBookSidebarView - books count: \(books.count), selectedBook: \(selectedBook?.id.uuidString ?? "nil")")
@@ -36,10 +37,10 @@ struct SpaceBookSidebarView: View {
         }
         .frame(width: 90)
         .frame(maxHeight: .infinity)
-        .background(Color.clear)
+        .background(colorScheme == .dark ? Color(uiColor: .systemGray6).opacity(0.5) : Color.clear)
         .overlay(
             Rectangle()
-                .fill(Color.primary.opacity(0.05))
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05))
                 .frame(width: 1),
             alignment: .trailing
         )

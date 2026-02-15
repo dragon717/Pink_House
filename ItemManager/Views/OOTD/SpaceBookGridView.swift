@@ -16,6 +16,7 @@ struct SpaceBookGridView: View {
     let onSetCover: (SpaceBookGroup) -> Void
     var namespace: Namespace.ID?
     var openingBook: SpaceBookGroup?
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ScrollView {
@@ -25,7 +26,7 @@ struct SpaceBookGridView: View {
                 } description: {
                     Text("点击右上角 + 创建新的空间手帐")
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(emptyStateForegroundColor)
                 .padding(.top, 100)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
@@ -64,5 +65,9 @@ struct SpaceBookGridView: View {
                 .padding(24)
             }
         }
+    }
+    
+    private var emptyStateForegroundColor: some ShapeStyle {
+        colorScheme == .dark ? Color.white.opacity(0.7) : Color.secondary
     }
 }

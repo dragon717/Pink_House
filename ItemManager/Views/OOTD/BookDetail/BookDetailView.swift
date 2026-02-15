@@ -6,6 +6,7 @@ struct BookDetailView: View {
     @Bindable var book: BookGroup
     @Binding var navigationPath: NavigationPath
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
 
     @Binding var isSidebarVisible: Bool
     var onBack: (() -> Void)?

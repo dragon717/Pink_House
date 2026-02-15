@@ -13,6 +13,7 @@ struct AssetPanel: View {
     var onAssetSelect: (SpatialAsset) -> Void
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @Query private var cutoutItems: [CutoutItem]
     
     @State private var searchText = ""
@@ -39,7 +40,7 @@ struct AssetPanel: View {
                 }
             }
             .padding()
-            .background(Color.white.opacity(0.8))
+            .background(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
 
             if isExpanded {
                 // 分类标签
@@ -78,7 +79,7 @@ struct AssetPanel: View {
                     }
                 }
                 .padding()
-                .background(Color.gray.opacity(0.1))
+                .background(colorScheme == .dark ? Color(uiColor: .systemGray4).opacity(0.5) : Color.gray.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal)
                 .padding(.bottom, 8)
@@ -103,7 +104,7 @@ struct AssetPanel: View {
         }
         .frame(width: isExpanded ? 280 : 50)
         .frame(maxHeight: .infinity)
-        .background(Color.white.opacity(0.8))
+        .background(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.trailing, 16)
         .padding(.vertical, 80)

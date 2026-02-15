@@ -4,6 +4,7 @@ import SwiftData
 struct PageThumbnailView: View {
     let page: Outfit
     var gridMode: GridMode = .double
+    @Environment(\.colorScheme) private var colorScheme
     
     private var targetSize: CGSize {
         switch gridMode {
@@ -58,7 +59,7 @@ struct PageThumbnailView: View {
         switch page.canvasType {
         case "mannequin":
             ZStack {
-                Color.white
+                colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
                 Image(systemName: "tshirt")
                     .font(.system(size: 40))
                     .foregroundStyle(.gray.opacity(0.3))
@@ -69,7 +70,7 @@ struct PageThumbnailView: View {
             }
         case "blank":
             ZStack {
-                Color.white
+                colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [4]))
                     .foregroundStyle(.gray.opacity(0.3))
@@ -80,7 +81,7 @@ struct PageThumbnailView: View {
             }
         case "custom":
             ZStack {
-                Color.white
+                colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
                 Image(systemName: "photo")
                     .font(.system(size: 40))
                     .foregroundStyle(.gray.opacity(0.3))
@@ -91,7 +92,7 @@ struct PageThumbnailView: View {
             }
         default:
             ZStack {
-                Color.white
+                colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
                 Image(systemName: "doc.text")
                     .font(.system(size: 40))
                     .foregroundStyle(.gray.opacity(0.3))

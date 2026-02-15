@@ -13,6 +13,7 @@ struct SpaceBookDetailView: View {
     @Bindable var book: SpaceBookGroup
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @Query(filter: #Predicate<SpaceBookGroup> { $0.deletedAt == nil }) private var allBooks: [SpaceBookGroup]
 
     // Sidebar visibility control
@@ -145,8 +146,12 @@ struct SpaceBookDetailView: View {
         } description: {
             Text("点击 + 创建新的空间书页")
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(emptyStateForegroundColor)
         .padding(.top, 100)
+    }
+    
+    private var emptyStateForegroundColor: some ShapeStyle {
+        colorScheme == .dark ? Color.white.opacity(0.7) : Color.secondary
     }
 
     private var pagesGridView: some View {
