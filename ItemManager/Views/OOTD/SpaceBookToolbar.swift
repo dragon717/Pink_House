@@ -19,17 +19,7 @@ struct SpaceBookToolbar: ToolbarContent {
         // Leading: Back button and Sidebar toggle
         ToolbarItem(placement: .topBarLeading) {
             HStack(spacing: 8) {
-                // Back Button
-                Button {
-                    dismissAction()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("返回")
-                    }
-                    .fontWeight(.medium)
-                    .foregroundStyle(.primary)
-                }
+                
 
                 // Toggle Sidebar Button
                 Button {

@@ -79,12 +79,9 @@ struct SpatialBookShelfView: View {
                                         self.selectedBook = nil
                                     }
                                 } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "chevron.left")
-                                        Text("手帐架")
-                                    }
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.primary)
+                                    Image(systemName: "chevron.left")
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.primary)
                                 }
                             }
                         }

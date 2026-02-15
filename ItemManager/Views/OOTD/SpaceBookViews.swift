@@ -191,8 +191,8 @@ struct SpaceBookOpeningAnimationView: View {
     @State private var pageImages: [UIImage?] = Array(repeating: nil, count: 6)
 
     // 配置参数
-    private let bookWidth: CGFloat = 160
-    private let bookHeight: CGFloat = 220
+    private let bookWidth: CGFloat = 200
+    private let bookHeight: CGFloat = 280
 
     var body: some View {
         ZStack {
@@ -209,7 +209,7 @@ struct SpaceBookOpeningAnimationView: View {
 
                 // 2. 书页 (多层)
                 ForEach(0..<6) { index in
-                    SpaceBookPage(width: bookWidth - 8, height: bookHeight - 8, image: pageImages[index])
+                    SpaceBookPage(width: bookWidth - 10, height: bookHeight - 10, image: pageImages[index])
                         .rotation3DEffect(
                             .degrees(pagesFlipped[index] ? -175 + Double.random(in: -5...5) : 0),
                             axis: (x: 0.0, y: 1.0, z: 0.0),
@@ -217,7 +217,7 @@ struct SpaceBookOpeningAnimationView: View {
                             anchorZ: 0,
                             perspective: 0.5
                         )
-                        .offset(x: 4, y: 0)
+                        .offset(x: 5, y: 0)
                         .zIndex(Double(6 - index))
                 }
 
@@ -406,15 +406,18 @@ struct SpaceBookPage: View {
                     .frame(width: width - 16, height: height - 16)
                     .clipShape(RoundedRectangle(cornerRadius: 2))
             } else {
-                // 空白页纹理
-                VStack(spacing: 8) {
-                    ForEach(0..<8) { _ in
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .frame(height: 2)
+                 // 空白页纹理
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Image(systemName: "cube.transparent")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.gray.opacity(0.3))
+                        Spacer()
                     }
+                    Spacer()
                 }
-                .padding(16)
             }
         }
     }
