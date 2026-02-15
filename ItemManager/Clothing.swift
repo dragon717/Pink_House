@@ -289,6 +289,9 @@ final class SpaceOutfit {
     var note: String = ""
     var snapshotPath: String? // Path to the saved 3D snapshot
     
+    // Sorting
+    var sortIndex: Int = 0
+    
     // 3D Scene Configuration
     var modelPath: String? // Path to the 3D model file (e.g. .usdz, .ply)
     var camPosX: Double = 0.0
@@ -303,10 +306,11 @@ final class SpaceOutfit {
     @Relationship
     var book: SpaceBookGroup?
     
-    init(note: String = "", snapshotPath: String? = nil, book: SpaceBookGroup? = nil) {
+    init(note: String = "", snapshotPath: String? = nil, book: SpaceBookGroup? = nil, sortIndex: Int = 0) {
         self.note = note
         self.snapshotPath = snapshotPath
         self.book = book
         self.createdAt = Date()
+        self.sortIndex = sortIndex
     }
 }

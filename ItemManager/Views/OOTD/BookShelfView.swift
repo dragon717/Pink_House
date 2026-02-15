@@ -45,20 +45,26 @@ struct BookShelfView: View {
     @State private var bookToDelete: BookGroup?
     @State private var showingDeleteBookAlert = false
     
+    // Track spatial book selection state
+    @State private var isSpatialBookSelected = false
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             Group {
                 if viewMode == .planar {
                     planarContent
                 } else {
-                    SpatialBookShelfView()
+                    SpatialBookShelfView(onSelectionChange: { isSelected in
+                        isSpatialBookSelected = isSelected
+                    })
                 }
             }
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                if selectedBook == nil {
+                // Show mode picker when no book is selected (both Planar and Spatial mode)
+                if selectedBook == nil && !isSpatialBookSelected {
                     ToolbarItem(placement: .principal) {
                         Picker("模式", selection: $viewMode) {
                             ForEach(ViewMode.allCases) { mode in
@@ -187,7 +193,7 @@ struct BookShelfView: View {
     
     private var navigationTitle: String {
         if viewMode == .spatial {
-            return ""
+            return isSpatialBookSelected ? "" : ""
         }
         return selectedBook == nil ? "穿搭手帐" : selectedBook!.title
     }
