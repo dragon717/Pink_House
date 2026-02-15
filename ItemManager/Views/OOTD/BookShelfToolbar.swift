@@ -18,6 +18,9 @@ struct BookShelfToolbar: ToolbarContent {
     @Binding var showingRepairConfirmation: Bool
     @Binding var showingBatchReplaceSheet: Bool
     
+    // Custom Sort Editing
+    @Binding var isEditing: Bool
+    
     var body: some ToolbarContent {
         // Show mode picker when no book is selected
         if selectedBook == nil && !isSpatialBookSelected {
@@ -35,43 +38,62 @@ struct BookShelfToolbar: ToolbarContent {
         // Only show top-level menu in Grid Mode (Planar)
         if viewMode == .planar && selectedBook == nil {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
+                HStack(spacing: 16) {
+                    // Custom Sort Edit Button
                     Button {
-                        newBookName = ""
-                        showingNewBookAlert = true
+                        withAnimation {
+                            isEditing.toggle()
+                        }
                     } label: {
-                        Label("新建手帐", systemImage: "plus.rectangle.on.folder")
+                        if isEditing {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.pink)
+                        } else {
+                            Image(systemName: "list.number")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.primary)
+                        }
                     }
                     
-                    Button {
-                        showingTrash = true
+                    Menu {
+                        Button {
+                            newBookName = ""
+                            showingNewBookAlert = true
+                        } label: {
+                            Label("新建手帐", systemImage: "plus.rectangle.on.folder")
+                        }
+                        
+                        Button {
+                            showingTrash = true
+                        } label: {
+                            Label("垃圾篓", systemImage: "trash")
+                        }
+                        
+                        Divider()
+                        
+                        Button {
+                            showingBatchConfirmation = true
+                        } label: {
+                            Label("批量处理小裙子", systemImage: "wand.and.stars")
+                        }
+                        
+                        Button {
+                            showingRepairConfirmation = true
+                        } label: {
+                            Label("修复数据", systemImage: "hammer")
+                        }
+                        
+                        Button {
+                            showingBatchReplaceSheet = true
+                        } label: {
+                            Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
+                        }
                     } label: {
-                        Label("垃圾篓", systemImage: "trash")
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.primary)
                     }
-                    
-                    Divider()
-                    
-                    Button {
-                        showingBatchConfirmation = true
-                    } label: {
-                        Label("批量处理小裙子", systemImage: "wand.and.stars")
-                    }
-                    
-                    Button {
-                        showingRepairConfirmation = true
-                    } label: {
-                        Label("修复数据", systemImage: "hammer")
-                    }
-                    
-                    Button {
-                        showingBatchReplaceSheet = true
-                    } label: {
-                        Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.primary)
                 }
             }
         }

@@ -429,15 +429,36 @@ struct SpaceReorderableDropDelegate: DropDelegate {
     let item: SpaceOutfit
     let pages: [SpaceOutfit]
     let onMove: (IndexSet, Int) -> Void
-
-    func performDrop(info: DropInfo) -> Bool {
-        // 简化实现，直接返回 true
-        // 实际拖拽排序逻辑可以在后续实现
-        return true
+    
+    func dropEntered(info: DropInfo) {
+        guard info.hasItemsConforming(to: [.text]) else { return }
     }
-
+    
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
+        return DropProposal(operation: .move)
+    }
+    
+    func validateDrop(info: DropInfo) -> Bool {
+        return info.hasItemsConforming(to: [.text])
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        if let itemProvider = info.itemProviders(for: [.text]).first {
+            itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
+                if let data = data as? Data, let idString = String(data: data, encoding: .utf8), let uuid = UUID(uuidString: idString) {
+                    DispatchQueue.main.async {
+                        if let sourceIndex = pages.firstIndex(where: { $0.id == uuid }),
+                           let destinationIndex = pages.firstIndex(where: { $0.id == item.id }) {
+                            if sourceIndex != destinationIndex {
+                                onMove(IndexSet(integer: sourceIndex), destinationIndex)
+                            }
+                        }
+                    }
+                }
+            }
+            return true
+        }
+        return false
     }
 }
 

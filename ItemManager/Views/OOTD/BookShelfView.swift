@@ -11,7 +11,7 @@ import PhotosUI
 
 struct BookShelfView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.createdAt, order: .reverse) private var books: [BookGroup]
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
     
     // View Mode Switcher
     enum ViewMode: String, CaseIterable, Identifiable {
@@ -56,6 +56,10 @@ struct BookShelfView: View {
     // Track spatial book selection state
     @State var isSpatialBookSelected = false
     
+    // Custom Sort Editing
+    @State var isEditing = false
+    @State var editableBooks: [BookGroup] = []
+    
     var body: some View {
         NavigationStack(path: $navigationPath) {
             BookShelfContentView(
@@ -77,7 +81,8 @@ struct BookShelfView: View {
                 onDelete: { book in
                     bookToDelete = book
                     showingDeleteBookAlert = true
-                }
+                },
+                isEditing: $isEditing
             )
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -92,14 +97,19 @@ struct BookShelfView: View {
                     showingTrash: $showingTrash,
                     showingBatchConfirmation: $showingBatchConfirmation,
                     showingRepairConfirmation: $showingRepairConfirmation,
-                    showingBatchReplaceSheet: $showingBatchReplaceSheet
+                    showingBatchReplaceSheet: $showingBatchReplaceSheet,
+                    isEditing: $isEditing
                 )
             }
             .alert("新建手帐本", isPresented: $showingNewBookAlert) {
                 TextField("名称", text: $newBookName)
                 Button("取消", role: .cancel) {}
                 Button("创建") {
-                    let book = BookGroup(title: newBookName.isEmpty ? "新书本" : newBookName)
+                    let maxSortIndex = books.map { $0.sortIndex }.max() ?? -1
+                    let book = BookGroup(
+                        title: newBookName.isEmpty ? "新书本" : newBookName,
+                        sortIndex: maxSortIndex + 1
+                    )
                     modelContext.insert(book)
                 }
             }
@@ -129,7 +139,14 @@ struct BookShelfView: View {
                 }
             }
             .navigationDestination(for: BookGroup.self) { book in
-                BookDetailView(book: book, navigationPath: $navigationPath, isSidebarVisible: .constant(true))
+                BookDetailView(
+                    book: book,
+                    navigationPath: $navigationPath,
+                    isSidebarVisible: .constant(true),
+                    onBack: {
+                        navigationPath.removeLast()
+                    }
+                )
             }
             .navigationDestination(for: SpaceBookGroup.self) { book in
                 SpaceBookDetailView(book: book, isSidebarVisible: .constant(true))

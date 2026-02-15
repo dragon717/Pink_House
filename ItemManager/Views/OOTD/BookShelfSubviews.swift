@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 // MARK: - Subviews for BookShelf
 
@@ -7,21 +8,20 @@ struct BookSidebarView: View {
     let books: [BookGroup]
     let selectedBook: BookGroup?
     let onSelect: (BookGroup) -> Void
+    var isEditing: Bool = false
+    @State private var draggingItem: BookGroup?
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 16) {
                 ForEach(books) { book in
-                    ThreeDBookView(book: book, isSelected: selectedBook?.id == book.id)
-                        .frame(width: 60, height: 80) // Small thumbnail
-                        .scaleEffect(0.4) // Visual scaling
-                        .frame(width: 60, height: 80) // Clip frame
-                        .onTapGesture {
-                            withAnimation {
-                                onSelect(book)
-                            }
-                        }
-                        .opacity(book.id == selectedBook?.id ? 1.0 : 0.6)
+                    if isEditing {
+                        // Editing Mode: Draggable
+                        editingBookCell(for: book)
+                    } else {
+                        // Normal Mode: Tappable
+                        normalBookCell(for: book)
+                    }
                 }
             }
             .padding(.vertical, 20)
@@ -37,6 +37,99 @@ struct BookSidebarView: View {
                 .frame(width: 1),
             alignment: .trailing
         )
+    }
+    
+    @ViewBuilder
+    private func normalBookCell(for book: BookGroup) -> some View {
+        ThreeDBookView(book: book, isSelected: selectedBook?.id == book.id)
+            .frame(width: 60, height: 80) // Small thumbnail
+            .scaleEffect(0.4) // Visual scaling
+            .frame(width: 60, height: 80) // Clip frame
+            .onTapGesture {
+                withAnimation {
+                    onSelect(book)
+                }
+            }
+            .opacity(book.id == selectedBook?.id ? 1.0 : 0.6)
+    }
+    
+    @ViewBuilder
+    private func editingBookCell(for book: BookGroup) -> some View {
+        ThreeDBookView(book: book, isSelected: false)
+            .frame(width: 60, height: 80)
+            .scaleEffect(0.4)
+            .frame(width: 60, height: 80)
+            .overlay(alignment: .topTrailing) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(2)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                    .offset(x: -5, y: 5)
+            }
+            .onDrag {
+                self.draggingItem = book
+                return NSItemProvider(object: book.id.uuidString as NSString)
+            }
+            .onDrop(of: [.text], delegate: BookSidebarReorderableDropDelegate(item: book, books: books, draggingItem: $draggingItem))
+    }
+}
+
+// MARK: - Book Sidebar Reorderable Drop Delegate
+
+struct BookSidebarReorderableDropDelegate: DropDelegate {
+    let item: BookGroup
+    let books: [BookGroup]
+    @Binding var draggingItem: BookGroup?
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        guard let draggingItem = draggingItem else { return false }
+        
+        if let itemProvider = info.itemProviders(for: [.text]).first {
+            itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
+                if let data = data as? Data,
+                   let idString = String(data: data, encoding: .utf8),
+                   let uuid = UUID(uuidString: idString) {
+                    DispatchQueue.main.async {
+                        if let sourceIndex = books.firstIndex(where: { $0.id == uuid }),
+                           let destinationIndex = books.firstIndex(where: { $0.id == item.id }) {
+                            if sourceIndex != destinationIndex {
+                                // Update sort indices
+                                let minIndex = min(sourceIndex, destinationIndex)
+                                let maxIndex = max(sourceIndex, destinationIndex)
+                                
+                                if sourceIndex < destinationIndex {
+                                    // Moving down
+                                    for i in minIndex...maxIndex {
+                                        if i == sourceIndex {
+                                            books[i].sortIndex = destinationIndex
+                                        } else {
+                                            books[i].sortIndex -= 1
+                                        }
+                                    }
+                                } else {
+                                    // Moving up
+                                    for i in minIndex...maxIndex {
+                                        if i == sourceIndex {
+                                            books[i].sortIndex = destinationIndex
+                                        } else {
+                                            books[i].sortIndex += 1
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return true
+        }
+        return false
     }
 }
 
@@ -213,5 +306,3 @@ struct BouncingButtonStyle: ButtonStyle {
             .animation(.spring(), value: configuration.isPressed)
     }
 }
-
-

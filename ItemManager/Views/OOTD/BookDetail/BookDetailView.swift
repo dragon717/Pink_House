@@ -8,6 +8,7 @@ struct BookDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     @Binding var isSidebarVisible: Bool
+    var onBack: (() -> Void)?
 
     var sortedPages: [Outfit] {
         book.pages.filter { !$0.isDeleted }.sorted {
@@ -59,6 +60,8 @@ struct BookDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(book.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             leadingToolbarContent
             trailingToolbarContent

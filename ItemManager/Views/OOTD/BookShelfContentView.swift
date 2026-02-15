@@ -7,8 +7,11 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct BookShelfContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    
     @Binding var viewMode: BookShelfView.ViewMode
     @Binding var selectedBook: BookGroup?
     @Binding var isSpatialBookSelected: Bool
@@ -25,6 +28,11 @@ struct BookShelfContentView: View {
     
     // Sidebar visibility for planar mode
     @State private var isSidebarVisible = true
+    
+    // Custom Sort Editing
+    @Binding var isEditing: Bool
+    @State private var editableBooks: [BookGroup] = []
+    @State private var draggingItem: BookGroup?
     
     var body: some View {
         Group {
@@ -46,16 +54,19 @@ struct BookShelfContentView: View {
                 .ignoresSafeArea()
             
             if let selectedBook = selectedBook {
-                // Split Layout (Detail Mode)
+                // Split Layout (Detail Mode) - 类似空间书页
                 HStack(spacing: 0) {
-                    // Sidebar: List of Books (可隐藏)
+                    // Sidebar: List of Books (可手动隐藏)
                     if isSidebarVisible {
                         BookSidebarView(
-                            books: books,
+                            books: isEditing ? editableBooks : books,
                             selectedBook: selectedBook,
                             onSelect: { book in
-                                self.selectedBook = book
-                            }
+                                if !isEditing {
+                                    self.selectedBook = book
+                                }
+                            },
+                            isEditing: isEditing
                         )
                         .transition(.move(edge: .leading))
                     }
@@ -64,26 +75,19 @@ struct BookShelfContentView: View {
                     BookDetailView(
                         book: selectedBook,
                         navigationPath: .constant(NavigationPath()),
-                        isSidebarVisible: $isSidebarVisible
+                        isSidebarVisible: $isSidebarVisible,
+                        onBack: {
+                            self.selectedBook = nil
+                        }
                     )
                         .id(selectedBook.id)
                         .transition(.opacity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             } else {
                 // Grid Layout (Bookshelf Mode)
-                BookGridView(
-                    books: books,
-                    selectedBook: $selectedBook,
-                    selectedBookForCover: $selectedBookForCover,
-                    showingCoverPicker: $showingCoverPicker,
-                    onDelete: onDelete,
-                    namespace: namespace,
-                    onBookTap: onBookTap,
-                    openingBook: openingBook
-                )
-                .transition(.opacity)
-                .opacity(openingBook == nil ? 1 : 0)
+                bookGridContent
             }
             
             // Animation Overlay
@@ -97,5 +101,108 @@ struct BookShelfContentView: View {
                 .zIndex(100)
             }
         }
+        .onChange(of: isEditing) { _, newValue in
+            if newValue {
+                editableBooks = books
+            } else {
+                // Save sort order
+                for (index, book) in editableBooks.enumerated() {
+                    book.sortIndex = index
+                }
+                try? modelContext.save()
+            }
+        }
+        .onChange(of: books) { _, newValue in
+            if isEditing {
+                editableBooks = newValue
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var bookGridContent: some View {
+        ScrollView {
+            if isEditing {
+                // Editing Mode: Draggable Grid
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
+                    ForEach(editableBooks) { book in
+                        editingBookCell(for: book)
+                    }
+                }
+                .padding(24)
+                .animation(.default, value: editableBooks)
+            } else {
+                // Normal Mode: Navigation Grid
+                BookGridView(
+                    books: books,
+                    selectedBook: $selectedBook,
+                    selectedBookForCover: $selectedBookForCover,
+                    showingCoverPicker: $showingCoverPicker,
+                    onDelete: onDelete,
+                    namespace: namespace,
+                    onBookTap: onBookTap,
+                    openingBook: openingBook
+                )
+            }
+        }
+        .transition(.opacity)
+        .opacity(openingBook == nil ? 1 : 0)
+    }
+    
+    @ViewBuilder
+    private func editingBookCell(for book: BookGroup) -> some View {
+        ThreeDBookView(book: book, namespace: namespace)
+            .overlay(alignment: .topTrailing) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(4)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                    .padding(4)
+            }
+            .onDrag {
+                self.draggingItem = book
+                return NSItemProvider(object: book.id.uuidString as NSString)
+            }
+            .onDrop(of: [.text], delegate: BookReorderableDropDelegate(item: book, books: $editableBooks, draggingItem: $draggingItem))
+    }
+}
+
+// MARK: - Book Reorderable Drop Delegate
+
+struct BookReorderableDropDelegate: DropDelegate {
+    let item: BookGroup
+    @Binding var books: [BookGroup]
+    @Binding var draggingItem: BookGroup?
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        guard let draggingItem = draggingItem else { return false }
+        
+        if let itemProvider = info.itemProviders(for: [.text]).first {
+            itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
+                if let data = data as? Data,
+                   let idString = String(data: data, encoding: .utf8),
+                   let uuid = UUID(uuidString: idString) {
+                    DispatchQueue.main.async {
+                        if let sourceIndex = books.firstIndex(where: { $0.id == uuid }),
+                           let destinationIndex = books.firstIndex(where: { $0.id == item.id }) {
+                            if sourceIndex != destinationIndex {
+                                withAnimation {
+                                    let item = books.remove(at: sourceIndex)
+                                    books.insert(item, at: destinationIndex)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return true
+        }
+        return false
     }
 }

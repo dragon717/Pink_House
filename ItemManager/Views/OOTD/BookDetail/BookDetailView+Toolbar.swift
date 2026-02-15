@@ -6,7 +6,20 @@ extension BookDetailView {
 
     var leadingToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            sidebarToggleButton
+            HStack(spacing: 8) {
+                backButton
+                sidebarToggleButton
+            }
+        }
+    }
+
+    private var backButton: some View {
+        Button {
+            onBack?()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.primary)
         }
     }
 

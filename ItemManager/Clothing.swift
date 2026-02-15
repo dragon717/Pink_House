@@ -197,14 +197,16 @@ final class BookGroup {
     var createdAt: Date = Date()
     var isDeleted: Bool = false
     var deletedAt: Date? = nil
+    var sortIndex: Int = 0 // 自定义排序索引
     
     @Relationship(deleteRule: .cascade, inverse: \Outfit.book)
     var pages: [Outfit] = []
     
-    init(title: String, coverImage: String? = nil) {
+    init(title: String, coverImage: String? = nil, sortIndex: Int = 0) {
         self.title = title
         self.coverImage = coverImage
         self.createdAt = Date()
+        self.sortIndex = sortIndex
     }
 }
 
@@ -271,14 +273,16 @@ final class SpaceBookGroup {
     var createdAt: Date = Date()
     var isDeleted: Bool = false
     var deletedAt: Date? = nil
+    var sortIndex: Int = 0 // 自定义排序索引
     
     @Relationship(deleteRule: .cascade, inverse: \SpaceOutfit.book)
     var pages: [SpaceOutfit] = []
     
-    init(title: String, coverImage: String? = nil) {
+    init(title: String, coverImage: String? = nil, sortIndex: Int = 0) {
         self.title = title
         self.coverImage = coverImage
         self.createdAt = Date()
+        self.sortIndex = sortIndex
     }
 }
 
