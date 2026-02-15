@@ -18,71 +18,104 @@ struct AssetPanel: View {
     
     @State private var searchText = ""
     @State private var isExpanded = true
+    @State private var isSearchActive = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部标题栏
-            HStack {
-                Text("素材")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                
-                Spacer()
-                
-                Button {
-                    withAnimation(.spring(response: 0.3)) {
-                        isExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: isExpanded ? "xmark" : "line.3.horizontal")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding()
-            .background(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
-
             if isExpanded {
-                // 分类标签
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(AssetCategory.allCases, id: \.self) { category in
-                            CategoryTab(
-                                title: category.rawValue,
-                                isSelected: selectedCategory == category
-                            ) {
-                                withAnimation {
-                                    selectedCategory = category
+                // 顶部标题栏 + 分类标签 + 搜索栏 合并为一行
+                VStack(spacing: 8) {
+                    // 第一行：标题和关闭按钮
+                    HStack {
+                        Text("素材")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                        
+                        Button {
+                            withAnimation(.spring(response: 0.3)) {
+                                isExpanded.toggle()
+                            }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 28, height: 28)
+                                .background(Color.gray.opacity(0.15))
+                                .clipShape(Circle())
+                        }
+                    }
+                    
+                    // 第二行：分类标签和搜索
+                    HStack(spacing: 8) {
+                        // 搜索框（当激活时显示）
+                        if isSearchActive {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.gray)
+                                    .font(.system(size: 14))
+                                
+                                TextField("搜索素材...", text: $searchText)
+                                    .font(.system(size: 14))
+                                    .textFieldStyle(PlainTextFieldStyle())
+                                
+                                if !searchText.isEmpty {
+                                    Button(action: { searchText = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.gray)
+                                            .font(.system(size: 14))
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.gray.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                         }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                }
-                
-                // 搜索栏
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    
-                    TextField("搜索...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                    
-                    if !searchText.isEmpty {
+                        
+                        // 分类标签（当搜索未激活时显示）
+                        if !isSearchActive {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(AssetCategory.allCases, id: \.self) { category in
+                                        CategoryTab(
+                                            title: category.rawValue,
+                                            category: category,
+                                            isSelected: selectedCategory == category
+                                        ) {
+                                            withAnimation {
+                                                selectedCategory = category
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        }
+                        
+                        // 搜索按钮
                         Button {
-                            searchText = ""
+                            withAnimation(.spring(response: 0.3)) {
+                                isSearchActive.toggle()
+                                if !isSearchActive {
+                                    searchText = ""
+                                }
+                            }
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                            Image(systemName: isSearchActive ? "xmark" : "magnifyingglass")
+                                .font(.system(size: 14))
+                                .foregroundStyle(isSearchActive ? .primary : .secondary)
+                                .frame(width: 32, height: 32)
+                                .background(isSearchActive ? Color.pink.opacity(0.2) : Color.gray.opacity(0.15))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
                 }
-                .padding()
-                .background(colorScheme == .dark ? Color(uiColor: .systemGray4).opacity(0.5) : Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .padding(.horizontal)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
                 
                 // 素材列表
                 ScrollView {
@@ -91,21 +124,43 @@ struct AssetPanel: View {
                         case .clothing:
                             ClothingAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .effect:
-                            EffectAssetList(onSelect: onAssetSelect)
+                            EffectAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .template:
-                            TemplateAssetList(onSelect: onAssetSelect)
+                            TemplateAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .material:
-                            MaterialAssetList(onSelect: onAssetSelect)
+                            MaterialAssetList(searchText: searchText, onSelect: onAssetSelect)
                         }
                     }
                     .padding()
                 }
+            } else {
+                // 折叠状态 - 显示小按钮
+                VStack {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            isExpanded.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.title3)
+                            .foregroundStyle(.primary)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Circle()
+                                    .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Spacer()
+                }
+                .padding(.top, 16)
             }
         }
-        .frame(width: isExpanded ? 320 : 50)
+        .frame(width: isExpanded ? 320 : 60)
         .frame(maxHeight: .infinity)
-        .background(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(isExpanded ? (colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8)) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 16 : 0, style: .continuous))
         .padding(.trailing, 8)
         .ignoresSafeArea(edges: .bottom)
     }
@@ -115,20 +170,34 @@ struct AssetPanel: View {
 
 struct CategoryTab: View {
     let title: String
+    let category: AssetCategory
     let isSelected: Bool
     let action: () -> Void
+    
+    var categoryColor: Color {
+        switch category {
+        case .clothing:
+            return .orange
+        case .effect:
+            return .pink
+        case .template:
+            return .cyan
+        case .material:
+            return .purple
+        }
+    }
     
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline)
+                .font(.system(size: 13))
                 .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundStyle(isSelected ? .white : .primary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(isSelected ? Color.purple : Color.gray.opacity(0.15))
+                        .fill(isSelected ? categoryColor : Color.gray.opacity(0.15))
                 )
         }
         .buttonStyle(PlainButtonStyle())
@@ -223,20 +292,30 @@ struct ClothingAssetCard: View {
 // MARK: - 特效素材列表
 
 struct EffectAssetList: View {
+    let searchText: String
     let onSelect: (SpatialAsset) -> Void
     
     let effects = [
         ("粒子星光", "sparkles", Color.yellow),
         ("花瓣飘落", "leaf", Color.pink),
-        ("蝴蝶飞舞", "butterfly", Color.purple),
+        ("蝴蝶飞舞", "🦋", Color.purple),
         ("雪花飘落", "snowflake", Color.cyan),
         ("光晕效果", "sun.max", Color.orange),
         ("魔法光环", "circle.hexagongrid", Color.blue)
     ]
     
+    var filteredEffects: [(String, String, Color)] {
+        if searchText.isEmpty {
+            return effects
+        }
+        return effects.filter { effect in
+            effect.0.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 12) {
-            ForEach(effects, id: \.0) { effect in
+            ForEach(filteredEffects, id: \.0) { effect in
                 EffectAssetCard(name: effect.0, icon: effect.1, color: effect.2) {
                     let asset = SpatialAsset(
                         type: .effect,
@@ -260,6 +339,10 @@ struct EffectAssetCard: View {
     let color: Color
     let onTap: () -> Void
     
+    private var isEmoji: Bool {
+        icon.count == 1 && icon.unicodeScalars.first?.properties.isEmoji == true
+    }
+    
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
@@ -269,9 +352,14 @@ struct EffectAssetCard: View {
                         .fill(color.opacity(0.2))
                         .frame(width: 50, height: 50)
                     
-                    Image(systemName: icon)
-                        .font(.title2)
-                        .foregroundStyle(color)
+                    if isEmoji {
+                        Text(icon)
+                            .font(.system(size: 28))
+                    } else {
+                        Image(systemName: icon)
+                            .font(.title2)
+                            .foregroundStyle(color)
+                    }
                 }
                 
                 Text(name)
@@ -293,6 +381,7 @@ struct EffectAssetCard: View {
 // MARK: - 模版素材列表
 
 struct TemplateAssetList: View {
+    let searchText: String
     let onSelect: (SpatialAsset) -> Void
     
     let templates = [
@@ -303,9 +392,18 @@ struct TemplateAssetList: View {
         ("星空主题", "starry", Color.indigo)
     ]
     
+    var filteredTemplates: [(String, String, Color)] {
+        if searchText.isEmpty {
+            return templates
+        }
+        return templates.filter { template in
+            template.0.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            ForEach(templates, id: \.0) { template in
+            ForEach(filteredTemplates, id: \.0) { template in
                 TemplateCard(name: template.0, color: template.2) {
                     let asset = SpatialAsset(
                         type: .template,
@@ -352,6 +450,7 @@ struct TemplateCard: View {
 // MARK: - 材质素材列表
 
 struct MaterialAssetList: View {
+    let searchText: String
     let onSelect: (SpatialAsset) -> Void
     
     let materials = [
@@ -363,9 +462,18 @@ struct MaterialAssetList: View {
         ("珍珠", "pearl", Color.white.opacity(0.9))
     ]
     
+    var filteredMaterials: [(String, String, Color)] {
+        if searchText.isEmpty {
+            return materials
+        }
+        return materials.filter { material in
+            material.0.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            ForEach(materials, id: \.0) { material in
+            ForEach(filteredMaterials, id: \.0) { material in
                 MaterialCard(name: material.0, color: material.2) {
                     let asset = SpatialAsset(
                         type: .material,
