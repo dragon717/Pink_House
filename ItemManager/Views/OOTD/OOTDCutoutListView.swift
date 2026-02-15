@@ -53,6 +53,9 @@ struct OOTDCutoutListView: View {
     @State private var showToast = false
     @State private var toastMessage = ""
     
+    // 完全隐藏状态
+    @State private var isCompletelyHidden = false
+    
     private let categories = ["全部", "裙子", "外套", "鞋子", "袜子", "玩偶", "小物", "未分类"]
     // For picker (exclude "全部")
     private var selectableCategories: [String] {
@@ -153,16 +156,36 @@ struct OOTDCutoutListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Handle (Only in Portrait)
-            if !isLandscape {
-                Capsule()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 40, height: 5)
-                    .padding(.top, 10)
-                    .padding(.bottom, 5)
-            }
-            
-            if isExpanded || isLandscape {
+            // 完全隐藏时的显示按钮
+            if isCompletelyHidden {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isCompletelyHidden = false
+                    }
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(.ultraThinMaterial)
+                                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        )
+                }
+                .padding(.top, 8)
+            } else {
+                // Handle (Only in Portrait)
+                if !isLandscape {
+                    Capsule()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 40, height: 5)
+                        .padding(.top, 10)
+                        .padding(.bottom, 5)
+                }
+                
+                if isExpanded || isLandscape {
                 // Header, Search, Filter (Show if expanded, or if landscape and expanded)
                 // In Landscape + Collapsed, we hide these to save space
                 if isExpanded {
@@ -354,6 +377,8 @@ struct OOTDCutoutListView: View {
                     .padding()
                 }
             }
+            
+            }
         }
         .background(
             Color(uiColor: .systemBackground)
@@ -364,7 +389,7 @@ struct OOTDCutoutListView: View {
             // Expand on tap if not tapping an item
             // Only relevant for Portrait Minimized view? 
             // In Landscape Collapsed, tapping empty space might expand?
-            if !isExpanded && !isLandscape {
+            if !isExpanded && !isLandscape && !isCompletelyHidden {
                  // withAnimation { isExpanded = true } 
                  // Removing this as it might conflict with item taps if not careful, 
                  // but originally it was there (implied). 
@@ -372,11 +397,17 @@ struct OOTDCutoutListView: View {
             }
         }
         .gesture(
-            // Drag to expand/collapse - Only for Portrait
-            !isLandscape ? DragGesture()
+            // Drag to expand/collapse/hide - Only for Portrait
+            !isLandscape && !isCompletelyHidden ? DragGesture()
                 .onEnded { value in
                     if value.translation.height < -50 {
                         withAnimation { isExpanded = true }
+                    } else if value.translation.height > 100 {
+                        // 大幅度下滑完全隐藏
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isCompletelyHidden = true
+                            isExpanded = false
+                        }
                     } else if value.translation.height > 50 {
                         withAnimation { isExpanded = false }
                     }

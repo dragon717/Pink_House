@@ -9,6 +9,8 @@ struct OOTDContentArea: View {
     @Binding var isListExpanded: Bool
     @Binding var isProcessing: Bool
     let processingMessage: String
+    @Binding var isToolbarVisible: Bool
+    @Binding var isStickerLibraryVisible: Bool
     let geometry: GeometryProxy
     
     // Actions
@@ -26,66 +28,81 @@ struct OOTDContentArea: View {
                 HStack(spacing: 0) {
                     // Canvas Area
                     if let outfit = currentOutfit {
-                        OOTDCanvasView(outfit: outfit, onCanvasChange: onUpdate)
-                            .id(outfit.id)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        OOTDCanvasView(
+                            outfit: outfit,
+                            isToolbarVisible: $isToolbarVisible,
+                            isStickerLibraryVisible: $isStickerLibraryVisible,
+                            onCanvasChange: onUpdate
+                        )
+                        .id(outfit.id)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     
-                    // Right Sidebar (Cutout List)
-                    OOTDCutoutListView(
-                        isExpanded: $isListExpanded,
-                        isLandscape: true,
-                        onSelect: onAddToOutfit,
-                        onAddPhoto: onAddPhoto,
-                        onBatchAdd: onBatchAdd
-                    )
-                    .frame(width: isListExpanded ? 320 : 100) // Width control
-                    .background(Color(uiColor: .systemBackground))
-                    .transition(.move(edge: .trailing))
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isListExpanded)
-                    .overlay(alignment: .leading) {
-                         // Toggle Handle
-                         Button(action: {
-                             withAnimation {
-                                 isListExpanded.toggle()
+                    // Right Sidebar (Cutout List) - 贴纸库
+                    if isStickerLibraryVisible {
+                        OOTDCutoutListView(
+                            isExpanded: $isListExpanded,
+                            isLandscape: true,
+                            onSelect: onAddToOutfit,
+                            onAddPhoto: onAddPhoto,
+                            onBatchAdd: onBatchAdd
+                        )
+                        .frame(width: isListExpanded ? 320 : 100) // Width control
+                        .background(Color(uiColor: .systemBackground))
+                        .transition(.move(edge: .trailing))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isListExpanded)
+                        .overlay(alignment: .leading) {
+                             // Toggle Handle
+                             Button(action: {
+                                 withAnimation {
+                                     isListExpanded.toggle()
+                                 }
+                             }) {
+                                 Image(systemName: isListExpanded ? "chevron.right" : "chevron.left")
+                                     .font(.system(size: 16, weight: .bold))
+                                     .foregroundColor(.secondary)
+                                     .padding(8)
+                                     .background(.ultraThinMaterial)
+                                     .clipShape(Circle())
+                                     .shadow(radius: 2)
                              }
-                         }) {
-                             Image(systemName: isListExpanded ? "chevron.right" : "chevron.left")
-                                 .font(.system(size: 16, weight: .bold))
-                                 .foregroundColor(.secondary)
-                                 .padding(8)
-                                 .background(.ultraThinMaterial)
-                                 .clipShape(Circle())
-                                 .shadow(radius: 2)
-                         }
-                         .padding(.leading, -16) // Offset to overlap or sit on edge
-                         .offset(x: 10) // Push it a bit inside
+                             .padding(.leading, -16) // Offset to overlap or sit on edge
+                             .offset(x: 10) // Push it a bit inside
+                        }
                     }
                 }
             } else {
                 // Portrait Layout: ZStack (Canvas + Bottom Sheet)
                 ZStack {
                     if let outfit = currentOutfit {
-                        OOTDCanvasView(outfit: outfit, onCanvasChange: onUpdate)
-                            .id(outfit.id)
+                        OOTDCanvasView(
+                            outfit: outfit,
+                            isToolbarVisible: $isToolbarVisible,
+                            isStickerLibraryVisible: $isStickerLibraryVisible,
+                            onCanvasChange: onUpdate
+                        )
+                        .id(outfit.id)
                     } else {
                         ContentUnavailableView("开始新的穿搭", systemImage: "tshirt.fill")
                     }
                     
-                    VStack {
-                        Spacer()
-                        OOTDCutoutListView(
-                            isExpanded: $isListExpanded,
-                            isLandscape: false,
-                            onSelect: onAddToOutfit,
-                            onAddPhoto: onAddPhoto,
-                            onBatchAdd: onBatchAdd
-                        )
-                        .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+                    // 贴纸库 - 底部弹出
+                    if isStickerLibraryVisible {
+                        VStack {
+                            Spacer()
+                            OOTDCutoutListView(
+                                isExpanded: $isListExpanded,
+                                isLandscape: false,
+                                onSelect: onAddToOutfit,
+                                onAddPhoto: onAddPhoto,
+                                onBatchAdd: onBatchAdd
+                            )
+                            .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+                        }
                     }
                 }
             }

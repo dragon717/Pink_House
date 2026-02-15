@@ -155,9 +155,17 @@ struct SpaceBookDetailView: View {
     }
 
     private var pagesGridView: some View {
-        LazyVGrid(columns: gridMode.columns, spacing: 16) {
-            ForEach(sortedPages) { page in
-                pageCell(for: page)
+        GeometryReader { geometry in
+            let containerWidth = geometry.size.width
+            let columnCount = gridMode.rawValue
+            let totalSpacing: CGFloat = CGFloat(columnCount - 1) * 16
+            let itemWidth = (containerWidth - totalSpacing) / CGFloat(columnCount)
+            let itemHeight = itemWidth * 4 / 3
+
+            LazyVGrid(columns: gridMode.columns, spacing: 16) {
+                ForEach(sortedPages) { page in
+                    pageCell(for: page, itemWidth: itemWidth, itemHeight: itemHeight)
+                }
             }
         }
         .padding(24)
@@ -165,16 +173,16 @@ struct SpaceBookDetailView: View {
     }
 
     @ViewBuilder
-    private func pageCell(for page: SpaceOutfit) -> some View {
+    private func pageCell(for page: SpaceOutfit, itemWidth: CGFloat, itemHeight: CGFloat) -> some View {
         if isEditing {
-            editingPageCell(for: page)
+            editingPageCell(for: page, itemWidth: itemWidth, itemHeight: itemHeight)
         } else {
-            normalPageCell(for: page)
+            normalPageCell(for: page, itemWidth: itemWidth, itemHeight: itemHeight)
         }
     }
 
-    private func editingPageCell(for page: SpaceOutfit) -> some View {
-        SpaceOutfitCard(page: page)
+    private func editingPageCell(for page: SpaceOutfit, itemWidth: CGFloat, itemHeight: CGFloat) -> some View {
+        SpaceOutfitCard(page: page, width: itemWidth, height: itemHeight)
             .overlay(alignment: .topTrailing) {
                 Image(systemName: "line.3.horizontal")
                     .font(.caption)
@@ -190,9 +198,9 @@ struct SpaceBookDetailView: View {
             .onDrop(of: [.text], delegate: SpaceReorderableDropDelegate(item: page, pages: sortedPages, onMove: movePage))
     }
 
-    private func normalPageCell(for page: SpaceOutfit) -> some View {
+    private func normalPageCell(for page: SpaceOutfit, itemWidth: CGFloat, itemHeight: CGFloat) -> some View {
         NavigationLink(value: page) {
-            SpaceOutfitCard(page: page)
+            SpaceOutfitCard(page: page, width: itemWidth, height: itemHeight)
         }
         .contextMenu {
             pageContextMenu(for: page)

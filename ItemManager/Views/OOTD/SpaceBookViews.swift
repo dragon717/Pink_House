@@ -119,10 +119,12 @@ struct SpaceBookCoverVisuals: View {
 
 struct SpaceOutfitCard: View {
     let page: SpaceOutfit
+    var width: CGFloat? = nil
+    var height: CGFloat? = nil
 
     var body: some View {
         SpaceOutfitCover(page: page)
-            .frame(height: 200)
+            .frame(width: width, height: height ?? 200)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

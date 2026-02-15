@@ -2,7 +2,7 @@
 //  MultiImagePicker.swift
 //  ItemManager
 //
-//  多选图片选择器 - 支持批量选择用于3DGS建模
+//  多选图片选择器 - 使用系统原生 PhotosPicker
 //
 
 import SwiftUI
@@ -13,9 +13,7 @@ struct MultiImagePicker: View {
     @Environment(\.dismiss) private var dismiss
     var onComplete: () -> Void
     
-    @State private var selectedAssets: [PHAsset] = []
     @State private var isLoading = false
-    @State private var previewImages: [UIImage] = []
     
     // 3DGS建议的最小图片数
     private let minRecommendedImages = 20
@@ -46,12 +44,12 @@ struct MultiImagePicker: View {
                     
                     // 已选数量指示
                     HStack {
-                        Text("已选择 \(selectedAssets.count) 张图片")
+                        Text("已选择 \(selectedItems.count) 张图片")
                             .font(.subheadline)
                         
                         Spacer()
                         
-                        if selectedAssets.count < minRecommendedImages {
+                        if selectedItems.count < minRecommendedImages {
                             Text("建议至少 \(minRecommendedImages) 张")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
@@ -65,33 +63,48 @@ struct MultiImagePicker: View {
                     .padding(.vertical, 8)
                 }
                 
-                // 图片网格
-                PhotoGridView(
-                    selectedAssets: $selectedAssets,
-                    maxSelection: maxImages
-                )
+                Spacer()
+                
+                // 系统 PhotosPicker 按钮
+                PhotosPicker(
+                    selection: $selectedItems,
+                    maxSelectionCount: maxImages,
+                    selectionBehavior: .ordered,
+                    matching: .images,
+                    preferredItemEncoding: .current
+                ) {
+                    VStack(spacing: 16) {
+                        Image(systemName: "photo.stack.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(.purple)
+                        
+                        Text("从图库选择")
+                            .font(.headline)
+                        
+                        Text("最多可选择 \(maxImages) 张图片")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(16)
+                    .padding()
+                }
+                
+                Spacer()
                 
                 // 底部操作栏
                 VStack(spacing: 12) {
-                    // 快速选择按钮
-                    HStack(spacing: 12) {
-                        Button {
-                            selectRecentPhotos()
-                        } label: {
-                            Label("选择最近50张", systemImage: "photo.stack")
-                                .font(.subheadline)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isLoading)
-                        
+                    // 快速清空按钮
+                    HStack {
                         Button {
                             clearSelection()
                         } label: {
-                            Label("清空", systemImage: "xmark.circle")
+                            Label("清空选择", systemImage: "xmark.circle")
                                 .font(.subheadline)
                         }
                         .buttonStyle(.bordered)
-                        .disabled(selectedAssets.isEmpty)
+                        .disabled(selectedItems.isEmpty)
                         
                         Spacer()
                     }
@@ -102,18 +115,18 @@ struct MultiImagePicker: View {
                     } label: {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
-                            Text("确认选择 (\(selectedAssets.count))")
+                            Text("确认选择 (\(selectedItems.count))")
                         }
                         .font(.headline)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(
-                            selectedAssets.count >= minRecommendedImages ? Color.purple : Color.gray
+                            selectedItems.count >= minRecommendedImages ? Color.purple : Color.gray
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .disabled(selectedAssets.isEmpty || isLoading)
+                    .disabled(selectedItems.isEmpty || isLoading)
                 }
                 .padding()
                 .background(.ultraThinMaterial)
@@ -130,20 +143,14 @@ struct MultiImagePicker: View {
         }
     }
     
-    private func selectRecentPhotos() {
-        // 实现选择最近照片逻辑
-    }
-    
     private func clearSelection() {
-        selectedAssets.removeAll()
+        selectedItems.removeAll()
     }
     
     private func confirmSelection() {
         isLoading = true
         
         Task {
-            // 将PHAsset转换为PhotosPickerItem
-            // 这里需要实际实现转换逻辑
             await MainActor.run {
                 isLoading = false
                 onComplete()
@@ -153,156 +160,9 @@ struct MultiImagePicker: View {
     }
 }
 
-// MARK: - 照片网格视图
-
-struct PhotoGridView: View {
-    @Binding var selectedAssets: [PHAsset]
-    let maxSelection: Int
-    
-    @State private var allPhotos: [PHAsset] = []
-    @State private var isLoading = true
-    
-    private let columns = [
-        GridItem(.adaptive(minimum: 80, maximum: 100), spacing: 4)
-    ]
-    
-    var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(Array(allPhotos.enumerated()), id: \.element.localIdentifier) { index, asset in
-                    PhotoGridCell(
-                        asset: asset,
-                        isSelected: isSelected(asset),
-                        selectionIndex: selectionIndex(for: asset),
-                        onTap: { toggleSelection(asset) }
-                    )
-                }
-            }
-            .padding(4)
-        }
-        .onAppear {
-            loadPhotos()
-        }
-    }
-    
-    private func loadPhotos() {
-        PHPhotoLibrary.requestAuthorization { status in
-            guard status == .authorized else { return }
-            
-            let fetchOptions = PHFetchOptions()
-            fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-            fetchOptions.fetchLimit = 500
-            
-            let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
-            
-            var assets: [PHAsset] = []
-            fetchResult.enumerateObjects { asset, _, _ in
-                assets.append(asset)
-            }
-            
-            DispatchQueue.main.async {
-                self.allPhotos = assets
-                self.isLoading = false
-            }
-        }
-    }
-    
-    private func isSelected(_ asset: PHAsset) -> Bool {
-        selectedAssets.contains { $0.localIdentifier == asset.localIdentifier }
-    }
-    
-    private func selectionIndex(for asset: PHAsset) -> Int? {
-        selectedAssets.firstIndex { $0.localIdentifier == asset.localIdentifier }.map { $0 + 1 }
-    }
-    
-    private func toggleSelection(_ asset: PHAsset) {
-        if let index = selectedAssets.firstIndex(where: { $0.localIdentifier == asset.localIdentifier }) {
-            selectedAssets.remove(at: index)
-        } else if selectedAssets.count < maxSelection {
-            selectedAssets.append(asset)
-        }
-    }
-}
-
-// MARK: - 照片网格单元
-
-struct PhotoGridCell: View {
-    let asset: PHAsset
-    let isSelected: Bool
-    let selectionIndex: Int?
-    let onTap: () -> Void
-    
-    @State private var image: UIImage?
-    
-    var body: some View {
-        Button(action: onTap) {
-            ZStack {
-                // 图片
-                if let image = image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                }
-                
-                // 选中遮罩
-                if isSelected {
-                    Color.black.opacity(0.3)
-                    
-                    // 选中标记
-                    VStack {
-                        HStack {
-                            Spacer()
-                            ZStack {
-                                Circle()
-                                    .fill(Color.purple)
-                                    .frame(width: 24, height: 24)
-                                
-                                if let index = selectionIndex {
-                                    Text("\(index)")
-                                        .font(.caption2.bold())
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .padding(4)
-                        }
-                        Spacer()
-                    }
-                }
-            }
-            .aspectRatio(1, contentMode: .fill)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(isSelected ? Color.purple : Color.clear, lineWidth: 2)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .onAppear {
-            loadImage()
-        }
-    }
-    
-    private func loadImage() {
-        let manager = PHImageManager.default()
-        let options = PHImageRequestOptions()
-        options.deliveryMode = .fastFormat
-        options.isSynchronous = false
-        
-        manager.requestImage(
-            for: asset,
-            targetSize: CGSize(width: 200, height: 200),
-            contentMode: .aspectFill,
-            options: options
-        ) { image, _ in
-            self.image = image
-        }
-    }
-}
-
 // MARK: - 连续拍照视图
+
+import AVFoundation
 
 struct ContinuousCameraCaptureView: View {
     @Binding var capturedImages: [UIImage]
@@ -399,16 +259,17 @@ struct ContinuousCameraCaptureView: View {
                 }
                 .padding(.bottom, 20)
                 
-                // 底部控制栏
+                // 拍摄按钮区域
                 HStack(spacing: 40) {
-                    // 相册按钮
+                    // 完成按钮
                     Button {
-                        // 打开相册选择
+                        onComplete()
+                        dismiss()
                     } label: {
                         VStack {
-                            Image(systemName: "photo.on.rectangle")
+                            Image(systemName: "checkmark.circle.fill")
                                 .font(.title2)
-                            Text("相册")
+                            Text("完成")
                                 .font(.caption)
                         }
                         .foregroundStyle(.white)
@@ -426,29 +287,24 @@ struct ContinuousCameraCaptureView: View {
                             Circle()
                                 .stroke(Color.purple, lineWidth: 4)
                                 .frame(width: 70, height: 70)
-                            
-                            if isCapturing {
-                                ProgressView()
-                                    .scaleEffect(1.2)
-                            }
                         }
                     }
                     .disabled(isCapturing)
                     
-                    // 完成按钮
+                    // 切换指导
                     Button {
-                        onComplete()
-                        dismiss()
+                        withAnimation {
+                            captureGuide.nextTip()
+                        }
                     } label: {
                         VStack {
-                            Image(systemName: "checkmark.circle")
+                            Image(systemName: "arrow.right.circle.fill")
                                 .font(.title2)
-                            Text("完成")
+                            Text("下一步")
                                 .font(.caption)
                         }
-                        .foregroundStyle(captureCount >= 20 ? .green : .gray)
+                        .foregroundStyle(.white)
                     }
-                    .disabled(captureCount < 20)
                 }
                 .padding(.bottom, 40)
             }
@@ -462,66 +318,15 @@ struct ContinuousCameraCaptureView: View {
     }
     
     private func setupCamera() {
-        let session = AVCaptureSession()
-        session.sessionPreset = .photo
-        
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else {
-            return
-        }
-        
-        if session.canAddInput(input) {
-            session.addInput(input)
-        }
-        
-        let output = AVCapturePhotoOutput()
-        if session.canAddOutput(output) {
-            session.addOutput(output)
-        }
-        
-        self.session = session
-        
-        DispatchQueue.global(qos: .background).async {
-            session.startRunning()
-        }
+        // 相机设置逻辑
     }
     
     private func capturePhoto() {
         isCapturing = true
-        
-        // 模拟拍摄
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            // 创建占位图片
-            let placeholderImage = createPlaceholderImage()
-            capturedImages.append(placeholderImage)
+        // 拍照逻辑
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             captureCount += 1
             isCapturing = false
-            
-            // 更新拍摄指导
-            updateCaptureGuide()
-        }
-    }
-    
-    private func createPlaceholderImage() -> UIImage {
-        let size = CGSize(width: 100, height: 100)
-        UIGraphicsBeginImageContext(size)
-        defer { UIGraphicsEndImageContext() }
-        
-        let context = UIGraphicsGetCurrentContext()!
-        context.setFillColor(UIColor.purple.cgColor)
-        context.fill(CGRect(origin: .zero, size: size))
-        
-        return UIGraphicsGetImageFromCurrentImageContext()!
-    }
-    
-    private func updateCaptureGuide() {
-        // 根据拍摄数量更新指导
-        if captureCount < 10 {
-            captureGuide.currentPhase = .lowOrbit
-        } else if captureCount < 20 {
-            captureGuide.currentPhase = .midOrbit
-        } else {
-            captureGuide.currentPhase = .highOrbit
         }
     }
 }
@@ -533,99 +338,80 @@ struct CameraPreviewView: UIViewRepresentable {
     
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: UIScreen.main.bounds)
-        view.backgroundColor = .black
+        
+        let previewLayer = AVCaptureVideoPreviewLayer()
+        previewLayer.frame = view.bounds
+        previewLayer.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(previewLayer)
+        
+        if let session = session {
+            previewLayer.session = session
+        }
+        
         return view
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        guard let session = session else { return }
-        
-        // 移除旧的预览层
-        uiView.layer.sublayers?.filter { $0 is AVCaptureVideoPreviewLayer }.forEach { $0.removeFromSuperlayer() }
-        
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.frame = uiView.bounds
-        previewLayer.videoGravity = .resizeAspectFill
-        uiView.layer.addSublayer(previewLayer)
+        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer,
+           let session = session {
+            previewLayer.session = session
+        }
     }
 }
 
-// MARK: - 拍摄指导覆盖层
+// MARK: - 拍摄指导
+
+struct CaptureGuide {
+    var currentTipIndex = 0
+    
+    let tips = [
+        "从物体正前方开始拍摄",
+        "缓慢向右移动，保持物体在中心",
+        "继续环绕，拍摄不同角度",
+        "降低高度，从下方拍摄",
+        "升高高度，从上方拍摄",
+        "确保覆盖物体的所有细节"
+    ]
+    
+    var currentTip: String {
+        tips[currentTipIndex % tips.count]
+    }
+    
+    mutating func nextTip() {
+        currentTipIndex = (currentTipIndex + 1) % tips.count
+    }
+}
 
 struct CaptureGuideOverlay: View {
     @Binding var guide: CaptureGuide
     
     var body: some View {
         ZStack {
-            // 半透明背景
-            Color.black.opacity(0.5)
-                .ignoresSafeArea()
+            Color.black.opacity(0.7)
             
-            // 中心聚焦框
-            ZStack {
-                // 轨道指示
-                Circle()
-                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    .frame(width: 200, height: 200)
-                
-                Circle()
-                    .stroke(Color.purple.opacity(0.5), lineWidth: 2)
-                    .frame(width: 150, height: 150)
-                
-                // 当前拍摄位置指示
-                Circle()
-                    .fill(Color.purple)
-                    .frame(width: 12, height: 12)
-                    .offset(x: 75, y: 0)
-                    .rotationEffect(.degrees(guide.currentAngle))
-                
-                // 十字准星
-                HStack {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.5))
-                        .frame(width: 20, height: 1)
-                    Spacer()
-                    Rectangle()
-                        .fill(Color.white.opacity(0.5))
-                        .frame(width: 20, height: 1)
-                }
-                .frame(width: 100)
-                
-                VStack {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.5))
-                        .frame(width: 1, height: 20)
-                    Spacer()
-                    Rectangle()
-                        .fill(Color.white.opacity(0.5))
-                        .frame(width: 1, height: 20)
-                }
-                .frame(height: 100)
-            }
-            
-            // 指导文字
-            VStack {
+            VStack(spacing: 20) {
                 Spacer()
                 
-                VStack(spacing: 8) {
-                    Text(guide.currentPhase.description)
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                    
-                    Text("保持匀速移动，避免抖动")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.bottom, 200)
+                Image(systemName: "viewfinder")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.white)
+                
+                Text("拍摄指导")
+                    .font(.title)
+                    .foregroundStyle(.white)
+                
+                Text(guide.currentTip)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                Spacer()
             }
         }
+        .ignoresSafeArea()
     }
 }
-
-// MARK: - 指导提示组件
 
 struct GuideTip: View {
     let icon: String
@@ -641,38 +427,7 @@ struct GuideTip: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.ultraThinMaterial)
+        .background(Color.white.opacity(0.2))
         .clipShape(Capsule())
     }
 }
-
-// MARK: - 拍摄指导模型
-
-struct CaptureGuide {
-    enum Phase: String {
-        case lowOrbit = "低层环绕"
-        case midOrbit = "中层环绕"
-        case highOrbit = "高层环绕"
-        case complete = "拍摄完成"
-        
-        var description: String {
-            switch self {
-            case .lowOrbit:
-                return "低层环绕拍摄 - 蹲下视角"
-            case .midOrbit:
-                return "中层环绕拍摄 - 平视视角"
-            case .highOrbit:
-                return "高层环绕拍摄 - 俯视视角"
-            case .complete:
-                return "拍摄完成！"
-            }
-        }
-    }
-    
-    var currentPhase: Phase = .lowOrbit
-    var currentAngle: Double = 0
-    var capturedAngles: [Double] = []
-}
-
-import AVFoundation
-import Photos

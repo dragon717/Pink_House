@@ -102,12 +102,12 @@ struct AssetPanel: View {
                 }
             }
         }
-        .frame(width: isExpanded ? 280 : 50)
+        .frame(width: isExpanded ? 320 : 50)
         .frame(maxHeight: .infinity)
         .background(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .padding(.trailing, 16)
-        .padding(.vertical, 80)
+        .padding(.trailing, 8)
+        .ignoresSafeArea(edges: .bottom)
     }
 }
 

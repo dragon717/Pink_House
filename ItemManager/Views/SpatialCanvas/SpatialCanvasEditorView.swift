@@ -48,6 +48,10 @@ struct SpatialCanvasEditorView: View {
     // 高斯泼溅建模状态
     @State private var isProcessing3DGS = false
     @State private var processingStage: GSProcessingStage = .idle
+    
+    // 返回确认
+    @State private var showingBackConfirmation = false
+    @State private var hasUnsavedChanges = false
     @State private var processingProgress: Double = 0.0
     @State private var gsModelPath: String?
     
@@ -128,11 +132,13 @@ struct SpatialCanvasEditorView: View {
                     selectedTool: $selectedTool,
                     onToolTap: handleToolTap
                 )
-                .padding(.leading, 16)
-                .padding(.bottom, 100)
+                .padding(.leading, 8)
+                .padding(.bottom, 20)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            
+            .ignoresSafeArea(edges: .vertical)
+            .allowsHitTesting(true)
+
             // 右侧素材面板
             if showingAssetPanel {
                 AssetPanel(
@@ -141,6 +147,7 @@ struct SpatialCanvasEditorView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 .transition(.move(edge: .trailing))
+                .allowsHitTesting(true)
             }
 
             // 底部操作栏
@@ -201,11 +208,29 @@ struct SpatialCanvasEditorView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    if hasUnsavedChanges {
+                        showingBackConfirmation = true
+                    } else {
+                        dismiss()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("返回")
+                    }
+                    .foregroundStyle(.primary)
+                }
+            }
+            
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
                         saveScene()
+                        hasUnsavedChanges = false
                     } label: {
                         Label("保存", systemImage: "checkmark.circle")
                     }
@@ -230,6 +255,20 @@ struct SpatialCanvasEditorView: View {
                 }
             }
         }
+        .confirmationDialog("确认返回？", isPresented: $showingBackConfirmation, titleVisibility: .visible) {
+            Button("保存并返回", role: .none) {
+                saveScene()
+                hasUnsavedChanges = false
+                dismiss()
+            }
+            Button("不保存返回", role: .destructive) {
+                dismiss()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("您有未保存的更改，是否保存？")
+        }
+        .interactiveDismissDisabled(hasUnsavedChanges)
     }
 
     // MARK: - Scene Setup
@@ -508,6 +547,7 @@ struct SpatialCanvasEditorView: View {
                 scale: SCNVector3(1, 1, 1)
             )
             spatialObjects.append(object)
+            hasUnsavedChanges = true
         }
     }
     
@@ -564,6 +604,7 @@ struct SpatialCanvasEditorView: View {
         // 更新对象状态
         object.rotation = node.eulerAngles
         object.scale = node.scale
+        hasUnsavedChanges = true
     }
     
     private func deleteSelectedObject() {
@@ -573,6 +614,7 @@ struct SpatialCanvasEditorView: View {
         spatialObjects.removeAll { $0.id == object.id }
         selectedObject = nil
         showingBottomControls = false
+        hasUnsavedChanges = true
     }
     
     // MARK: - Save & Export

@@ -22,7 +22,7 @@ struct CanvasToolbar: View {
     ]
     
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 12) {
                 ForEach(Array(toolGroups.enumerated()), id: \.offset) { groupIndex, tools in
                     VStack(spacing: 8) {
@@ -52,6 +52,7 @@ struct CanvasToolbar: View {
             .padding(.vertical, 16)
             .padding(.horizontal, 8)
         }
+        .frame(maxHeight: UIScreen.main.bounds.height * 0.7)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
@@ -61,7 +62,7 @@ struct CanvasToolbar: View {
                 )
         )
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 10, x: 0, y: 5)
-        .frame(maxHeight: 600)
+        .contentShape(Rectangle())
     }
 }
 
@@ -131,7 +132,8 @@ extension View {
                 }
                 .onEnded { _ in
                     onRelease()
-                }
+                },
+            including: .all
         )
     }
 }

@@ -24,6 +24,11 @@ struct OOTDEditorView: View {
     @State private var showingRenameAlert = false
     @State private var newName = ""
     @State private var showingDeleteAlert = false
+    @State private var showingMultiPhotoPicker = false
+    
+    // 工具栏和贴纸库显示状态
+    @State private var isToolbarVisible = true
+    @State private var isStickerLibraryVisible = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -32,6 +37,8 @@ struct OOTDEditorView: View {
                 isListExpanded: $isListExpanded,
                 isProcessing: $isProcessing,
                 processingMessage: processingMessage,
+                isToolbarVisible: $isToolbarVisible,
+                isStickerLibraryVisible: $isStickerLibraryVisible,
                 geometry: geometry,
                 onAddToOutfit: { cutout in
                     addToOutfit(cutout)
@@ -67,6 +74,19 @@ struct OOTDEditorView: View {
         .navigationTitle(outfit.note.isEmpty ? "编辑书页" : outfit.note)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // 左侧：显示/隐藏工具栏按钮
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isToolbarVisible.toggle()
+                    }
+                } label: {
+                    Image(systemName: isToolbarVisible ? "sidebar.leading" : "sidebar.trailing")
+                        .font(.system(size: 16, weight: .medium))
+                }
+            }
+            
+            // 右侧：更多操作菜单
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
@@ -100,8 +120,8 @@ struct OOTDEditorView: View {
                     showingCamera = true
                 }
             }
-            Button("来自图库") {
-                isImagePickerPresented = true
+            Button("从图库多选") {
+                showingMultiPhotoPicker = true
             }
             Button("取消", role: .cancel) {}
         }
@@ -114,10 +134,10 @@ struct OOTDEditorView: View {
                 processCameraImage(image, shouldCutout: shouldCutoutCameraImage)
             }
         }
-        .photosPicker(isPresented: $isImagePickerPresented, selection: $selectedItem, matching: .images)
-        .onChange(of: selectedItem) { _, newItem in
-            if let newItem {
-                processPickedImage(newItem)
+        .sheet(isPresented: $showingMultiPhotoPicker) {
+            MultiPhotoPickerView { cutouts in
+                // 批量添加抠图到画布
+                batchAddCutouts(cutouts)
             }
         }
         .sheet(isPresented: $showingSaveToClothingSheet) {
@@ -210,5 +230,28 @@ struct OOTDEditorView: View {
                 }
             }
         }
+    }
+    
+    private func batchAddCutouts(_ cutouts: [CutoutItem]) {
+        // 检查是否超过限制
+        if outfit.items.count + cutouts.count > 20 {
+            showingLimitAlert = true
+            return
+        }
+        
+        // 批量添加
+        for (index, cutout) in cutouts.enumerated() {
+            let item = OutfitItem(
+                cutout: cutout,
+                x: Double(index * 20),
+                y: Double(index * 20),
+                rotation: 0,
+                scale: 1.0,
+                zIndex: outfit.items.count
+            )
+            outfit.items.append(item)
+        }
+        
+        saveSnapshot()
     }
 }
