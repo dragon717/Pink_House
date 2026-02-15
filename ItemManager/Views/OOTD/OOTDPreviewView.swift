@@ -10,10 +10,22 @@ struct OOTDPreviewView: View {
     
     var body: some View {
         ZStack {
+            // Always ensure a white base layer to prevent black background when saving as JPEG
+            Color.white
+                .frame(width: canvasWidth, height: canvasHeight)
+            
             if outfit.canvasType == "blank" {
-                Color.white
+                // Already white
+            } else if outfit.canvasType == "custom",
+                      let path = outfit.backgroundImagePath,
+                      let uiImage = ImageManager.shared.loadImage(fileName: path) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
                     .frame(width: canvasWidth, height: canvasHeight)
+                    .clipped()
             } else {
+                // Mannequin or fallback
                 Image("ootd_background")
                     .resizable()
                     .scaledToFill()

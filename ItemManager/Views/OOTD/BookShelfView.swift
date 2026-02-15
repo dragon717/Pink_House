@@ -12,7 +12,7 @@ struct BookShelfView: View {
         case spatial = "空间"
         var id: Self { self }
     }
-    @State private var viewMode: ViewMode = .planar
+    @AppStorage("bookShelfViewMode") private var viewMode: ViewMode = .planar
     
     @State private var showingNewBookAlert = false
     @State private var newBookName = ""
@@ -228,6 +228,7 @@ struct BookShelfView: View {
                             }
                         }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             } else {
                 // Grid Layout (Bookshelf Mode)
                 BookGridView(
@@ -253,7 +254,7 @@ struct BookShelfView: View {
             
             // Animation Overlay
             if let book = openingBook {
-                BookOpeningOverlay(book: book, namespace: animationNamespace) {
+                BookOpeningAnimationView(book: book) {
                     withAnimation {
                         selectedBook = book
                         openingBook = nil

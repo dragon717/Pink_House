@@ -13,6 +13,10 @@ struct RococoSmallWorldView: View {
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
     
+    // Isometric Layout Constants
+    private let tileWidth: CGFloat = 100
+    private let tileHeight: CGFloat = 50
+    
     enum ViewMode: String, CaseIterable, Identifiable {
         case both = "并排显示"
         case upper = "显示上层"

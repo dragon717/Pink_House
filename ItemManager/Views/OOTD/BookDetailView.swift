@@ -39,13 +39,46 @@ struct BookDetailView: View {
     @State private var showingMoveSheet = false
     @State private var pageToMove: Outfit?
     
+    // Grid Layout Mode
+    enum GridMode: Int, CaseIterable {
+        case single = 1
+        case double = 2
+        case triple = 3
+        
+        var iconName: String {
+            switch self {
+            case .single: return "rectangle.grid.1x2"
+            case .double: return "rectangle.grid.2x2"
+            case .triple: return "rectangle.grid.3x2"
+            }
+        }
+        
+        var displayName: String {
+            switch self {
+            case .single: return "单列"
+            case .double: return "双列"
+            case .triple: return "三列"
+            }
+        }
+    }
+    
+    @AppStorage("bookDetailGridMode") private var gridModeValue = 2
+    
+    private var gridMode: GridMode {
+        GridMode(rawValue: gridModeValue) ?? .double
+    }
+    
+    private var gridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 16), count: gridMode.rawValue)
+    }
+    
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 16)], spacing: 16) {
+            LazyVGrid(columns: gridColumns, spacing: 16) {
                 ForEach(sortedPages) { page in
                     Group {
                         if isEditing {
-                            PageThumbnailView(page: page)
+                            PageThumbnailView(page: page, gridMode: gridMode)
                                 .overlay(alignment: .topTrailing) {
                                     Image(systemName: "line.3.horizontal")
                                         .font(.caption)
@@ -61,7 +94,7 @@ struct BookDetailView: View {
                                 .onDrop(of: [.text], delegate: ReorderableDropDelegate(item: page, pages: sortedPages, onMove: movePage))
                         } else {
                             NavigationLink(value: page) {
-                                PageThumbnailView(page: page)
+                                PageThumbnailView(page: page, gridMode: gridMode)
                             }
                             .contextMenu {
                                 Button {
@@ -110,19 +143,40 @@ struct BookDetailView: View {
             .padding()
             .animation(.default, value: sortedPages)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(book.title)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
+                HStack(spacing: 8) {
+                    // Grid Mode Switcher
+                    Menu {
+                        Picker("视图布局", selection: $gridModeValue) {
+                            ForEach(GridMode.allCases, id: \.rawValue) { mode in
+                                Label(mode.displayName, systemImage: mode.iconName)
+                                    .tag(mode.rawValue)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: gridMode.iconName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+                    
                     // Edit / Sort Button
                     Button {
                         withAnimation {
                             isEditing.toggle()
                         }
                     } label: {
-                        Image(systemName: isEditing ? "checkmark.circle.fill" : "arrow.up.arrow.down")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.primary)
+                        if isEditing {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.pink)
+                        } else {
+                            Image(systemName: "list.number")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.primary)
+                        }
                     }
                     
                     // Add / More Menu
@@ -392,6 +446,18 @@ extension BookDetailView {
 // ... PageThumbnailView and MovePageSheet remain the same ...
 struct PageThumbnailView: View {
     let page: Outfit
+    var gridMode: BookDetailView.GridMode = .double
+    
+    private var targetSize: CGSize {
+        switch gridMode {
+        case .single:
+            return CGSize(width: 800, height: 1066)
+        case .double:
+            return CGSize(width: 400, height: 533)
+        case .triple:
+            return CGSize(width: 300, height: 400)
+        }
+    }
     
     var body: some View {
         VStack {
@@ -400,7 +466,7 @@ struct PageThumbnailView: View {
                     // Use AsyncDownsampledImage for efficient loading and display
                     AsyncDownsampledImage(
                         fileName: path,
-                        targetSize: CGSize(width: 300, height: 400),
+                        targetSize: targetSize,
                         content: { uiImage in
                             Image(uiImage: uiImage)
                                 .resizable()
@@ -420,7 +486,7 @@ struct PageThumbnailView: View {
                     placeholderView
                 }
             }
-            .frame(height: 120)
+            .aspectRatio(0.75, contentMode: .fit) // 3:4 aspect ratio (Canvas size)
             .frame(maxWidth: .infinity)
             .background(Color.white)
             .cornerRadius(8)

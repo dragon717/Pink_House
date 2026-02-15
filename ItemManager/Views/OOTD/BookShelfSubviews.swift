@@ -28,6 +28,7 @@ struct BookSidebarView: View {
             .padding(.horizontal, 10)
         }
         .frame(width: 90)
+        .frame(maxHeight: .infinity)
         // Transparent UI as requested
         .background(Color.clear)
         .overlay(
