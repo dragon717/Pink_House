@@ -23,9 +23,20 @@ struct RecycleBinView: View {
     @Query(filter: #Predicate<Outfit> { $0.deletedAt != nil }, sort: \Outfit.deletedAt, order: .reverse)
     private var allDeletedOutfits: [Outfit]
     
+    // Space OOTD Queries
+    @Query(filter: #Predicate<SpaceBookGroup> { $0.deletedAt != nil }, sort: \SpaceBookGroup.deletedAt, order: .reverse)
+    private var deletedSpaceBooks: [SpaceBookGroup]
+    
+    @Query(filter: #Predicate<SpaceOutfit> { $0.deletedAt != nil }, sort: \SpaceOutfit.deletedAt, order: .reverse)
+    private var allDeletedSpaceOutfits: [SpaceOutfit]
+    
     // Filter out outfits that belong to deleted books (to avoid duplicates in the list)
     var isolatedDeletedOutfits: [Outfit] {
         allDeletedOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
+    }
+    
+    var isolatedDeletedSpaceOutfits: [SpaceOutfit] {
+        allDeletedSpaceOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
     }
     
     @State private var selectedTab: Int
@@ -52,14 +63,17 @@ struct RecycleBinView: View {
             Picker("分类", selection: $selectedTab) {
                 Text("衣橱").tag(0)
                 Text("手帐").tag(1)
+                Text("空间").tag(2)
             }
             .pickerStyle(.segmented)
             .padding()
             
             if selectedTab == 0 {
                 wardrobeList
-            } else {
+            } else if selectedTab == 1 {
                 ootdList
+            } else {
+                spaceOOTDList
             }
         }
         .environment(\.editMode, $editMode)
@@ -135,6 +149,10 @@ struct RecycleBinView: View {
                     permanentlyDeleteBook(book)
                 } else if let outfit = itemToDelete as? Outfit {
                     permanentlyDeleteOutfit(outfit)
+                } else if let spaceBook = itemToDelete as? SpaceBookGroup {
+                    permanentlyDeleteSpaceBook(spaceBook)
+                } else if let spaceOutfit = itemToDelete as? SpaceOutfit {
+                    permanentlyDeleteSpaceOutfit(spaceOutfit)
                 }
                 itemToDelete = nil
             }
@@ -184,6 +202,10 @@ struct RecycleBinView: View {
                     restoreBook(book)
                 } else if let outfit = itemToDelete as? Outfit {
                     restoreOutfit(outfit)
+                } else if let spaceBook = itemToDelete as? SpaceBookGroup {
+                    restoreSpaceBook(spaceBook)
+                } else if let spaceOutfit = itemToDelete as? SpaceOutfit {
+                    restoreSpaceOutfit(spaceOutfit)
                 }
                 itemToDelete = nil
             }
@@ -285,6 +307,56 @@ struct RecycleBinView: View {
         .scrollContentBackground(.hidden)
     }
     
+    // MARK: - Space OOTD View
+    
+    var spaceOOTDList: some View {
+        List(selection: $selectedItems) {
+            if deletedSpaceBooks.isEmpty && isolatedDeletedSpaceOutfits.isEmpty {
+                ContentUnavailableView(
+                    "回收站是空的",
+                    systemImage: "cube.transparent",
+                    description: Text("删除的空间手帐和书页会出现在这里")
+                )
+                .listRowBackground(Color.clear)
+            } else {
+                // Deleted Books Section
+                if !deletedSpaceBooks.isEmpty {
+                    Section("空间手帐") {
+                        ForEach(deletedSpaceBooks) { book in
+                            DeletedSpaceBookRow(book: book, isEditing: editMode == .active, onRestore: {
+                                itemToDelete = book
+                                showingRestoreAlert = true
+                            }, onDelete: {
+                                itemToDelete = book
+                                showingDeleteAlert = true
+                            })
+                            .listRowBackground(Color.clear)
+                            .tag(book.id)
+                        }
+                    }
+                }
+                
+                // Deleted Pages Section
+                if !isolatedDeletedSpaceOutfits.isEmpty {
+                    Section("单独删除的空间书页") {
+                        ForEach(isolatedDeletedSpaceOutfits) { outfit in
+                            DeletedSpaceOutfitRow(outfit: outfit, isEditing: editMode == .active, onRestore: {
+                                itemToDelete = outfit
+                                showingRestoreAlert = true
+                            }, onDelete: {
+                                itemToDelete = outfit
+                                showingDeleteAlert = true
+                            })
+                            .listRowBackground(Color.clear)
+                            .tag(outfit.id)
+                        }
+                    }
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+    }
+    
     // MARK: - Actions
     
     private func restoreClothing(_ clothing: Clothing) {
@@ -341,6 +413,46 @@ struct RecycleBinView: View {
         }
     }
     
+    private func restoreSpaceBook(_ book: SpaceBookGroup) {
+        withAnimation {
+            book.isDeleted = false
+            book.deletedAt = nil
+            // Restore all pages in this book
+            for page in book.pages {
+                page.isDeleted = false
+                page.deletedAt = nil
+            }
+        }
+    }
+    
+    private func permanentlyDeleteSpaceBook(_ book: SpaceBookGroup) {
+        withAnimation {
+            // Delete snapshot files for all pages
+            for page in book.pages {
+                if let path = page.snapshotPath {
+                    ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+                }
+            }
+            modelContext.delete(book)
+        }
+    }
+    
+    private func restoreSpaceOutfit(_ outfit: SpaceOutfit) {
+        withAnimation {
+            outfit.isDeleted = false
+            outfit.deletedAt = nil
+        }
+    }
+    
+    private func permanentlyDeleteSpaceOutfit(_ outfit: SpaceOutfit) {
+        withAnimation {
+            if let path = outfit.snapshotPath {
+                ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+            }
+            modelContext.delete(outfit)
+        }
+    }
+    
     // MARK: - Batch Actions
     
     private func restoreAll() {
@@ -348,12 +460,19 @@ struct RecycleBinView: View {
             for clothing in deletedClothings {
                 restoreClothing(clothing)
             }
-        } else {
+        } else if selectedTab == 1 {
             for book in deletedBooks {
                 restoreBook(book)
             }
             for outfit in isolatedDeletedOutfits {
                 restoreOutfit(outfit)
+            }
+        } else {
+            for book in deletedSpaceBooks {
+                restoreSpaceBook(book)
+            }
+            for outfit in isolatedDeletedSpaceOutfits {
+                restoreSpaceOutfit(outfit)
             }
         }
     }
@@ -363,12 +482,19 @@ struct RecycleBinView: View {
             for clothing in deletedClothings {
                 permanentlyDeleteClothing(clothing)
             }
-        } else {
+        } else if selectedTab == 1 {
             for book in deletedBooks {
                 permanentlyDeleteBook(book)
             }
             for outfit in isolatedDeletedOutfits {
                 permanentlyDeleteOutfit(outfit)
+            }
+        } else {
+            for book in deletedSpaceBooks {
+                permanentlyDeleteSpaceBook(book)
+            }
+            for outfit in isolatedDeletedSpaceOutfits {
+                permanentlyDeleteSpaceOutfit(outfit)
             }
         }
     }
@@ -379,7 +505,7 @@ struct RecycleBinView: View {
             for item in itemsToRestore {
                 restoreClothing(item)
             }
-        } else {
+        } else if selectedTab == 1 {
             let booksToRestore = deletedBooks.filter { selectedItems.contains($0.id) }
             for book in booksToRestore {
                 restoreBook(book)
@@ -388,6 +514,16 @@ struct RecycleBinView: View {
             let outfitsToRestore = isolatedDeletedOutfits.filter { selectedItems.contains($0.id) }
             for outfit in outfitsToRestore {
                 restoreOutfit(outfit)
+            }
+        } else {
+            let booksToRestore = deletedSpaceBooks.filter { selectedItems.contains($0.id) }
+            for book in booksToRestore {
+                restoreSpaceBook(book)
+            }
+            
+            let outfitsToRestore = isolatedDeletedSpaceOutfits.filter { selectedItems.contains($0.id) }
+            for outfit in outfitsToRestore {
+                restoreSpaceOutfit(outfit)
             }
         }
         selectedItems.removeAll()
@@ -399,7 +535,7 @@ struct RecycleBinView: View {
             for item in itemsToDelete {
                 permanentlyDeleteClothing(item)
             }
-        } else {
+        } else if selectedTab == 1 {
             let booksToDelete = deletedBooks.filter { selectedItems.contains($0.id) }
             for book in booksToDelete {
                 permanentlyDeleteBook(book)
@@ -408,6 +544,16 @@ struct RecycleBinView: View {
             let outfitsToDelete = isolatedDeletedOutfits.filter { selectedItems.contains($0.id) }
             for outfit in outfitsToDelete {
                 permanentlyDeleteOutfit(outfit)
+            }
+        } else {
+            let booksToDelete = deletedSpaceBooks.filter { selectedItems.contains($0.id) }
+            for book in booksToDelete {
+                permanentlyDeleteSpaceBook(book)
+            }
+            
+            let outfitsToDelete = isolatedDeletedSpaceOutfits.filter { selectedItems.contains($0.id) }
+            for outfit in outfitsToDelete {
+                permanentlyDeleteSpaceOutfit(outfit)
             }
         }
         selectedItems.removeAll()
@@ -519,6 +665,146 @@ struct DeletedOutfitRow: View {
                     .cornerRadius(8)
             } else {
                 Image(systemName: "tshirt")
+                    .frame(width: 40, height: 40)
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(8)
+            }
+            
+            VStack(alignment: .leading) {
+                Text(outfit.note.isEmpty ? "未命名书页" : outfit.note)
+                    .font(.body)
+                Text(outfit.deletedAt?.formatted() ?? "")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            if !isEditing {
+                HStack(spacing: 16) {
+                    Button(action: onRestore) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .foregroundStyle(.blue)
+                    }
+                    
+                    Button(action: onDelete) {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .cornerRadius(12)
+    }
+}
+
+struct DeletedSpaceBookRow: View {
+    let book: SpaceBookGroup
+    var isEditing: Bool = false
+    let onRestore: () -> Void
+    let onDelete: () -> Void
+    
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button {
+                    withAnimation {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        
+                        Image(systemName: "folder.fill")
+                            .foregroundStyle(Color.accentColor)
+                        
+                        Text(book.title)
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        Text("\(book.pages.count) 页")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isEditing)
+                
+                // Actions
+                if !isEditing {
+                    HStack(spacing: 16) {
+                        Button(action: onRestore) {
+                            Image(systemName: "arrow.uturn.backward.circle.fill")
+                                .foregroundStyle(.blue)
+                                .font(.title3)
+                        }
+                        
+                        Button(action: onDelete) {
+                            Image(systemName: "trash.circle.fill")
+                                .foregroundStyle(.red)
+                                .font(.title3)
+                        }
+                    }
+                }
+            }
+            
+            if isExpanded {
+                ForEach(book.pages) { page in
+                    HStack {
+                        Image(systemName: "cube.transparent")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 28)
+                        
+                        Text(page.note.isEmpty ? "未命名书页" : page.note)
+                            .font(.subheadline)
+                        
+                        Spacer()
+                        
+                        if let snapshotPath = page.snapshotPath,
+                           let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 30, height: 30)
+                                .cornerRadius(4)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .padding()
+        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .cornerRadius(12)
+    }
+}
+
+struct DeletedSpaceOutfitRow: View {
+    let outfit: SpaceOutfit
+    var isEditing: Bool = false
+    let onRestore: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        HStack {
+            if let snapshotPath = outfit.snapshotPath,
+               let uiImage = ImageManager.shared.loadImage(fileName: snapshotPath) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 40)
+                    .cornerRadius(8)
+            } else {
+                Image(systemName: "cube.transparent")
                     .frame(width: 40, height: 40)
                     .background(Color.gray.opacity(0.2))
                     .cornerRadius(8)

@@ -24,6 +24,10 @@ struct ThreeDOOTDView: View {
     
     var body: some View {
         ZStack {
+            // Background
+            LiquidBackground()
+                .ignoresSafeArea()
+            
             // 3D Scene
             SceneView(
                 scene: scene,
@@ -143,11 +147,15 @@ struct ThreeDOOTDView: View {
         
         scene.rootNode.addChildNode(cameraNode)
         
-        // Add Floor
+        // Add Floor (Transparent)
         let floor = SCNFloor()
         floor.reflectivity = 0.1
+        floor.firstMaterial?.diffuse.contents = UIColor.clear
         let floorNode = SCNNode(geometry: floor)
         scene.rootNode.addChildNode(floorNode)
+        
+        // Remove Default Background Color to allow LiquidBackground to show
+        scene.background.contents = UIColor.clear
         
         // Add Placeholder Mannequin (Cylinder + Sphere)
         let bodyGeo = SCNCylinder(radius: 0.3, height: 1.5)
