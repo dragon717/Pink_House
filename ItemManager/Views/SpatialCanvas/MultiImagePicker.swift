@@ -164,6 +164,27 @@ struct MultiImagePicker: View {
 
 import AVFoundation
 
+// 视图修饰符：锁定屏幕方向
+struct OrientationLockModifier: ViewModifier {
+    let orientation: UIInterfaceOrientationMask
+    
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                AppDelegate.orientationLock = orientation
+            }
+            .onDisappear {
+                AppDelegate.orientationLock = .all
+            }
+    }
+}
+
+extension View {
+    func lockOrientation(_ orientation: UIInterfaceOrientationMask) -> some View {
+        modifier(OrientationLockModifier(orientation: orientation))
+    }
+}
+
 struct ContinuousCameraCaptureView: View {
     @Binding var capturedImages: [UIImage]
     @Environment(\.dismiss) private var dismiss
@@ -323,8 +344,9 @@ struct ContinuousCameraCaptureView: View {
                 }
             }
         }
+        .lockOrientation(.portrait)
     }
-    
+
     private func setupCamera() {
         // 检查相机权限
         let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
@@ -350,64 +372,67 @@ struct ContinuousCameraCaptureView: View {
     }
     
     private func configureCameraSession() {
-        let newSession = AVCaptureSession()
-        newSession.beginConfiguration()
-        
-        // 设置会话预设 - 使用较小的预设以提高兼容性
-        if newSession.canSetSessionPreset(.high) {
-            newSession.sessionPreset = .high
-        } else {
-            newSession.sessionPreset = .photo
-        }
-        
-        // 获取后置摄像头
-        guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-            print("无法获取后置摄像头")
-            return
-        }
-        
-        do {
-            // 配置摄像头设备
-            try videoDevice.lockForConfiguration()
-            if videoDevice.isFocusModeSupported(.continuousAutoFocus) {
-                videoDevice.focusMode = .continuousAutoFocus
+        // 在后台线程配置相机会话
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            let newSession = AVCaptureSession()
+            newSession.beginConfiguration()
+
+            // 设置会话预设 - 使用 photo 预设以提高兼容性
+            if newSession.canSetSessionPreset(.photo) {
+                newSession.sessionPreset = .photo
             }
-            if videoDevice.isExposureModeSupported(.continuousAutoExposure) {
-                videoDevice.exposureMode = .continuousAutoExposure
-            }
-            videoDevice.unlockForConfiguration()
-            
-            // 添加视频输入
-            let videoInput = try AVCaptureDeviceInput(device: videoDevice)
-            if newSession.canAddInput(videoInput) {
-                newSession.addInput(videoInput)
-            } else {
-                print("无法添加视频输入")
+
+            // 获取后置摄像头
+            guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+                print("无法获取后置摄像头")
                 return
             }
-            
-            // 创建照片输出
-            let output = AVCapturePhotoOutput()
-            output.isHighResolutionCaptureEnabled = false
-            if newSession.canAddOutput(output) {
-                newSession.addOutput(output)
-                photoOutput = output
-            } else {
-                print("无法添加照片输出")
+
+            do {
+                // 配置摄像头设备
+                try videoDevice.lockForConfiguration()
+                if videoDevice.isFocusModeSupported(.continuousAutoFocus) {
+                    videoDevice.focusMode = .continuousAutoFocus
+                }
+                if videoDevice.isExposureModeSupported(.continuousAutoExposure) {
+                    videoDevice.exposureMode = .continuousAutoExposure
+                }
+                videoDevice.unlockForConfiguration()
+
+                // 添加视频输入
+                let videoInput = try AVCaptureDeviceInput(device: videoDevice)
+                if newSession.canAddInput(videoInput) {
+                    newSession.addInput(videoInput)
+                } else {
+                    print("无法添加视频输入")
+                    return
+                }
+
+                // 创建照片输出
+                let output = AVCapturePhotoOutput()
+                if newSession.canAddOutput(output) {
+                    newSession.addOutput(output)
+                    DispatchQueue.main.async {
+                        self.photoOutput = output
+                    }
+                } else {
+                    print("无法添加照片输出")
+                    return
+                }
+
+            } catch {
+                print("相机设置错误: \(error.localizedDescription)")
                 return
             }
-            
-        } catch {
-            print("相机设置错误: \(error.localizedDescription)")
-            return
-        }
-        
-        newSession.commitConfiguration()
-        session = newSession
-        
-        // 在后台线程启动会话
-        DispatchQueue.global(qos: .userInitiated).async { [weak newSession] in
-            newSession?.startRunning()
+
+            newSession.commitConfiguration()
+
+            DispatchQueue.main.async {
+                self.session = newSession
+            }
+
+            // 启动会话
+            newSession.startRunning()
         }
     }
     
