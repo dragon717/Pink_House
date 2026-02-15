@@ -260,3 +260,53 @@ final class OutfitItem {
         self.zIndex = zIndex
     }
 }
+
+// MARK: - 3D Space OOTD Models
+
+@Model
+final class SpaceBookGroup {
+    @Attribute(.unique) var id: UUID = UUID()
+    var title: String = ""
+    var coverImage: String? // Optional custom cover
+    var createdAt: Date = Date()
+    var isDeleted: Bool = false
+    var deletedAt: Date? = nil
+    
+    @Relationship(deleteRule: .cascade, inverse: \SpaceOutfit.book)
+    var pages: [SpaceOutfit] = []
+    
+    init(title: String, coverImage: String? = nil) {
+        self.title = title
+        self.coverImage = coverImage
+        self.createdAt = Date()
+    }
+}
+
+@Model
+final class SpaceOutfit {
+    @Attribute(.unique) var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var note: String = ""
+    var snapshotPath: String? // Path to the saved 3D snapshot
+    
+    // 3D Scene Configuration
+    var modelPath: String? // Path to the 3D model file (e.g. .usdz, .ply)
+    var camPosX: Double = 0.0
+    var camPosY: Double = 1.5
+    var camPosZ: Double = 5.0
+    var lightingIntensity: Double = 1000.0
+    
+    // Trash Bin Logic
+    var isDeleted: Bool = false
+    var deletedAt: Date? = nil
+    
+    @Relationship
+    var book: SpaceBookGroup?
+    
+    init(note: String = "", snapshotPath: String? = nil, book: SpaceBookGroup? = nil) {
+        self.note = note
+        self.snapshotPath = snapshotPath
+        self.book = book
+        self.createdAt = Date()
+    }
+}

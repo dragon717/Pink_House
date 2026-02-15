@@ -150,6 +150,12 @@ struct BookShelfView: View {
                 .navigationDestination(for: BookGroup.self) { book in
                     BookDetailView(book: book, navigationPath: $navigationPath)
                 }
+                .navigationDestination(for: SpaceBookGroup.self) { book in
+                    SpaceBookDetailView(book: book)
+                }
+                .navigationDestination(for: SpaceOutfit.self) { outfit in
+                    ThreeDOOTDView(outfit: outfit)
+                }
                 .sheet(isPresented: $showingTrash) {
                     RecycleBinView(initialTab: 1) // Default to OOTD tab from BookShelf
                 }

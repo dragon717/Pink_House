@@ -2,8 +2,11 @@
 import SwiftUI
 import SceneKit
 import PhotosUI
+import SwiftData
 
 struct ThreeDOOTDView: View {
+    var outfit: SpaceOutfit?
+    
     @State private var scene = SCNScene()
     @State private var cameraNode = SCNNode()
     @State private var modelNode: SCNNode?
@@ -14,10 +17,10 @@ struct ThreeDOOTDView: View {
     @State private var isProcessing = false
     @State private var processingMessage = ""
     
-    // Camera State Persistence (Mock)
-    @AppStorage("ThreeDCamPosX") private var camPosX: Double = 0
-    @AppStorage("ThreeDCamPosY") private var camPosY: Double = 1.5
-    @AppStorage("ThreeDCamPosZ") private var camPosZ: Double = 5
+    // Camera State Persistence (Fallback to AppStorage if no outfit)
+    @AppStorage("ThreeDCamPosX") private var defaultCamPosX: Double = 0
+    @AppStorage("ThreeDCamPosY") private var defaultCamPosY: Double = 1.5
+    @AppStorage("ThreeDCamPosZ") private var defaultCamPosZ: Double = 5
     
     var body: some View {
         ZStack {
@@ -34,7 +37,7 @@ struct ThreeDOOTDView: View {
             VStack {
                 // Header
                 HStack {
-                    Text("空间穿搭")
+                    Text(outfit?.note ?? "空间穿搭")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .shadow(radius: 2)
@@ -119,14 +122,25 @@ struct ThreeDOOTDView: View {
             setupScene()
         }
         .onDisappear {
-            saveCameraState()
+            saveState()
         }
     }
     
     private func setupScene() {
         // Setup Camera
         cameraNode.camera = SCNCamera()
-        cameraNode.position = SCNVector3(camPosX, camPosY, camPosZ)
+        
+        if let outfit = outfit {
+            // Use saved camera position or default if zero (which is default init value)
+            if outfit.camPosZ == 0 && outfit.camPosY == 0 && outfit.camPosX == 0 {
+                cameraNode.position = SCNVector3(0, 1.5, 5)
+            } else {
+                cameraNode.position = SCNVector3(outfit.camPosX, outfit.camPosY, outfit.camPosZ)
+            }
+        } else {
+            cameraNode.position = SCNVector3(defaultCamPosX, defaultCamPosY, defaultCamPosZ)
+        }
+        
         scene.rootNode.addChildNode(cameraNode)
         
         // Add Floor
@@ -172,10 +186,17 @@ struct ThreeDOOTDView: View {
         cameraNode.eulerAngles = SCNVector3(0, 0, 0)
     }
     
-    private func saveCameraState() {
-        camPosX = Double(cameraNode.position.x)
-        camPosY = Double(cameraNode.position.y)
-        camPosZ = Double(cameraNode.position.z)
+    private func saveState() {
+        if let outfit = outfit {
+            outfit.camPosX = Double(cameraNode.position.x)
+            outfit.camPosY = Double(cameraNode.position.y)
+            outfit.camPosZ = Double(cameraNode.position.z)
+            // Try to take snapshot (Need SCNView snapshot, but SceneView is wrapped. Skipping for now or mocking)
+        } else {
+            defaultCamPosX = Double(cameraNode.position.x)
+            defaultCamPosY = Double(cameraNode.position.y)
+            defaultCamPosZ = Double(cameraNode.position.z)
+        }
     }
 }
 

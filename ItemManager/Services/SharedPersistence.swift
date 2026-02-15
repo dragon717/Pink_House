@@ -25,7 +25,9 @@ class SharedPersistence {
             CutoutItem.self,
             Outfit.self,
             OutfitItem.self,
-            BookGroup.self
+            BookGroup.self,
+            SpaceBookGroup.self,
+            SpaceOutfit.self
         ])
         
         // 检查 iCloud 同步设置
