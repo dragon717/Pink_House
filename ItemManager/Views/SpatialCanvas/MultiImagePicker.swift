@@ -178,6 +178,10 @@ struct ContinuousCameraCaptureView: View {
     // 3DGS拍摄指导
     @State private var captureGuide = CaptureGuide()
     
+    // 照片输出
+    @State private var photoOutput: AVCapturePhotoOutput?
+    @State private var captureDelegate: PhotoCaptureDelegate?
+    
     var body: some View {
         ZStack {
             // 相机预览
@@ -313,21 +317,143 @@ struct ContinuousCameraCaptureView: View {
             setupCamera()
         }
         .onDisappear {
-            session?.stopRunning()
+            if let session = session {
+                if session.isRunning {
+                    session.stopRunning()
+                }
+            }
         }
     }
     
     private func setupCamera() {
-        // 相机设置逻辑
+        // 检查相机权限
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch authStatus {
+        case .authorized:
+            configureCameraSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [self] granted in
+                if granted {
+                    DispatchQueue.main.async {
+                        configureCameraSession()
+                    }
+                } else {
+                    print("相机权限被拒绝")
+                }
+            }
+        case .denied, .restricted:
+            print("相机权限被拒绝或受限")
+        @unknown default:
+            print("未知的相机权限状态")
+        }
+    }
+    
+    private func configureCameraSession() {
+        let newSession = AVCaptureSession()
+        newSession.beginConfiguration()
+        
+        // 设置会话预设 - 使用较小的预设以提高兼容性
+        if newSession.canSetSessionPreset(.high) {
+            newSession.sessionPreset = .high
+        } else {
+            newSession.sessionPreset = .photo
+        }
+        
+        // 获取后置摄像头
+        guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            print("无法获取后置摄像头")
+            return
+        }
+        
+        do {
+            // 配置摄像头设备
+            try videoDevice.lockForConfiguration()
+            if videoDevice.isFocusModeSupported(.continuousAutoFocus) {
+                videoDevice.focusMode = .continuousAutoFocus
+            }
+            if videoDevice.isExposureModeSupported(.continuousAutoExposure) {
+                videoDevice.exposureMode = .continuousAutoExposure
+            }
+            videoDevice.unlockForConfiguration()
+            
+            // 添加视频输入
+            let videoInput = try AVCaptureDeviceInput(device: videoDevice)
+            if newSession.canAddInput(videoInput) {
+                newSession.addInput(videoInput)
+            } else {
+                print("无法添加视频输入")
+                return
+            }
+            
+            // 创建照片输出
+            let output = AVCapturePhotoOutput()
+            output.isHighResolutionCaptureEnabled = false
+            if newSession.canAddOutput(output) {
+                newSession.addOutput(output)
+                photoOutput = output
+            } else {
+                print("无法添加照片输出")
+                return
+            }
+            
+        } catch {
+            print("相机设置错误: \(error.localizedDescription)")
+            return
+        }
+        
+        newSession.commitConfiguration()
+        session = newSession
+        
+        // 在后台线程启动会话
+        DispatchQueue.global(qos: .userInitiated).async { [weak newSession] in
+            newSession?.startRunning()
+        }
     }
     
     private func capturePhoto() {
+        guard let photoOutput = photoOutput else { return }
+        
         isCapturing = true
-        // 拍照逻辑
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            captureCount += 1
-            isCapturing = false
+        
+        let settings = AVCapturePhotoSettings()
+        let delegate = PhotoCaptureDelegate { [self] image in
+            DispatchQueue.main.async {
+                if let image = image {
+                    capturedImages.append(image)
+                    captureCount = capturedImages.count
+                }
+                isCapturing = false
+            }
         }
+        captureDelegate = delegate
+        photoOutput.capturePhoto(with: settings, delegate: delegate)
+    }
+}
+
+// MARK: - 照片捕获委托
+
+class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    private let completion: (UIImage?) -> Void
+    
+    init(completion: @escaping (UIImage?) -> Void) {
+        self.completion = completion
+    }
+    
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        if let error = error {
+            print("照片处理错误: \(error.localizedDescription)")
+            completion(nil)
+            return
+        }
+        
+        guard let imageData = photo.fileDataRepresentation(),
+              let image = UIImage(data: imageData) else {
+            completion(nil)
+            return
+        }
+        
+        completion(image)
     }
 }
 
@@ -338,6 +464,7 @@ struct CameraPreviewView: UIViewRepresentable {
     
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: UIScreen.main.bounds)
+        view.backgroundColor = .black
         
         let previewLayer = AVCaptureVideoPreviewLayer()
         previewLayer.frame = view.bounds
@@ -352,9 +479,11 @@ struct CameraPreviewView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer,
-           let session = session {
-            previewLayer.session = session
+        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
+            previewLayer.frame = uiView.bounds
+            if let session = session, previewLayer.session !== session {
+                previewLayer.session = session
+            }
         }
     }
 }

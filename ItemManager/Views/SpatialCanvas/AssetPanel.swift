@@ -7,6 +7,39 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
+
+// MARK: - SpatialAsset 类型
+
+struct SpatialAsset: Identifiable {
+    let id = UUID()
+    let type: AssetType
+    let name: String
+    let imagePath: String?
+    let thumbnail: UIImage?
+    let metadata: [String: String]
+    
+    enum AssetType {
+        case clothing
+        case effect
+        case template
+        case material
+    }
+    
+    init(
+        type: AssetType,
+        name: String,
+        imagePath: String? = nil,
+        thumbnail: UIImage? = nil,
+        metadata: [String: String] = [:]
+    ) {
+        self.type = type
+        self.name = name
+        self.imagePath = imagePath
+        self.thumbnail = thumbnail
+        self.metadata = metadata
+    }
+}
 
 struct AssetPanel: View {
     @Binding var selectedCategory: AssetCategory
@@ -129,6 +162,10 @@ struct AssetPanel: View {
                             TemplateAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .material:
                             MaterialAssetList(searchText: searchText, onSelect: onAssetSelect)
+                        case .accessories:
+                            AccessoriesAssetList(searchText: searchText, onSelect: onAssetSelect)
+                        case .furniture:
+                            FurnitureAssetList(searchText: searchText, onSelect: onAssetSelect)
                         }
                     }
                     .padding()
@@ -184,6 +221,10 @@ struct CategoryTab: View {
             return .cyan
         case .material:
             return .purple
+        case .accessories:
+            return .blue
+        case .furniture:
+            return .brown
         }
     }
     
@@ -502,6 +543,154 @@ struct MaterialCard: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(color)
                     .aspectRatio(1, contentMode: .fit)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+                
+                Text(name)
+                    .font(.caption)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - 配饰素材列表
+
+struct AccessoriesAssetList: View {
+    let searchText: String
+    let onSelect: (SpatialAsset) -> Void
+    
+    let accessories = [
+        ("项链", "necklace", Color.yellow),
+        ("耳环", "earrings", Color.pink),
+        ("手链", "bracelet", Color.blue),
+        ("戒指", "ring", Color.orange),
+        ("发饰", "hairpin", Color.purple),
+        ("包包", "bag", Color.brown)
+    ]
+    
+    var filteredAccessories: [(String, String, Color)] {
+        if searchText.isEmpty {
+            return accessories
+        }
+        return accessories.filter { item in
+            item.0.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            ForEach(filteredAccessories, id: \.0) { item in
+                AccessoryCard(name: item.0, color: item.2) {
+                    let asset = SpatialAsset(
+                        type: .effect,
+                        name: item.0,
+                        imagePath: nil,
+                        thumbnail: nil,
+                        metadata: ["accessoryType": item.1]
+                    )
+                    onSelect(asset)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 配饰卡片
+
+struct AccessoryCard: View {
+    let name: String
+    let color: Color
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(color.opacity(0.3))
+                    .aspectRatio(1, contentMode: .fit)
+                    .overlay(
+                        Image(systemName: "sparkles")
+                            .font(.title2)
+                            .foregroundStyle(color)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+                
+                Text(name)
+                    .font(.caption)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - 家具素材列表
+
+struct FurnitureAssetList: View {
+    let searchText: String
+    let onSelect: (SpatialAsset) -> Void
+    
+    let furniture = [
+        ("沙发", "sofa", Color.brown),
+        ("椅子", "chair", Color.orange),
+        ("桌子", "table", Color.gray),
+        ("床", "bed", Color.blue),
+        ("柜子", "cabinet", Color.purple),
+        ("灯具", "lamp", Color.yellow)
+    ]
+    
+    var filteredFurniture: [(String, String, Color)] {
+        if searchText.isEmpty {
+            return furniture
+        }
+        return furniture.filter { item in
+            item.0.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            ForEach(filteredFurniture, id: \.0) { item in
+                FurnitureCard(name: item.0, color: item.2) {
+                    let asset = SpatialAsset(
+                        type: .template,
+                        name: item.0,
+                        imagePath: nil,
+                        thumbnail: nil,
+                        metadata: ["furnitureType": item.1]
+                    )
+                    onSelect(asset)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 家具卡片
+
+struct FurnitureCard: View {
+    let name: String
+    let color: Color
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(color.opacity(0.3))
+                    .aspectRatio(1, contentMode: .fit)
+                    .overlay(
+                        Image(systemName: "cube.box")
+                            .font(.title2)
+                            .foregroundStyle(color)
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.white.opacity(0.3), lineWidth: 1)

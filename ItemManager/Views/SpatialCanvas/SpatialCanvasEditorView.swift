@@ -2,15 +2,14 @@
 //  SpatialCanvasEditorView.swift
 //  ItemManager
 //
-//  空间画布编辑器 - 支持3D高斯泼溅建模
+//  空间画布编辑器 - 支持3D高斯泼溅建模 (Metal版)
 //
 
 import SwiftUI
 import SwiftData
 import PhotosUI
-import SceneKit
-import ARKit
-import CoreMotion
+import MetalKit
+import simd
 import Combine
 
 // MARK: - 主编辑器视图
@@ -25,15 +24,9 @@ struct SpatialCanvasEditorView: View {
     
     // MARK: - State
     
-    // 3D场景状态
-    @State private var scene = SCNScene()
-    @State private var cameraNode = SCNNode()
-    @State private var modelNode: SCNNode?
-    @State private var gizmoNode: SCNNode? // 变换辅助器
-    
-    // 选中的3D对象
-    @State private var selectedObject: SpatialObject?
-    @State private var spatialObjects: [SpatialObject] = []
+    // 3D场景状态 - 使用新的 Metal SceneObject
+    @State private var sceneObjects: [SceneObject] = []
+    @State private var selectedObject: SceneObject?
     
     // 工具栏状态
     @State private var selectedTool: CanvasTool = .select
@@ -53,7 +46,6 @@ struct SpatialCanvasEditorView: View {
     @State private var showingBackConfirmation = false
     @State private var hasUnsavedChanges = false
     @State private var processingProgress: Double = 0.0
-    @State private var gsModelPath: String?
     
     // 右侧素材面板
     @State private var showingAssetPanel = true
@@ -69,9 +61,6 @@ struct SpatialCanvasEditorView: View {
     @State private var rotationZ: Double = 0
     @State private var scale: Double = 1.0
     
-    // 相机位姿追踪
-    @StateObject private var cameraTracker = CameraPoseTracker()
-
     // 加载状态
     @State private var isSceneReady = false
 
@@ -87,13 +76,13 @@ struct SpatialCanvasEditorView: View {
             // 背景 - 根据暗黑模式调整
             editorBackground.ignoresSafeArea()
 
-            // 3D场景视图
+            // 3D场景视图 - 使用新的 Metal SpatialSceneView
             GeometryReader { geometry in
                 SpatialSceneView(
-                    scene: scene,
-                    cameraNode: cameraNode,
                     selectedObject: $selectedObject,
-                    onObjectTap: handleObjectTap
+                    objects: $sceneObjects,
+                    onObjectTap: handleObjectTap,
+                    onObjectTransform: handleObjectTransform
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .opacity(isSceneReady ? 1 : 0)
@@ -175,35 +164,31 @@ struct SpatialCanvasEditorView: View {
             }
         }
         .onAppear {
-            setupScene()
             loadExistingData()
-
-            // 使用多次延迟确保 SceneKit 完全准备好
-            DispatchQueue.main.async {
-                // 强制场景渲染更新 - 根据暗黑模式调整
-                let bgColor = colorScheme == .dark 
-                    ? UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
-                    : UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
-                self.scene.background.contents = bgColor
-
-                // 延迟显示，给 SceneKit 足够时间初始化
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.easeIn(duration: 0.2)) {
-                        isSceneReady = true
-                    }
+            
+            // 延迟显示
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    isSceneReady = true
                 }
             }
         }
         .sheet(isPresented: $showingImagePicker) {
             MultiImagePicker(
                 selectedItems: $selectedPhotoItems,
-                onComplete: handleSelectedImages
+                onComplete: {
+                    // 处理选中的图片
+                    handleSelectedImages([])
+                }
             )
         }
         .sheet(isPresented: $showingCameraCapture) {
             ContinuousCameraCaptureView(
                 capturedImages: $capturedImages,
-                onComplete: handleCapturedImages
+                onComplete: {
+                    // 处理拍摄的图片
+                    handleCapturedImages([])
+                }
             )
         }
         .navigationTitle("")
@@ -245,6 +230,7 @@ struct SpatialCanvasEditorView: View {
 
                     Button(role: .destructive) {
                         // 清空场景
+                        sceneObjects.removeAll()
                     } label: {
                         Label("清空场景", systemImage: "trash")
                     }
@@ -271,74 +257,6 @@ struct SpatialCanvasEditorView: View {
         .interactiveDismissDisabled(hasUnsavedChanges)
     }
 
-    // MARK: - Scene Setup
-    
-    private func setupScene() {
-        // 设置场景背景色 - 根据暗黑模式调整
-        let bgColor = colorScheme == .dark 
-            ? UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
-            : UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
-        scene.background.contents = bgColor
-        
-        // 设置相机
-        cameraNode.camera = SCNCamera()
-        cameraNode.position = SCNVector3(0, 1.5, 5)
-        scene.rootNode.addChildNode(cameraNode)
-        
-        // 添加环境光
-        let ambientLight = SCNNode()
-        ambientLight.light = SCNLight()
-        ambientLight.light?.type = .ambient
-        ambientLight.light?.intensity = 500
-        scene.rootNode.addChildNode(ambientLight)
-        
-        // 添加方向光
-        let directionalLight = SCNNode()
-        directionalLight.light = SCNLight()
-        directionalLight.light?.type = .directional
-        directionalLight.light?.intensity = 1000
-        directionalLight.position = SCNVector3(5, 10, 5)
-        directionalLight.eulerAngles = SCNVector3(-Float.pi/3, 0, 0)
-        scene.rootNode.addChildNode(directionalLight)
-        
-        // 添加网格地板
-        addGridFloor()
-    }
-    
-    private func addGridFloor() {
-        let gridSize: CGFloat = 20
-        let gridDivisions: Int = 20
-        let gridSpacing = gridSize / CGFloat(gridDivisions)
-        
-        let floorNode = SCNNode()
-        
-        // 创建网格线
-        for i in 0...gridDivisions {
-            let x = -gridSize/2 + CGFloat(i) * gridSpacing
-            
-            // X方向线
-            let lineX = SCNNode()
-            let geometryX = SCNCylinder(radius: 0.005, height: gridSize)
-            geometryX.firstMaterial?.diffuse.contents = UIColor.gray.withAlphaComponent(0.3)
-            lineX.geometry = geometryX
-            lineX.position = SCNVector3(x, 0, 0)
-            lineX.rotation = SCNVector4(1, 0, 0, Float.pi/2)
-            floorNode.addChildNode(lineX)
-            
-            // Z方向线
-            let z = -gridSize/2 + CGFloat(i) * gridSpacing
-            let lineZ = SCNNode()
-            let geometryZ = SCNCylinder(radius: 0.005, height: gridSize)
-            geometryZ.firstMaterial?.diffuse.contents = UIColor.gray.withAlphaComponent(0.3)
-            lineZ.geometry = geometryZ
-            lineZ.position = SCNVector3(0, 0, z)
-            lineZ.rotation = SCNVector4(0, 0, 1, Float.pi/2)
-            floorNode.addChildNode(lineZ)
-        }
-        
-        scene.rootNode.addChildNode(floorNode)
-    }
-    
     // MARK: - Data Loading
     
     private func loadExistingData() {
@@ -348,214 +266,25 @@ struct SpatialCanvasEditorView: View {
         if let modelPath = outfit.modelPath {
             load3DModel(from: modelPath)
         }
-        
-        // 恢复相机位置
-        cameraNode.position = SCNVector3(outfit.camPosX, outfit.camPosY, outfit.camPosZ)
     }
     
-    // MARK: - Tool Handlers
-    
-    private func handleToolTap(_ tool: CanvasTool) {
-        selectedTool = tool
-        
-        switch tool {
-        case .select:
-            showingAssetPanel = false
-        case .image:
-            showingImagePicker = true
-        case .camera:
-            showingCameraCapture = true
-        case .gsModel:
-            startGSCapture()
-        case .light:
-            adjustLighting()
-        case .text:
-            addTextObject()
-        case .material:
-            showingAssetPanel = true
-            selectedAssetCategory = .material
-        case .clothing:
-            showingAssetPanel = true
-            selectedAssetCategory = .clothing
-        case .effect:
-            showingAssetPanel = true
-            selectedAssetCategory = .effect
-        case .template:
-            showingAssetPanel = true
-            selectedAssetCategory = .template
-        case .record:
-            startRecording()
-        case .settings:
-            showSettings()
-        }
-    }
-    
-    // MARK: - 3D Gaussian Splatting
-    
-    private func startGSCapture() {
-        // 显示采集选项
-        showingCameraCapture = true
-    }
-    
-    private func processGaussianSplatting(images: [UIImage]) {
-        guard images.count >= 20 else {
-            // 需要至少20张图片
-            return
-        }
-        
-        isProcessing3DGS = true
-        processingStage = .uploading
-        processingProgress = 0.0
-        
-        Task {
-            // 阶段1: 上传图片
-            await simulateProcessing(stage: .uploading, duration: 1.0)
-            
-            // 阶段2: SfM (Structure from Motion)
-            processingStage = .sfm
-            await simulateProcessing(stage: .sfm, duration: 2.0)
-            
-            // 阶段3: 训练高斯泼溅模型
-            processingStage = .training
-            await simulateProcessing(stage: .training, duration: 3.0)
-            
-            // 阶段4: 优化和导出
-            processingStage = .optimizing
-            await simulateProcessing(stage: .optimizing, duration: 1.5)
-            
-            // 完成
-            await MainActor.run {
-                processingStage = .complete
-                isProcessing3DGS = false
-                
-                // 加载生成的模型
-                loadGeneratedGSModel()
-            }
-        }
-    }
-    
-    private func simulateProcessing(stage: GSProcessingStage, duration: Double) async {
-        let steps = 20
-        let stepDuration = duration / Double(steps)
-        
-        for i in 0..<steps {
-            await MainActor.run {
-                processingProgress = Double(i) / Double(steps)
-            }
-            try? await Task.sleep(nanoseconds: UInt64(stepDuration * 1_000_000_000))
-        }
-    }
-    
-    private func loadGeneratedGSModel() {
-        // 这里加载生成的PLY/SPLAT文件
-        // 实际实现需要使用Metal渲染器
-        let placeholderNode = createPlaceholderGSNode()
-        scene.rootNode.addChildNode(placeholderNode)
-        
-        let object = SpatialObject(
-            id: UUID(),
+    private func load3DModel(from path: String) {
+        // 创建新的 SceneObject
+        let object = SceneObject(
             type: .gsModel,
-            node: placeholderNode,
-            position: SCNVector3(0, 1, 0),
-            rotation: SCNVector3(0, 0, 0),
-            scale: SCNVector3(1, 1, 1)
+            position: SIMD3<Float>(0, 0, 0),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(1, 1, 1),
+            gsModelPath: path
         )
-        spatialObjects.append(object)
+        sceneObjects.append(object)
     }
     
-    private func createPlaceholderGSNode() -> SCNNode {
-        // 创建高斯泼溅占位模型
-        let node = SCNNode()
-        
-        // 主体
-        let sphere = SCNSphere(radius: 0.5)
-        sphere.firstMaterial?.diffuse.contents = UIColor.systemPink.withAlphaComponent(0.6)
-        sphere.firstMaterial?.isDoubleSided = true
-        
-        let sphereNode = SCNNode(geometry: sphere)
-        node.addChildNode(sphereNode)
-        
-        // 添加粒子效果表示高斯点
-        let particleSystem = SCNParticleSystem()
-        particleSystem.birthRate = 1000
-        particleSystem.particleLifeSpan = 2.0
-        particleSystem.particleSize = 0.02
-        particleSystem.particleColor = UIColor.white.withAlphaComponent(0.5)
-        particleSystem.emitterShape = sphere
-        particleSystem.birthLocation = .surface
-        
-        node.addParticleSystem(particleSystem)
-        
-        return node
-    }
+    // MARK: - Event Handlers
     
-    // MARK: - Image Handling
-    
-    private func handleSelectedImages() {
-        Task {
-            var images: [UIImage] = []
-            for item in selectedPhotoItems {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    images.append(image)
-                }
-            }
-            
-            if images.count >= 20 {
-                // 足够图片进行3DGS建模
-                processGaussianSplatting(images: images)
-            } else {
-                // 添加为普通图片对象
-                await MainActor.run {
-                    for image in images {
-                        addImageObject(image: image)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func handleCapturedImages() {
-        if capturedImages.count >= 20 {
-            processGaussianSplatting(images: capturedImages)
-        } else {
-            for image in capturedImages {
-                addImageObject(image: image)
-            }
-        }
-        capturedImages = []
-    }
-    
-    private func addImageObject(image: UIImage) {
-        // 保存图片到沙盒
-        if let path = ImageManager.shared.saveImage(image, context: modelContext) {
-            let plane = SCNPlane(width: 1, height: 1)
-            plane.firstMaterial?.diffuse.contents = image
-            plane.firstMaterial?.isDoubleSided = true
-            
-            let node = SCNNode(geometry: plane)
-            node.position = SCNVector3(0, 1, 0)
-            scene.rootNode.addChildNode(node)
-            
-            let object = SpatialObject(
-                id: UUID(),
-                type: .image,
-                node: node,
-                imagePath: path,
-                position: node.position,
-                rotation: SCNVector3(0, 0, 0),
-                scale: SCNVector3(1, 1, 1)
-            )
-            spatialObjects.append(object)
-            hasUnsavedChanges = true
-        }
-    }
-    
-    // MARK: - Object Management
-    
-    private func handleObjectTap(_ object: SpatialObject) {
+    private func handleObjectTap(_ object: SceneObject) {
         selectedObject = object
-        showingBottomControls = true
+        hasUnsavedChanges = true
         
         // 更新变换状态
         rotationX = Double(object.rotation.x)
@@ -564,237 +293,163 @@ struct SpatialCanvasEditorView: View {
         scale = Double(object.scale.x)
     }
     
-    private func handleAssetSelect(_ asset: SpatialAsset) {
-        switch asset.type {
-        case .clothing:
-            addClothingAsset(asset)
+    private func handleObjectTransform(_ object: SceneObject) {
+        hasUnsavedChanges = true
+    }
+    
+    private func handleToolTap(_ tool: CanvasTool) {
+        selectedTool = tool
+        
+        switch tool {
+        case .select:
+            break
+        case .image:
+            showingImagePicker = true
+        case .gallery:
+            showingImagePicker = true
+        case .camera:
+            showingCameraCapture = true
+        case .gsModel:
+            // 启动3DGS建模流程
+            start3DGSProcessing()
+        case .light:
+            // TODO: 添加灯光
+            break
+        case .text:
+            // TODO: 添加文字
+            break
         case .material:
-            addMaterialAsset(asset)
+            // TODO: 选择材质
+            break
+        case .clothing:
+            showingAssetPanel = true
         case .effect:
-            addEffectAsset(asset)
+            // TODO: 添加特效
+            break
         case .template:
-            applyTemplate(asset)
+            // TODO: 选择模板
+            break
+        case .transform:
+            showingToolPanel = true
+        case .record:
+            // TODO: 开始录制
+            break
+        case .settings:
+            // TODO: 打开设置
+            break
         }
     }
     
-    private func addClothingAsset(_ asset: SpatialAsset) {
-        // 从抠图添加服饰
-        if let cutoutPath = asset.imagePath,
-           let image = ImageManager.shared.loadImage(fileName: cutoutPath) {
-            addImageObject(image: image)
+    private func handleAssetSelect(_ asset: SpatialAsset) {
+        // 处理素材选择
+        hasUnsavedChanges = true
+    }
+    
+    private func handleSelectedImages(_ images: [UIImage]) {
+        // 处理选中的图片
+        capturedImages = images
+        start3DGSProcessing()
+    }
+    
+    private func handleCapturedImages(_ images: [UIImage]) {
+        // 处理拍摄的图片
+        capturedImages = images
+        start3DGSProcessing()
+    }
+    
+    // MARK: - 3DGS Processing
+    
+    private func start3DGSProcessing() {
+        guard !capturedImages.isEmpty else { return }
+        
+        isProcessing3DGS = true
+        processingStage = .preparing
+        processingProgress = 0.0
+        
+        // 模拟处理进度
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            processingStage = .processing
+            processingProgress = 0.3
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            processingProgress = 0.7
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            processingStage = .finalizing
+            processingProgress = 0.9
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            processingStage = .complete
+            processingProgress = 1.0
+            isProcessing3DGS = false
+            
+            // 创建示例模型路径 (实际应该从处理结果获取)
+            let modelPath = "path/to/generated/model.ply"
+            load3DModel(from: modelPath)
         }
     }
+    
+    // MARK: - Transform
     
     private func applyTransform() {
-        guard let object = selectedObject else { return }
+        guard let index = sceneObjects.firstIndex(where: { $0.id == selectedObject?.id }) else { return }
         
-        let node = object.node
+        sceneObjects[index].rotation = SIMD3<Float>(
+            Float(rotationX),
+            Float(rotationY),
+            Float(rotationZ)
+        )
+        sceneObjects[index].scale = SIMD3<Float>(
+            Float(scale),
+            Float(scale),
+            Float(scale)
+        )
         
-        switch transformMode {
-        case .rotate:
-            node.eulerAngles = SCNVector3(
-                Float(rotationX * .pi / 180),
-                Float(rotationY * .pi / 180),
-                Float(rotationZ * .pi / 180)
-            )
-        case .scale:
-            node.scale = SCNVector3(Float(scale), Float(scale), Float(scale))
-        }
-        
-        // 更新对象状态
-        object.rotation = node.eulerAngles
-        object.scale = node.scale
+        selectedObject = sceneObjects[index]
         hasUnsavedChanges = true
     }
     
     private func deleteSelectedObject() {
-        guard let object = selectedObject else { return }
+        guard let object = selectedObject,
+              let index = sceneObjects.firstIndex(where: { $0.id == object.id }) else { return }
         
-        object.node.removeFromParentNode()
-        spatialObjects.removeAll { $0.id == object.id }
+        sceneObjects.remove(at: index)
         selectedObject = nil
-        showingBottomControls = false
         hasUnsavedChanges = true
     }
     
-    // MARK: - Save & Export
+    // MARK: - Save
     
     private func saveScene() {
-        // 保存相机位置
-        let outfit = spaceOutfit ?? SpaceOutfit(note: "空间穿搭")
-        outfit.camPosX = Double(cameraNode.position.x)
-        outfit.camPosY = Double(cameraNode.position.y)
-        outfit.camPosZ = Double(cameraNode.position.z)
-        
-        if spaceOutfit == nil {
-            modelContext.insert(outfit)
+        // 保存场景数据
+        if let outfit = spaceOutfit {
+            // 更新现有的 SpaceOutfit
+            // outfit.modelPath = ...
+            // modelContext.save()
         }
         
-        try? modelContext.save()
-        onSave?(outfit)
-        dismiss()
-    }
-    
-    // MARK: - Placeholder Methods
-    
-    private func load3DModel(from path: String) {
-        // 实现3D模型加载
-    }
-    
-    private func adjustLighting() {}
-    private func addTextObject() {}
-    private func addMaterialAsset(_ asset: SpatialAsset) {}
-    private func addEffectAsset(_ asset: SpatialAsset) {}
-    private func applyTemplate(_ asset: SpatialAsset) {}
-    private func startRecording() {}
-    private func showSettings() {}
-}
-
-// MARK: - Supporting Types
-
-enum CanvasTool: String, CaseIterable {
-    case select = "选择"
-    case image = "图片"
-    case camera = "拍照"
-    case gsModel = "3D建模"
-    case light = "灯光"
-    case text = "文本"
-    case material = "素材"
-    case clothing = "服饰"
-    case effect = "特效"
-    case template = "模版"
-    case record = "记录"
-    case settings = "设置"
-    
-    var icon: String {
-        switch self {
-        case .select: return "arrow.up.left.and.arrow.down.right"
-        case .image: return "photo"
-        case .camera: return "camera.fill"
-        case .gsModel: return "cube.transparent"
-        case .light: return "light.max"
-        case .text: return "textformat"
-        case .material: return "circle.fill"
-        case .clothing: return "tshirt"
-        case .effect: return "sparkles"
-        case .template: return "square.grid.2x2"
-        case .record: return "video.fill"
-        case .settings: return "gearshape.fill"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .select: return .gray
-        case .image: return .green
-        case .camera: return .orange
-        case .gsModel: return .purple
-        case .light: return .yellow
-        case .text: return .blue
-        case .material: return .purple
-        case .clothing: return .orange
-        case .effect: return .pink
-        case .template: return .cyan
-        case .record: return .red
-        case .settings: return .gray
+        // 调用保存回调
+        if let outfit = spaceOutfit {
+            onSave?(outfit)
         }
     }
 }
 
-enum TransformMode {
-    case rotate, scale
-}
+// MARK: - 辅助类型
 
-enum GSProcessingStage: String {
-    case idle = "准备中"
-    case uploading = "上传图片"
-    case sfm = "计算点云 (SfM)"
-    case training = "训练高斯泼溅模型"
-    case optimizing = "优化模型"
-    case complete = "完成"
-    
-    var description: String {
-        return rawValue
-    }
-}
 
-enum AssetCategory: String, CaseIterable {
-    case clothing = "服饰"
-    case effect = "特效"
-    case template = "模版"
-    case material = "素材"
-}
 
-// MARK: - Spatial Object Model
-
-class SpatialObject: Identifiable, ObservableObject {
-    let id: UUID
-    let type: ObjectType
-    let node: SCNNode
-    var imagePath: String?
-    
-    @Published var positionX: Double = 0
-    @Published var positionY: Double = 0
-    @Published var positionZ: Double = 0
-    @Published var rotationX: Double = 0
-    @Published var rotationY: Double = 0
-    @Published var rotationZ: Double = 0
-    @Published var scaleX: Double = 1
-    @Published var scaleY: Double = 1
-    @Published var scaleZ: Double = 1
-    
-    var position: SCNVector3 {
-        get { SCNVector3(positionX, positionY, positionZ) }
-        set {
-            positionX = Double(newValue.x)
-            positionY = Double(newValue.y)
-            positionZ = Double(newValue.z)
-        }
-    }
-    
-    var rotation: SCNVector3 {
-        get { SCNVector3(rotationX, rotationY, rotationZ) }
-        set {
-            rotationX = Double(newValue.x)
-            rotationY = Double(newValue.y)
-            rotationZ = Double(newValue.z)
-        }
-    }
-    
-    var scale: SCNVector3 {
-        get { SCNVector3(scaleX, scaleY, scaleZ) }
-        set {
-            scaleX = Double(newValue.x)
-            scaleY = Double(newValue.y)
-            scaleZ = Double(newValue.z)
-        }
-    }
-    
-    enum ObjectType {
-        case gsModel, image, text, clothing, effect
-    }
-    
-    init(id: UUID, type: ObjectType, node: SCNNode, imagePath: String? = nil,
-         position: SCNVector3, rotation: SCNVector3, scale: SCNVector3) {
-        self.id = id
-        self.type = type
-        self.node = node
-        self.imagePath = imagePath
-        self.position = position
-        self.rotation = rotation
-        self.scale = scale
-    }
-}
-
-struct SpatialAsset: Identifiable {
-    let id = UUID()
-    let type: AssetType
+struct AssetItem {
+    let id: String
     let name: String
-    let imagePath: String?
-    let thumbnail: UIImage?
-    let metadata: [String: Any]?
-    
-    enum AssetType {
-        case clothing, material, effect, template
-    }
+    let category: AssetCategory
 }
+
+// MARK: - 占位视图组件
+
+
+
+

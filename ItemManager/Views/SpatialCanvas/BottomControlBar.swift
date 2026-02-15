@@ -7,6 +7,8 @@
 
 import SwiftUI
 
+// 注意：GSProcessingStage, GSProcessingOverlay, TransformMode 定义在 SpatialCanvasTypes.swift 中
+
 struct BottomControlBar: View {
     @Binding var transformMode: TransformMode
     var onRotate: () -> Void
@@ -104,127 +106,7 @@ struct ControlButton: View {
     }
 }
 
-// MARK: - 3DGS处理进度遮罩
 
-struct GSProcessingOverlay: View {
-    let stage: GSProcessingStage
-    let progress: Double
-    
-    @State private var pulseAnimation = false
-    
-    var body: some View {
-        ZStack {
-            // 背景遮罩
-            Color.black.opacity(0.85)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 32) {
-                // 3D图标动画
-                ZStack {
-                    // 外圈脉冲
-                    Circle()
-                        .stroke(Color.purple.opacity(0.3), lineWidth: 2)
-                        .frame(width: 120, height: 120)
-                        .scaleEffect(pulseAnimation ? 1.2 : 1.0)
-                        .opacity(pulseAnimation ? 0 : 1)
-                    
-                    // 中圈
-                    Circle()
-                        .stroke(Color.purple.opacity(0.5), lineWidth: 2)
-                        .frame(width: 100, height: 100)
-                    
-                    // 内圈
-                    Circle()
-                        .fill(Color.purple.opacity(0.2))
-                        .frame(width: 80, height: 80)
-                    
-                    // 中心图标
-                    Image(systemName: "cube.transparent")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.purple)
-                }
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
-                        pulseAnimation.toggle()
-                    }
-                }
-                
-                // 标题
-                VStack(spacing: 8) {
-                    Text("3D高斯泼溅建模")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                    
-                    Text(stage.description)
-                        .font(.subheadline)
-                        .foregroundStyle(.purple)
-                }
-                
-                // 进度条
-                VStack(spacing: 8) {
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            // 背景
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.white.opacity(0.1))
-                                .frame(height: 8)
-                            
-                            // 进度
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.purple, .pink],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: geometry.size.width * progress, height: 8)
-                                .animation(.easeInOut(duration: 0.3), value: progress)
-                        }
-                    }
-                    .frame(width: 250, height: 8)
-                    
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                
-                // 阶段指示器
-                HStack(spacing: 8) {
-                    ForEach(GSProcessingStage.allCases, id: \.self) { s in
-                        Circle()
-                            .fill(stage == s ? Color.purple : Color.white.opacity(0.2))
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(stage == s ? 1.5 : 1.0)
-                    }
-                }
-                
-                // 提示文字
-                VStack(spacing: 4) {
-                    Text("请勿关闭应用")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
-                    
-                    if stage == .training {
-                        Text("这可能需要几分钟时间")
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-                }
-            }
-            .padding(40)
-        }
-    }
-}
-
-// MARK: - GSProcessingStage 扩展
-
-extension GSProcessingStage: CaseIterable {
-    static var allCases: [GSProcessingStage] {
-        [.uploading, .sfm, .training, .optimizing, .complete]
-    }
-}
 
 // MARK: - 变换控制滑块
 
