@@ -60,8 +60,6 @@ struct SmallWorldMenuOverlay: View {
             MenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
             // 日历: 莫妮卡紫 (对应 MonicaTheme Accent，略加深以提升白色图标对比度)
             MenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80)),
-            // 3D试衣: 青色
-            MenuItem(title: "3D试衣", icon: "cube.transparent", destination: .threeDOotd, color: Color.cyan)
         ]
     }
     

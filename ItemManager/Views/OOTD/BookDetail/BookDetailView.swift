@@ -1,4 +1,3 @@
-
 import SwiftUI
 import SwiftData
 import PhotosUI
@@ -7,8 +6,10 @@ struct BookDetailView: View {
     @Bindable var book: BookGroup
     @Binding var navigationPath: NavigationPath
     @Environment(\.modelContext) private var modelContext
-    
-    // Sort pages by sortIndex (primary) then createdAt (secondary)
+    @Environment(\.dismiss) private var dismiss
+
+    @Binding var isSidebarVisible: Bool
+
     var sortedPages: [Outfit] {
         book.pages.filter { !$0.isDeleted }.sorted {
             if $0.sortIndex == $1.sortIndex {
@@ -27,7 +28,6 @@ struct BookDetailView: View {
     @State private var showingCoverPicker = false
     @State private var selectedCoverItem: PhotosPickerItem?
     
-    // Background Picker
     @State private var showingBackgroundPicker = false
     @State private var selectedBackgroundItem: PhotosPickerItem?
     @State private var tempBackgroundImage: UIImage?
@@ -35,32 +35,8 @@ struct BookDetailView: View {
     
     @State private var showingTrash = false
     
-    // For moving pages
     @State private var showingMoveSheet = false
     @State private var pageToMove: Outfit?
-    
-    // Grid Layout Mode
-    enum GridMode: Int, CaseIterable {
-        case single = 1
-        case double = 2
-        case triple = 3
-        
-        var iconName: String {
-            switch self {
-            case .single: return "rectangle.grid.1x2"
-            case .double: return "rectangle.grid.2x2"
-            case .triple: return "rectangle.grid.3x2"
-            }
-        }
-        
-        var displayName: String {
-            switch self {
-            case .single: return "单列"
-            case .double: return "双列"
-            case .triple: return "三列"
-            }
-        }
-    }
     
     @AppStorage("bookDetailGridMode") private var gridModeValue = 2
     
@@ -146,9 +122,33 @@ struct BookDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(book.title)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                HStack(spacing: 8) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("返回")
+                        }
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                    }
+
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isSidebarVisible.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isSidebarVisible ? "sidebar.left" : "sidebar.right")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
-                    // Grid Mode Switcher
                     Menu {
                         Picker("视图布局", selection: $gridModeValue) {
                             ForEach(GridMode.allCases, id: \.rawValue) { mode in
@@ -161,8 +161,7 @@ struct BookDetailView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.primary)
                     }
-                    
-                    // Edit / Sort Button
+
                     Button {
                         withAnimation {
                             isEditing.toggle()
@@ -178,8 +177,7 @@ struct BookDetailView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    
-                    // Add / More Menu
+
                     Menu {
                         Menu {
                             Button {
@@ -187,13 +185,13 @@ struct BookDetailView: View {
                             } label: {
                                 Label("人台画布", systemImage: "tshirt")
                             }
-                            
+
                             Button {
                                 addNewPage(canvasType: "blank")
                             } label: {
                                 Label("空白画布", systemImage: "square.dashed")
                             }
-                            
+
                             Button {
                                 showingBackgroundPicker = true
                             } label: {
@@ -202,15 +200,15 @@ struct BookDetailView: View {
                         } label: {
                             Label("新增书页", systemImage: "doc.badge.plus")
                         }
-                        
+
                         Button {
                             showingCoverPicker = true
                         } label: {
                             Label("修改封面", systemImage: "photo")
                         }
-                        
+
                         Divider()
-                        
+
                         Button {
                             showingTrash = true
                         } label: {
@@ -252,8 +250,8 @@ struct BookDetailView: View {
             if let image = tempBackgroundImage {
                 ImageCropView(
                     image: image,
-                    aspectRatio: 0.75, // 3:4 aspect ratio
-                    targetWidth: 1080  // Ensure high quality output
+                    aspectRatio: 0.75,
+                    targetWidth: 1080
                 ) { croppedImage in
                      addNewPage(canvasType: "custom", customImage: croppedImage)
                      showingBackgroundCropper = false
@@ -284,8 +282,6 @@ struct BookDetailView: View {
         }
     }
     
-    // MARK: - Actions
-    
     private func movePage(from source: Outfit, to destination: Outfit) {
         var pages = sortedPages
         guard let sourceIndex = pages.firstIndex(where: { $0.id == source.id }),
@@ -297,7 +293,6 @@ struct BookDetailView: View {
             let item = pages.remove(at: sourceIndex)
             pages.insert(item, at: destIndex)
             
-            // Update sort indices
             for (index, page) in pages.enumerated() {
                 page.sortIndex = index
             }
@@ -308,14 +303,11 @@ struct BookDetailView: View {
     
     private func addNewPage(canvasType: String = "mannequin", customImage: UIImage? = nil) {
         let newPage = Outfit(note: "新书页 \(Date().formatted(date: .numeric, time: .shortened))", canvasType: canvasType, book: book)
-        // Set index to be last
         newPage.sortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
         
         if canvasType == "custom", let image = customImage {
-            // Save image with reference counting and compression (handled by ImageManager)
             if let path = ImageManager.shared.saveImage(image, context: modelContext) {
                 newPage.backgroundImagePath = path
-                // Also set snapshot for immediate display
                 newPage.snapshotPath = path
             }
         }
@@ -326,7 +318,6 @@ struct BookDetailView: View {
     private func insertPage(after page: Outfit) {
         let newPage = Outfit(note: "新书页", book: book)
         
-        // Insert logic: shift everyone after this page by 1
         let pages = sortedPages
         if let index = pages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex + 1
@@ -346,7 +337,6 @@ struct BookDetailView: View {
         let pages = sortedPages
         if let index = pages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex
-            // Shift everyone from this index onwards
             for p in pages where p.sortIndex >= page.sortIndex {
                 p.sortIndex += 1
             }
@@ -357,7 +347,7 @@ struct BookDetailView: View {
     
     private func duplicatePage(_ page: Outfit) {
         let newPage = Outfit(note: page.note + " 副本", canvasType: page.canvasType, backgroundImagePath: page.backgroundImagePath, book: book)
-        // Insert after current
+        
         let pages = sortedPages
         if let index = pages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex + 1
@@ -394,185 +384,6 @@ struct BookDetailView: View {
                 await MainActor.run {
                     book.coverImage = path
                     selectedCoverItem = nil
-                }
-            }
-        }
-    }
-}
-
-// Better DropDelegate for Reordering
-struct ReorderableDropDelegate: DropDelegate {
-    let item: Outfit
-    var pages: [Outfit]
-    var onMove: (Outfit, Outfit) -> Void
-    
-    func dropEntered(info: DropInfo) {
-        guard info.hasItemsConforming(to: [.text]) else { return }
-    }
-    
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        return DropProposal(operation: .move)
-    }
-    
-    func validateDrop(info: DropInfo) -> Bool {
-        return info.hasItemsConforming(to: [.text])
-    }
-    
-    func performDrop(info: DropInfo) -> Bool {
-        if let itemProvider = info.itemProviders(for: [.text]).first {
-            itemProvider.loadItem(forTypeIdentifier: "public.text", options: nil) { (data, error) in
-                if let data = data as? Data, let idString = String(data: data, encoding: .utf8), let uuid = UUID(uuidString: idString) {
-                    DispatchQueue.main.async {
-                        if let source = pages.first(where: { $0.id == uuid }) {
-                            onMove(source, item)
-                        }
-                    }
-                }
-            }
-            return true
-        }
-        return false
-    }
-}
-
-// Update the View to use ReorderableDropDelegate
-extension BookDetailView {
-    // Helper to fix the Delegate usage in body
-    func dropDelegate(for page: Outfit) -> some DropDelegate {
-        ReorderableDropDelegate(item: page, pages: sortedPages, onMove: movePage)
-    }
-}
-
-// ... PageThumbnailView and MovePageSheet remain the same ...
-struct PageThumbnailView: View {
-    let page: Outfit
-    var gridMode: BookDetailView.GridMode = .double
-    
-    private var targetSize: CGSize {
-        switch gridMode {
-        case .single:
-            return CGSize(width: 800, height: 1066)
-        case .double:
-            return CGSize(width: 400, height: 533)
-        case .triple:
-            return CGSize(width: 300, height: 400)
-        }
-    }
-    
-    var body: some View {
-        VStack {
-            Group {
-                if let path = page.snapshotPath {
-                    // Use AsyncDownsampledImage for efficient loading and display
-                    AsyncDownsampledImage(
-                        fileName: path,
-                        targetSize: targetSize,
-                        content: { uiImage in
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                        },
-                        placeholder: {
-                            // If snapshotPath exists but image is loading or failed
-                            // We should also show the placeholder view to avoid black screen
-                            placeholderView
-                                .overlay {
-                                    ProgressView()
-                                }
-                        }
-                    )
-                } else {
-                    // No snapshot available, show type-specific placeholder
-                    placeholderView
-                }
-            }
-            .aspectRatio(0.75, contentMode: .fit) // 3:4 aspect ratio (Canvas size)
-            .frame(maxWidth: .infinity)
-            .background(Color.white)
-            .cornerRadius(8)
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-            
-            Text(page.note)
-                .font(.caption)
-                .lineLimit(1)
-                .foregroundStyle(.primary)
-        }
-        .padding(8)
-    }
-    
-    @ViewBuilder
-    private var placeholderView: some View {
-        switch page.canvasType {
-        case "mannequin":
-            ZStack {
-                Color.white
-                Image(systemName: "tshirt")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.gray.opacity(0.3))
-                Text("人台")
-                    .font(.caption2)
-                    .foregroundStyle(.gray)
-                    .offset(y: 24)
-            }
-        case "blank":
-            ZStack {
-                Color.white
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [4]))
-                    .foregroundStyle(.gray.opacity(0.3))
-                    .padding(16)
-                Text("空白")
-                    .font(.caption2)
-                    .foregroundStyle(.gray)
-            }
-        case "custom":
-            ZStack {
-                Color.white
-                Image(systemName: "photo")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.gray.opacity(0.3))
-                Text("图片丢失")
-                    .font(.caption2)
-                    .foregroundStyle(.gray)
-                    .offset(y: 24)
-            }
-        default:
-            ZStack {
-                Color.white
-                Image(systemName: "doc.text")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.gray.opacity(0.3))
-            }
-        }
-    }
-}
-
-struct MovePageSheet: View {
-    let page: Outfit
-    let currentBook: BookGroup
-    @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }) private var books: [BookGroup]
-    
-    var body: some View {
-        NavigationStack {
-            List(books) { targetBook in
-                if targetBook.id != currentBook.id {
-                    Button {
-                        page.book = targetBook
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Text(targetBook.title)
-                            Spacer()
-                            Text("\(targetBook.pages.filter({ !$0.isDeleted }).count) 页").foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("移动到...")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
                 }
             }
         }
