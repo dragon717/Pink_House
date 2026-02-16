@@ -452,6 +452,9 @@ struct SpatialCanvasEditorView: View {
         case .settings:
             // TODO: 打开设置
             break
+        case .resetCamera:
+            // 重置相机视角已在工具栏按钮中处理
+            break
         }
     }
     

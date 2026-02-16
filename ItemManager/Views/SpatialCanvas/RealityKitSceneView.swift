@@ -154,13 +154,17 @@ public struct RealityKitSceneView: View {
             // 手势控制层
             CameraGestureView(controller: cameraController)
             
+            // 提示信息 - 右下角，避开安全区域
             VStack {
                 Spacer()
                 HStack {
-                    CameraControlHint()
                     Spacer()
+                    CameraControlHint()
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 100) // 避开底部导航栏
                 }
             }
+            .ignoresSafeArea(.container, edges: .bottom)
         }
     }
     
