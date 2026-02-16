@@ -3,6 +3,7 @@
 //  ItemManager
 //
 //  多选图片选择器 - 使用系统原生 PhotosPicker
+//  支持从图库多选图片并实时预览
 //
 
 import SwiftUI
@@ -14,6 +15,8 @@ struct MultiImagePicker: View {
     var onComplete: () -> Void
     
     @State private var isLoading = false
+    @State private var selectedImages: [UIImage] = []
+    @State private var showMaxSelectionAlert = false
     
     // 3DGS建议的最小图片数
     private let minRecommendedImages = 20
@@ -23,44 +26,14 @@ struct MultiImagePicker: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // 顶部提示
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: "cube.transparent")
-                            .font(.title2)
-                            .foregroundStyle(.purple)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("3D高斯泼溅建模")
-                                .font(.headline)
-                            Text("选择 \(minRecommendedImages)+ 张图片以获得最佳效果")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding()
-                    .background(Color.purple.opacity(0.1))
-                    
-                    // 已选数量指示
-                    HStack {
-                        Text("已选择 \(selectedItems.count) 张图片")
-                            .font(.subheadline)
-                        
-                        Spacer()
-                        
-                        if selectedItems.count < minRecommendedImages {
-                            Text("建议至少 \(minRecommendedImages) 张")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        } else {
-                            Text("✓ 数量充足")
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
+                headerView
+                
+                Divider()
+                
+                // 已选图片预览区域
+                if !selectedItems.isEmpty {
+                    selectedImagesPreview
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 
                 Spacer()
@@ -78,12 +51,18 @@ struct MultiImagePicker: View {
                             .font(.system(size: 60))
                             .foregroundStyle(.purple)
                         
-                        Text("从图库选择")
+                        Text(selectedItems.isEmpty ? "从图库选择" : "已选择 \(selectedItems.count) 张图片")
                             .font(.headline)
                         
-                        Text("最多可选择 \(maxImages) 张图片")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if selectedItems.isEmpty {
+                            Text("最多可选择 \(maxImages) 张图片")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("点击继续添加更多图片")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.gray.opacity(0.1))
@@ -94,42 +73,7 @@ struct MultiImagePicker: View {
                 Spacer()
                 
                 // 底部操作栏
-                VStack(spacing: 12) {
-                    // 快速清空按钮
-                    HStack {
-                        Button {
-                            clearSelection()
-                        } label: {
-                            Label("清空选择", systemImage: "xmark.circle")
-                                .font(.subheadline)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(selectedItems.isEmpty)
-                        
-                        Spacer()
-                    }
-                    
-                    // 确认按钮
-                    Button {
-                        confirmSelection()
-                    } label: {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("确认选择 (\(selectedItems.count))")
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(
-                            selectedItems.count >= minRecommendedImages ? Color.purple : Color.gray
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .disabled(selectedItems.isEmpty || isLoading)
-                }
-                .padding()
-                .background(.ultraThinMaterial)
+                bottomActionBar
             }
             .navigationTitle("选择图片")
             .navigationBarTitleDisplayMode(.inline)
@@ -140,11 +84,205 @@ struct MultiImagePicker: View {
                     }
                 }
             }
+            .alert("选择数量限制", isPresented: $showMaxSelectionAlert) {
+                Button("确定", role: .cancel) {}
+            } message: {
+                Text("一次最多只能选择 \(maxImages) 张图片")
+            }
+            .onChange(of: selectedItems) { _, newItems in
+                if newItems.count > maxImages {
+                    showMaxSelectionAlert = true
+                    selectedItems = Array(newItems.prefix(maxImages))
+                }
+                // 加载选中图片的预览
+                loadSelectedImages()
+            }
         }
+    }
+    
+    // MARK: - 顶部提示视图
+    private var headerView: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "cube.transparent")
+                    .font(.title2)
+                    .foregroundStyle(.purple)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("3D高斯泼溅建模")
+                        .font(.headline)
+                    Text("选择 \(minRecommendedImages)+ 张图片以获得最佳效果")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+            }
+            .padding()
+            .background(Color.purple.opacity(0.1))
+            
+            // 已选数量指示
+            HStack {
+                Text("已选择 \(selectedItems.count) 张图片")
+                    .font(.subheadline)
+                
+                Spacer()
+                
+                if selectedItems.count < minRecommendedImages {
+                    Text("建议至少 \(minRecommendedImages) 张")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("✓ 数量充足")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+    }
+    
+    // MARK: - 已选图片预览
+    private var selectedImagesPreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("已选图片预览")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                Text("\(selectedItems.count)/\(maxImages)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                        selectedImageCell(image: image, index: index)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            .frame(height: 120)
+        }
+        .background(Color.gray.opacity(0.03))
+    }
+    
+    // MARK: - 单个已选图片单元格
+    private func selectedImageCell(image: UIImage, index: Int) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 100, height: 100)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.purple.opacity(0.3), lineWidth: 2)
+                )
+            
+            // 序号标签
+            Text("\(index + 1)")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.purple)
+                .clipShape(Capsule())
+                .padding(4)
+            
+            // 删除按钮
+            Button {
+                removeItem(at: index)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white, Color.red.opacity(0.8))
+                    .shadow(radius: 2)
+            }
+            .padding(4)
+            .offset(x: 8, y: -8)
+        }
+    }
+    
+    // MARK: - 底部操作栏
+    private var bottomActionBar: some View {
+        VStack(spacing: 12) {
+            // 快速清空按钮
+            HStack {
+                Button {
+                    clearSelection()
+                } label: {
+                    Label("清空选择", systemImage: "xmark.circle")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.bordered)
+                .disabled(selectedItems.isEmpty)
+                
+                Spacer()
+            }
+            
+            // 确认按钮
+            Button {
+                confirmSelection()
+            } label: {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("确认选择 (\(selectedItems.count))")
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    selectedItems.count >= minRecommendedImages ? Color.purple : Color.gray
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .disabled(selectedItems.isEmpty || isLoading)
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+    }
+    
+    // MARK: - 加载已选图片
+    private func loadSelectedImages() {
+        Task {
+            var images: [UIImage] = []
+            for item in selectedItems {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    images.append(image)
+                }
+            }
+            await MainActor.run {
+                selectedImages = images
+            }
+        }
+    }
+    
+    // MARK: - 移除指定位置的图片
+    private func removeItem(at index: Int) {
+        guard index < selectedItems.count && index < selectedImages.count else { return }
+        selectedItems.remove(at: index)
+        selectedImages.remove(at: index)
     }
     
     private func clearSelection() {
         selectedItems.removeAll()
+        selectedImages.removeAll()
     }
     
     private func confirmSelection() {
@@ -338,13 +476,35 @@ struct ContinuousCameraCaptureView: View {
             setupCamera()
         }
         .onDisappear {
-            if let session = session {
-                if session.isRunning {
-                    session.stopRunning()
-                }
-            }
+            // 彻底清理相机会话，释放所有资源
+            cleanupCamera()
         }
         .lockOrientation(.portrait)
+    }
+    
+    /// 彻底清理相机资源
+    private func cleanupCamera() {
+        // 停止会话
+        if let session = session {
+            if session.isRunning {
+                session.stopRunning()
+            }
+            // 移除所有输入和输出
+            for input in session.inputs {
+                session.removeInput(input)
+            }
+            for output in session.outputs {
+                session.removeOutput(output)
+            }
+        }
+        
+        // 清理引用
+        session = nil
+        photoOutput = nil
+        captureDelegate = nil
+        previewLayer = nil
+        
+        print("[Camera] 相机资源已彻底清理")
     }
 
     private func setupCamera() {
@@ -441,14 +601,26 @@ struct ContinuousCameraCaptureView: View {
         
         isCapturing = true
         
+        // 使用更高效的设置，减少内存占用
         let settings = AVCapturePhotoSettings()
-        let delegate = PhotoCaptureDelegate { [self] image in
-            DispatchQueue.main.async {
+        // 使用 JPEG 格式减少内存占用
+        settings.isHighResolutionPhotoEnabled = false
+        // 禁用实时照片以减少资源占用
+        if #available(iOS 16.0, *) {
+            settings.livePhotoMovieFileURL = nil
+        }
+        
+        // 捕获当前状态的引用，避免在闭包中捕获 self
+        let capturedImagesRef = capturedImages
+        let delegate = PhotoCaptureDelegate { [capturedImagesRef] image in
+            DispatchQueue.main.async { [self] in
                 if let image = image {
-                    capturedImages.append(image)
-                    captureCount = capturedImages.count
+                    self.capturedImages.append(image)
+                    self.captureCount = self.capturedImages.count
                 }
-                isCapturing = false
+                self.isCapturing = false
+                // 释放 delegate 引用，避免内存累积
+                self.captureDelegate = nil
             }
         }
         captureDelegate = delegate
@@ -472,13 +644,48 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
             return
         }
         
-        guard let imageData = photo.fileDataRepresentation(),
-              let image = UIImage(data: imageData) else {
-            completion(nil)
-            return
+        // 在后台线程处理图像数据，避免阻塞主线程
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            guard let imageData = photo.fileDataRepresentation(),
+                  let image = UIImage(data: imageData) else {
+                DispatchQueue.main.async {
+                    self.completion(nil)
+                }
+                return
+            }
+            
+            // 压缩图像以减少内存占用
+            let maxDimension: CGFloat = 2048
+            let scaledImage = self.scaleImage(image, toMaxDimension: maxDimension)
+            
+            DispatchQueue.main.async {
+                self.completion(scaledImage)
+            }
+        }
+    }
+    
+    /// 缩放图像到最大尺寸
+    private func scaleImage(_ image: UIImage, toMaxDimension maxDimension: CGFloat) -> UIImage {
+        let size = image.size
+        
+        // 如果图像已经小于最大尺寸，直接返回
+        if size.width <= maxDimension && size.height <= maxDimension {
+            return image
         }
         
-        completion(image)
+        // 计算缩放比例
+        let scale = min(maxDimension / size.width, maxDimension / size.height)
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        
+        // 使用 UIGraphicsImageRenderer 进行高质量缩放
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let scaledImage = renderer.image { context in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        
+        return scaledImage
     }
 }
 

@@ -84,6 +84,18 @@ struct ClothingCard: View, Equatable {
                         .aspectRatio(1, contentMode: .fit)
                 }
                 
+                // 3D模型标签
+                if clothing.is3DModel, let typeDesc = clothing.model3DTypeDescription {
+                    Text(typeDesc)
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(Color.purple.opacity(0.9))
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .padding(8)
+                }
+                
                 if clothing.isDepositPlan {
                     Text("尾款天使")
                         .font(.system(size: 10, weight: .medium))

@@ -34,6 +34,9 @@ struct ClothingListView: View {
     
     @State private var viewLayout: ViewLayout = .listDetailed
     
+    // 3D模型筛选
+    @State private var showOnly3DModels = false
+    
     // 价格显示设置 - 使用单例管理器
     //@ObservedObject private var privacyManager = PrivacyManager.shared
     
@@ -112,7 +115,10 @@ struct ClothingListView: View {
             
             let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
+            // 3D模型筛选
+            let matches3DFilter: Bool = !showOnly3DModels || clothing.is3DModel
+            
+            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matches3DFilter
         }
     }
     
@@ -325,6 +331,15 @@ struct ClothingListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
+                        // 3D模型筛选按钮
+                        Button {
+                            showOnly3DModels.toggle()
+                        } label: {
+                            Label("3D模型", systemImage: "cube.box")
+                                .symbolVariant(showOnly3DModels ? .fill : .none)
+                        }
+                        .foregroundStyle(showOnly3DModels ? .purple : .primary)
+                        
                         Menu {
                             Picker("布局", selection: $viewLayout) {
                                 ForEach(ViewLayout.allCases) { layout in

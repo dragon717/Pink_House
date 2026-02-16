@@ -57,6 +57,11 @@ final class Clothing {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     
+    // 3D模型信息
+    var model3DPath: String? = nil // 3D模型文件路径
+    var model3DType: String? = nil // 3D模型类型: "multi"(多图3D), "single"(单图3D)
+    var model3DThumbnailPath: String? = nil // 3D模型缩略图路径
+    
     @Relationship(deleteRule: .nullify)
     var tags: [Tag]? = []
     
@@ -68,6 +73,23 @@ final class Clothing {
     
     // Removed direct relationship to prevent SwiftData side effects on deletion
     // var cutouts: [CutoutItem] = []
+    
+    // MARK: - 3D模型相关计算属性
+    
+    /// 是否是3D模型
+    var is3DModel: Bool {
+        return model3DPath != nil
+    }
+    
+    /// 3D模型类型描述
+    var model3DTypeDescription: String? {
+        guard is3DModel else { return nil }
+        switch model3DType {
+        case "multi": return "3D"
+        case "single": return "单向"
+        default: return "3D"
+        }
+    }
     
     init(name: String,
          brand: Brand? = nil,

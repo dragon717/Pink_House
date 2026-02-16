@@ -2,13 +2,14 @@
 //  SpatialCanvasEditorView.swift
 //  ItemManager
 //
-//  空间画布编辑器 - 支持3D高斯泼溅建模 (Metal版)
+//  空间画布编辑器 - 支持 Object Capture 3D建模 (RealityKit版)
 //
 
 import SwiftUI
 import SwiftData
 import PhotosUI
-import MetalKit
+import RealityKit
+import ARKit
 import simd
 import Combine
 
@@ -24,6 +25,9 @@ struct SpatialCanvasEditorView: View {
     
     // MARK: - State
     
+    // 当前编辑的 SpaceOutfit（用于新建场景时）
+    @State private var currentOutfit: SpaceOutfit?
+    
     // 3D场景状态 - 使用新的 Metal SceneObject
     @State private var sceneObjects: [SceneObject] = []
     @State private var selectedObject: SceneObject?
@@ -35,15 +39,17 @@ struct SpatialCanvasEditorView: View {
     // 图片采集状态
     @State private var showingImagePicker = false
     @State private var showingCameraCapture = false
+    @State private var showingObjectCaptureScanner = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var capturedImages: [UIImage] = []
     
-    // 高斯泼溅建模状态
+    // Object Capture 建模状态
     @State private var isProcessing3DGS = false
     @State private var processingStage: GSProcessingStage = .idle
     
     // 返回确认
     @State private var showingBackConfirmation = false
+    @State private var showingClearConfirmation = false
     @State private var hasUnsavedChanges = false
     @State private var processingProgress: Double = 0.0
     
@@ -76,9 +82,9 @@ struct SpatialCanvasEditorView: View {
             // 背景 - 根据暗黑模式调整
             editorBackground.ignoresSafeArea()
 
-            // 3D场景视图 - 使用新的 Metal SpatialSceneView
+            // 3D场景视图 - 使用 RealityKit
             GeometryReader { geometry in
-                SpatialSceneView(
+                RealityKitSceneView(
                     selectedObject: $selectedObject,
                     objects: $sceneObjects,
                     onObjectTap: handleObjectTap,
@@ -159,7 +165,13 @@ struct SpatialCanvasEditorView: View {
             if isProcessing3DGS {
                 GSProcessingOverlay(
                     stage: processingStage,
-                    progress: processingProgress
+                    progress: processingProgress,
+                    onDismiss: {
+                        if case .failed = processingStage {
+                            isProcessing3DGS = false
+                            processingStage = .idle
+                        }
+                    }
                 )
             }
         }
@@ -177,8 +189,8 @@ struct SpatialCanvasEditorView: View {
             MultiImagePicker(
                 selectedItems: $selectedPhotoItems,
                 onComplete: {
-                    // 处理选中的图片
-                    handleSelectedImages([])
+                    // 从 PhotosPickerItem 异步加载图片
+                    loadImagesFromPickerItems(selectedPhotoItems)
                 }
             )
         }
@@ -186,10 +198,14 @@ struct SpatialCanvasEditorView: View {
             ContinuousCameraCaptureView(
                 capturedImages: $capturedImages,
                 onComplete: {
-                    // 处理拍摄的图片
-                    handleCapturedImages([])
+                    handleCapturedImages(capturedImages)
                 }
             )
+        }
+        .fullScreenCover(isPresented: $showingObjectCaptureScanner) {
+            ObjectCaptureScannerView { imageDirectory in
+                processObjectCaptureDirectory(imageDirectory)
+            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -212,32 +228,54 @@ struct SpatialCanvasEditorView: View {
             }
             
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
+                HStack(spacing: 12) {
+                    // 保存按钮
                     Button {
                         saveScene()
-                        hasUnsavedChanges = false
                     } label: {
                         Label("保存", systemImage: "checkmark.circle")
+                            .symbolVariant(hasUnsavedChanges ? .none : .fill)
                     }
-
+                    .foregroundStyle(hasUnsavedChanges ? .purple : .secondary)
+                    .disabled(!hasUnsavedChanges)
+                    
+                    // 清空场景按钮
                     Button {
-                        // 导出功能
+                        showingClearConfirmation = true
                     } label: {
-                        Label("导出", systemImage: "square.and.arrow.up")
+                        Label("清空", systemImage: "trash")
                     }
+                    .foregroundStyle(.red)
+                    .disabled(sceneObjects.isEmpty)
+                    
+                    // 更多选项菜单
+                    Menu {
+                        Button {
+                            saveScene()
+                        } label: {
+                            Label("保存场景", systemImage: "checkmark.circle")
+                        }
+                        .disabled(!hasUnsavedChanges)
 
-                    Divider()
+                        Button {
+                            showingClearConfirmation = true
+                        } label: {
+                            Label("清空场景", systemImage: "trash")
+                        }
+                        .disabled(sceneObjects.isEmpty)
 
-                    Button(role: .destructive) {
-                        // 清空场景
-                        sceneObjects.removeAll()
+                        Divider()
+
+                        Button {
+                            // 导出功能
+                        } label: {
+                            Label("导出", systemImage: "square.and.arrow.up")
+                        }
                     } label: {
-                        Label("清空场景", systemImage: "trash")
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.primary)
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.primary)
                 }
             }
         }
@@ -254,6 +292,17 @@ struct SpatialCanvasEditorView: View {
         } message: {
             Text("您有未保存的更改，是否保存？")
         }
+        .confirmationDialog("清空场景？", isPresented: $showingClearConfirmation, titleVisibility: .visible) {
+            Button("清空", role: .destructive) {
+                sceneObjects.removeAll()
+                selectedObject = nil
+                hasUnsavedChanges = true
+                print("[Scene] 场景已清空（未保存）")
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("确定要清空场景中的所有模型吗？此操作不会删除已保存的数据。")
+        }
         .interactiveDismissDisabled(hasUnsavedChanges)
     }
 
@@ -261,21 +310,35 @@ struct SpatialCanvasEditorView: View {
     
     private func loadExistingData() {
         guard let outfit = spaceOutfit else { return }
+        let outfitId = outfit.id
         
-        // 加载3D模型
-        if let modelPath = outfit.modelPath {
-            load3DModel(from: modelPath)
+        // 从 SceneObjectData 加载所有场景对象
+        if let objectDataList = try? modelContext.fetch(
+            FetchDescriptor<SceneObjectData>(
+                predicate: #Predicate<SceneObjectData> { $0.spaceOutfit?.id == outfitId },
+                sortBy: [SortDescriptor(\.sortIndex)]
+            )
+        ) {
+            // 清空当前场景
+            sceneObjects.removeAll()
+            
+            // 加载保存的对象
+            for objectData in objectDataList {
+                let object = objectData.toSceneObject()
+                sceneObjects.append(object)
+            }
+            
+            print("[Scene] 加载了 \(objectDataList.count) 个对象")
         }
     }
     
-    private func load3DModel(from path: String) {
-        // 创建新的 SceneObject
+    private func loadUSDZModel(from path: String) {
         let object = SceneObject(
-            type: .gsModel,
+            type: .usdzModel,
             position: SIMD3<Float>(0, 0, 0),
             rotation: SIMD3<Float>(0, 0, 0),
             scale: SIMD3<Float>(1, 1, 1),
-            gsModelPath: path
+            usdzModelPath: path
         )
         sceneObjects.append(object)
     }
@@ -308,26 +371,20 @@ struct SpatialCanvasEditorView: View {
         case .gallery:
             showingImagePicker = true
         case .camera:
-            showingCameraCapture = true
-        case .gsModel:
-            // 启动3DGS建模流程
-            start3DGSProcessing()
+            showingObjectCaptureScanner = true
+        case .usdzModel:
+            showingImagePicker = true
         case .light:
-            // TODO: 添加灯光
             break
         case .text:
-            // TODO: 添加文字
             break
         case .material:
-            // TODO: 选择材质
             break
         case .clothing:
             showingAssetPanel = true
         case .effect:
-            // TODO: 添加特效
             break
         case .template:
-            // TODO: 选择模板
             break
         case .transform:
             showingToolPanel = true
@@ -341,8 +398,20 @@ struct SpatialCanvasEditorView: View {
     }
     
     private func handleAssetSelect(_ asset: SpatialAsset) {
-        // 处理素材选择
         hasUnsavedChanges = true
+        
+        switch asset.type {
+        case .clothing:
+            if let modelPath = asset.metadata["modelPath"] {
+                loadUSDZModel(from: modelPath)
+            }
+        case .effect:
+            print("[Asset] 选择特效: \(asset.name)")
+        case .template:
+            print("[Asset] 选择模板: \(asset.name)")
+        case .material:
+            print("[Asset] 选择材质: \(asset.name)")
+        }
     }
     
     private func handleSelectedImages(_ images: [UIImage]) {
@@ -357,7 +426,37 @@ struct SpatialCanvasEditorView: View {
         start3DGSProcessing()
     }
     
-    // MARK: - 3DGS Processing
+    /// 从 PhotosPickerItem 异步加载图片
+    private func loadImagesFromPickerItems(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        
+        isProcessing3DGS = true
+        processingStage = .preparing
+        processingProgress = 0.0
+        
+        Task {
+            var loadedImages: [UIImage] = []
+            
+            for (index, item) in items.enumerated() {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    loadedImages.append(image)
+                }
+                
+                // 更新进度
+                await MainActor.run {
+                    processingProgress = Double(index + 1) / Double(items.count) * 0.3
+                }
+            }
+            
+            await MainActor.run {
+                capturedImages = loadedImages
+                start3DGSProcessing()
+            }
+        }
+    }
+    
+    // MARK: - Object Capture Processing
     
     private func start3DGSProcessing() {
         guard !capturedImages.isEmpty else { return }
@@ -366,30 +465,144 @@ struct SpatialCanvasEditorView: View {
         processingStage = .preparing
         processingProgress = 0.0
         
-        // 模拟处理进度
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            processingStage = .processing
-            processingProgress = 0.3
+        Task {
+            do {
+                let usdzURL = try await ObjectCaptureService.shared.processImagesWithFallback(capturedImages)
+                
+                await MainActor.run {
+                    processingStage = .complete
+                    processingProgress = 1.0
+                    isProcessing3DGS = false
+                    
+                    saveUSDZModelAndCreateClothing(usdzURL: usdzURL, images: capturedImages)
+                }
+            } catch {
+                await MainActor.run {
+                    processingStage = .failed(error.localizedDescription)
+                    isProcessing3DGS = false
+                    print("[ObjectCapture] 处理失败: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func processObjectCaptureDirectory(_ imageDirectory: URL) {
+        isProcessing3DGS = true
+        processingStage = .processing
+        processingProgress = 0.0
+        
+        Task {
+            do {
+                let usdzURL = try await ObjectCaptureService.shared.processImagesFromDirectory(imageDirectory)
+                
+                await MainActor.run {
+                    processingStage = .complete
+                    processingProgress = 1.0
+                    isProcessing3DGS = false
+                    
+                    let object = SceneObject(
+                        type: .usdzModel,
+                        position: SIMD3<Float>(0, 0, 0),
+                        rotation: SIMD3<Float>(0, 0, 0),
+                        scale: SIMD3<Float>(1, 1, 1),
+                        usdzModelPath: usdzURL.path
+                    )
+                    sceneObjects.append(object)
+                    hasUnsavedChanges = true
+                    
+                    print("[ObjectCapture] 模型已添加到场景: \(usdzURL.path)")
+                }
+            } catch {
+                await MainActor.run {
+                    processingStage = .failed(error.localizedDescription)
+                    isProcessing3DGS = false
+                    print("[ObjectCapture] 处理失败: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func saveUSDZModelAndCreateClothing(usdzURL: URL, images: [UIImage]) {
+        let modelID = UUID()
+        
+        let thumbnailPath = saveThumbnail(from: images.first, modelID: modelID)
+        
+        let imagePaths = saveSourceImages(images, modelID: modelID)
+        
+        let clothing = Clothing(
+            name: "3D模型 \(modelID.uuidString.prefix(8))",
+            types: "3D模型",
+            imagePaths: imagePaths,
+            status: .onShelf
+        )
+        clothing.model3DPath = usdzURL.path
+        clothing.model3DType = "usdz"
+        clothing.model3DThumbnailPath = thumbnailPath
+        
+        modelContext.insert(clothing)
+        
+        let object = SceneObject(
+            type: .usdzModel,
+            position: SIMD3<Float>(0, 0, 0),
+            rotation: SIMD3<Float>(0, 0, 0),
+            scale: SIMD3<Float>(1, 1, 1),
+            usdzModelPath: usdzURL.path
+        )
+        sceneObjects.append(object)
+        
+        hasUnsavedChanges = true
+        
+        print("[ObjectCapture] 创建3D模型记录: \(modelID)")
+    }
+    
+    /// 保存缩略图
+    private func saveThumbnail(from image: UIImage?, modelID: UUID) -> String? {
+        guard let image = image else { return nil }
+        
+        let fileManager = FileManager.default
+        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            processingProgress = 0.7
+        let modelDir = documentsPath.appendingPathComponent("Models/\(modelID.uuidString)")
+        try? fileManager.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        
+        // 压缩缩略图
+        let thumbnailSize = CGSize(width: 200, height: 200)
+        let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+        let thumbnail = renderer.image { context in
+            image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            processingStage = .finalizing
-            processingProgress = 0.9
+        let thumbnailPath = modelDir.appendingPathComponent("thumbnail.jpg")
+        if let data = thumbnail.jpegData(compressionQuality: 0.8) {
+            try? data.write(to: thumbnailPath)
+            return thumbnailPath.path
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-            processingStage = .complete
-            processingProgress = 1.0
-            isProcessing3DGS = false
-            
-            // 创建示例模型路径 (实际应该从处理结果获取)
-            let modelPath = "path/to/generated/model.ply"
-            load3DModel(from: modelPath)
+        return nil
+    }
+    
+    /// 保存源图片
+    private func saveSourceImages(_ images: [UIImage], modelID: UUID) -> [String] {
+        let fileManager = FileManager.default
+        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return []
         }
+        
+        let modelDir = documentsPath.appendingPathComponent("Models/\(modelID.uuidString)/source")
+        try? fileManager.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        
+        var paths: [String] = []
+        for (index, image) in images.enumerated() {
+            let imagePath = modelDir.appendingPathComponent("image_\(index).jpg")
+            if let data = image.jpegData(compressionQuality: 0.9) {
+                try? data.write(to: imagePath)
+                paths.append(imagePath.path)
+            }
+        }
+        
+        return paths
     }
     
     // MARK: - Transform
@@ -424,17 +637,68 @@ struct SpatialCanvasEditorView: View {
     // MARK: - Save
     
     private func saveScene() {
-        // 保存场景数据
-        if let outfit = spaceOutfit {
-            // 更新现有的 SpaceOutfit
-            // outfit.modelPath = ...
-            // modelContext.save()
+        guard !sceneObjects.isEmpty else {
+            print("[Scene] 场景为空，无需保存")
+            return
+        }
+        
+        // 获取或创建 SpaceOutfit
+        let outfit: SpaceOutfit
+        if let existingOutfit = spaceOutfit {
+            outfit = existingOutfit
+        } else if let current = currentOutfit {
+            outfit = current
+        } else {
+            outfit = SpaceOutfit(note: "3D场景 \(Date().formatted(date: .abbreviated, time: .shortened))")
+            modelContext.insert(outfit)
+            currentOutfit = outfit
+        }
+        
+        // 删除旧的场景对象数据
+        let outfitId = outfit.id
+        if let existingObjects = try? modelContext.fetch(
+            FetchDescriptor<SceneObjectData>(
+                predicate: #Predicate<SceneObjectData> { $0.spaceOutfit?.id == outfitId }
+            )
+        ) {
+            for obj in existingObjects {
+                modelContext.delete(obj)
+            }
+        }
+        
+        // 保存新的场景对象
+        for (index, object) in sceneObjects.enumerated() {
+            let objectData = SceneObjectData(
+                id: object.id,
+                objectType: object.type == .primitive ? "primitive" : "usdzModel",
+                position: object.position,
+                rotation: object.rotation,
+                scale: object.scale,
+                usdzModelPath: object.usdzModelPath,
+                color: object.color,
+                sortIndex: index,
+                spaceOutfit: outfit
+            )
+            modelContext.insert(objectData)
+        }
+        
+        // 保存第一个模型的路径到 SpaceOutfit
+        if let firstObject = sceneObjects.first,
+           let modelPath = firstObject.usdzModelPath {
+            outfit.modelPath = modelPath
+        }
+        
+        // 保存上下文
+        do {
+            try modelContext.save()
+            hasUnsavedChanges = false
+            print("[Scene] 场景保存成功，共 \(sceneObjects.count) 个对象")
+        } catch {
+            print("[Scene] 保存失败: \(error)")
         }
         
         // 调用保存回调
-        if let outfit = spaceOutfit {
-            onSave?(outfit)
-        }
+        onSave?(outfit)
     }
 }
 

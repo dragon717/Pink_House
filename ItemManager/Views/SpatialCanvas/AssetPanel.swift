@@ -245,53 +245,93 @@ struct CategoryTab: View {
     }
 }
 
-// MARK: - 服饰素材列表
+// MARK: - 服饰素材列表 (只显示3D模型)
 
 struct ClothingAssetList: View {
     let searchText: String
     let onSelect: (SpatialAsset) -> Void
     
-    @Query(filter: #Predicate<CutoutItem> { $0.category != "已删除" }) private var cutouts: [CutoutItem]
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil && $0.model3DPath != nil }) private var clothing3DModels: [Clothing]
     
-    var filteredCutouts: [CutoutItem] {
+    var filteredClothing: [Clothing] {
         if searchText.isEmpty {
-            return cutouts
+            return clothing3DModels
         }
-        return cutouts.filter { cutout in
-            (cutout.clothingName?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-            cutout.category.localizedCaseInsensitiveContains(searchText)
+        return clothing3DModels.filter { clothing in
+            clothing.name.localizedCaseInsensitiveContains(searchText) ||
+            clothing.types.localizedCaseInsensitiveContains(searchText)
         }
     }
     
     var body: some View {
         VStack(spacing: 12) {
-            ForEach(filteredCutouts.prefix(20)) { cutout in
-                ClothingAssetCard(cutout: cutout) {
-                    let asset = SpatialAsset(
-                        type: .clothing,
-                        name: cutout.clothingName ?? "未命名",
-                        imagePath: cutout.imagePath,
-                        thumbnail: ImageManager.shared.loadImage(fileName: cutout.imagePath),
-                        metadata: ["category": cutout.category]
-                    )
-                    onSelect(asset)
+            if filteredClothing.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "cube.box")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("暂无3D模型")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("使用相机拍摄20+张照片\n或从图库选择图片生成3D模型")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 40)
+            } else {
+                ForEach(filteredClothing.prefix(20)) { clothing in
+                    Clothing3DAssetCard(clothing: clothing) {
+                        let asset = SpatialAsset(
+                            type: .clothing,
+                            name: clothing.name,
+                            imagePath: clothing.model3DThumbnailPath,
+                            thumbnail: loadThumbnail(for: clothing),
+                            metadata: [
+                                "modelPath": clothing.model3DPath ?? "",
+                                "modelType": clothing.model3DType ?? "multi",
+                                "typeDescription": clothing.model3DTypeDescription ?? "3D"
+                            ]
+                        )
+                        onSelect(asset)
+                    }
                 }
             }
         }
     }
+    
+    private func loadThumbnail(for clothing: Clothing) -> UIImage? {
+        if let thumbnailPath = clothing.model3DThumbnailPath {
+            return ImageManager.shared.loadImage(fileName: thumbnailPath)
+        }
+        if let firstImagePath = clothing.imagePaths.first {
+            return ImageManager.shared.loadImage(fileName: firstImagePath)
+        }
+        return nil
+    }
 }
 
-// MARK: - 服饰卡片
+// MARK: - 3D服饰卡片
 
-struct ClothingAssetCard: View {
-    let cutout: CutoutItem
+struct Clothing3DAssetCard: View {
+    let clothing: Clothing
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 // 缩略图
-                if let image = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
+                if let thumbnailPath = clothing.model3DThumbnailPath,
+                   let image = ImageManager.shared.loadImage(fileName: thumbnailPath) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if let firstImagePath = clothing.imagePaths.first,
+                          let image = ImageManager.shared.loadImage(fileName: firstImagePath) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -299,22 +339,34 @@ struct ClothingAssetCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.3))
+                        .fill(Color.purple.opacity(0.3))
                         .frame(width: 60, height: 60)
                         .overlay(
-                            Image(systemName: "tshirt")
-                                .foregroundStyle(.secondary)
+                            Image(systemName: "cube.box")
+                                .foregroundStyle(.purple)
                         )
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(cutout.clothingName ?? "未命名")
+                    Text(clothing.name)
                         .font(.subheadline)
                         .lineLimit(1)
                     
-                    Text(cutout.category)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        // 3D类型标签
+                        Text(clothing.model3DTypeDescription ?? "3D")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.2))
+                            .foregroundStyle(.purple)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        
+                        Text(clothing.types)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 
                 Spacer()

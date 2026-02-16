@@ -16,6 +16,7 @@ class SharedPersistence {
     // 使用默认配置，即存储在 App 的 Documents/Library 目录，不共享
     // 这样保证了数据安全且无需迁移现有数据
     var sharedModelContainer: ModelContainer = {
+        #if WIDGET_EXTENSION
         let schema = Schema([
             Clothing.self,
             Item.self,
@@ -29,6 +30,22 @@ class SharedPersistence {
             SpaceBookGroup.self,
             SpaceOutfit.self
         ])
+        #else
+        let schema = Schema([
+            Clothing.self,
+            Item.self,
+            Tag.self,
+            Brand.self,
+            AccessoryItem.self,
+            CutoutItem.self,
+            Outfit.self,
+            OutfitItem.self,
+            BookGroup.self,
+            SpaceBookGroup.self,
+            SpaceOutfit.self,
+            SceneObjectData.self
+        ])
+        #endif
         
         // 检查 iCloud 同步设置
         // let isCloudSyncEnabled = UserDefaults.standard.bool(forKey: "useCloudSync")

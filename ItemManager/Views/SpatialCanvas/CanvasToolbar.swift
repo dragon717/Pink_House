@@ -15,7 +15,7 @@ struct CanvasToolbar: View {
     // 工具分组
     private let toolGroups: [[CanvasTool]] = [
         [.select],
-        [.image, .camera, .gsModel],
+        [.image, .camera, .usdzModel],
         [.light, .text],
         [.material, .clothing, .effect, .template],
         [.record, .settings]

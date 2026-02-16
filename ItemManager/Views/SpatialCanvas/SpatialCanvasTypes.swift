@@ -14,7 +14,7 @@ enum CanvasTool: String, CaseIterable {
     case image = "图片"
     case gallery = "图库"
     case camera = "相机"
-    case gsModel = "3D模型"
+    case usdzModel = "3D模型"
     case light = "灯光"
     case text = "文字"
     case material = "材质"
@@ -31,7 +31,7 @@ enum CanvasTool: String, CaseIterable {
         case .image: return "photo"
         case .gallery: return "photo.on.rectangle"
         case .camera: return "camera.fill"
-        case .gsModel: return "cube.box"
+        case .usdzModel: return "cube.box"
         case .light: return "lightbulb"
         case .text: return "textformat"
         case .material: return "paintpalette"
@@ -50,7 +50,7 @@ enum CanvasTool: String, CaseIterable {
         case .image: return .green
         case .gallery: return .orange
         case .camera: return .red
-        case .gsModel: return .purple
+        case .usdzModel: return .purple
         case .light: return .yellow
         case .text: return .cyan
         case .material: return .pink
@@ -73,7 +73,7 @@ enum TransformMode {
 
 // MARK: - 3DGS处理阶段
 
-enum GSProcessingStage: CaseIterable {
+enum GSProcessingStage: Equatable {
     case idle
     case preparing
     case processing
@@ -83,6 +83,7 @@ enum GSProcessingStage: CaseIterable {
     case optimizing
     case finalizing
     case complete
+    case failed(String)
     
     var description: String {
         switch self {
@@ -95,6 +96,26 @@ enum GSProcessingStage: CaseIterable {
         case .optimizing: return "优化模型..."
         case .finalizing: return "最终处理..."
         case .complete: return "完成!"
+        case .failed(let message): return "失败: \(message)"
+        }
+    }
+    
+    static func == (lhs: GSProcessingStage, rhs: GSProcessingStage) -> Bool {
+        switch (lhs, rhs) {
+        case (.idle, .idle),
+             (.preparing, .preparing),
+             (.processing, .processing),
+             (.uploading, .uploading),
+             (.sfm, .sfm),
+             (.training, .training),
+             (.optimizing, .optimizing),
+             (.finalizing, .finalizing),
+             (.complete, .complete):
+            return true
+        case (.failed(let l), .failed(let r)):
+            return l == r
+        default:
+            return false
         }
     }
 }
@@ -115,85 +136,128 @@ enum AssetCategory: String, CaseIterable {
 struct GSProcessingOverlay: View {
     let stage: GSProcessingStage
     let progress: Double
+    var onDismiss: (() -> Void)? = nil
     
     @State private var pulseAnimation = false
     
     var body: some View {
         ZStack {
-            // 背景遮罩
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
             
             VStack(spacing: 32) {
-                // 3D图标动画
-                ZStack {
-                    // 外圈脉冲
-                    Circle()
-                        .stroke(Color.purple.opacity(0.3), lineWidth: 2)
-                        .frame(width: 120, height: 120)
-                        .scaleEffect(pulseAnimation ? 1.2 : 1.0)
-                        .opacity(pulseAnimation ? 0 : 1)
-                    
-                    // 中圈
-                    Circle()
-                        .stroke(Color.purple.opacity(0.5), lineWidth: 2)
-                        .frame(width: 100, height: 100)
-                    
-                    // 内圈
-                    Circle()
-                        .fill(Color.purple.opacity(0.2))
-                        .frame(width: 80, height: 80)
-                    
-                    // 中心图标
-                    Image(systemName: "cube.transparent")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.purple)
+                if case .failed(let message) = stage {
+                    failedView(message: message)
+                } else {
+                    processingView
                 }
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
-                        pulseAnimation.toggle()
-                    }
-                }
-                
-                // 进度信息
-                VStack(spacing: 16) {
-                    // 进度条
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.white.opacity(0.2))
-                                .frame(height: 8)
-                            
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.purple, .pink],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: geometry.size.width * CGFloat(progress), height: 8)
-                        }
-                    }
-                    .frame(width: 200, height: 8)
-                    
-                    // 阶段文本
-                    Text(stageText)
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                    
-                    // 百分比
-                    Text("\(Int(progress * 100))%")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.purple)
-                }
-                
-                // 提示文本
-                Text("请保持应用在前台运行")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
+        }
+    }
+    
+    private func failedView(message: String) -> some View {
+        VStack(spacing: 24) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.orange)
+            
+            VStack(spacing: 12) {
+                Text("处理失败")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                
+                Text(userFriendlyMessage(from: message))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+            
+            Button {
+                onDismiss?()
+            } label: {
+                Text("确定")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+            }
+            .padding(.horizontal, 40)
+        }
+    }
+    
+    private var processingView: some View {
+        VStack(spacing: 32) {
+            ZStack {
+                Circle()
+                    .stroke(Color.purple.opacity(0.3), lineWidth: 2)
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(pulseAnimation ? 1.2 : 1.0)
+                    .opacity(pulseAnimation ? 0 : 1)
+                
+                Circle()
+                    .stroke(Color.purple.opacity(0.5), lineWidth: 2)
+                    .frame(width: 100, height: 100)
+                
+                Circle()
+                    .fill(Color.purple.opacity(0.2))
+                    .frame(width: 80, height: 80)
+                
+                Image(systemName: "cube.transparent")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.purple)
+            }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
+                    pulseAnimation.toggle()
+                }
+            }
+            
+            VStack(spacing: 16) {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.2))
+                            .frame(height: 8)
+                        
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.purple, .pink],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * CGFloat(progress), height: 8)
+                    }
+                }
+                .frame(width: 200, height: 8)
+                
+                Text(stageText)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                
+                Text("\(Int(progress * 100))%")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.purple)
+            }
+            
+            Text("请保持应用在前台运行")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private func userFriendlyMessage(from error: String) -> String {
+        if error.contains("不支持") || error.contains("not supported") {
+            return "您的设备不支持 3D 建模功能\n需要 iPhone 12 Pro 及以上机型"
+        } else if error.contains("图片") || error.contains("images") {
+            return "请确保选择至少 20 张清晰的照片"
+        } else {
+            return "模型生成过程中出现错误\n请重试或检查照片质量"
         }
     }
     
