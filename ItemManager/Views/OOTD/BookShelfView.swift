@@ -154,8 +154,10 @@ struct BookShelfView: View {
             .navigationDestination(for: SpaceOutfit.self) { outfit in
                 SpatialCanvasEditorView(
                     spaceOutfit: outfit,
-                    onSave: { _ in
-                        // 保存后自动返回
+                    currentBook: outfit.book,  // 传递当前书
+                    onSave: { updatedOutfit in
+                        // 保存后确保数据持久化到磁盘
+                        print("[BookShelf] 编辑器保存回调，outfit.id: \(updatedOutfit.id)")
                     }
                 )
             }

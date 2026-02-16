@@ -21,6 +21,7 @@ struct SpatialCanvasEditorView: View {
     @Environment(\.colorScheme) private var colorScheme
     
     var spaceOutfit: SpaceOutfit?
+    var currentBook: SpaceBookGroup?  // 当前书，用于新建页面时关联
     var onSave: ((SpaceOutfit) -> Void)?
     
     // MARK: - State
@@ -52,6 +53,9 @@ struct SpatialCanvasEditorView: View {
     @State private var showingClearConfirmation = false
     @State private var hasUnsavedChanges = false
     @State private var processingProgress: Double = 0.0
+    
+    // 保存成功提示
+    @State private var showingSaveSuccess = false
     
     // 右侧素材面板
     @State private var showingAssetPanel = true
@@ -313,32 +317,56 @@ struct SpatialCanvasEditorView: View {
         } message: {
             Text("确定要清空场景中的所有模型吗？此操作不会删除已保存的数据。")
         }
+        .alert("保存成功", isPresented: $showingSaveSuccess) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text("场景已成功保存到数据库")
+        }
         .interactiveDismissDisabled(hasUnsavedChanges)
     }
 
     // MARK: - Data Loading
     
     private func loadExistingData() {
-        guard let outfit = spaceOutfit else { return }
+        guard let outfit = spaceOutfit else {
+            print("[Scene] 没有现有的 spaceOutfit，无需加载")
+            return
+        }
         let outfitId = outfit.id
+        print("[Scene] 开始加载现有数据，outfit.id: \(outfitId)")
+        print("[Scene] outfit.modelPath: \(outfit.modelPath ?? "nil")")
         
         // 从 SceneObjectData 加载所有场景对象
-        if let objectDataList = try? modelContext.fetch(
-            FetchDescriptor<SceneObjectData>(
-                predicate: #Predicate<SceneObjectData> { $0.spaceOutfit?.id == outfitId },
-                sortBy: [SortDescriptor(\.sortIndex)]
+        do {
+            let objectDataList = try modelContext.fetch(
+                FetchDescriptor<SceneObjectData>(
+                    predicate: #Predicate<SceneObjectData> { $0.spaceOutfit?.id == outfitId },
+                    sortBy: [SortDescriptor(\.sortIndex)]
+                )
             )
-        ) {
+            
+            print("[Scene] 从数据库获取到 \(objectDataList.count) 个对象")
+            
             // 清空当前场景
             sceneObjects.removeAll()
             
             // 加载保存的对象
-            for objectData in objectDataList {
+            for (index, objectData) in objectDataList.enumerated() {
                 let object = objectData.toSceneObject()
+                print("[Scene] 加载对象 \(index + 1): id=\(object.id), type=\(object.type), path=\(object.usdzModelPath ?? "nil")")
                 sceneObjects.append(object)
             }
             
-            print("[Scene] 加载了 \(objectDataList.count) 个对象")
+            print("[Scene] 成功加载了 \(objectDataList.count) 个对象到场景")
+            
+            // 验证模型文件是否存在
+            if let firstObject = sceneObjects.first,
+               let modelPath = firstObject.usdzModelPath {
+                let fileExists = FileManager.default.fileExists(atPath: modelPath)
+                print("[Scene] 模型文件是否存在: \(fileExists), 路径: \(modelPath)")
+            }
+        } catch {
+            print("[Scene] 加载数据失败: \(error)")
         }
     }
     
@@ -538,6 +566,10 @@ struct SpatialCanvasEditorView: View {
                     hasUnsavedChanges = true
                     
                     print("[SpatialCanvasEditorView] 模型已添加到场景，当前对象数: \(sceneObjects.count)")
+                    
+                    // 自动保存场景
+                    print("[SpatialCanvasEditorView] 自动保存场景...")
+                    saveScene()
                 }
             } catch let error as ObjectCaptureError {
                 progressTask.cancel()
@@ -677,16 +709,25 @@ struct SpatialCanvasEditorView: View {
             return
         }
         
+        print("[Scene] 开始保存场景，对象数: \(sceneObjects.count)")
+        
         // 获取或创建 SpaceOutfit
         let outfit: SpaceOutfit
         if let existingOutfit = spaceOutfit {
             outfit = existingOutfit
+            print("[Scene] 使用现有的 SpaceOutfit: \(outfit.id)")
         } else if let current = currentOutfit {
             outfit = current
+            print("[Scene] 使用当前的 SpaceOutfit: \(outfit.id)")
         } else {
-            outfit = SpaceOutfit(note: "3D场景 \(Date().formatted(date: .abbreviated, time: .shortened))")
+            // 创建新的 SpaceOutfit，关联到当前书
+            outfit = SpaceOutfit(
+                note: "3D场景 \(Date().formatted(date: .abbreviated, time: .shortened))",
+                book: currentBook
+            )
             modelContext.insert(outfit)
             currentOutfit = outfit
+            print("[Scene] 创建新的 SpaceOutfit: \(outfit.id), book: \(currentBook?.id.uuidString ?? "nil")")
         }
         
         // 删除旧的场景对象数据
@@ -696,6 +737,7 @@ struct SpatialCanvasEditorView: View {
                 predicate: #Predicate<SceneObjectData> { $0.spaceOutfit?.id == outfitId }
             )
         ) {
+            print("[Scene] 删除 \(existingObjects.count) 个旧对象")
             for obj in existingObjects {
                 modelContext.delete(obj)
             }
@@ -703,6 +745,7 @@ struct SpatialCanvasEditorView: View {
         
         // 保存新的场景对象
         for (index, object) in sceneObjects.enumerated() {
+            print("[Scene] 保存对象 \(index + 1)/\(sceneObjects.count): type=\(object.type), path=\(object.usdzModelPath ?? "nil")")
             let objectData = SceneObjectData(
                 id: object.id,
                 objectType: object.type == .primitive ? "primitive" : "usdzModel",
@@ -721,13 +764,15 @@ struct SpatialCanvasEditorView: View {
         if let firstObject = sceneObjects.first,
            let modelPath = firstObject.usdzModelPath {
             outfit.modelPath = modelPath
+            print("[Scene] 设置 outfit.modelPath: \(modelPath)")
         }
         
         // 保存上下文
         do {
             try modelContext.save()
             hasUnsavedChanges = false
-            print("[Scene] 场景保存成功，共 \(sceneObjects.count) 个对象")
+            showingSaveSuccess = true
+            print("[Scene] 场景保存成功，共 \(sceneObjects.count) 个对象，outfit.id: \(outfit.id)")
         } catch {
             print("[Scene] 保存失败: \(error)")
         }

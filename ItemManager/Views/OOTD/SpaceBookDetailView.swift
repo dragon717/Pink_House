@@ -102,6 +102,14 @@ struct SpaceBookDetailView: View {
                     let newPage = SpaceOutfit(note: newPageNote, book: book)
                     newPage.sortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
                     modelContext.insert(newPage)
+                    
+                    // 立即保存到磁盘
+                    do {
+                        try modelContext.save()
+                        print("[SpaceBook] 新建页面已保存: \(newPage.id)")
+                    } catch {
+                        print("[SpaceBook] 保存新建页面失败: \(error)")
+                    }
                 }
             }
             .alert("修改名称", isPresented: $showingRenameAlert) {
