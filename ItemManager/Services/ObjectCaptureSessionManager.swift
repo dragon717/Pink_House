@@ -146,9 +146,13 @@ class ObjectCaptureSessionManager: ObservableObject {
         let stateTask = Task<Void, Never> { [weak self] in
             for await newState in session.stateUpdates {
                 guard let self = self else { break }
+                // 如果 session 已被清理，退出循环
+                guard self.session != nil else { break }
                 // 减少主线程更新频率
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
                 await MainActor.run {
+                    // 再次检查 session 是否有效
+                    guard self.session != nil else { return }
                     self.state = newState
                     self.handleStateChange(newState)
                 }
@@ -159,7 +163,11 @@ class ObjectCaptureSessionManager: ObservableObject {
         let feedbackTask = Task<Void, Never> { [weak self] in
             for await _ in session.feedbackUpdates {
                 guard let self = self else { break }
+                // 如果 session 已被清理，退出循环
+                guard self.session != nil else { break }
                 await MainActor.run {
+                    // 再次检查 session 是否有效
+                    guard self.session != nil else { return }
                     self.checkCaptureProgress()
                     self.updateSessionMetrics()
                 }
@@ -224,8 +232,50 @@ class ObjectCaptureSessionManager: ObservableObject {
     }
 
     func finishCapturing() -> URL? {
-        session?.finish()
-        print("[ObjectCapture] 完成捕获")
+        // 检查当前状态，只有在 capturing 或 detecting 状态下才能调用 finish
+        guard let session = session else {
+            print("[ObjectCapture] 错误: session 为 nil")
+            return nil
+        }
+        
+        switch session.state {
+        case .capturing, .detecting:
+            session.finish()
+            print("[ObjectCapture] 完成捕获")
+        case .ready:
+            print("[ObjectCapture] 警告: 在 ready 状态下调用 finish，可能没有足够图片")
+            session.finish()
+        default:
+            print("[ObjectCapture] 警告: 当前状态为 \(session.state)，无法调用 finish")
+        }
+        
+        return imageSaveDirectory
+    }
+    
+    /// 等待捕获真正完成并获取最终目录
+    func finishCapturingAsync() async -> URL? {
+        guard let session = session else {
+            print("[ObjectCapture] 错误: session 为 nil")
+            return nil
+        }
+        
+        // 调用 finish
+        session.finish()
+        print("[ObjectCapture] 已调用 finish，等待完成...")
+        
+        // 等待状态变为 completed 或 failed，最多等待5秒
+        for _ in 0..<50 {
+            if case .completed = session.state {
+                print("[ObjectCapture] 捕获已完成")
+                break
+            }
+            if case .failed = session.state {
+                print("[ObjectCapture] 捕获失败")
+                break
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        }
+        
         return imageSaveDirectory
     }
 

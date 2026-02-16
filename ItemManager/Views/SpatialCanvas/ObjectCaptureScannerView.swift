@@ -48,7 +48,11 @@ struct ObjectCaptureScannerView: View {
             setupSession()
         }
         .onDisappear {
-            sessionManager.reset()
+            // 延迟重置以避免与 RealityKit 内部资源管理器的竞争条件
+            // 这是一个 workaround 来解决 Apple 框架内部的断言失败问题
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                sessionManager.reset()
+            }
         }
         .onChange(of: sessionManager.state) { _, newState in
             handleStateChange(newState)
@@ -88,7 +92,13 @@ struct ObjectCaptureScannerView: View {
             return
         }
 
-        self.session = sessionManager.prepareSession()
+        // 确保之前的 session 已完全清理
+        sessionManager.reset()
+
+        // 延迟创建新 session，避免与之前 session 的资源竞争
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            self.session = sessionManager.prepareSession()
+        }
     }
 
     private func retrySession() {
@@ -453,60 +463,107 @@ struct ObjectCaptureScannerView: View {
                 .foregroundStyle(.white)
                 .cornerRadius(12)
             } else if case .capturing = sessionManager.state {
-                // 在 capturing 状态下，始终显示"下一步"按钮
-                // 让用户手动决定何时完成当前轨道的扫描
-                HStack(spacing: 12) {
-                    // 完成按钮（结束整个扫描）
-                    Button {
-                        print("[ObjectCaptureScannerView] 用户点击完成按钮")
-                        print("[ObjectCaptureScannerView] 当前 session 状态: \(String(describing: sessionManager.state))")
-                        print("[ObjectCaptureScannerView] currentImageDirectory: \(String(describing: sessionManager.currentImageDirectory))")
-
-                        // 先获取目录，再调用 finish
-                        guard let imageDir = sessionManager.currentImageDirectory else {
-                            print("[ObjectCaptureScannerView] 错误: currentImageDirectory 为 nil")
-                            return
-                        }
-                        
-                        // 调用 finish 结束扫描
-                        sessionManager.finishCapturing()
-                        
-                        print("[ObjectCaptureScannerView] 扫描完成，目录: \(imageDir.path)")
-                        
-                        // 确保在主线程调用 onComplete
-                        DispatchQueue.main.async {
-                            self.onComplete(imageDir)
-                            self.dismiss()
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "checkmark")
-                            Text("完成")
+                // 在 capturing 状态下，显示操作按钮
+                VStack(spacing: 12) {
+                    // 显示当前图片数量提示
+                    HStack {
+                        Image(systemName: "photo.stack")
+                        Text("已拍摄 \(sessionManager.numberOfShotsTaken) 张")
+                            .font(.subheadline)
+                        if sessionManager.numberOfShotsTaken < 10 {
+                            Text("(至少需10张)")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        } else {
+                            Text("(✓ 可完成)")
+                                .font(.caption)
+                                .foregroundStyle(.green)
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.green)
                     .foregroundStyle(.white)
-                    .cornerRadius(12)
-
-                    // 下一步按钮（进入下一个轨道）
-                    if sessionManager.currentOrbit < 3 {
+                    
+                    HStack(spacing: 12) {
+                        // 完成按钮（结束整个扫描）- 需要至少10张图片
                         Button {
-                            sessionManager.currentOrbit += 1
-                            // 这里可以添加进入下一个轨道的逻辑
-                            print("[ObjectCaptureScannerView] 进入轨道 \(sessionManager.currentOrbit)")
+                            Task {
+                                print("[ObjectCaptureScannerView] 用户点击完成按钮")
+                                print("[ObjectCaptureScannerView] 当前 session 状态: \(String(describing: sessionManager.state))")
+                                print("[ObjectCaptureScannerView] 已拍摄图片数: \(sessionManager.numberOfShotsTaken)")
+                                print("[ObjectCaptureScannerView] currentImageDirectory: \(String(describing: sessionManager.currentImageDirectory))")
+                                
+                                // 检查图片数量
+                                guard sessionManager.numberOfShotsTaken >= 10 else {
+                                    await MainActor.run {
+                                        errorMessage = "需要至少10张图片才能生成3D模型，当前只有 \(sessionManager.numberOfShotsTaken) 张"
+                                        showErrorAlert = true
+                                    }
+                                    return
+                                }
+
+                                // 先获取目录
+                                guard let imageDir = sessionManager.currentImageDirectory else {
+                                    print("[ObjectCaptureScannerView] 错误: currentImageDirectory 为 nil")
+                                    await MainActor.run {
+                                        errorMessage = "无法获取图像目录"
+                                        showErrorAlert = true
+                                    }
+                                    return
+                                }
+                                
+                                // 使用异步方法等待捕获真正完成
+                                let finalDir = await sessionManager.finishCapturingAsync()
+                                
+                                guard let finalImageDir = finalDir else {
+                                    print("[ObjectCaptureScannerView] 错误: 无法获取最终目录")
+                                    await MainActor.run {
+                                        errorMessage = "扫描完成失败"
+                                        showErrorAlert = true
+                                    }
+                                    return
+                                }
+                                
+                                print("[ObjectCaptureScannerView] 扫描完成，目录: \(finalImageDir.path)")
+                                
+                                // 给系统一点时间确保所有文件写入完成
+                                try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                                
+                                // 在主线程调用 onComplete
+                                await MainActor.run {
+                                    self.onComplete(finalImageDir)
+                                    self.dismiss()
+                                }
+                            }
                         } label: {
                             HStack {
-                                Text("下一步")
-                                Image(systemName: "arrow.right")
+                                Image(systemName: "checkmark")
+                                Text("完成")
                             }
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
+                        .background(sessionManager.numberOfShotsTaken >= 10 ? Color.green : Color.gray)
                         .foregroundStyle(.white)
                         .cornerRadius(12)
+                        .disabled(sessionManager.numberOfShotsTaken < 10)
+
+                        // 下一步按钮（进入下一个轨道）
+                        if sessionManager.currentOrbit < 3 {
+                            Button {
+                                sessionManager.currentOrbit += 1
+                                // 这里可以添加进入下一个轨道的逻辑
+                                print("[ObjectCaptureScannerView] 进入轨道 \(sessionManager.currentOrbit)")
+                            } label: {
+                                HStack {
+                                    Text("下一步")
+                                    Image(systemName: "arrow.right")
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundStyle(.white)
+                            .cornerRadius(12)
+                        }
                     }
                 }
             } else if case .completed = sessionManager.state {

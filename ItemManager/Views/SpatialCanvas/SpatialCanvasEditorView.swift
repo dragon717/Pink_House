@@ -498,14 +498,28 @@ struct SpatialCanvasEditorView: View {
     
     private func processObjectCaptureDirectory(_ imageDirectory: URL) {
         print("[SpatialCanvasEditorView] 开始处理扫描目录: \(imageDirectory.path)")
+        
         isProcessing3DGS = true
         processingStage = .processing
         processingProgress = 0.0
+        
+        // 创建进度监听任务
+        let progressTask = Task {
+            while !Task.isCancelled {
+                await MainActor.run {
+                    self.processingProgress = ObjectCaptureService.shared.progress
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+        }
         
         Task {
             do {
                 print("[SpatialCanvasEditorView] 调用 ObjectCaptureService 处理图像...")
                 let usdzURL = try await ObjectCaptureService.shared.processImagesFromDirectory(imageDirectory)
+                
+                // 取消进度监听
+                progressTask.cancel()
                 
                 await MainActor.run {
                     print("[SpatialCanvasEditorView] 处理完成，USDZ 路径: \(usdzURL.path)")
@@ -525,11 +539,19 @@ struct SpatialCanvasEditorView: View {
                     
                     print("[SpatialCanvasEditorView] 模型已添加到场景，当前对象数: \(sceneObjects.count)")
                 }
-            } catch {
+            } catch let error as ObjectCaptureError {
+                progressTask.cancel()
                 await MainActor.run {
+                    print("[SpatialCanvasEditorView] 处理失败: \(error)")
                     processingStage = .failed(error.localizedDescription)
                     isProcessing3DGS = false
+                }
+            } catch {
+                progressTask.cancel()
+                await MainActor.run {
                     print("[SpatialCanvasEditorView] 处理失败: \(error)")
+                    processingStage = .failed("处理失败: \(error.localizedDescription)")
+                    isProcessing3DGS = false
                 }
             }
         }

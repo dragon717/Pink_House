@@ -215,39 +215,63 @@ struct GSProcessingOverlay: View {
                 }
             }
             
-            VStack(spacing: 16) {
+            VStack(spacing: 20) {
+                // 进度条 - 增加对比度
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.white.opacity(0.2))
-                            .frame(height: 8)
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(0.3))
+                            .frame(height: 12)
                         
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: 6)
                             .fill(
                                 LinearGradient(
-                                    colors: [.purple, .pink],
+                                    colors: [.purple, .pink, .orange],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
-                            .frame(width: geometry.size.width * CGFloat(progress), height: 8)
+                            .frame(width: geometry.size.width * CGFloat(progress), height: 12)
+                            .shadow(color: .purple.opacity(0.5), radius: 4, x: 0, y: 0)
                     }
                 }
-                .frame(width: 200, height: 8)
+                .frame(width: 240, height: 12)
                 
+                // 阶段文字 - 增加可读性
                 Text(stageText)
-                    .font(.headline)
+                    .font(.title3)
+                    .fontWeight(.semibold)
                     .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                 
+                // 百分比 - 更醒目
                 Text("\(Int(progress * 100))%")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.purple)
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .pink],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .shadow(color: .purple.opacity(0.3), radius: 8, x: 0, y: 0)
             }
             
-            Text("请保持应用在前台运行")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // 底部提示 - 更醒目
+            VStack(spacing: 8) {
+                Text("⏱️ 处理时间约 1-3 分钟")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.yellow)
+                
+                Text("请保持应用在前台运行，不要锁屏")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(Color.black.opacity(0.4))
+            .cornerRadius(8)
         }
     }
     

@@ -123,8 +123,51 @@ class ObjectCaptureService: ObservableObject {
     
     func processImagesFromDirectory(_ imageDirectory: URL, detail: PhotogrammetrySession.Request.Detail = .reduced) async throws -> URL {
         let modelID = UUID()
+        
+        // ObjectCaptureSession 创建的目录结构是:
+        // ObjectCapture_UUID/
+        //   ├── images/          <-- 图片在这里
+        //   └── checkpoints/
+        // PhotogrammetrySession 需要传入 images 子目录
+        
+        let imagesDir = imageDirectory.appendingPathComponent("images")
+        
+        // 详细检查输入目录
+        print("[ObjectCaptureService] 开始处理目录: \(imageDirectory.path)")
+        print("[ObjectCaptureService] 图片目录: \(imagesDir.path)")
+        
+        // 检查 images 目录是否存在
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: imagesDir.path, isDirectory: &isDirectory)
+        
+        guard exists && isDirectory.boolValue else {
+            print("[ObjectCaptureService] 错误: images 目录不存在")
+            throw ObjectCaptureError.invalidInput
+        }
+        
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: imagesDir, includingPropertiesForKeys: [.fileSizeKey, .creationDateKey])
+            let imageFiles = files.filter { ["jpg", "jpeg", "heic", "png"].contains($0.pathExtension.lowercased()) }
+            print("[ObjectCaptureService] 找到 \(imageFiles.count) 张图片")
+            
+            guard imageFiles.count >= 10 else {
+                print("[ObjectCaptureService] 错误: 图片数量不足 (\(imageFiles.count)/10)")
+                throw ObjectCaptureError.insufficientImages
+            }
+            
+            for (index, file) in imageFiles.enumerated() {
+                let attrs = try? FileManager.default.attributesOfItem(atPath: file.path)
+                let size = attrs?[.size] as? Int64 ?? 0
+                print("[ObjectCaptureService] 图片 \(index + 1): \(file.lastPathComponent), 大小: \(size) bytes")
+            }
+        } catch {
+            print("[ObjectCaptureService] 读取目录失败: \(error)")
+            throw ObjectCaptureError.invalidInput
+        }
+        
+        // 传入 images 子目录给 PhotogrammetrySession
         return try await performPhotogrammetry(
-            imageDirectory: imageDirectory,
+            imageDirectory: imagesDir,
             modelID: modelID,
             detail: detail
         )
@@ -258,6 +301,7 @@ class ObjectCaptureService: ObservableObject {
             
         case .inputComplete:
             await MainActor.run {
+                self.progress = 0.1
                 self.statusMessage = "📂 输入处理完成\n🚀 开始 3D 重建..."
             }
             
