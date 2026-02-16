@@ -10,6 +10,7 @@ import SwiftUI
 struct CanvasToolbar: View {
     @Binding var selectedTool: CanvasTool
     var onToolTap: (CanvasTool) -> Void
+    var onResetCamera: () -> Void = {}
     @Environment(\.colorScheme) private var colorScheme
     
     // 工具分组
@@ -24,6 +25,18 @@ struct CanvasToolbar: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 12) {
+                // 重置视角按钮 - 放在最上面
+                ToolButton(
+                    tool: .resetCamera,
+                    isSelected: false,
+                    onTap: onResetCamera
+                )
+                
+                Divider()
+                    .background(Color.black.opacity(0.1))
+                    .frame(width: 30)
+                    .padding(.vertical, 4)
+                
                 ForEach(Array(toolGroups.enumerated()), id: \.offset) { groupIndex, tools in
                     VStack(spacing: 8) {
                         ForEach(tools, id: \.self) { tool in
@@ -52,7 +65,7 @@ struct CanvasToolbar: View {
             .padding(.vertical, 16)
             .padding(.horizontal, 8)
         }
-        .frame(maxHeight: UIScreen.main.bounds.height * 0.7)
+        .frame(maxHeight: UIScreen.main.bounds.height * 0.75)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))

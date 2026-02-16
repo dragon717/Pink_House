@@ -24,6 +24,7 @@ enum CanvasTool: String, CaseIterable {
     case transform = "变换"
     case record = "录制"
     case settings = "设置"
+    case resetCamera = "视角"
     
     var icon: String {
         switch self {
@@ -41,6 +42,7 @@ enum CanvasTool: String, CaseIterable {
         case .transform: return "rotate.3d"
         case .record: return "record.circle"
         case .settings: return "gearshape"
+        case .resetCamera: return "arrow.counterclockwise"
         }
     }
     
@@ -60,6 +62,7 @@ enum CanvasTool: String, CaseIterable {
         case .transform: return .brown
         case .record: return .red
         case .settings: return .gray
+        case .resetCamera: return .blue
         }
     }
 }

@@ -73,6 +73,9 @@ struct SpatialCanvasEditorView: View {
     
     // 加载状态
     @State private var isSceneReady = false
+    
+    // 相机控制器
+    @State private var cameraController: CameraController?
 
     // 背景色 - 根据暗黑模式调整
     private var editorBackground: Color {
@@ -92,7 +95,10 @@ struct SpatialCanvasEditorView: View {
                     selectedObject: $selectedObject,
                     objects: $sceneObjects,
                     onObjectTap: handleObjectTap,
-                    onObjectTransform: handleObjectTransform
+                    onObjectTransform: handleObjectTransform,
+                    onCameraControllerReady: { controller in
+                        cameraController = controller
+                    }
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .opacity(isSceneReady ? 1 : 0)
@@ -129,7 +135,10 @@ struct SpatialCanvasEditorView: View {
                 Spacer()
                 CanvasToolbar(
                     selectedTool: $selectedTool,
-                    onToolTap: handleToolTap
+                    onToolTap: handleToolTap,
+                    onResetCamera: {
+                        cameraController?.reset()
+                    }
                 )
                 .padding(.leading, 8)
                 .padding(.bottom, 20)

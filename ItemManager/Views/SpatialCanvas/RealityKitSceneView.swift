@@ -44,102 +44,124 @@ public struct RealityKitSceneView: View {
     @Binding var objects: [SceneObject]
     var onObjectTap: (SceneObject) -> Void
     var onObjectTransform: (SceneObject) -> Void
+    var onCameraControllerReady: ((CameraController) -> Void)?
     
-    // 实体缓存，避免重复加载
+    @StateObject private var cameraController = CameraController()
     @State private var entityCache: [UUID: Entity] = [:]
-    // 限制同时加载的实体数量
     private let maxConcurrentLoads = 3
     
     public init(
         selectedObject: Binding<SceneObject?>,
         objects: Binding<[SceneObject]>,
         onObjectTap: @escaping (SceneObject) -> Void = { _ in },
-        onObjectTransform: @escaping (SceneObject) -> Void = { _ in }
+        onObjectTransform: @escaping (SceneObject) -> Void = { _ in },
+        onCameraControllerReady: ((CameraController) -> Void)? = nil
     ) {
         self._selectedObject = selectedObject
         self._objects = objects
         self.onObjectTap = onObjectTap
         self.onObjectTransform = onObjectTransform
+        self.onCameraControllerReady = onCameraControllerReady
     }
     
     public var body: some View {
-        RealityView { content in
-            let rootEntity = Entity()
-            rootEntity.name = "sceneRoot"
-            content.add(rootEntity)
-        } update: { content in
-            guard let rootEntity = content.entities.first(where: { $0.name == "sceneRoot" }) else {
-                return
-            }
-            
-            // 分批加载，避免内存峰值
-            let objectsToLoad = objects.filter { entityCache[$0.id] == nil }
-            let limitedObjects = Array(objectsToLoad.prefix(maxConcurrentLoads))
-            
-            for object in objects {
-                if let cachedEntity = entityCache[object.id] {
-                    // 使用缓存的实体
-                    if cachedEntity.parent == nil {
-                        cachedEntity.name = object.id.uuidString
-                        rootEntity.addChild(cachedEntity)
+        ZStack {
+            RealityView { content in
+                let rootEntity = Entity()
+                rootEntity.name = "sceneRoot"
+                content.add(rootEntity)
+                
+                let cameraEntity = cameraController.setupCamera(in: rootEntity)
+                
+                // 通知外部相机控制器已就绪
+                onCameraControllerReady?(cameraController)
+                
+                print("[RealityKitSceneView] 相机设置完成，位置: \(cameraEntity.position)")
+                
+                let lightEntity = Entity()
+                lightEntity.name = "directionalLight"
+                var lightComponent = DirectionalLightComponent()
+                lightComponent.intensity = 2.0
+                lightComponent.color = .white
+                lightEntity.components.set(lightComponent)
+                lightEntity.orientation = simd_quatf(angle: Float.pi / 4, axis: [1, 0, 0])
+                rootEntity.addChild(lightEntity)
+                
+                let pointLight = Entity()
+                pointLight.name = "pointLight"
+                pointLight.position = SIMD3<Float>(2, 3, 2)
+                var pointLightComponent = PointLightComponent()
+                pointLightComponent.intensity = 1.0
+                pointLightComponent.color = .white
+                pointLight.components.set(pointLightComponent)
+                rootEntity.addChild(pointLight)
+                
+            } update: { content in
+                guard let rootEntity = content.entities.first(where: { $0.name == "sceneRoot" }) else {
+                    return
+                }
+                
+                let objectsToLoad = objects.filter { entityCache[$0.id] == nil }
+                let limitedObjects = Array(objectsToLoad.prefix(maxConcurrentLoads))
+                
+                for object in objects {
+                    if let cachedEntity = entityCache[object.id] {
+                        if cachedEntity.parent == nil {
+                            cachedEntity.name = object.id.uuidString
+                            rootEntity.addChild(cachedEntity)
+                        }
+                        updateEntity(cachedEntity, from: object)
+                    } else if limitedObjects.contains(where: { $0.id == object.id }) {
+                        Task {
+                            if let newEntity = try? await loadEntity(for: object) {
+                                newEntity.name = object.id.uuidString
+                                entityCache[object.id] = newEntity
+                                rootEntity.addChild(newEntity)
+                            }
+                        }
                     }
-                    updateEntity(cachedEntity, from: object)
-                } else if limitedObjects.contains(where: { $0.id == object.id }) {
-                    // 异步加载新实体
-                    Task {
-                        if let newEntity = try? await loadEntity(for: object) {
-                            newEntity.name = object.id.uuidString
-                            entityCache[object.id] = newEntity
-                            rootEntity.addChild(newEntity)
+                }
+                
+                let currentIDs = Set(objects.map { $0.id })
+                for (id, entity) in entityCache {
+                    if !currentIDs.contains(id) {
+                        entity.removeFromParent()
+                        entityCache.removeValue(forKey: id)
+                    }
+                }
+                
+                if entityCache.count > 10 {
+                    let objectsToKeep = Set(objects.map { $0.id })
+                    for id in entityCache.keys {
+                        if !objectsToKeep.contains(id) {
+                            entityCache[id]?.removeFromParent()
+                            entityCache.removeValue(forKey: id)
                         }
                     }
                 }
             }
-            
-            // 清理不在列表中的实体
-            let currentIDs = Set(objects.map { $0.id })
-            for (id, entity) in entityCache {
-                if !currentIDs.contains(id) {
-                    entity.removeFromParent()
-                    entityCache.removeValue(forKey: id)
-                }
-            }
-            
-            // 内存警告时清理缓存
-            if entityCache.count > 10 {
-                // 保留最近使用的实体
-                let objectsToKeep = Set(objects.map { $0.id })
-                for id in entityCache.keys {
-                    if !objectsToKeep.contains(id) {
-                        entityCache[id]?.removeFromParent()
-                        entityCache.removeValue(forKey: id)
+            .gesture(
+                SpatialTapGesture()
+                    .targetedToAnyEntity()
+                    .onEnded { value in
+                        if let object = objects.first(where: { $0.id.uuidString == value.entity.name }) {
+                            selectedObject = object
+                            onObjectTap(object)
+                        }
                     }
+            )
+            
+            // 手势控制层
+            CameraGestureView(controller: cameraController)
+            
+            VStack {
+                Spacer()
+                HStack {
+                    CameraControlHint()
+                    Spacer()
                 }
             }
         }
-        .gesture(
-            SpatialTapGesture()
-                .targetedToAnyEntity()
-                .onEnded { value in
-                    if let object = objects.first(where: { $0.id.uuidString == value.entity.name }) {
-                        selectedObject = object
-                        onObjectTap(object)
-                    }
-                }
-        )
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    guard let selected = selectedObject,
-                          let index = objects.firstIndex(where: { $0.id == selected.id }) else { return }
-                    
-                    let deltaX = Float(value.translation.width) * 0.005
-                    let deltaY = Float(value.translation.height) * 0.005
-                    
-                    objects[index].position.x += deltaX
-                    objects[index].position.y -= deltaY
-                }
-        )
     }
     
     private func loadEntity(for object: SceneObject) async throws -> Entity? {
@@ -148,23 +170,17 @@ public struct RealityKitSceneView: View {
             if let path = object.usdzModelPath {
                 let url = URL(fileURLWithPath: path)
                 
-                // 检查文件大小，如果太大则显示警告
                 if let fileSize = try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64 {
                     let sizeMB = Double(fileSize) / 1024 / 1024
                     print("[RealityKitSceneView] 加载模型: \(path), 大小: \(String(format: "%.2f", sizeMB)) MB")
                     
-                    // 如果模型超过 50MB，可能需要优化
                     if sizeMB > 50 {
                         print("[RealityKitSceneView] 警告: 模型较大，可能影响性能")
                     }
                 }
                 
-                // 使用 autoreleasepool 减少内存峰值
                 let entity = try await Entity.load(contentsOf: url)
-                
-                // 优化模型：降低材质复杂度
                 optimizeEntityMaterials(entity)
-                
                 applyTransform(to: entity, from: object)
                 return entity
             }
@@ -187,15 +203,11 @@ public struct RealityKitSceneView: View {
     }
     
     private func optimizeEntityMaterials(_ entity: Entity) {
-        // 递归优化所有子实体的材质
         if let modelEntity = entity as? ModelEntity {
             if var model = modelEntity.model {
-                // 使用 RealityKit.Material 明确指定类型
                 var optimizedMaterials: [RealityKit.Material] = []
                 
                 for material in model.materials {
-                    // 这里可以添加材质优化逻辑
-                    // 例如：降低纹理分辨率、简化着色器等
                     optimizedMaterials.append(material)
                 }
                 
@@ -204,7 +216,6 @@ public struct RealityKitSceneView: View {
             }
         }
         
-        // 递归处理子实体
         for child in entity.children {
             optimizeEntityMaterials(child)
         }
@@ -238,7 +249,7 @@ struct CameraControlHint: View {
         VStack(alignment: .leading, spacing: 4) {
             Label("单指拖动旋转视角", systemImage: "hand.draw")
             Label("双指捏合缩放", systemImage: "arrow.up.left.and.arrow.down.right")
-            Label("点击选择对象", systemImage: "hand.tap")
+            Label("双指拖动平移", systemImage: "hand.tap")
         }
         .font(.caption)
         .foregroundStyle(.secondary)
