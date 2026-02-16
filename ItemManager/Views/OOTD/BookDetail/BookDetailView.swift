@@ -7,6 +7,7 @@ struct BookDetailView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }) private var allBooks: [BookGroup]
 
     @Binding var isSidebarVisible: Bool
     var onBack: (() -> Void)?
@@ -38,6 +39,10 @@ struct BookDetailView: View {
 
     @State var showingMoveSheet = false
     @State var pageToMove: Outfit?
+    
+    // Rename Book
+    @State var showingRenameBookAlert = false
+    @State var renameBookName = ""
 
     @AppStorage("bookDetailGridMode") var gridModeValue = 2
 
@@ -84,6 +89,14 @@ struct BookDetailView: View {
             showingMoveSheet: $showingMoveSheet,
             movePageSheet: { movePageSheet }
         )
+        .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
+            TextField("名称", text: $renameBookName)
+            Button("取消", role: .cancel) {}
+            Button("保存") {
+                book.title = renameBookName
+                try? modelContext.save()
+            }
+        }
     }
 
     private var backgroundCropperSheet: some View {

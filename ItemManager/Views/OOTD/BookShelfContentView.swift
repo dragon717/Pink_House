@@ -34,6 +34,11 @@ struct BookShelfContentView: View {
     @State private var editableBooks: [BookGroup] = []
     @State private var draggingItem: BookGroup?
     
+    // Rename Book
+    @State private var bookToRename: BookGroup?
+    @State private var showingRenameBookAlert = false
+    @State private var renameBookName = ""
+    
     var body: some View {
         Group {
             if viewMode == .planar {
@@ -139,6 +144,11 @@ struct BookShelfContentView: View {
                     selectedBookForCover: $selectedBookForCover,
                     showingCoverPicker: $showingCoverPicker,
                     onDelete: onDelete,
+                    onRename: { book in
+                        bookToRename = book
+                        renameBookName = book.title
+                        showingRenameBookAlert = true
+                    },
                     namespace: namespace,
                     onBookTap: onBookTap,
                     openingBook: openingBook
@@ -147,6 +157,17 @@ struct BookShelfContentView: View {
         }
         .transition(.opacity)
         .opacity(openingBook == nil ? 1 : 0)
+        .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
+            TextField("名称", text: $renameBookName)
+            Button("取消", role: .cancel) { bookToRename = nil }
+            Button("保存") {
+                if let book = bookToRename {
+                    book.title = renameBookName
+                    try? modelContext.save()
+                }
+                bookToRename = nil
+            }
+        }
     }
     
     @ViewBuilder
@@ -206,3 +227,5 @@ struct BookReorderableDropDelegate: DropDelegate {
         return false
     }
 }
+
+

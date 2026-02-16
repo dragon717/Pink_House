@@ -334,7 +334,8 @@ struct SpatialCanvasEditorView: View {
         }
         let outfitId = outfit.id
         print("[Scene] 开始加载现有数据，outfit.id: \(outfitId)")
-        print("[Scene] outfit.modelPath: \(outfit.modelPath ?? "nil")")
+        print("[Scene] outfit.modelPath (stored): \(outfit.modelPath ?? "nil")")
+        print("[Scene] outfit.modelPath (resolved): \(outfit.resolvedModelPath ?? "nil")")
         
         // 从 SceneObjectData 加载所有场景对象
         do {
@@ -352,8 +353,18 @@ struct SpatialCanvasEditorView: View {
             
             // 加载保存的对象
             for (index, objectData) in objectDataList.enumerated() {
-                let object = objectData.toSceneObject()
-                print("[Scene] 加载对象 \(index + 1): id=\(object.id), type=\(object.type), path=\(object.usdzModelPath ?? "nil")")
+                var object = objectData.toSceneObject()
+                
+                // 使用解析后的路径（支持相对路径）
+                if let resolvedPath = objectData.resolvedModelPath {
+                    object.usdzModelPath = resolvedPath
+                    print("[Scene] 加载对象 \(index + 1): id=\(object.id), type=\(object.type)")
+                    print("[Scene]   stored path: \(objectData.usdzModelPath ?? "nil")")
+                    print("[Scene]   resolved path: \(resolvedPath)")
+                } else {
+                    print("[Scene] 加载对象 \(index + 1): id=\(object.id), type=\(object.type), path=nil")
+                }
+                
                 sceneObjects.append(object)
             }
             
@@ -602,7 +613,8 @@ struct SpatialCanvasEditorView: View {
             imagePaths: imagePaths,
             status: .onShelf
         )
-        clothing.model3DPath = usdzURL.path
+        // 使用相对路径存储
+        clothing.setModel3DPath(usdzURL.path)
         clothing.model3DType = "usdz"
         clothing.model3DThumbnailPath = thumbnailPath
         
@@ -622,7 +634,7 @@ struct SpatialCanvasEditorView: View {
         print("[ObjectCapture] 创建3D模型记录: \(modelID)")
     }
     
-    /// 保存缩略图
+    /// 保存缩略图，返回相对路径
     private func saveThumbnail(from image: UIImage?, modelID: UUID) -> String? {
         guard let image = image else { return nil }
         
@@ -641,16 +653,18 @@ struct SpatialCanvasEditorView: View {
             image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
         }
         
-        let thumbnailPath = modelDir.appendingPathComponent("thumbnail.jpg")
+        let thumbnailFileName = "thumbnail.jpg"
+        let thumbnailPath = modelDir.appendingPathComponent(thumbnailFileName)
         if let data = thumbnail.jpegData(compressionQuality: 0.8) {
             try? data.write(to: thumbnailPath)
-            return thumbnailPath.path
+            // 返回相对路径
+            return "Models/\(modelID.uuidString)/\(thumbnailFileName)"
         }
         
         return nil
     }
     
-    /// 保存源图片
+    /// 保存源图片，返回相对路径数组
     private func saveSourceImages(_ images: [UIImage], modelID: UUID) -> [String] {
         let fileManager = FileManager.default
         guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
@@ -662,10 +676,12 @@ struct SpatialCanvasEditorView: View {
         
         var paths: [String] = []
         for (index, image) in images.enumerated() {
-            let imagePath = modelDir.appendingPathComponent("image_\(index).jpg")
+            let imageFileName = "image_\(index).jpg"
+            let imagePath = modelDir.appendingPathComponent(imageFileName)
             if let data = image.jpegData(compressionQuality: 0.9) {
                 try? data.write(to: imagePath)
-                paths.append(imagePath.path)
+                // 返回相对路径
+                paths.append("Models/\(modelID.uuidString)/source/\(imageFileName)")
             }
         }
         
@@ -752,19 +768,22 @@ struct SpatialCanvasEditorView: View {
                 position: object.position,
                 rotation: object.rotation,
                 scale: object.scale,
-                usdzModelPath: object.usdzModelPath,
+                usdzModelPath: nil, // 先设为 nil，下面用 setModelPath 设置相对路径
                 color: object.color,
                 sortIndex: index,
                 spaceOutfit: outfit
             )
+            // 使用相对路径存储
+            objectData.setModelPath(object.usdzModelPath)
             modelContext.insert(objectData)
         }
         
-        // 保存第一个模型的路径到 SpaceOutfit
+        // 保存第一个模型的路径到 SpaceOutfit（使用相对路径）
         if let firstObject = sceneObjects.first,
            let modelPath = firstObject.usdzModelPath {
-            outfit.modelPath = modelPath
-            print("[Scene] 设置 outfit.modelPath: \(modelPath)")
+            outfit.setModelPath(modelPath)
+            print("[Scene] 设置 outfit.modelPath (stored): \(outfit.modelPath ?? "nil")")
+            print("[Scene] 设置 outfit.modelPath (resolved): \(outfit.resolvedModelPath ?? "nil")")
         }
         
         // 保存上下文

@@ -14,6 +14,7 @@ struct SpaceBookToolbar: ToolbarContent {
     @Binding var showingNewPageAlert: Bool
     @Binding var showingCoverPicker: Bool
     var dismissAction: () -> Void
+    var onRenameBook: () -> Void
 
     var body: some ToolbarContent {
         // Leading: Back button and Sidebar toggle
@@ -78,6 +79,12 @@ struct SpaceBookToolbar: ToolbarContent {
                         showingCoverPicker = true
                     } label: {
                         Label("修改手帐封面", systemImage: "photo")
+                    }
+                    
+                    Button {
+                        onRenameBook()
+                    } label: {
+                        Label("重命名手帐", systemImage: "pencil")
                     }
 
                     Divider()

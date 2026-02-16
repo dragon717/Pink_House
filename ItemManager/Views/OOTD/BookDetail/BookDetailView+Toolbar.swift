@@ -87,6 +87,12 @@ extension BookDetailView {
             } label: {
                 Label("修改封面", systemImage: "photo")
             }
+            
+            Button {
+                showingRenameBookAlert = true
+            } label: {
+                Label("重命名手帐", systemImage: "pencil")
+            }
 
             Divider()
 

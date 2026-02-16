@@ -203,16 +203,6 @@ struct BookPage: View {
                     .scaledToFit()
                     .frame(width: width - 20, height: height - 20)
                     .clipShape(RoundedRectangle(cornerRadius: 2))
-            } else {
-                // 模拟文字行
-                VStack(spacing: 10) {
-                    ForEach(0..<10) { _ in
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .frame(height: 2)
-                    }
-                }
-                .padding(20)
             }
         }
     }

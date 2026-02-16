@@ -140,6 +140,7 @@ struct BookGridView: View {
     @Binding var selectedBookForCover: BookGroup?
     @Binding var showingCoverPicker: Bool
     let onDelete: (BookGroup) -> Void
+    let onRename: (BookGroup) -> Void
     var namespace: Namespace.ID?
     var onBookTap: ((BookGroup) -> Void)?
     var openingBook: BookGroup?
@@ -167,6 +168,12 @@ struct BookGridView: View {
                     }
                     .buttonStyle(BouncingButtonStyle())
                     .contextMenu {
+                        Button {
+                            onRename(book)
+                        } label: {
+                            Label("重命名", systemImage: "pencil")
+                        }
+                        
                         Button {
                             selectedBookForCover = book
                             showingCoverPicker = true

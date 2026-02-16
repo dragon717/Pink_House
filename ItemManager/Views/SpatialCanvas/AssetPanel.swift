@@ -284,13 +284,15 @@ struct ClothingAssetList: View {
             } else {
                 ForEach(filteredClothing.prefix(20)) { clothing in
                     Clothing3DAssetCard(clothing: clothing) {
+                        // 使用解析后的路径（支持相对路径）
+                        let resolvedPath = clothing.resolvedModel3DPath ?? ""
                         let asset = SpatialAsset(
                             type: .clothing,
                             name: clothing.name,
                             imagePath: clothing.model3DThumbnailPath,
                             thumbnail: loadThumbnail(for: clothing),
                             metadata: [
-                                "modelPath": clothing.model3DPath ?? "",
+                                "modelPath": resolvedPath,
                                 "modelType": clothing.model3DType ?? "multi",
                                 "typeDescription": clothing.model3DTypeDescription ?? "3D"
                             ]
@@ -303,11 +305,17 @@ struct ClothingAssetList: View {
     }
     
     private func loadThumbnail(for clothing: Clothing) -> UIImage? {
-        if let thumbnailPath = clothing.model3DThumbnailPath {
-            return ImageManager.shared.loadImage(fileName: thumbnailPath)
+        // 使用解析后的路径加载缩略图
+        if let resolvedPath = clothing.resolvedModel3DThumbnailPath,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: resolvedPath)),
+           let image = UIImage(data: data) {
+            return image
         }
-        if let firstImagePath = clothing.imagePaths.first {
-            return ImageManager.shared.loadImage(fileName: firstImagePath)
+        // 尝试加载第一张源图片
+        if let firstResolvedPath = clothing.resolvedImagePaths.first,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: firstResolvedPath)),
+           let image = UIImage(data: data) {
+            return image
         }
         return nil
     }
@@ -319,19 +327,28 @@ struct Clothing3DAssetCard: View {
     let clothing: Clothing
     let onTap: () -> Void
     
+    /// 加载缩略图图片
+    private var thumbnailImage: UIImage? {
+        // 优先使用解析后的缩略图路径
+        if let resolvedPath = clothing.resolvedModel3DThumbnailPath,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: resolvedPath)),
+           let image = UIImage(data: data) {
+            return image
+        }
+        // 尝试第一张源图片
+        if let firstResolvedPath = clothing.resolvedImagePaths.first,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: firstResolvedPath)),
+           let image = UIImage(data: data) {
+            return image
+        }
+        return nil
+    }
+    
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 // 缩略图
-                if let thumbnailPath = clothing.model3DThumbnailPath,
-                   let image = ImageManager.shared.loadImage(fileName: thumbnailPath) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else if let firstImagePath = clothing.imagePaths.first,
-                          let image = ImageManager.shared.loadImage(fileName: firstImagePath) {
+                if let image = thumbnailImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()

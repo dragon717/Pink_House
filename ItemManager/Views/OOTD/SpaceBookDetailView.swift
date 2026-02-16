@@ -44,6 +44,10 @@ struct SpaceBookDetailView: View {
     // Cover Picker
     @State private var showingCoverPicker = false
     @State private var selectedCoverItem: PhotosPickerItem?
+    
+    // Rename Book
+    @State private var showingRenameBookAlert = false
+    @State private var renameBookName = ""
 
     // Grid Layout
     enum GridMode: Int, CaseIterable, Identifiable {
@@ -92,7 +96,8 @@ struct SpaceBookDetailView: View {
                     isEditing: $isEditing,
                     showingNewPageAlert: $showingNewPageAlert,
                     showingCoverPicker: $showingCoverPicker,
-                    dismissAction: { dismiss() }
+                    dismissAction: { dismiss() },
+                    onRenameBook: { showingRenameBookAlert = true }
                 )
             }
             .alert("新建空间书页", isPresented: $showingNewPageAlert) {
@@ -134,6 +139,14 @@ struct SpaceBookDetailView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
+            .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
+                TextField("名称", text: $renameBookName)
+                Button("取消", role: .cancel) {}
+                Button("保存") {
+                    book.title = renameBookName
+                    try? modelContext.save()
+                }
+            }
     }
 
     // MARK: - Main Content
