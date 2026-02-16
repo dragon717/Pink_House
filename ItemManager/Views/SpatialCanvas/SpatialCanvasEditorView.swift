@@ -184,6 +184,14 @@ struct SpatialCanvasEditorView: View {
                     isSceneReady = true
                 }
             }
+            
+            // 清理旧的模型文件，释放磁盘空间
+            Task {
+                let sizeBefore = await ObjectCaptureService.shared.getModelsDirectorySize()
+                await ObjectCaptureService.shared.cleanupOldModels(keepRecent: 10)
+                let sizeAfter = await ObjectCaptureService.shared.getModelsDirectorySize()
+                print("[SpatialCanvasEditorView] 磁盘空间清理完成: \(String(format: "%.1f", sizeBefore)) MB -> \(String(format: "%.1f", sizeAfter)) MB")
+            }
         }
         .sheet(isPresented: $showingImagePicker) {
             MultiImagePicker(
@@ -204,6 +212,8 @@ struct SpatialCanvasEditorView: View {
         }
         .fullScreenCover(isPresented: $showingObjectCaptureScanner) {
             ObjectCaptureScannerView { imageDirectory in
+                // 先关闭扫描界面，再处理图像
+                showingObjectCaptureScanner = false
                 processObjectCaptureDirectory(imageDirectory)
             }
         }
@@ -487,15 +497,18 @@ struct SpatialCanvasEditorView: View {
     }
     
     private func processObjectCaptureDirectory(_ imageDirectory: URL) {
+        print("[SpatialCanvasEditorView] 开始处理扫描目录: \(imageDirectory.path)")
         isProcessing3DGS = true
         processingStage = .processing
         processingProgress = 0.0
         
         Task {
             do {
+                print("[SpatialCanvasEditorView] 调用 ObjectCaptureService 处理图像...")
                 let usdzURL = try await ObjectCaptureService.shared.processImagesFromDirectory(imageDirectory)
                 
                 await MainActor.run {
+                    print("[SpatialCanvasEditorView] 处理完成，USDZ 路径: \(usdzURL.path)")
                     processingStage = .complete
                     processingProgress = 1.0
                     isProcessing3DGS = false
@@ -510,13 +523,13 @@ struct SpatialCanvasEditorView: View {
                     sceneObjects.append(object)
                     hasUnsavedChanges = true
                     
-                    print("[ObjectCapture] 模型已添加到场景: \(usdzURL.path)")
+                    print("[SpatialCanvasEditorView] 模型已添加到场景，当前对象数: \(sceneObjects.count)")
                 }
             } catch {
                 await MainActor.run {
                     processingStage = .failed(error.localizedDescription)
                     isProcessing3DGS = false
-                    print("[ObjectCapture] 处理失败: \(error)")
+                    print("[SpatialCanvasEditorView] 处理失败: \(error)")
                 }
             }
         }

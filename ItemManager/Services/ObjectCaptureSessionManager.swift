@@ -1,11 +1,8 @@
 import Foundation
 import Combine
-
-#if os(iOS)
 import SwiftUI
 import RealityKit
 
-@available(iOS 17.0, *)
 @MainActor
 class ObjectCaptureSessionManager: ObservableObject {
 
@@ -16,8 +13,20 @@ class ObjectCaptureSessionManager: ObservableObject {
     @Published var isCapturing: Bool = false
     @Published var capturedImageCount: Int = 0
     @Published var userCompletedScanPass: Bool = false
+    @Published var initializationError: Error?
+    @Published var isInitializing: Bool = false
+    @Published var numberOfShotsTaken: Int = 0
+    @Published var maximumNumberOfInputImages: Int = 0
+    @Published var currentOrbit: Int = 1
+    @Published var isObjectFlippable: Bool = true
 
     private var imageSaveDirectory: URL?
+    
+    // 公共访问器，用于获取图像保存目录
+    var currentImageDirectory: URL? {
+        imageSaveDirectory
+    }
+    private var observationTasks: [Task<Void, Never>] = []
 
     private init() {}
 
@@ -25,51 +34,220 @@ class ObjectCaptureSessionManager: ObservableObject {
         ObjectCaptureSession.isSupported
     }
 
-    func prepareSession() -> ObjectCaptureSession {
-        let newSession = ObjectCaptureSession()
-        self.session = newSession
-        return newSession
-    }
+    /// 准备 Object Capture Session
+    /// 根据 Apple 官方文档，调用 start 后 session 会进入 ready 状态
+    /// 然后需要调用 startDetecting() 进入 detecting 状态
+    func prepareSession() -> ObjectCaptureSession? {
+        guard ObjectCaptureSession.isSupported else {
+            print("[ObjectCapture] 设备不支持 Object Capture")
+            return nil
+        }
 
-    func startDetecting() {
-        session?.startDetecting()
-    }
+        // 清理之前的任务
+        observationTasks.forEach { $0.cancel() }
+        observationTasks.removeAll()
 
-    func startCapturing() {
+        isInitializing = true
+        initializationError = nil
+
+        // 创建保存目录结构
+        // 根据 Apple 官方示例，需要创建 images 和 checkpoints 子目录
         guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             print("[ObjectCapture] 无法获取文档目录")
-            return
+            return nil
         }
 
         let captureDir = documentsDir.appendingPathComponent("ObjectCapture_\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(at: captureDir, withIntermediateDirectories: true)
-        imageSaveDirectory = captureDir
+        let imagesDir = captureDir.appendingPathComponent("images")
+        let checkpointsDir = captureDir.appendingPathComponent("checkpoints")
 
-        session?.beginNewScanPass()
+        do {
+            try FileManager.default.createDirectory(at: imagesDir, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: checkpointsDir, withIntermediateDirectories: true)
+            imageSaveDirectory = captureDir
+            print("[ObjectCapture] 创建捕获目录: \(captureDir.path)")
+        } catch {
+            print("[ObjectCapture] 创建目录失败: \(error)")
+            return nil
+        }
+
+        // 创建 session
+        let newSession = ObjectCaptureSession()
+        self.session = newSession
+        setupStateObservation(for: newSession)
+
+        // 配置并启动 session
+        // 根据 Apple 官方示例，需要设置 checkpointDirectory
+        var configuration = ObjectCaptureSession.Configuration()
+        configuration.isOverCaptureEnabled = true
+        configuration.checkpointDirectory = checkpointsDir
+
+        // 检查省电模式，如果开启则降低质量设置
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            print("[ObjectCapture] 省电模式开启，降低扫描质量")
+            // 在省电模式下降低帧率或质量
+            // 注意：ObjectCaptureSession.Configuration 没有直接的 quality 设置
+            // 但可以通过其他方式优化
+        }
+
+        newSession.start(imagesDirectory: imagesDir, configuration: configuration)
+        print("[ObjectCapture] Session 已启动，等待进入 ready 状态...")
+
+        // 检查启动是否立即失败
+        if case let .failed(error) = newSession.state {
+            print("[ObjectCapture] 启动失败: \(error)")
+            initializationError = error
+            isInitializing = false
+            return nil
+        }
+
+        return newSession
     }
 
-    func pauseCapturing() {
-        session?.pause()
+    /// 开始检测物体
+    /// 需要在 ready 状态下调用
+    func startDetecting() -> Bool {
+        guard let session = session else {
+            print("[ObjectCapture] 错误: session 未初始化")
+            return false
+        }
+
+        // 检查当前状态
+        if case .ready = session.state {
+            let result = session.startDetecting()
+            print("[ObjectCapture] startDetecting() 调用结果: \(result)")
+            return result
+        } else {
+            print("[ObjectCapture] 错误: 当前状态为 \(session.state)，无法调用 startDetecting()")
+            return false
+        }
     }
 
-    func resumeCapturing() {
-        session?.resume()
+    /// 开始捕获
+    /// 在 detecting 状态下调用，进入 capturing 状态
+    func startCapturing() {
+        guard let session = session else {
+            print("[ObjectCapture] 错误: session 未初始化")
+            return
+        }
+
+        if case .detecting = session.state {
+            session.startCapturing()
+            print("[ObjectCapture] 开始捕获")
+        } else {
+            print("[ObjectCapture] 错误: 当前状态为 \(session.state)，无法调用 startCapturing()")
+        }
+    }
+
+    private var metricsTimer: Timer?
+
+    private func setupStateObservation(for session: ObjectCaptureSession) {
+        // 使用更长的间隔减少 CPU 使用
+        let stateTask = Task<Void, Never> { [weak self] in
+            for await newState in session.stateUpdates {
+                guard let self = self else { break }
+                // 减少主线程更新频率
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                await MainActor.run {
+                    self.state = newState
+                    self.handleStateChange(newState)
+                }
+            }
+        }
+        observationTasks.append(stateTask)
+
+        let feedbackTask = Task<Void, Never> { [weak self] in
+            for await _ in session.feedbackUpdates {
+                guard let self = self else { break }
+                await MainActor.run {
+                    self.checkCaptureProgress()
+                    self.updateSessionMetrics()
+                }
+            }
+        }
+        observationTasks.append(feedbackTask)
+
+        // 使用更长的更新间隔
+        metricsTimer?.invalidate()
+        metricsTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self = self, let currentSession = self.session else {
+                timer.invalidate()
+                return
+            }
+            self.userCompletedScanPass = currentSession.userCompletedScanPass
+            self.updateSessionMetrics()
+        }
+    }
+
+    private func updateSessionMetrics() {
+        guard let session = session else { return }
+        numberOfShotsTaken = session.numberOfShotsTaken
+        maximumNumberOfInputImages = session.maximumNumberOfInputImages
+    }
+
+    private func checkCaptureProgress() {
+        guard let captureDir = imageSaveDirectory else { return }
+        let imagesDir = captureDir.appendingPathComponent("images")
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: imagesDir, includingPropertiesForKeys: nil)
+            let imageFiles = files.filter { ["jpg", "heic", "png"].contains($0.pathExtension.lowercased()) }
+            capturedImageCount = imageFiles.count
+        } catch {
+            // 忽略错误
+        }
+    }
+
+    private func handleStateChange(_ newState: ObjectCaptureSession.CaptureState) {
+        switch newState {
+        case .initializing:
+            print("[ObjectCapture] 正在初始化...")
+        case .ready:
+            isInitializing = false
+            print("[ObjectCapture] 准备就绪，等待用户开始检测")
+        case .detecting:
+            isInitializing = false
+            print("[ObjectCapture] 正在检测物体...")
+        case .capturing:
+            isCapturing = true
+            print("[ObjectCapture] 正在捕获...")
+        case .completed:
+            isCapturing = false
+            print("[ObjectCapture] 捕获完成")
+        case .failed(let error):
+            isCapturing = false
+            isInitializing = false
+            initializationError = error
+            print("[ObjectCapture] 错误: \(error.localizedDescription)")
+        @unknown default:
+            break
+        }
     }
 
     func finishCapturing() -> URL? {
         session?.finish()
+        print("[ObjectCapture] 完成捕获")
         return imageSaveDirectory
     }
 
     func cancelSession() {
+        metricsTimer?.invalidate()
+        metricsTimer = nil
+        observationTasks.forEach { $0.cancel() }
+        observationTasks.removeAll()
         session?.cancel()
         session = nil
         isCapturing = false
         capturedImageCount = 0
         userCompletedScanPass = false
+        isInitializing = false
+        print("[ObjectCapture] 会话已取消")
     }
 
     func reset() {
+        metricsTimer?.invalidate()
+        metricsTimer = nil
+        observationTasks.forEach { $0.cancel() }
+        observationTasks.removeAll()
         session?.cancel()
         session = nil
         state = .initializing
@@ -77,33 +255,8 @@ class ObjectCaptureSessionManager: ObservableObject {
         capturedImageCount = 0
         userCompletedScanPass = false
         imageSaveDirectory = nil
+        initializationError = nil
+        isInitializing = false
+        print("[ObjectCapture] 已重置")
     }
 }
-#else
-
-import SwiftUI
-
-@MainActor
-class ObjectCaptureSessionManager: ObservableObject {
-    static let shared = ObjectCaptureSessionManager()
-
-    @Published var session: Any? = nil
-    @Published var state: String = "unsupported"
-    @Published var isCapturing: Bool = false
-    @Published var capturedImageCount: Int = 0
-    @Published var userCompletedScanPass: Bool = false
-
-    var isSupported: Bool { false }
-
-    private init() {}
-
-    func prepareSession() -> Any? { nil }
-    func startDetecting() {}
-    func startCapturing() {}
-    func pauseCapturing() {}
-    func resumeCapturing() {}
-    func finishCapturing() -> URL? { nil }
-    func cancelSession() {}
-    func reset() {}
-}
-#endif

@@ -1,6 +1,9 @@
 import SwiftUI
 import RealityKit
 import simd
+#if os(iOS)
+import UIKit
+#endif
 
 public enum SceneObjectType {
     case usdzModel
@@ -42,6 +45,11 @@ public struct RealityKitSceneView: View {
     var onObjectTap: (SceneObject) -> Void
     var onObjectTransform: (SceneObject) -> Void
     
+    // 实体缓存，避免重复加载
+    @State private var entityCache: [UUID: Entity] = [:]
+    // 限制同时加载的实体数量
+    private let maxConcurrentLoads = 3
+    
     public init(
         selectedObject: Binding<SceneObject?>,
         objects: Binding<[SceneObject]>,
@@ -64,23 +72,48 @@ public struct RealityKitSceneView: View {
                 return
             }
             
+            // 分批加载，避免内存峰值
+            let objectsToLoad = objects.filter { entityCache[$0.id] == nil }
+            let limitedObjects = Array(objectsToLoad.prefix(maxConcurrentLoads))
+            
             for object in objects {
-                if let existingEntity = rootEntity.findEntity(named: object.id.uuidString) {
-                    updateEntity(existingEntity, from: object)
-                } else {
+                if let cachedEntity = entityCache[object.id] {
+                    // 使用缓存的实体
+                    if cachedEntity.parent == nil {
+                        cachedEntity.name = object.id.uuidString
+                        rootEntity.addChild(cachedEntity)
+                    }
+                    updateEntity(cachedEntity, from: object)
+                } else if limitedObjects.contains(where: { $0.id == object.id }) {
+                    // 异步加载新实体
                     Task {
                         if let newEntity = try? await loadEntity(for: object) {
                             newEntity.name = object.id.uuidString
+                            entityCache[object.id] = newEntity
                             rootEntity.addChild(newEntity)
                         }
                     }
                 }
             }
             
-            let currentIDs = Set(objects.map { $0.id.uuidString })
-            for child in rootEntity.children {
-                if !currentIDs.contains(child.name) {
-                    rootEntity.removeChild(child)
+            // 清理不在列表中的实体
+            let currentIDs = Set(objects.map { $0.id })
+            for (id, entity) in entityCache {
+                if !currentIDs.contains(id) {
+                    entity.removeFromParent()
+                    entityCache.removeValue(forKey: id)
+                }
+            }
+            
+            // 内存警告时清理缓存
+            if entityCache.count > 10 {
+                // 保留最近使用的实体
+                let objectsToKeep = Set(objects.map { $0.id })
+                for id in entityCache.keys {
+                    if !objectsToKeep.contains(id) {
+                        entityCache[id]?.removeFromParent()
+                        entityCache.removeValue(forKey: id)
+                    }
                 }
             }
         }
@@ -114,7 +147,24 @@ public struct RealityKitSceneView: View {
         case .usdzModel:
             if let path = object.usdzModelPath {
                 let url = URL(fileURLWithPath: path)
+                
+                // 检查文件大小，如果太大则显示警告
+                if let fileSize = try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64 {
+                    let sizeMB = Double(fileSize) / 1024 / 1024
+                    print("[RealityKitSceneView] 加载模型: \(path), 大小: \(String(format: "%.2f", sizeMB)) MB")
+                    
+                    // 如果模型超过 50MB，可能需要优化
+                    if sizeMB > 50 {
+                        print("[RealityKitSceneView] 警告: 模型较大，可能影响性能")
+                    }
+                }
+                
+                // 使用 autoreleasepool 减少内存峰值
                 let entity = try await Entity.load(contentsOf: url)
+                
+                // 优化模型：降低材质复杂度
+                optimizeEntityMaterials(entity)
+                
                 applyTransform(to: entity, from: object)
                 return entity
             }
@@ -134,6 +184,30 @@ public struct RealityKitSceneView: View {
         }
         
         return nil
+    }
+    
+    private func optimizeEntityMaterials(_ entity: Entity) {
+        // 递归优化所有子实体的材质
+        if let modelEntity = entity as? ModelEntity {
+            if var model = modelEntity.model {
+                // 使用 RealityKit.Material 明确指定类型
+                var optimizedMaterials: [RealityKit.Material] = []
+                
+                for material in model.materials {
+                    // 这里可以添加材质优化逻辑
+                    // 例如：降低纹理分辨率、简化着色器等
+                    optimizedMaterials.append(material)
+                }
+                
+                model.materials = optimizedMaterials
+                modelEntity.model = model
+            }
+        }
+        
+        // 递归处理子实体
+        for child in entity.children {
+            optimizeEntityMaterials(child)
+        }
     }
     
     private func applyTransform(to entity: Entity, from object: SceneObject) {

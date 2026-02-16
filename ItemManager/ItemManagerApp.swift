@@ -29,6 +29,10 @@ struct ItemManagerApp: App {
     init() {
         // Ensure NotificationManager is initialized to set the delegate
         _ = NotificationManager.shared
+        
+        // 预热 RealityKit 渲染引擎，避免 Object Capture 时的材质加载错误
+        // 这会在 App 启动时预加载 engine:throttleGhosted.rematerial 等内部资源
+        RealityKitHelper.warmUp()
     }
     
     var body: some Scene {
