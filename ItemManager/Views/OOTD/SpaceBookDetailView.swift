@@ -19,9 +19,12 @@ struct SpaceBookDetailView: View {
     // Sidebar visibility control
     @Binding var isSidebarVisible: Bool
 
+    // 使用 @Query 获取书页数据，这样删除后会自动刷新
+    @Query(filter: #Predicate<SpaceOutfit> { $0.isDeleted == false }, sort: \SpaceOutfit.sortIndex) private var allPages: [SpaceOutfit]
+
     // Sort pages by sortIndex (primary) then createdAt (secondary)
     var sortedPages: [SpaceOutfit] {
-        book.pages.filter { !$0.isDeleted }.sorted {
+        allPages.filter { $0.book?.id == book.id }.sorted {
             if $0.sortIndex == $1.sortIndex {
                 return $0.createdAt < $1.createdAt
             }
@@ -86,8 +89,12 @@ struct SpaceBookDetailView: View {
     // Editing Mode for custom sort
     @State private var isEditing = false
 
+    // 用于强制刷新视图的触发器
+    @State private var refreshTrigger = false
+
     var body: some View {
         mainContent
+            .id(refreshTrigger)
             .navigationTitle(book.title)
             .toolbar {
                 SpaceBookToolbar(
@@ -286,9 +293,13 @@ struct SpaceBookDetailView: View {
     }
 
     private func deletePage(_ page: SpaceOutfit) {
-        page.isDeleted = true
-        page.deletedAt = Date()
-        try? modelContext.save()
+        withAnimation {
+            page.isDeleted = true
+            page.deletedAt = Date()
+            try? modelContext.save()
+            // 强制刷新视图
+            refreshTrigger.toggle()
+        }
     }
 
     private func duplicatePage(_ page: SpaceOutfit) {

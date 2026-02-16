@@ -12,8 +12,11 @@ struct BookDetailView: View {
     @Binding var isSidebarVisible: Bool
     var onBack: (() -> Void)?
 
+    // 使用 @Query 获取书页数据，这样删除后会自动刷新
+    @Query(filter: #Predicate<Outfit> { $0.isDeleted == false }, sort: \Outfit.sortIndex) private var allPages: [Outfit]
+
     var sortedPages: [Outfit] {
-        book.pages.filter { !$0.isDeleted }.sorted {
+        allPages.filter { $0.book?.id == book.id }.sorted {
             if $0.sortIndex == $1.sortIndex {
                 return $0.createdAt < $1.createdAt
             }
@@ -54,6 +57,9 @@ struct BookDetailView: View {
         Array(repeating: GridItem(.flexible(), spacing: 16), count: gridMode.rawValue)
     }
 
+    // 用于强制刷新视图的触发器
+    @State private var refreshTrigger = false
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: gridColumns, spacing: 16) {
@@ -64,6 +70,7 @@ struct BookDetailView: View {
             .padding()
             .animation(.default, value: sortedPages)
         }
+        .id(refreshTrigger)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(book.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -222,9 +229,13 @@ struct BookDetailView: View {
     }
 
     func deletePage(_ page: Outfit) {
-        page.isDeleted = true
-        page.deletedAt = Date()
-        try? modelContext.save()
+        withAnimation {
+            page.isDeleted = true
+            page.deletedAt = Date()
+            try? modelContext.save()
+            // 强制刷新视图
+            refreshTrigger.toggle()
+        }
     }
 
     func updateCover(with item: PhotosPickerItem) {

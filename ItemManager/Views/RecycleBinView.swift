@@ -606,12 +606,14 @@ struct DeletedBookRow: View {
                                 .foregroundStyle(.blue)
                                 .font(.title3)
                         }
+                        .buttonStyle(.plain)
                         
                         Button(action: onDelete) {
                             Image(systemName: "trash.circle.fill")
                                 .foregroundStyle(.red)
                                 .font(.title3)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -686,11 +688,13 @@ struct DeletedOutfitRow: View {
                         Image(systemName: "arrow.uturn.backward")
                             .foregroundStyle(.blue)
                     }
+                    .buttonStyle(.plain)
                     
                     Button(action: onDelete) {
                         Image(systemName: "trash")
                             .foregroundStyle(.red)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -746,16 +750,18 @@ struct DeletedSpaceBookRow: View {
                                 .foregroundStyle(.blue)
                                 .font(.title3)
                         }
+                        .buttonStyle(.plain)
                         
                         Button(action: onDelete) {
                             Image(systemName: "trash.circle.fill")
                                 .foregroundStyle(.red)
                                 .font(.title3)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            
+
             if isExpanded {
                 ForEach(book.pages) { page in
                     HStack {
@@ -826,11 +832,13 @@ struct DeletedSpaceOutfitRow: View {
                         Image(systemName: "arrow.uturn.backward")
                             .foregroundStyle(.blue)
                     }
-                    
+                    .buttonStyle(.plain)
+
                     Button(action: onDelete) {
                         Image(systemName: "trash")
                             .foregroundStyle(.red)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }

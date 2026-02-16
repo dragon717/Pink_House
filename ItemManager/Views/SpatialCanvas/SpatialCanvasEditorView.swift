@@ -58,7 +58,7 @@ struct SpatialCanvasEditorView: View {
     @State private var showingSaveSuccess = false
     
     // 右侧素材面板
-    @State private var showingAssetPanel = true
+    @State private var showingAssetPanel = false
     @State private var selectedAssetCategory: AssetCategory = .clothing
     
     // 底部操作栏状态
@@ -619,6 +619,14 @@ struct SpatialCanvasEditorView: View {
         clothing.model3DThumbnailPath = thumbnailPath
         
         modelContext.insert(clothing)
+        
+        // 保存上下文到数据库
+        do {
+            try modelContext.save()
+            print("[ObjectCapture] Clothing 已保存到数据库: \(modelID)")
+        } catch {
+            print("[ObjectCapture] 保存 Clothing 失败: \(error)")
+        }
         
         let object = SceneObject(
             type: .usdzModel,
