@@ -141,7 +141,7 @@ struct DreamyBackgroundView: View {
 
 // MARK: - Components
 
-struct OutlinedText: View {
+struct WidgetOutlinedText: View {
     let text: String
     var size: CGFloat
     var weight: Font.Weight = .bold
@@ -167,7 +167,7 @@ struct SmallWidgetView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                OutlinedText(text: "本月", size: 12, weight: .bold)
+                WidgetOutlinedText(text: "本月", size: 12, weight: .bold)
                 Spacer()
             }
             .padding(.bottom, 4)
@@ -180,8 +180,8 @@ struct SmallWidgetView: View {
             VStack(spacing: 4) {
                 Spacer()
                 VStack(spacing: 0) {
-                    OutlinedText(text: "\(monthData?.count ?? 0)", size: 28, weight: .heavy)
-                    OutlinedText(text: "款待付", size: 10, weight: .medium, color: .white.opacity(0.8))
+                    WidgetOutlinedText(text: "\(monthData?.count ?? 0)", size: 28, weight: .heavy)
+                    WidgetOutlinedText(text: "款待付", size: 10, weight: .medium, color: .white.opacity(0.8))
                 }
                 
                 Rectangle()
@@ -190,8 +190,8 @@ struct SmallWidgetView: View {
                     .padding(.vertical, 4)
                 
                 VStack(spacing: 0) {
-                    OutlinedText(text: "¥\((monthData?.totalBalance ?? 0).formatted(.number.notation(.compactName)))", size: 16, weight: .bold, color: .orange)
-                    OutlinedText(text: "尾款", size: 10, weight: .medium, color: .orange.opacity(0.8))
+                    WidgetOutlinedText(text: "¥\((monthData?.totalBalance ?? 0).formatted(.number.notation(.compactName)))", size: 16, weight: .bold, color: .orange)
+                    WidgetOutlinedText(text: "尾款", size: 10, weight: .medium, color: .orange.opacity(0.8))
                 }
                 Spacer()
             }
@@ -214,9 +214,9 @@ struct MediumWidgetView: View {
                             .font(.caption)
                             .foregroundStyle(.white)
                         let currentYear = Calendar.current.component(.year, from: Date())
-                        OutlinedText(text: "\(currentYear)年月度尾款天使", size: 14, weight: .bold)
+                        WidgetOutlinedText(text: "\(currentYear)年月度尾款天使", size: 14, weight: .bold)
                     }
-                    OutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName))) · 总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 10, weight: .regular, color: .white.opacity(0.9))
+                    WidgetOutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName))) · 总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 10, weight: .regular, color: .white.opacity(0.9))
                 }
                 Spacer()
             }
@@ -266,17 +266,17 @@ struct LargeWidgetView: View {
                             .font(.title3)
                             .foregroundStyle(.white)
                         let currentYear = Calendar.current.component(.year, from: Date())
-                        OutlinedText(text: "\(currentYear)年度尾款天使表", size: 20, weight: .heavy)
+                        WidgetOutlinedText(text: "\(currentYear)年度尾款天使表", size: 20, weight: .heavy)
                     }
                     
                     HStack(spacing: 12) {
                         HStack(spacing: 4) {
                             Circle().fill(Color.pink).frame(width: 6, height: 6)
-                            OutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 12)
+                            WidgetOutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 12)
                         }
                         HStack(spacing: 4) {
                             Circle().fill(Color.orange).frame(width: 6, height: 6)
-                            OutlinedText(text: "总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 12)
+                            WidgetOutlinedText(text: "总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 12)
                         }
                     }
                 }
@@ -323,14 +323,14 @@ struct StatCard: View {
                 )
             
             VStack(spacing: 4) {
-                OutlinedText(text: title, size: 12, weight: .bold)
+                WidgetOutlinedText(text: title, size: 12, weight: .bold)
                     .lineLimit(1)
                 
-                OutlinedText(text: value, size: 14, weight: .heavy, color: .orange)
+                WidgetOutlinedText(text: value, size: 14, weight: .heavy, color: .orange)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
-                OutlinedText(text: subValue, size: 10, weight: .medium, color: .white.opacity(0.8))
+                WidgetOutlinedText(text: subValue, size: 10, weight: .medium, color: .white.opacity(0.8))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }

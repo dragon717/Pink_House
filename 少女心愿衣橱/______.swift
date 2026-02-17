@@ -23,7 +23,7 @@ struct ItemManagerWidget: Widget {
             WidgetEntryView(entry: entry)
         }
         .configurationDisplayName("少女心愿衣橱")
-        .description("高密度展示您的衣橱统计与近期动态。长按可配置统计方式。")
+        .description("展示您的衣橱统计与近期动态")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled() // 允许背景充满
     }
