@@ -199,6 +199,7 @@ public struct RealityKitSceneView: View {
             .onChange(of: selectedTool) { _, _ in
                 DispatchQueue.main.async {
                     updateSelectionOutline()
+                    updateGizmoManually()
                 }
             }
             .onChange(of: transformMode) { _, _ in
@@ -459,11 +460,9 @@ public struct RealityKitSceneView: View {
     }
     
     private func updateGizmo(in rootEntity: Entity) {
-        if gizmoEntity == nil {
-            rootEntity.children.forEach { child in
-                if child.name == "gizmo" || child.name.starts(with: "gizmo_") {
-                    child.removeFromParent()
-                }
+        rootEntity.children.forEach { child in
+            if child.name == "gizmo" || child.name.starts(with: "gizmo_") {
+                child.removeFromParent()
             }
         }
         
@@ -488,14 +487,12 @@ public struct RealityKitSceneView: View {
             return
         }
         
-        if let existingGizmo = gizmoEntity, existingGizmo.parent != nil {
-            existingGizmo.position = entity.position
-        } else {
-            let gizmo = createGizmo(for: transformMode)
-            gizmo.position = entity.position
-            rootEntity.addChild(gizmo)
-            gizmoEntity = gizmo
-        }
+        gizmoEntity = nil
+        
+        let gizmo = createGizmo(for: transformMode)
+        gizmo.position = entity.position
+        rootEntity.addChild(gizmo)
+        gizmoEntity = gizmo
     }
     
     private func updateGizmoManually() {
@@ -504,6 +501,11 @@ public struct RealityKitSceneView: View {
         if let existingGizmo = gizmoEntity {
             existingGizmo.removeFromParent()
             gizmoEntity = nil
+        }
+        
+        if let existingOrigin = originEntity {
+            existingOrigin.removeFromParent()
+            originEntity = nil
         }
         
         updateGizmo(in: rootEntity)
