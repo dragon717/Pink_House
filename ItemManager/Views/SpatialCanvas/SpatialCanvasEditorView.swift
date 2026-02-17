@@ -12,6 +12,7 @@ import RealityKit
 import ARKit
 import simd
 import Combine
+import UniformTypeIdentifiers
 
 // MARK: - 主编辑器视图
 
@@ -66,6 +67,9 @@ struct SpatialCanvasEditorView: View {
     
     // 顶部模型列表状态
     @State private var showingModelList = true
+    
+    // USDZ 文件导入状态
+    @State private var showingUSDZFilePicker = false
     
     // 变换状态
     @State private var transformMode: TransformMode = .move
@@ -248,6 +252,16 @@ struct SpatialCanvasEditorView: View {
                 // 先关闭扫描界面，再处理图像
                 showingObjectCaptureScanner = false
                 processObjectCaptureDirectory(imageDirectory)
+            }
+        }
+        .fileImporter(isPresented: $showingUSDZFilePicker, allowedContentTypes: [UTType(filenameExtension: "usdz") ?? .data], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    handleSelectedUSDZFile(url)
+                }
+            case .failure(let error):
+                print("[USDZ Import] 选择文件失败: \(error.localizedDescription)")
             }
         }
         .navigationTitle("")
@@ -484,7 +498,7 @@ struct SpatialCanvasEditorView: View {
             case .camera:
                 showingObjectCaptureScanner = true
             case .usdzModel:
-                showingImagePicker = true
+                showingUSDZFilePicker = true
             case .light:
                 break
             case .text:
@@ -730,6 +744,80 @@ struct SpatialCanvasEditorView: View {
         
         print("[ObjectCapture] 创建3D模型记录: \(modelID)")
         print("[ObjectCapture] =====================")
+    }
+    
+    private func handleSelectedUSDZFile(_ url: URL) {
+        print("[USDZ Import] ===== 开始导入 USDZ 文件 =====")
+        print("[USDZ Import] 原始 URL: \(url)")
+        
+        // 访问安全通报资源
+        let canAccess = url.startAccessingSecurityScopedResource()
+        print("[USDZ Import] startAccessingSecurityScopedResource: \(canAccess)")
+        
+        guard canAccess else {
+            print("[USDZ Import] ❌ 无法访问文件")
+            return
+        }
+        
+        Task {
+            defer {
+                url.stopAccessingSecurityScopedResource()
+            }
+            
+            do {
+                // 复制文件到应用目录
+                let modelID = UUID()
+                let fileManager = FileManager.default
+                guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                    print("[USDZ Import] ❌ 无法获取文档目录")
+                    return
+                }
+                
+                let modelDir = documentsPath.appendingPathComponent("Models/\(modelID.uuidString)")
+                try fileManager.createDirectory(at: modelDir, withIntermediateDirectories: true)
+                
+                let destinationURL = modelDir.appendingPathComponent("model.usdz")
+                
+                // 复制文件
+                try fileManager.copyItem(at: url, to: destinationURL)
+                print("[USDZ Import] ✅ 文件已复制到: \(destinationURL.path)")
+                
+                // 创建 Model3D 记录
+                let model3D = Model3D(
+                    name: url.deletingPathExtension().lastPathComponent,
+                    types: "3D模型",
+                    modelPath: nil,
+                    modelType: "usdz",
+                    thumbnailPath: nil,
+                    sourceImagePaths: []
+                )
+                model3D.setModelPath(destinationURL.path)
+                
+                modelContext.insert(model3D)
+                
+                // 保存上下文
+                try modelContext.save()
+                print("[USDZ Import] ✅ Model3D 已保存到数据库: \(modelID)")
+                
+                await MainActor.run {
+                    // 创建场景对象
+                    let object = SceneObject(
+                        type: .usdzModel,
+                        position: SIMD3<Float>(0, 0, 0),
+                        rotation: SIMD3<Float>(0, 0, 0),
+                        scale: SIMD3<Float>(1, 1, 1),
+                        usdzModelPath: destinationURL.path,
+                        model3DID: model3D.id
+                    )
+                    sceneObjects.append(object)
+                    hasUnsavedChanges = true
+                    print("[USDZ Import] ✅ 场景对象已创建")
+                }
+                
+            } catch {
+                print("[USDZ Import] ❌ 导入失败: \(error)")
+            }
+        }
     }
     
     /// 保存缩略图，返回相对路径
