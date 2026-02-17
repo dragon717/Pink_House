@@ -149,15 +149,20 @@ struct SpatialCanvasEditorView: View {
                 Spacer()
                 
                 if selectedObject != nil {
-                    BottomControlBar(
-                        transformMode: $transformMode,
-                        onMove: { transformMode = .move },
-                        onRotate: { transformMode = .rotate },
-                        onScale: { transformMode = .scale },
-                        onDelete: { deleteSelectedObject() }
-                    )
-                    .padding(.bottom, 30)
-                    .transition(.move(edge: .bottom))
+                    HStack {
+                        Spacer()
+                        BottomControlBar(
+                            transformMode: $transformMode,
+                            onMove: { transformMode = .move },
+                            onRotate: { transformMode = .rotate },
+                            onScale: { transformMode = .scale },
+                            onDelete: { deleteSelectedObject() }
+                        )
+                        .padding(.bottom, 20)
+                        .transition(.move(edge: .bottom))
+                        Spacer()
+                    }
+                    .padding(.leading, 70)
                 }
             }
             

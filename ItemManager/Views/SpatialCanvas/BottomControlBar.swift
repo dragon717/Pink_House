@@ -18,7 +18,7 @@ struct BottomControlBar: View {
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 8) {
             // 移动按钮
             ControlButton(
                 title: "移动",
@@ -59,8 +59,8 @@ struct BottomControlBar: View {
                 onDelete()
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
         .background(
             Capsule()
                 .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
@@ -69,7 +69,7 @@ struct BottomControlBar: View {
                         .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05), lineWidth: 1)
                 )
         )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 10, x: 0, y: 5)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 6, x: 0, y: 3)
     }
 }
 
@@ -86,18 +86,18 @@ struct ControlButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(isActive ? color : .primary)
                 
                 Text(title)
-                    .font(.subheadline)
+                    .font(.caption)
                     .fontWeight(isActive ? .semibold : .regular)
                     .foregroundStyle(isActive ? color : .primary.opacity(0.7))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(
                 Capsule()
                     .fill(isActive ? color.opacity(0.15) : Color.gray.opacity(0.1))
