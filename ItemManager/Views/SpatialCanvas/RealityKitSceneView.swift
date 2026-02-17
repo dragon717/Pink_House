@@ -70,6 +70,7 @@ public struct RealityKitSceneView: View {
     @State private var activeGizmoAxis: GizmoAxis? = nil
     @State private var initialDragPosition: SIMD3<Float>? = nil
     @State private var initialObjectTransform: (position: SIMD3<Float>, rotation: simd_quatf, scale: SIMD3<Float>)? = nil
+    @State private var sceneUpdateTrigger = false
     private let maxConcurrentLoads = 3
     
     public init(
@@ -126,6 +127,8 @@ public struct RealityKitSceneView: View {
                 rootEntity.addChild(pointLight)
                 
             } update: { content in
+                _ = sceneUpdateTrigger
+                
                 guard let rootEntity = content.entities.first(where: { $0.name == "sceneRoot" }) else {
                     return
                 }
@@ -334,6 +337,15 @@ public struct RealityKitSceneView: View {
         
         if tappedEntity.name.starts(with: "gizmo_") {
             DispatchQueue.main.async {
+                if let selected = self.selectedObject, let entity = self.entityCache[selected.id] {
+                    self.initialDragPosition = SIMD3<Float>(0, 0, 0)
+                    self.initialObjectTransform = (
+                        position: entity.position,
+                        rotation: entity.orientation,
+                        scale: entity.scale
+                    )
+                }
+                
                 if tappedEntity.name.contains("_x") {
                     self.activeGizmoAxis = .x
                 } else if tappedEntity.name.contains("_y") {
@@ -355,10 +367,10 @@ public struct RealityKitSceneView: View {
         if let targetEntity = currentEntity, 
            let object = objects.first(where: { $0.id.uuidString == targetEntity.name }) {
             DispatchQueue.main.async {
-                self.selectedObject = object
-                DispatchQueue.main.async {
-                    self.onObjectTap(object)
-                }
+                self.initialDragPosition = nil
+                self.initialObjectTransform = nil
+                self.activeGizmoAxis = nil
+                self.onObjectTap(object)
                 print("[RealityKitSceneView] 选中对象: \(object.id), 名称: \(targetEntity.name)")
             }
         } else {
@@ -429,23 +441,40 @@ public struct RealityKitSceneView: View {
     }
     
     private func updateGizmo(in rootEntity: Entity) {
-        rootEntity.children.forEach { child in
-            if child.name == "gizmo" || child.name.starts(with: "gizmo_") {
-                child.removeFromParent()
+        if gizmoEntity == nil {
+            rootEntity.children.forEach { child in
+                if child.name == "gizmo" || child.name.starts(with: "gizmo_") {
+                    child.removeFromParent()
+                }
             }
         }
-        gizmoEntity = nil
         
-        guard selectedTool == .select, let selected = selectedObject, let entity = entityCache[selected.id] else { return }
+        guard selectedTool == .select, let selected = selectedObject, let entity = entityCache[selected.id] else {
+            if let gizmo = gizmoEntity {
+                gizmo.removeFromParent()
+                gizmoEntity = nil
+            }
+            return
+        }
         
-        let gizmo = createGizmo(for: transformMode)
-        gizmo.position = entity.position
-        rootEntity.addChild(gizmo)
-        gizmoEntity = gizmo
+        if let existingGizmo = gizmoEntity, existingGizmo.parent != nil {
+            existingGizmo.position = entity.position
+        } else {
+            let gizmo = createGizmo(for: transformMode)
+            gizmo.position = entity.position
+            rootEntity.addChild(gizmo)
+            gizmoEntity = gizmo
+        }
     }
     
     private func updateGizmoManually() {
         guard let rootEntity = entityCache.values.first?.parent else { return }
+        
+        if let existingGizmo = gizmoEntity {
+            existingGizmo.removeFromParent()
+            gizmoEntity = nil
+        }
+        
         updateGizmo(in: rootEntity)
     }
     
@@ -666,6 +695,7 @@ public struct RealityKitSceneView: View {
                 rotation: entity.orientation,
                 scale: entity.scale
             )
+            activeGizmoAxis = .all
         }
         
         guard let axis = activeGizmoAxis, let initial = initialObjectTransform else { return }
@@ -689,12 +719,15 @@ public struct RealityKitSceneView: View {
                 newPosition.y -= deltaY * 0.005
             }
             
+            entity.position = newPosition
+            gizmoEntity?.position = newPosition
+            
             DispatchQueue.main.async {
+                self.sceneUpdateTrigger.toggle()
                 if let index = self.objects.firstIndex(where: { $0.id == selected.id }) {
                     self.objects[index].position = newPosition
                     self.selectedObject = self.objects[index]
                     self.onObjectTransform(self.objects[index])
-                    self.gizmoEntity?.position = newPosition
                 }
             }
             
@@ -717,7 +750,10 @@ public struct RealityKitSceneView: View {
                 newRotation = rotY * rotX * newRotation
             }
             
+            entity.orientation = newRotation
+            
             DispatchQueue.main.async {
+                self.sceneUpdateTrigger.toggle()
                 if let index = self.objects.firstIndex(where: { $0.id == selected.id }) {
                     let euler = newRotation.eulerAngles
                     self.objects[index].rotation = SIMD3<Float>(euler.x, euler.y, euler.z)
@@ -743,7 +779,10 @@ public struct RealityKitSceneView: View {
             
             newScale = simd_clamp(newScale, SIMD3<Float>(0.1, 0.1, 0.1), SIMD3<Float>(10, 10, 10))
             
+            entity.scale = newScale
+            
             DispatchQueue.main.async {
+                self.sceneUpdateTrigger.toggle()
                 if let index = self.objects.firstIndex(where: { $0.id == selected.id }) {
                     self.objects[index].scale = newScale
                     self.selectedObject = self.objects[index]
