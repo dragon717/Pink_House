@@ -129,12 +129,9 @@ enum GSProcessingStage: Equatable {
 
 enum AssetCategory: String, CaseIterable {
     case models = "模型"
-    case clothing = "服饰"
-    case accessories = "配饰"
-    case furniture = "家具"
+    case clothing = "服装"
     case effect = "特效"
-    case template = "模板"
-    case material = "材质"
+    case light = "灯光"
 }
 
 // MARK: - GS处理遮罩视图

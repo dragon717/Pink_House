@@ -163,14 +163,8 @@ struct AssetPanel: View {
                             ClothingAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .effect:
                             EffectAssetList(searchText: searchText, onSelect: onAssetSelect)
-                        case .template:
-                            TemplateAssetList(searchText: searchText, onSelect: onAssetSelect)
-                        case .material:
-                            MaterialAssetList(searchText: searchText, onSelect: onAssetSelect)
-                        case .accessories:
-                            AccessoriesAssetList(searchText: searchText, onSelect: onAssetSelect)
-                        case .furniture:
-                            FurnitureAssetList(searchText: searchText, onSelect: onAssetSelect)
+                        case .light:
+                            LightAssetList(searchText: searchText, onSelect: onAssetSelect)
                         }
                     }
                     .padding()
@@ -221,17 +215,11 @@ struct CategoryTab: View {
         case .models:
             return .purple
         case .clothing:
-            return .orange
+            return .indigo
         case .effect:
             return .pink
-        case .template:
-            return .cyan
-        case .material:
-            return .purple
-        case .accessories:
-            return .blue
-        case .furniture:
-            return .brown
+        case .light:
+            return .yellow
         }
     }
     
@@ -477,6 +465,83 @@ struct EffectAssetCard: View {
                             .font(.title2)
                             .foregroundStyle(color)
                     }
+                }
+                
+                Text(name)
+                    .font(.subheadline)
+                
+                Spacer()
+                
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(color)
+            }
+            .padding()
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - 灯光素材列表
+
+struct LightAssetList: View {
+    let searchText: String
+    let onSelect: (SpatialAsset) -> Void
+    
+    let lights = [
+        ("点光源", "lightbulb", Color.yellow),
+        ("聚光灯", "flashlight.on.fill", Color.orange),
+        ("环境光", "sun.max", Color.cyan),
+        ("定向光", "arrow.up.and.down", Color.white)
+    ]
+    
+    var filteredLights: [(String, String, Color)] {
+        if searchText.isEmpty {
+            return lights
+        }
+        return lights.filter { light in
+            light.0.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            ForEach(filteredLights, id: \.0) { light in
+                LightAssetCard(name: light.0, icon: light.1, color: light.2) {
+                    let asset = SpatialAsset(
+                        type: .effect,
+                        name: light.0,
+                        imagePath: nil,
+                        thumbnail: nil,
+                        metadata: ["lightType": light.0]
+                    )
+                    onSelect(asset)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 灯光卡片
+
+struct LightAssetCard: View {
+    let name: String
+    let icon: String
+    let color: Color
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.2))
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: icon)
+                        .font(.title2)
+                        .foregroundStyle(color)
                 }
                 
                 Text(name)

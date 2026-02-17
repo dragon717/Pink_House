@@ -11,15 +11,12 @@ struct CanvasToolbar: View {
     @Binding var selectedTool: CanvasTool?
     var onToolTap: (CanvasTool) -> Void
     var onResetCamera: () -> Void = {}
+    var onOpenAssetPanel: (AssetCategory) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
     
     // 工具分组
     private let toolGroups: [[CanvasTool]] = [
-        [.select],
-        [.image, .camera, .usdzModel],
-        [.light, .text],
-        [.material, .clothing, .effect, .template],
-        [.record, .settings]
+        [.record]
     ]
     
     var body: some View {
@@ -31,6 +28,40 @@ struct CanvasToolbar: View {
                     isSelected: false,
                     onTap: onResetCamera
                 )
+                
+                Divider()
+                    .background(Color.black.opacity(0.1))
+                    .frame(width: 30)
+                    .padding(.vertical, 4)
+                
+                // 选择按钮
+                ToolButton(
+                    tool: .select,
+                    isSelected: selectedTool == .select,
+                    onTap: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            print("[CanvasToolbar] 点击工具: select, 当前选中: \(selectedTool?.rawValue ?? "nil")")
+                            onToolTap(.select)
+                            print("[CanvasToolbar] 点击后选中: \(selectedTool?.rawValue ?? "nil")")
+                        }
+                    }
+                )
+                
+                Divider()
+                    .background(Color.black.opacity(0.1))
+                    .frame(width: 30)
+                    .padding(.vertical, 4)
+                
+                // 导入菜单按钮
+                ImportMenuButton(onToolTap: onToolTap)
+                
+                Divider()
+                    .background(Color.black.opacity(0.1))
+                    .frame(width: 30)
+                    .padding(.vertical, 4)
+                
+                // 素材库菜单按钮
+                AssetMenuButton(onOpenAssetPanel: onOpenAssetPanel, onToolTap: onToolTap)
                 
                 Divider()
                     .background(Color.black.opacity(0.1))
@@ -67,7 +98,7 @@ struct CanvasToolbar: View {
             .padding(.vertical, 16)
             .padding(.horizontal, 8)
         }
-        .frame(maxHeight: UIScreen.main.bounds.height * 0.75)
+        .frame(maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
@@ -78,6 +109,137 @@ struct CanvasToolbar: View {
         )
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 10, x: 0, y: 5)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - 素材库菜单按钮
+
+struct AssetMenuButton: View {
+    var onOpenAssetPanel: (AssetCategory) -> Void
+    var onToolTap: (CanvasTool) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isPressed = false
+    
+    var body: some View {
+        Menu {
+            Button {
+                onOpenAssetPanel(.clothing)
+            } label: {
+                Label("服装", systemImage: CanvasTool.clothing.icon)
+            }
+            
+            Button {
+                onOpenAssetPanel(.effect)
+            } label: {
+                Label("特效", systemImage: CanvasTool.effect.icon)
+            }
+            
+            Button {
+                onOpenAssetPanel(.light)
+            } label: {
+                Label("灯光", systemImage: CanvasTool.light.icon)
+            }
+            
+            Divider()
+            
+            Button {
+                onToolTap(.text)
+            } label: {
+                Label("文字", systemImage: CanvasTool.text.icon)
+            }
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(Color.gray.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                    
+                    Image(systemName: "folder")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+                .scaleEffect(isPressed ? 0.9 : 1.0)
+                
+                Text("素材")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.7))
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .pressEvents {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = true
+            }
+        } onRelease: {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = false
+            }
+        }
+    }
+}
+
+// MARK: - 导入菜单按钮
+
+struct ImportMenuButton: View {
+    var onToolTap: (CanvasTool) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isPressed = false
+    
+    var body: some View {
+        Menu {
+            Button {
+                onToolTap(.image)
+            } label: {
+                Label("图片", systemImage: CanvasTool.image.icon)
+            }
+            
+            Button {
+                onToolTap(.camera)
+            } label: {
+                Label("相机", systemImage: CanvasTool.camera.icon)
+            }
+            
+            Button {
+                onToolTap(.usdzModel)
+            } label: {
+                Label("3D模型", systemImage: CanvasTool.usdzModel.icon)
+            }
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(Color.gray.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                    
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+                .scaleEffect(isPressed ? 0.9 : 1.0)
+                
+                Text("导入")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.7))
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .pressEvents {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = true
+            }
+        } onRelease: {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = false
+            }
+        }
     }
 }
 

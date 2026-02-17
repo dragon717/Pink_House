@@ -144,13 +144,18 @@ struct SpatialCanvasEditorView: View {
                     onToolTap: handleToolTap,
                     onResetCamera: {
                         cameraController?.reset()
+                    },
+                    onOpenAssetPanel: { category in
+                        DispatchQueue.main.async {
+                            selectedAssetCategory = category
+                            showingAssetPanel = true
+                        }
                     }
                 )
                 .padding(.leading, 8)
-                .padding(.bottom, 20)
+                .padding(.bottom, 8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .ignoresSafeArea(edges: .vertical)
             .allowsHitTesting(true)
 
             // 右侧素材面板
