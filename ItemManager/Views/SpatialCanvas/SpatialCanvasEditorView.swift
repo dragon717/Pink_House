@@ -34,7 +34,7 @@ struct SpatialCanvasEditorView: View {
     @State private var selectedObject: SceneObject?
     
     // 工具栏状态
-    @State private var selectedTool: CanvasTool = .select
+    @State private var selectedTool: CanvasTool? = nil
     @State private var showingToolPanel = false
     
     // 图片采集状态
@@ -65,11 +65,7 @@ struct SpatialCanvasEditorView: View {
     @State private var showingBottomControls = false
     
     // 变换状态
-    @State private var transformMode: TransformMode = .rotate
-    @State private var rotationX: Double = 0
-    @State private var rotationY: Double = 0
-    @State private var rotationZ: Double = 0
-    @State private var scale: Double = 1.0
+    @State private var transformMode: TransformMode = .move
     
     // 加载状态
     @State private var isSceneReady = false
@@ -94,6 +90,8 @@ struct SpatialCanvasEditorView: View {
                 RealityKitSceneView(
                     selectedObject: $selectedObject,
                     objects: $sceneObjects,
+                    selectedTool: $selectedTool,
+                    transformMode: $transformMode,
                     onObjectTap: handleObjectTap,
                     onObjectTransform: handleObjectTransform,
                     onCameraControllerReady: { controller in
@@ -116,18 +114,6 @@ struct SpatialCanvasEditorView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(editorBackground)
-            }
-            
-            // 变换辅助器 (Gizmo)
-            if selectedObject != nil {
-                TransformGizmoOverlay(
-                    mode: transformMode,
-                    rotationX: $rotationX,
-                    rotationY: $rotationY,
-                    rotationZ: $rotationZ,
-                    scale: $scale,
-                    onTransformChange: applyTransform
-                )
             }
             
             // 左侧工具栏
@@ -165,6 +151,7 @@ struct SpatialCanvasEditorView: View {
                 if selectedObject != nil {
                     BottomControlBar(
                         transformMode: $transformMode,
+                        onMove: { transformMode = .move },
                         onRotate: { transformMode = .rotate },
                         onScale: { transformMode = .scale },
                         onDelete: { deleteSelectedObject() }
@@ -236,6 +223,7 @@ struct SpatialCanvasEditorView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
+                    selectedObject = nil
                     if hasUnsavedChanges {
                         showingBackConfirmation = true
                     } else {
@@ -254,6 +242,7 @@ struct SpatialCanvasEditorView: View {
                 HStack(spacing: 12) {
                     // 保存按钮
                     Button {
+                        selectedObject = nil
                         saveScene()
                     } label: {
                         Label("保存", systemImage: "checkmark.circle")
@@ -304,11 +293,13 @@ struct SpatialCanvasEditorView: View {
         }
         .confirmationDialog("确认返回？", isPresented: $showingBackConfirmation, titleVisibility: .visible) {
             Button("保存并返回", role: .none) {
+                selectedObject = nil
                 saveScene()
                 hasUnsavedChanges = false
                 dismiss()
             }
             Button("不保存返回", role: .destructive) {
+                selectedObject = nil
                 dismiss()
             }
             Button("取消", role: .cancel) {}
@@ -406,12 +397,6 @@ struct SpatialCanvasEditorView: View {
     private func handleObjectTap(_ object: SceneObject) {
         selectedObject = object
         hasUnsavedChanges = true
-        
-        // 更新变换状态
-        rotationX = Double(object.rotation.x)
-        rotationY = Double(object.rotation.y)
-        rotationZ = Double(object.rotation.z)
-        scale = Double(object.scale.x)
     }
     
     private func handleObjectTransform(_ object: SceneObject) {
@@ -419,10 +404,29 @@ struct SpatialCanvasEditorView: View {
     }
     
     private func handleToolTap(_ tool: CanvasTool) {
+        print("[SpatialCanvasEditorView] handleToolTap 被调用，工具: \(tool.rawValue), 当前选中: \(selectedTool?.rawValue ?? "nil")")
+        
+        // 如果选择工具已经是选中状态，则取消选中并恢复手势控制
+        if tool == .select && selectedTool == .select {
+            print("[SpatialCanvasEditorView] 选择工具已选中，取消选择")
+            selectedTool = nil
+            selectedObject = nil
+            print("[SpatialCanvasEditorView] 取消后选中: \(selectedTool?.rawValue ?? "nil")")
+            return
+        }
+        
+        // 如果点击的是其他工具，先取消选择模式
+        if selectedTool == .select {
+            selectedObject = nil
+        }
+        
         selectedTool = tool
+        selectedObject = nil
+        print("[SpatialCanvasEditorView] 设置选中为: \(selectedTool?.rawValue ?? "nil")")
         
         switch tool {
         case .select:
+            // 选择工具：禁用手势控制视角，启用点击选择模型
             break
         case .image:
             showingImagePicker = true
@@ -709,24 +713,6 @@ struct SpatialCanvasEditorView: View {
     }
     
     // MARK: - Transform
-    
-    private func applyTransform() {
-        guard let index = sceneObjects.firstIndex(where: { $0.id == selectedObject?.id }) else { return }
-        
-        sceneObjects[index].rotation = SIMD3<Float>(
-            Float(rotationX),
-            Float(rotationY),
-            Float(rotationZ)
-        )
-        sceneObjects[index].scale = SIMD3<Float>(
-            Float(scale),
-            Float(scale),
-            Float(scale)
-        )
-        
-        selectedObject = sceneObjects[index]
-        hasUnsavedChanges = true
-    }
     
     private func deleteSelectedObject() {
         guard let object = selectedObject,

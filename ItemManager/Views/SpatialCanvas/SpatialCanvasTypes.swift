@@ -9,7 +9,8 @@ import SwiftUI
 
 // MARK: - 工具类型
 
-enum CanvasTool: String, CaseIterable {
+public enum CanvasTool: String, CaseIterable {
+    case resetCamera = "重置视角"
     case select = "选择"
     case image = "图片"
     case gallery = "图库"
@@ -24,7 +25,7 @@ enum CanvasTool: String, CaseIterable {
     case transform = "变换"
     case record = "录制"
     case settings = "设置"
-    case resetCamera = "视角"
+    
     
     var icon: String {
         switch self {
@@ -69,7 +70,8 @@ enum CanvasTool: String, CaseIterable {
 
 // MARK: - 变换模式
 
-enum TransformMode {
+public enum TransformMode {
+    case move
     case rotate
     case scale
 }

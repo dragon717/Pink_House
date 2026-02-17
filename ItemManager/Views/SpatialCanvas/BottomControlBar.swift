@@ -11,13 +11,24 @@ import SwiftUI
 
 struct BottomControlBar: View {
     @Binding var transformMode: TransformMode
+    var onMove: () -> Void
     var onRotate: () -> Void
     var onScale: () -> Void
     var onDelete: () -> Void
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        HStack(spacing: 40) {
+        HStack(spacing: 16) {
+            // 移动按钮
+            ControlButton(
+                title: "移动",
+                icon: "arrow.up.and.down.and.arrow.left.and.right",
+                isActive: transformMode == .move,
+                color: .purple
+            ) {
+                onMove()
+            }
+            
             // 旋转按钮
             ControlButton(
                 title: "旋转",
@@ -48,8 +59,8 @@ struct BottomControlBar: View {
                 onDelete()
             }
         }
-        .padding(.horizontal, 40)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
         .background(
             Capsule()
                 .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
@@ -75,28 +86,29 @@ struct ControlButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(isActive ? color : .primary)
-                    .frame(width: 50, height: 50)
-                    .background(
-                        Circle()
-                            .fill(isActive ? color.opacity(0.2) : Color.gray.opacity(0.15))
-                            .overlay(
-                                Circle()
-                                    .stroke(isActive ? color : Color.gray.opacity(0.2), lineWidth: 1)
-                            )
-                    )
-
+                
                 Text(title)
-                    .font(.caption)
+                    .font(.subheadline)
                     .fontWeight(isActive ? .semibold : .regular)
                     .foregroundStyle(isActive ? color : .primary.opacity(0.7))
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(isActive ? color.opacity(0.15) : Color.gray.opacity(0.1))
+                    .overlay(
+                        Capsule()
+                            .stroke(isActive ? color : Color.gray.opacity(0.2), lineWidth: 1)
+                    )
+            )
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isPressed ? 0.9 : 1.0)
+        .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
         .pressEvents {
             isPressed = true
@@ -205,6 +217,7 @@ struct AxisSlider: View {
             
             BottomControlBar(
                 transformMode: .constant(.rotate),
+                onMove: {},
                 onRotate: {},
                 onScale: {},
                 onDelete: {}

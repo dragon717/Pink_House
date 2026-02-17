@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CanvasToolbar: View {
-    @Binding var selectedTool: CanvasTool
+    @Binding var selectedTool: CanvasTool?
     var onToolTap: (CanvasTool) -> Void
     var onResetCamera: () -> Void = {}
     @Environment(\.colorScheme) private var colorScheme
@@ -45,8 +45,10 @@ struct CanvasToolbar: View {
                                 isSelected: selectedTool == tool,
                                 onTap: {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        selectedTool = tool
+                                        print("[CanvasToolbar] 点击工具: \(tool.rawValue), 当前选中: \(selectedTool?.rawValue ?? "nil")")
+                                        // 不再在这里设置 selectedTool，让父视图决定
                                         onToolTap(tool)
+                                        print("[CanvasToolbar] 点击后选中: \(selectedTool?.rawValue ?? "nil")")
                                     }
                                 }
                             )
