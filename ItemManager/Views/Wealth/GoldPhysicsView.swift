@@ -58,16 +58,12 @@ struct GoldPhysicsView: View {
                         
                         // Update boundary in case it changed
                         scene?.updateBoundary(backgroundInfo.physicsBoundary)
-                        
-                        // 强制测试震动，确认引擎是否工作
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            print("🧪 Triggering Test Haptic on Appear...")
-                            HapticEngineManager.shared.playTestHaptic()
-                        }
                     }
                     .onDisappear {
                         isViewVisible = false
-                        // checkState()
+                        // 暂停物理模拟
+                        scene?.pauseSimulation()
+                        print("🛑 GoldPhysicsView.onDisappear: 物理模拟已暂停")
                     }
                     .onChange(of: totalWeightGrams) { _, newValue in
                         // Ensure update runs on main thread and scene is ready
@@ -226,6 +222,9 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     }
     
     override func update(_ currentTime: TimeInterval) {
+        // 如果场景被暂停，不执行任何更新
+        guard !isPaused else { return }
+        
         // 0. Batch Processing for Bean Management
         processBeanQueue()
 

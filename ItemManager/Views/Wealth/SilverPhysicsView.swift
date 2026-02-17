@@ -55,14 +55,12 @@ struct SilverPhysicsView: View {
                         
                         // Update boundary in case it changed
                         scene?.updateBoundary(backgroundInfo.physicsBoundary)
-                        
-                        // 强制测试震动，确认引擎是否工作
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            HapticEngineManager.shared.playTestHaptic()
-                        }
                     }
                     .onDisappear {
                         isViewVisible = false
+                        // 暂停物理模拟
+                        scene?.pauseSimulation()
+                        print("🛑 SilverPhysicsView.onDisappear: 物理模拟已暂停")
                     }
                     .onChange(of: totalWeightGrams) { _, newValue in
                         if let scene = scene {
@@ -211,6 +209,9 @@ class SilverScene: SKScene, SKPhysicsContactDelegate {
     }
     
     override func update(_ currentTime: TimeInterval) {
+        // 如果场景被暂停，不执行任何更新
+        guard !isPaused else { return }
+        
         processBeanQueue()
 
         if frameCollisionCount > 0 {

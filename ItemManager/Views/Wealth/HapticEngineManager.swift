@@ -287,6 +287,11 @@ final class HapticEngineManager: ObservableObject {
     func playCollisionHaptic(intensity: Float, sharpness: Float, position: CGPoint? = nil, type: SoundManager.ImpactType = .soft) {
         // print("playCollisionHaptic called with intensity: \(intensity), sharpness: \(sharpness)")
         
+        // 检查物理计算是否被暂停
+        if MediaStateManager.shared.isPhysicsPaused {
+            return
+        }
+        
         // 声音总是尝试播放（即使没有震动引擎）
         // 参数限制
         // 即使 intensity 很小，我们也给一个最小音量，确保能听到反馈
@@ -396,6 +401,17 @@ final class HapticEngineManager: ObservableObject {
     /// 播放连续的滚动纹理（当大量金豆移动时）
     /// - Parameter intensity: 整体滚动的剧烈程度
     func playRollingTexture(intensity: Float) {
+        // 检查物理计算是否被暂停
+        if MediaStateManager.shared.isPhysicsPaused {
+            // 如果暂停了，停止滚动音效和震动
+            soundManager.updateRollingSound(intensity: 0)
+            if rollingPlayer != nil {
+                try? rollingPlayer?.stop(atTime: 0)
+                rollingPlayer = nil
+            }
+            return
+        }
+        
         // 更新滚动音效
         soundManager.updateRollingSound(intensity: intensity)
         
