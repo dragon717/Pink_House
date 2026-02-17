@@ -911,10 +911,13 @@ struct AssetItem {
 
 struct TopModelListView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
     @Binding var objects: [SceneObject]
     @Binding var selectedObject: SceneObject?
     @Binding var selectedTool: CanvasTool?
     @Binding var showingModelList: Bool
+    @State private var model3DCache: [UUID: Model3D] = [:]
+    @State private var refreshTimer: Timer?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -924,6 +927,42 @@ struct TopModelListView: View {
             }
             
             toggleButton
+        }
+        .onAppear {
+            loadModel3DCache()
+            startRefreshTimer()
+        }
+        .onDisappear {
+            stopRefreshTimer()
+        }
+        .onChange(of: objects) { _, _ in
+            loadModel3DCache()
+        }
+    }
+    
+    private func startRefreshTimer() {
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            loadModel3DCache()
+        }
+    }
+    
+    private func stopRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+    
+    private func loadModel3DCache() {
+        let ids = objects.compactMap { $0.model3DID }
+        guard !ids.isEmpty else { return }
+        
+        do {
+            let descriptor = FetchDescriptor<Model3D>(
+                predicate: #Predicate<Model3D> { ids.contains($0.id) && $0.isDeleted == false }
+            )
+            let models = try modelContext.fetch(descriptor)
+            model3DCache = Dictionary(uniqueKeysWithValues: models.map { ($0.id, $0) })
+        } catch {
+            print("[TopModelListView] 加载 Model3D 缓存失败: \(error)")
         }
     }
     
@@ -955,7 +994,8 @@ struct TopModelListView: View {
                 .fill(colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.9))
                 .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 2)
         )
-        .padding(.horizontal, 16)
+        .padding(.leading, 70)
+        .padding(.trailing, 16)
         .padding(.top, 8)
     }
     
@@ -981,6 +1021,7 @@ struct TopModelListView: View {
                 ForEach(objects) { object in
                     ModelCard(
                         object: object,
+                        model3D: object.model3DID.flatMap { model3DCache[$0] },
                         isSelected: selectedObject?.id == object.id,
                         onTap: {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -1019,8 +1060,20 @@ struct TopModelListView: View {
 struct ModelCard: View {
     @Environment(\.colorScheme) private var colorScheme
     let object: SceneObject
+    let model3D: Model3D?
     let isSelected: Bool
     let onTap: () -> Void
+    
+    private var thumbnailPath: String? {
+        model3D?.resolvedThumbnailPath
+    }
+    
+    private var modelName: String {
+        if let name = model3D?.name, !name.isEmpty {
+            return name
+        }
+        return "模型"
+    }
     
     var body: some View {
         Button(action: onTap) {
@@ -1030,12 +1083,22 @@ struct ModelCard: View {
                         .fill(colorScheme == .dark ? Color.gray.opacity(0.3) : Color.gray.opacity(0.1))
                         .frame(width: 80, height: 80)
                     
-                    Image(systemName: "cube.fill")
-                        .font(.system(size: 36))
-                        .foregroundStyle(isSelected ? Color.purple : Color.secondary)
+                    if let path = thumbnailPath,
+                       let uiImage = UIImage(contentsOfFile: path) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 80, height: 80)
+                            .clipped()
+                            .cornerRadius(12)
+                    } else {
+                        Image(systemName: "cube.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(isSelected ? Color.purple : Color.secondary)
+                    }
                 }
                 
-                Text(object.model3DID != nil ? "3D模型" : "模型")
+                Text(modelName)
                     .font(.caption)
                     .foregroundStyle(isSelected ? Color.purple : Color.secondary)
                     .lineLimit(1)

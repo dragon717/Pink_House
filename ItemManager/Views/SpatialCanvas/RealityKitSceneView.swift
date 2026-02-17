@@ -67,6 +67,7 @@ public struct RealityKitSceneView: View {
     @State private var entityCache: [UUID: Entity] = [:]
     @State private var selectionOutlineEntity: Entity?
     @State private var gizmoEntity: Entity?
+    @State private var originEntity: Entity?
     @State private var activeGizmoAxis: GizmoAxis? = nil
     @State private var initialDragPosition: SIMD3<Float>? = nil
     @State private var initialObjectTransform: (position: SIMD3<Float>, rotation: simd_quatf, scale: SIMD3<Float>)? = nil
@@ -440,12 +441,42 @@ public struct RealityKitSceneView: View {
         return lineEntity
     }
     
+    private func createOriginMarker() -> Entity {
+        let origin = Entity()
+        origin.name = "origin"
+        
+        let centerSphere = ModelEntity(mesh: .generateSphere(radius: 0.04))
+        var centerMaterial = UnlitMaterial(color: UIColor(red: 1.0, green: 0.4, blue: 0.65, alpha: 1.0))
+        centerSphere.model?.materials = [centerMaterial]
+        origin.addChild(centerSphere)
+        
+        let innerSphere = ModelEntity(mesh: .generateSphere(radius: 0.02))
+        var innerMaterial = UnlitMaterial(color: UIColor(red: 1.0, green: 0.7, blue: 0.85, alpha: 1.0))
+        innerSphere.model?.materials = [innerMaterial]
+        origin.addChild(innerSphere)
+        
+        return origin
+    }
+    
     private func updateGizmo(in rootEntity: Entity) {
         if gizmoEntity == nil {
             rootEntity.children.forEach { child in
                 if child.name == "gizmo" || child.name.starts(with: "gizmo_") {
                     child.removeFromParent()
                 }
+            }
+        }
+        
+        if selectedTool == .select {
+            if originEntity == nil {
+                let origin = createOriginMarker()
+                rootEntity.addChild(origin)
+                originEntity = origin
+            }
+        } else {
+            if let origin = originEntity {
+                origin.removeFromParent()
+                originEntity = nil
             }
         }
         
@@ -497,14 +528,14 @@ public struct RealityKitSceneView: View {
     }
     
     private func createMoveGizmo(on gizmo: Entity, scale: Float) {
-        let arrowLength: Float = scale
-        let arrowRadius: Float = 0.012
-        let coneHeight: Float = 0.08
-        let coneRadius: Float = 0.035
+        let arrowLength: Float = scale * 1.15
+        let arrowRadius: Float = 0.02
+        let coneHeight: Float = 0.14
+        let coneRadius: Float = 0.06
         
-        let xColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0)
-        let yColor = UIColor(red: 0.3, green: 0.9, blue: 0.3, alpha: 1.0)
-        let zColor = UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 1.0)
+        let xColor = UIColor(red: 1.0, green: 0.5, blue: 0.6, alpha: 1.0)
+        let yColor = UIColor(red: 0.4, green: 0.9, blue: 0.5, alpha: 1.0)
+        let zColor = UIColor(red: 0.4, green: 0.6, blue: 1.0, alpha: 1.0)
         
         let xAxis = createModernArrow(axis: [1, 0, 0], color: xColor, length: arrowLength, arrowRadius: arrowRadius, coneHeight: coneHeight, coneRadius: coneRadius)
         xAxis.name = "gizmo_x"
@@ -518,11 +549,11 @@ public struct RealityKitSceneView: View {
         zAxis.name = "gizmo_z"
         gizmo.addChild(zAxis)
         
-        let centerSphere = ModelEntity(mesh: .generateSphere(radius: 0.025))
-        var centerMaterial = UnlitMaterial(color: UIColor(white: 0.95, alpha: 1.0))
+        let centerSphere = ModelEntity(mesh: .generateSphere(radius: 0.045))
+        var centerMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
         centerSphere.model?.materials = [centerMaterial]
         centerSphere.name = "gizmo_center"
-        let collisionShape = ShapeResource.generateSphere(radius: 0.06)
+        let collisionShape = ShapeResource.generateSphere(radius: 0.09)
         centerSphere.components.set(CollisionComponent(shapes: [collisionShape]))
         centerSphere.components.set(InputTargetComponent())
         gizmo.addChild(centerSphere)
@@ -542,7 +573,9 @@ public struct RealityKitSceneView: View {
         var coneMaterial = UnlitMaterial(color: color)
         let cone = ModelEntity(mesh: coneMesh, materials: [coneMaterial])
         cone.position = axis * (length * 0.75 + coneHeight * 0.5)
-        cone.look(at: axis * (length + coneHeight), from: axis * length, relativeTo: axisEntity)
+        
+        let targetDirection = normalize(axis)
+        cone.orientation = simd_quatf(from: [0, 1, 0], to: targetDirection)
         axisEntity.addChild(cone)
         
         let sphereMesh = MeshResource.generateSphere(radius: coneRadius * 0.7)
@@ -559,12 +592,12 @@ public struct RealityKitSceneView: View {
     }
     
     private func createRotateGizmo(on gizmo: Entity, scale: Float) {
-        let ringRadius: Float = scale * 0.9
-        let ringThickness: Float = 0.008
+        let ringRadius: Float = scale * 1.0
+        let ringThickness: Float = 0.015
         
-        let xColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0)
-        let yColor = UIColor(red: 0.3, green: 0.9, blue: 0.3, alpha: 1.0)
-        let zColor = UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 1.0)
+        let xColor = UIColor(red: 1.0, green: 0.5, blue: 0.6, alpha: 1.0)
+        let yColor = UIColor(red: 0.4, green: 0.9, blue: 0.5, alpha: 1.0)
+        let zColor = UIColor(red: 0.4, green: 0.6, blue: 1.0, alpha: 1.0)
         
         let xRing = createModernTorus(ringRadius: ringRadius, tubeRadius: ringThickness, color: xColor, axis: [1, 0, 0])
         xRing.name = "gizmo_x"
@@ -578,8 +611,8 @@ public struct RealityKitSceneView: View {
         zRing.name = "gizmo_z"
         gizmo.addChild(zRing)
         
-        let centerSphere = ModelEntity(mesh: .generateSphere(radius: 0.02))
-        var centerMaterial = UnlitMaterial(color: UIColor(white: 0.95, alpha: 1.0))
+        let centerSphere = ModelEntity(mesh: .generateSphere(radius: 0.04))
+        var centerMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
         centerSphere.model?.materials = [centerMaterial]
         gizmo.addChild(centerSphere)
     }
@@ -630,13 +663,13 @@ public struct RealityKitSceneView: View {
     }
     
     private func createScaleGizmo(on gizmo: Entity, scale: Float) {
-        let handleSize: Float = 0.05
-        let handleLength: Float = scale * 0.8
+        let handleSize: Float = 0.07
+        let handleLength: Float = scale * 0.95
         
-        let xColor = UIColor(red: 1.0, green: 0.3, blue: 0.3, alpha: 1.0)
-        let yColor = UIColor(red: 0.3, green: 0.9, blue: 0.3, alpha: 1.0)
-        let zColor = UIColor(red: 0.3, green: 0.5, blue: 1.0, alpha: 1.0)
-        let centerColor = UIColor(red: 1.0, green: 0.85, blue: 0.2, alpha: 1.0)
+        let xColor = UIColor(red: 1.0, green: 0.5, blue: 0.6, alpha: 1.0)
+        let yColor = UIColor(red: 0.4, green: 0.9, blue: 0.5, alpha: 1.0)
+        let zColor = UIColor(red: 0.4, green: 0.6, blue: 1.0, alpha: 1.0)
+        let centerColor = UIColor(red: 1.0, green: 0.6, blue: 0.8, alpha: 1.0)
         
         let xHandle = createModernScaleHandle(axis: [1, 0, 0], color: xColor, length: handleLength, size: handleSize)
         xHandle.name = "gizmo_x"
@@ -650,11 +683,11 @@ public struct RealityKitSceneView: View {
         zHandle.name = "gizmo_z"
         gizmo.addChild(zHandle)
         
-        let centerBox = ModelEntity(mesh: .generateBox(size: handleSize * 1.3))
+        let centerBox = ModelEntity(mesh: .generateBox(size: handleSize * 1.5))
         var centerMaterial = UnlitMaterial(color: centerColor)
         centerBox.model?.materials = [centerMaterial]
         centerBox.name = "gizmo_center"
-        let collisionShape = ShapeResource.generateSphere(radius: 0.06)
+        let collisionShape = ShapeResource.generateSphere(radius: 0.09)
         centerBox.components.set(CollisionComponent(shapes: [collisionShape]))
         centerBox.components.set(InputTargetComponent())
         gizmo.addChild(centerBox)
@@ -663,7 +696,7 @@ public struct RealityKitSceneView: View {
     private func createModernScaleHandle(axis: SIMD3<Float>, color: UIColor, length: Float, size: Float) -> Entity {
         let handleEntity = Entity()
         
-        let line = createLine(from: [0, 0, 0], to: axis * length * 0.8, thickness: 0.012, color: color)
+        let line = createLine(from: [0, 0, 0], to: axis * length * 0.8, thickness: 0.02, color: color)
         handleEntity.addChild(line)
         
         let box = ModelEntity(mesh: .generateBox(size: size))

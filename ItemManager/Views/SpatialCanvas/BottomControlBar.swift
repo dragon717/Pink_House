@@ -18,7 +18,7 @@ struct BottomControlBar: View {
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             // 移动按钮
             ControlButton(
                 title: "移动",
@@ -49,6 +49,9 @@ struct BottomControlBar: View {
                 onScale()
             }
             
+            Divider()
+                .frame(height: 30)
+            
             // 删除按钮
             ControlButton(
                 title: "删除",
@@ -59,17 +62,17 @@ struct BottomControlBar: View {
                 onDelete()
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(
             Capsule()
-                .fill(colorScheme == .dark ? Color(uiColor: .systemGray5).opacity(0.9) : Color.white.opacity(0.8))
-                .overlay(
-                    Capsule()
-                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05), lineWidth: 1)
-                )
+                .fill(.ultraThinMaterial)
         )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 6, x: 0, y: 3)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.15), radius: 12, x: 0, y: 4)
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(colorScheme == .dark ? 0.2 : 0.5), lineWidth: 1)
+        )
     }
 }
 
@@ -86,30 +89,37 @@ struct ControlButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
+            VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(isActive ? color : .primary)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isActive ? color : .primary.opacity(0.7))
+                    .symbolRenderingMode(isActive ? .hierarchical : .monochrome)
                 
                 Text(title)
-                    .font(.caption)
-                    .fontWeight(isActive ? .semibold : .regular)
-                    .foregroundStyle(isActive ? color : .primary.opacity(0.7))
+                    .font(.system(size: 11, weight: isActive ? .semibold : .medium))
+                    .foregroundStyle(isActive ? color : .primary.opacity(0.6))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
             .background(
-                Capsule()
-                    .fill(isActive ? color.opacity(0.15) : Color.gray.opacity(0.1))
-                    .overlay(
-                        Capsule()
-                            .stroke(isActive ? color : Color.gray.opacity(0.2), lineWidth: 1)
-                    )
+                ZStack {
+                    if isActive {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(color.opacity(0.18))
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(color.opacity(0.6), lineWidth: 1.5)
+                    } else {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.clear)
+                    }
+                }
             )
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isPressed ? 0.95 : 1.0)
-        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
         .pressEvents {
             isPressed = true
         } onRelease: {
