@@ -64,6 +64,9 @@ struct SpatialCanvasEditorView: View {
     // 底部操作栏状态
     @State private var showingBottomControls = false
     
+    // 顶部模型列表状态
+    @State private var showingModelList = true
+    
     // 变换状态
     @State private var transformMode: TransformMode = .move
     
@@ -115,6 +118,19 @@ struct SpatialCanvasEditorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(editorBackground)
             }
+            
+            // 顶部模型列表
+            VStack {
+                TopModelListView(
+                    objects: $sceneObjects,
+                    selectedObject: $selectedObject,
+                    selectedTool: $selectedTool,
+                    showingModelList: $showingModelList
+                )
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .allowsHitTesting(true)
             
             // 左侧工具栏
             VStack {
@@ -418,7 +434,13 @@ struct SpatialCanvasEditorView: View {
     
     private func handleObjectTap(_ object: SceneObject) {
         DispatchQueue.main.async {
-            selectedObject = object
+            if selectedObject?.id == object.id {
+                selectedObject = nil
+                selectedTool = nil
+            } else {
+                selectedObject = object
+                selectedTool = .select
+            }
             hasUnsavedChanges = true
         }
     }
@@ -883,6 +905,155 @@ struct AssetItem {
     let id: String
     let name: String
     let category: AssetCategory
+}
+
+// MARK: - 顶部模型列表视图
+
+struct TopModelListView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Binding var objects: [SceneObject]
+    @Binding var selectedObject: SceneObject?
+    @Binding var selectedTool: CanvasTool?
+    @Binding var showingModelList: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if showingModelList {
+                modelListContent
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            
+            toggleButton
+        }
+    }
+    
+    private var modelListContent: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("场景模型")
+                    .font(.headline)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                Text("\(objects.count) 个模型")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            
+            if objects.isEmpty {
+                emptyState
+            } else {
+                modelList
+            }
+        }
+        .padding(.bottom, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.9))
+                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 2)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+    
+    private var emptyState: some View {
+        HStack {
+            Spacer()
+            VStack(spacing: 8) {
+                Image(systemName: "cube.box")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                Text("暂无模型")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 24)
+    }
+    
+    private var modelList: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(objects) { object in
+                    ModelCard(
+                        object: object,
+                        isSelected: selectedObject?.id == object.id,
+                        onTap: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                if selectedObject?.id == object.id {
+                                    selectedObject = nil
+                                    selectedTool = nil
+                                } else {
+                                    selectedObject = object
+                                    selectedTool = .select
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .frame(height: 120)
+    }
+    
+    private var toggleButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showingModelList.toggle()
+            }
+        } label: {
+            Image(systemName: showingModelList ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(colorScheme == .dark ? Color.white : Color.purple)
+                .symbolRenderingMode(.hierarchical)
+        }
+        .padding(.top, 8)
+    }
+}
+
+struct ModelCard: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let object: SceneObject
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(colorScheme == .dark ? Color.gray.opacity(0.3) : Color.gray.opacity(0.1))
+                        .frame(width: 80, height: 80)
+                    
+                    Image(systemName: "cube.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(isSelected ? Color.purple : Color.secondary)
+                }
+                
+                Text(object.model3DID != nil ? "3D模型" : "模型")
+                    .font(.caption)
+                    .foregroundStyle(isSelected ? Color.purple : Color.secondary)
+                    .lineLimit(1)
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isSelected ? 
+                          (colorScheme == .dark ? Color.purple.opacity(0.2) : Color.purple.opacity(0.1)) :
+                          (colorScheme == .dark ? Color.gray.opacity(0.2) : Color.white))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(isSelected ? Color.purple : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
 }
 
 // MARK: - 占位视图组件

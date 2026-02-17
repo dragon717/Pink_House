@@ -879,6 +879,7 @@ struct Model3DAssetCard: View {
     @State private var showingDeleteAlert = false
     @State private var showingUsageAlert = false
     @State private var showingThumbnailEditor = false
+    @State private var showingShareSheet = false
     @State private var newName: String = ""
     @State private var usageCount: Int = 0
     
@@ -960,6 +961,12 @@ struct Model3DAssetCard: View {
                 Label("设置缩略图", systemImage: "camera.viewfinder")
             }
             
+            Button {
+                showingShareSheet = true
+            } label: {
+                Label("导出模型分享", systemImage: "square.and.arrow.up")
+            }
+            
             Button(role: .destructive) {
                 checkUsageAndShowDeleteAlert()
             } label: {
@@ -988,6 +995,11 @@ struct Model3DAssetCard: View {
         }
         .sheet(isPresented: $showingThumbnailEditor) {
             ModelThumbnailEditorView(model: model)
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let resolvedPath = model.resolvedModelPath {
+                ShareSheet(items: [URL(fileURLWithPath: resolvedPath)])
+            }
         }
     }
     
