@@ -98,7 +98,9 @@ public struct RealityKitSceneView: View {
                 
                 let cameraEntity = cameraController.setupCamera(in: rootEntity)
                 
-                onCameraControllerReady?(cameraController)
+                DispatchQueue.main.async {
+                    onCameraControllerReady?(cameraController)
+                }
                 
                 print("[RealityKitSceneView] 相机设置完成，位置: \(cameraEntity.position)")
                 
@@ -351,7 +353,9 @@ public struct RealityKitSceneView: View {
            let object = objects.first(where: { $0.id.uuidString == targetEntity.name }) {
             DispatchQueue.main.async {
                 self.selectedObject = object
-                self.onObjectTap(object)
+                DispatchQueue.main.async {
+                    self.onObjectTap(object)
+                }
                 print("[RealityKitSceneView] 选中对象: \(object.id), 名称: \(targetEntity.name)")
             }
         } else {

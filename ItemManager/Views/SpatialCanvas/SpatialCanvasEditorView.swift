@@ -153,12 +153,24 @@ struct SpatialCanvasEditorView: View {
                         Spacer()
                         BottomControlBar(
                             transformMode: $transformMode,
-                            onMove: { transformMode = .move },
-                            onRotate: { transformMode = .rotate },
-                            onScale: { transformMode = .scale },
+                            onMove: { 
+                                DispatchQueue.main.async {
+                                    transformMode = .move 
+                                }
+                            },
+                            onRotate: { 
+                                DispatchQueue.main.async {
+                                    transformMode = .rotate 
+                                }
+                            },
+                            onScale: { 
+                                DispatchQueue.main.async {
+                                    transformMode = .scale 
+                                }
+                            },
                             onDelete: { deleteSelectedObject() }
                         )
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 40)
                         .transition(.move(edge: .bottom))
                         Spacer()
                     }
@@ -400,87 +412,95 @@ struct SpatialCanvasEditorView: View {
     // MARK: - Event Handlers
     
     private func handleObjectTap(_ object: SceneObject) {
-        selectedObject = object
-        hasUnsavedChanges = true
+        DispatchQueue.main.async {
+            selectedObject = object
+            hasUnsavedChanges = true
+        }
     }
     
     private func handleObjectTransform(_ object: SceneObject) {
-        hasUnsavedChanges = true
+        DispatchQueue.main.async {
+            hasUnsavedChanges = true
+        }
     }
     
     private func handleToolTap(_ tool: CanvasTool) {
         print("[SpatialCanvasEditorView] handleToolTap 被调用，工具: \(tool.rawValue), 当前选中: \(selectedTool?.rawValue ?? "nil")")
         
-        // 如果选择工具已经是选中状态，则取消选中并恢复手势控制
-        if tool == .select && selectedTool == .select {
-            print("[SpatialCanvasEditorView] 选择工具已选中，取消选择")
-            selectedTool = nil
+        DispatchQueue.main.async {
+            // 如果选择工具已经是选中状态，则取消选中并恢复手势控制
+            if tool == .select && selectedTool == .select {
+                print("[SpatialCanvasEditorView] 选择工具已选中，取消选择")
+                selectedTool = nil
+                selectedObject = nil
+                print("[SpatialCanvasEditorView] 取消后选中: \(selectedTool?.rawValue ?? "nil")")
+                return
+            }
+            
+            // 如果点击的是其他工具，先取消选择模式
+            if selectedTool == .select {
+                selectedObject = nil
+            }
+            
+            selectedTool = tool
             selectedObject = nil
-            print("[SpatialCanvasEditorView] 取消后选中: \(selectedTool?.rawValue ?? "nil")")
-            return
-        }
-        
-        // 如果点击的是其他工具，先取消选择模式
-        if selectedTool == .select {
-            selectedObject = nil
-        }
-        
-        selectedTool = tool
-        selectedObject = nil
-        print("[SpatialCanvasEditorView] 设置选中为: \(selectedTool?.rawValue ?? "nil")")
-        
-        switch tool {
-        case .select:
-            // 选择工具：禁用手势控制视角，启用点击选择模型
-            break
-        case .image:
-            showingImagePicker = true
-        case .gallery:
-            showingImagePicker = true
-        case .camera:
-            showingObjectCaptureScanner = true
-        case .usdzModel:
-            showingImagePicker = true
-        case .light:
-            break
-        case .text:
-            break
-        case .material:
-            break
-        case .clothing:
-            showingAssetPanel = true
-        case .effect:
-            break
-        case .template:
-            break
-        case .transform:
-            showingToolPanel = true
-        case .record:
-            // TODO: 开始录制
-            break
-        case .settings:
-            // TODO: 打开设置
-            break
-        case .resetCamera:
-            // 重置相机视角已在工具栏按钮中处理
-            break
+            print("[SpatialCanvasEditorView] 设置选中为: \(selectedTool?.rawValue ?? "nil")")
+            
+            switch tool {
+            case .select:
+                // 选择工具：禁用手势控制视角，启用点击选择模型
+                break
+            case .image:
+                showingImagePicker = true
+            case .gallery:
+                showingImagePicker = true
+            case .camera:
+                showingObjectCaptureScanner = true
+            case .usdzModel:
+                showingImagePicker = true
+            case .light:
+                break
+            case .text:
+                break
+            case .material:
+                break
+            case .clothing:
+                showingAssetPanel = true
+            case .effect:
+                break
+            case .template:
+                break
+            case .transform:
+                showingToolPanel = true
+            case .record:
+                // TODO: 开始录制
+                break
+            case .settings:
+                // TODO: 打开设置
+                break
+            case .resetCamera:
+                // 重置相机视角已在工具栏按钮中处理
+                break
+            }
         }
     }
     
     private func handleAssetSelect(_ asset: SpatialAsset) {
-        hasUnsavedChanges = true
-        
-        switch asset.type {
-        case .clothing:
-            if let modelPath = asset.metadata["modelPath"] {
-                loadUSDZModel(from: modelPath)
+        DispatchQueue.main.async {
+            hasUnsavedChanges = true
+            
+            switch asset.type {
+            case .clothing:
+                if let modelPath = asset.metadata["modelPath"] {
+                    loadUSDZModel(from: modelPath)
+                }
+            case .effect:
+                print("[Asset] 选择特效: \(asset.name)")
+            case .template:
+                print("[Asset] 选择模板: \(asset.name)")
+            case .material:
+                print("[Asset] 选择材质: \(asset.name)")
             }
-        case .effect:
-            print("[Asset] 选择特效: \(asset.name)")
-        case .template:
-            print("[Asset] 选择模板: \(asset.name)")
-        case .material:
-            print("[Asset] 选择材质: \(asset.name)")
         }
     }
     
@@ -720,12 +740,14 @@ struct SpatialCanvasEditorView: View {
     // MARK: - Transform
     
     private func deleteSelectedObject() {
-        guard let object = selectedObject,
-              let index = sceneObjects.firstIndex(where: { $0.id == object.id }) else { return }
-        
-        sceneObjects.remove(at: index)
-        selectedObject = nil
-        hasUnsavedChanges = true
+        DispatchQueue.main.async {
+            guard let object = selectedObject,
+                  let index = sceneObjects.firstIndex(where: { $0.id == object.id }) else { return }
+            
+            sceneObjects.remove(at: index)
+            selectedObject = nil
+            hasUnsavedChanges = true
+        }
     }
     
     // MARK: - Save
