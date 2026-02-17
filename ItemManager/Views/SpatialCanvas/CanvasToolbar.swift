@@ -123,9 +123,9 @@ struct AssetMenuButton: View {
     var body: some View {
         Menu {
             Button {
-                onOpenAssetPanel(.clothing)
+                onOpenAssetPanel(.models)
             } label: {
-                Label("服装", systemImage: CanvasTool.clothing.icon)
+                Label("服装", systemImage: "tshirt")
             }
             
             Button {

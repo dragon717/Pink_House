@@ -159,8 +159,6 @@ struct AssetPanel: View {
                         switch selectedCategory {
                         case .models:
                             Model3DAssetList(searchText: searchText, onSelect: onAssetSelect)
-                        case .clothing:
-                            ClothingAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .effect:
                             EffectAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .light:
@@ -214,8 +212,6 @@ struct CategoryTab: View {
         switch category {
         case .models:
             return .purple
-        case .clothing:
-            return .indigo
         case .effect:
             return .pink
         case .light:
