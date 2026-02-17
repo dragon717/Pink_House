@@ -3,6 +3,7 @@
 //  ItemManager
 //
 //  分享卡片管理器 - 负责生成分享图片和管理卡牌资源
+//  优化版本：添加猫爪加载动画、异步生成、内存优化
 //
 
 import SwiftUI
@@ -26,12 +27,121 @@ class SharePreviewItem: NSObject, UIActivityItemSource {
     }
     
     func activityViewController(_ activityViewController: UIActivityViewController, thumbnailImageForActivityType activityType: UIActivity.ActivityType?, suggestedSize size: CGSize) -> UIImage? {
-        // 返回缩略图用于预览
-        return image.preparingThumbnail(of: size)
+        // 返回缩略图用于预览 - 使用更小的尺寸减少内存占用
+        let targetSize = CGSize(width: min(size.width, 300), height: min(size.height, 300))
+        return image.preparingThumbnail(of: targetSize)
     }
     
     func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
         return "分享图片"
+    }
+}
+
+// MARK: - 猫爪加载动画视图
+struct CatPawLoadingView: View {
+    @State private var rotation: Double = 0
+    @State private var scale: CGFloat = 1.0
+    @State private var opacity: Double = 1.0
+    @State private var breatheScale: CGFloat = 1.0
+    @State private var glowOpacity: Double = 0.5
+    
+    let message: String
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // 猫爪旋转动画 - 带呼吸效果
+            ZStack {
+                // 外发光圈 - 呼吸效果
+                Circle()
+                    .fill(MonicaColors.primaryPink.opacity(glowOpacity * 0.3))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(breatheScale)
+                
+                // 外圈装饰 - 脉冲效果
+                Circle()
+                    .stroke(MonicaColors.primaryPink.opacity(0.4), lineWidth: 2)
+                    .frame(width: 100, height: 100)
+                    .scaleEffect(scale)
+                
+                // 内圈装饰
+                Circle()
+                    .stroke(MonicaColors.lightPink.opacity(0.6), lineWidth: 1)
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(scale * 0.9)
+                
+                // 猫爪图标 - 使用 pawprint.fill
+                Image(systemName: "pawprint.fill")
+                    .font(.system(size: 50, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [MonicaColors.primaryPink, MonicaColors.lightPink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .rotationEffect(.degrees(rotation))
+                    .shadow(color: MonicaColors.primaryPink.opacity(glowOpacity), radius: 15, x: 0, y: 5)
+                    .scaleEffect(breatheScale)
+            }
+            
+            // 加载文字 - 带呼吸效果
+            Text(message)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(MonicaColors.mediumText)
+                .opacity(opacity)
+                .scaleEffect(breatheScale)
+        }
+        .onAppear {
+            // 旋转动画
+            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
+            
+            // 脉冲缩放动画
+            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                scale = 1.1
+            }
+            
+            // 文字闪烁动画
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                opacity = 0.6
+            }
+            
+            // 呼吸动画 - 整体缩放
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                breatheScale = 1.08
+            }
+            
+            // 发光呼吸动画
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                glowOpacity = 0.8
+            }
+        }
+    }
+}
+
+// MARK: - 分享加载遮罩
+struct ShareLoadingOverlay: View {
+    let message: String
+    
+    var body: some View {
+        ZStack {
+            // 半透明背景
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+            
+            // 加载内容
+            VStack(spacing: 24) {
+                CatPawLoadingView(message: message)
+            }
+            .padding(40)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
+            )
+        }
+        .transition(.opacity)
     }
 }
 
@@ -43,7 +153,17 @@ class ShareCardManager {
     private var cardFrontImage: UIImage?
     private var cardBackImage: UIImage?
     
+    // 内存优化：根据设备内存动态调整图片质量
+    private let isLowMemoryDevice: Bool
+    private let renderScale: CGFloat
+    
     private init() {
+        // 检测设备内存
+        let totalMemory = ProcessInfo.processInfo.physicalMemory
+        self.isLowMemoryDevice = totalMemory <= 2 * 1024 * 1024 * 1024 // <= 2GB
+        // 低内存设备使用更低的分辨率
+        self.renderScale = isLowMemoryDevice ? 1.0 : UIScreen.main.scale
+        
         loadCardImages()
     }
     
@@ -78,62 +198,160 @@ class ShareCardManager {
         return cardBackImage
     }
     
-    // MARK: - 生成裙子分享图片
+    // MARK: - 异步生成裙子分享图片（优化版本）
+    func generateClothingShareImageAsync(clothing: Clothing) async -> UIImage? {
+        // 在主线程获取需要的值，避免跨actor访问
+        let frontImage = self.cardFrontImage
+        
+        // 步骤1：在后台线程加载和预处理图片
+        let clothingImage = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+            return autoreleasepool {
+                guard let firstPath = clothing.imagePaths.first else { return nil }
+                var img = ImageManager.shared.loadImage(fileName: firstPath)
+                // 如果图片太大，进行缩放
+                if let image = img,
+                   max(image.size.width, image.size.height) > 800 {
+                    img = image.resized(toMaxDimension: 800)
+                }
+                return img
+            }
+        }.value
+        
+        // 步骤2：回到主线程创建和渲染SwiftUI视图
+        return await MainActor.run {
+            return autoreleasepool {
+                let cardView = ClothingShareCardFullView(
+                    clothing: clothing,
+                    image: clothingImage,
+                    cardBackground: frontImage,
+                    fontProvider: CustomFontProvider()
+                )
+                return self.renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+            }
+        }
+    }
+    
+    // MARK: - 异步生成书页分享图片（平面书页）
+    func generateOutfitShareImageAsync(outfit: Outfit) async -> UIImage? {
+        // 在主线程获取需要的值
+        let frontImage = self.cardFrontImage
+        
+        // 直接回到主线程渲染（Outfit图片已经在加载时处理过了）
+        return await MainActor.run {
+            return autoreleasepool {
+                let cardView = OutfitShareCardView(
+                    outfit: outfit,
+                    cardBackground: frontImage
+                )
+                .environment(\.fontProvider, CustomFontProvider())
+                
+                return self.renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+            }
+        }
+    }
+    
+    // MARK: - 异步生成书页分享图片（空间书页）
+    func generateSpaceOutfitShareImageAsync(outfit: SpaceOutfit) async -> UIImage? {
+        // 在主线程获取需要的值
+        let frontImage = self.cardFrontImage
+        
+        // 直接回到主线程渲染
+        return await MainActor.run {
+            return autoreleasepool {
+                let cardView = SpaceOutfitShareCardView(
+                    outfit: outfit,
+                    cardBackground: frontImage
+                )
+                .environment(\.fontProvider, CustomFontProvider())
+                
+                return self.renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+            }
+        }
+    }
+    
+    // MARK: - 同步生成方法（保留用于兼容）
     func generateClothingShareImage(clothing: Clothing) -> UIImage? {
-        // 加载裙子主图
-        var clothingImage: UIImage?
-        if let firstPath = clothing.imagePaths.first {
-            clothingImage = ImageManager.shared.loadImage(fileName: firstPath)
+        // 低内存设备直接返回 nil，强制使用异步方法
+        if isLowMemoryDevice {
+            AppLogger.info("Low memory device detected, please use async method")
+            return nil
         }
         
-        // 创建分享卡片视图
-        let cardView = ClothingShareCardFullView(
-            clothing: clothing,
-            image: clothingImage,
-            cardBackground: cardFrontImage,
-            fontProvider: CustomFontProvider()
-        )
-        
-        // 渲染为图片
-        return renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+        return autoreleasepool {
+            var clothingImage: UIImage?
+            if let firstPath = clothing.imagePaths.first {
+                clothingImage = ImageManager.shared.loadImage(fileName: firstPath)
+            }
+            
+            let cardView = ClothingShareCardFullView(
+                clothing: clothing,
+                image: clothingImage,
+                cardBackground: cardFrontImage,
+                fontProvider: CustomFontProvider()
+            )
+            
+            return renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+        }
     }
     
-    // MARK: - 生成书页分享图片（平面书页）
     func generateOutfitShareImage(outfit: Outfit) -> UIImage? {
-        let cardView = OutfitShareCardView(
-            outfit: outfit,
-            cardBackground: cardFrontImage
-        )
-        .environment(\.fontProvider, CustomFontProvider())
+        if isLowMemoryDevice { return nil }
         
-        return renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+        return autoreleasepool {
+            let cardView = OutfitShareCardView(
+                outfit: outfit,
+                cardBackground: cardFrontImage
+            )
+            .environment(\.fontProvider, CustomFontProvider())
+            
+            return renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+        }
     }
     
-    // MARK: - 生成书页分享图片（空间书页）
     func generateSpaceOutfitShareImage(outfit: SpaceOutfit) -> UIImage? {
-        let cardView = SpaceOutfitShareCardView(
-            outfit: outfit,
-            cardBackground: cardFrontImage
-        )
-        .environment(\.fontProvider, CustomFontProvider())
+        if isLowMemoryDevice { return nil }
         
-        return renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+        return autoreleasepool {
+            let cardView = SpaceOutfitShareCardView(
+                outfit: outfit,
+                cardBackground: cardFrontImage
+            )
+            .environment(\.fontProvider, CustomFontProvider())
+            
+            return renderViewToImage(cardView, size: CGSize(width: 320, height: 520))
+        }
     }
     
-    // MARK: - 渲染视图为图片
+    // MARK: - 渲染视图为图片（优化版本）
     private func renderViewToImage<V: View>(_ view: V, size: CGSize) -> UIImage? {
+        // 低内存设备使用更小的渲染尺寸
+        let renderSize = isLowMemoryDevice ? CGSize(width: size.width * 0.75, height: size.height * 0.75) : size
+        
         let controller = UIHostingController(rootView: view)
         let view = controller.view
         
-        let targetSize = size
-        view?.bounds = CGRect(origin: .zero, size: targetSize)
+        view?.bounds = CGRect(origin: .zero, size: renderSize)
         view?.backgroundColor = .clear
         
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        // 使用更高效的渲染配置
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = renderScale
+        format.opaque = false
+        // 低内存设备使用更低的质量
+        if isLowMemoryDevice {
+            format.preferredRange = .standard
+        }
         
-        return renderer.image { _ in
+        let renderer = UIGraphicsImageRenderer(size: renderSize, format: format)
+        
+        let image = renderer.image { _ in
             view?.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
         }
+        
+        // 及时释放视图控制器
+        controller.removeFromParent()
+        
+        return image
     }
 }
 
@@ -142,6 +360,63 @@ enum ShareContentType {
     case clothing(Clothing)
     case outfit(Outfit)
     case spaceOutfit(SpaceOutfit)
+}
+
+// MARK: - 翻转动画执行函数
+func executeFlipAnimation(
+    totalFlips: Int = 12,
+    animationDuration: Double = 2.0,
+    updateState: @escaping (Double, Double, Bool) -> Void,
+    showShareButton: @escaping () -> Void
+) {
+    let totalDegrees = Double(totalFlips * 180)
+    let startTime = Date()
+    let frameInterval: TimeInterval = 1.0 / 60.0 // 60fps
+    var displayLink: Timer?
+    
+    displayLink = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: true) { timer in
+        let elapsed = Date().timeIntervalSince(startTime)
+        let progress = min(elapsed / animationDuration, 1.0)
+        
+        // 使用 easeInOut 曲线：由慢到快到慢
+        let easeInOutProgress = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - pow(-2 * progress + 2, 2) / 2
+        
+        let currentRotation = totalDegrees * easeInOutProgress
+        let currentFlip = Int(currentRotation / 180)
+        let isFront = currentFlip % 2 == 0
+        
+        // 在翻转中间时降低透明度
+        let flipProgress = (currentRotation.truncatingRemainder(dividingBy: 180)) / 180
+        let distanceFromMiddle = abs(flipProgress - 0.5) * 2
+        let currentOpacity = 0.3 + (0.7 * distanceFromMiddle)
+        
+        // 更新状态
+        updateState(currentRotation, currentOpacity, isFront)
+        
+        if progress >= 1.0 {
+            timer.invalidate()
+            
+            // 在背面停留0.5秒
+            // 12次翻转 = 2160度（6圈整，正面角度），显示背面
+            updateState(totalDegrees, 1.0, false)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // 缓慢翻转到正面（再转360度，确保是正面角度2520度）
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    updateState(totalDegrees + 360, 1.0, true)
+                }
+                
+                // 动画完成，显示分享按钮
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showShareButton()
+                    }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - 裙子分享卡片容器视图（带快速翻转动画）
@@ -158,6 +433,8 @@ struct ClothingShareCardContainerView: View {
     @State private var opacity: Double = 0
     @State private var showShareButton = false
     @State private var isShowingFront: Bool = true
+    @State private var isSharing = false // 分享加载状态
+    @State private var shareTask: Task<Void, Never>? // 用于取消任务
     
     // 动画配置：2秒内翻转12次（10-15次范围），由慢到快到慢
     private let totalFlips = 12
@@ -223,10 +500,8 @@ struct ClothingShareCardContainerView: View {
                     VStack(spacing: 16) {
                         // 分享按钮 - 莫妮卡色系
                         Button {
-                            // 直接调用原生分享，带图片预览
-                            if let image = ShareCardManager.shared.generateClothingShareImage(clothing: clothing) {
-                                presentShareSheet(with: image)
-                            }
+                            // 异步生成分享图片，显示猫爪加载动画
+                            performShare()
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "square.and.arrow.up")
@@ -247,23 +522,61 @@ struct ClothingShareCardContainerView: View {
                             .cornerRadius(16)
                             .shadow(color: MonicaColors.primaryPink.opacity(0.4), radius: 8, x: 0, y: 4)
                         }
+                        .disabled(isSharing) // 分享时禁用按钮
+                        .opacity(isSharing ? 0.6 : 1.0)
                         
                         // 取消按钮
                         Button {
+                            // 取消正在进行的分享任务
+                            shareTask?.cancel()
                             onDismiss()
                         } label: {
                             Text("取消")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(MonicaColors.mediumText)
                         }
+                        .disabled(isSharing)
                     }
                     .padding(.bottom, 50)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            
+            // 猫爪加载遮罩
+            if isSharing {
+                ShareLoadingOverlay(message: "正在准备分享...")
+                    .transition(.opacity)
+            }
         }
         .onAppear {
             startAnimation()
+        }
+        .onDisappear {
+            // 清理资源
+            shareTask?.cancel()
+        }
+    }
+    
+    // MARK: - 异步分享（带猫爪动画）
+    private func performShare() {
+        isSharing = true
+        
+        shareTask = Task {
+            // 异步生成分享图片
+            if let image = await ShareCardManager.shared.generateClothingShareImageAsync(clothing: clothing) {
+                // 检查任务是否被取消
+                guard !Task.isCancelled else { return }
+                
+                // 在主线程显示分享表
+                await MainActor.run {
+                    isSharing = false
+                    presentShareSheet(with: image)
+                }
+            } else {
+                await MainActor.run {
+                    isSharing = false
+                }
+            }
         }
     }
     
@@ -309,57 +622,18 @@ struct ClothingShareCardContainerView: View {
     }
     
     private func performSmoothFlipAnimation() {
-        let totalDegrees = Double(totalFlips * 180)
-        let startTime = Date()
-        let frameInterval: TimeInterval = 1.0 / 60.0 // 60fps
-        var displayLink: Timer?
-        
-        displayLink = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: true) { timer in
-            let elapsed = Date().timeIntervalSince(startTime)
-            let progress = min(elapsed / self.animationDuration, 1.0)
-            
-            // 使用 easeInOut 曲线：由慢到快到慢
-            let easeInOutProgress = progress < 0.5 
-                ? 2 * progress * progress 
-                : 1 - pow(-2 * progress + 2, 2) / 2
-            
-            let currentRotation = totalDegrees * easeInOutProgress
-            let currentFlip = Int(currentRotation / 180)
-            let isFront = currentFlip % 2 == 0
-            
-            // 更新状态
-            self.rotationY = currentRotation
-            self.isShowingFront = isFront
-            
-            // 在翻转中间时降低透明度
-            let flipProgress = (currentRotation.truncatingRemainder(dividingBy: 180)) / 180
-            let distanceFromMiddle = abs(flipProgress - 0.5) * 2
-            self.opacity = 0.3 + (0.7 * distanceFromMiddle)
-            
-            if progress >= 1.0 {
-                timer.invalidate()
-                
-                // 在背面停留0.5秒
-                self.isShowingFront = false
-                self.rotationY = totalDegrees
-                self.opacity = 1.0
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // 翻转到正面
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self.rotationY = totalDegrees + 360
-                        self.isShowingFront = true
-                    }
-                    
-                    // 动画完成，显示分享按钮
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            self.showShareButton = true
-                        }
-                    }
-                }
+        executeFlipAnimation(
+            totalFlips: totalFlips,
+            animationDuration: animationDuration,
+            updateState: { rotation, opacity, isFront in
+                self.rotationY = rotation
+                self.opacity = opacity
+                self.isShowingFront = isFront
+            },
+            showShareButton: {
+                self.showShareButton = true
             }
-        }
+        )
     }
 }
 
@@ -431,6 +705,8 @@ struct BookPageShareCardContainerView: View {
     @State private var opacity: Double = 0
     @State private var showShareButton = false
     @State private var isShowingFront: Bool = true
+    @State private var isSharing = false // 分享加载状态
+    @State private var shareTask: Task<Void, Never>? // 用于取消任务
     
     // 动画配置：2秒内翻转12次（10-15次范围），由慢到快到慢
     private let totalFlips = 12
@@ -491,10 +767,8 @@ struct BookPageShareCardContainerView: View {
                     VStack(spacing: 16) {
                         // 分享按钮 - 莫妮卡色系
                         Button {
-                            // 直接调用原生分享，带图片预览
-                            if let image = generateShareImage() {
-                                presentShareSheet(with: image)
-                            }
+                            // 异步生成分享图片，显示猫爪加载动画
+                            performShare()
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "square.and.arrow.up")
@@ -515,23 +789,72 @@ struct BookPageShareCardContainerView: View {
                             .cornerRadius(16)
                             .shadow(color: MonicaColors.primaryPink.opacity(0.4), radius: 8, x: 0, y: 4)
                         }
+                        .disabled(isSharing) // 分享时禁用按钮
+                        .opacity(isSharing ? 0.6 : 1.0)
                         
                         // 取消按钮
                         Button {
+                            // 取消正在进行的分享任务
+                            shareTask?.cancel()
                             onDismiss()
                         } label: {
                             Text("取消")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(MonicaColors.mediumText)
                         }
+                        .disabled(isSharing)
                     }
                     .padding(.bottom, 50)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            
+            // 猫爪加载遮罩
+            if isSharing {
+                ShareLoadingOverlay(message: "正在准备分享...")
+                    .transition(.opacity)
+            }
         }
         .onAppear {
             startAnimation()
+        }
+        .onDisappear {
+            // 清理资源
+            shareTask?.cancel()
+        }
+    }
+    
+    // MARK: - 异步分享（带猫爪动画）
+    private func performShare() {
+        isSharing = true
+        
+        shareTask = Task {
+            // 异步生成分享图片
+            if let image = await generateShareImageAsync() {
+                // 检查任务是否被取消
+                guard !Task.isCancelled else { return }
+                
+                // 在主线程显示分享表
+                await MainActor.run {
+                    isSharing = false
+                    presentShareSheet(with: image)
+                }
+            } else {
+                await MainActor.run {
+                    isSharing = false
+                }
+            }
+        }
+    }
+    
+    private func generateShareImageAsync() async -> UIImage? {
+        switch shareType {
+        case .clothing:
+            return nil
+        case .outfit(let outfit):
+            return await ShareCardManager.shared.generateOutfitShareImageAsync(outfit: outfit)
+        case .spaceOutfit(let outfit):
+            return await ShareCardManager.shared.generateSpaceOutfitShareImageAsync(outfit: outfit)
         }
     }
     
@@ -608,57 +931,18 @@ struct BookPageShareCardContainerView: View {
     }
     
     private func performSmoothFlipAnimation() {
-        let totalDegrees = Double(totalFlips * 180)
-        let startTime = Date()
-        let frameInterval: TimeInterval = 1.0 / 60.0 // 60fps
-        var displayLink: Timer?
-        
-        displayLink = Timer.scheduledTimer(withTimeInterval: frameInterval, repeats: true) { timer in
-            let elapsed = Date().timeIntervalSince(startTime)
-            let progress = min(elapsed / self.animationDuration, 1.0)
-            
-            // 使用 easeInOut 曲线：由慢到快到慢
-            let easeInOutProgress = progress < 0.5 
-                ? 2 * progress * progress 
-                : 1 - pow(-2 * progress + 2, 2) / 2
-            
-            let currentRotation = totalDegrees * easeInOutProgress
-            let currentFlip = Int(currentRotation / 180)
-            let isFront = currentFlip % 2 == 0
-            
-            // 更新状态
-            self.rotationY = currentRotation
-            self.isShowingFront = isFront
-            
-            // 在翻转中间时降低透明度
-            let flipProgress = (currentRotation.truncatingRemainder(dividingBy: 180)) / 180
-            let distanceFromMiddle = abs(flipProgress - 0.5) * 2
-            self.opacity = 0.3 + (0.7 * distanceFromMiddle)
-            
-            if progress >= 1.0 {
-                timer.invalidate()
-                
-                // 在背面停留0.5秒
-                self.isShowingFront = false
-                self.rotationY = totalDegrees
-                self.opacity = 1.0
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // 翻转到正面
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self.rotationY = totalDegrees + 360
-                        self.isShowingFront = true
-                    }
-                    
-                    // 动画完成，显示分享按钮
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            self.showShareButton = true
-                        }
-                    }
-                }
+        executeFlipAnimation(
+            totalFlips: totalFlips,
+            animationDuration: animationDuration,
+            updateState: { rotation, opacity, isFront in
+                self.rotationY = rotation
+                self.opacity = opacity
+                self.isShowingFront = isFront
+            },
+            showShareButton: {
+                self.showShareButton = true
             }
-        }
+        )
     }
 }
 

@@ -201,6 +201,9 @@ struct CustomFontProvider: FontProvider {
     private let englishFontFile = "LoversQuarrel-Regular"
     private var englishFontName = "LoversQuarrel-Regular"
     
+    // 静态缓存：已注册的字体 URL 和对应的 PostScript 名称
+    private static var registeredFonts: [URL: String] = [:]
+    
     init() {
         // 注册字体并获取实际的 PostScript 名称
         registerFonts()
@@ -209,80 +212,74 @@ struct CustomFontProvider: FontProvider {
     private mutating func registerFonts() {
         // 注册中文字体
         if let chineseFontURL = Bundle.main.url(forResource: chineseFontFile, withExtension: "ttf") {
-            if let name = registerFont(from: chineseFontURL) {
+            if let name = registerFontIfNeeded(from: chineseFontURL) {
                 chineseFontName = name
-                print("CustomFontProvider: Using Chinese font name: \(name)")
             }
         } else if let chineseFontURL = Bundle.main.url(forResource: chineseFontFile, withExtension: "ttf", subdirectory: "asserts") {
-            if let name = registerFont(from: chineseFontURL) {
+            if let name = registerFontIfNeeded(from: chineseFontURL) {
                 chineseFontName = name
-                print("CustomFontProvider: Using Chinese font name: \(name)")
             }
         } else {
-            // 尝试从文件路径直接加载
+            // 尝试从文件路径直接加载（开发调试使用）
             let directPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/\(chineseFontFile).ttf"
             if FileManager.default.fileExists(atPath: directPath) {
-                if let name = registerFont(from: URL(fileURLWithPath: directPath)) {
+                let url = URL(fileURLWithPath: directPath)
+                if let name = registerFontIfNeeded(from: url) {
                     chineseFontName = name
-                    print("CustomFontProvider: Using Chinese font name: \(name)")
                 }
             }
         }
         
         // 注册英文字体
         if let englishFontURL = Bundle.main.url(forResource: englishFontFile, withExtension: "ttf") {
-            if let name = registerFont(from: englishFontURL) {
+            if let name = registerFontIfNeeded(from: englishFontURL) {
                 englishFontName = name
-                print("CustomFontProvider: Using English font name: \(name)")
             }
         } else if let englishFontURL = Bundle.main.url(forResource: englishFontFile, withExtension: "ttf", subdirectory: "asserts") {
-            if let name = registerFont(from: englishFontURL) {
+            if let name = registerFontIfNeeded(from: englishFontURL) {
                 englishFontName = name
-                print("CustomFontProvider: Using English font name: \(name)")
             }
         } else {
-            // 尝试从文件路径直接加载
+            // 尝试从文件路径直接加载（开发调试使用）
             let directPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/\(englishFontFile).ttf"
             if FileManager.default.fileExists(atPath: directPath) {
-                if let name = registerFont(from: URL(fileURLWithPath: directPath)) {
+                let url = URL(fileURLWithPath: directPath)
+                if let name = registerFontIfNeeded(from: url) {
                     englishFontName = name
-                    print("CustomFontProvider: Using English font name: \(name)")
                 }
             }
         }
     }
     
-    private func registerFont(from url: URL) -> String? {
+    /// 注册字体（如果尚未注册），返回 PostScript 名称
+    private func registerFontIfNeeded(from url: URL) -> String? {
+        // 检查是否已注册
+        if let cachedName = CustomFontProvider.registeredFonts[url] {
+            return cachedName
+        }
+        
         guard let fontDataProvider = CGDataProvider(url: url as CFURL),
               let font = CGFont(fontDataProvider),
               let postScriptName = font.postScriptName as String? else {
-            print("CustomFontProvider: Failed to parse font file at \(url)")
             return nil
         }
         
-        print("CustomFontProvider: Font PostScript name from file: \(postScriptName)")
-        
         var error: Unmanaged<CFError>?
-        if CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
-            print("CustomFontProvider: Successfully registered font: \(postScriptName)")
+        let success = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
+        
+        // 检查是否成功或已注册（error code 105）
+        let isAlreadyRegistered = error?.takeUnretainedValue()._code == 105
+        
+        if success || isAlreadyRegistered {
+            // 注册成功或已注册，缓存结果
+            CustomFontProvider.registeredFonts[url] = postScriptName
             return postScriptName
-        } else {
-            if let errorRef = error {
-                let nsError = errorRef.takeUnretainedValue() as Error as NSError
-                // error code 105 means already registered
-                if nsError.code == 105 {
-                    print("CustomFontProvider: Font already registered: \(postScriptName)")
-                    return postScriptName
-                } else {
-                    print("CustomFontProvider: Error registering font: \(nsError.localizedDescription)")
-                }
-            }
         }
+        
         return nil
     }
     
     func titleFont() -> Font {
-        print("CustomFontProvider: titleFont using: \(chineseFontName)")
         return Font.custom(chineseFontName, size: 20)
     }
     
