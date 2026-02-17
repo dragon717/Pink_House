@@ -52,7 +52,7 @@ struct RococoSmallWorldView: View {
     // Room 1 (Floor 1) Hotspots
     private var room1Hotspots: [HotspotData] {
         [
-            HotspotData(name: "今日穿搭", rect: CGRect(x: 0.35, y: 0.53, width: 0.08, height: 0.19), color: .orange, label: "今日穿搭", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.41, y: 0.725)) {
+            HotspotData(name: "穿搭手帐", rect: CGRect(x: 0.35, y: 0.53, width: 0.08, height: 0.19), color: .orange, label: "穿搭手帐", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.41, y: 0.725)) {
                 destination = .ootd
             },
             HotspotData(name: "来财", rect: CGRect(x: 0.46, y: 0.68, width: 0.06, height: 0.08), color: .yellow, label: "马上来财", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.52, y: 0.77)) {

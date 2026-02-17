@@ -149,8 +149,8 @@ struct FrenchRetroSmallWorldView: View {
     @ViewBuilder
     private func hotspotContent(geometry: GeometryProxy) -> some View {
         ZStack(alignment: .topLeading) {
-            // 1. OOTD (今日穿搭) - 最左侧
-            InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange, label: "今日穿搭", labelStyle: .horizontal(angle: -28), labelPosition: CGPoint(x: 0.17, y: 0.86)) {
+            // 1. OOTD (穿搭手帐) - 最左侧
+            InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange, label: "穿搭手帐", labelStyle: .horizontal(angle: -28), labelPosition: CGPoint(x: 0.17, y: 0.86)) {
                 destination = .ootd
             }
             

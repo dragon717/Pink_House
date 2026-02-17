@@ -62,7 +62,7 @@ struct MainTabView: View {
                     case .menu:
                         Label("小世界", systemImage: "map")
                     case .ootd:
-                        Label("今日穿搭", systemImage: "tshirt")
+                        Label("穿搭手帐", systemImage: "tshirt")
                     case .pet:
                         Label(petDataManager.status.displayName, systemImage: "pawprint")
                     case .wealth:
