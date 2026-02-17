@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 // MARK: - 马上来财主页面
 
@@ -8,9 +9,13 @@ struct WealthView: View {
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
+    @StateObject private var mediaStateManager = MediaStateManager.shared
     
     // 主页面签选择
     @State private var selectedMainTab: WealthMainTab = .divination
+    
+    // 用于监听媒体状态通知
+    @State private var cancellables = Set<AnyCancellable>()
     
     // Money Counting State
     struct MoneyCountingState: Identifiable {
@@ -58,10 +63,10 @@ struct WealthView: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
             }
-            .navigationTitle("🐎上来财")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                principalToolbarContent
+                leadingToolbarContent
+                centerToolbarContent
                 trailingToolbarContent
             }
             .fullScreenCover(item: $moneyCountingState) { state in
@@ -79,10 +84,41 @@ struct WealthView: View {
             }
             .onAppear {
                 handleOnAppear()
+                
+                // 通知媒体状态管理器切换到财富页面
+                print("💰 WealthView.onAppear: 准备切换到财富页面")
+                mediaStateManager.switchToPage(.wealth)
+                print("💰 WealthView.onAppear: 已切换到财富页面")
+                
+                // 监听媒体停止通知（当切换到其他页面时）
+                NotificationCenter.default.publisher(for: .wealthMediaShouldStop)
+                    .sink { [weak soundManager, weak hapticManager] _ in
+                        soundManager?.stopAllSounds()
+                        hapticManager?.stopHaptics()
+                    }
+                    .store(in: &cancellables)
+                
+                // 监听媒体启动通知（当切换回财富页面时）
+                NotificationCenter.default.publisher(for: .wealthMediaShouldStart)
+                    .sink { [weak soundManager] _ in
+                        soundManager?.isSoundEnabled = true
+                        // 注意：财富页面的震动由具体交互（如金豆碰撞）触发，这里不需要自动启动
+                    }
+                    .store(in: &cancellables)
             }
             .onDisappear {
                 lockOrientation(isLocked: false)
                 stopEffects()
+                
+                // 清理通知监听
+                cancellables.removeAll()
+                
+                // 如果当前页面是财富页面，切换到其他页面
+                print("💰 WealthView.onDisappear: 准备切换到其他页面")
+                if mediaStateManager.currentPage == .wealth {
+                    mediaStateManager.switchToPage(.other)
+                }
+                print("💰 WealthView.onDisappear: 已切换到其他页面")
             }
             .onChange(of: viewModel.selectedCurrency) { _, newValue in
                 handleCurrencyChange(newValue)
@@ -96,7 +132,23 @@ struct WealthView: View {
     // MARK: - Toolbar Content
     
     @ToolbarContentBuilder
-    private var principalToolbarContent: some ToolbarContent {
+    private var leadingToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Menu {
+                Text("马上来财")
+                    .font(.headline)
+                Text("财运亨通，日进斗金")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } label: {
+                Text("🐎")
+                    .font(.caption)
+            }
+        }
+    }
+    
+    @ToolbarContentBuilder
+    private var centerToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             Picker("功能", selection: $selectedMainTab) {
                 ForEach(WealthMainTab.allCases) { tab in
@@ -104,7 +156,7 @@ struct WealthView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .frame(width: 240)
+            .frame(width: 180)
         }
     }
     
@@ -112,11 +164,12 @@ struct WealthView: View {
     private var trailingToolbarContent: some ToolbarContent {
         if selectedMainTab == .wealthStorage {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     Button {
                         soundManager.isSoundEnabled.toggle()
                     } label: {
                         Image(systemName: soundManager.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                            .font(.caption)
                             .foregroundStyle(soundManager.isSoundEnabled ? .blue : .gray)
                     }
                     
@@ -124,6 +177,7 @@ struct WealthView: View {
                         hapticManager.isHapticsEnabled.toggle()
                     } label: {
                         Image(systemName: hapticManager.isHapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
+                            .font(.caption)
                             .foregroundStyle(hapticManager.isHapticsEnabled ? .yellow : .gray)
                     }
                 }

@@ -24,6 +24,7 @@ struct MainTabView: View {
     @State private var smallWorldDestination: SmallWorldDestination = .menu
     @State private var isPlayingOpeningAnimation = false
     @ObservedObject private var petDataManager = PetDataManager.shared
+    @StateObject private var mediaStateManager = MediaStateManager.shared
     
     var body: some View {
         ZStack {
@@ -138,6 +139,13 @@ struct MainTabView: View {
                 .id("OpeningVideoOverlay") // 强制刷新
             }
         }
+        .onChange(of: smallWorldDestination) { oldValue, newValue in
+            // 当小世界内部页面切换时，更新媒体状态
+            print("🔄 MainTabView: 小世界内部切换从 \(oldValue) 到 \(newValue), selectedTab: \(selectedTab)")
+            if selectedTab == 1 {
+                handleSmallWorldDestinationChange()
+            }
+        }
     }
     
     // 自定义 Binding 处理 Tab 点击逻辑
@@ -155,8 +163,58 @@ struct MainTabView: View {
                     }
                 }
                 selectedTab = newValue
+                
+                // 处理媒体状态切换
+                handleTabChange(newTab: newValue)
             }
         )
+    }
+    
+    /// 处理 Tab 切换时的媒体状态
+    private func handleTabChange(newTab: Int) {
+        print("🔄 MainTabView: Tab 切换到 \(newTab), 小世界目标: \(smallWorldDestination)")
+        switch newTab {
+        case 0:
+            // 切换到衣橱页面
+            print("🏠 切换到衣橱页面")
+            mediaStateManager.switchToPage(.wardrobe)
+        case 1:
+            // 小世界页面，根据具体子页面决定
+            switch smallWorldDestination {
+            case .pet:
+                print("🐱 切换到萌宠页面")
+                mediaStateManager.switchToPage(.pet)
+            case .wealth:
+                print("💰 切换到财富页面")
+                mediaStateManager.switchToPage(.wealth)
+            default:
+                print("🌍 切换到小世界其他页面")
+                mediaStateManager.switchToPage(.other)
+            }
+        case 2:
+            // 我的页面
+            print("👤 切换到我的页面")
+            mediaStateManager.switchToPage(.other)
+        default:
+            print("❓ 切换到未知页面")
+            mediaStateManager.switchToPage(.other)
+        }
+    }
+    
+    /// 处理小世界内部页面切换
+    private func handleSmallWorldDestinationChange() {
+        print("🔄 MainTabView: 处理小世界内部切换, 目标: \(smallWorldDestination)")
+        switch smallWorldDestination {
+        case .pet:
+            print("🐱 小世界切换到萌宠")
+            mediaStateManager.switchToPage(.pet)
+        case .wealth:
+            print("💰 小世界切换到财富")
+            mediaStateManager.switchToPage(.wealth)
+        default:
+            print("🌍 小世界切换到其他")
+            mediaStateManager.switchToPage(.other)
+        }
     }
     
     // 计算属性判断是否激活模拟 (针对 WealthView)

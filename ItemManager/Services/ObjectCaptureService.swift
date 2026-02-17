@@ -56,6 +56,14 @@ class ObjectCaptureService: ObservableObject {
     private var photogrammetrySession: PhotogrammetrySession?
     private var currentTask: Task<Void, Never>?
     
+    // MARK: - 暂停/恢复状态
+    private var isPaused: Bool = false
+    private var pendingContinuation: CheckedContinuation<URL, Error>?
+    private var pendingOutputURL: URL?
+    private var savedStage: ObjectCaptureStage?
+    private var savedProgress: Double = 0.0
+    private var savedStatusMessage: String = ""
+    
     private init() {}
     
     var isSupported: Bool {
@@ -332,6 +340,9 @@ class ObjectCaptureService: ObservableObject {
         stage = .idle
         progress = 0.0
         statusMessage = ""
+        isPaused = false
+        pendingContinuation = nil
+        pendingOutputURL = nil
     }
     
     func reset() {
@@ -340,6 +351,56 @@ class ObjectCaptureService: ObservableObject {
         progress = 0.0
         statusMessage = ""
         estimatedRemainingTime = nil
+        isPaused = false
+        pendingContinuation = nil
+        pendingOutputURL = nil
+    }
+    
+    // MARK: - 暂停/恢复功能
+
+    /// 暂停当前处理（当离开页面时调用）
+    /// 注意：PhotogrammetrySession 不支持真正的暂停，这里只是保存状态并取消当前任务
+    func pauseProcessing() {
+        guard case .processing = stage, !isPaused else { return }
+
+        isPaused = true
+        savedStage = stage
+        savedProgress = progress
+        savedStatusMessage = statusMessage
+
+        // 注意：PhotogrammetrySession 没有 pause 方法，只能取消
+        // 但取消后无法恢复，所以这里我们只是标记状态，不真正取消
+        // 让处理在后台继续运行
+
+        print("[ObjectCaptureService] 建模处理标记为后台运行（页面离开）")
+    }
+
+    /// 恢复处理（当回到页面时调用）
+    /// 实际上处理一直在后台运行，这里只是恢复UI状态显示
+    func resumeProcessing() {
+        guard isPaused else { return }
+
+        isPaused = false
+
+        print("[ObjectCaptureService] 建模处理恢复前台显示")
+    }
+
+    /// 检查是否处于暂停状态
+    var isProcessingPaused: Bool {
+        isPaused
+    }
+
+    /// 获取保存的状态（用于恢复UI显示）
+    var pausedState: (stage: ObjectCaptureStage, progress: Double, statusMessage: String)? {
+        guard isPaused, let savedStage = savedStage else { return nil }
+        return (savedStage, savedProgress, savedStatusMessage)
+    }
+
+    /// 检查处理是否仍在进行中（用于页面恢复时检查）
+    var isProcessing: Bool {
+        if case .processing = stage { return true }
+        if case .preparing = stage { return true }
+        return false
     }
     
     // MARK: - 磁盘空间管理

@@ -17,6 +17,9 @@ struct GoldPhysicsView: View {
     // Appearance Manager (for background toggle)
     private var appearanceManager = WealthAppearanceManager.shared
     
+    // Media State Manager
+    @StateObject private var mediaStateManager = MediaStateManager.shared
+    
     init(totalWeightGrams: Double, beanWeight: Double) {
         self.totalWeightGrams = totalWeightGrams
         self.beanWeight = beanWeight
@@ -25,7 +28,7 @@ struct GoldPhysicsView: View {
     // Computed pause state for SpriteView
     private var shouldPause: Bool {
         // print("GoldPhysicsView: shouldPause check - Visible: \(isViewVisible), SimActive: \(isSimulationActive), Scene: \(scenePhase)")
-        return !isViewVisible || !isSimulationActive || scenePhase != .active
+        return !isViewVisible || !isSimulationActive || scenePhase != .active || mediaStateManager.isPhysicsPaused
     }
     
     var body: some View {

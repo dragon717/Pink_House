@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 struct PetHomeView: View {
     @StateObject private var viewModel = PetViewModel()
@@ -9,6 +10,7 @@ struct PetHomeView: View {
     @StateObject private var audioManager = AudioManager.shared
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
+    @StateObject private var mediaStateManager = MediaStateManager.shared
     @Environment(\.scenePhase) var scenePhase
     @State private var panelState: PanelState = .hidden
     @State private var showRenameAlert = false
@@ -22,6 +24,9 @@ struct PetHomeView: View {
     @State private var showChatView = false // ChatView State
     @State private var showMicMenu = false // Mic Menu State
     @State private var showVIPView = false // VIP View State
+    
+    // 用于监听媒体状态通知
+    @State private var cancellables = Set<AnyCancellable>()
     
     var body: some View {
         Group {
@@ -389,9 +394,41 @@ struct PetHomeView: View {
         .onAppear {
             viewModel.onViewAppear()
             viewModel.updateWardrobeContext(clothings: clothings)
+            
+            // 通知媒体状态管理器切换到萌宠页面
+                print("🐱 PetHomeView.onAppear: 准备切换到萌宠页面")
+                mediaStateManager.switchToPage(.pet)
+                print("🐱 PetHomeView.onAppear: 已切换到萌宠页面")
+            
+            // 监听媒体停止通知（当切换到其他页面时）
+            NotificationCenter.default.publisher(for: .petMediaShouldStop)
+                .sink { [weak audioManager, weak hapticManager] _ in
+                    audioManager?.isBackgroundMusicEnabled = false
+                    audioManager?.isInteractionEnabled = false
+                    hapticManager?.stopHaptics()
+                }
+                .store(in: &cancellables)
+            
+            // 监听媒体启动通知（当切换回萌宠页面时）
+                NotificationCenter.default.publisher(for: .petMediaShouldStart)
+                    .sink { [weak audioManager] _ in
+                        audioManager?.isBackgroundMusicEnabled = true
+                        // 注意：萌宠页面的震动由具体交互触发，这里不需要自动启动
+                    }
+                    .store(in: &cancellables)
         }
         .onDisappear {
             viewModel.onViewDisappear()
+            
+            // 清理通知监听
+            cancellables.removeAll()
+            
+            // 如果当前页面是萌宠页面，切换到其他页面
+                print("🐱 PetHomeView.onDisappear: 准备切换到其他页面")
+                if mediaStateManager.currentPage == .pet {
+                    mediaStateManager.switchToPage(.other)
+                }
+                print("🐱 PetHomeView.onDisappear: 已切换到其他页面")
         }
     }
 }

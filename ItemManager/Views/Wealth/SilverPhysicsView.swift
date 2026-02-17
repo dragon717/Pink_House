@@ -17,6 +17,9 @@ struct SilverPhysicsView: View {
     // Appearance Manager (for background toggle)
     private var appearanceManager = WealthAppearanceManager.shared
     
+    // Media State Manager
+    @StateObject private var mediaStateManager = MediaStateManager.shared
+    
     init(totalWeightGrams: Double, beanWeight: Double) {
         self.totalWeightGrams = totalWeightGrams
         self.beanWeight = beanWeight
@@ -24,7 +27,7 @@ struct SilverPhysicsView: View {
     
     // Computed pause state for SpriteView
     private var shouldPause: Bool {
-        return !isViewVisible || !isSimulationActive || scenePhase != .active
+        return !isViewVisible || !isSimulationActive || scenePhase != .active || mediaStateManager.isPhysicsPaused
     }
     
     var body: some View {

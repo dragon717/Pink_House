@@ -185,7 +185,7 @@ class SeamlessVideoPlayerView: UIView {
     
     // MARK: - Public Interface
     
-    func update(videoName: String, isLooping: Bool, isMuted: Bool, volume: Float, onFinished: (() -> Void)?, onProgress: ((Double, Double) -> Void)?) {
+    func update(videoName: String, isLooping: Bool, isMuted: Bool, volume: Float, isPaused: Bool = false, onFinished: (() -> Void)?, onProgress: ((Double, Double) -> Void)?) {
         // 更新非视频属性
         self.isMuted = isMuted
         self.volume = volume
@@ -193,6 +193,12 @@ class SeamlessVideoPlayerView: UIView {
         self.onProgress = onProgress
         
         updateVolumeAndMute()
+        
+        // 处理暂停状态
+        if isPaused {
+            activePlayer?.pause()
+            return
+        }
         
         // 优化：先检查视频名字是否真正改变
         // 如果名字相同，则认为视频源相同，无需调用昂贵的 findVideoURL
@@ -204,8 +210,8 @@ class SeamlessVideoPlayerView: UIView {
                 updateLoopingState(isLooping: isLooping)
             }
             
-            // 确保正在播放
-            if activePlayer?.timeControlStatus != .playing {
+            // 确保正在播放（如果不是暂停状态）
+            if activePlayer?.timeControlStatus != .playing && !isPaused {
                 activePlayer?.play()
             }
             return
@@ -632,6 +638,7 @@ struct SeamlessVideoPlayer: UIViewRepresentable {
     var isLooping: Bool
     var isMuted: Bool
     var volume: Float
+    var isPaused: Bool = false
     var onFinished: (() -> Void)?
     var onProgress: ((Double, Double) -> Void)? = nil
     
@@ -647,6 +654,7 @@ struct SeamlessVideoPlayer: UIViewRepresentable {
             isLooping: isLooping,
             isMuted: isMuted,
             volume: volume,
+            isPaused: isPaused,
             onFinished: onFinished,
             onProgress: onProgress
         )

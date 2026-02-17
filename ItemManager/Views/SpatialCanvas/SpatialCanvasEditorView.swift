@@ -76,14 +76,17 @@ struct SpatialCanvasEditorView: View {
     
     // 加载状态
     @State private var isSceneReady = false
-    
+
     // 相机控制器
     @State private var cameraController: CameraController?
 
+    // 建模进度监听定时器
+    @State private var progressUpdateTimer: Timer?
+
     // 背景色 - 根据暗黑模式调整
     private var editorBackground: Color {
-        colorScheme == .dark 
-            ? Color(red: 0.15, green: 0.15, blue: 0.15) 
+        colorScheme == .dark
+            ? Color(red: 0.15, green: 0.15, blue: 0.15)
             : Color(red: 0.96, green: 0.95, blue: 0.93)
     }
 
@@ -219,14 +222,14 @@ struct SpatialCanvasEditorView: View {
         }
         .onAppear {
             loadExistingData()
-            
+
             // 延迟显示
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation(.easeIn(duration: 0.2)) {
                     isSceneReady = true
                 }
             }
-            
+
             // 清理旧的模型文件，释放磁盘空间
             Task {
                 let sizeBefore = await ObjectCaptureService.shared.getModelsDirectorySize()
@@ -234,6 +237,19 @@ struct SpatialCanvasEditorView: View {
                 let sizeAfter = await ObjectCaptureService.shared.getModelsDirectorySize()
                 print("[SpatialCanvasEditorView] 磁盘空间清理完成: \(String(format: "%.1f", sizeBefore)) MB -> \(String(format: "%.1f", sizeAfter)) MB")
             }
+
+            // 检查是否有暂停的建模任务，恢复处理
+            checkAndResumeProcessing()
+
+            // 监听应用生命周期通知
+            setupAppLifecycleNotifications()
+        }
+        .onDisappear {
+            // 离开页面时暂停建模处理
+            pauseProcessingIfNeeded()
+
+            // 移除生命周期监听
+            removeAppLifecycleNotifications()
         }
         .sheet(isPresented: $showingImagePicker) {
             MultiImagePicker(
@@ -599,23 +615,29 @@ struct SpatialCanvasEditorView: View {
     }
     
     // MARK: - Object Capture Processing
-    
+
     private func start3DGSProcessing() {
         guard !capturedImages.isEmpty else { return }
-        
+
         isProcessing3DGS = true
         processingStage = .preparing
         processingProgress = 0.0
-        
+
+        // 启动进度监听定时器
+        startProgressUpdateTimer()
+
         Task {
             do {
                 let usdzURL = try await ObjectCaptureService.shared.processImagesWithFallback(capturedImages)
-                
+
                 await MainActor.run {
                     processingStage = .complete
                     processingProgress = 1.0
                     isProcessing3DGS = false
-                    
+
+                    // 停止进度监听
+                    stopProgressUpdateTimer()
+
                     saveUSDZModelAndCreateModel3D(usdzURL: usdzURL, images: capturedImages)
                 }
             } catch {
@@ -623,6 +645,7 @@ struct SpatialCanvasEditorView: View {
                     processingStage = .failed(error.localizedDescription)
                     isProcessing3DGS = false
                     print("[ObjectCapture] 处理失败: \(error)")
+                    stopProgressUpdateTimer()
                 }
             }
         }
@@ -630,26 +653,19 @@ struct SpatialCanvasEditorView: View {
     
     private func processObjectCaptureDirectory(_ imageDirectory: URL) {
         print("[SpatialCanvasEditorView] 开始处理扫描目录: \(imageDirectory.path)")
-        
+
         isProcessing3DGS = true
         processingStage = .processing
         processingProgress = 0.0
-        
-        // 创建进度监听任务
-        let progressTask = Task {
-            while !Task.isCancelled {
-                await MainActor.run {
-                    self.processingProgress = ObjectCaptureService.shared.progress
-                }
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            }
-        }
-        
+
+        // 启动进度监听定时器
+        startProgressUpdateTimer()
+
         Task {
             do {
                 print("[SpatialCanvasEditorView] 调用 ObjectCaptureService 处理图像...")
                 let usdzURL = try await ObjectCaptureService.shared.processImagesFromDirectory(imageDirectory)
-                
+
                 // 从目录加载图片
                 var images: [UIImage] = []
                 let fileManager = FileManager.default
@@ -661,36 +677,36 @@ struct SpatialCanvasEditorView: View {
                         }
                     }
                 }
-                
-                // 取消进度监听
-                progressTask.cancel()
-                
+
                 await MainActor.run {
                     print("[SpatialCanvasEditorView] 处理完成，USDZ 路径: \(usdzURL.path)")
                     processingStage = .complete
                     processingProgress = 1.0
                     isProcessing3DGS = false
-                    
+
+                    // 停止进度监听
+                    stopProgressUpdateTimer()
+
                     // 保存到 Model3D 并创建场景对象
                     saveUSDZModelAndCreateModel3D(usdzURL: usdzURL, images: images)
-                    
+
                     // 自动保存场景
                     print("[SpatialCanvasEditorView] 自动保存场景...")
                     saveScene()
                 }
             } catch let error as ObjectCaptureError {
-                progressTask.cancel()
                 await MainActor.run {
                     print("[SpatialCanvasEditorView] 处理失败: \(error)")
                     processingStage = .failed(error.localizedDescription)
                     isProcessing3DGS = false
+                    stopProgressUpdateTimer()
                 }
             } catch {
-                progressTask.cancel()
                 await MainActor.run {
                     print("[SpatialCanvasEditorView] 处理失败: \(error)")
                     processingStage = .failed("处理失败: \(error.localizedDescription)")
                     isProcessing3DGS = false
+                    stopProgressUpdateTimer()
                 }
             }
         }
@@ -987,6 +1003,136 @@ struct SpatialCanvasEditorView: View {
             print("[Scene] 保存失败: \(error)")
             completion?()
         }
+    }
+
+    // MARK: - 3D建模暂停/恢复
+
+    /// 如果需要，暂停正在进行的建模处理
+    private func pauseProcessingIfNeeded() {
+        // 检查是否正在处理3DGS（UI显示）或ObjectCaptureService正在处理
+        guard isProcessing3DGS || ObjectCaptureService.shared.isProcessing else { return }
+
+        print("[SpatialCanvasEditorView] 离开页面，标记建模处理为后台运行")
+
+        // 停止进度监听定时器
+        stopProgressUpdateTimer()
+
+        // 标记 ObjectCaptureService 为暂停状态（实际上继续在后台运行）
+        ObjectCaptureService.shared.pauseProcessing()
+    }
+
+    /// 检查并恢复暂停的建模处理
+    private func checkAndResumeProcessing() {
+        // 检查 ObjectCaptureService 是否正在处理或已暂停
+        let service = ObjectCaptureService.shared
+
+        if service.isProcessingPaused {
+            print("[SpatialCanvasEditorView] 回到页面，恢复建模处理显示")
+
+            // 恢复 ObjectCaptureService 的状态标记
+            service.resumeProcessing()
+
+            // 恢复 UI 状态
+            if let pausedState = service.pausedState {
+                DispatchQueue.main.async {
+                    self.isProcessing3DGS = true
+                    self.processingStage = .processing
+                    self.processingProgress = pausedState.progress
+                }
+            }
+
+            // 启动进度监听
+            startProgressUpdateTimer()
+        } else if service.isProcessing {
+            // 如果服务正在处理但页面之前没有标记暂停（可能是应用从后台恢复）
+            print("[SpatialCanvasEditorView] 检测到正在进行的建模处理，恢复UI显示")
+            DispatchQueue.main.async {
+                self.isProcessing3DGS = true
+                self.processingStage = .processing
+            }
+
+            // 启动进度监听
+            startProgressUpdateTimer()
+        }
+    }
+
+    /// 启动进度更新定时器
+    private func startProgressUpdateTimer() {
+        // 先停止之前的定时器
+        stopProgressUpdateTimer()
+
+        // 创建新的定时器，每100ms更新一次进度
+        progressUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            DispatchQueue.main.async {
+                let service = ObjectCaptureService.shared
+
+                // 更新进度
+                self.processingProgress = service.progress
+
+                // 根据服务状态更新UI
+                switch service.stage {
+                case .completed:
+                    self.processingStage = .complete
+                    self.processingProgress = 1.0
+                    self.stopProgressUpdateTimer()
+                case .failed(let error):
+                    self.processingStage = .failed(error.localizedDescription)
+                    self.stopProgressUpdateTimer()
+                case .processing:
+                    self.processingStage = .processing
+                case .preparing:
+                    self.processingStage = .preparing
+                case .idle:
+                    // 如果服务回到空闲状态但UI还在显示处理中，可能是完成了
+                    if self.isProcessing3DGS && self.processingProgress >= 1.0 {
+                        self.processingStage = .complete
+                        self.stopProgressUpdateTimer()
+                    }
+                }
+            }
+        }
+    }
+
+    /// 停止进度更新定时器
+    private func stopProgressUpdateTimer() {
+        progressUpdateTimer?.invalidate()
+        progressUpdateTimer = nil
+    }
+
+    // MARK: - 应用生命周期管理
+
+    private func setupAppLifecycleNotifications() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            print("[SpatialCanvasEditorView] 应用进入后台，暂停建模")
+            self.pauseProcessingIfNeeded()
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            print("[SpatialCanvasEditorView] 应用回到前台，检查恢复建模")
+            self.checkAndResumeProcessing()
+        }
+    }
+
+    private func removeAppLifecycleNotifications() {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
     }
 }
 

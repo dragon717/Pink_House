@@ -50,8 +50,12 @@ struct ObjectCaptureScannerView: View {
         .onDisappear {
             // 延迟重置以避免与 RealityKit 内部资源管理器的竞争条件
             // 这是一个 workaround 来解决 Apple 框架内部的断言失败问题
+            // 注意：如果 session 已经被手动清理（如点击完成按钮），这里会安全地执行 reset
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                sessionManager.reset()
+                // 只有当 session 还存在时才重置，避免重复清理
+                if sessionManager.session != nil {
+                    sessionManager.reset()
+                }
             }
         }
         .onChange(of: sessionManager.state) { _, newState in
@@ -269,10 +273,14 @@ struct ObjectCaptureScannerView: View {
                         }
                         sessionManager.finishCapturing()
                         print("[ObjectCaptureScannerView] 扫描完成，目录: \(imageDir.path)")
-                        DispatchQueue.main.async {
-                            self.onComplete(imageDir)
-                            self.dismiss()
-                        }
+                        
+                        // 先将本地 session 设为 nil，避免 ObjectCaptureView 渲染已销毁的 session
+                        self.session = nil
+                        // 清理 session manager
+                        sessionManager.cancelSession()
+                        
+                        self.onComplete(imageDir)
+                        self.dismiss()
                     }
                 } label: {
                     Text(sessionManager.currentOrbit < 3 ? "下一步" : "完成")
@@ -529,6 +537,13 @@ struct ObjectCaptureScannerView: View {
                                 
                                 // 在主线程调用 onComplete
                                 await MainActor.run {
+                                    // 在调用 onComplete 之前，先将本地 session 设为 nil
+                                    // 这样 ObjectCaptureView 就不会尝试渲染一个即将被销毁的 session
+                                    self.session = nil
+                                    
+                                    // 清理 session manager，但保留图像目录信息
+                                    sessionManager.cancelSession()
+                                    
                                     self.onComplete(finalImageDir)
                                     self.dismiss()
                                 }

@@ -12,6 +12,9 @@ struct PetInteractionAreaView: View {
     @State private var videoDuration: Double = 1.0
     @State private var isVisible: Bool = true // 追踪视图可见性以优化内存
     
+    // Media State Manager
+    @StateObject private var mediaStateManager = MediaStateManager.shared
+    
     // 需要显示进度条的状态
     var shouldShowProgressBar: Bool {
         switch viewModel.currentState {
@@ -37,6 +40,7 @@ struct PetInteractionAreaView: View {
                         // listening 视频强制静音，避免录音时录入视频声音
                         isMuted: !soundManager.isSoundEnabled || viewModel.currentVideoName == PetViewModel.PetVideoPaths.listening,
                         volume: 0.6,
+                        isPaused: mediaStateManager.isVideoPaused, // 根据媒体状态管理器暂停视频
                         onFinished: {
                             viewModel.onAnimationFinished()
                         },
