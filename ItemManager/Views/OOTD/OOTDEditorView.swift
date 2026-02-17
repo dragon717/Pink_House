@@ -25,6 +25,7 @@ struct OOTDEditorView: View {
     @State private var newName = ""
     @State private var showingDeleteAlert = false
     @State private var showingMultiPhotoPicker = false
+    @State private var showingShareSheet = false
     
     // 工具栏和贴纸库显示状态
     @State private var isToolbarVisible = true
@@ -86,29 +87,40 @@ struct OOTDEditorView: View {
                 }
             }
             
-            // 右侧：更多操作菜单
+            // 右侧：分享按钮和更多操作菜单
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
+                HStack(spacing: 16) {
+                    // 分享按钮
                     Button {
-                        showingSaveToClothingSheet = true
+                        showingShareSheet = true
                     } label: {
-                        Label("保存为裙子主图", systemImage: "photo.badge.arrow.down")
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .semibold))
                     }
                     
-                    Button {
-                        newName = outfit.note
-                        showingRenameAlert = true
+                    // 更多操作菜单
+                    Menu {
+                        Button {
+                            showingSaveToClothingSheet = true
+                        } label: {
+                            Label("保存为裙子主图", systemImage: "photo.badge.arrow.down")
+                        }
+                        
+                        Button {
+                            newName = outfit.note
+                            showingRenameAlert = true
+                        } label: {
+                            Label("重命名", systemImage: "pencil")
+                        }
+                        
+                        Button(role: .destructive) {
+                            showingDeleteAlert = true
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
                     } label: {
-                        Label("重命名", systemImage: "pencil")
+                        Image(systemName: "ellipsis.circle")
                     }
-                    
-                    Button(role: .destructive) {
-                        showingDeleteAlert = true
-                    } label: {
-                        Label("删除", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -146,6 +158,12 @@ struct OOTDEditorView: View {
                 // Logic needs to be ported or accessed via static/shared helper
                 // For now, let's just log or implement simple version
             }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            ShareCardSheet(
+                shareType: .outfit(outfit),
+                onDismiss: { showingShareSheet = false }
+            )
         }
         .alert("重命名", isPresented: $showingRenameAlert) {
             TextField("名称", text: $newName)

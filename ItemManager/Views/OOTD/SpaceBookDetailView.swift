@@ -51,6 +51,10 @@ struct SpaceBookDetailView: View {
     // Rename Book
     @State private var showingRenameBookAlert = false
     @State private var renameBookName = ""
+    
+    // 分享卡片
+    @State private var showingShareCard = false
+    @State private var pageToShare: SpaceOutfit?
 
     // Grid Layout
     enum GridMode: Int, CaseIterable, Identifiable {
@@ -137,6 +141,14 @@ struct SpaceBookDetailView: View {
             .sheet(isPresented: $showingMoveSheet) {
                 if let page = pageToMove {
                     SpaceMovePageSheet(page: page, currentBook: book)
+                }
+            }
+            .fullScreenCover(isPresented: $showingShareCard) {
+                if let page = pageToShare {
+                    ShareCardSheet(
+                        shareType: .spaceOutfit(page),
+                        onDismiss: { showingShareCard = false }
+                    )
                 }
             }
             .photosPicker(isPresented: $showingCoverPicker, selection: $selectedCoverItem, matching: .images)
@@ -252,6 +264,12 @@ struct SpaceBookDetailView: View {
         }
 
         Button {
+            sharePage(page)
+        } label: {
+            Label("分享成图片", systemImage: "square.and.arrow.up")
+        }
+
+        Button {
             insertPage(after: page)
         } label: {
             Label("在后面新增", systemImage: "arrow.right.square")
@@ -275,6 +293,12 @@ struct SpaceBookDetailView: View {
         } label: {
             Label("删除", systemImage: "trash")
         }
+    }
+    
+    private func sharePage(_ page: SpaceOutfit) {
+        // 打开分享卡片动画界面
+        pageToShare = page
+        showingShareCard = true
     }
 
     // MARK: - Actions

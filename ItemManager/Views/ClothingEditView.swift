@@ -70,10 +70,15 @@ struct ClothingEditView: View {
     var isEditing: Bool { clothing != nil }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // MARK: - 裙子信息
-                ClothingBasicInfoView(
+        ZStack {
+            // Background
+            LiquidBackground()
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // MARK: - 裙子信息
+                    ClothingBasicInfoView(
                     imagePaths: $imagePaths,
                     name: $name,
                     brandName: $brandName,
@@ -115,10 +120,10 @@ struct ClothingEditView: View {
                     finalPaymentEndDate: $finalPaymentEndDate,
                     note: $note
                 )
+                }
+                .padding()
             }
-            .padding()
         }
-        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(isEditing ? "编辑" : "手动添加")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

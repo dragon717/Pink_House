@@ -43,6 +43,10 @@ struct BookDetailView: View {
     @State var showingMoveSheet = false
     @State var pageToMove: Outfit?
     
+    // 分享卡片
+    @State var showingShareCard = false
+    @State var pageToShare: Outfit?
+    
     // Rename Book
     @State var showingRenameBookAlert = false
     @State var renameBookName = ""
@@ -96,6 +100,14 @@ struct BookDetailView: View {
             showingMoveSheet: $showingMoveSheet,
             movePageSheet: { movePageSheet }
         )
+        .fullScreenCover(isPresented: $showingShareCard) {
+            if let page = pageToShare {
+                ShareCardSheet(
+                    shareType: .outfit(page),
+                    onDismiss: { showingShareCard = false }
+                )
+            }
+        }
         .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
             TextField("名称", text: $renameBookName)
             Button("取消", role: .cancel) {}

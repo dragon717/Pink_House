@@ -71,13 +71,6 @@
 			);
 			target = A2AE58722F19377500B4B6EB /* ItemManager */;
 		};
-		A2AE59DA2F1EB85400B4B6EB /* Exceptions for "少女心愿衣橱" folder in "少女心愿衣橱Extension" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = A2AE59BF2F1EB85300B4B6EB /* 少女心愿衣橱Extension */;
-		};
 		A2AE59E92F1EB9C200B4B6EB /* Exceptions for "ItemManager" folder in "少女心愿衣橱Extension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -126,14 +119,6 @@
 			path = ItemManagerUITests;
 			sourceTree = "<group>";
 		};
-		A2AE59C62F1EB85300B4B6EB /* 少女心愿衣橱 */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				A2AE59DA2F1EB85400B4B6EB /* Exceptions for "少女心愿衣橱" folder in "少女心愿衣橱Extension" target */,
-			);
-			path = "少女心愿衣橱";
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -177,10 +162,10 @@
 				A2AE58752F19377500B4B6EB /* ItemManager */,
 				A2AE58872F19377600B4B6EB /* ItemManagerTests */,
 				A2AE58912F19377600B4B6EB /* ItemManagerUITests */,
-				A2AE59C62F1EB85300B4B6EB /* 少女心愿衣橱 */,
 				A2AE59C12F1EB85300B4B6EB /* Frameworks */,
 				A2AE58742F19377500B4B6EB /* Products */,
 				A226CD732F26A507004E4E41 /* 少女心愿logo.icon */,
+				A2F14A312F44792000BA78C6 /* 少女心愿衣橱 */,
 			);
 			sourceTree = "<group>";
 		};
@@ -202,6 +187,13 @@
 				A2AE59C42F1EB85300B4B6EB /* SwiftUI.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A2F14A312F44792000BA78C6 /* 少女心愿衣橱 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "少女心愿衣橱";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -289,9 +281,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				A2AE59C62F1EB85300B4B6EB /* 少女心愿衣橱 */,
 			);
 			name = "少女心愿衣橱Extension";
 			packageProductDependencies = (

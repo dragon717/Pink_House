@@ -61,6 +61,12 @@ extension BookDetailView {
         }
 
         Button {
+            sharePage(page)
+        } label: {
+            Label("分享成图片", systemImage: "square.and.arrow.up")
+        }
+
+        Button {
             insertPage(after: page)
         } label: {
             Label("在后面新增", systemImage: "arrow.right.square")
@@ -84,5 +90,11 @@ extension BookDetailView {
         } label: {
             Label("删除", systemImage: "trash")
         }
+    }
+    
+    private func sharePage(_ page: Outfit) {
+        // 打开分享卡片动画界面
+        pageToShare = page
+        showingShareCard = true
     }
 }

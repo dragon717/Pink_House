@@ -18,6 +18,7 @@ struct ClothingDetailView: View {
     @State private var showingConfirmPaymentAlert = false
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
+    @State private var showingShareSheet = false
     
     @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = false
     
@@ -26,7 +27,8 @@ struct ClothingDetailView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .top) {
-                Color(uiColor: .systemGroupedBackground)
+                // Background
+                LiquidBackground()
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -128,28 +130,40 @@ struct ClothingDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
+                HStack(spacing: 16) {
+                    // 分享按钮
                     Button {
-                        showingEditSheet = true
+                        showingShareSheet = true
                     } label: {
-                        Label("编辑", systemImage: "pencil")
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.primary)
                     }
                     
-                    Button {
-                        duplicateClothing()
+                    // 更多操作菜单
+                    Menu {
+                        Button {
+                            showingEditSheet = true
+                        } label: {
+                            Label("编辑", systemImage: "pencil")
+                        }
+                        
+                        Button {
+                            duplicateClothing()
+                        } label: {
+                            Label("复制", systemImage: "doc.on.doc")
+                        }
+                        
+                        Button(role: .destructive) {
+                            showingDeleteAlert = true
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
                     } label: {
-                        Label("复制", systemImage: "doc.on.doc")
+                        Image(systemName: "ellipsis")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
                     }
-                    
-                    Button(role: .destructive) {
-                        showingDeleteAlert = true
-                    } label: {
-                        Label("删除", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
                 }
             }
         }
@@ -157,6 +171,12 @@ struct ClothingDetailView: View {
             NavigationStack {
                 ClothingEditView(clothing: clothing)
             }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            ShareCardSheet(
+                shareType: .clothing(clothing),
+                onDismiss: { showingShareSheet = false }
+            )
         }
         .fullScreenCover(isPresented: $showingImageViewer) {
             ImageViewer(imagePaths: clothing.imagePaths, selectedIndex: $currentImageIndex)

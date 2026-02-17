@@ -76,6 +76,9 @@ struct SpatialCanvasEditorView: View {
     
     // 加载状态
     @State private var isSceneReady = false
+    
+    // 分享
+    @State private var showingShareSheet = false
 
     // 相机控制器
     @State private var cameraController: CameraController?
@@ -328,6 +331,15 @@ struct SpatialCanvasEditorView: View {
                     .foregroundStyle(.red)
                     .disabled(sceneObjects.isEmpty)
                     
+                    // 分享按钮
+                    Button {
+                        showingShareSheet = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .disabled(spaceOutfit == nil)
+                    
                     // 更多选项菜单
                     Menu {
                         Button {
@@ -357,6 +369,14 @@ struct SpatialCanvasEditorView: View {
                             .foregroundStyle(.primary)
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let outfit = spaceOutfit {
+                ShareCardSheet(
+                    shareType: .spaceOutfit(outfit),
+                    onDismiss: { showingShareSheet = false }
+                )
             }
         }
         .confirmationDialog("确认返回？", isPresented: $showingBackConfirmation, titleVisibility: .visible) {
