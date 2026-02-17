@@ -152,14 +152,6 @@ struct RococoSmallWorldView: View {
                             }
                         }
                 )
-                .onTapGesture(count: 2) {
-                    withAnimation {
-                        finalZoomScale = 1.0
-                        currentZoomScale = 1.0
-                        finalDragOffset = .zero
-                        currentDragOffset = .zero
-                    }
-                }
                 .onChange(of: viewMode) { _ in
                     withAnimation {
                         finalZoomScale = 1.0
