@@ -362,14 +362,6 @@ public struct RealityKitSceneView: View {
     private func updateSelectionOutline() {
         selectionOutlineEntity?.removeFromParent()
         selectionOutlineEntity = nil
-        
-        guard selectedTool == .select, let selected = selectedObject else { return }
-        
-        guard let entity = entityCache[selected.id] else { return }
-        
-        let outline = createSelectionOutline(for: entity, object: selected)
-        entity.addChild(outline)
-        selectionOutlineEntity = outline
     }
     
     private func createSelectionOutline(for entity: Entity, object: SceneObject) -> Entity {
