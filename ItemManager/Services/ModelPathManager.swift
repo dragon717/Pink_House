@@ -123,19 +123,9 @@ class ModelPathManager {
 // MARK: - SwiftData Model 扩展
 
 extension SceneObjectData {
-    /// 获取解析后的模型路径（绝对路径）
-    var resolvedModelPath: String? {
-        return ModelPathManager.shared.resolvePath(usdzModelPath)
-    }
-    
     /// 设置模型路径（会自动转换为相对路径存储）
     func setModelPath(_ absolutePath: String?) {
         usdzModelPath = ModelPathManager.shared.storePath(absolutePath)
-    }
-    
-    /// 检查模型文件是否存在
-    var modelFileExists: Bool {
-        return ModelPathManager.shared.fileExists(usdzModelPath)
     }
 }
 

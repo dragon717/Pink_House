@@ -59,7 +59,7 @@ struct SpatialCanvasEditorView: View {
     
     // 右侧素材面板
     @State private var showingAssetPanel = false
-    @State private var selectedAssetCategory: AssetCategory = .clothing
+    @State private var selectedAssetCategory: AssetCategory = .models
     
     // 底部操作栏状态
     @State private var showingBottomControls = false
@@ -311,9 +311,13 @@ struct SpatialCanvasEditorView: View {
         .confirmationDialog("确认返回？", isPresented: $showingBackConfirmation, titleVisibility: .visible) {
             Button("保存并返回", role: .none) {
                 selectedObject = nil
-                saveScene()
-                hasUnsavedChanges = false
-                dismiss()
+                if hasUnsavedChanges {
+                    saveScene {
+                        dismiss()
+                    }
+                } else {
+                    dismiss()
+                }
             }
             Button("不保存返回", role: .destructive) {
                 selectedObject = nil
@@ -398,13 +402,14 @@ struct SpatialCanvasEditorView: View {
         }
     }
     
-    private func loadUSDZModel(from path: String) {
+    private func loadUSDZModel(from path: String, model3DID: UUID? = nil) {
         let object = SceneObject(
             type: .usdzModel,
             position: SIMD3<Float>(0, 0, 0),
             rotation: SIMD3<Float>(0, 0, 0),
             scale: SIMD3<Float>(1, 1, 1),
-            usdzModelPath: path
+            usdzModelPath: path,
+            model3DID: model3DID
         )
         sceneObjects.append(object)
     }
@@ -490,9 +495,15 @@ struct SpatialCanvasEditorView: View {
             hasUnsavedChanges = true
             
             switch asset.type {
+            case .model:
+                if let modelPath = asset.metadata["modelPath"] {
+                    let model3DIDString = asset.metadata["model3DID"]
+                    let model3DID = model3DIDString.flatMap { UUID(uuidString: $0) }
+                    loadUSDZModel(from: modelPath, model3DID: model3DID)
+                }
             case .clothing:
                 if let modelPath = asset.metadata["modelPath"] {
-                    loadUSDZModel(from: modelPath)
+                    loadUSDZModel(from: modelPath, model3DID: nil)
                 }
             case .effect:
                 print("[Asset] 选择特效: \(asset.name)")
@@ -564,7 +575,7 @@ struct SpatialCanvasEditorView: View {
                     processingProgress = 1.0
                     isProcessing3DGS = false
                     
-                    saveUSDZModelAndCreateClothing(usdzURL: usdzURL, images: capturedImages)
+                    saveUSDZModelAndCreateModel3D(usdzURL: usdzURL, images: capturedImages)
                 }
             } catch {
                 await MainActor.run {
@@ -598,6 +609,18 @@ struct SpatialCanvasEditorView: View {
                 print("[SpatialCanvasEditorView] 调用 ObjectCaptureService 处理图像...")
                 let usdzURL = try await ObjectCaptureService.shared.processImagesFromDirectory(imageDirectory)
                 
+                // 从目录加载图片
+                var images: [UIImage] = []
+                let fileManager = FileManager.default
+                if let imageURLs = try? fileManager.contentsOfDirectory(at: imageDirectory, includingPropertiesForKeys: nil) {
+                    for url in imageURLs {
+                        if let data = try? Data(contentsOf: url),
+                           let image = UIImage(data: data) {
+                            images.append(image)
+                        }
+                    }
+                }
+                
                 // 取消进度监听
                 progressTask.cancel()
                 
@@ -607,17 +630,8 @@ struct SpatialCanvasEditorView: View {
                     processingProgress = 1.0
                     isProcessing3DGS = false
                     
-                    let object = SceneObject(
-                        type: .usdzModel,
-                        position: SIMD3<Float>(0, 0, 0),
-                        rotation: SIMD3<Float>(0, 0, 0),
-                        scale: SIMD3<Float>(1, 1, 1),
-                        usdzModelPath: usdzURL.path
-                    )
-                    sceneObjects.append(object)
-                    hasUnsavedChanges = true
-                    
-                    print("[SpatialCanvasEditorView] 模型已添加到场景，当前对象数: \(sceneObjects.count)")
+                    // 保存到 Model3D 并创建场景对象
+                    saveUSDZModelAndCreateModel3D(usdzURL: usdzURL, images: images)
                     
                     // 自动保存场景
                     print("[SpatialCanvasEditorView] 自动保存场景...")
@@ -641,32 +655,43 @@ struct SpatialCanvasEditorView: View {
         }
     }
     
-    private func saveUSDZModelAndCreateClothing(usdzURL: URL, images: [UIImage]) {
+    private func saveUSDZModelAndCreateModel3D(usdzURL: URL, images: [UIImage]) {
         let modelID = UUID()
+        print("[ObjectCapture] ===== 开始保存 Model3D =====")
+        print("[ObjectCapture] modelID: \(modelID)")
+        print("[ObjectCapture] usdzURL: \(usdzURL.path)")
         
         let thumbnailPath = saveThumbnail(from: images.first, modelID: modelID)
+        print("[ObjectCapture] thumbnailPath: \(thumbnailPath ?? "nil")")
         
         let imagePaths = saveSourceImages(images, modelID: modelID)
+        print("[ObjectCapture] sourceImagePaths count: \(imagePaths.count)")
         
-        let clothing = Clothing(
+        let model3D = Model3D(
             name: "3D模型 \(modelID.uuidString.prefix(8))",
             types: "3D模型",
-            imagePaths: imagePaths,
-            status: .onShelf
+            modelPath: nil,
+            modelType: "usdz",
+            thumbnailPath: nil,
+            sourceImagePaths: imagePaths
         )
         // 使用相对路径存储
-        clothing.setModel3DPath(usdzURL.path)
-        clothing.model3DType = "usdz"
-        clothing.model3DThumbnailPath = thumbnailPath
+        model3D.setModelPath(usdzURL.path)
+        model3D.setThumbnailPath(thumbnailPath)
         
-        modelContext.insert(clothing)
+        print("[ObjectCapture] model3D.modelPath after set: \(model3D.modelPath ?? "nil")")
+        print("[ObjectCapture] model3D.thumbnailPath after set: \(model3D.thumbnailPath ?? "nil")")
+        print("[ObjectCapture] model3D.isDeleted: \(model3D.isDeleted)")
+        
+        modelContext.insert(model3D)
+        print("[ObjectCapture] model3D 已插入 modelContext")
         
         // 保存上下文到数据库
         do {
             try modelContext.save()
-            print("[ObjectCapture] Clothing 已保存到数据库: \(modelID)")
+            print("[ObjectCapture] ✅ Model3D 已保存到数据库: \(modelID)")
         } catch {
-            print("[ObjectCapture] 保存 Clothing 失败: \(error)")
+            print("[ObjectCapture] ❌ 保存 Model3D 失败: \(error)")
         }
         
         let object = SceneObject(
@@ -674,13 +699,15 @@ struct SpatialCanvasEditorView: View {
             position: SIMD3<Float>(0, 0, 0),
             rotation: SIMD3<Float>(0, 0, 0),
             scale: SIMD3<Float>(1, 1, 1),
-            usdzModelPath: usdzURL.path
+            usdzModelPath: usdzURL.path,
+            model3DID: model3D.id
         )
         sceneObjects.append(object)
         
         hasUnsavedChanges = true
         
         print("[ObjectCapture] 创建3D模型记录: \(modelID)")
+        print("[ObjectCapture] =====================")
     }
     
     /// 保存缩略图，返回相对路径
@@ -752,9 +779,11 @@ struct SpatialCanvasEditorView: View {
     
     // MARK: - Save
     
-    private func saveScene() {
+    private func saveScene(completion: (() -> Void)? = nil) {
         guard !sceneObjects.isEmpty else {
             print("[Scene] 场景为空，无需保存")
+            hasUnsavedChanges = false
+            completion?()
             return
         }
         
@@ -795,6 +824,15 @@ struct SpatialCanvasEditorView: View {
         // 保存新的场景对象
         for (index, object) in sceneObjects.enumerated() {
             print("[Scene] 保存对象 \(index + 1)/\(sceneObjects.count): type=\(object.type), path=\(object.usdzModelPath ?? "nil")")
+            
+            var model3D: Model3D? = nil
+            if let model3DID = object.model3DID {
+                let descriptor = FetchDescriptor<Model3D>(
+                    predicate: #Predicate<Model3D> { $0.id == model3DID && $0.isDeleted == false }
+                )
+                model3D = try? modelContext.fetch(descriptor).first
+            }
+            
             let objectData = SceneObjectData(
                 id: object.id,
                 objectType: object.type == .primitive ? "primitive" : "usdzModel",
@@ -804,7 +842,8 @@ struct SpatialCanvasEditorView: View {
                 usdzModelPath: nil, // 先设为 nil，下面用 setModelPath 设置相对路径
                 color: object.color,
                 sortIndex: index,
-                spaceOutfit: outfit
+                spaceOutfit: outfit,
+                model3D: model3D
             )
             // 使用相对路径存储
             objectData.setModelPath(object.usdzModelPath)
@@ -825,12 +864,14 @@ struct SpatialCanvasEditorView: View {
             hasUnsavedChanges = false
             showingSaveSuccess = true
             print("[Scene] 场景保存成功，共 \(sceneObjects.count) 个对象，outfit.id: \(outfit.id)")
+            
+            // 调用保存回调
+            onSave?(outfit)
+            completion?()
         } catch {
             print("[Scene] 保存失败: \(error)")
+            completion?()
         }
-        
-        // 调用保存回调
-        onSave?(outfit)
     }
 }
 

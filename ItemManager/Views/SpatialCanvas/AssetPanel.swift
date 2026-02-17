@@ -8,6 +8,8 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import RealityKit
+import simd
 
 // MARK: - SpatialAsset 类型
 
@@ -20,6 +22,7 @@ struct SpatialAsset: Identifiable {
     let metadata: [String: String]
     
     enum AssetType {
+        case model
         case clothing
         case effect
         case template
@@ -154,6 +157,8 @@ struct AssetPanel: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         switch selectedCategory {
+                        case .models:
+                            Model3DAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .clothing:
                             ClothingAssetList(searchText: searchText, onSelect: onAssetSelect)
                         case .effect:
@@ -213,6 +218,8 @@ struct CategoryTab: View {
     
     var categoryColor: Color {
         switch category {
+        case .models:
+            return .purple
         case .clothing:
             return .orange
         case .effect:
@@ -774,6 +781,461 @@ struct FurnitureCard: View {
     }
 }
 
+// MARK: - 3D模型素材列表
+
+struct Model3DAssetList: View {
+    let searchText: String
+    let onSelect: (SpatialAsset) -> Void
+    
+    @Query(filter: #Predicate<Model3D> { $0.isDeleted == false }) private var models: [Model3D]
+    
+    var filteredModels: [Model3D] {
+        let validModels = models.filter { $0.modelPath != nil }
+        if searchText.isEmpty {
+            return validModels
+        }
+        return validModels.filter { model in
+            model.name.localizedCaseInsensitiveContains(searchText) ||
+            model.types.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            if filteredModels.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "cube.box")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("暂无3D模型")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("使用相机拍摄20+张照片\n或从图库选择图片生成3D模型")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 40)
+                .onAppear {
+                    print("[Model3DAssetList] ===== 调试信息 =====")
+                    print("[Model3DAssetList] 查询到所有 Model3D 数量: \(models.count)")
+                    for model in models {
+                        print("[Model3DAssetList]  - id: \(model.id), name: \(model.name), isDeleted: \(model.isDeleted), modelPath: \(model.modelPath ?? "nil")")
+                    }
+                    print("[Model3DAssetList] 有 modelPath 的数量: \(models.filter { $0.modelPath != nil }.count)")
+                    print("[Model3DAssetList] ==================")
+                }
+            } else {
+                ForEach(filteredModels.prefix(20)) { model in
+                    Model3DAssetCard(model: model) {
+                        let resolvedPath = model.resolvedModelPath ?? ""
+                        let asset = SpatialAsset(
+                            type: .model,
+                            name: model.name,
+                            imagePath: model.thumbnailPath,
+                            thumbnail: loadThumbnail(for: model),
+                            metadata: [
+                                "modelPath": resolvedPath,
+                                "modelType": model.modelType ?? "multi",
+                                "typeDescription": model.modelTypeDescription ?? "3D",
+                                "model3DID": model.id.uuidString
+                            ]
+                        )
+                        onSelect(asset)
+                    }
+                }
+                .onAppear {
+                    print("[Model3DAssetList] 显示 \(filteredModels.count) 个 3D 模型")
+                }
+            }
+        }
+    }
+    
+    private func loadThumbnail(for model: Model3D) -> UIImage? {
+        if let resolvedPath = model.resolvedThumbnailPath,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: resolvedPath)),
+           let image = UIImage(data: data) {
+            return image
+        }
+        if let firstResolvedPath = model.resolvedSourceImagePaths.first,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: firstResolvedPath)),
+           let image = UIImage(data: data) {
+            return image
+        }
+        return nil
+    }
+}
+
+// MARK: - 3D模型卡片
+
+struct Model3DAssetCard: View {
+    let model: Model3D
+    let onTap: () -> Void
+    
+    @Environment(\.modelContext) private var modelContext
+    @State private var showingRenameAlert = false
+    @State private var showingDeleteAlert = false
+    @State private var showingUsageAlert = false
+    @State private var showingThumbnailEditor = false
+    @State private var newName: String = ""
+    @State private var usageCount: Int = 0
+    
+    private var thumbnailImage: UIImage? {
+        if let resolvedPath = model.resolvedThumbnailPath,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: resolvedPath)),
+           let image = UIImage(data: data) {
+            return image
+        }
+        if let firstResolvedPath = model.resolvedSourceImagePaths.first,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: firstResolvedPath)),
+           let image = UIImage(data: data) {
+            return image
+        }
+        return nil
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                if let image = thumbnailImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.purple.opacity(0.3))
+                        .frame(width: 60, height: 60)
+                        .overlay(
+                            Image(systemName: "cube.box")
+                                .foregroundStyle(.purple)
+                        )
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.name)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 4) {
+                        Text(model.modelTypeDescription ?? "3D")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.2))
+                            .foregroundStyle(.purple)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        
+                        Text(model.types)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(.purple)
+            }
+            .padding()
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .contextMenu {
+            Button {
+                newName = model.name
+                showingRenameAlert = true
+            } label: {
+                Label("重命名", systemImage: "pencil")
+            }
+            
+            Button {
+                showingThumbnailEditor = true
+            } label: {
+                Label("设置缩略图", systemImage: "camera.viewfinder")
+            }
+            
+            Button(role: .destructive) {
+                checkUsageAndShowDeleteAlert()
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
+        .alert("重命名", isPresented: $showingRenameAlert) {
+            TextField("请输入新名称", text: $newName)
+            Button("取消", role: .cancel) { }
+            Button("确定") {
+                renameModel()
+            }
+        }
+        .alert("确认删除", isPresented: $showingDeleteAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                performDelete()
+            }
+        } message: {
+            Text("确定要删除「\(model.name)」吗？此操作无法撤销，模型文件和数据将被永久删除。")
+        }
+        .alert("无法删除", isPresented: $showingUsageAlert) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text("该模型正在被 \(usageCount) 个场景使用，请先从场景中移除后再删除。")
+        }
+        .sheet(isPresented: $showingThumbnailEditor) {
+            ModelThumbnailEditorView(model: model)
+        }
+    }
+    
+    private func renameModel() {
+        guard !newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        model.name = newName
+        model.updatedAt = Date()
+        try? modelContext.save()
+    }
+    
+    private func checkUsageAndShowDeleteAlert() {
+        let descriptor = FetchDescriptor<SceneObjectData>()
+        let allObjects = (try? modelContext.fetch(descriptor)) ?? []
+        usageCount = allObjects.filter { $0.model3D?.id == model.id }.count
+        
+        if usageCount > 0 {
+            showingUsageAlert = true
+        } else {
+            showingDeleteAlert = true
+        }
+    }
+    
+    private func performDelete() {
+        let fileManager = FileManager.default
+        if let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let modelDir = documentsPath.appendingPathComponent("Models/\(model.id.uuidString)")
+            try? fileManager.removeItem(at: modelDir)
+        }
+        
+        modelContext.delete(model)
+        try? modelContext.save()
+    }
+}
+
+// MARK: - 3D模型缩略图编辑器
+
+struct ModelThumbnailEditorView: View {
+    let model: Model3D
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
+    
+    @State private var cameraPosition: SIMD3<Float> = SIMD3<Float>(0, 0, 3)
+    @State private var cameraRotation: SIMD3<Float> = SIMD3<Float>(0, 0, 0)
+    @State private var isSaving = false
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                (colorScheme == .dark ? Color(red: 0.15, green: 0.15, blue: 0.15) : Color(red: 0.96, green: 0.95, blue: 0.93))
+                    .ignoresSafeArea()
+                
+                if let resolvedPath = model.resolvedModelPath {
+                    SingleModelRealityView(
+                        modelPath: resolvedPath,
+                        cameraPosition: $cameraPosition,
+                        cameraRotation: $cameraRotation
+                    )
+                } else {
+                    VStack(spacing: 16) {
+                        Image(systemName: "cube.box")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                        
+                        Text("无法加载模型")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                VStack {
+                    Spacer()
+                    
+                    HStack(spacing: 16) {
+                        Button {
+                            resetCamera()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("重置视角")
+                            }
+                            .font(.subheadline)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.gray.opacity(0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        
+                        Spacer()
+                        
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("取消")
+                                .font(.subheadline)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color.gray.opacity(0.2))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        
+                        Button {
+                            saveThumbnail()
+                        } label: {
+                            HStack(spacing: 4) {
+                                if isSaving {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "checkmark")
+                                }
+                                Text("保存")
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.purple)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .disabled(isSaving)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                }
+            }
+            .navigationTitle("设置缩略图")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                cameraPosition = model.cameraPosition
+                cameraRotation = model.cameraRotation
+            }
+        }
+    }
+    
+    private func resetCamera() {
+        cameraPosition = SIMD3<Float>(0, 0, 3)
+        cameraRotation = SIMD3<Float>(0, 0, 0)
+    }
+    
+    private func saveThumbnail() {
+        isSaving = true
+        
+        Task {
+            await MainActor.run {
+                model.cameraPosition = cameraPosition
+                model.cameraRotation = cameraRotation
+                model.updatedAt = Date()
+                
+                let modelID = model.id
+                let fileManager = FileManager.default
+                guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                    isSaving = false
+                    return
+                }
+                
+                let modelDir = documentsPath.appendingPathComponent("Models/\(modelID.uuidString)")
+                try? fileManager.createDirectory(at: modelDir, withIntermediateDirectories: true)
+                
+                if let firstImagePath = model.resolvedSourceImagePaths.first,
+                   let data = try? Data(contentsOf: URL(fileURLWithPath: firstImagePath)),
+                   let image = UIImage(data: data) {
+                    
+                    let thumbnailSize = CGSize(width: 200, height: 200)
+                    let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
+                    let thumbnail = renderer.image { context in
+                        let bgColor = UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
+                        bgColor.setFill()
+                        context.fill(CGRect(origin: .zero, size: thumbnailSize))
+                        image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                    }
+                    
+                    let thumbnailFileName = "thumbnail.jpg"
+                    let thumbnailPath = modelDir.appendingPathComponent(thumbnailFileName)
+                    if let data = thumbnail.jpegData(compressionQuality: 0.8) {
+                        try? data.write(to: thumbnailPath)
+                        let relativePath = "Models/\(modelID.uuidString)/\(thumbnailFileName)"
+                        model.setThumbnailPath(relativePath)
+                    }
+                }
+                
+                try? modelContext.save()
+                isSaving = false
+                dismiss()
+            }
+        }
+    }
+}
+
+struct SingleModelRealityView: View {
+    let modelPath: String
+    @Binding var cameraPosition: SIMD3<Float>
+    @Binding var cameraRotation: SIMD3<Float>
+    
+    @StateObject private var cameraController = CameraController()
+    
+    var body: some View {
+        GeometryReader { geometry in
+            RealityView { content in
+                let rootEntity = Entity()
+                rootEntity.name = "sceneRoot"
+                content.add(rootEntity)
+                
+                cameraController.distance = cameraPosition.z
+                cameraController.rotationY = cameraRotation.y
+                cameraController.rotationX = cameraRotation.x
+                
+                _ = cameraController.setupCamera(in: rootEntity)
+                
+                if let modelEntity = try? Entity.load(contentsOf: URL(fileURLWithPath: modelPath)) {
+                    modelEntity.position = SIMD3<Float>(0, 0, 0)
+                    rootEntity.addChild(modelEntity)
+                }
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        let delta = value.translation
+                        let rotationSpeed: Float = 0.005
+                        cameraController.rotationY += Float(delta.width) * rotationSpeed
+                        cameraController.rotationX += Float(delta.height) * rotationSpeed
+                        cameraRotation.y = cameraController.rotationY
+                        cameraRotation.x = cameraController.rotationX
+                    }
+            )
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        let scaleFactor: Float = Float(value)
+                        let baseDistance: Float = 3.0
+                        cameraController.distance = baseDistance / scaleFactor
+                        cameraController.distance = max(0.5, min(10, cameraController.distance))
+                        cameraPosition.z = cameraController.distance
+                    }
+            )
+        }
+    }
+}
+
 // MARK: - 预览
 
 #Preview {
@@ -781,7 +1243,7 @@ struct FurnitureCard: View {
         Color.black.ignoresSafeArea()
         
         AssetPanel(
-            selectedCategory: .constant(.clothing),
+            selectedCategory: .constant(.models),
             onAssetSelect: { _ in }
         )
     }

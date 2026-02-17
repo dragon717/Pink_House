@@ -29,8 +29,11 @@ final class SceneObjectData {
     
     var sortIndex: Int = 0
     
-    @Relationship(deleteRule: .cascade)
+    @Relationship
     var spaceOutfit: SpaceOutfit?
+    
+    @Relationship
+    var model3D: Model3D?
     
     init(
         id: UUID = UUID(),
@@ -41,7 +44,8 @@ final class SceneObjectData {
         usdzModelPath: String? = nil,
         color: SIMD4<Float> = SIMD4<Float>(0.8, 0.8, 0.8, 1.0),
         sortIndex: Int = 0,
-        spaceOutfit: SpaceOutfit? = nil
+        spaceOutfit: SpaceOutfit? = nil,
+        model3D: Model3D? = nil
     ) {
         self.id = id
         self.objectType = objectType
@@ -61,6 +65,7 @@ final class SceneObjectData {
         self.colorA = Double(color.w)
         self.sortIndex = sortIndex
         self.spaceOutfit = spaceOutfit
+        self.model3D = model3D
     }
     
     var position: SIMD3<Float> {
@@ -100,6 +105,17 @@ final class SceneObjectData {
         }
     }
     
+    var resolvedModelPath: String? {
+        if let model3D = model3D {
+            return model3D.resolvedModelPath
+        }
+        return ModelPathManager.shared.resolvePath(usdzModelPath)
+    }
+    
+    var modelFileExists: Bool {
+        return ModelPathManager.shared.fileExists(resolvedModelPath)
+    }
+    
     func toSceneObject() -> SceneObject {
         let type: SceneObjectType
         switch objectType {
@@ -113,8 +129,9 @@ final class SceneObjectData {
             position: position,
             rotation: rotation,
             scale: scale,
-            usdzModelPath: usdzModelPath,
-            color: color
+            usdzModelPath: resolvedModelPath,
+            color: color,
+            model3DID: model3D?.id
         )
     }
     

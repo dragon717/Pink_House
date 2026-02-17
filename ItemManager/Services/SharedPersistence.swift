@@ -43,7 +43,8 @@ class SharedPersistence {
             BookGroup.self,
             SpaceBookGroup.self,
             SpaceOutfit.self,
-            SceneObjectData.self
+            SceneObjectData.self,
+            Model3D.self
         ])
         #endif
         

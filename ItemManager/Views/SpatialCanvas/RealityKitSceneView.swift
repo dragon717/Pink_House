@@ -21,6 +21,7 @@ public struct SceneObject: Identifiable, Equatable {
     public var scale: SIMD3<Float>
     public var usdzModelPath: String?
     public var color: SIMD4<Float>
+    public var model3DID: UUID?
     
     public init(
         id: UUID = UUID(),
@@ -29,7 +30,8 @@ public struct SceneObject: Identifiable, Equatable {
         rotation: SIMD3<Float> = SIMD3<Float>(0, 0, 0),
         scale: SIMD3<Float> = SIMD3<Float>(1, 1, 1),
         usdzModelPath: String? = nil,
-        color: SIMD4<Float> = SIMD4<Float>(0.8, 0.8, 0.8, 1.0)
+        color: SIMD4<Float> = SIMD4<Float>(0.8, 0.8, 0.8, 1.0),
+        model3DID: UUID? = nil
     ) {
         self.id = id
         self.type = type
@@ -38,6 +40,7 @@ public struct SceneObject: Identifiable, Equatable {
         self.scale = scale
         self.usdzModelPath = usdzModelPath
         self.color = color
+        self.model3DID = model3DID
     }
     
     public static func == (lhs: SceneObject, rhs: SceneObject) -> Bool {
