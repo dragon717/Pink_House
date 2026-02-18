@@ -67,7 +67,7 @@ struct ModernTabView: View {
                 )
             }
             
-            Tab("我的", systemImage: "face.smiling", value: 2) {
+            Tab("我", systemImage: "face.smiling", value: 2) {
                 MeTabContent()
             }
             
@@ -133,7 +133,7 @@ struct SmallWorldTabContent: View {
     }
 }
 
-// MARK: - 我的 Tab 内容
+// MARK: - 我 Tab 内容
 @available(iOS 18.0, *)
 struct MeTabContent: View {
     var body: some View {

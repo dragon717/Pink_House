@@ -129,7 +129,7 @@ struct MeView: View {
             .background {
                 LiquidBackground()
             }
-            .navigationTitle("我的")
+            .navigationTitle("我")
             .sheet(isPresented: $showingCloudSyncSheet) {
                 CloudSyncSheetView(
                     authManager: authManager,
