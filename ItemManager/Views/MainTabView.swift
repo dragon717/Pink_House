@@ -267,6 +267,8 @@ struct SmallWorldContainerView: View {
                 WealthView()
             case .calendar:
                 DreamDressCalendarView()
+            case .bigWorld:
+                BigWorldView()
             }
         }
     }

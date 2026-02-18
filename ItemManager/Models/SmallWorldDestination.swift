@@ -6,4 +6,5 @@ enum SmallWorldDestination {
     case pet
     case wealth
     case calendar
+    case bigWorld
 }
