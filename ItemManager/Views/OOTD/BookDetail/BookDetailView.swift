@@ -50,6 +50,13 @@ struct BookDetailView: View {
     // Rename Book
     @State var showingRenameBookAlert = false
     @State var renameBookName = ""
+    
+    // 批量添加图片书页
+    @State var showingBatchPhotoPicker = false
+    @State var selectedBatchPhotos: [PhotosPickerItem] = []
+    @State var isBatchProcessing = false
+    @State var batchProcessingProgress = 0
+    @State var batchTotalCount = 0
 
     @AppStorage("bookDetailGridMode") var gridModeValue = 2
 
@@ -116,6 +123,107 @@ struct BookDetailView: View {
                 try? modelContext.save()
             }
         }
+        .photosPicker(
+            isPresented: $showingBatchPhotoPicker,
+            selection: $selectedBatchPhotos,
+            maxSelectionCount: 20,
+            selectionBehavior: .ordered,
+            matching: .images
+        )
+        .onChange(of: selectedBatchPhotos) { _, newItems in
+            if !newItems.isEmpty {
+                batchTotalCount = newItems.count
+                processBatchPhotos(newItems)
+                selectedBatchPhotos = []
+            }
+        }
+        .overlay {
+            if isBatchProcessing {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView(value: Double(batchProcessingProgress), total: Double(batchTotalCount))
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                        Text("正在添加书页... \(batchProcessingProgress)/\(batchTotalCount)")
+                            .foregroundStyle(.white)
+                            .font(.headline)
+                    }
+                    .padding(32)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
+                }
+            }
+        }
+    }
+    
+    private func processBatchPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        
+        isBatchProcessing = true
+        batchProcessingProgress = 0
+        
+        Task {
+            let startSortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
+            
+            for (index, item) in items.enumerated() {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await MainActor.run {
+                        let newPage = Outfit(
+                            note: "图片书页 \(Date().formatted(date: .numeric, time: .shortened))",
+                            canvasType: "custom",
+                            book: book
+                        )
+                        newPage.sortIndex = startSortIndex + index
+                        
+                        // 裁剪图片为 3:4 比例
+                        let croppedImage = cropImageToAspectRatio(image, aspectRatio: 0.75)
+                        
+                        if let path = ImageManager.shared.saveImage(croppedImage, context: modelContext) {
+                            newPage.backgroundImagePath = path
+                            newPage.snapshotPath = path
+                        }
+                        
+                        modelContext.insert(newPage)
+                        batchProcessingProgress = index + 1
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                try? modelContext.save()
+                refreshTrigger.toggle()
+                isBatchProcessing = false
+            }
+        }
+    }
+    
+    private func cropImageToAspectRatio(_ image: UIImage, aspectRatio: CGFloat) -> UIImage {
+        let imageSize = image.size
+        let targetRatio = aspectRatio
+        let currentRatio = imageSize.width / imageSize.height
+        
+        var cropRect: CGRect
+        
+        if currentRatio > targetRatio {
+            // 图片太宽，裁剪宽度
+            let newWidth = imageSize.height * targetRatio
+            let xOffset = (imageSize.width - newWidth) / 2
+            cropRect = CGRect(x: xOffset, y: 0, width: newWidth, height: imageSize.height)
+        } else {
+            // 图片太高，裁剪高度
+            let newHeight = imageSize.width / targetRatio
+            let yOffset = (imageSize.height - newHeight) / 2
+            cropRect = CGRect(x: 0, y: yOffset, width: imageSize.width, height: newHeight)
+        }
+        
+        guard let cgImage = image.cgImage?.cropping(to: cropRect) else {
+            return image
+        }
+        
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
     }
 
     private var backgroundCropperSheet: some View {

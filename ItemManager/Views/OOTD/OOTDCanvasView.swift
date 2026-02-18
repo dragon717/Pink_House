@@ -27,6 +27,14 @@ struct OOTDCanvasView: View {
     // 贴纸库显示状态
     @Binding var isStickerLibraryVisible: Bool
     
+    // 翻页相关参数
+    let currentPageIndex: Int
+    let totalPages: Int
+    let hasPreviousPage: Bool
+    let hasNextPage: Bool
+    var onPreviousPage: () -> Void
+    var onNextPage: () -> Void
+    
     // Callback for when canvas content changes (for snapshot updates)
     var onCanvasChange: (() -> Void)?
     
@@ -49,6 +57,12 @@ struct OOTDCanvasView: View {
                         selectedItemId: $selectedItemId,
                         isVisible: $isToolbarVisible,
                         isStickerLibraryVisible: $isStickerLibraryVisible,
+                        currentPageIndex: currentPageIndex,
+                        totalPages: totalPages,
+                        hasPreviousPage: hasPreviousPage,
+                        hasNextPage: hasNextPage,
+                        onPreviousPage: onPreviousPage,
+                        onNextPage: onNextPage,
                         onDelete: { item in
                             deleteItem(item)
                         },

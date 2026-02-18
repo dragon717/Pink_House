@@ -60,7 +60,7 @@ extension View {
                 movePageSheet()
             }
             .navigationDestination(for: Outfit.self) { outfit in
-                OOTDEditorView(outfit: outfit)
+                PageFlipEditorContainer(initialOutfit: outfit)
             }
     }
 }

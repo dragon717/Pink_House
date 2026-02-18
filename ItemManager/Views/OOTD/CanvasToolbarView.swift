@@ -18,6 +18,14 @@ struct CanvasToolbarView: View {
     // 贴纸库显示状态
     @Binding var isStickerLibraryVisible: Bool
     
+    // 翻页相关
+    let currentPageIndex: Int
+    let totalPages: Int
+    let hasPreviousPage: Bool
+    let hasNextPage: Bool
+    var onPreviousPage: () -> Void
+    var onNextPage: () -> Void
+    
     // 回调
     var onDelete: (OutfitItem) -> Void
     var onBringToFront: (OutfitItem) -> Void
@@ -45,6 +53,36 @@ struct CanvasToolbarView: View {
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)
+                    
+                    Divider()
+                        .frame(width: 24)
+                    
+                    // 翻页控制组
+                    ToolbarButtonGroup(title: "翻页") {
+                        // 上一页按钮
+                        ToolbarButton(
+                            icon: "chevron.left",
+                            label: "上一张",
+                            isEnabled: hasPreviousPage
+                        ) {
+                            onPreviousPage()
+                        }
+
+                        // 页码指示器
+                        Text("\(currentPageIndex + 1)/\(totalPages)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 44)
+
+                        // 下一页按钮
+                        ToolbarButton(
+                            icon: "chevron.right",
+                            label: "下一张",
+                            isEnabled: hasNextPage
+                        ) {
+                            onNextPage()
+                        }
+                    }
                     
                     Divider()
                         .frame(width: 24)
@@ -222,6 +260,12 @@ struct ToolbarButton: View {
         selectedItemId: .constant(nil),
         isVisible: .constant(true),
         isStickerLibraryVisible: .constant(false),
+        currentPageIndex: 2,
+        totalPages: 10,
+        hasPreviousPage: true,
+        hasNextPage: true,
+        onPreviousPage: {},
+        onNextPage: {},
         onDelete: { _ in },
         onBringToFront: { _ in },
         onBringForward: { _ in },

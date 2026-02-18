@@ -207,17 +207,21 @@ struct InteractionHotspot: View {
         
         ZStack {
             // 热区本体
-            Button(action: action) {
+            Button(action: {
+                print("[FrenchRetroSmallWorldView] 热区点击, 坐标: (\(rect.minX), \(rect.minY))")
+                action()
+            }) {
                 if showDebug {
                     Rectangle()
                         .fill(debugColor.opacity(0.3))
                         .border(debugColor)
                 } else {
-                    Color.clear
+                    // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
+                    Color.black.opacity(0.001)
                         .contentShape(Rectangle())
                 }
             }
-            .frame(width: rect.width * width, height: rect.height * height)
+            .frame(width: max(1, rect.width * width), height: max(1, rect.height * height))
             .position(x: (rect.minX + rect.width/2) * width, y: (rect.minY + rect.height/2) * height)
             
             // 独立控制的悬浮文字
@@ -272,13 +276,17 @@ struct CalendarHotspot: View {
                     )
                 
                 // 点击跳转
-                Button(action: action) {
+                Button(action: {
+                    print("[FrenchRetroSmallWorldView] 日历热区点击, 坐标: (\(rect.minX), \(rect.minY))")
+                    action()
+                }) {
                     if showDebug {
                         Rectangle()
                             .fill(Color.blue.opacity(0.3))
                             .border(Color.blue)
                     } else {
-                        Color.clear
+                        // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
+                        Color.black.opacity(0.001)
                             .contentShape(Rectangle())
                     }
                 }

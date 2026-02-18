@@ -13,6 +13,14 @@ struct OOTDContentArea: View {
     @Binding var isStickerLibraryVisible: Bool
     let geometry: GeometryProxy
     
+    // 翻页相关参数（可选，用于支持翻页功能）
+    var currentPageIndex: Int = 0
+    var totalPages: Int = 1
+    var hasPreviousPage: Bool = false
+    var hasNextPage: Bool = false
+    var onPreviousPage: (() -> Void)? = nil
+    var onNextPage: (() -> Void)? = nil
+    
     // Actions
     let onAddToOutfit: (CutoutItem) -> Void
     let onAddPhoto: () -> Void
@@ -32,6 +40,12 @@ struct OOTDContentArea: View {
                             outfit: outfit,
                             isToolbarVisible: $isToolbarVisible,
                             isStickerLibraryVisible: $isStickerLibraryVisible,
+                            currentPageIndex: currentPageIndex,
+                            totalPages: totalPages,
+                            hasPreviousPage: hasPreviousPage,
+                            hasNextPage: hasNextPage,
+                            onPreviousPage: onPreviousPage ?? {},
+                            onNextPage: onNextPage ?? {},
                             onCanvasChange: onUpdate
                         )
                         .id(outfit.id)
@@ -82,6 +96,12 @@ struct OOTDContentArea: View {
                             outfit: outfit,
                             isToolbarVisible: $isToolbarVisible,
                             isStickerLibraryVisible: $isStickerLibraryVisible,
+                            currentPageIndex: currentPageIndex,
+                            totalPages: totalPages,
+                            hasPreviousPage: hasPreviousPage,
+                            hasNextPage: hasNextPage,
+                            onPreviousPage: onPreviousPage ?? {},
+                            onNextPage: onNextPage ?? {},
                             onCanvasChange: onUpdate
                         )
                         .id(outfit.id)

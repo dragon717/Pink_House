@@ -127,6 +127,14 @@ extension BookDetailView {
             } label: {
                 Label("自定义图片", systemImage: "photo")
             }
+            
+            Divider()
+            
+            Button {
+                showingBatchPhotoPicker = true
+            } label: {
+                Label("批量添加图片书页", systemImage: "photo.stack")
+            }
         } label: {
             Label("新增书页", systemImage: "doc.badge.plus")
         }

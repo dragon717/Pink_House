@@ -8,6 +8,12 @@ struct OOTDEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
+    // 获取同一本书的所有书页（用于翻页导航）
+    @Query(filter: #Predicate<Outfit> { $0.isDeleted == false }, sort: \Outfit.sortIndex) private var allPages: [Outfit]
+    
+    // 页面切换回调
+    var onPageChange: ((Outfit) -> Void)?
+    
     // States copied from OOTDView
     @State private var isListExpanded = false
     @State private var isProcessing = false
@@ -27,50 +33,55 @@ struct OOTDEditorView: View {
     @State private var showingMultiPhotoPicker = false
     @State private var showingShareSheet = false
     
+    // 编辑底图相关状态
+    @State private var showingBackgroundEditSheet = false
+    @State private var showingBackgroundPicker = false
+    @State private var selectedBackgroundItem: PhotosPickerItem?
+    @State private var tempBackgroundImage: UIImage?
+    @State private var showingBackgroundCropper = false
+    
     // 工具栏和贴纸库显示状态
     @State private var isToolbarVisible = true
     @State private var isStickerLibraryVisible = false
     
+    // 当前书页索引
+    private var currentPageIndex: Int {
+        bookPages.firstIndex { $0.id == outfit.id } ?? 0
+    }
+    
+    // 当前书的所有书页
+    private var bookPages: [Outfit] {
+        allPages.filter { $0.book?.id == outfit.book?.id }
+    }
+    
+    // 是否有上一页
+    private var hasPreviousPage: Bool {
+        currentPageIndex > 0
+    }
+    
+    // 是否有下一页
+    private var hasNextPage: Bool {
+        currentPageIndex < bookPages.count - 1
+    }
+    
+    // 上一页
+    private var previousPage: Outfit? {
+        guard hasPreviousPage else { return nil }
+        return bookPages[currentPageIndex - 1]
+    }
+    
+    // 下一页
+    private var nextPage: Outfit? {
+        guard hasNextPage else { return nil }
+        return bookPages[currentPageIndex + 1]
+    }
+    
     var body: some View {
         GeometryReader { geometry in
-            OOTDContentArea(
-                currentOutfit: Binding(get: { outfit }, set: { _ in }), // OOTDContentArea expects optional binding
-                isListExpanded: $isListExpanded,
-                isProcessing: $isProcessing,
-                processingMessage: processingMessage,
-                isToolbarVisible: $isToolbarVisible,
-                isStickerLibraryVisible: $isStickerLibraryVisible,
-                geometry: geometry,
-                onAddToOutfit: { cutout in
-                    addToOutfit(cutout)
-                },
-                onAddPhoto: {
-                    showingActionSheet = true
-                },
-                onBatchAdd: { cutouts in
-                    // Logic from OOTDView
-                    if outfit.items.count + cutouts.count > 20 {
-                        showingLimitAlert = true
-                        return false
-                    }
-                    for (index, cutout) in cutouts.enumerated() {
-                        let item = OutfitItem(
-                            cutout: cutout,
-                            x: Double(index * 20),
-                            y: Double(index * 20),
-                            rotation: 0,
-                            scale: 1.0,
-                            zIndex: outfit.items.count
-                        )
-                        outfit.items.append(item)
-                    }
-                    saveSnapshot()
-                    return true
-                },
-                onUpdate: {
-                    saveSnapshot()
-                }
-            )
+            ZStack {
+                // 主内容区域
+                mainContentArea(geometry: geometry)
+            }
         }
         .navigationTitle(outfit.note.isEmpty ? "编辑书页" : outfit.note)
         .navigationBarTitleDisplayMode(.inline)
@@ -100,6 +111,12 @@ struct OOTDEditorView: View {
                     
                     // 更多操作菜单
                     Menu {
+                        Button {
+                            showingBackgroundEditSheet = true
+                        } label: {
+                            Label("编辑底图", systemImage: "photo")
+                        }
+                        
                         Button {
                             showingSaveToClothingSheet = true
                         } label: {
@@ -184,6 +201,88 @@ struct OOTDEditorView: View {
         } message: {
             Text("确定要删除这张书页吗？")
         }
+        // MARK: - 编辑底图相关 Sheets
+        .confirmationDialog("编辑底图", isPresented: $showingBackgroundEditSheet) {
+            Button("更换底图") {
+                showingBackgroundPicker = true
+            }
+            if outfit.canvasType == "custom" {
+                Button("恢复默认", role: .destructive) {
+                    resetBackgroundToDefault()
+                }
+            }
+            Button("取消", role: .cancel) {}
+        }
+        .photosPicker(isPresented: $showingBackgroundPicker, selection: $selectedBackgroundItem, matching: .images)
+        .onChange(of: selectedBackgroundItem) { _, newItem in
+            if let newItem {
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await MainActor.run {
+                            tempBackgroundImage = image
+                            showingBackgroundCropper = true
+                            selectedBackgroundItem = nil
+                        }
+                    }
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showingBackgroundCropper) {
+            backgroundCropperSheet
+        }
+    }
+    
+    // MARK: - 底图裁剪 Sheet
+    private var backgroundCropperSheet: some View {
+        Group {
+            if let image = tempBackgroundImage {
+                ImageCropView(
+                    image: image,
+                    aspectRatio: 0.75, // 3:4 比例
+                    targetWidth: 1080
+                ) { croppedImage in
+                    updateBackgroundImage(croppedImage)
+                    showingBackgroundCropper = false
+                    tempBackgroundImage = nil
+                } onCancel: {
+                    showingBackgroundCropper = false
+                    tempBackgroundImage = nil
+                }
+            }
+        }
+    }
+    
+    // MARK: - 更新底图
+    private func updateBackgroundImage(_ image: UIImage) {
+        // 删除旧底图
+        if let oldPath = outfit.backgroundImagePath {
+            ImageManager.shared.deleteImage(fileName: oldPath, context: modelContext)
+        }
+        
+        // 保存新底图
+        if let path = ImageManager.shared.saveImage(image, context: modelContext) {
+            outfit.backgroundImagePath = path
+            outfit.canvasType = "custom"
+            outfit.snapshotPath = path // 同时更新快照
+            try? modelContext.save()
+        }
+    }
+    
+    // MARK: - 恢复默认底图
+    private func resetBackgroundToDefault() {
+        // 删除旧底图
+        if let oldPath = outfit.backgroundImagePath {
+            ImageManager.shared.deleteImage(fileName: oldPath, context: modelContext)
+        }
+        
+        outfit.backgroundImagePath = nil
+        outfit.canvasType = "mannequin"
+        outfit.snapshotPath = nil
+        try? modelContext.save()
+        
+        // 重新生成快照
+        saveSnapshot()
     }
     
     // MARK: - Helper Methods
@@ -272,4 +371,161 @@ struct OOTDEditorView: View {
         
         saveSnapshot()
     }
+    
+    // MARK: - 翻页导航
+    
+    /// 前往上一页
+    private func goToPreviousPage() {
+        guard let prev = previousPage else { return }
+        
+        // 先保存当前页快照
+        saveSnapshot()
+        
+        // 渐隐渐出效果切换页面
+        withAnimation(.easeInOut(duration: 0.3)) {
+            self.onPageChange?(prev)
+        }
+    }
+    
+    // MARK: - 主内容区域
+    
+    @ViewBuilder
+    private func mainContentArea(geometry: GeometryProxy) -> some View {
+        let isLandscape = geometry.size.width > geometry.size.height
+        
+        ZStack {
+            if isLandscape {
+                // Landscape Layout: HStack (Canvas + Sidebar)
+                HStack(spacing: 0) {
+                    // Canvas Area with Page Flip Controls in Toolbar
+                    OOTDCanvasView(
+                        outfit: outfit,
+                        isToolbarVisible: $isToolbarVisible,
+                        isStickerLibraryVisible: $isStickerLibraryVisible,
+                        currentPageIndex: currentPageIndex,
+                        totalPages: bookPages.count,
+                        hasPreviousPage: hasPreviousPage,
+                        hasNextPage: hasNextPage,
+                        onPreviousPage: { goToPreviousPage() },
+                        onNextPage: { goToNextPage() },
+                        onCanvasChange: { saveSnapshot() }
+                    )
+                    .id(outfit.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    // Right Sidebar (Cutout List) - 贴纸库
+                    if isStickerLibraryVisible {
+                        OOTDCutoutListView(
+                            isExpanded: $isListExpanded,
+                            isLandscape: true,
+                            onSelect: { cutout in addToOutfit(cutout) },
+                            onAddPhoto: { showingActionSheet = true },
+                            onBatchAdd: { cutouts in
+                                if outfit.items.count + cutouts.count > 20 {
+                                    showingLimitAlert = true
+                                    return false
+                                }
+                                for (index, cutout) in cutouts.enumerated() {
+                                    let item = OutfitItem(
+                                        cutout: cutout,
+                                        x: Double(index * 20),
+                                        y: Double(index * 20),
+                                        rotation: 0,
+                                        scale: 1.0,
+                                        zIndex: outfit.items.count
+                                    )
+                                    outfit.items.append(item)
+                                }
+                                saveSnapshot()
+                                return true
+                            }
+                        )
+                        .frame(width: isListExpanded ? 320 : 100)
+                        .background(Color(uiColor: .systemBackground))
+                        .transition(.move(edge: .trailing))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isListExpanded)
+                    }
+                }
+            } else {
+                // Portrait Layout: ZStack (Canvas + Bottom Sheet)
+                ZStack {
+                    OOTDCanvasView(
+                        outfit: outfit,
+                        isToolbarVisible: $isToolbarVisible,
+                        isStickerLibraryVisible: $isStickerLibraryVisible,
+                        currentPageIndex: currentPageIndex,
+                        totalPages: bookPages.count,
+                        hasPreviousPage: hasPreviousPage,
+                        hasNextPage: hasNextPage,
+                        onPreviousPage: { goToPreviousPage() },
+                        onNextPage: { goToNextPage() },
+                        onCanvasChange: { saveSnapshot() }
+                    )
+                    .id(outfit.id)
+
+                    // 贴纸库 - 底部弹出
+                    if isStickerLibraryVisible {
+                        VStack {
+                            Spacer()
+                            OOTDCutoutListView(
+                                isExpanded: $isListExpanded,
+                                isLandscape: false,
+                                onSelect: { cutout in addToOutfit(cutout) },
+                                onAddPhoto: { showingActionSheet = true },
+                                onBatchAdd: { cutouts in
+                                    if outfit.items.count + cutouts.count > 20 {
+                                        showingLimitAlert = true
+                                        return false
+                                    }
+                                    for (index, cutout) in cutouts.enumerated() {
+                                        let item = OutfitItem(
+                                            cutout: cutout,
+                                            x: Double(index * 20),
+                                            y: Double(index * 20),
+                                            rotation: 0,
+                                            scale: 1.0,
+                                            zIndex: outfit.items.count
+                                        )
+                                        outfit.items.append(item)
+                                    }
+                                    saveSnapshot()
+                                    return true
+                                }
+                            )
+                            .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isListExpanded)
+                        }
+                    }
+                }
+            }
+            
+            if isProcessing {
+                Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                VStack {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    Text(processingMessage)
+                        .foregroundColor(.white)
+                        .padding(.top)
+                }
+            }
+        }
+    }
+    
+    /// 前往下一页
+    private func goToNextPage() {
+        guard let next = nextPage else { return }
+        
+        // 先保存当前页快照
+        saveSnapshot()
+        
+        // 渐隐渐出效果切换页面
+        withAnimation(.easeInOut(duration: 0.3)) {
+            self.onPageChange?(next)
+        }
+    }
 }
+
+

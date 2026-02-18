@@ -279,7 +279,10 @@ struct RococoSmallWorldView: View {
             ZStack(alignment: .topLeading) {
                 ForEach(hotspots) { hotspot in
                     ZStack {
-                        Button(action: hotspot.action) {
+                        Button(action: {
+                            print("[RococoSmallWorldView] 热区点击: \(hotspot.name), 坐标: (\(hotspot.rect.minX), \(hotspot.rect.minY)), 尺寸: \(geo.size)")
+                            hotspot.action()
+                        }) {
                             if showDebugHotspots {
                                 ZStack {
                                     Rectangle()
@@ -294,13 +297,14 @@ struct RococoSmallWorldView: View {
                                 }
                                 .contentShape(Rectangle())
                             } else {
-                                Color.clear
+                                // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
+                                Color.black.opacity(0.001)
                                     .contentShape(Rectangle())
                             }
                         }
                         .frame(
-                            width: hotspot.rect.width * geo.size.width,
-                            height: hotspot.rect.height * geo.size.height
+                            width: max(1, hotspot.rect.width * geo.size.width),
+                            height: max(1, hotspot.rect.height * geo.size.height)
                         )
                         .position(
                             x: (hotspot.rect.minX + hotspot.rect.width/2) * geo.size.width,
