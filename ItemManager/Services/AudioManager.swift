@@ -303,18 +303,22 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             // 路由变化时，重新应用音量设置
             self.updatePlayerVolume()
             
-            // 如果开启了互动，并且需要强制使用手机麦克风，则重新应用设置
-            if self.isInteractionEnabled && self.useiPhoneMicWithHeadphones {
-                // 只有当原因是新设备连接或旧设备断开时，才积极重置 AudioSession
-                // 避免在其他无关路由变化时频繁重置
+            // 如果开启了互动，需要重新启动互动以适应新的音频路由和采样率
+            // 这是修复麦克风采样率为 0 的关键
+            if self.isInteractionEnabled {
+                // 只有当原因是新设备连接或旧设备断开时，才积极重置
                 if reason == .newDeviceAvailable || reason == .oldDeviceUnavailable {
-                    self.setupAudioSession(isRecording: true)
+                    print("AudioManager: Restarting interaction due to route change")
+                    self.stopInteraction()
+                    // 短暂延迟后重新启动，让系统完成路由切换
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        if self.isInteractionEnabled {
+                            self.startInteraction()
+                        }
+                    }
                 }
             }
         }
-        
-        // 如果是新设备接入（例如连接了蓝牙耳机），可能需要检查是否需要重启互动以适应新的采样率或I/O
-        // 这里暂时只处理音量适配
     }
     
     @objc private func handleAppDidEnterBackground() {
@@ -569,6 +573,17 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // 移除旧的 Tap
         engine.inputNode.removeTap(onBus: 0)
         
+        // 关键修复：在获取格式之前先启动引擎
+        // 否则 inputNode.outputFormat 可能返回采样率为 0 的无效格式
+        do {
+            try engine.start()
+        } catch {
+            print("AudioManager: Failed to start engine before getting format: \(error)")
+            isInteractionEnabled = false
+            stopInteraction()
+            return
+        }
+        
         let inputNode = engine.inputNode
         // 使用 outputFormat 而不是 inputFormat，因为这是 InputNode 输出给 Tap 的数据格式
         let format = inputNode.outputFormat(forBus: 0)
@@ -578,9 +593,26 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         if format.sampleRate == 0 || format.channelCount == 0 {
             print("AudioManager: Invalid input format: \(format)")
-            isInteractionEnabled = false // 关闭开关
-            stopInteraction()
-            return
+            // 尝试重启引擎并延迟重试一次
+            engine.stop()
+            engine.reset()
+            Thread.sleep(forTimeInterval: 0.1)
+            do {
+                try engine.start()
+                let retryFormat = inputNode.outputFormat(forBus: 0)
+                print("AudioManager: Retry input format: \(retryFormat)")
+                if retryFormat.sampleRate == 0 || retryFormat.channelCount == 0 {
+                    print("AudioManager: Still invalid format after retry")
+                    isInteractionEnabled = false
+                    stopInteraction()
+                    return
+                }
+            } catch {
+                print("AudioManager: Failed to retry engine start: \(error)")
+                isInteractionEnabled = false
+                stopInteraction()
+                return
+            }
         }
         
         prepareSpeechRecognition()
@@ -653,6 +685,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
         
         do {
+            // 引擎已经在前面启动，这里只需要确保它正在运行
             if !engine.isRunning {
                 try engine.start()
             }

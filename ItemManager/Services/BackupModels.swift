@@ -44,10 +44,22 @@ struct BackupManifest: Codable {
     // App Version Persistence
     let appVersion: String?
     
+    // Version 1.5: Book Groups and Space Outfits
+    let bookGroups: [BookGroupDTO]?
+    let spaceBookGroups: [SpaceBookGroupDTO]?
+    let spaceOutfits: [SpaceOutfitDTO]?
+    
+    // Version 1.5: Model3D
+    let model3Ds: [Model3DDTO]?
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int
     let outfitCount: Int
+    let bookGroupCount: Int?
+    let spaceBookGroupCount: Int?
+    let spaceOutfitCount: Int?
+    let model3DCount: Int?
 }
 
 struct BrandDTO: Codable {
@@ -160,6 +172,7 @@ struct OOTDSnapshotDTO: Codable {
     let snapshotPath: String?
     var canvasType: String? = "mannequin"
     var backgroundImagePath: String?
+    let bookID: UUID? // Reference to parent BookGroup (v1.5)
     let items: [OOTDSnapshotItemDTO]
 }
 
@@ -172,4 +185,89 @@ struct OOTDSnapshotItemDTO: Codable {
     let height: Double
     let zIndex: Int
     let rotation: Double
+}
+
+// MARK: - Model3D DTO (v1.5)
+
+struct Model3DDTO: Codable {
+    let id: UUID
+    let name: String
+    let types: String
+    let modelPath: String?
+    let modelType: String?
+    let thumbnailPath: String?
+    let sourceImagePaths: [String]
+    let isDeleted: Bool
+    let deletedAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+    let sortIndex: Int
+    let cameraPositionX: Float
+    let cameraPositionY: Float
+    let cameraPositionZ: Float
+    let cameraRotationX: Float
+    let cameraRotationY: Float
+    let cameraRotationZ: Float
+}
+
+// MARK: - Book Group DTOs (v1.5)
+
+struct BookGroupDTO: Codable {
+    let id: UUID
+    let title: String
+    let coverImage: String?
+    let createdAt: Date
+    let isDeleted: Bool
+    let deletedAt: Date?
+    let sortIndex: Int
+}
+
+struct SpaceBookGroupDTO: Codable {
+    let id: UUID
+    let title: String
+    let coverImage: String?
+    let createdAt: Date
+    let isDeleted: Bool
+    let deletedAt: Date?
+    let sortIndex: Int
+}
+
+// MARK: - Space Outfit DTOs (v1.5)
+
+struct SpaceOutfitDTO: Codable {
+    let id: UUID
+    let createdAt: Date
+    let note: String
+    let snapshotPath: String?
+    let sortIndex: Int
+    let modelPath: String?
+    let camPosX: Double
+    let camPosY: Double
+    let camPosZ: Double
+    let lightingIntensity: Double
+    let isDeleted: Bool
+    let deletedAt: Date?
+    let bookID: UUID? // Reference to parent SpaceBookGroup
+    let sceneObjects: [SceneObjectDataDTO]
+}
+
+struct SceneObjectDataDTO: Codable {
+    let id: UUID
+    let objectType: String
+    let positionX: Double
+    let positionY: Double
+    let positionZ: Double
+    let rotationX: Double
+    let rotationY: Double
+    let rotationZ: Double
+    let scaleX: Double
+    let scaleY: Double
+    let scaleZ: Double
+    let usdzModelPath: String?
+    let colorR: Double
+    let colorG: Double
+    let colorB: Double
+    let colorA: Double
+    let sortIndex: Int
+    let model3DID: UUID? // Reference to Model3D if applicable
 }

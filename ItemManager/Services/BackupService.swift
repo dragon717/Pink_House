@@ -277,7 +277,7 @@ class BackupService {
             
             // 6. OOTD Snapshots (Replacing Outfits)
             var outfitDescriptor = FetchDescriptor<Outfit>()
-            outfitDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items]
+            outfitDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items, \Outfit.book]
             let snapshotDTOs: [OOTDSnapshotDTO] = try self.processByIDs(context: context, descriptor: outfitDescriptor, entityName: "Outfits (Snapshots)") { o in
                 var safeSnapshotPath: String? = nil
                 if let snapshot = o.snapshotPath {
@@ -324,6 +324,7 @@ class BackupService {
                     snapshotPath: safeSnapshotPath,
                     canvasType: o.canvasType,
                     backgroundImagePath: safeBackgroundImagePath,
+                    bookID: o.book?.id,
                     items: items
                 )
             }
@@ -331,6 +332,158 @@ class BackupService {
             let fileManager = FileManager.default
             guard let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 throw BackupError.fileCreateFailed
+            }
+            
+            // 7. Model3D (3D模型)
+            let model3DDTOs: [Model3DDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<Model3D>(), entityName: "Model3Ds") { m in
+                // Model file
+                if let modelPath = m.modelPath {
+                    let fileName = (modelPath as NSString).lastPathComponent
+                    if !fileName.isEmpty {
+                        standardImagesToBackup.insert(fileName)
+                    }
+                }
+                
+                // Thumbnail
+                if let thumbnailPath = m.thumbnailPath {
+                    let fileName = (thumbnailPath as NSString).lastPathComponent
+                    if !fileName.isEmpty {
+                        standardImagesToBackup.insert(fileName)
+                    }
+                }
+                
+                // Source images
+                for sourcePath in m.sourceImagePaths {
+                    let fileName = (sourcePath as NSString).lastPathComponent
+                    if !fileName.isEmpty {
+                        standardImagesToBackup.insert(fileName)
+                    }
+                }
+                
+                return Model3DDTO(
+                    id: m.id,
+                    name: m.name,
+                    types: m.types,
+                    modelPath: m.modelPath,
+                    modelType: m.modelType,
+                    thumbnailPath: m.thumbnailPath,
+                    sourceImagePaths: m.sourceImagePaths,
+                    isDeleted: m.isDeleted,
+                    deletedAt: m.deletedAt,
+                    createdAt: m.createdAt,
+                    updatedAt: m.updatedAt,
+                    sortIndex: m.sortIndex,
+                    cameraPositionX: m.cameraPositionX,
+                    cameraPositionY: m.cameraPositionY,
+                    cameraPositionZ: m.cameraPositionZ,
+                    cameraRotationX: m.cameraRotationX,
+                    cameraRotationY: m.cameraRotationY,
+                    cameraRotationZ: m.cameraRotationZ
+                )
+            }
+            
+            // 8. Book Groups (平面手帐)
+            let bookGroupDTOs: [BookGroupDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<BookGroup>(), entityName: "BookGroups") { bg in
+                // Cover image
+                if let coverImage = bg.coverImage {
+                    standardImagesToBackup.insert(coverImage)
+                }
+                
+                return BookGroupDTO(
+                    id: bg.id,
+                    title: bg.title,
+                    coverImage: bg.coverImage,
+                    createdAt: bg.createdAt,
+                    isDeleted: bg.isDeleted,
+                    deletedAt: bg.deletedAt,
+                    sortIndex: bg.sortIndex
+                )
+            }
+            
+            // 8. Space Book Groups (空间手帐)
+            let spaceBookGroupDTOs: [SpaceBookGroupDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<SpaceBookGroup>(), entityName: "SpaceBookGroups") { sbg in
+                // Cover image
+                if let coverImage = sbg.coverImage {
+                    standardImagesToBackup.insert(coverImage)
+                }
+                
+                return SpaceBookGroupDTO(
+                    id: sbg.id,
+                    title: sbg.title,
+                    coverImage: sbg.coverImage,
+                    createdAt: sbg.createdAt,
+                    isDeleted: sbg.isDeleted,
+                    deletedAt: sbg.deletedAt,
+                    sortIndex: sbg.sortIndex
+                )
+            }
+            
+            // 9. Space Outfits (空间书页) with Scene Objects
+            var spaceOutfitDescriptor = FetchDescriptor<SpaceOutfit>()
+            spaceOutfitDescriptor.relationshipKeyPathsForPrefetching = [\SpaceOutfit.book]
+            let spaceOutfitDTOs: [SpaceOutfitDTO] = try self.processByIDs(context: context, descriptor: spaceOutfitDescriptor, entityName: "SpaceOutfits") { so in
+                // Snapshot image
+                if let snapshotPath = so.snapshotPath {
+                    let fileName = (snapshotPath as NSString).lastPathComponent
+                    standardImagesToBackup.insert(fileName)
+                }
+                
+                // 3D Model file
+                if let modelPath = so.modelPath {
+                    // Model files are stored in documents directory
+                    let fileName = (modelPath as NSString).lastPathComponent
+                    if !fileName.isEmpty {
+                        let modelURL = documentsDir.appendingPathComponent(fileName)
+                        if fileManager.fileExists(atPath: modelURL.path) {
+                            standardImagesToBackup.insert(fileName)
+                        }
+                    }
+                }
+                
+                // Fetch scene objects for this space outfit
+                // Note: Using filter instead of predicate due to SwiftData macro limitations
+                let allSceneObjects = try? context.fetch(FetchDescriptor<SceneObjectData>())
+                let sceneObjects = allSceneObjects?.filter { $0.spaceOutfit?.id == so.id }
+                
+                let sceneObjectDTOs = sceneObjects?.map { obj in
+                    SceneObjectDataDTO(
+                        id: obj.id,
+                        objectType: obj.objectType,
+                        positionX: obj.positionX,
+                        positionY: obj.positionY,
+                        positionZ: obj.positionZ,
+                        rotationX: obj.rotationX,
+                        rotationY: obj.rotationY,
+                        rotationZ: obj.rotationZ,
+                        scaleX: obj.scaleX,
+                        scaleY: obj.scaleY,
+                        scaleZ: obj.scaleZ,
+                        usdzModelPath: obj.usdzModelPath,
+                        colorR: obj.colorR,
+                        colorG: obj.colorG,
+                        colorB: obj.colorB,
+                        colorA: obj.colorA,
+                        sortIndex: obj.sortIndex,
+                        model3DID: obj.model3D?.id
+                    )
+                } ?? []
+                
+                return SpaceOutfitDTO(
+                    id: so.id,
+                    createdAt: so.createdAt,
+                    note: so.note,
+                    snapshotPath: so.snapshotPath,
+                    sortIndex: so.sortIndex,
+                    modelPath: so.modelPath,
+                    camPosX: so.camPosX,
+                    camPosY: so.camPosY,
+                    camPosZ: so.camPosZ,
+                    lightingIntensity: so.lightingIntensity,
+                    isDeleted: so.isDeleted,
+                    deletedAt: so.deletedAt,
+                    bookID: so.book?.id,
+                    sceneObjects: sceneObjectDTOs
+                )
             }
             
             var themeFiles: [String] = []
@@ -394,10 +547,21 @@ class BackupService {
             var imageFiles: [String: URL] = [:]
             
             for fileName in standardImagesToBackup {
-                let fileURL = imagesDir.appendingPathComponent(fileName)
-                if fileManager.fileExists(atPath: fileURL.path) {
-                    imageFiles[fileName] = fileURL
+                // First try images directory (most images are here)
+                let imageFileURL = imagesDir.appendingPathComponent(fileName)
+                if fileManager.fileExists(atPath: imageFileURL.path) {
+                    imageFiles[fileName] = imageFileURL
+                    continue
                 }
+                
+                // Then try documents directory (for 3D models and other files)
+                let docFileURL = documentsDir.appendingPathComponent(fileName)
+                if fileManager.fileExists(atPath: docFileURL.path) {
+                    imageFiles[fileName] = docFileURL
+                    continue
+                }
+                
+                print("### Export: Warning - File not found: \(fileName)")
             }
             
             for fileName in themeFiles {
@@ -463,7 +627,7 @@ class BackupService {
             let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
             
             let manifest = BackupManifest(
-                version: "1.2",
+                version: "1.5",
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -484,9 +648,17 @@ class BackupService {
                 petStatusData: petStatusData,
                 chatHistoryData: chatHistoryData,
                 appVersion: appVersion,
+                bookGroups: bookGroupDTOs,
+                spaceBookGroups: spaceBookGroupDTOs,
+                spaceOutfits: spaceOutfitDTOs,
+                model3Ds: model3DDTOs,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
-                outfitCount: snapshotDTOs.count
+                outfitCount: snapshotDTOs.count,
+                bookGroupCount: bookGroupDTOs.count,
+                spaceBookGroupCount: spaceBookGroupDTOs.count,
+                spaceOutfitCount: spaceOutfitDTOs.count,
+                model3DCount: model3DDTOs.count
             )
             
             print("### Export: Prepared data. Total files: \(imageFiles.count)")
@@ -845,6 +1017,10 @@ class BackupService {
         }
         print("### Restore: Built cutoutFileMap with \(cutoutFileMap.count) entries from \(cutoutMap.count) cutouts.")
         
+        // Pre-fetch BookGroups for Outfit relationship restoration
+        let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
+        var bookGroupMap: [UUID: BookGroup] = Dictionary(uniqueKeysWithValues: existingBookGroups.map { ($0.id, $0) })
+        
         // 1. 优先尝试恢复 Snapshots (新版备份格式)
         if let snapshots = manifest.snapshots {
             print("### Restore: Found \(snapshots.count) snapshots. Restoring as Outfits...")
@@ -863,6 +1039,11 @@ class BackupService {
                     outfit.createdAt = dto.createdAt
                     context.insert(outfit)
                     outfitMap[dto.id] = outfit
+                }
+                
+                // Restore book relationship (v1.5+)
+                if let bookID = dto.bookID {
+                    outfit.book = bookGroupMap[bookID]
                 }
                 
                 print("### Restore: Processing Outfit \(dto.note) (\(dto.id)) with \(dto.items.count) items...")
@@ -976,6 +1157,238 @@ class BackupService {
                                 context.insert(newCutout)
                                 item.cutout = newCutout
                             }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // MARK: - 阶段 3b: 恢复 Model3D (v1.5)
+        print("--- Stage 3b: Restoring Model3Ds ---")
+        
+        var model3DMap: [UUID: Model3D] = [:]
+        if let model3DDTOs = manifest.model3Ds {
+            print("### Restore: Found \(model3DDTOs.count) Model3Ds.")
+            
+            let existingModel3Ds = try context.fetch(FetchDescriptor<Model3D>())
+            model3DMap = Dictionary(uniqueKeysWithValues: existingModel3Ds.map { ($0.id, $0) })
+            
+            for dto in model3DDTOs {
+                // Skip deleted models in backup
+                if dto.isDeleted { continue }
+                
+                let model3D: Model3D
+                if let existing = model3DMap[dto.id] {
+                    model3D = existing
+                    model3D.name = dto.name
+                    model3D.types = dto.types
+                    model3D.modelPath = dto.modelPath
+                    model3D.modelType = dto.modelType
+                    model3D.thumbnailPath = dto.thumbnailPath
+                    model3D.sourceImagePaths = dto.sourceImagePaths
+                    model3D.sortIndex = dto.sortIndex
+                    model3D.cameraPositionX = dto.cameraPositionX
+                    model3D.cameraPositionY = dto.cameraPositionY
+                    model3D.cameraPositionZ = dto.cameraPositionZ
+                    model3D.cameraRotationX = dto.cameraRotationX
+                    model3D.cameraRotationY = dto.cameraRotationY
+                    model3D.cameraRotationZ = dto.cameraRotationZ
+                } else {
+                    model3D = Model3D(
+                        name: dto.name,
+                        types: dto.types,
+                        modelPath: dto.modelPath,
+                        modelType: dto.modelType,
+                        thumbnailPath: dto.thumbnailPath,
+                        sourceImagePaths: dto.sourceImagePaths,
+                        sortIndex: dto.sortIndex
+                    )
+                    model3D.id = dto.id
+                    model3D.createdAt = dto.createdAt
+                    model3D.updatedAt = dto.updatedAt
+                    model3D.cameraPositionX = dto.cameraPositionX
+                    model3D.cameraPositionY = dto.cameraPositionY
+                    model3D.cameraPositionZ = dto.cameraPositionZ
+                    model3D.cameraRotationX = dto.cameraRotationX
+                    model3D.cameraRotationY = dto.cameraRotationY
+                    model3D.cameraRotationZ = dto.cameraRotationZ
+                    context.insert(model3D)
+                    model3DMap[dto.id] = model3D
+                }
+                
+                // Ensure local deleted state is preserved
+                model3D.isDeleted = false
+                model3D.deletedAt = nil
+            }
+        }
+        
+        // MARK: - 阶段 3c: 恢复书册数据 (v1.5)
+        print("--- Stage 3c: Restoring Book Groups ---")
+        
+        // 1. 恢复平面手帐 (BookGroup)
+        if let bookGroupDTOs = manifest.bookGroups {
+            print("### Restore: Found \(bookGroupDTOs.count) book groups.")
+            
+            let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
+            var bookGroupMap: [UUID: BookGroup] = Dictionary(uniqueKeysWithValues: existingBookGroups.map { ($0.id, $0) })
+            
+            for dto in bookGroupDTOs {
+                // Skip deleted book groups in backup
+                if dto.isDeleted { continue }
+                
+                let bookGroup: BookGroup
+                if let existing = bookGroupMap[dto.id] {
+                    bookGroup = existing
+                    bookGroup.title = dto.title
+                    bookGroup.coverImage = dto.coverImage
+                    bookGroup.sortIndex = dto.sortIndex
+                } else {
+                    bookGroup = BookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
+                    bookGroup.id = dto.id
+                    bookGroup.createdAt = dto.createdAt
+                    context.insert(bookGroup)
+                    bookGroupMap[dto.id] = bookGroup
+                }
+                
+                // Ensure local deleted state is preserved
+                bookGroup.isDeleted = false
+                bookGroup.deletedAt = nil
+            }
+            
+            // 2. 恢复平面书页与手帐的关联
+            // Re-fetch outfits to establish book relationships
+            let allOutfits = try context.fetch(FetchDescriptor<Outfit>())
+            for outfit in allOutfits {
+                // Find if this outfit should belong to a book
+                // Note: In current data model, Outfit doesn't have a direct book reference
+                // This relationship is established via BookGroup.pages
+                // We need to check if the backup had this relationship
+            }
+        }
+        
+        // 3. 恢复空间手帐 (SpaceBookGroup)
+        if let spaceBookGroupDTOs = manifest.spaceBookGroups {
+            print("### Restore: Found \(spaceBookGroupDTOs.count) space book groups.")
+            
+            let existingSpaceBookGroups = try context.fetch(FetchDescriptor<SpaceBookGroup>())
+            var spaceBookGroupMap: [UUID: SpaceBookGroup] = Dictionary(uniqueKeysWithValues: existingSpaceBookGroups.map { ($0.id, $0) })
+            
+            for dto in spaceBookGroupDTOs {
+                // Skip deleted space book groups in backup
+                if dto.isDeleted { continue }
+                
+                let spaceBookGroup: SpaceBookGroup
+                if let existing = spaceBookGroupMap[dto.id] {
+                    spaceBookGroup = existing
+                    spaceBookGroup.title = dto.title
+                    spaceBookGroup.coverImage = dto.coverImage
+                    spaceBookGroup.sortIndex = dto.sortIndex
+                } else {
+                    spaceBookGroup = SpaceBookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
+                    spaceBookGroup.id = dto.id
+                    spaceBookGroup.createdAt = dto.createdAt
+                    context.insert(spaceBookGroup)
+                    spaceBookGroupMap[dto.id] = spaceBookGroup
+                }
+                
+                // Ensure local deleted state is preserved
+                spaceBookGroup.isDeleted = false
+                spaceBookGroup.deletedAt = nil
+            }
+            
+            // 4. 恢复空间书页 (SpaceOutfit) 与场景对象
+            if let spaceOutfitDTOs = manifest.spaceOutfits {
+                print("### Restore: Found \(spaceOutfitDTOs.count) space outfits.")
+                
+                let existingSpaceOutfits = try context.fetch(FetchDescriptor<SpaceOutfit>())
+                var spaceOutfitMap: [UUID: SpaceOutfit] = Dictionary(uniqueKeysWithValues: existingSpaceOutfits.map { ($0.id, $0) })
+                
+                // Fetch all existing scene objects to avoid collision
+                let existingSceneObjects = try context.fetch(FetchDescriptor<SceneObjectData>())
+                var sceneObjectMap: [UUID: SceneObjectData] = Dictionary(uniqueKeysWithValues: existingSceneObjects.map { ($0.id, $0) })
+                
+                for dto in spaceOutfitDTOs {
+                    // Skip deleted space outfits in backup
+                    if dto.isDeleted { continue }
+                    
+                    let spaceOutfit: SpaceOutfit
+                    if let existing = spaceOutfitMap[dto.id] {
+                        spaceOutfit = existing
+                        spaceOutfit.note = dto.note
+                        spaceOutfit.snapshotPath = dto.snapshotPath
+                        spaceOutfit.sortIndex = dto.sortIndex
+                        spaceOutfit.modelPath = dto.modelPath
+                        spaceOutfit.camPosX = dto.camPosX
+                        spaceOutfit.camPosY = dto.camPosY
+                        spaceOutfit.camPosZ = dto.camPosZ
+                        spaceOutfit.lightingIntensity = dto.lightingIntensity
+                    } else {
+                        spaceOutfit = SpaceOutfit(
+                            note: dto.note,
+                            snapshotPath: dto.snapshotPath,
+                            book: nil, // Will set later
+                            sortIndex: dto.sortIndex
+                        )
+                        spaceOutfit.id = dto.id
+                        spaceOutfit.createdAt = dto.createdAt
+                        spaceOutfit.modelPath = dto.modelPath
+                        spaceOutfit.camPosX = dto.camPosX
+                        spaceOutfit.camPosY = dto.camPosY
+                        spaceOutfit.camPosZ = dto.camPosZ
+                        spaceOutfit.lightingIntensity = dto.lightingIntensity
+                        context.insert(spaceOutfit)
+                        spaceOutfitMap[dto.id] = spaceOutfit
+                    }
+                    
+                    // Ensure local deleted state is preserved
+                    spaceOutfit.isDeleted = false
+                    spaceOutfit.deletedAt = nil
+                    
+                    // Re-link to book
+                    if let bookID = dto.bookID {
+                        spaceOutfit.book = spaceBookGroupMap[bookID]
+                    }
+                    
+                    // Restore scene objects
+                    for sceneDTO in dto.sceneObjects {
+                        let sceneObject: SceneObjectData
+                        if let existing = sceneObjectMap[sceneDTO.id] {
+                            sceneObject = existing
+                            sceneObject.objectType = sceneDTO.objectType
+                            sceneObject.positionX = sceneDTO.positionX
+                            sceneObject.positionY = sceneDTO.positionY
+                            sceneObject.positionZ = sceneDTO.positionZ
+                            sceneObject.rotationX = sceneDTO.rotationX
+                            sceneObject.rotationY = sceneDTO.rotationY
+                            sceneObject.rotationZ = sceneDTO.rotationZ
+                            sceneObject.scaleX = sceneDTO.scaleX
+                            sceneObject.scaleY = sceneDTO.scaleY
+                            sceneObject.scaleZ = sceneDTO.scaleZ
+                            sceneObject.usdzModelPath = sceneDTO.usdzModelPath
+                            sceneObject.colorR = sceneDTO.colorR
+                            sceneObject.colorG = sceneDTO.colorG
+                            sceneObject.colorB = sceneDTO.colorB
+                            sceneObject.colorA = sceneDTO.colorA
+                            sceneObject.sortIndex = sceneDTO.sortIndex
+                            // Re-link Model3D if applicable
+                            if let model3DID = sceneDTO.model3DID {
+                                sceneObject.model3D = model3DMap[model3DID]
+                            }
+                        } else {
+                            sceneObject = SceneObjectData(
+                                id: sceneDTO.id,
+                                objectType: sceneDTO.objectType,
+                                position: SIMD3<Float>(Float(sceneDTO.positionX), Float(sceneDTO.positionY), Float(sceneDTO.positionZ)),
+                                rotation: SIMD3<Float>(Float(sceneDTO.rotationX), Float(sceneDTO.rotationY), Float(sceneDTO.rotationZ)),
+                                scale: SIMD3<Float>(Float(sceneDTO.scaleX), Float(sceneDTO.scaleY), Float(sceneDTO.scaleZ)),
+                                usdzModelPath: sceneDTO.usdzModelPath,
+                                color: SIMD4<Float>(Float(sceneDTO.colorR), Float(sceneDTO.colorG), Float(sceneDTO.colorB), Float(sceneDTO.colorA)),
+                                sortIndex: sceneDTO.sortIndex,
+                                spaceOutfit: spaceOutfit,
+                                model3D: sceneDTO.model3DID.flatMap { model3DMap[$0] }
+                            )
+                            context.insert(sceneObject)
+                            sceneObjectMap[sceneDTO.id] = sceneObject
                         }
                     }
                 }
