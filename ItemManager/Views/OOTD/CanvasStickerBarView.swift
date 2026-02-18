@@ -8,6 +8,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 /// 画布顶部贴纸管理栏
 struct CanvasStickerBarView: View {

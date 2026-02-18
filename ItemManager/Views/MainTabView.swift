@@ -67,7 +67,7 @@ struct ModernTabView: View {
                 )
             }
             
-            Tab("我的", systemImage: "face.smiling", value: 2) {
+            Tab("我", systemImage: "face.smiling", value: 2) {
                 MeTabContent()
             }
             
@@ -133,7 +133,7 @@ struct SmallWorldTabContent: View {
     }
 }
 
-// MARK: - 我的 Tab 内容
+// MARK: - 我 Tab 内容
 @available(iOS 18.0, *)
 struct MeTabContent: View {
     var body: some View {
@@ -173,9 +173,8 @@ struct SearchContainerView: View {
                 List {
                     if searchText.isEmpty {
                         Section("搜索建议") {
-                            Label("搜索衣物名称", systemImage: "tshirt")
-                            Label("搜索品牌", systemImage: "tag")
-                            Label("搜索标签", systemImage: "number")
+                            Label("裙子/小物名称", systemImage: "tshirt")
+                            Label("品牌/标签", systemImage: "tag")
                         }
                     } else if filteredClothings.isEmpty {
                         ContentUnavailableView {
@@ -268,6 +267,8 @@ struct SmallWorldContainerView: View {
                 WealthView()
             case .calendar:
                 DreamDressCalendarView()
+            case .bigWorld:
+                BigWorldView()
             }
         }
     }

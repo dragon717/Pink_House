@@ -70,7 +70,14 @@ class BackupService {
         "voiceModelId",
         "voiceToneId",
         "UserCustomFontFileName",
-        "HasRedeemedVIP_Prince"
+        "HasRedeemedVIP_Prince",
+        // 大世界图钉数据
+        "bigWorldPins",
+        // 用户资料数据
+        "userProfileName",
+        "userProfileAvatar",
+        "userProfileIsAuthenticated",
+        "userProfileAppleIdentifier"
     ]
     
     // MARK: - Internal Helpers
@@ -328,6 +335,122 @@ class BackupService {
                 )
             }
             
+            // 7. Book Groups (平面手帐)
+            let bookGroupDTOs: [BookGroupDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<BookGroup>(), entityName: "BookGroups") { bg in
+                // 备份封面图片
+                if let coverImage = bg.coverImage {
+                    standardImagesToBackup.insert(coverImage)
+                }
+                
+                return BookGroupDTO(
+                    id: bg.id,
+                    title: bg.title,
+                    coverImage: bg.coverImage,
+                    createdAt: bg.createdAt,
+                    isDeleted: bg.isDeleted,
+                    deletedAt: bg.deletedAt,
+                    sortIndex: bg.sortIndex
+                )
+            }
+            
+            // 8. Outfits Full (平面书页 - 包含手帐关联)
+            var outfitFullDescriptor = FetchDescriptor<Outfit>()
+            outfitFullDescriptor.relationshipKeyPathsForPrefetching = [\Outfit.items, \Outfit.book]
+            let outfitFullDTOs: [OutfitFullDTO] = try self.processByIDs(context: context, descriptor: outfitFullDescriptor, entityName: "Outfits (Full)") { o in
+                var safeSnapshotPath: String? = nil
+                if let snapshot = o.snapshotPath {
+                    let fileName = (snapshot as NSString).lastPathComponent
+                    standardImagesToBackup.insert(fileName)
+                    safeSnapshotPath = fileName
+                }
+                
+                var safeBackgroundImagePath: String? = nil
+                if let bgPath = o.backgroundImagePath {
+                    let fileName = (bgPath as NSString).lastPathComponent
+                    standardImagesToBackup.insert(fileName)
+                    safeBackgroundImagePath = fileName
+                }
+                
+                var items: [OutfitItemFullDTO] = []
+                for item in o.items {
+                    if item.isDeleted { continue }
+                    
+                    let itemDTO = OutfitItemFullDTO(
+                        id: item.id,
+                        x: item.x,
+                        y: item.y,
+                        rotation: item.rotation,
+                        scale: item.scale,
+                        zIndex: item.zIndex,
+                        cutoutID: item.cutout?.id
+                    )
+                    items.append(itemDTO)
+                }
+                
+                return OutfitFullDTO(
+                    id: o.id,
+                    createdAt: o.createdAt,
+                    note: o.note,
+                    snapshotPath: safeSnapshotPath,
+                    canvasType: o.canvasType,
+                    backgroundImagePath: safeBackgroundImagePath,
+                    sortIndex: o.sortIndex,
+                    isDeleted: o.isDeleted,
+                    deletedAt: o.deletedAt,
+                    bookID: o.book?.id,
+                    items: items
+                )
+            }
+            
+            // 9. Space Book Groups (空间手帐)
+            let spaceBookGroupDTOs: [SpaceBookGroupDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<SpaceBookGroup>(), entityName: "SpaceBookGroups") { sbg in
+                // 备份封面图片
+                if let coverImage = sbg.coverImage {
+                    standardImagesToBackup.insert(coverImage)
+                }
+                
+                return SpaceBookGroupDTO(
+                    id: sbg.id,
+                    title: sbg.title,
+                    coverImage: sbg.coverImage,
+                    createdAt: sbg.createdAt,
+                    isDeleted: sbg.isDeleted,
+                    deletedAt: sbg.deletedAt,
+                    sortIndex: sbg.sortIndex
+                )
+            }
+            
+            // 10. Space Outfits (空间书页)
+            let spaceOutfitDTOs: [SpaceOutfitDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<SpaceOutfit>(), entityName: "SpaceOutfits") { so in
+                var safeSnapshotPath: String? = nil
+                if let snapshot = so.snapshotPath {
+                    let fileName = (snapshot as NSString).lastPathComponent
+                    standardImagesToBackup.insert(fileName)
+                    safeSnapshotPath = fileName
+                }
+                
+                // 备份3D模型文件
+                if let modelPath = so.modelPath {
+                    standardImagesToBackup.insert(modelPath)
+                }
+                
+                return SpaceOutfitDTO(
+                    id: so.id,
+                    createdAt: so.createdAt,
+                    note: so.note,
+                    snapshotPath: safeSnapshotPath,
+                    sortIndex: so.sortIndex,
+                    modelPath: so.modelPath,
+                    camPosX: so.camPosX,
+                    camPosY: so.camPosY,
+                    camPosZ: so.camPosZ,
+                    lightingIntensity: so.lightingIntensity,
+                    isDeleted: so.isDeleted,
+                    deletedAt: so.deletedAt,
+                    bookID: so.book?.id
+                )
+            }
+            
             let fileManager = FileManager.default
             guard let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 throw BackupError.fileCreateFailed
@@ -462,8 +585,19 @@ class BackupService {
             // App Version
             let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
             
+            // 大世界图钉数据
+            let bigWorldPinsData = UserDefaults.standard.data(forKey: "bigWorldPins")
+            
+            // 用户资料数据
+            let userProfileDTO = UserProfileDTO(
+                userName: UserDefaults.standard.string(forKey: "userProfileName") ?? "用户",
+                userAvatar: UserDefaults.standard.data(forKey: "userProfileAvatar"),
+                isAuthenticated: UserDefaults.standard.bool(forKey: "userProfileIsAuthenticated"),
+                appleUserIdentifier: UserDefaults.standard.string(forKey: "userProfileAppleIdentifier")
+            )
+            
             let manifest = BackupManifest(
-                version: "1.2",
+                version: "1.6",
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -473,6 +607,10 @@ class BackupService {
                 cutouts: cutoutDTOs,
                 outfits: nil,
                 snapshots: snapshotDTOs,
+                bookGroups: bookGroupDTOs,
+                outfitsFull: outfitFullDTOs,
+                spaceBookGroups: spaceBookGroupDTOs,
+                spaceOutfits: spaceOutfitDTOs,
                 appSettings: settings,
                 themeFiles: themeFiles,
                 wealthFiles: wealthFiles,
@@ -484,6 +622,8 @@ class BackupService {
                 petStatusData: petStatusData,
                 chatHistoryData: chatHistoryData,
                 appVersion: appVersion,
+                bigWorldPinsData: bigWorldPinsData,
+                userProfileData: userProfileDTO,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: snapshotDTOs.count
@@ -984,6 +1124,238 @@ class BackupService {
         
         try context.save()
         
+        // 阶段 3b: 恢复手帐和书页 (Book Groups, Outfits, Space Book Groups, Space Outfits)
+        print("--- Stage 3b: Restoring Book Groups & Outfits ---")
+        
+        // 3b.1 Book Groups (平面手帐)
+        if let bookGroupDTOs = manifest.bookGroups {
+            print("### Restore: Found \(bookGroupDTOs.count) book groups. Restoring...")
+            let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
+            var bookGroupMap: [UUID: BookGroup] = Dictionary(uniqueKeysWithValues: existingBookGroups.map { ($0.id, $0) })
+            
+            for dto in bookGroupDTOs {
+                // 跳过已删除的手帐
+                let isBackupDeleted = dto.isDeleted ?? (dto.deletedAt != nil)
+                if isBackupDeleted {
+                    continue
+                }
+                
+                let bookGroup: BookGroup
+                if let existing = bookGroupMap[dto.id] {
+                    bookGroup = existing
+                    // 如果本地已删除，保持删除状态
+                    let isLocalDeleted = existing.isDeleted || existing.deletedAt != nil
+                    if isLocalDeleted {
+                        bookGroup.isDeleted = true
+                        if bookGroup.deletedAt == nil {
+                            bookGroup.deletedAt = Date()
+                        }
+                        continue
+                    }
+                } else {
+                    bookGroup = BookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
+                    bookGroup.id = dto.id
+                    context.insert(bookGroup)
+                    bookGroupMap[dto.id] = bookGroup
+                }
+                
+                bookGroup.title = dto.title
+                bookGroup.coverImage = dto.coverImage
+                bookGroup.createdAt = dto.createdAt
+                bookGroup.isDeleted = false
+                bookGroup.deletedAt = nil
+                bookGroup.sortIndex = dto.sortIndex
+            }
+            try context.save()
+            print("### Restore: Book Groups restored successfully.")
+        }
+        
+        // 3b.2 Outfits Full (平面书页 - 包含手帐关联)
+        if let outfitFullDTOs = manifest.outfitsFull {
+            print("### Restore: Found \(outfitFullDTOs.count) outfits (full). Restoring...")
+            let existingOutfits = try context.fetch(FetchDescriptor<Outfit>())
+            var outfitMap: [UUID: Outfit] = Dictionary(uniqueKeysWithValues: existingOutfits.map { ($0.id, $0) })
+            let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
+            var bookGroupMap: [UUID: BookGroup] = Dictionary(uniqueKeysWithValues: existingBookGroups.map { ($0.id, $0) })
+            let allOutfitItems = try context.fetch(FetchDescriptor<OutfitItem>())
+            var globalItemMap: [UUID: OutfitItem] = Dictionary(uniqueKeysWithValues: allOutfitItems.map { ($0.id, $0) })
+            
+            for dto in outfitFullDTOs {
+                // 跳过已删除的书页
+                let isBackupDeleted = dto.isDeleted ?? (dto.deletedAt != nil)
+                if isBackupDeleted {
+                    continue
+                }
+                
+                let outfit: Outfit
+                if let existing = outfitMap[dto.id] {
+                    outfit = existing
+                    // 如果本地已删除，保持删除状态
+                    let isLocalDeleted = existing.isDeleted || existing.deletedAt != nil
+                    if isLocalDeleted {
+                        outfit.isDeleted = true
+                        if outfit.deletedAt == nil {
+                            outfit.deletedAt = Date()
+                        }
+                        continue
+                    }
+                } else {
+                    outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin", backgroundImagePath: dto.backgroundImagePath, book: nil)
+                    outfit.id = dto.id
+                    outfit.createdAt = dto.createdAt
+                    context.insert(outfit)
+                    outfitMap[dto.id] = outfit
+                }
+                
+                outfit.note = dto.note
+                outfit.snapshotPath = dto.snapshotPath
+                outfit.canvasType = dto.canvasType ?? "mannequin"
+                outfit.backgroundImagePath = dto.backgroundImagePath
+                outfit.sortIndex = dto.sortIndex
+                outfit.isDeleted = false
+                outfit.deletedAt = nil
+                
+                // 恢复手帐关联
+                if let bookID = dto.bookID, let bookGroup = bookGroupMap[bookID] {
+                    outfit.book = bookGroup
+                } else {
+                    outfit.book = nil
+                }
+                
+                // 恢复 Items
+                for itemDTO in dto.items {
+                    let item: OutfitItem
+                    if let ex = globalItemMap[itemDTO.id] {
+                        item = ex
+                        item.x = itemDTO.x
+                        item.y = itemDTO.y
+                        item.rotation = itemDTO.rotation
+                        item.scale = itemDTO.scale
+                        item.zIndex = itemDTO.zIndex
+                    } else {
+                        item = OutfitItem(cutout: nil, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: itemDTO.scale, zIndex: itemDTO.zIndex)
+                        item.id = itemDTO.id
+                        context.insert(item)
+                        globalItemMap[item.id] = item
+                    }
+                    
+                    // 恢复 Cutout 关联
+                    if let cutoutID = itemDTO.cutoutID, let cutout = cutoutMap[cutoutID] {
+                        item.cutout = cutout
+                    } else {
+                        item.cutout = nil
+                    }
+                    
+                    // 确保 item 在 outfit 的列表中
+                    if !outfit.items.contains(where: { $0.id == item.id }) {
+                        outfit.items.append(item)
+                    }
+                }
+            }
+            try context.save()
+            print("### Restore: Outfits (full) restored successfully.")
+        }
+        
+        // 3b.3 Space Book Groups (空间手帐)
+        if let spaceBookGroupDTOs = manifest.spaceBookGroups {
+            print("### Restore: Found \(spaceBookGroupDTOs.count) space book groups. Restoring...")
+            let existingSpaceBookGroups = try context.fetch(FetchDescriptor<SpaceBookGroup>())
+            var spaceBookGroupMap: [UUID: SpaceBookGroup] = Dictionary(uniqueKeysWithValues: existingSpaceBookGroups.map { ($0.id, $0) })
+            
+            for dto in spaceBookGroupDTOs {
+                // 跳过已删除的空间手帐
+                let isBackupDeleted = dto.isDeleted ?? (dto.deletedAt != nil)
+                if isBackupDeleted {
+                    continue
+                }
+                
+                let spaceBookGroup: SpaceBookGroup
+                if let existing = spaceBookGroupMap[dto.id] {
+                    spaceBookGroup = existing
+                    // 如果本地已删除，保持删除状态
+                    let isLocalDeleted = existing.isDeleted || existing.deletedAt != nil
+                    if isLocalDeleted {
+                        spaceBookGroup.isDeleted = true
+                        if spaceBookGroup.deletedAt == nil {
+                            spaceBookGroup.deletedAt = Date()
+                        }
+                        continue
+                    }
+                } else {
+                    spaceBookGroup = SpaceBookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
+                    spaceBookGroup.id = dto.id
+                    context.insert(spaceBookGroup)
+                    spaceBookGroupMap[dto.id] = spaceBookGroup
+                }
+                
+                spaceBookGroup.title = dto.title
+                spaceBookGroup.coverImage = dto.coverImage
+                spaceBookGroup.createdAt = dto.createdAt
+                spaceBookGroup.isDeleted = false
+                spaceBookGroup.deletedAt = nil
+                spaceBookGroup.sortIndex = dto.sortIndex
+            }
+            try context.save()
+            print("### Restore: Space Book Groups restored successfully.")
+        }
+        
+        // 3b.4 Space Outfits (空间书页)
+        if let spaceOutfitDTOs = manifest.spaceOutfits {
+            print("### Restore: Found \(spaceOutfitDTOs.count) space outfits. Restoring...")
+            let existingSpaceOutfits = try context.fetch(FetchDescriptor<SpaceOutfit>())
+            var spaceOutfitMap: [UUID: SpaceOutfit] = Dictionary(uniqueKeysWithValues: existingSpaceOutfits.map { ($0.id, $0) })
+            let existingSpaceBookGroups = try context.fetch(FetchDescriptor<SpaceBookGroup>())
+            var spaceBookGroupMap: [UUID: SpaceBookGroup] = Dictionary(uniqueKeysWithValues: existingSpaceBookGroups.map { ($0.id, $0) })
+            
+            for dto in spaceOutfitDTOs {
+                // 跳过已删除的空间书页
+                let isBackupDeleted = dto.isDeleted ?? (dto.deletedAt != nil)
+                if isBackupDeleted {
+                    continue
+                }
+                
+                let spaceOutfit: SpaceOutfit
+                if let existing = spaceOutfitMap[dto.id] {
+                    spaceOutfit = existing
+                    // 如果本地已删除，保持删除状态
+                    let isLocalDeleted = existing.isDeleted || existing.deletedAt != nil
+                    if isLocalDeleted {
+                        spaceOutfit.isDeleted = true
+                        if spaceOutfit.deletedAt == nil {
+                            spaceOutfit.deletedAt = Date()
+                        }
+                        continue
+                    }
+                } else {
+                    spaceOutfit = SpaceOutfit(note: dto.note, snapshotPath: dto.snapshotPath, book: nil, sortIndex: dto.sortIndex)
+                    spaceOutfit.id = dto.id
+                    spaceOutfit.createdAt = dto.createdAt
+                    context.insert(spaceOutfit)
+                    spaceOutfitMap[dto.id] = spaceOutfit
+                }
+                
+                spaceOutfit.note = dto.note
+                spaceOutfit.snapshotPath = dto.snapshotPath
+                spaceOutfit.sortIndex = dto.sortIndex
+                spaceOutfit.modelPath = dto.modelPath
+                spaceOutfit.camPosX = dto.camPosX
+                spaceOutfit.camPosY = dto.camPosY
+                spaceOutfit.camPosZ = dto.camPosZ
+                spaceOutfit.lightingIntensity = dto.lightingIntensity
+                spaceOutfit.isDeleted = false
+                spaceOutfit.deletedAt = nil
+                
+                // 恢复空间手帐关联
+                if let bookID = dto.bookID, let spaceBookGroup = spaceBookGroupMap[bookID] {
+                    spaceOutfit.book = spaceBookGroup
+                } else {
+                    spaceOutfit.book = nil
+                }
+            }
+            try context.save()
+            print("### Restore: Space Outfits restored successfully.")
+        }
+        
         // 阶段 4: 恢复设置
         print("--- Stage 4: Restoring Settings ---")
         
@@ -1049,6 +1421,30 @@ class BackupService {
             // Reload Pet AI Service
             DispatchQueue.main.async {
                 PetAIService.shared.reloadHistory()
+            }
+        }
+        
+        // Restore Big World Pins
+        if let pinsData = manifest.bigWorldPinsData {
+            print("Restore: Restoring Big World Pins...")
+            UserDefaults.standard.set(pinsData, forKey: "bigWorldPins")
+        }
+        
+        // Restore User Profile
+        if let profileData = manifest.userProfileData {
+            print("Restore: Restoring User Profile...")
+            UserDefaults.standard.set(profileData.userName, forKey: "userProfileName")
+            if let avatar = profileData.userAvatar {
+                UserDefaults.standard.set(avatar, forKey: "userProfileAvatar")
+            }
+            UserDefaults.standard.set(profileData.isAuthenticated, forKey: "userProfileIsAuthenticated")
+            if let appleId = profileData.appleUserIdentifier {
+                UserDefaults.standard.set(appleId, forKey: "userProfileAppleIdentifier")
+            }
+            
+            // Reload UserProfileManager
+            DispatchQueue.main.async {
+                UserProfileManager.shared.loadUserProfile()
             }
         }
         

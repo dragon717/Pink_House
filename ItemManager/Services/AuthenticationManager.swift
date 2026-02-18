@@ -162,6 +162,15 @@ class AuthenticationManager: NSObject, ObservableObject {
         
         // 更新缓存的 ID
         self.cachedUserIdentifier = userId
+        
+        // 同步到 UserProfileManager
+        Task { @MainActor in
+            UserProfileManager.shared.syncFromAppleID(
+                givenName: credential.fullName?.givenName,
+                familyName: credential.fullName?.familyName
+            )
+            UserProfileManager.shared.setAuthenticated(true, appleUserIdentifier: userId)
+        }
     }
     
     // 模拟后端验证接口

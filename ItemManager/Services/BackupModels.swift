@@ -24,6 +24,15 @@ struct BackupManifest: Codable {
     // New: OOTD Snapshots
     let snapshots: [OOTDSnapshotDTO]?
     
+    // Book Groups (平面手帐) - v1.6
+    let bookGroups: [BookGroupDTO]?
+    // Outfits Full (平面书页 - 包含手帐关联) - v1.6
+    let outfitsFull: [OutfitFullDTO]?
+    // Space Book Groups (空间手帐) - v1.6
+    let spaceBookGroups: [SpaceBookGroupDTO]?
+    // Space Outfits (空间书页) - v1.6
+    let spaceOutfits: [SpaceOutfitDTO]?
+    
     // New Features Backup (Optional for backward compatibility)
     let appSettings: [String: String]?
     let themeFiles: [String]?
@@ -44,10 +53,24 @@ struct BackupManifest: Codable {
     // App Version Persistence
     let appVersion: String?
     
+    // 大世界图钉数据 (v1.5)
+    let bigWorldPinsData: Data?
+    
+    // 用户资料数据 (v1.5)
+    let userProfileData: UserProfileDTO?
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int
     let outfitCount: Int
+}
+
+// MARK: - 用户资料 DTO
+struct UserProfileDTO: Codable {
+    let userName: String
+    let userAvatar: Data?
+    let isAuthenticated: Bool
+    let appleUserIdentifier: String?
 }
 
 struct BrandDTO: Codable {
@@ -172,4 +195,72 @@ struct OOTDSnapshotItemDTO: Codable {
     let height: Double
     let zIndex: Int
     let rotation: Double
+}
+
+// MARK: - Book Group DTOs (平面手帐)
+
+struct BookGroupDTO: Codable {
+    let id: UUID
+    let title: String
+    let coverImage: String?
+    let createdAt: Date
+    let isDeleted: Bool?
+    let deletedAt: Date?
+    let sortIndex: Int
+}
+
+// MARK: - Outfit DTO (平面书页 - 完整版)
+
+struct OutfitFullDTO: Codable {
+    let id: UUID
+    let createdAt: Date
+    let note: String
+    let snapshotPath: String?
+    let canvasType: String?
+    let backgroundImagePath: String?
+    let sortIndex: Int
+    let isDeleted: Bool?
+    let deletedAt: Date?
+    let bookID: UUID? // 关联的手帐ID
+    let items: [OutfitItemFullDTO]
+}
+
+struct OutfitItemFullDTO: Codable {
+    let id: UUID
+    let x: Double
+    let y: Double
+    let rotation: Double
+    let scale: Double
+    let zIndex: Int
+    let cutoutID: UUID?
+}
+
+// MARK: - Space Book Group DTOs (空间手帐)
+
+struct SpaceBookGroupDTO: Codable {
+    let id: UUID
+    let title: String
+    let coverImage: String?
+    let createdAt: Date
+    let isDeleted: Bool?
+    let deletedAt: Date?
+    let sortIndex: Int
+}
+
+// MARK: - Space Outfit DTO (空间书页)
+
+struct SpaceOutfitDTO: Codable {
+    let id: UUID
+    let createdAt: Date
+    let note: String
+    let snapshotPath: String?
+    let sortIndex: Int
+    let modelPath: String?
+    let camPosX: Double
+    let camPosY: Double
+    let camPosZ: Double
+    let lightingIntensity: Double
+    let isDeleted: Bool?
+    let deletedAt: Date?
+    let bookID: UUID? // 关联的空间手帐ID
 }

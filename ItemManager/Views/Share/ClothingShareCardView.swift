@@ -314,6 +314,8 @@ struct ClothingShareCardFullView: View {
     let cardBackground: UIImage?
     var fontProvider: FontProvider = DefaultFontProvider()
     
+    @StateObject private var userProfileManager = UserProfileManager.shared
+    
     var body: some View {
         ZStack {
             // card_front 背景 - 不透明
@@ -334,6 +336,48 @@ struct ClothingShareCardFullView: View {
             )
             .frame(width: 260, height: 420)
             .background(Color.clear)
+            
+            // 用户头像 - 右上角
+            VStack {
+                HStack {
+                    Spacer()
+                    
+                    // 用户头像
+                    if let avatarData = userProfileManager.userAvatar,
+                       let avatarImage = UIImage(data: avatarData) {
+                        Image(uiImage: avatarImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 2)
+                            )
+                            .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 2)
+                    } else {
+                        // 默认头像
+                        ZStack {
+                            Circle()
+                                .fill(MonicaColors.primaryPink.opacity(0.8))
+                                .frame(width: 36, height: 36)
+                            
+                            Text(userProfileManager.userName.prefix(1).uppercased())
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white, lineWidth: 2)
+                        )
+                        .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 2)
+                    }
+                }
+                .padding(.top, 12)
+                .padding(.trailing, 12)
+                
+                Spacer()
+            }
         }
         .frame(width: 280, height: 440)
         .cornerRadius(16)

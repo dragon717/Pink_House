@@ -56,6 +56,8 @@ struct SmallWorldMenuOverlay: View {
             MenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55)),
             // 穿搭: 莫妮卡热粉 (对应 MonicaTheme FinalPayment)
             MenuItem(title: "穿搭手帐", icon: "tshirt", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
+            // 大世界: 地球蓝绿色 (3D地球)
+            MenuItem(title: "大世界", icon: "globe", destination: .bigWorld, color: Color(red: 0.2, green: 0.6, blue: 0.9)),
             // 来财: 莫妮卡金 (对应 MonicaTheme Deposit)
             MenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
             // 日历: 莫妮卡紫 (对应 MonicaTheme Accent，略加深以提升白色图标对比度)
@@ -114,10 +116,11 @@ struct SmallWorldMenuOverlay: View {
                         let item = menuItems[index]
                         
                         // 计算角度
-                        // iPhone: 分布在 -160 (左下) 到 -20 (右下) 之间，上方是 -90 (向上发射)
-                        // iPad: 分布在 160 (左上) 到 20 (右上) 之间，下方是 90 (向下发射)
-                        let totalAngle: Double = isIPad ? -140 : 140
-                        let startAngle: Double = isIPad ? 160 : -160
+                        // iPhone: 分布在 -150 (左下) 到 -30 (右下) 之间，上方是 -90 (向上发射)
+                        // iPad: 分布在 150 (左上) 到 30 (右上) 之间，下方是 90 (向下发射)
+                        // 缩小总角度范围，让菜单项间距更合理，避免过于分散
+                        let totalAngle: Double = isIPad ? -120 : 120
+                        let startAngle: Double = isIPad ? 150 : -150
                         let step = totalAngle / Double(menuItems.count - 1)
                         let degrees = startAngle + Double(index) * step
                         

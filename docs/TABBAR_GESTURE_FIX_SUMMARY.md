@@ -79,7 +79,7 @@ self.touchLocation = CGPoint(x: globalX, y: globalY)
 TabView(selection: $selectedTab) {
     Tab("衣橱", systemImage: "cabinet.fill", value: 0) { ... }
     Tab("小世界", systemImage: "map", value: 1) { ... }
-    Tab("我的", systemImage: "face.smiling", value: 2) { ... }
+    Tab("我", systemImage: "face.smiling", value: 2) { ... }
     Tab(value: 3, role: .search) { ... }  // 注意：value 必须在 role 之前
 }
 
@@ -207,7 +207,7 @@ struct ModernTabView: View {
                 SmallWorldTabContent(...)
             }
             
-            Tab("我的", systemImage: "face.smiling", value: 2) {
+            Tab("我", systemImage: "face.smiling", value: 2) {
                 MeTabContent()
             }
             

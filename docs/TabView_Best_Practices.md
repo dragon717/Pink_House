@@ -229,7 +229,7 @@ struct ModernTabView: View {
                 SmallWorldTabContent()
             }
             
-            Tab("我的", systemImage: "face.smiling") {
+            Tab("我", systemImage: "face.smiling") {
                 MeTabContent()
             }
             

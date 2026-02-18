@@ -462,6 +462,17 @@ class CloudSyncManager: ObservableObject {
         }
     }
     
+    // MARK: - Sync Now
+    
+    func syncNow() async {
+        guard let container = try? ModelContainer(for: Clothing.self, Outfit.self, SpaceOutfit.self, StoredImage.self) else {
+            self.syncError = "无法访问数据容器"
+            return
+        }
+        
+        _ = await uploadBackup(modelContainer: container)
+    }
+    
     // MARK: - Auto Sync & Silent Restore
     
     func checkAndSilentRestore(container: ModelContainer) async {

@@ -33,13 +33,11 @@ struct MeView: View {
                     
                     // 2. 设置网格 (豆腐块)
                     LazyVGrid(columns: columns, spacing: 16) {
-                        // 账户与云端 (1x1) - 聚合了登录和 iCloud
-                        AccountCard(
-                            authManager: authManager,
-                            cloudManager: cloudManager
-                        ) {
-                            showingCloudSyncSheet = true
+                        // 账户与同步 - 导航到新页面
+                        NavigationLink(destination: AccountSyncView()) {
+                            AccountCardNew()
                         }
+                        .buttonStyle(PlainButtonStyle())
                         
                         // 梦幻衣橱
                         NavigationLink(destination: WardrobeSettingsView()) {
@@ -129,7 +127,7 @@ struct MeView: View {
             .background {
                 LiquidBackground()
             }
-            .navigationTitle("我的")
+            .navigationTitle("我")
             .sheet(isPresented: $showingCloudSyncSheet) {
                 CloudSyncSheetView(
                     authManager: authManager,
