@@ -71,6 +71,7 @@ struct HomeView: View {
     @State private var showingBatchImportSheet = false
     @State private var isSelectionMode = false
     @State private var isEditing = false
+    @State private var isSearchActive = false
     @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
     
     // Filter States
@@ -161,6 +162,10 @@ struct HomeView: View {
             .onChange(of: viewLayout) { _, _ in
                 RewardManager.shared.triggerReward(type: .firstTimeFeature("ViewLayoutChange"))
             }
+            .onChange(of: selectedTab) { _, _ in
+                // 切换标签页时关闭搜索栏
+                isSearchActive = false
+            }
             .sheet(isPresented: $showingBatchImportSheet) {
                 BatchImportView()
             }
@@ -185,9 +190,14 @@ struct HomeView: View {
                         }
                     }
                 ),
-                placement: .automatic,
-                prompt: "搜索名称、品牌、标签、属性..."
+                isPresented: $isSearchActive,
+                placement: .toolbar,//.navigationBarDrawer(displayMode: .automatic),
+                prompt: "在衣橱内搜索名称、品牌、标签..."
             )
+            .onAppear {
+                // 确保初始状态下搜索栏不显示
+                isSearchActive = false
+            }
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {
                     ClothingEditView(
@@ -261,48 +271,69 @@ struct HomeView: View {
     }
     
     private var actionButtons: some View {
-        ViewThatFits(in: .horizontal) {
-            // Full Layout
-            HStack(spacing: 6) {
-                sortButton
-                filterButton
-                displayButton
-                if selectedTab == .wardrobe {
-                    if sortOption == .custom {
-                        manualSortButton
-                    }
-                    editButton
-                }
-                if selectedTab == .depositPlan {
-                    notificationButton
-                }
-                addButton
+        HStack(spacing: 6) {
+            // 完成编辑按钮（编辑模式时直接显示）
+            if selectedTab == .wardrobe && isSelectionMode {
+                doneEditButton
             }
             
-            // Compact Layout (Three Dots)
-            Menu {
+            // 完成排序按钮（自定义排序编辑模式时直接显示）
+            if selectedTab == .wardrobe && sortOption == .custom && isEditing {
+                doneSortButton
+            }
+            
+            // 检查是否处于任何编辑模式
+            let isInEditMode = selectedTab == .wardrobe && (isSelectionMode || (sortOption == .custom && isEditing))
+            
+            // 排序、筛选、视图直接显示在导航栏（非编辑模式时显示）
+            if !isInEditMode {
                 sortButton
                 filterButton
                 displayButton
-                if selectedTab == .depositPlan {
-                    notificationLink
-                }
-                addButton
-                if selectedTab == .wardrobe {
-                    if sortOption == .custom {
-                        manualSortButton
-                    }
-                    editButton
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(.primary)
+            }
+            
+            // 补款提醒（仅尾款天使标签页，且非编辑模式）
+            if selectedTab == .depositPlan && !isInEditMode {
+                notificationButton
+            }
+            
+            // 更多菜单 - 包含搜索、编辑、自定义排序等功能
+            moreMenuButton
+            
+            addButton
+        }
+    }
+    
+    private var doneEditButton: some View {
+        Button {
+            withAnimation {
+                isSelectionMode = false
+            }
+        } label: {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(.pink)
+        }
+    }
+    
+    private var doneSortButton: some View {
+        Button {
+            withAnimation {
+                isEditing = false
+            }
+        } label: {
+            if #available(iOS 26.0, *) {
+                Image(systemName: "list.number.badge.ellipsis")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.pink)
+            } else {
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.pink)
             }
         }
     }
     
-    // Extracted buttons for reuse
     private var notificationButton: some View {
         NavigationLink(destination: NotificationSettingsView()) {
             Image(systemName: "bell")
@@ -311,51 +342,45 @@ struct HomeView: View {
         }
     }
     
-    private var notificationLink: some View {
-        NavigationLink(destination: NotificationSettingsView()) {
-            Label("补款提醒", systemImage: "bell")
-        }
-    }
-    
-    private var manualSortButton: some View {
-        Button {
-            withAnimation {
-                isEditing.toggle()
+    private var moreMenuButton: some View {
+        Menu {
+            // 搜索功能
+            Button {
+                isSearchActive = true
+            } label: {
+                Label("搜索", systemImage: "magnifyingglass")
             }
-        } label: {
-            if isEditing {
-                if #available(iOS 26.0, *) {
-                    Image(systemName: "list.number.badge.ellipsis")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.pink)
-                } else {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.pink)
+            
+            if selectedTab == .wardrobe {
+                Divider()
+                
+                // 编辑模式（仅在非编辑模式时显示入口）
+                if !isSelectionMode {
+                    Button {
+                        withAnimation {
+                            isSelectionMode = true
+                        }
+                    } label: {
+                        Label("编辑", systemImage: "pencil.circle")
+                    }
                 }
-            } else {
-                Image(systemName: "list.number")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.primary)
+                
+                // 自定义排序编辑（仅在非编辑模式且排序为自定义时显示入口）
+                if sortOption == .custom && !isEditing {
+                    Button {
+                        withAnimation {
+                            isEditing = true
+                        }
+                    } label: {
+                        Label("调整顺序", systemImage: "list.number")
+                    }
+                }
             }
-        }
-    }
-    
-    private var editButton: some View {
-        Button {
-            withAnimation {
-                isSelectionMode.toggle()
-            }
+            
         } label: {
-            if isSelectionMode {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.pink)
-            } else {
-                Image(systemName: "pencil.circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.primary)
-            }
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 16))
+                .foregroundStyle(.primary)
         }
     }
     
@@ -368,11 +393,9 @@ struct HomeView: View {
                 }
             }
         } label: {
-            if let _ =  Optional(true) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.primary)
-            }
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.system(size: 16))
+                .foregroundStyle(.primary)
         }
     }
     

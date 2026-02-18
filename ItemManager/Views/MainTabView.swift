@@ -80,11 +80,6 @@ struct ModernTabView: View {
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
         .applyTabBarMinimizeBehavior()
-        .searchable(
-            text: $searchText,
-            placement: .toolbar,
-            prompt: "搜索衣物、品牌、标签..."
-        )
         .applySearchToolbarBehavior()
         .environment(\.isSimulationActive, isSimulationActive)
         .overlay {
