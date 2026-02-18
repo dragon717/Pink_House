@@ -3,6 +3,7 @@
 //  ItemManager
 //
 //  画布左侧工具栏 - 提供图层管理和变换操作
+//  特性：安全区域适配、自适应布局、可滑动
 //
 
 import SwiftUI
@@ -17,6 +18,8 @@ struct CanvasToolbarView: View {
     @Binding var isVisible: Bool
     // 贴纸库显示状态
     @Binding var isStickerLibraryVisible: Bool
+    // 横屏状态
+    let isLandscape: Bool
     
     // 翻页相关
     let currentPageIndex: Int
@@ -38,6 +41,9 @@ struct CanvasToolbarView: View {
     @State private var showingDeleteConfirmation = false
     @State private var itemToDelete: OutfitItem?
     
+    // 环境变量
+    @Environment(\.safeAreaInsets) private var safeAreaInsets
+    
     var selectedItem: OutfitItem? {
         guard let id = selectedItemId else { return nil }
         return outfit.items.first { $0.id == id }
@@ -46,142 +52,147 @@ struct CanvasToolbarView: View {
     var body: some View {
         HStack(spacing: 0) {
             if isVisible {
-                // 工具栏内容
-                VStack(spacing: 16) {
-                    // 标题
-                    Text("工具")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                    
-                    Divider()
-                        .frame(width: 24)
-                    
-                    // 翻页控制组
-                    ToolbarButtonGroup(title: "翻页") {
-                        // 上一页按钮
-                        ToolbarButton(
-                            icon: "chevron.left",
-                            label: "上一张",
-                            isEnabled: hasPreviousPage
-                        ) {
-                            onPreviousPage()
-                        }
-
-                        // 页码指示器
-                        Text("\(currentPageIndex + 1)/\(totalPages)")
-                            .font(.system(size: 11, weight: .medium))
+                // 工具栏内容 - 使用 ScrollView 实现可滑动
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        // 标题
+                        Text("工具")
+                            .font(.caption)
+                            .fontWeight(.medium)
                             .foregroundStyle(.secondary)
-                            .frame(width: 44)
+                        
+                        Divider()
+                            .frame(width: 24)
+                        
+                        // 贴纸库按钮
+                        ToolbarButton(
+                            icon: isStickerLibraryVisible ? "rectangle.stack.fill" : "rectangle.stack",
+                            label: "贴纸库",
+                            tint: .pink,
+                            isEnabled: true
+                        ) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isStickerLibraryVisible.toggle()
+                            }
+                        }
+                        
+                        Divider()
+                            .frame(width: 24)
+                        
+                        // 翻页控制组
+                        ToolbarButtonGroup(title: "翻页") {
+                            // 上一页按钮
+                            ToolbarButton(
+                                icon: "chevron.left",
+                                label: "上一张",
+                                isEnabled: hasPreviousPage
+                            ) {
+                                onPreviousPage()
+                            }
 
-                        // 下一页按钮
-                        ToolbarButton(
-                            icon: "chevron.right",
-                            label: "下一张",
-                            isEnabled: hasNextPage
-                        ) {
-                            onNextPage()
-                        }
-                    }
-                    
-                    Divider()
-                        .frame(width: 24)
-                    
-                    // 图层控制组
-                    ToolbarButtonGroup(title: "图层") {
-                        ToolbarButton(
-                            icon: "arrow.up.to.line",
-                            label: "置顶",
-                            isEnabled: selectedItem != nil
-                        ) {
-                            if let item = selectedItem {
-                                onBringToFront(item)
+                            // 页码指示器
+                            Text("\(currentPageIndex + 1)/\(totalPages)")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 44)
+
+                            // 下一页按钮
+                            ToolbarButton(
+                                icon: "chevron.right",
+                                label: "下一张",
+                                isEnabled: hasNextPage
+                            ) {
+                                onNextPage()
                             }
                         }
                         
-                        ToolbarButton(
-                            icon: "arrow.up",
-                            label: "上一层",
-                            isEnabled: selectedItem != nil
-                        ) {
-                            if let item = selectedItem {
-                                onBringForward(item)
+                        Divider()
+                            .frame(width: 24)
+                        
+                        // 图层控制组
+                        ToolbarButtonGroup(title: "图层") {
+                            ToolbarButton(
+                                icon: "arrow.up.to.line",
+                                label: "置顶",
+                                isEnabled: selectedItem != nil
+                            ) {
+                                if let item = selectedItem {
+                                    onBringToFront(item)
+                                }
+                            }
+                            
+                            ToolbarButton(
+                                icon: "arrow.up",
+                                label: "上一层",
+                                isEnabled: selectedItem != nil
+                            ) {
+                                if let item = selectedItem {
+                                    onBringForward(item)
+                                }
+                            }
+                            
+                            ToolbarButton(
+                                icon: "arrow.down",
+                                label: "下一层",
+                                isEnabled: selectedItem != nil
+                            ) {
+                                if let item = selectedItem {
+                                    onSendBackward(item)
+                                }
+                            }
+                            
+                            ToolbarButton(
+                                icon: "arrow.down.to.line",
+                                label: "置底",
+                                isEnabled: selectedItem != nil
+                            ) {
+                                if let item = selectedItem {
+                                    onSendToBack(item)
+                                }
                             }
                         }
                         
-                        ToolbarButton(
-                            icon: "arrow.down",
-                            label: "下一层",
-                            isEnabled: selectedItem != nil
-                        ) {
-                            if let item = selectedItem {
-                                onSendBackward(item)
+                        Divider()
+                            .frame(width: 24)
+                        
+                        // 变换控制组
+                        ToolbarButtonGroup(title: "变换") {
+                            ToolbarButton(
+                                icon: "arrow.counterclockwise",
+                                label: "重置",
+                                isEnabled: selectedItem != nil
+                            ) {
+                                if let item = selectedItem {
+                                    onResetTransform(item)
+                                }
                             }
                         }
                         
+                        Divider()
+                            .frame(width: 24)
+                        
+                        // 删除按钮
                         ToolbarButton(
-                            icon: "arrow.down.to.line",
-                            label: "置底",
+                            icon: "trash",
+                            label: "删除",
+                            tint: .red,
                             isEnabled: selectedItem != nil
                         ) {
                             if let item = selectedItem {
-                                onSendToBack(item)
+                                itemToDelete = item
+                                showingDeleteConfirmation = true
                             }
                         }
+                        
+                        Spacer(minLength: 20)
                     }
-                    
-                    Divider()
-                        .frame(width: 24)
-                    
-                    // 变换控制组
-                    ToolbarButtonGroup(title: "变换") {
-                        ToolbarButton(
-                            icon: "arrow.counterclockwise",
-                            label: "重置",
-                            isEnabled: selectedItem != nil
-                        ) {
-                            if let item = selectedItem {
-                                onResetTransform(item)
-                            }
-                        }
-                    }
-                    
-                    Divider()
-                        .frame(width: 24)
-                    
-                    // 删除按钮
-                    ToolbarButton(
-                        icon: "trash",
-                        label: "删除",
-                        tint: .red,
-                        isEnabled: selectedItem != nil
-                    ) {
-                        if let item = selectedItem {
-                            itemToDelete = item
-                            showingDeleteConfirmation = true
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Divider()
-                        .frame(width: 24)
-                    
-                    // 贴纸库按钮
-                    ToolbarButton(
-                        icon: isStickerLibraryVisible ? "rectangle.stack.fill" : "rectangle.stack",
-                        label: "贴纸库",
-                        tint: .pink,
-                        isEnabled: true
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            isStickerLibraryVisible.toggle()
-                        }
-                    }
+                    .padding(.vertical, 16)
+                    .padding(.horizontal, 8)
+                    // 底部增加安全区域高度，确保内容不被遮挡
+                    .padding(.bottom, max(safeAreaInsets.bottom, 16))
                 }
-                .padding(.vertical, 16)
-                .padding(.horizontal, 8)
                 .frame(width: 64)
+                .frame(maxHeight: .infinity)
                 .background(.ultraThinMaterial)
                 .background(Color(UIColor.systemBackground).opacity(0.9))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -189,6 +200,10 @@ struct CanvasToolbarView: View {
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
+        // 整体安全区域适配
+        .padding(.top, 0)
+        .padding(.bottom, 0)
+        .padding(.leading, 0)
         .alert("确认删除", isPresented: $showingDeleteConfirmation) {
             Button("取消", role: .cancel) {
                 itemToDelete = nil
@@ -253,6 +268,21 @@ struct ToolbarButton: View {
     }
 }
 
+// MARK: - 安全区域扩展
+/// 安全区域 Insets 环境变量
+private struct SafeAreaInsetsKey: EnvironmentKey {
+    static var defaultValue: EdgeInsets {
+        EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
+    }
+}
+
+extension EnvironmentValues {
+    var safeAreaInsets: EdgeInsets {
+        get { self[SafeAreaInsetsKey.self] }
+        set { self[SafeAreaInsetsKey.self] = newValue }
+    }
+}
+
 // MARK: - 预览
 #Preview {
     CanvasToolbarView(
@@ -260,6 +290,7 @@ struct ToolbarButton: View {
         selectedItemId: .constant(nil),
         isVisible: .constant(true),
         isStickerLibraryVisible: .constant(false),
+        isLandscape: false,
         currentPageIndex: 2,
         totalPages: 10,
         hasPreviousPage: true,

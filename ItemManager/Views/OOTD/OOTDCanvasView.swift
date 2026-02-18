@@ -26,6 +26,8 @@ struct OOTDCanvasView: View {
     @Binding var isToolbarVisible: Bool
     // 贴纸库显示状态
     @Binding var isStickerLibraryVisible: Bool
+    // 横屏状态
+    var isLandscape: Bool = false
     
     // 翻页相关参数
     let currentPageIndex: Int
@@ -40,14 +42,20 @@ struct OOTDCanvasView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            // Calculate scale to fit the current view port
-            let fitScale = min(
-                geometry.size.width / canvasWidth,
-                geometry.size.height / canvasHeight
-            )
+            // 获取安全区域 insets
+            let safeArea = geometry.safeAreaInsets
             
-            // 工具栏宽度（显示时64+padding，隐藏时0）
+            // 计算可用空间（考虑工具栏宽度）
             let toolbarWidth: CGFloat = isToolbarVisible ? 72 : 0
+            let availableWidth = geometry.size.width - toolbarWidth
+            let availableHeight = geometry.size.height
+            
+            // 计算缩放比例以适应可用空间，保留适当边距
+            let margin: CGFloat = isLandscape ? 16 : 8
+            let fitScale = min(
+                (availableWidth - margin * 2) / canvasWidth,
+                (availableHeight - margin * 2) / canvasHeight
+            )
             
             HStack(spacing: 0) {
                 // 左侧工具栏
@@ -57,6 +65,7 @@ struct OOTDCanvasView: View {
                         selectedItemId: $selectedItemId,
                         isVisible: $isToolbarVisible,
                         isStickerLibraryVisible: $isStickerLibraryVisible,
+                        isLandscape: isLandscape,
                         currentPageIndex: currentPageIndex,
                         totalPages: totalPages,
                         hasPreviousPage: hasPreviousPage,
@@ -82,7 +91,8 @@ struct OOTDCanvasView: View {
                             resetTransform(item)
                         }
                     )
-                    .padding(.leading, 8)
+                    .environment(\.safeAreaInsets, safeArea)
+                    .padding(.leading, isLandscape ? 12 : 8)
                     .frame(width: toolbarWidth)
                     .transition(.move(edge: .leading))
                 }
@@ -90,7 +100,7 @@ struct OOTDCanvasView: View {
                 // Canvas Area - 占据剩余空间
                 ZStack {
                     // 画布内容
-                    canvasContent(fitScale: fitScale, geometry: geometry)
+                    canvasContent(fitScale: fitScale, geometry: geometry, availableWidth: availableWidth, availableHeight: availableHeight)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
                     // 顶部贴纸管理栏 - 悬浮在画布上方
@@ -105,7 +115,7 @@ struct OOTDCanvasView: View {
                                 bringToFront(item)
                             }
                         )
-                        .padding(.top, 8)
+                        .padding(.top, isLandscape ? 12 : 8)
                         
                         Spacer()
                     }
@@ -115,7 +125,7 @@ struct OOTDCanvasView: View {
     }
     
     // MARK: - 画布内容
-    private func canvasContent(fitScale: CGFloat, geometry: GeometryProxy) -> some View {
+    private func canvasContent(fitScale: CGFloat, geometry: GeometryProxy, availableWidth: CGFloat, availableHeight: CGFloat) -> some View {
         ZStack {
             // Background
             if outfit.canvasType == "blank" {

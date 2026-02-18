@@ -154,6 +154,23 @@ struct OOTDCutoutListView: View {
         }
     }
     
+    // 根据横屏状态和展开状态计算网格列数
+    private var gridColumns: [GridItem] {
+        if isLandscape {
+            // 横屏时根据展开状态调整
+            if isExpanded {
+                // 展开状态：使用自适应列数，最小宽度70
+                return [GridItem(.adaptive(minimum: 70), spacing: 12)]
+            } else {
+                // 收起状态（窄侧边栏）：单列显示
+                return [GridItem(.flexible(), spacing: 8)]
+            }
+        } else {
+            // 竖屏：使用自适应列数，最小宽度80
+            return [GridItem(.adaptive(minimum: 80), spacing: 16)]
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // 完全隐藏时的显示按钮
@@ -183,6 +200,29 @@ struct OOTDCutoutListView: View {
                         .frame(width: 40, height: 5)
                         .padding(.top, 10)
                         .padding(.bottom, 5)
+                }
+                
+                // 横屏模式下的展开/收起按钮
+                if isLandscape {
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isExpanded.toggle()
+                            }
+                        } label: {
+                            Image(systemName: isExpanded ? "chevron.right" : "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 28, height: 28)
+                                .background(
+                                    Circle()
+                                        .fill(Color(uiColor: .secondarySystemBackground))
+                                )
+                        }
+                        .padding(.trailing, 8)
+                        .padding(.vertical, 4)
+                    }
                 }
                 
                 if isExpanded || isLandscape {
@@ -276,9 +316,12 @@ struct OOTDCutoutListView: View {
                 }
                 
                 // Expanded View (Grid)
-                // In Landscape + Collapsed (Narrow), this grid will adapt to 1 column
+                // In Landscape + Collapsed (Narrow), this grid will adapt to fewer columns
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 16)], spacing: 16) {
+                    LazyVGrid(
+                        columns: gridColumns,
+                        spacing: isLandscape && !isExpanded ? 8 : 16
+                    ) {
                         if !isEditing {
                             addButton
                         }
@@ -293,7 +336,7 @@ struct OOTDCutoutListView: View {
                                 )
                         }
                     }
-                    .padding()
+                    .padding(isLandscape && !isExpanded ? 8 : 16)
                     .padding(.bottom, isEditing ? 80 : 0) // Space for toolbar
                 }
                 .coordinateSpace(name: "gridSpace")
@@ -533,17 +576,21 @@ struct OOTDCutoutListView: View {
     }
     
     private func itemThumbnailView(_ item: CutoutItem) -> some View {
-        CutoutThumbnail(imagePath: item.imagePath, category: item.category)
-            .overlay {
-                if processingItem == item.id {
-                    ZStack {
-                        Color.black.opacity(0.3)
-                            .cornerRadius(12)
-                        ProgressView()
-                            .tint(.white)
-                    }
+        CutoutThumbnail(
+            imagePath: item.imagePath,
+            category: item.category,
+            size: isLandscape && !isExpanded ? 56 : 72
+        )
+        .overlay {
+            if processingItem == item.id {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .cornerRadius(isLandscape && !isExpanded ? 8 : 12)
+                    ProgressView()
+                        .tint(.white)
                 }
             }
+        }
     }
     
     private func toggleSelection(for item: CutoutItem) {
@@ -751,22 +798,25 @@ struct OOTDCutoutListView: View {
     
     var addButton: some View {
         Button(action: onAddPhoto) {
-            VStack(spacing: 4) {
+            VStack(spacing: isLandscape && !isExpanded ? 2 : 4) {
                 ZStack {
                     Circle()
                         .fill(Color.blue.opacity(0.1))
-                        .frame(width: 48, height: 48)
+                        .frame(width: isLandscape && !isExpanded ? 36 : 48, height: isLandscape && !isExpanded ? 36 : 48)
                     Image(systemName: "plus")
-                        .font(.title2)
+                        .font(isLandscape && !isExpanded ? .title3 : .title2)
                         .foregroundColor(.blue)
                 }
                 Text("添加")
-                    .font(.caption2)
+                    .font(isLandscape && !isExpanded ? .caption2 : .caption2)
                     .foregroundColor(.primary)
             }
-            .frame(width: 72, height: 72)
+            .frame(
+                width: isLandscape && !isExpanded ? 60 : 72,
+                height: isLandscape && !isExpanded ? 60 : 72
+            )
             .background(Color(uiColor: .secondarySystemBackground))
-            .cornerRadius(12)
+            .cornerRadius(isLandscape && !isExpanded ? 8 : 12)
         }
     }
     
@@ -794,6 +844,7 @@ struct OOTDCutoutListView: View {
 struct CutoutThumbnail: View {
     let imagePath: String
     var category: String? = nil
+    var size: CGFloat = 72
     
     @State private var image: UIImage?
     
@@ -806,32 +857,32 @@ struct CutoutThumbnail: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 72, height: 72)
-                        .padding(4)
+                        .frame(width: size, height: size)
+                        .padding(size == 72 ? 4 : 2)
                         .background(Color(uiColor: .secondarySystemGroupedBackground))
-                        .cornerRadius(12)
+                        .cornerRadius(size == 72 ? 12 : 8)
                         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                         .overlay(alignment: .bottomLeading) {
                             if let category = category {
                                 Text(category)
-                                    .font(.system(size: 8))
-                                    .padding(2)
+                                    .font(.system(size: size == 72 ? 8 : 7))
+                                    .padding(size == 72 ? 2 : 1)
                                     .background(Color.black.opacity(0.5))
                                     .foregroundColor(.white)
-                                    .cornerRadius(4)
-                                    .padding(4)
+                                    .cornerRadius(size == 72 ? 4 : 2)
+                                    .padding(size == 72 ? 4 : 2)
                             }
                         }
                 } else {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: size == 72 ? 12 : 8)
                         .fill(Color(uiColor: .secondarySystemBackground))
-                        .frame(width: 72, height: 72)
+                        .frame(width: size, height: size)
                 }
             }
             .task {
                 if image == nil {
-                    // Request downsampled image (72pt * scale)
-                    let targetSize = CGSize(width: 72 * displayScale, height: 72 * displayScale)
+                    // Request downsampled image (size * scale)
+                    let targetSize = CGSize(width: size * displayScale, height: size * displayScale)
                     image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: targetSize)
                 }
             }

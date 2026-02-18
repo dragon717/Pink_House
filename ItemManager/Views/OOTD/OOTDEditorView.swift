@@ -34,7 +34,6 @@ struct OOTDEditorView: View {
     @State private var showingShareSheet = false
     
     // 编辑底图相关状态
-    @State private var showingBackgroundEditSheet = false
     @State private var showingBackgroundPicker = false
     @State private var selectedBackgroundItem: PhotosPickerItem?
     @State private var tempBackgroundImage: UIImage?
@@ -111,8 +110,20 @@ struct OOTDEditorView: View {
                     
                     // 更多操作菜单
                     Menu {
-                        Button {
-                            showingBackgroundEditSheet = true
+                        Menu {
+                            Button {
+                                showingBackgroundPicker = true
+                            } label: {
+                                Label("更换底图", systemImage: "photo")
+                            }
+                            
+                            if outfit.canvasType == "custom" {
+                                Button(role: .destructive) {
+                                    resetBackgroundToDefault()
+                                } label: {
+                                    Label("恢复默认", systemImage: "arrow.counterclockwise")
+                                }
+                            }
                         } label: {
                             Label("编辑底图", systemImage: "photo")
                         }
@@ -202,17 +213,6 @@ struct OOTDEditorView: View {
             Text("确定要删除这张书页吗？")
         }
         // MARK: - 编辑底图相关 Sheets
-        .confirmationDialog("编辑底图", isPresented: $showingBackgroundEditSheet) {
-            Button("更换底图") {
-                showingBackgroundPicker = true
-            }
-            if outfit.canvasType == "custom" {
-                Button("恢复默认", role: .destructive) {
-                    resetBackgroundToDefault()
-                }
-            }
-            Button("取消", role: .cancel) {}
-        }
         .photosPicker(isPresented: $showingBackgroundPicker, selection: $selectedBackgroundItem, matching: .images)
         .onChange(of: selectedBackgroundItem) { _, newItem in
             if let newItem {
@@ -277,7 +277,7 @@ struct OOTDEditorView: View {
         }
         
         outfit.backgroundImagePath = nil
-        outfit.canvasType = "mannequin"
+        outfit.canvasType = "blank"
         outfit.snapshotPath = nil
         try? modelContext.save()
         
@@ -392,6 +392,18 @@ struct OOTDEditorView: View {
     @ViewBuilder
     private func mainContentArea(geometry: GeometryProxy) -> some View {
         let isLandscape = geometry.size.width > geometry.size.height
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        
+        // 根据设备类型和屏幕尺寸计算贴纸库宽度
+        let sidebarWidth: CGFloat = {
+            if isIPad {
+                // iPad: 根据展开状态使用不同宽度
+                return isListExpanded ? min(380, geometry.size.width * 0.35) : 120
+            } else {
+                // iPhone 横屏: 更窄的侧边栏
+                return isListExpanded ? min(320, geometry.size.width * 0.4) : 90
+            }
+        }()
         
         ZStack {
             if isLandscape {
@@ -402,6 +414,7 @@ struct OOTDEditorView: View {
                         outfit: outfit,
                         isToolbarVisible: $isToolbarVisible,
                         isStickerLibraryVisible: $isStickerLibraryVisible,
+                        isLandscape: true,
                         currentPageIndex: currentPageIndex,
                         totalPages: bookPages.count,
                         hasPreviousPage: hasPreviousPage,
@@ -440,7 +453,7 @@ struct OOTDEditorView: View {
                                 return true
                             }
                         )
-                        .frame(width: isListExpanded ? 320 : 100)
+                        .frame(width: sidebarWidth)
                         .background(Color(uiColor: .systemBackground))
                         .transition(.move(edge: .trailing))
                         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isListExpanded)
@@ -453,6 +466,7 @@ struct OOTDEditorView: View {
                         outfit: outfit,
                         isToolbarVisible: $isToolbarVisible,
                         isStickerLibraryVisible: $isStickerLibraryVisible,
+                        isLandscape: false,
                         currentPageIndex: currentPageIndex,
                         totalPages: bookPages.count,
                         hasPreviousPage: hasPreviousPage,
