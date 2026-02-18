@@ -205,6 +205,28 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         setupAudioEngine()
     }
     
+    /// 完全重新创建音频引擎 - 用于解决输入格式为 0 Hz 的问题
+    private func recreateAudioEngine() {
+        // 停止并清理旧引擎
+        engine.stop()
+        engine.reset()
+        
+        // 重新创建引擎实例
+        engine = AVAudioEngine()
+        
+        // 重新创建节点
+        bgmPlayerNode = AVAudioPlayerNode()
+        playerNode = AVAudioPlayerNode()
+        timePitch = AVAudioUnitTimePitch()
+        eqNode = AVAudioUnitEQ(numberOfBands: 4)
+        mixerNode = AVAudioMixerNode()
+        
+        // 重新配置引擎
+        setupAudioEngine()
+        
+        print("AudioManager: Audio engine recreated")
+    }
+    
     private func setupAudioEngine() {
         // Attach nodes
         engine.attach(bgmPlayerNode)
@@ -217,10 +239,12 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         
         // Connect Voice Effects Chain
         // Player -> TimePitch -> EQ -> MainMixer
+        // 使用硬件输出格式，如果不可用则使用标准格式
         let format = engine.outputNode.inputFormat(forBus: 0)
-        engine.connect(playerNode, to: timePitch, format: format)
-        engine.connect(timePitch, to: eqNode, format: format)
-        engine.connect(eqNode, to: engine.mainMixerNode, format: format)
+        let validFormat = (format.sampleRate > 0 && format.channelCount > 0) ? format : AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2)!
+        engine.connect(playerNode, to: timePitch, format: validFormat)
+        engine.connect(timePitch, to: eqNode, format: validFormat)
+        engine.connect(eqNode, to: engine.mainMixerNode, format: validFormat)
         
         // Prepare BGM Buffer
         prepareBGMBuffer()
@@ -573,8 +597,33 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         // 移除旧的 Tap
         engine.inputNode.removeTap(onBus: 0)
         
-        // 关键修复：在获取格式之前先启动引擎
+        // 关键修复：确保音频会话完全激活后再启动引擎
         // 否则 inputNode.outputFormat 可能返回采样率为 0 的无效格式
+        
+        // 先确保音频会话激活
+        let session = AVAudioSession.sharedInstance()
+        
+        // 打印当前音频会话状态
+        print("AudioManager: Session category: \(session.category), mode: \(session.mode)")
+        print("AudioManager: Session sample rate: \(session.sampleRate)")
+        print("AudioManager: Current route inputs: \(session.currentRoute.inputs.map { $0.portType })")
+        
+        do {
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("AudioManager: Failed to activate audio session: \(error)")
+        }
+        
+        // 关键：在配置好音频会话后，完全重新创建引擎以确保它使用正确的硬件配置
+        recreateAudioEngine()
+        
+        // 延迟一小段时间让硬件准备好
+        Thread.sleep(forTimeInterval: 0.1)
+        
+        // 现在获取输入节点 - 此时音频会话已经配置为 PlayAndRecord
+        let inputNode = engine.inputNode
+        
+        // 启动引擎
         do {
             try engine.start()
         } catch {
@@ -584,22 +633,40 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             return
         }
         
-        let inputNode = engine.inputNode
+        // 再延迟一下确保引擎和硬件同步
+        Thread.sleep(forTimeInterval: 0.1)
+        
         // 使用 outputFormat 而不是 inputFormat，因为这是 InputNode 输出给 Tap 的数据格式
         let format = inputNode.outputFormat(forBus: 0)
         
         // 打印调试信息，确认采样率
         print("AudioManager: Input format: \(format)")
+        print("AudioManager: Engine running: \(engine.isRunning), input node: \(inputNode)")
         
         if format.sampleRate == 0 || format.channelCount == 0 {
             print("AudioManager: Invalid input format: \(format)")
-            // 尝试重启引擎并延迟重试一次
-            engine.stop()
-            engine.reset()
-            Thread.sleep(forTimeInterval: 0.1)
+            // 尝试完全重置并重新配置
+            
+            // 重新激活音频会话
+            do {
+                try session.setActive(false, options: .notifyOthersOnDeactivation)
+                Thread.sleep(forTimeInterval: 0.2)
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+                Thread.sleep(forTimeInterval: 0.2)
+            } catch {
+                print("AudioManager: Failed to reactivate audio session: \(error)")
+            }
+            
+            // 完全重新创建引擎
+            recreateAudioEngine()
+            
+            // 重新获取输入节点（因为引擎已重新创建）
+            let retryInputNode = engine.inputNode
+            
             do {
                 try engine.start()
-                let retryFormat = inputNode.outputFormat(forBus: 0)
+                Thread.sleep(forTimeInterval: 0.1)
+                let retryFormat = retryInputNode.outputFormat(forBus: 0)
                 print("AudioManager: Retry input format: \(retryFormat)")
                 if retryFormat.sampleRate == 0 || retryFormat.channelCount == 0 {
                     print("AudioManager: Still invalid format after retry")
