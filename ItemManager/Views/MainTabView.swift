@@ -50,14 +50,16 @@ struct ModernTabView: View {
     @StateObject private var mediaStateManager = MediaStateManager.shared
     
     @State private var searchText = ""
+    // 修复：添加 selectedTab 状态来跟踪当前选中的 Tab，用于 SmallWorldMenuOverlay
+    @State private var selectedTab: Int = 1
     
     var body: some View {
-        TabView {
-            Tab("衣橱", systemImage: "cabinet.fill") {
+        TabView(selection: $selectedTab) {
+            Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
                 WardrobeTabContent(homeTabSelection: $homeTabSelection)
             }
             
-            Tab("小世界", systemImage: "map") {
+            Tab("小世界", systemImage: "map", value: 1) {
                 SmallWorldTabContent(
                     homeTab: $homeTabSelection,
                     destination: $smallWorldDestination,
@@ -65,11 +67,11 @@ struct ModernTabView: View {
                 )
             }
             
-            Tab("我的", systemImage: "face.smiling") {
+            Tab("我的", systemImage: "face.smiling", value: 2) {
                 MeTabContent()
             }
             
-            Tab(role: .search) {
+            Tab(value: 3, role: .search) {
                 SearchContainerView(searchText: $searchText)
             }
         }
@@ -90,8 +92,9 @@ struct ModernTabView: View {
             PetOverlayView(action: {
                 smallWorldDestination = .pet
             }, petName: petDataManager.status.displayName)
+            // 修复：使用正确的 Binding 传递 selectedTab
             SmallWorldMenuOverlay(
-                selectedTab: .constant(1),
+                selectedTab: $selectedTab,
                 smallWorldDestination: $smallWorldDestination
             )
         }

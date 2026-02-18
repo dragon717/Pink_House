@@ -202,68 +202,55 @@ struct SmallWorldMenuOverlay: View {
                         // 使用 Color.black.opacity(0.001) 更稳妥
                         Color.black.opacity(0.001)
                             .contentShape(Rectangle())
-                            .frame(width: triggerAreaWidth, height: triggerHeight) // 动态高度和宽度
-                            // 替换为同时支持点击和长按的组合手势
-                            // DragGesture(minimumDistance: 0) 会独占事件，导致极短的点击可能被误判或不触发
-                            // 更好的方式是使用 simultaneousGesture 组合 LongPress 和 Tap，
-                            // 但为了获取坐标，我们必须保留 DragGesture。
-                            // 修正：在 .onEnded 中强制执行点击逻辑，不再依赖 TapGesture
-                            // 另外，确保视图层级在最顶层，且 allowsHitTesting(true)
-                            .highPriorityGesture(
-                                DragGesture(minimumDistance: 0, coordinateSpace: .named("MenuOverlay"))
-                                    .onChanged { value in
-                                        if showMenu { return } // 菜单打开时忽略长按逻辑
-                                        
-                                        // 始终更新触摸位置，确保圆环跟随手指
-                                        touchLocation = value.location
-                                        
-                                        if !isPressing {
-                                            print("SmallWorldMenuOverlay: Drag started at \(value.location)")
-                                            isPressing = true
-                                            startLocation = value.location // 记录起始位置
-                                            
-                                            // 触发轻微震动反馈，提示用户已开始按压
-                                            #if canImport(UIKit)
-                                            let generator = UIImpactFeedbackGenerator(style: .light)
-                                            generator.impactOccurred()
-                                            #endif
-                                            
-                                            startLongPressTimer()
-                                        } else {
-                                            // 检测位移，如果移动距离过大，则取消长按（防止滑动误触）
-                                            let distance = hypot(value.location.x - startLocation.x, value.location.y - startLocation.y)
-                                            if distance > 20 { // 阈值设为 20
-                                                print("SmallWorldMenuOverlay: Drag distance \(distance) > 20, cancelling long press")
-                                                cancelLongPress()
+                            .frame(width: triggerAreaWidth, height: triggerHeight)
+                            // 修复：使用 onLongPressGesture 和 onTapGesture 组合，避免与 TabView 手势冲突
+                            // 关键修改：
+                            // 1. 使用原生 onLongPressGesture 和 onTapGesture，系统会自动处理手势冲突
+                            // 2. 添加一个透明的覆盖层来捕获手势，避免与 TabBar 直接竞争
+                            // 3. 计算全屏坐标用于圆环和菜单定位
+                            .overlay(
+                                GeometryReader { geo in
+                                    Color.clear
+                                        .contentShape(Rectangle())
+                                        .onLongPressGesture(
+                                            minimumDuration: longPressDuration,
+                                            maximumDistance: 20,
+                                            pressing: { isPressing in
+                                                if isPressing {
+                                                    print("SmallWorldMenuOverlay: Long press started")
+                                                    self.isPressing = true
+                                                    
+                                                    // 计算触发区域中心在全屏坐标系中的位置
+                                                    let globalX = geometry.size.width / 2
+                                                    let globalY = isIPad ? triggerHeight / 2 : geometry.size.height - (triggerHeight / 2)
+                                                    self.startLocation = CGPoint(x: globalX, y: globalY)
+                                                    self.touchLocation = self.startLocation
+                                                    
+                                                    #if canImport(UIKit)
+                                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                                    generator.impactOccurred()
+                                                    #endif
+                                                    
+                                                    startLongPressTimer()
+                                                } else {
+                                                    print("SmallWorldMenuOverlay: Long press ended")
+                                                    handlePressEnded()
+                                                }
+                                            },
+                                            perform: {
+                                                print("SmallWorldMenuOverlay: Long press performed")
+                                                triggerMenu()
+                                            }
+                                        )
+                                        .onTapGesture {
+                                            print("SmallWorldMenuOverlay: Tap detected")
+                                            if showMenu {
+                                                closeMenu()
+                                            } else {
+                                                handleTapAction()
                                             }
                                         }
-                                    }
-                                    .onEnded { value in
-                                        print("SmallWorldMenuOverlay: Drag ended")
-                                        handlePressEnded()
-                                    }
-                            )
-                            // 尝试显式添加 TapGesture 以处理极短点击
-                            // 某些情况下 DragGesture(minimumDistance: 0) 响应太快，而 Tap 可能在抬起时才确认
-                            // 我们可以试试 simultaneousGesture(TapGesture().onEnded { ... }) 配合 Drag
-                            // 但如果 highPriorityGesture(Drag) 生效，Tap 应该不会被触发。
-                            // 这里的核心问题是 handlePressEnded 是否被调用了。
-                            // 用户反馈说日志打印了 "Drag started" 和 "Drag ended"，但没生效。
-                            // 这说明 handlePressEnded 确实被调用了。
-                            // 问题可能出在逻辑内部判断或者 Binding 更新没反应。
-                            
-                            // 让我们再加一层保险：直接在视图上添加 TapGesture，不依赖 Drag 的 onEnded
-                            // 但这会导致长按时也触发 Tap... 除非我们有状态判断
-                            .simultaneousGesture(
-                                TapGesture()
-                                    .onEnded {
-                                        print("SmallWorldMenuOverlay: Explicit TapGesture triggered")
-                                        if showMenu {
-                                            closeMenu()
-                                        } else {
-                                            handleTapAction()
-                                        }
-                                    }
+                                }
                             )
                         Spacer()
                     }
@@ -302,16 +289,23 @@ struct SmallWorldMenuOverlay: View {
         pressProgress = 0.0
         didLongPressTrigger = false
         
-        // 进度条动画
+        // 进度条动画 - 与 onLongPressGesture 的 minimumDuration 同步
         withAnimation(.linear(duration: longPressDuration)) {
             pressProgress = 1.0
         }
         
-        // 启动定时器检测长按完成
+        // 注意：不再使用 Timer 触发菜单
+        // 菜单触发现在由 onLongPressGesture 的 perform 闭包处理
+        // Timer 仅用于在长按被取消时清理状态
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: longPressDuration, repeats: false) { _ in
-            // 长按完成，触发菜单
-            triggerMenu()
+        timer = Timer.scheduledTimer(withTimeInterval: longPressDuration + 0.1, repeats: false) { _ in
+            // 如果定时器触发但菜单未显示，说明长按被取消，清理状态
+            if !self.showMenu && self.isPressing {
+                DispatchQueue.main.async {
+                    self.isPressing = false
+                    self.pressProgress = 0.0
+                }
+            }
         }
     }
     
@@ -357,26 +351,16 @@ struct SmallWorldMenuOverlay: View {
             return
         }
         
-        // 如果进度没满，视为点击
-        if pressProgress < 1.0 {
-            // 立即停止长按动画
-            isPressing = false
-            withAnimation(.easeOut(duration: 0.2)) {
-                pressProgress = 0.0
-            }
-            
-            // 执行单击逻辑
-            print("SmallWorldMenuOverlay: Tap detected in handlePressEnded")
-            if showMenu {
-                closeMenu()
-            } else {
-                handleTapAction()
-            }
-        } else {
-            // 已经触发了菜单（理论上会被 didLongPressTrigger 拦截，但以防万一）
-            isPressing = false
+        // 长按被取消（未达到触发时间），视为普通按压结束
+        // 立即停止长按动画
+        isPressing = false
+        withAnimation(.easeOut(duration: 0.2)) {
             pressProgress = 0.0
         }
+        
+        // 注意：点击逻辑现在由 onTapGesture 处理，这里不再重复处理
+        // 以避免与 onTapGesture 冲突导致重复触发
+        print("SmallWorldMenuOverlay: Press ended without triggering menu")
     }
     
     private func triggerMenu() {
