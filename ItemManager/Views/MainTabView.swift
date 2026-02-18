@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 private struct IsSimulationActiveKey: EnvironmentKey {
     static let defaultValue: Bool = true
@@ -18,6 +19,257 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - View 扩展：条件应用 searchToolbarBehavior
+extension View {
+    @ViewBuilder
+    func applySearchToolbarBehavior() -> some View {
+        if #available(iOS 26.0, *) {
+            self.searchToolbarBehavior(.automatic)
+        } else {
+            self
+        }
+    }
+    
+    @ViewBuilder
+    func applyTabBarMinimizeBehavior() -> some View {
+        if #available(iOS 26.0, *) {
+            self.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            self
+        }
+    }
+}
+
+// MARK: - iOS 18+ 现代 TabView
+@available(iOS 18.0, *)
+struct ModernTabView: View {
+    @Binding var homeTabSelection: HomeTab
+    @Binding var smallWorldDestination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
+    @ObservedObject private var petDataManager = PetDataManager.shared
+    @StateObject private var mediaStateManager = MediaStateManager.shared
+    
+    @State private var searchText = ""
+    
+    var body: some View {
+        TabView {
+            Tab("衣橱", systemImage: "cabinet.fill") {
+                WardrobeTabContent(homeTabSelection: $homeTabSelection)
+            }
+            
+            Tab("小世界", systemImage: "map") {
+                SmallWorldTabContent(
+                    homeTab: $homeTabSelection,
+                    destination: $smallWorldDestination,
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                )
+            }
+            
+            Tab("我的", systemImage: "face.smiling") {
+                MeTabContent()
+            }
+            
+            Tab(role: .search) {
+                SearchContainerView(searchText: $searchText)
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
+        .applyTabBarMinimizeBehavior()
+        .searchable(
+            text: $searchText,
+            placement: .toolbar,
+            prompt: "搜索衣物、品牌、标签..."
+        )
+        .applySearchToolbarBehavior()
+        .environment(\.isSimulationActive, isSimulationActive)
+        .overlay {
+            RewardBubbleView()
+            PetOverlayView(action: {
+                smallWorldDestination = .pet
+            }, petName: petDataManager.status.displayName)
+            SmallWorldMenuOverlay(
+                selectedTab: .constant(1),
+                smallWorldDestination: $smallWorldDestination
+            )
+        }
+    }
+    
+    private var isSimulationActive: Bool {
+        return smallWorldDestination == .wealth
+    }
+}
+
+// MARK: - 衣橱 Tab 内容
+@available(iOS 18.0, *)
+struct WardrobeTabContent: View {
+    @Binding var homeTabSelection: HomeTab
+    
+    var body: some View {
+        NavigationStack {
+            HomeView(selectedTab: $homeTabSelection)
+                .toolbarBackground(.hidden, for: .navigationBar)
+        }
+    }
+}
+
+// MARK: - 小世界 Tab 内容
+@available(iOS 18.0, *)
+struct SmallWorldTabContent: View {
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
+    
+    var body: some View {
+        NavigationStack {
+            SmallWorldContainerView(
+                selectedTab: .constant(1),
+                homeTab: $homeTab,
+                destination: $destination,
+                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+            )
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+    }
+}
+
+// MARK: - 我的 Tab 内容
+@available(iOS 18.0, *)
+struct MeTabContent: View {
+    var body: some View {
+        NavigationStack {
+            MeView()
+                .toolbarBackground(.hidden, for: .navigationBar)
+        }
+    }
+}
+
+// MARK: - 搜索容器视图
+@available(iOS 18.0, *)
+struct SearchContainerView: View {
+    @Binding var searchText: String
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
+    
+    var filteredClothings: [Clothing] {
+        if searchText.isEmpty {
+            return []
+        }
+        return clothings.filter { clothing in
+            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
+            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
+            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
+            return nameMatch || brandMatch || tagMatch
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                if searchText.isEmpty {
+                    Section("搜索建议") {
+                        Label("搜索衣物名称", systemImage: "tshirt")
+                        Label("搜索品牌", systemImage: "tag")
+                        Label("搜索标签", systemImage: "number")
+                    }
+                } else if filteredClothings.isEmpty {
+                    ContentUnavailableView {
+                        Label("未找到结果", systemImage: "magnifyingglass")
+                    } description: {
+                        Text("尝试其他关键词搜索")
+                    }
+                } else {
+                    Section("找到 \(filteredClothings.count) 件衣物") {
+                        ForEach(filteredClothings) { clothing in
+                            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                HStack {
+                                    clothingThumbnail(clothing)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(clothing.name)
+                                            .font(.headline)
+                                        if let brand = clothing.brand {
+                                            Text(brand.name)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("搜索")
+        }
+    }
+    
+    @ViewBuilder
+    private func clothingThumbnail(_ clothing: Clothing) -> some View {
+        if let firstImagePath = clothing.imagePaths.first,
+           let image = loadImage(from: firstImagePath) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Image(systemName: "tshirt")
+                        .foregroundStyle(.secondary)
+                )
+        }
+    }
+    
+    private func loadImage(from path: String) -> UIImage? {
+        let fileManager = FileManager.default
+        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let imagePath = documentsPath.appendingPathComponent(path)
+        guard let imageData = try? Data(contentsOf: imagePath) else {
+            return nil
+        }
+        return UIImage(data: imageData)
+    }
+}
+
+// MARK: - 小世界容器视图
+@available(iOS 18.0, *)
+struct SmallWorldContainerView: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
+    
+    var body: some View {
+        Group {
+            switch destination {
+            case .menu:
+                SmallWorldView(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    destination: $destination,
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                )
+            case .ootd:
+                OOTDView()
+            case .pet:
+                PetHomeView()
+            case .wealth:
+                WealthView()
+            case .calendar:
+                DreamDressCalendarView()
+            }
+        }
+    }
+}
+
+// MARK: - 主 Tab 视图
 struct MainTabView: View {
     @State private var selectedTab: Int = 0
     @State private var homeTabSelection: HomeTab = .wardrobe
@@ -27,9 +279,48 @@ struct MainTabView: View {
     @StateObject private var mediaStateManager = MediaStateManager.shared
     
     var body: some View {
+        Group {
+            if #available(iOS 18.0, *) {
+                ModernTabView(
+                    homeTabSelection: $homeTabSelection,
+                    smallWorldDestination: $smallWorldDestination,
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                )
+                .overlay {
+                    if isPlayingOpeningAnimation {
+                        OpeningVideoOverlay(
+                            isPlaying: $isPlayingOpeningAnimation,
+                            onComplete: {
+                                homeTabSelection = .wardrobe
+                                selectedTab = 0
+                            }
+                        )
+                    }
+                }
+            } else {
+                LegacyTabView(
+                    selectedTab: $selectedTab,
+                    homeTabSelection: $homeTabSelection,
+                    smallWorldDestination: $smallWorldDestination,
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                )
+            }
+        }
+    }
+}
+
+// MARK: - 传统 TabView
+struct LegacyTabView: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTabSelection: HomeTab
+    @Binding var smallWorldDestination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
+    @ObservedObject private var petDataManager = PetDataManager.shared
+    @StateObject private var mediaStateManager = MediaStateManager.shared
+    
+    var body: some View {
         ZStack {
             TabView(selection: tabSelectionBinding) {
-                // Tab 0: 衣橱 (Wardrobe)
                 HomeView(selectedTab: $homeTabSelection)
                     .tabItem {
                         Image(systemName: selectedTab == 0 ? "cabinet" : "cabinet.fill")
@@ -38,7 +329,6 @@ struct MainTabView: View {
                     }
                     .tag(0)
                 
-                // Tab 1: 小世界 (Small World) / 功能页
                 Group {
                     switch smallWorldDestination {
                     case .menu:
@@ -74,152 +364,208 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
-                // Tab 2: 我的 (Me)
                 MeView()
                     .tabItem {
                         Label("我的", systemImage: "face.smiling")
                     }
                     .tag(2)
+                
+                SearchLegacyView()
+                    .tabItem {
+                        Label("搜索", systemImage: "magnifyingglass")
+                    }
+                    .tag(3)
             }
             .environment(\.isSimulationActive, isSimulationActive)
             
-            // Existing Overlay
             RewardBubbleView()
-            
-            // New Pet Overlay (ZStack 顶层)
             PetOverlayView(action: {
                 selectedTab = 1
                 smallWorldDestination = .pet
             }, petName: petDataManager.status.displayName)
-            
-            // Small World Long Press Menu Overlay
             SmallWorldMenuOverlay(selectedTab: $selectedTab, smallWorldDestination: $smallWorldDestination)
             
-            // Video Player Overlay
             if isPlayingOpeningAnimation {
-                ZStack(alignment: .topTrailing) {
-                    Color.black.ignoresSafeArea()
-                    
-                    PetVideoPlayer(videoName: "open_dress", isLooping: false, onFinished: {
-                        // 1. Switch Tab behind the scene
+                OpeningVideoOverlay(
+                    isPlaying: $isPlayingOpeningAnimation,
+                    onComplete: {
                         homeTabSelection = .wardrobe
                         selectedTab = 0
-                        
-                        // 2. Fade out video
-                        // 延迟一点点执行，确保 Tab 切换已生效
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation(.easeOut(duration: 0.8)) {
-                                isPlayingOpeningAnimation = false
-                            }
-                        }
-                    })
-                    .ignoresSafeArea()
-                    
-                    // Skip Button
-                    Button {
-                        homeTabSelection = .wardrobe
-                        selectedTab = 0
-                        withAnimation(.easeOut(duration: 0.5)) {
-                            isPlayingOpeningAnimation = false
-                        }
-                    } label: {
-                        Text("跳过")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.black.opacity(0.4))
-                            .clipShape(Capsule())
                     }
-                    .padding(.top, 50)
-                    .padding(.trailing, 20)
-                }
-                .transition(.opacity)
-                .zIndex(200) // Ensure it's on top of everything
-                .id("OpeningVideoOverlay") // 强制刷新
-            }
-        }
-        .onChange(of: smallWorldDestination) { oldValue, newValue in
-            // 当小世界内部页面切换时，更新媒体状态
-            print("🔄 MainTabView: 小世界内部切换从 \(oldValue) 到 \(newValue), selectedTab: \(selectedTab)")
-            if selectedTab == 1 {
-                handleSmallWorldDestinationChange()
+                )
             }
         }
     }
     
-    // 自定义 Binding 处理 Tab 点击逻辑
     private var tabSelectionBinding: Binding<Int> {
         Binding(
             get: { selectedTab },
             set: { newValue in
-                // 如果用户再次点击当前的 Tab 1 (且不在菜单页)，则返回菜单
-                // 注意：由于我们在 SmallWorldMenuOverlay 中已经处理了 Tab 1 的点击逻辑，
-                // 这里的逻辑主要用于原生 TabBarItem 的点击。
-                // 如果 Overlay 拦截了点击，这里可能不会触发。
                 if newValue == selectedTab && newValue == 1 {
                     if smallWorldDestination != .menu {
                         smallWorldDestination = .menu
                     }
                 }
                 selectedTab = newValue
-                
-                // 处理媒体状态切换
                 handleTabChange(newTab: newValue)
             }
         )
     }
     
-    /// 处理 Tab 切换时的媒体状态
     private func handleTabChange(newTab: Int) {
-        print("🔄 MainTabView: Tab 切换到 \(newTab), 小世界目标: \(smallWorldDestination)")
         switch newTab {
         case 0:
-            // 切换到衣橱页面
-            print("🏠 切换到衣橱页面")
             mediaStateManager.switchToPage(.wardrobe)
         case 1:
-            // 小世界页面，根据具体子页面决定
             switch smallWorldDestination {
             case .pet:
-                print("🐱 切换到萌宠页面")
                 mediaStateManager.switchToPage(.pet)
             case .wealth:
-                print("💰 切换到财富页面")
                 mediaStateManager.switchToPage(.wealth)
             default:
-                print("🌍 切换到小世界其他页面")
                 mediaStateManager.switchToPage(.other)
             }
-        case 2:
-            // 我的页面
-            print("👤 切换到我的页面")
-            mediaStateManager.switchToPage(.other)
         default:
-            print("❓ 切换到未知页面")
             mediaStateManager.switchToPage(.other)
         }
     }
     
-    /// 处理小世界内部页面切换
-    private func handleSmallWorldDestinationChange() {
-        print("🔄 MainTabView: 处理小世界内部切换, 目标: \(smallWorldDestination)")
-        switch smallWorldDestination {
-        case .pet:
-            print("🐱 小世界切换到萌宠")
-            mediaStateManager.switchToPage(.pet)
-        case .wealth:
-            print("💰 小世界切换到财富")
-            mediaStateManager.switchToPage(.wealth)
-        default:
-            print("🌍 小世界切换到其他")
-            mediaStateManager.switchToPage(.other)
-        }
-    }
-    
-    // 计算属性判断是否激活模拟 (针对 WealthView)
     private var isSimulationActive: Bool {
         return selectedTab == 1 && smallWorldDestination == .wealth
+    }
+}
+
+// MARK: - iOS 17 搜索视图
+struct SearchLegacyView: View {
+    @State private var searchText = ""
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
+    
+    var filteredClothings: [Clothing] {
+        if searchText.isEmpty {
+            return []
+        }
+        return clothings.filter { clothing in
+            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
+            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
+            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
+            return nameMatch || brandMatch || tagMatch
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                if searchText.isEmpty {
+                    Section("搜索建议") {
+                        Label("搜索衣物名称", systemImage: "tshirt")
+                        Label("搜索品牌", systemImage: "tag")
+                        Label("搜索标签", systemImage: "number")
+                    }
+                } else if filteredClothings.isEmpty {
+                    ContentUnavailableView {
+                        Label("未找到结果", systemImage: "magnifyingglass")
+                    } description: {
+                        Text("尝试其他关键词搜索")
+                    }
+                } else {
+                    Section("找到 \(filteredClothings.count) 件衣物") {
+                        ForEach(filteredClothings) { clothing in
+                            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                HStack {
+                                    clothingThumbnail(clothing)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(clothing.name)
+                                            .font(.headline)
+                                        if let brand = clothing.brand {
+                                            Text(brand.name)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("搜索")
+            .searchable(text: $searchText, prompt: "搜索衣物、品牌、标签...")
+        }
+    }
+    
+    @ViewBuilder
+    private func clothingThumbnail(_ clothing: Clothing) -> some View {
+        if let firstImagePath = clothing.imagePaths.first,
+           let image = loadImage(from: firstImagePath) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Image(systemName: "tshirt")
+                        .foregroundStyle(.secondary)
+                )
+        }
+    }
+    
+    private func loadImage(from path: String) -> UIImage? {
+        let fileManager = FileManager.default
+        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let imagePath = documentsPath.appendingPathComponent(path)
+        guard let imageData = try? Data(contentsOf: imagePath) else {
+            return nil
+        }
+        return UIImage(data: imageData)
+    }
+}
+
+// MARK: - 开场视频遮罩
+struct OpeningVideoOverlay: View {
+    @Binding var isPlaying: Bool
+    let onComplete: () -> Void
+    
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            
+            PetVideoPlayer(videoName: "open_dress", isLooping: false, onFinished: {
+                onComplete()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeOut(duration: 0.8)) {
+                        isPlaying = false
+                    }
+                }
+            })
+            .ignoresSafeArea()
+            
+            Button {
+                onComplete()
+                withAnimation(.easeOut(duration: 0.5)) {
+                    isPlaying = false
+                }
+            } label: {
+                Text("跳过")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.4))
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 50)
+            .padding(.trailing, 20)
+        }
+        .transition(.opacity)
+        .zIndex(200)
+        .id("OpeningVideoOverlay")
     }
 }
 

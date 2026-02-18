@@ -312,7 +312,7 @@ struct WardrobeView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .environment(\.editMode, .constant(isEditing ? .active : .inactive))
-                
+
             case .grid2, .grid3, .grid6:
                 ScrollViewReader { proxy in
                     ZStack {
