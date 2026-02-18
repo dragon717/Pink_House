@@ -14,45 +14,67 @@ struct WardrobeStatisticsDetailView: View {
     var onClearFilter: (() -> Void)? = nil
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // 1. 总览统计
-                OverviewStatsCard(clothings: clothings)
-                
-                // 2. 标签分类统计
-                TagStatsCard(clothings: clothings)
-                
-                // 3. 尾款天使统计
-                DepositStatsCard(clothings: clothings)
-                
-                // 4. 购买时间统计
-                PurchaseTimeStatsCard(clothings: clothings)
-            }
-            .padding()
-            .padding(.bottom, 40)
-        }
-        .navigationTitle("衣橱统计")
-        .navigationBarTitleDisplayMode(.inline)
-        .background(Color(uiColor: .systemGroupedBackground))
-        .toolbar {
-            if let filterDescription, !filterDescription.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
-                        Text("筛选:\(filterDescription)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        
-                        Button("清除") {
-                            onClearFilter?()
-                        }
-                        .font(.caption)
-                        .buttonStyle(.bordered)
-                    }
+        ZStack {
+            // 背景
+            LiquidBackground()
+                .ignoresSafeArea()
+            
+            // 内容
+            ScrollView {
+                VStack(spacing: 20) {
+                    // 1. 总览统计
+                    OverviewStatsCard(clothings: clothings)
+                    
+                    // 2. 标签分类统计
+                    TagStatsCard(clothings: clothings)
+                    
+                    // 3. 尾款天使统计
+                    DepositStatsCard(clothings: clothings)
+                    
+                    // 4. 购买时间统计
+                    PurchaseTimeStatsCard(clothings: clothings)
                 }
+                .padding()
+                .padding(.bottom, 40)
             }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            centerToolbarContent
+            trailingToolbarContent
         }
         .onAppear {
             RewardManager.shared.triggerReward(type: .firstTimeFeature("WardrobeStats"))
+        }
+    }
+    
+    // MARK: - Toolbar Content
+    
+    @ToolbarContentBuilder
+    private var centerToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Text("衣橱统计")
+                .font(.headline)
+                .foregroundStyle(.primary)
+        }
+    }
+    
+    @ToolbarContentBuilder
+    private var trailingToolbarContent: some ToolbarContent {
+        if let filterDescription, !filterDescription.isEmpty {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 8) {
+                    Text("筛选:\(filterDescription)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Button("清除") {
+                        onClearFilter?()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                }
+            }
         }
     }
 }

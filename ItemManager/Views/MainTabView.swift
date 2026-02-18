@@ -165,32 +165,38 @@ struct SearchContainerView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                if searchText.isEmpty {
-                    Section("搜索建议") {
-                        Label("搜索衣物名称", systemImage: "tshirt")
-                        Label("搜索品牌", systemImage: "tag")
-                        Label("搜索标签", systemImage: "number")
-                    }
-                } else if filteredClothings.isEmpty {
-                    ContentUnavailableView {
-                        Label("未找到结果", systemImage: "magnifyingglass")
-                    } description: {
-                        Text("尝试其他关键词搜索")
-                    }
-                } else {
-                    Section("找到 \(filteredClothings.count) 件衣物") {
-                        ForEach(filteredClothings) { clothing in
-                            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                HStack {
-                                    clothingThumbnail(clothing)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(clothing.name)
-                                            .font(.headline)
-                                        if let brand = clothing.brand {
-                                            Text(brand.name)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
+            ZStack {
+                // 背景
+                LiquidBackground()
+                    .ignoresSafeArea()
+                
+                List {
+                    if searchText.isEmpty {
+                        Section("搜索建议") {
+                            Label("搜索衣物名称", systemImage: "tshirt")
+                            Label("搜索品牌", systemImage: "tag")
+                            Label("搜索标签", systemImage: "number")
+                        }
+                    } else if filteredClothings.isEmpty {
+                        ContentUnavailableView {
+                            Label("未找到结果", systemImage: "magnifyingglass")
+                        } description: {
+                            Text("尝试其他关键词搜索")
+                        }
+                    } else {
+                        Section("找到 \(filteredClothings.count) 件衣物") {
+                            ForEach(filteredClothings) { clothing in
+                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                    HStack {
+                                        clothingThumbnail(clothing)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(clothing.name)
+                                                .font(.headline)
+                                            if let brand = clothing.brand {
+                                                Text(brand.name)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
                                         }
                                     }
                                 }
@@ -198,20 +204,32 @@ struct SearchContainerView: View {
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
-            .navigationTitle("搜索")
+            .navigationTitle("全局搜索")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "全局搜索裙子、品牌、标签..."
+            )
         }
     }
     
     @ViewBuilder
     private func clothingThumbnail(_ clothing: Clothing) -> some View {
-        if let firstImagePath = clothing.imagePaths.first,
-           let image = loadImage(from: firstImagePath) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 50, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+        if let firstImagePath = clothing.imagePaths.first {
+            AsyncLocalImageView(
+                fileName: firstImagePath,
+                displaySize: CGSize(width: 50, height: 50),
+                contentMode: .fill,
+                cornerRadius: 8,
+                placeholderColor: Color.gray.opacity(0.2)
+            )
+            .overlay(
+                Image(systemName: "tshirt")
+                    .foregroundStyle(.secondary)
+                    .opacity(0.5)
+            )
         } else {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.gray.opacity(0.2))
@@ -221,18 +239,6 @@ struct SearchContainerView: View {
                         .foregroundStyle(.secondary)
                 )
         }
-    }
-    
-    private func loadImage(from path: String) -> UIImage? {
-        let fileManager = FileManager.default
-        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        let imagePath = documentsPath.appendingPathComponent(path)
-        guard let imageData = try? Data(contentsOf: imagePath) else {
-            return nil
-        }
-        return UIImage(data: imageData)
     }
 }
 
@@ -295,233 +301,8 @@ struct MainTabView: View {
                         )
                     }
                 }
-            } else {
-                LegacyTabView(
-                    selectedTab: $selectedTab,
-                    homeTabSelection: $homeTabSelection,
-                    smallWorldDestination: $smallWorldDestination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                )
             }
         }
-    }
-}
-
-// MARK: - 传统 TabView
-struct LegacyTabView: View {
-    @Binding var selectedTab: Int
-    @Binding var homeTabSelection: HomeTab
-    @Binding var smallWorldDestination: SmallWorldDestination
-    @Binding var isPlayingOpeningAnimation: Bool
-    @ObservedObject private var petDataManager = PetDataManager.shared
-    @StateObject private var mediaStateManager = MediaStateManager.shared
-    
-    var body: some View {
-        ZStack {
-            TabView(selection: tabSelectionBinding) {
-                HomeView(selectedTab: $homeTabSelection)
-                    .tabItem {
-                        Image(systemName: selectedTab == 0 ? "cabinet" : "cabinet.fill")
-                            .renderingMode(.original)
-                        Text("衣橱")
-                    }
-                    .tag(0)
-                
-                Group {
-                    switch smallWorldDestination {
-                    case .menu:
-                        SmallWorldView(
-                            selectedTab: $selectedTab,
-                            homeTab: $homeTabSelection,
-                            destination: $smallWorldDestination,
-                            isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                        )
-                    case .ootd:
-                        OOTDView()
-                    case .pet:
-                        PetHomeView()
-                    case .wealth:
-                        WealthView()
-                    case .calendar:
-                        DreamDressCalendarView()
-                    }
-                }
-                .tabItem {
-                    switch smallWorldDestination {
-                    case .menu:
-                        Label("小世界", systemImage: "map")
-                    case .ootd:
-                        Label("穿搭手帐", systemImage: "tshirt")
-                    case .pet:
-                        Label(petDataManager.status.displayName, systemImage: "pawprint")
-                    case .wealth:
-                        Label("马上来财", systemImage: "yensign.circle")
-                    case .calendar:
-                        Label("梦裙日历", systemImage: "calendar")
-                    }
-                }
-                .tag(1)
-
-                MeView()
-                    .tabItem {
-                        Label("我的", systemImage: "face.smiling")
-                    }
-                    .tag(2)
-                
-                SearchLegacyView()
-                    .tabItem {
-                        Label("搜索", systemImage: "magnifyingglass")
-                    }
-                    .tag(3)
-            }
-            .environment(\.isSimulationActive, isSimulationActive)
-            
-            RewardBubbleView()
-            PetOverlayView(action: {
-                selectedTab = 1
-                smallWorldDestination = .pet
-            }, petName: petDataManager.status.displayName)
-            SmallWorldMenuOverlay(selectedTab: $selectedTab, smallWorldDestination: $smallWorldDestination)
-            
-            if isPlayingOpeningAnimation {
-                OpeningVideoOverlay(
-                    isPlaying: $isPlayingOpeningAnimation,
-                    onComplete: {
-                        homeTabSelection = .wardrobe
-                        selectedTab = 0
-                    }
-                )
-            }
-        }
-    }
-    
-    private var tabSelectionBinding: Binding<Int> {
-        Binding(
-            get: { selectedTab },
-            set: { newValue in
-                if newValue == selectedTab && newValue == 1 {
-                    if smallWorldDestination != .menu {
-                        smallWorldDestination = .menu
-                    }
-                }
-                selectedTab = newValue
-                handleTabChange(newTab: newValue)
-            }
-        )
-    }
-    
-    private func handleTabChange(newTab: Int) {
-        switch newTab {
-        case 0:
-            mediaStateManager.switchToPage(.wardrobe)
-        case 1:
-            switch smallWorldDestination {
-            case .pet:
-                mediaStateManager.switchToPage(.pet)
-            case .wealth:
-                mediaStateManager.switchToPage(.wealth)
-            default:
-                mediaStateManager.switchToPage(.other)
-            }
-        default:
-            mediaStateManager.switchToPage(.other)
-        }
-    }
-    
-    private var isSimulationActive: Bool {
-        return selectedTab == 1 && smallWorldDestination == .wealth
-    }
-}
-
-// MARK: - iOS 17 搜索视图
-struct SearchLegacyView: View {
-    @State private var searchText = ""
-    @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
-    
-    var filteredClothings: [Clothing] {
-        if searchText.isEmpty {
-            return []
-        }
-        return clothings.filter { clothing in
-            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
-            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
-            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
-            return nameMatch || brandMatch || tagMatch
-        }
-    }
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                if searchText.isEmpty {
-                    Section("搜索建议") {
-                        Label("搜索衣物名称", systemImage: "tshirt")
-                        Label("搜索品牌", systemImage: "tag")
-                        Label("搜索标签", systemImage: "number")
-                    }
-                } else if filteredClothings.isEmpty {
-                    ContentUnavailableView {
-                        Label("未找到结果", systemImage: "magnifyingglass")
-                    } description: {
-                        Text("尝试其他关键词搜索")
-                    }
-                } else {
-                    Section("找到 \(filteredClothings.count) 件衣物") {
-                        ForEach(filteredClothings) { clothing in
-                            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                HStack {
-                                    clothingThumbnail(clothing)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(clothing.name)
-                                            .font(.headline)
-                                        if let brand = clothing.brand {
-                                            Text(brand.name)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("搜索")
-            .searchable(text: $searchText, prompt: "搜索衣物、品牌、标签...")
-        }
-    }
-    
-    @ViewBuilder
-    private func clothingThumbnail(_ clothing: Clothing) -> some View {
-        if let firstImagePath = clothing.imagePaths.first,
-           let image = loadImage(from: firstImagePath) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 50, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 50, height: 50)
-                .overlay(
-                    Image(systemName: "tshirt")
-                        .foregroundStyle(.secondary)
-                )
-        }
-    }
-    
-    private func loadImage(from path: String) -> UIImage? {
-        let fileManager = FileManager.default
-        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        let imagePath = documentsPath.appendingPathComponent(path)
-        guard let imageData = try? Data(contentsOf: imagePath) else {
-            return nil
-        }
-        return UIImage(data: imageData)
     }
 }
 
