@@ -18,13 +18,16 @@ struct DreamDressCalendarView: View {
     // Data Query
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     
+    // AppStorage for persisting filter preference
+    // 首次使用默认为 true，之后完全记录用户的选择习惯
+    @AppStorage("calendarShowDepositPlanOnly") private var showDepositPlanOnly: Bool = true
+    
     // State
     @State private var viewMode: CalendarViewMode = .monthly
     @State private var currentDate = Date() // Anchor date for Month/Year view
     @State private var showingDayPopup: Date? // Date for the popup
     @State private var showingMonthPreview: Date? // Month for the large preview popup
     @State private var viewModel = CalendarViewModel()
-    @State private var showDepositPlanOnly: Bool = false
 
     var body: some View {
         NavigationStack {

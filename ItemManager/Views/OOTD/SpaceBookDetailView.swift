@@ -311,6 +311,9 @@ struct SpaceBookDetailView: View {
                 await MainActor.run {
                     book.coverImage = path
                     selectedCoverItem = nil
+                    // 保存到数据库并刷新视图
+                    try? modelContext.save()
+                    refreshTrigger.toggle()
                 }
             }
         }

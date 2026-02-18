@@ -115,7 +115,7 @@ struct DreamCalendarCell: View {
                                     }
                                     
                                     Text("\(CalendarHelper.shared.dayOfMonth(dateObj.date))")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.system(size: 10, weight: .bold))
                                         .foregroundStyle(dateTextColor(hasImage: hasImage))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
@@ -343,6 +343,7 @@ struct CalendarEventRow: View {
                     }
                 }
             }
+            .padding(12)
         }
     }
     

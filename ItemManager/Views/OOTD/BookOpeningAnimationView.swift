@@ -8,6 +8,8 @@ struct BookOpeningAnimationView: View {
     // 回调：动画完成
     var onAnimationComplete: () -> Void
     
+    @Environment(\.modelContext) private var modelContext
+    
     // 动画状态
     @State private var isMovingToCenter = false
     @State private var isOpening = false
@@ -75,8 +77,16 @@ struct BookOpeningAnimationView: View {
     }
     
     private func loadPageImages() {
-        // 获取书页数据（过滤已删除的，按创建时间倒序）
-        let validPages = book.pages.filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
+        // 保底逻辑：重新从数据库获取最新的书页数据，确保不包含已删除的书页
+        let bookID = book.id
+        let descriptor = FetchDescriptor<Outfit>(
+            predicate: #Predicate { outfit in
+                outfit.book?.id == bookID && outfit.isDeleted == false
+            },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        
+        let validPages = (try? modelContext.fetch(descriptor)) ?? []
         
         // 如果没有书页，直接返回
         if validPages.isEmpty { return }

@@ -216,6 +216,8 @@ struct BookShelfView: View {
                     book.coverImage = path
                     selectedCoverItem = nil
                     selectedBookForCover = nil
+                    // 保存到数据库
+                    try? modelContext.save()
                 }
             }
         }
