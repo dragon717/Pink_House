@@ -51,6 +51,7 @@ struct ModernTabView: View {
     
     @State private var searchText = ""
     // 修复：添加 selectedTab 状态来跟踪当前选中的 Tab，用于 SmallWorldMenuOverlay
+    // 默认选中 Tab 1 (小世界)，与 smallWorldDestination 初始值 .menu 保持一致
     @State private var selectedTab: Int = 1
     
     // MARK: - 动态 Tab 标题和图标
