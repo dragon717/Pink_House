@@ -84,17 +84,33 @@ struct BigWorldView: View {
                     }
                 }
 
-                // 关闭按钮
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        viewModel.resetFlight()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Color.clear)
+                // 关闭按钮 - 仅在非探索页面显示
+                if case .idle = viewModel.flightStatus, selectedTab != .explore {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            viewModel.resetFlight()
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Color.clear)
+                        }
+                    }
+                } else if viewModel.flightStatus != .idle {
+                    // 飞行状态下始终显示关闭按钮
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            viewModel.resetFlight()
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Color.clear)
+                        }
                     }
                 }
             }

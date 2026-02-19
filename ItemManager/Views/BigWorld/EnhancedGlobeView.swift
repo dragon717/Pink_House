@@ -30,11 +30,7 @@ struct EnhancedGlobeView: View {
             
             // 3D地球 - 使用Map组件
             Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
-                // 用户当前位置
-                if let userLocation = viewModel.userCoordinate {
-                    Marker("出发地", coordinate: userLocation)
-                        .tint(.pink)
-                }
+                // 用户当前位置标记已移除
                 
                 // 地标标记
                 ForEach(viewModel.availableLandmarks) { landmark in
@@ -64,21 +60,6 @@ struct EnhancedGlobeView: View {
             .safeAreaInset(edge: .bottom) {
                 Color.clear.frame(height: 85)
             }
-            .overlay(
-                // 大气层光晕效果
-                RadialGradient(
-                    colors: [
-                        Color.clear,
-                        Color.blue.opacity(0.1),
-                        Color.purple.opacity(0.2),
-                        Color.clear
-                    ],
-                    center: .center,
-                    startRadius: 100,
-                    endRadius: 400
-                )
-                .allowsHitTesting(false)
-            )
             
             // UI 覆盖层
             GeometryReader { geometry in
