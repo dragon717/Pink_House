@@ -16,6 +16,7 @@ struct BoardingExperienceView: View {
     @State private var scanProgress: Double = 0
     @State private var boardingPassScale: CGFloat = 0.8
     @State private var boardingPassRotation: Double = -5
+    @Environment(\.colorScheme) var colorScheme
     
     enum BoardingStage {
         case privacyCheck
@@ -25,15 +26,73 @@ struct BoardingExperienceView: View {
         case complete
     }
     
+    // 获取目的地主题色
+    private var destinationThemeColor: Color {
+        viewModel.selectedLandmark?.type.themeColor ?? Color(red: 0.2, green: 0.5, blue: 0.9)
+    }
+    
+    // 根据目的地主题生成背景渐变
+    private var themeBackground: some View {
+        let baseColor = destinationThemeColor
+        return Group {
+            if colorScheme == .dark {
+                // 暗夜模式背景
+                LinearGradient(
+                    colors: [
+                        baseColor.opacity(0.3),
+                        baseColor.opacity(0.15),
+                        Color(red: 0.05, green: 0.05, blue: 0.08)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            } else {
+                // 亮色模式背景
+                LinearGradient(
+                    colors: [
+                        baseColor.opacity(0.2),
+                        baseColor.opacity(0.1),
+                        Color(red: 0.95, green: 0.95, blue: 0.97)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        }
+    }
+    
     var body: some View {
         ZStack {
-            // 机场背景
-            AirportBackgroundView()
-                // 使用 safeAreaPadding 和 safeAreaInset 确保背景不被导航栏覆盖
-                .safeAreaPadding(.top, 110)
-                .safeAreaInset(edge: .bottom) {
-                    Color.clear.frame(height: 100)
+            // 目的地主题背景 - 铺满整个屏幕
+            themeBackground
+                .ignoresSafeArea()
+            
+            // 装饰性主题元素
+            GeometryReader { geo in
+                ZStack {
+                    // 顶部装饰圆
+                    Circle()
+                        .fill(destinationThemeColor.opacity(colorScheme == .dark ? 0.2 : 0.25))
+                        .frame(width: 400, height: 400)
+                        .offset(x: -150, y: -150)
+                        .blur(radius: 80)
+                    
+                    // 右侧装饰圆
+                    Circle()
+                        .fill(destinationThemeColor.opacity(colorScheme == .dark ? 0.15 : 0.2))
+                        .frame(width: 300, height: 300)
+                        .offset(x: geo.size.width - 100, y: geo.size.height * 0.3)
+                        .blur(radius: 60)
+                    
+                    // 底部装饰圆
+                    Circle()
+                        .fill(destinationThemeColor.opacity(colorScheme == .dark ? 0.1 : 0.15))
+                        .frame(width: 350, height: 350)
+                        .offset(x: 100, y: geo.size.height - 100)
+                        .blur(radius: 70)
                 }
+            }
+            .ignoresSafeArea()
             
             // UI 覆盖层 - 使用 GeometryReader 精确定位
             GeometryReader { geometry in
@@ -255,23 +314,86 @@ struct PrivacyCheckView: View {
     @State private var showDeparture = false
     @Environment(\.colorScheme) var colorScheme
     
-    // 莫妮卡色系 - 适配暗夜模式
-    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
-    private var monicaSecondary: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.6, blue: 0.9) : Color(red: 0.3, green: 0.6, blue: 1.0) }
-    private var monicaBackground: Color { colorScheme == .dark ? Color(red: 0.08, green: 0.1, blue: 0.15) : Color(red: 0.9, green: 0.95, blue: 1.0) }
-    private var cardBackground: Color { colorScheme == .dark ? Color(red: 0.12, green: 0.15, blue: 0.2) : Color.white }
+    // 获取目的地主题色
+    private var destinationThemeColor: Color {
+        viewModel.selectedLandmark?.type.themeColor ?? Color(red: 0.2, green: 0.5, blue: 0.9)
+    }
+    
+    // 根据目的地主题生成亮色模式背景渐变
+    private var lightModeBackground: some View {
+        let baseColor = destinationThemeColor
+        return LinearGradient(
+            colors: [
+                baseColor.opacity(0.15),
+                baseColor.opacity(0.08),
+                Color(red: 0.95, green: 0.95, blue: 0.97)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
+    // 根据目的地主题生成暗夜模式背景渐变
+    private var darkModeBackground: some View {
+        let baseColor = destinationThemeColor
+        return LinearGradient(
+            colors: [
+                baseColor.opacity(0.25),
+                baseColor.opacity(0.12),
+                Color(red: 0.05, green: 0.05, blue: 0.08)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
+    // 动态主题色 - 适配暗夜模式
+    private var themePrimary: Color { colorScheme == .dark ? destinationThemeColor.opacity(0.9) : destinationThemeColor }
+    private var themeSecondary: Color { colorScheme == .dark ? destinationThemeColor.opacity(0.7) : destinationThemeColor.opacity(0.8) }
+    private var themeBackground: Color { colorScheme == .dark ? destinationThemeColor.opacity(0.15) : destinationThemeColor.opacity(0.1) }
+    private var cardBackground: Color { colorScheme == .dark ? Color(red: 0.12, green: 0.14, blue: 0.18) : Color.white }
     
     var body: some View {
-        VStack(spacing: 30) {
+        ZStack {
+            // 目的地主题背景
+            Group {
+                if colorScheme == .dark {
+                    darkModeBackground
+                } else {
+                    lightModeBackground
+                }
+            }
+            .ignoresSafeArea()
+            
+            // 装饰性主题元素
+            GeometryReader { geo in
+                ZStack {
+                    // 顶部装饰圆
+                    Circle()
+                        .fill(themePrimary.opacity(colorScheme == .dark ? 0.15 : 0.2))
+                        .frame(width: 300, height: 300)
+                        .offset(x: -100, y: -100)
+                        .blur(radius: 60)
+                    
+                    // 底部装饰圆
+                    Circle()
+                        .fill(themeSecondary.opacity(colorScheme == .dark ? 0.1 : 0.15))
+                        .frame(width: 250, height: 250)
+                        .offset(x: 150, y: geo.size.height - 150)
+                        .blur(radius: 50)
+                }
+            }
+            
+            VStack(spacing: 30) {
             // 图标
             ZStack {
                 Circle()
-                    .fill(monicaBackground)
+                    .fill(themeBackground)
                     .frame(width: 100, height: 100)
                 
                 Image(systemName: showDeparture ? "eye" : "eye.slash")
                     .font(.system(size: 40))
-                    .foregroundStyle(monicaPrimary)
+                    .foregroundStyle(themePrimary)
                     .symbolEffect(.bounce, value: showDeparture)
             }
             
@@ -309,7 +431,7 @@ struct PrivacyCheckView: View {
                     Spacer()
                     
                     Image(systemName: "airplane")
-                        .foregroundStyle(monicaPrimary)
+                        .foregroundStyle(themePrimary)
                     
                     Spacer()
                     
@@ -334,7 +456,7 @@ struct PrivacyCheckView: View {
                     viewModel.isDepartureHidden = !newValue
                 }
                 .padding(.horizontal, 40)
-                .tint(monicaPrimary)
+                .tint(themePrimary)
             
             Spacer()
             
@@ -368,6 +490,7 @@ struct PrivacyCheckView: View {
             .padding(.bottom, 20)
         }
         .padding(.top, 20)
+        }
     }
 }
 
@@ -770,6 +893,20 @@ struct BoardingPassView: View {
             }
         }
     }
+    
+    private func formattedDate(_ date: Date?) -> String {
+        guard let date = date else { return "--/--" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd"
+        return formatter.string(from: date)
+    }
+    
+    private func formattedTime(_ date: Date?) -> String {
+        guard let date = date else { return "--:--" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
 }
 
 // MARK: - 撕票虚线视图
@@ -831,21 +968,6 @@ struct InfoItem: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-}
-
-// MARK: - 日期时间格式化辅助函数
-private func formattedDate(_ date: Date?) -> String {
-    guard let date = date else { return "--/--" }
-    let formatter = DateFormatter()
-    formatter.dateFormat = "MM/dd"
-    return formatter.string(from: date)
-}
-
-private func formattedTime(_ date: Date?) -> String {
-    guard let date = date else { return "--:--" }
-    let formatter = DateFormatter()
-    formatter.dateFormat = "HH:mm"
-    return formatter.string(from: date)
 }
 
 // MARK: - 扫描器视图
