@@ -253,18 +253,25 @@ struct PrivacyCheckView: View {
     @ObservedObject var viewModel: BigWorldViewModel
     let onContinue: () -> Void
     @State private var showDeparture = false
+    @Environment(\.colorScheme) var colorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    private var monicaSecondary: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.6, blue: 0.9) : Color(red: 0.3, green: 0.6, blue: 1.0) }
+    private var monicaBackground: Color { colorScheme == .dark ? Color(red: 0.08, green: 0.1, blue: 0.15) : Color(red: 0.9, green: 0.95, blue: 1.0) }
+    private var cardBackground: Color { colorScheme == .dark ? Color(red: 0.12, green: 0.15, blue: 0.2) : Color.white }
     
     var body: some View {
         VStack(spacing: 30) {
             // 图标
             ZStack {
                 Circle()
-                    .fill(Color(red: 0.9, green: 0.95, blue: 1.0))
+                    .fill(monicaBackground)
                     .frame(width: 100, height: 100)
                 
                 Image(systemName: showDeparture ? "eye" : "eye.slash")
                     .font(.system(size: 40))
-                    .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                    .foregroundStyle(monicaPrimary)
                     .symbolEffect(.bounce, value: showDeparture)
             }
             
@@ -292,6 +299,7 @@ struct PrivacyCheckView: View {
                     if showDeparture, let city = viewModel.departureCity {
                         Text("从 \(city) 出发")
                             .font(.subheadline)
+                            .foregroundStyle(.primary)
                     } else {
                         Text("出发地")
                             .font(.subheadline)
@@ -301,20 +309,21 @@ struct PrivacyCheckView: View {
                     Spacer()
                     
                     Image(systemName: "airplane")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(monicaPrimary)
                     
                     Spacer()
                     
                     if let landmark = viewModel.selectedLandmark {
                         Text("飞往 \(landmark.name)")
                             .font(.subheadline)
+                            .foregroundStyle(.primary)
                     }
                 }
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white)
-                        .shadow(color: .black.opacity(0.05), radius: 8)
+                        .fill(cardBackground)
+                        .shadow(color: colorScheme == .dark ? Color.black.opacity(0.3) : Color.black.opacity(0.05), radius: 8)
                 )
             }
             .padding(.horizontal, 30)
@@ -325,28 +334,38 @@ struct PrivacyCheckView: View {
                     viewModel.isDepartureHidden = !newValue
                 }
                 .padding(.horizontal, 40)
+                .tint(monicaPrimary)
             
             Spacer()
             
+            // 液态玻璃风格按钮
             Button(action: onContinue) {
-                HStack {
+                HStack(spacing: 8) {
                     Text("继续")
+                        .font(.system(size: 17, weight: .semibold))
                     Image(systemName: "arrow.right")
+                        .font(.system(size: 15, weight: .semibold))
                 }
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(colorScheme == .dark ? .white : .primary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
+                .padding(.horizontal, 24)
                 .background(
-                    LinearGradient(
-                        colors: [Color(red: 0.2, green: 0.5, blue: 0.9), Color(red: 0.3, green: 0.6, blue: 1.0)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
+                    ZStack {
+                        // 毛玻璃背景
+                        RoundedRectangle(cornerRadius: 25)
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.15) : Color.white.opacity(0.7))
+                        
+                        // 边框
+                        RoundedRectangle(cornerRadius: 25)
+                            .stroke(colorScheme == .dark ? Color.white.opacity(0.3) : Color.white.opacity(0.8), lineWidth: 1)
+                    }
                 )
-                .cornerRadius(25)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 25))
             }
             .padding(.horizontal, 30)
+            .padding(.bottom, 20)
         }
         .padding(.top, 20)
     }
@@ -357,6 +376,15 @@ struct SeatSelectionView: View {
     @Binding var selectedSeat: String
     let onConfirm: () -> Void
     @State private var selectedClass: SeatClass = .business
+    @Environment(\.colorScheme) var colorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    private var monicaSecondary: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.6, blue: 0.9) : Color(red: 0.3, green: 0.6, blue: 1.0) }
+    private var seatMapBackground: Color { colorScheme == .dark ? Color(red: 0.1, green: 0.12, blue: 0.18) : Color.white }
+    private var availableSeatColor: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.5, blue: 0.8) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    private var occupiedSeatColor: Color { colorScheme == .dark ? Color(red: 0.25, green: 0.25, blue: 0.28) : Color.gray.opacity(0.3) }
+    private var selectedSeatColor: Color { colorScheme == .dark ? Color(red: 1.0, green: 0.6, blue: 0.3) : Color.orange }
     
     enum SeatClass {
         case first, business, economy
@@ -378,9 +406,9 @@ struct SeatSelectionView: View {
             
             // 座位图例
             HStack(spacing: 20) {
-                SeatLegend(color: Color(red: 0.2, green: 0.5, blue: 0.9), label: "可选")
-                SeatLegend(color: Color.gray.opacity(0.3), label: "已占")
-                SeatLegend(color: Color.orange, label: "已选")
+                SeatLegend(color: availableSeatColor, label: "可选")
+                SeatLegend(color: occupiedSeatColor, label: "已占")
+                SeatLegend(color: selectedSeatColor, label: "已选")
             }
             
             // 座位图
@@ -389,7 +417,7 @@ struct SeatSelectionView: View {
                     // 机头方向
                     Image(systemName: "airplane")
                         .font(.system(size: 30))
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(-90))
                         .padding(.bottom, 20)
                     
@@ -401,7 +429,8 @@ struct SeatSelectionView: View {
                                     SeatButton(
                                         seat: "\(row)\(letter)",
                                         isSelected: selectedSeat == "\(row)\(letter)",
-                                        isAvailable: isSeatAvailable(row: row, letter: letter)
+                                        isAvailable: isSeatAvailable(row: row, letter: letter),
+                                        colorScheme: colorScheme
                                     ) {
                                         selectedSeat = "\(row)\(letter)"
                                     }
@@ -411,7 +440,7 @@ struct SeatSelectionView: View {
                             // 过道
                             Text("\(row)")
                                 .font(.caption)
-                                .foregroundStyle(.gray)
+                                .foregroundStyle(.secondary)
                                 .frame(width: 30)
                             
                             // DEF
@@ -420,7 +449,8 @@ struct SeatSelectionView: View {
                                     SeatButton(
                                         seat: "\(row)\(letter)",
                                         isSelected: selectedSeat == "\(row)\(letter)",
-                                        isAvailable: isSeatAvailable(row: row, letter: letter)
+                                        isAvailable: isSeatAvailable(row: row, letter: letter),
+                                        colorScheme: colorScheme
                                     ) {
                                         selectedSeat = "\(row)\(letter)"
                                     }
@@ -433,8 +463,8 @@ struct SeatSelectionView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.05), radius: 10)
+                    .fill(seatMapBackground)
+                    .shadow(color: colorScheme == .dark ? Color.black.opacity(0.3) : Color.black.opacity(0.05), radius: 10)
             )
             .padding(.horizontal, 16)
             
@@ -445,7 +475,7 @@ struct SeatSelectionView: View {
                         .foregroundStyle(.secondary)
                     Text(selectedSeat)
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(Color.orange)
+                        .foregroundStyle(selectedSeatColor)
                 }
                 .padding(.vertical, 8)
             }
@@ -460,7 +490,7 @@ struct SeatSelectionView: View {
                         selectedSeat.isEmpty ?
                         AnyView(Color.gray) :
                         AnyView(LinearGradient(
-                            colors: [Color(red: 0.2, green: 0.5, blue: 0.9), Color(red: 0.3, green: 0.6, blue: 1.0)],
+                            colors: [monicaPrimary, monicaSecondary],
                             startPoint: .leading,
                             endPoint: .trailing
                         ))
@@ -484,13 +514,18 @@ struct SeatButton: View {
     let seat: String
     let isSelected: Bool
     let isAvailable: Bool
+    let colorScheme: ColorScheme
     let action: () -> Void
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var availableSeatColor: Color { colorScheme == .dark ? Color(red: 0.25, green: 0.45, blue: 0.7) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    private var selectedSeatColor: Color { colorScheme == .dark ? Color(red: 1.0, green: 0.6, blue: 0.3) : Color.orange }
     
     var body: some View {
         Button(action: action) {
             Text(String(seat.last!))
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isSelected ? .white : (isAvailable ? .primary : .gray))
+                .foregroundStyle(isSelected ? .white : (isAvailable ? .primary : .secondary))
                 .frame(width: 36, height: 36)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
@@ -502,11 +537,11 @@ struct SeatButton: View {
     
     private var backgroundColor: Color {
         if isSelected {
-            return Color.orange
+            return selectedSeatColor
         } else if isAvailable {
-            return Color(red: 0.2, green: 0.5, blue: 0.9).opacity(0.2)
+            return availableSeatColor.opacity(colorScheme == .dark ? 0.3 : 0.2)
         } else {
-            return Color.gray.opacity(0.2)
+            return Color.gray.opacity(colorScheme == .dark ? 0.25 : 0.2)
         }
     }
 }
@@ -536,6 +571,14 @@ struct BoardingPassView: View {
     @State private var bottomPartOffset: CGFloat = 0
     @State private var bottomPartRotation: Double = 0
     @State private var tearProgress: CGFloat = 0
+    @Environment(\.colorScheme) var colorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    private var cardBackground: Color { colorScheme == .dark ? Color(red: 0.12, green: 0.14, blue: 0.18) : Color.white }
+    private var cardSecondaryBackground: Color { colorScheme == .dark ? Color(red: 0.08, green: 0.1, blue: 0.14) : Color(red: 0.98, green: 0.98, blue: 0.99) }
+    private var barcodeColor: Color { colorScheme == .dark ? Color.white : Color.black }
+    private var shimmerColor: Color { colorScheme == .dark ? Color.white.opacity(0.2) : Color.white.opacity(0.8) }
     
     var body: some View {
         ZStack {
@@ -547,11 +590,12 @@ struct BoardingPassView: View {
                     HStack {
                         Image(systemName: "airplane.circle.fill")
                             .font(.system(size: 30))
-                            .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                            .foregroundStyle(monicaPrimary)
                         
                         VStack(alignment: .leading) {
                             Text("LOLITA AIR")
                                 .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.primary)
                             Text("茶会专机")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -561,10 +605,11 @@ struct BoardingPassView: View {
                         
                         Text("BOARDING PASS")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                            .foregroundStyle(monicaPrimary)
                     }
                     
                     Divider()
+                        .background(Color.gray.opacity(colorScheme == .dark ? 0.3 : 0.2))
                     
                     // 航班信息
                     HStack {
@@ -575,9 +620,11 @@ struct BoardingPassView: View {
                             if viewModel.isDepartureHidden {
                                 Text("***")
                                     .font(.system(size: 20, weight: .bold))
+                                    .foregroundStyle(.primary)
                             } else if let city = viewModel.departureCity {
                                 Text(city.prefix(3).uppercased())
                                     .font(.system(size: 20, weight: .bold))
+                                    .foregroundStyle(.primary)
                             }
                         }
                         
@@ -585,7 +632,7 @@ struct BoardingPassView: View {
                         
                         VStack(spacing: 4) {
                             Image(systemName: "airplane")
-                                .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                                .foregroundStyle(monicaPrimary)
                             Text(viewModel.currentBoardingPass?.formattedFlightNumber ?? "LA888")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -599,22 +646,23 @@ struct BoardingPassView: View {
                                 .foregroundStyle(.secondary)
                             Text(viewModel.selectedLandmark?.code ?? "???")
                                 .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.primary)
                         }
                     }
                     
                     // 详细信息网格
                     HStack {
-                        InfoItem(title: "DATE", value: formattedDate(viewModel.currentBoardingPass?.flightDate))
-                        InfoItem(title: "TIME", value: formattedTime(viewModel.currentBoardingPass?.flightDate))
-                        InfoItem(title: "SEAT", value: viewModel.currentBoardingPass?.seatNumber ?? "--")
-                        InfoItem(title: "GATE", value: viewModel.currentBoardingPass?.gate ?? "--")
+                        InfoItem(title: "DATE", value: formattedDate(viewModel.currentBoardingPass?.flightDate), colorScheme: colorScheme)
+                        InfoItem(title: "TIME", value: formattedTime(viewModel.currentBoardingPass?.flightDate), colorScheme: colorScheme)
+                        InfoItem(title: "SEAT", value: viewModel.currentBoardingPass?.seatNumber ?? "--", colorScheme: colorScheme)
+                        InfoItem(title: "GATE", value: viewModel.currentBoardingPass?.gate ?? "--", colorScheme: colorScheme)
                     }
                 }
                 .padding(20)
-                .background(Color.white)
+                .background(cardBackground)
                 
                 // 虚线分隔（可点击撕票）
-                TearLineView(isTorn: isTorn, progress: tearProgress)
+                TearLineView(isTorn: isTorn, progress: tearProgress, colorScheme: colorScheme)
                     .onTapGesture {
                         tearTicket()
                     }
@@ -625,9 +673,9 @@ struct BoardingPassView: View {
                             }
                     )
             }
-            .background(Color.white)
+            .background(cardBackground)
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+            .shadow(color: colorScheme == .dark ? Color.black.opacity(0.4) : Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
             .padding(.horizontal, 30)
             
             // 下半部分（可撕下）
@@ -636,7 +684,7 @@ struct BoardingPassView: View {
                     Spacer().frame(height: 220) // 上半部分高度
                     
                     // 虚线分隔
-                    TearLineView(isTorn: isTorn, progress: tearProgress)
+                    TearLineView(isTorn: isTorn, progress: tearProgress, colorScheme: colorScheme)
                         .opacity(0) // 隐藏，只用于占位
                     
                     // 下半部分内容
@@ -644,12 +692,13 @@ struct BoardingPassView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(viewModel.currentBoardingPass?.passengerName ?? "PASSENGER")
                                 .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
                             
                             // 模拟条形码
                             HStack(spacing: 2) {
                                 ForEach(0..<30) { i in
                                     Rectangle()
-                                        .fill(Color.black)
+                                        .fill(barcodeColor)
                                         .frame(width: CGFloat.random(in: 1...3), height: 40)
                                 }
                             }
@@ -664,17 +713,17 @@ struct BoardingPassView: View {
                         // QR码
                         Image(systemName: "qrcode")
                             .font(.system(size: 60))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(barcodeColor)
                     }
                     .padding(20)
                     .background(
-                        Color(red: 0.98, green: 0.98, blue: 0.99)
+                        cardSecondaryBackground
                             .overlay(
                                 // 闪光效果
                                 LinearGradient(
                                     colors: [
                                         Color.clear,
-                                        Color.white.opacity(0.8),
+                                        shimmerColor,
                                         Color.clear
                                     ],
                                     startPoint: .leading,
@@ -683,9 +732,9 @@ struct BoardingPassView: View {
                                 .offset(x: shimmerOffset)
                             )
                     )
-                    .background(Color.white)
+                    .background(cardBackground)
                     .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+                    .shadow(color: colorScheme == .dark ? Color.black.opacity(0.4) : Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
                     .offset(y: bottomPartOffset)
                     .rotationEffect(.degrees(bottomPartRotation))
                     .animation(.spring(response: 0.6, dampingFraction: 0.7), value: bottomPartOffset)
@@ -727,6 +776,11 @@ struct BoardingPassView: View {
 struct TearLineView: View {
     let isTorn: Bool
     let progress: CGFloat
+    let colorScheme: ColorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var lineColor: Color { colorScheme == .dark ? Color.gray.opacity(0.4) : Color.gray.opacity(0.3) }
+    private var scissorsColor: Color { colorScheme == .dark ? Color.gray.opacity(0.6) : Color.gray.opacity(0.5) }
     
     var body: some View {
         HStack(spacing: 0) {
@@ -735,7 +789,7 @@ struct TearLineView: View {
                 let isTornPart = itemProgress < progress
                 
                 Rectangle()
-                    .fill(isTornPart ? Color.clear : Color.gray.opacity(0.3))
+                    .fill(isTornPart ? Color.clear : lineColor)
                     .frame(width: 8, height: 1)
                 
                 Rectangle()
@@ -752,7 +806,7 @@ struct TearLineView: View {
                 Spacer()
                 Image(systemName: "scissors")
                     .font(.system(size: 12))
-                    .foregroundStyle(.gray.opacity(0.5))
+                    .foregroundStyle(scissorsColor)
                     .rotationEffect(.degrees(180))
                 Spacer()
             }
@@ -764,6 +818,7 @@ struct TearLineView: View {
 struct InfoItem: View {
     let title: String
     let value: String
+    let colorScheme: ColorScheme
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -772,6 +827,7 @@ struct InfoItem: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -798,6 +854,13 @@ struct ScannerView: View {
     @Binding var scanProgress: Double
     let onComplete: () -> Void
     @State private var scanLineOffset: CGFloat = -150
+    @Environment(\.colorScheme) var colorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    private var monicaSecondary: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.7, blue: 1.0) : Color(red: 0.3, green: 0.7, blue: 1.0) }
+    private var scanLineColor: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0).opacity(0.9) : Color(red: 0.2, green: 0.5, blue: 0.9).opacity(0.8) }
+    private var progressBgColor: Color { colorScheme == .dark ? Color(red: 0.2, green: 0.2, blue: 0.22) : Color.gray.opacity(0.2) }
     
     var body: some View {
         VStack(spacing: 30) {
@@ -805,7 +868,7 @@ struct ScannerView: View {
             ZStack {
                 // 外框
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color(red: 0.2, green: 0.5, blue: 0.9), lineWidth: 3)
+                    .stroke(monicaPrimary, lineWidth: 3)
                     .frame(width: 280, height: 180)
 
                     // 扫描线
@@ -814,7 +877,7 @@ struct ScannerView: View {
                         LinearGradient(
                             colors: [
                                 Color.clear,
-                                Color(red: 0.2, green: 0.5, blue: 0.9).opacity(0.8),
+                                scanLineColor,
                                 Color.clear
                             ],
                             startPoint: .leading,
@@ -828,12 +891,15 @@ struct ScannerView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "airplane")
                         .font(.system(size: 40))
-                        .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                        .foregroundStyle(monicaPrimary)
 
                     HStack {
                         Text(viewModel.isDepartureHidden ? "***" : (viewModel.departureCity?.prefix(3).uppercased() ?? "???"))
+                            .foregroundStyle(.primary)
                         Image(systemName: "arrow.right")
+                            .foregroundStyle(.secondary)
                         Text(viewModel.selectedLandmark?.code ?? "???")
+                            .foregroundStyle(.primary)
                     }
                     .font(.system(size: 16, weight: .semibold))
                 }
@@ -843,19 +909,20 @@ struct ScannerView: View {
             VStack(spacing: 8) {
                 Text("正在检票...")
                     .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.primary)
 
                 // 进度条
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Rectangle()
-                            .fill(Color.gray.opacity(0.2))
+                            .fill(progressBgColor)
                             .frame(height: 6)
                             .cornerRadius(3)
 
                         Rectangle()
                             .fill(
                                 LinearGradient(
-                                    colors: [Color(red: 0.2, green: 0.5, blue: 0.9), Color(red: 0.3, green: 0.7, blue: 1.0)],
+                                    colors: [monicaPrimary, monicaSecondary],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -889,35 +956,40 @@ struct ScannerView: View {
 
 // MARK: - 角标
 struct CornerMarkers: View {
+    @Environment(\.colorScheme) var colorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    
     var body: some View {
         ZStack {
             // 左上
             VStack(spacing: 0) {
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 30, height: 4)
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 4, height: 30)
+                Rectangle().fill(monicaPrimary).frame(width: 30, height: 4)
+                Rectangle().fill(monicaPrimary).frame(width: 4, height: 30)
             }
             .position(x: 20, y: 20)
             
             // 右上
             VStack(spacing: 0) {
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 30, height: 4)
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 4, height: 30)
+                Rectangle().fill(monicaPrimary).frame(width: 30, height: 4)
+                Rectangle().fill(monicaPrimary).frame(width: 4, height: 30)
             }
             .rotationEffect(.degrees(90))
             .position(x: 260, y: 20)
             
             // 左下
             VStack(spacing: 0) {
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 30, height: 4)
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 4, height: 30)
+                Rectangle().fill(monicaPrimary).frame(width: 30, height: 4)
+                Rectangle().fill(monicaPrimary).frame(width: 4, height: 30)
             }
             .rotationEffect(.degrees(-90))
             .position(x: 20, y: 160)
             
             // 右下
             VStack(spacing: 0) {
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 30, height: 4)
-                Rectangle().fill(Color(red: 0.2, green: 0.5, blue: 0.9)).frame(width: 4, height: 30)
+                Rectangle().fill(monicaPrimary).frame(width: 30, height: 4)
+                Rectangle().fill(monicaPrimary).frame(width: 4, height: 30)
             }
             .rotationEffect(.degrees(180))
             .position(x: 260, y: 160)
@@ -931,28 +1003,35 @@ struct BoardingCompleteView: View {
     @ObservedObject var viewModel: BigWorldViewModel
     @State private var scale: CGFloat = 0.5
     @State private var opacity: Double = 0
+    @Environment(\.colorScheme) var colorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var successColor: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.8, blue: 0.5) : Color.green }
+    private var successBgColor: Color { colorScheme == .dark ? Color(red: 0.08, green: 0.25, blue: 0.15) : Color.green.opacity(0.2) }
+    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
     
     var body: some View {
         VStack(spacing: 24) {
             // 成功图标
             ZStack {
                 Circle()
-                    .fill(Color.green.opacity(0.2))
+                    .fill(successBgColor)
                     .frame(width: 120, height: 120)
                 
                 Circle()
-                    .stroke(Color.green, lineWidth: 3)
+                    .stroke(successColor, lineWidth: 3)
                     .frame(width: 100, height: 100)
                 
                 Image(systemName: "checkmark")
                     .font(.system(size: 50, weight: .bold))
-                    .foregroundStyle(Color.green)
+                    .foregroundStyle(successColor)
             }
             .scaleEffect(scale)
             
             VStack(spacing: 8) {
                 Text("检票成功")
                     .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(.primary)
                 
                 Text("欢迎搭乘 LOLITA AIR")
                     .font(.subheadline)
@@ -969,8 +1048,8 @@ struct BoardingCompleteView: View {
             
             // 登机口信息
             HStack(spacing: 30) {
-                BoardingInfoItem(icon: "number", title: "登机口", value: viewModel.currentBoardingPass?.gate ?? "A1")
-                BoardingInfoItem(icon: "airplane", title: "座位", value: viewModel.currentBoardingPass?.seatNumber ?? "--")
+                BoardingInfoItem(icon: "number", title: "登机口", value: viewModel.currentBoardingPass?.gate ?? "A1", colorScheme: colorScheme)
+                BoardingInfoItem(icon: "airplane", title: "座位", value: viewModel.currentBoardingPass?.seatNumber ?? "--", colorScheme: colorScheme)
             }
             .padding(.top, 20)
             .opacity(opacity)
@@ -997,12 +1076,16 @@ struct BoardingInfoItem: View {
     let icon: String
     let title: String
     let value: String
+    let colorScheme: ColorScheme
+    
+    // 莫妮卡色系 - 适配暗夜模式
+    private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
     
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 24))
-                .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                .foregroundStyle(monicaPrimary)
             
             Text(title)
                 .font(.caption)
@@ -1010,6 +1093,7 @@ struct BoardingInfoItem: View {
             
             Text(value)
                 .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.primary)
         }
         .frame(width: 80)
     }

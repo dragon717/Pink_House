@@ -124,7 +124,7 @@ struct EnhancedGlobeView: View {
         }
         .sheet(isPresented: $showBadgeWall) {
             UserLevelSheet(viewModel: viewModel)
-                .presentationDetents([.height(200), .medium])
+                .presentationDetents([.height(320), .medium])
         }
         .sheet(isPresented: $showLandmarkSheet) {
             if let landmark = selectedLandmark {
