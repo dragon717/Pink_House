@@ -140,6 +140,9 @@ struct ClothingCard: View, Equatable {
                     try? await Task.sleep(nanoseconds: 50_000_000)
                     if Task.isCancelled { return }
                     self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+                } else {
+                    // 当图片被全部删除时，清空 image 以显示占位图
+                    self.image = nil
                 }
             }
             
@@ -244,6 +247,9 @@ struct ClothingThumbnail: View, Equatable {
                 try? await Task.sleep(nanoseconds: 50_000_000)
                 if Task.isCancelled { return }
                 self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+            } else {
+                // 当图片被全部删除时，清空 image 以显示占位图
+                self.image = nil
             }
         }
     }
@@ -308,6 +314,9 @@ struct ClothingRow: View {
                         try? await Task.sleep(nanoseconds: 50_000_000)
                         if Task.isCancelled { return }
                         self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
+                    } else {
+                        // 当图片被全部删除时，清空 image 以显示占位图
+                        self.image = nil
                     }
                 }
                 .overlay(alignment: .topTrailing) {
@@ -436,6 +445,9 @@ struct ClothingRowBrief: View {
                         try? await Task.sleep(nanoseconds: 50_000_000)
                         if Task.isCancelled { return }
                         self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
+                    } else {
+                        // 当图片被全部删除时，清空 image 以显示占位图
+                        self.image = nil
                     }
                 }
                 
