@@ -22,6 +22,10 @@ struct EnhancedGlobeView: View {
     @State private var isMapLoaded = false
     @State private var showBadgeWall = false
     @State private var showLandmarkSheet = false
+    @State private var currentCameraDistance: Double = 20000000
+    
+    // 缩放阈值：超过此距离显示小圆点模式
+    private let compactThreshold: Double = 15000000
     
     var body: some View {
         ZStack {
@@ -40,7 +44,11 @@ struct EnhancedGlobeView: View {
                 // 地标标记
                 ForEach(viewModel.availableLandmarks) { landmark in
                     Annotation(landmark.name, coordinate: landmark.coordinate) {
-                        LandmarkAnnotationView(landmark: landmark, isSelected: selectedLandmark?.id == landmark.id) {
+                        LandmarkAnnotationView(
+                            landmark: landmark,
+                            isSelected: selectedLandmark?.id == landmark.id,
+                            isCompact: currentCameraDistance > compactThreshold
+                        ) {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                                 selectedLandmark = landmark
                                 focusOnLandmark(landmark)
@@ -60,6 +68,8 @@ struct EnhancedGlobeView: View {
             .mapControlVisibility(.hidden)
             .onMapCameraChange { context in
                 isMapLoaded = true
+                // 更新相机距离用于判断缩放级别
+                currentCameraDistance = context.camera.distance
             }
             .safeAreaPadding(.top, 110)
             .safeAreaInset(edge: .bottom) {
@@ -573,9 +583,12 @@ struct StarfieldView: View {
     }
 }
 
-// MARK: - 用户位置标注视图（外白圈，内主题色）
+// MARK: - 用户位置标注视图（外白圈，内徽章金色主题色）
 struct UserLocationAnnotationView: View {
     @State private var pulseScale: CGFloat = 1.0
+    
+    // 徽章金色主题色
+    private let badgeGoldColor = Color(red: 1.0, green: 0.84, blue: 0.0)
     
     var body: some View {
         ZStack {
@@ -596,9 +609,9 @@ struct UserLocationAnnotationView: View {
                 .frame(width: 24, height: 24)
                 .shadow(color: Color.white.opacity(0.5), radius: 4)
             
-            // 内主题色（粉色主题）
+            // 内徽章金色主题色
             Circle()
-                .fill(Color(red: 1.0, green: 0.41, blue: 0.71))
+                .fill(badgeGoldColor)
                 .frame(width: 16, height: 16)
             
             // 中心点
@@ -613,54 +626,102 @@ struct UserLocationAnnotationView: View {
 struct LandmarkAnnotationView: View {
     let landmark: Landmark
     let isSelected: Bool
+    let isCompact: Bool
     let action: () -> Void
     @State private var pulseScale: CGFloat = 1.0
     
     var body: some View {
         Button(action: action) {
             ZStack {
-                // 脉冲动画环
-                if isSelected {
-                    Circle()
-                        .fill(landmark.type.themeColor.opacity(0.3))
-                        .frame(width: 50, height: 50)
-                        .scaleEffect(pulseScale)
-                        .onAppear {
-                            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                                pulseScale = 1.3
-                            }
+                if isCompact {
+                    // 紧凑模式：小圆点（外白圈 + 内地标主题色）
+                    compactView
+                } else {
+                    // 完整模式：大图标
+                    fullView
+                }
+            }
+        }
+    }
+    
+    // 紧凑模式视图
+    private var compactView: some View {
+        ZStack {
+            // 脉冲动画环（选中时）
+            if isSelected {
+                Circle()
+                    .fill(landmark.type.themeColor.opacity(0.3))
+                    .frame(width: 28, height: 28)
+                    .scaleEffect(pulseScale)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                            pulseScale = 1.4
                         }
-                }
+                    }
+            }
+            
+            // 外白圈
+            Circle()
+                .fill(Color.white)
+                .frame(width: 18, height: 18)
+                .shadow(color: Color.white.opacity(0.5), radius: 3)
+            
+            // 内地标主题色
+            Circle()
+                .fill(landmark.type.themeColor)
+                .frame(width: 12, height: 12)
+            
+            // 中心点
+            Circle()
+                .fill(Color.white)
+                .frame(width: 4, height: 4)
+        }
+    }
+    
+    // 完整模式视图
+    private var fullView: some View {
+        ZStack {
+            // 脉冲动画环
+            if isSelected {
+                Circle()
+                    .fill(landmark.type.themeColor.opacity(0.3))
+                    .frame(width: 50, height: 50)
+                    .scaleEffect(pulseScale)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                            pulseScale = 1.3
+                        }
+                    }
+            }
+            
+            // 地标图标
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.7))
+                    .frame(width: 40, height: 40)
                 
-                // 地标图标
-                ZStack {
-                    Circle()
-                        .fill(Color.black.opacity(0.7))
-                        .frame(width: 40, height: 40)
-                    
-                    Circle()
-                        .stroke(landmark.type.themeColor, lineWidth: 2)
-                        .frame(width: 40, height: 40)
-                    
-                    Image(systemName: landmark.type.icon)
-                        .font(.system(size: 18))
-                        .foregroundStyle(landmark.type.themeColor)
-                }
+                Circle()
+                    .stroke(landmark.type.themeColor, lineWidth: 2)
+                    .frame(width: 40, height: 40)
                 
-                // 标签
-                if isSelected {
-                    Text(landmark.name)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.7))
-                        )
-                        .offset(y: -35)
-                }
+                Image(systemName: landmark.type.icon)
+                    .font(.system(size: 18))
+                    .foregroundStyle(landmark.type.themeColor)
+            }
+            
+            // 标签
+            if isSelected {
+                Text(landmark.name)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.7))
+                    )
+                    .offset(y: -35)
             }
         }
     }
