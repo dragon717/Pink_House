@@ -29,60 +29,83 @@ struct BoardingExperienceView: View {
         ZStack {
             // 机场背景
             AirportBackgroundView()
+                // 使用 safeAreaPadding 和 safeAreaInset 确保背景不被导航栏覆盖
+                .safeAreaPadding(.top, 110)
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear.frame(height: 100)
+                }
             
-            VStack {
-                // 进度指示器
-                BoardingProgressView(currentStage: boardingStage)
-                    .padding(.top, 60)
+            // UI 覆盖层 - 使用 GeometryReader 精确定位
+            GeometryReader { geometry in
+                let safeAreaTop = geometry.safeAreaInsets.top
+                let safeAreaBottom = geometry.safeAreaInsets.bottom
+                // 导航栏高度约 44pt，加上间距
+                let navBarOffset = safeAreaTop + 70
+                // TabBar 高度约 49pt，加上间距
+                let tabBarOffset = safeAreaBottom + 90
                 
-                Spacer()
+                // 进度指示器（在导航栏下方）
+                VStack {
+                    Spacer().frame(height: navBarOffset)
+                    
+                    BoardingProgressView(currentStage: boardingStage)
+                        .frame(maxWidth: .infinity)
+                    
+                    Spacer()
+                }
+                .allowsHitTesting(false)
                 
-                // 主要内容
-                switch boardingStage {
-                case .privacyCheck:
-                    PrivacyCheckView(viewModel: viewModel) {
-                        withAnimation(.spring()) {
-                            boardingStage = .seatSelection
-                        }
-                    }
+                // 主要内容区域（在进度指示器下方，TabBar 上方）
+                VStack {
+                    Spacer().frame(height: navBarOffset + 70)
                     
-                case .seatSelection:
-                    SeatSelectionView(selectedSeat: $selectedSeat) {
-                        viewModel.generateCurrentBoardingPass(seatNumber: selectedSeat)
-                        withAnimation(.spring()) {
-                            boardingStage = .boardingPass
-                        }
-                    }
-                    
-                case .boardingPass:
-                    BoardingPassView(viewModel: viewModel)
-                        .scaleEffect(boardingPassScale)
-                        .rotationEffect(.degrees(boardingPassRotation))
-                        .onAppear {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                                boardingPassScale = 1.0
-                                boardingPassRotation = 0
+                    // 根据阶段显示不同内容
+                    switch boardingStage {
+                    case .privacyCheck:
+                        PrivacyCheckView(viewModel: viewModel) {
+                            withAnimation(.spring()) {
+                                boardingStage = .seatSelection
                             }
-                            // 3秒后自动进入扫描
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                withAnimation {
-                                    boardingStage = .scanner
+                        }
+                        
+                    case .seatSelection:
+                        SeatSelectionView(selectedSeat: $selectedSeat) {
+                            viewModel.generateCurrentBoardingPass(seatNumber: selectedSeat)
+                            withAnimation(.spring()) {
+                                boardingStage = .boardingPass
+                            }
+                        }
+                        
+                    case .boardingPass:
+                        BoardingPassView(viewModel: viewModel)
+                            .scaleEffect(boardingPassScale)
+                            .rotationEffect(.degrees(boardingPassRotation))
+                            .onAppear {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                                    boardingPassScale = 1.0
+                                    boardingPassRotation = 0
+                                }
+                                // 3秒后自动进入扫描
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                    withAnimation {
+                                        boardingStage = .scanner
+                                    }
                                 }
                             }
+                        
+                    case .scanner:
+                        ScannerView(viewModel: viewModel, scanProgress: $scanProgress) {
+                            withAnimation(.spring()) {
+                                boardingStage = .complete
+                            }
                         }
-                    
-                case .scanner:
-                    ScannerView(viewModel: viewModel, scanProgress: $scanProgress) {
-                        withAnimation(.spring()) {
-                            boardingStage = .complete
-                        }
+                        
+                    case .complete:
+                        BoardingCompleteView(viewModel: viewModel)
                     }
                     
-                case .complete:
-                    BoardingCompleteView(viewModel: viewModel)
+                    Spacer().frame(height: tabBarOffset)
                 }
-                
-                Spacer()
             }
         }
     }
@@ -325,7 +348,7 @@ struct PrivacyCheckView: View {
             }
             .padding(.horizontal, 30)
         }
-        .padding(.top, 40)
+        .padding(.top, 20)
     }
 }
 
@@ -448,7 +471,7 @@ struct SeatSelectionView: View {
             .padding(.horizontal, 30)
         }
     }
-    
+
     private func isSeatAvailable(row: Int, letter: String) -> Bool {
         // 模拟一些座位已被占用
         let occupiedSeats = ["1A", "1F", "2B", "2E", "3C", "3D", "5A", "5F", "7B", "7E"]
@@ -509,147 +532,231 @@ struct SeatLegend: View {
 struct BoardingPassView: View {
     @ObservedObject var viewModel: BigWorldViewModel
     @State private var shimmerOffset: CGFloat = -200
+    @State private var isTorn = false
+    @State private var bottomPartOffset: CGFloat = 0
+    @State private var bottomPartRotation: Double = 0
+    @State private var tearProgress: CGFloat = 0
     
     var body: some View {
-        VStack(spacing: 0) {
-            // 上半部分
-            VStack(alignment: .leading, spacing: 16) {
-                // 航空公司信息
-                HStack {
-                    Image(systemName: "airplane.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
-                    
-                    VStack(alignment: .leading) {
-                        Text("LOLITA AIR")
-                            .font(.system(size: 16, weight: .bold))
-                        Text("茶会专机")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("BOARDING PASS")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
-                }
-                
-                Divider()
-                
-                // 航班信息
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("FROM")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if viewModel.isDepartureHidden {
-                            Text("***")
-                                .font(.system(size: 20, weight: .bold))
-                        } else if let city = viewModel.departureCity {
-                            Text(city.prefix(3).uppercased())
-                                .font(.system(size: 20, weight: .bold))
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(spacing: 4) {
-                        Image(systemName: "airplane")
+        ZStack {
+            // 上半部分（固定）
+            VStack(spacing: 0) {
+                // 上半部分内容
+                VStack(alignment: .leading, spacing: 16) {
+                    // 航空公司信息
+                    HStack {
+                        Image(systemName: "airplane.circle.fill")
+                            .font(.system(size: 30))
                             .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
-                        Text(viewModel.currentBoardingPass?.formattedFlightNumber ?? "LA888")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        
+                        VStack(alignment: .leading) {
+                            Text("LOLITA AIR")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("茶会专机")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Text("BOARDING PASS")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
                     }
                     
-                    Spacer()
+                    Divider()
                     
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("TO")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text(viewModel.selectedLandmark?.code ?? "???")
-                            .font(.system(size: 20, weight: .bold))
-                    }
-                }
-                
-                // 详细信息网格
-                HStack {
-                    InfoItem(title: "DATE", value: formattedDate(viewModel.currentBoardingPass?.flightDate))
-                    InfoItem(title: "TIME", value: formattedTime(viewModel.currentBoardingPass?.flightDate))
-                    InfoItem(title: "SEAT", value: viewModel.currentBoardingPass?.seatNumber ?? "--")
-                    InfoItem(title: "GATE", value: viewModel.currentBoardingPass?.gate ?? "--")
-                }
-            }
-            .padding(20)
-            .background(Color.white)
-            
-            // 虚线分隔
-            HStack(spacing: 0) {
-                ForEach(0..<20) { _ in
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 8, height: 1)
-                    Rectangle()
-                        .fill(Color.clear)
-                        .frame(width: 8, height: 1)
-                }
-            }
-            
-            // 下半部分 - 条形码区域
-            HStack {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(viewModel.currentBoardingPass?.passengerName ?? "PASSENGER")
-                        .font(.system(size: 14, weight: .medium))
-                    
-                    // 模拟条形码
-                    HStack(spacing: 2) {
-                        ForEach(0..<30) { i in
-                            Rectangle()
-                                .fill(Color.black)
-                                .frame(width: CGFloat.random(in: 1...3), height: 40)
+                    // 航班信息
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("FROM")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if viewModel.isDepartureHidden {
+                                Text("***")
+                                    .font(.system(size: 20, weight: .bold))
+                            } else if let city = viewModel.departureCity {
+                                Text(city.prefix(3).uppercased())
+                                    .font(.system(size: 20, weight: .bold))
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(spacing: 4) {
+                            Image(systemName: "airplane")
+                                .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
+                            Text(viewModel.currentBoardingPass?.formattedFlightNumber ?? "LA888")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("TO")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(viewModel.selectedLandmark?.code ?? "???")
+                                .font(.system(size: 20, weight: .bold))
                         }
                     }
                     
-                    Text(viewModel.currentBoardingPass?.qrCodeData ?? "LA8888888888")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                    // 详细信息网格
+                    HStack {
+                        InfoItem(title: "DATE", value: formattedDate(viewModel.currentBoardingPass?.flightDate))
+                        InfoItem(title: "TIME", value: formattedTime(viewModel.currentBoardingPass?.flightDate))
+                        InfoItem(title: "SEAT", value: viewModel.currentBoardingPass?.seatNumber ?? "--")
+                        InfoItem(title: "GATE", value: viewModel.currentBoardingPass?.gate ?? "--")
+                    }
                 }
+                .padding(20)
+                .background(Color.white)
                 
-                Spacer()
-                
-                // QR码
-                Image(systemName: "qrcode")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.black)
-            }
-            .padding(20)
-            .background(
-                Color(red: 0.98, green: 0.98, blue: 0.99)
-                    .overlay(
-                        // 闪光效果
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                Color.white.opacity(0.8),
-                                Color.clear
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .offset(x: shimmerOffset)
+                // 虚线分隔（可点击撕票）
+                TearLineView(isTorn: isTorn, progress: tearProgress)
+                    .onTapGesture {
+                        tearTicket()
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 10)
+                            .onEnded { _ in
+                                tearTicket()
+                            }
                     )
-            )
+            }
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+            .padding(.horizontal, 30)
+            
+            // 下半部分（可撕下）
+            if !isTorn {
+                VStack(spacing: 0) {
+                    Spacer().frame(height: 220) // 上半部分高度
+                    
+                    // 虚线分隔
+                    TearLineView(isTorn: isTorn, progress: tearProgress)
+                        .opacity(0) // 隐藏，只用于占位
+                    
+                    // 下半部分内容
+                    HStack {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(viewModel.currentBoardingPass?.passengerName ?? "PASSENGER")
+                                .font(.system(size: 14, weight: .medium))
+                            
+                            // 模拟条形码
+                            HStack(spacing: 2) {
+                                ForEach(0..<30) { i in
+                                    Rectangle()
+                                        .fill(Color.black)
+                                        .frame(width: CGFloat.random(in: 1...3), height: 40)
+                                }
+                            }
+                            
+                            Text(viewModel.currentBoardingPass?.qrCodeData ?? "LA8888888888")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // QR码
+                        Image(systemName: "qrcode")
+                            .font(.system(size: 60))
+                            .foregroundStyle(.black)
+                    }
+                    .padding(20)
+                    .background(
+                        Color(red: 0.98, green: 0.98, blue: 0.99)
+                            .overlay(
+                                // 闪光效果
+                                LinearGradient(
+                                    colors: [
+                                        Color.clear,
+                                        Color.white.opacity(0.8),
+                                        Color.clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .offset(x: shimmerOffset)
+                            )
+                    )
+                    .background(Color.white)
+                    .cornerRadius(16)
+                    .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+                    .offset(y: bottomPartOffset)
+                    .rotationEffect(.degrees(bottomPartRotation))
+                    .animation(.spring(response: 0.6, dampingFraction: 0.7), value: bottomPartOffset)
+                }
+                .padding(.horizontal, 30)
+            }
         }
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        .padding(.horizontal, 30)
         .onAppear {
             withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
                 shimmerOffset = 400
             }
         }
+    }
+    
+    private func tearTicket() {
+        guard !isTorn else { return }
+        
+        // 撕票动画
+        withAnimation(.easeInOut(duration: 0.3)) {
+            tearProgress = 1.0
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                isTorn = true
+                bottomPartOffset = 300
+                bottomPartRotation = 15
+            }
+            
+            // 触发完成回调
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // 可以在这里添加撕票后的逻辑
+            }
+        }
+    }
+}
+
+// MARK: - 撕票虚线视图
+struct TearLineView: View {
+    let isTorn: Bool
+    let progress: CGFloat
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(0..<20) { i in
+                let itemProgress = CGFloat(i) / 20.0
+                let isTornPart = itemProgress < progress
+                
+                Rectangle()
+                    .fill(isTornPart ? Color.clear : Color.gray.opacity(0.3))
+                    .frame(width: 8, height: 1)
+                
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: 8, height: 1)
+            }
+        }
+        .frame(height: 20)
+        .background(Color.clear)
+        .contentShape(Rectangle())
+        .overlay(
+            // 撕票提示图标
+            HStack {
+                Spacer()
+                Image(systemName: "scissors")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.gray.opacity(0.5))
+                    .rotationEffect(.degrees(180))
+                Spacer()
+            }
+        )
     }
 }
 
@@ -700,11 +807,8 @@ struct ScannerView: View {
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(Color(red: 0.2, green: 0.5, blue: 0.9), lineWidth: 3)
                     .frame(width: 280, height: 180)
-                
-                // 角标
-                CornerMarkers()
-                
-                // 扫描线
+
+                    // 扫描线
                 Rectangle()
                     .fill(
                         LinearGradient(
@@ -719,13 +823,13 @@ struct ScannerView: View {
                     )
                     .frame(width: 260, height: 2)
                     .offset(y: scanLineOffset)
-                
+
                 // 登机牌缩略图
                 VStack(spacing: 8) {
                     Image(systemName: "airplane")
                         .font(.system(size: 40))
                         .foregroundStyle(Color(red: 0.2, green: 0.5, blue: 0.9))
-                    
+
                     HStack {
                         Text(viewModel.isDepartureHidden ? "***" : (viewModel.departureCity?.prefix(3).uppercased() ?? "???"))
                         Image(systemName: "arrow.right")
@@ -734,12 +838,12 @@ struct ScannerView: View {
                     .font(.system(size: 16, weight: .semibold))
                 }
             }
-            
+
             // 扫描文字
             VStack(spacing: 8) {
                 Text("正在检票...")
                     .font(.system(size: 18, weight: .medium))
-                
+
                 // 进度条
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -747,7 +851,7 @@ struct ScannerView: View {
                             .fill(Color.gray.opacity(0.2))
                             .frame(height: 6)
                             .cornerRadius(3)
-                        
+
                         Rectangle()
                             .fill(
                                 LinearGradient(
@@ -763,6 +867,7 @@ struct ScannerView: View {
                 .frame(width: 200, height: 6)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             // 扫描线动画
             withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: true)) {
@@ -870,6 +975,7 @@ struct BoardingCompleteView: View {
             .padding(.top, 20)
             .opacity(opacity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 scale = 1.0

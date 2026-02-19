@@ -98,7 +98,12 @@ struct BigWorldView: View {
                     }
                 }
             }
+            // 顶部安全区域 - 确保内容不被导航栏覆盖
             .safeAreaInset(edge: .top) {
+                Color.clear.frame(height: 0)
+            }
+            // 底部安全区域 - 确保内容不被 TabBar 覆盖
+            .safeAreaInset(edge: .bottom) {
                 Color.clear.frame(height: 0)
             }
         }
@@ -135,86 +140,96 @@ struct EnhancedArrivalView: View {
     @State private var planeOffset: CGFloat = -200
     
     var body: some View {
-        ZStack {
-            // 背景
-            if let landmark = viewModel.selectedLandmark {
-                LandmarkThemeBackground(type: landmark.type)
-            }
+        GeometryReader { geometry in
+            let safeAreaTop = geometry.safeAreaInsets.top
+            let safeAreaBottom = geometry.safeAreaInsets.bottom
+            let navBarOffset = safeAreaTop + 60
+            let tabBarOffset = safeAreaBottom + 90
             
-            VStack(spacing: 30) {
-                Spacer()
+            ZStack {
+                // 背景
+                if let landmark = viewModel.selectedLandmark {
+                    LandmarkThemeBackground(type: landmark.type)
+                }
                 
-                // 飞机降落动画
-                Image(systemName: "airplane")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.white)
-                    .rotationEffect(.degrees(45))
-                    .offset(x: planeOffset)
-                    .onAppear {
-                        withAnimation(.easeOut(duration: 2)) {
-                            planeOffset = 0
+                // 主内容
+                VStack(spacing: 30) {
+                    Spacer().frame(height: navBarOffset)
+                    
+                    // 飞机降落动画
+                    Image(systemName: "airplane")
+                        .font(.system(size: 80))
+                        .foregroundStyle(.white)
+                        .rotationEffect(.degrees(45))
+                        .offset(x: planeOffset)
+                        .onAppear {
+                            withAnimation(.easeOut(duration: 2)) {
+                                planeOffset = 0
+                            }
                         }
-                    }
-                
-                // 到达信息
-                VStack(spacing: 16) {
-                    Text("已到达目的地")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.white.opacity(0.8))
                     
-                    if let landmark = viewModel.selectedLandmark {
-                        Text(landmark.name)
-                            .font(.system(size: 36, weight: .bold, design: .serif))
-                            .foregroundStyle(.white)
+                    // 到达信息
+                    VStack(spacing: 16) {
+                        Text("已到达目的地")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.white.opacity(0.8))
                         
-                        Text(landmark.subtitle)
-                            .font(.title3)
-                            .foregroundStyle(landmark.type.themeColor)
+                        if let landmark = viewModel.selectedLandmark {
+                            Text(landmark.name)
+                                .font(.system(size: 36, weight: .bold, design: .serif))
+                                .foregroundStyle(.white)
+                            
+                            Text(landmark.subtitle)
+                                .font(.title3)
+                                .foregroundStyle(landmark.type.themeColor)
+                        }
+                        
+                        // 天气信息（模拟）
+                        HStack(spacing: 20) {
+                            WeatherInfo(icon: "sun.max.fill", value: "24°C", label: "温度")
+                            WeatherInfo(icon: "wind", value: "3级", label: "风速")
+                            WeatherInfo(icon: "drop.fill", value: "45%", label: "湿度")
+                        }
+                        .padding(.top, 20)
                     }
+                    .opacity(showContent ? 1 : 0)
+                    .offset(y: showContent ? 0 : 30)
                     
-                    // 天气信息（模拟）
-                    HStack(spacing: 20) {
-                        WeatherInfo(icon: "sun.max.fill", value: "24°C", label: "温度")
-                        WeatherInfo(icon: "wind", value: "3级", label: "风速")
-                        WeatherInfo(icon: "drop.fill", value: "45%", label: "湿度")
-                    }
-                    .padding(.top, 20)
-                }
-                .opacity(showContent ? 1 : 0)
-                .offset(y: showContent ? 0 : 30)
-                
-                Spacer()
-                
-                // 打卡按钮
-                Button {
-                    viewModel.checkIn()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("立即打卡")
-                    }
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                    Spacer()
+                    
+                    // 打卡按钮
+                    Button {
+                        viewModel.checkIn()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("立即打卡")
+                        }
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
-                    )
-                    .cornerRadius(30)
+                        .cornerRadius(30)
+                    }
+                    .padding(.horizontal, 40)
+                    .opacity(showContent ? 1 : 0)
+                    
+                    // 底部留出 TabBar 空间
+                    Spacer().frame(height: tabBarOffset)
                 }
-                .padding(.horizontal, 40)
-                .opacity(showContent ? 1 : 0)
-                .padding(.bottom, 50)
             }
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation(.spring()) {
-                    showContent = true
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation(.spring()) {
+                        showContent = true
+                    }
                 }
             }
         }

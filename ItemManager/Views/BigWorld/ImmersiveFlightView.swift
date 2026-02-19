@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MapKit
 
 // MARK: - 沉浸式飞行主视图
 struct ImmersiveFlightView: View {
@@ -15,7 +16,8 @@ struct ImmersiveFlightView: View {
     @State private var cloudOffset: CGFloat = 0
     @State private var turbulence: Double = 0
     @State private var showNarrative = true
-    
+    @State private var showAirplaneWindow = false
+
     enum FlightPhase {
         case taxi      // 滑行
         case takeoff   // 起飞
@@ -23,37 +25,39 @@ struct ImmersiveFlightView: View {
         case descent   // 下降
         case landing   // 着陆
     }
-    
+
     var body: some View {
         ZStack {
-            // 舷窗视图
-            AirplaneWindowView(
-                flightPhase: flightPhase,
-                progress: viewModel.flightProgress,
-                destination: viewModel.selectedLandmark
-            )
-            
-            // 飞机震动效果
-            VStack {
-                Spacer()
+            // 一直保持地图界面（图一）
+            AirportMapView(viewModel: viewModel, flightPhase: flightPhase)
+
+            // 飞机震动效果（仅在巡航及以后阶段）
+            if flightPhase != .taxi && flightPhase != .takeoff {
+                VStack {
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .offset(x: CGFloat.random(in: -turbulence...turbulence),
+                        y: CGFloat.random(in: -turbulence...turbulence))
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .offset(x: CGFloat.random(in: -turbulence...turbulence),
-                    y: CGFloat.random(in: -turbulence...turbulence))
-            
+
             // UI 覆盖层
             VStack {
                 // 顶部状态栏
                 FlightStatusBar(viewModel: viewModel, flightPhase: flightPhase)
                     .padding(.top, 60)
-                
+
                 Spacer()
-                
-                // 底部控制面板
-                FlightControlPanel(viewModel: viewModel, flightPhase: $flightPhase)
-                    .padding(.bottom, 40)
+
+                // 底部控制面板（包含打开舷窗按钮）
+                FlightControlPanel(
+                    viewModel: viewModel,
+                    flightPhase: $flightPhase,
+                    showAirplaneWindow: $showAirplaneWindow
+                )
+                .padding(.bottom, 40)
             }
-            
+
             // 叙事文字
             if showNarrative, !viewModel.currentNarrative.isEmpty {
                 NarrativeOverlay(text: viewModel.currentNarrative)
@@ -65,6 +69,16 @@ struct ImmersiveFlightView: View {
         }
         .onChange(of: viewModel.flightProgress) { progress in
             updateFlightPhase(progress)
+        }
+        .sheet(isPresented: $showAirplaneWindow) {
+            AirplaneWindowView(
+                flightPhase: flightPhase,
+                progress: viewModel.flightProgress,
+                destination: viewModel.selectedLandmark
+            )
+            .presentationDetents([.fraction(0.9)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(40)
         }
     }
     
@@ -98,15 +112,34 @@ struct ImmersiveFlightView: View {
     }
 }
 
-// MARK: - 飞机舷窗视图
+// MARK: - Lo 裙设计理念
+struct LolitaDesignPhilosophy {
+    static let quotes = [
+        "每一针一线，都是对美好生活的向往",
+        "蕾丝与缎带编织的，是少女心中的童话",
+        "在繁复的褶皱中，藏着对细节的执着",
+        "裙摆飞扬的瞬间，是自由与优雅的共舞",
+        "精致的不仅是衣裳，更是对生活的态度",
+        "每一次穿上 Lo 裙，都是与自己的浪漫约会",
+        "在快节奏的世界里，慢下来做一场关于美的梦"
+    ]
+    
+    static func randomQuote() -> String {
+        quotes.randomElement() ?? quotes[0]
+    }
+}
+
+// MARK: - 飞机舷窗视图（Sheet 方式）
 struct AirplaneWindowView: View {
     let flightPhase: ImmersiveFlightView.FlightPhase
     let progress: Double
     let destination: Landmark?
-    
+    @Environment(\.dismiss) private var dismiss
+
     @State private var sunPosition: CGFloat = 0
     @State private var cloudLayers: [CloudLayer] = []
-    
+    @State private var quote: String = ""
+
     struct CloudLayer: Identifiable {
         let id = UUID()
         let offset: CGFloat
@@ -114,36 +147,102 @@ struct AirplaneWindowView: View {
         let opacity: Double
         let speed: Double
     }
-    
+
     var body: some View {
         GeometryReader { geo in
+            // 舷窗占界面 50%
+            let windowWidth: CGFloat = geo.size.width * 0.5
+            let windowHeight: CGFloat = windowWidth * 1.1
+            // 大圆角
+            let cornerRadius: CGFloat = 50
+
             ZStack {
-                // 天空渐变背景
-                SkyGradientView(phase: flightPhase, progress: progress)
-                
-                // 太阳/月亮
-                CelestialBodyView(phase: flightPhase, progress: progress)
-                    .offset(y: sunPosition)
-                
-                // 云层
-                ForEach(cloudLayers) { cloud in
-                    CloudView(scale: cloud.scale, opacity: cloud.opacity)
-                        .offset(x: cloud.offset)
-                        .animation(
-                            .linear(duration: cloud.speed)
-                            .repeatForever(autoreverses: false),
-                            value: cloud.offset
+                // 透明背景
+                Color.clear
+                    .ignoresSafeArea()
+
+                VStack(spacing: 30) {
+                    Spacer()
+
+                    // 舷窗视图
+                    ZStack {
+                        // 窗外景色（使用遮罩裁剪为大圆角矩形）
+                        RoundedRectangle(cornerRadius: cornerRadius - 8)
+                            .fill(Color.clear)
+                            .frame(width: windowWidth - 16, height: windowHeight - 16)
+                            .overlay(
+                                ZStack {
+                                    // 天空渐变背景
+                                    SkyGradientView(phase: flightPhase, progress: progress)
+
+                                    // 太阳/月亮
+                                    CelestialBodyView(phase: flightPhase, progress: progress)
+                                        .offset(y: sunPosition)
+
+                                    // 云层
+                                    ForEach(cloudLayers) { cloud in
+                                        CloudView(scale: cloud.scale, opacity: cloud.opacity)
+                                            .offset(x: cloud.offset)
+                                            .animation(
+                                                .linear(duration: cloud.speed)
+                                                    .repeatForever(autoreverses: false),
+                                                value: cloud.offset
+                                            )
+                                    }
+
+                                    // 地面景观（仅在低空显示）
+                                    if flightPhase == .takeoff || flightPhase == .landing || progress < 0.1 || progress > 0.9 {
+                                        GroundView(destination: destination)
+                                            .offset(y: windowHeight * 0.3)
+                                    }
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 8))
+                            )
+
+                        // 舷窗边框（在最上层）- 大圆角矩形
+                        WindowFrameView(
+                            width: windowWidth,
+                            height: windowHeight,
+                            cornerRadius: cornerRadius
                         )
+                    }
+
+                    // Lo 裙设计理念文字
+                    VStack(spacing: 12) {
+                        Text("✦ 茶会物语 ✦")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+
+                        Text(quote)
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(6)
+                            .padding(.horizontal, 40)
+                    }
+                    .padding(.vertical, 20)
+
+                    Spacer()
                 }
-                
-                // 地面景观（仅在低空显示）
-                if flightPhase == .takeoff || flightPhase == .landing || progress < 0.1 || progress > 0.9 {
-                    GroundView(destination: destination)
-                        .offset(y: geo.size.height * 0.6)
+
+                // 关闭按钮
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.secondary)
+                                .background(Color.white.opacity(0.8))
+                                .clipShape(Circle())
+                        }
+                        .padding(.top, 60)
+                        .padding(.trailing, 20)
+                    }
+                    Spacer()
                 }
-                
-                // 舷窗边框
-                WindowFrameView()
             }
         }
         .onAppear {
@@ -156,11 +255,64 @@ struct AirplaneWindowView: View {
                     speed: Double.random(in: 15...30)
                 )
             }
+            // 随机选择一条理念
+            quote = LolitaDesignPhilosophy.randomQuote()
         }
     }
 }
 
 // MARK: - 天空渐变
+// MARK: - 天空背景视图（用于巡航阶段）
+struct SkyBackgroundView: View {
+    let phase: ImmersiveFlightView.FlightPhase
+    let progress: Double
+    
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1/30)) { _ in
+            LinearGradient(
+                colors: skyColors,
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        }
+    }
+    
+    private var skyColors: [Color] {
+        switch phase {
+        case .taxi, .takeoff:
+            return [
+                Color(red: 0.4, green: 0.7, blue: 0.9),
+                Color(red: 0.7, green: 0.85, blue: 0.95)
+            ]
+        case .cruise:
+            // 根据进度改变天空颜色（模拟时间流逝）
+            if progress < 0.3 {
+                return [
+                    Color(red: 0.2, green: 0.5, blue: 0.9),
+                    Color(red: 0.6, green: 0.8, blue: 0.95)
+                ]
+            } else if progress < 0.7 {
+                return [
+                    Color(red: 0.1, green: 0.4, blue: 0.8),
+                    Color(red: 0.5, green: 0.75, blue: 0.95)
+                ]
+            } else {
+                return [
+                    Color(red: 0.9, green: 0.5, blue: 0.3),
+                    Color(red: 0.95, green: 0.7, blue: 0.5)
+                ]
+            }
+        case .descent, .landing:
+            return [
+                Color(red: 0.95, green: 0.6, blue: 0.4),
+                Color(red: 0.98, green: 0.8, blue: 0.6)
+            ]
+        }
+    }
+}
+
+// MARK: - 天空渐变（用于舷窗内部）
 struct SkyGradientView: View {
     let phase: ImmersiveFlightView.FlightPhase
     let progress: Double
@@ -475,38 +627,125 @@ struct TerrainFeaturesView: View {
     }
 }
 
-// MARK: - 舷窗边框
+// MARK: - 舷窗边框（大圆角矩形）
 struct WindowFrameView: View {
+    let width: CGFloat
+    let height: CGFloat
+    let cornerRadius: CGFloat
+
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                // 外框
-                RoundedRectangle(cornerRadius: 150)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.3, green: 0.3, blue: 0.35),
-                                Color(red: 0.5, green: 0.5, blue: 0.55),
-                                Color(red: 0.3, green: 0.3, blue: 0.35)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 20
+        ZStack {
+            // 外层深色背景（机身内壁）
+            RoundedRectangle(cornerRadius: cornerRadius + 12)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.15, green: 0.15, blue: 0.18),
+                            Color(red: 0.08, green: 0.08, blue: 0.10),
+                            Color(red: 0.12, green: 0.12, blue: 0.15)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                
-                // 内阴影
-                RoundedRectangle(cornerRadius: 140)
-                    .stroke(Color.black.opacity(0.5), lineWidth: 8)
-                    .padding(10)
-                
-                // 高光
-                RoundedRectangle(cornerRadius: 150)
-                    .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                    .padding(8)
-            }
-            .frame(width: geo.size.width - 40, height: geo.size.height - 100)
-            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                )
+                .frame(width: width + 24, height: height + 24)
+                .shadow(color: Color.black.opacity(0.8), radius: 20, x: 0, y: 8)
+
+            // 中层窗框（白色/灰色边框）
+            RoundedRectangle(cornerRadius: cornerRadius + 4)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.85, green: 0.87, blue: 0.90),
+                            Color(red: 0.70, green: 0.72, blue: 0.75),
+                            Color(red: 0.55, green: 0.57, blue: 0.60)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: width + 8, height: height + 8)
+                .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 5)
+
+            // 内层窗框阴影
+            RoundedRectangle(cornerRadius: cornerRadius + 2)
+                .fill(Color.black.opacity(0.3))
+                .frame(width: width + 6, height: height + 6)
+                .offset(x: 1, y: 2)
+
+            // 主窗框（更亮的边框）
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.95, green: 0.96, blue: 0.98),
+                            Color(red: 0.80, green: 0.82, blue: 0.85),
+                            Color(red: 0.65, green: 0.67, blue: 0.70)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: width + 4, height: height + 4)
+
+            // 内部深色凹槽
+            RoundedRectangle(cornerRadius: cornerRadius - 2)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.10, green: 0.10, blue: 0.12),
+                            Color(red: 0.20, green: 0.20, blue: 0.22),
+                            Color(red: 0.15, green: 0.15, blue: 0.18)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: width, height: height)
+
+            // 内部阴影边缘
+            RoundedRectangle(cornerRadius: cornerRadius - 2)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0.6),
+                            Color.clear,
+                            Color.black.opacity(0.4)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 6
+                )
+                .frame(width: width - 6, height: height - 6)
+
+            // 顶部高光（玻璃反光效果）
+            RoundedRectangle(cornerRadius: cornerRadius - 4)
+                .trim(from: 0.0, to: 0.5)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.4),
+                            Color.white.opacity(0.1),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 4
+                )
+                .frame(width: width - 12, height: height - 12)
+                .offset(y: -3)
+
+            // 左侧边缘光
+            RoundedRectangle(cornerRadius: cornerRadius - 4)
+                .trim(from: 0.15, to: 0.35)
+                .stroke(
+                    Color.white.opacity(0.2),
+                    lineWidth: 3
+                )
+                .frame(width: width - 10, height: height - 10)
+                .offset(x: -1)
         }
     }
 }
@@ -602,9 +841,33 @@ struct FlightStatusBar: View {
 struct FlightControlPanel: View {
     @ObservedObject var viewModel: BigWorldViewModel
     @Binding var flightPhase: ImmersiveFlightView.FlightPhase
+    @Binding var showAirplaneWindow: Bool
     
     var body: some View {
         VStack(spacing: 16) {
+            // 打开舷窗按钮（扁胶囊样式）
+            Button {
+                showAirplaneWindow = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "airplane.window")
+                        .font(.system(size: 14))
+                    Text("打开舷窗")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                )
+            }
+            
             // 高度和速度
             HStack(spacing: 40) {
                 FlightMetricView(
@@ -684,15 +947,179 @@ struct FlightMetricView: View {
     }
 }
 
+// MARK: - 机场标注数据
+struct AirportAnnotation: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+    let name: String
+}
+
+// MARK: - 机场地图视图（起飞阶段）
+struct AirportMapView: View {
+    @ObservedObject var viewModel: BigWorldViewModel
+    let flightPhase: ImmersiveFlightView.FlightPhase
+    @State private var planePosition: CGFloat = 0
+    @State private var mapOffset: CGFloat = 0
+
+    // 模拟机场位置（扬州泰州国际机场附近）
+    private let airportCoordinate = CLLocationCoordinate2D(latitude: 32.5617, longitude: 119.7156)
+    private let runwayHeading: Double = 180 // 跑道朝向（正南）
+
+    @State private var mapRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 32.5617, longitude: 119.7156),
+        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+    )
+
+    var body: some View {
+        ZStack {
+            // 地图背景 - 使用兼容的初始化方式
+            Map(coordinateRegion: $mapRegion,
+                annotationItems: [AirportAnnotation(coordinate: airportCoordinate, name: "扬州泰州国际机场")]) { item in
+                MapMarker(coordinate: item.coordinate, tint: .blue)
+            }
+            .mapStyle(.standard)
+            .disabled(true) // 禁用地图交互
+
+            // 遮罩层 - 上下渐变淡出
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [Color.black.opacity(0.3), Color.clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 100)
+
+                Spacer()
+
+                LinearGradient(
+                    colors: [Color.clear, Color.black.opacity(0.3)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 150)
+            }
+            .ignoresSafeArea()
+
+            // 中央垂直线（飞行路径）
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: 1)
+                .ignoresSafeArea()
+
+            // 飞机图标
+            Image(systemName: "airplane")
+                .font(.system(size: 32))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.5), radius: 4)
+                .rotationEffect(.degrees(flightPhase == .takeoff ? 0 : -90))
+                .offset(y: planePosition)
+                .animation(.easeInOut(duration: 2), value: planePosition)
+
+            // 航站楼标记
+            VStack(spacing: 4) {
+                Image(systemName: "building.2.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.blue)
+
+                Text("T2航站楼")
+                    .font(.caption)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black, radius: 2)
+            }
+            .offset(x: -80, y: 100)
+
+            // 右侧控制按钮组
+            VStack(spacing: 16) {
+                // 定位按钮
+                CircleButton(icon: "location.fill", isActive: true)
+
+                // 地图类型按钮
+                CircleButton(icon: "map.fill", isActive: false)
+
+                // 3D视图按钮
+                CircleButton(icon: "cube.fill", isActive: false)
+            }
+            .offset(x: 140, y: -80)
+
+            // 左侧信息按钮组
+            VStack(spacing: 16) {
+                // 暂停按钮
+                CircleButton(icon: "pause.fill", isActive: false)
+
+                // 信号按钮
+                CircleButton(icon: "antenna.radiowaves.left.and.right", isActive: false)
+            }
+            .offset(x: -140, y: -120)
+
+            // 底部信息面板
+            VStack {
+                Spacer()
+
+                HStack(spacing: 40) {
+                    // 剩余飞行时间
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("剩余飞行时间")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                        Text("32 min")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer()
+
+                    // 剩余飞行距离
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("剩余飞行距离")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                        Text("215 km")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .padding(.horizontal, 30)
+                .padding(.bottom, 120)
+            }
+        }
+        .onAppear {
+            // 飞机位置动画
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                planePosition = flightPhase == .takeoff ? -50 : 0
+            }
+        }
+    }
+}
+
+// MARK: - 圆形按钮
+struct CircleButton: View {
+    let icon: String
+    let isActive: Bool
+
+    var body: some View {
+        Button(action: {}) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(isActive ? .white : .primary)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(isActive ? Color.black : Color.white)
+                )
+                .shadow(color: .black.opacity(0.2), radius: 8)
+        }
+    }
+}
+
 // MARK: - 叙事覆盖层
 struct NarrativeOverlay: View {
     let text: String
     @State private var opacity: Double = 0
-    
+
     var body: some View {
         VStack {
             Spacer()
-            
+
             Text(text)
                 .font(.system(size: 16, weight: .medium, design: .serif))
                 .foregroundStyle(.white)
@@ -711,7 +1138,7 @@ struct NarrativeOverlay: View {
             withAnimation(.easeInOut(duration: 0.5)) {
                 opacity = 1
             }
-            
+
             // 4秒后淡出
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 withAnimation(.easeInOut(duration: 0.5)) {
@@ -722,6 +1149,68 @@ struct NarrativeOverlay: View {
     }
 }
 
-#Preview {
+// MARK: - 舷窗预览包装器
+struct AirplaneWindowPreview: View {
+    @State private var showWindow = false
+
+    var body: some View {
+        ZStack {
+            // 背景
+            Color.gray.ignoresSafeArea()
+
+            // 打开舷窗按钮
+            Button {
+                showWindow = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "airplane.window")
+                        .font(.system(size: 24))
+                    Text("打开舷窗")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [Color.blue, Color.purple],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(30)
+                .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+            }
+        }
+        .sheet(isPresented: $showWindow) {
+            AirplaneWindowView(
+                flightPhase: .cruise,
+                progress: 0.5,
+                destination: Landmark(
+                    name: "撒哈拉·翡翠绿洲",
+                    subtitle: "沙海蜃楼茶会",
+                    type: .oasis,
+                    coordinate: CLLocationCoordinate2D(latitude: 23.0, longitude: 12.0),
+                    description: "在金色沙丘间，品一杯薄荷茶的清凉",
+                    teaPartyTheme: "沙漠绿洲茶会",
+                    imageName: "sahara_oasis",
+                    badgeName: "沙漠行者",
+                    badgeDescription: "在撒哈拉沙漠完成茶会",
+                    requiredLevel: 1
+                )
+            )
+            .presentationDetents([.fraction(0.9)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(40)
+        }
+    }
+}
+
+// MARK: - Xcode 预览
+#Preview("沉浸式飞行") {
     ImmersiveFlightView(viewModel: BigWorldViewModel())
+}
+
+#Preview("舷窗视图") {
+    AirplaneWindowPreview()
 }
