@@ -30,7 +30,12 @@ struct EnhancedGlobeView: View {
             
             // 3D地球 - 使用Map组件
             Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
-                // 用户当前位置标记已移除
+                // 用户当前位置标记 - 外白圈内主题色
+                if let userLoc = viewModel.userCoordinate {
+                    Annotation("当前位置", coordinate: userLoc) {
+                        UserLocationAnnotationView()
+                    }
+                }
                 
                 // 地标标记
                 ForEach(viewModel.availableLandmarks) { landmark in
@@ -507,11 +512,11 @@ struct LandmarkDetailSheet: View {
                 }
             }
             .padding()
-            .navigationTitle(landmark.name)
+            .navigationTitle("目的地")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") {
+                    Button("取消") {
                         dismiss()
                     }
                 }
@@ -564,6 +569,42 @@ struct StarfieldView: View {
                     opacity: Double.random(in: 0.3...1.0)
                 )
             }
+        }
+    }
+}
+
+// MARK: - 用户位置标注视图（外白圈，内主题色）
+struct UserLocationAnnotationView: View {
+    @State private var pulseScale: CGFloat = 1.0
+    
+    var body: some View {
+        ZStack {
+            // 外圈脉冲动画
+            Circle()
+                .fill(Color.white.opacity(0.3))
+                .frame(width: 36, height: 36)
+                .scaleEffect(pulseScale)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                        pulseScale = 1.4
+                    }
+                }
+            
+            // 外白圈
+            Circle()
+                .fill(Color.white)
+                .frame(width: 24, height: 24)
+                .shadow(color: Color.white.opacity(0.5), radius: 4)
+            
+            // 内主题色（粉色主题）
+            Circle()
+                .fill(Color(red: 1.0, green: 0.41, blue: 0.71))
+                .frame(width: 16, height: 16)
+            
+            // 中心点
+            Circle()
+                .fill(Color.white)
+                .frame(width: 6, height: 6)
         }
     }
 }

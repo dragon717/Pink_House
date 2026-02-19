@@ -13,48 +13,72 @@ struct BadgeWallView: View {
     @State private var selectedBadge: TeaPartyBadge?
     @State private var showDetail = false
     @State private var wallRotation: Double = 0
+    @Environment(\.dismiss) private var dismiss
     
     let columns = [
         GridItem(.adaptive(minimum: 100), spacing: 20)
     ]
     
     var body: some View {
-        ZStack {
-            // 背景
-            BadgeWallBackground()
-            
-            VStack(spacing: 0) {
-                // 顶部标题
-                BadgeWallHeader(unlockedCount: viewModel.unlockedBadges.count, totalCount: viewModel.availableLandmarks.count)
-                    .padding(.top, 60)
+        NavigationStack {
+            GeometryReader { geometry in
+                let safeAreaTop = geometry.safeAreaInsets.top
+                let safeAreaBottom = geometry.safeAreaInsets.bottom
+                let navBarOffset = safeAreaTop + 60
+                let tabBarOffset = safeAreaBottom + 90
                 
-                // 徽章网格
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 24) {
-                        ForEach(viewModel.availableLandmarks) { landmark in
-                            BadgeCell(
-                                landmark: landmark,
-                                isUnlocked: viewModel.unlockedBadges.contains(where: { $0.landmarkId == landmark.id })
-                            ) {
-                                if let badge = viewModel.unlockedBadges.first(where: { $0.landmarkId == landmark.id }) {
-                                    selectedBadge = badge
-                                    showDetail = true
+                ZStack {
+                    // 背景
+                    BadgeWallBackground()
+                    
+                    VStack(spacing: 0) {
+                        // 顶部安全区域偏移
+                        Spacer().frame(height: navBarOffset)
+                        
+                        // 顶部标题
+                        BadgeWallHeader(unlockedCount: viewModel.unlockedBadges.count, totalCount: viewModel.availableLandmarks.count)
+                        
+                        // 徽章网格
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 24) {
+                                ForEach(viewModel.availableLandmarks) { landmark in
+                                    BadgeCell(
+                                        landmark: landmark,
+                                        isUnlocked: viewModel.unlockedBadges.contains(where: { $0.landmarkId == landmark.id })
+                                    ) {
+                                        if let badge = viewModel.unlockedBadges.first(where: { $0.landmarkId == landmark.id }) {
+                                            selectedBadge = badge
+                                            showDetail = true
+                                        }
+                                    }
                                 }
                             }
+                            .padding(20)
                         }
+                        
+                        // 成就进度
+                        AchievementSummaryView(viewModel: viewModel)
+                            .padding(.horizontal, 20)
+                        
+                        // 底部安全区域偏移
+                        Spacer().frame(height: tabBarOffset)
                     }
-                    .padding(20)
                 }
-                
-                // 成就进度
-                AchievementSummaryView(viewModel: viewModel)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 30)
             }
-        }
-        .sheet(isPresented: $showDetail) {
-            if let badge = selectedBadge {
-                BadgeDetailView(badge: badge)
+            .navigationTitle("茶会徽章墙")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                    .foregroundStyle(Color(red: 1.0, green: 0.41, blue: 0.71))
+                }
+            }
+            .sheet(isPresented: $showDetail) {
+                if let badge = selectedBadge {
+                    BadgeDetailView(badge: badge)
+                }
             }
         }
     }

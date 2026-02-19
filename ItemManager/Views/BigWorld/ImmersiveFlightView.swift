@@ -27,41 +27,52 @@ struct ImmersiveFlightView: View {
     }
 
     var body: some View {
-        ZStack {
-            // 一直保持地图界面（图一）
-            AirportMapView(viewModel: viewModel, flightPhase: flightPhase)
-
-            // 飞机震动效果（仅在巡航及以后阶段）
-            if flightPhase != .taxi && flightPhase != .takeoff {
-                VStack {
-                    Spacer()
+        GeometryReader { geometry in
+            let safeAreaTop = geometry.safeAreaInsets.top
+            let safeAreaBottom = geometry.safeAreaInsets.bottom
+            // 导航栏高度约 44pt，加上间距
+            let navBarOffset = safeAreaTop + 70
+            // TabBar 高度约 49pt，加上间距
+            let tabBarOffset = safeAreaBottom + 90
+            
+            ZStack {
+                // 一直保持地图界面（图一）
+                AirportMapView(viewModel: viewModel, flightPhase: flightPhase)
+                
+                // 飞机震动效果（仅在巡航及以后阶段）
+                if flightPhase != .taxi && flightPhase != .takeoff {
+                    VStack {
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .offset(x: CGFloat.random(in: -turbulence...turbulence),
+                            y: CGFloat.random(in: -turbulence...turbulence))
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .offset(x: CGFloat.random(in: -turbulence...turbulence),
-                        y: CGFloat.random(in: -turbulence...turbulence))
-            }
-
-            // UI 覆盖层
-            VStack {
-                // 顶部状态栏
-                FlightStatusBar(viewModel: viewModel, flightPhase: flightPhase)
-                    .padding(.top, 60)
-
-                Spacer()
-
-                // 底部控制面板（包含打开舷窗按钮）
-                FlightControlPanel(
-                    viewModel: viewModel,
-                    flightPhase: $flightPhase,
-                    showAirplaneWindow: $showAirplaneWindow
-                )
-                .padding(.bottom, 40)
-            }
-
-            // 叙事文字
-            if showNarrative, !viewModel.currentNarrative.isEmpty {
-                NarrativeOverlay(text: viewModel.currentNarrative)
-                    .transition(.opacity)
+                
+                // UI 覆盖层 - 使用 GeometryReader 精确定位
+                VStack(spacing: 0) {
+                    // 顶部状态栏（在导航栏下方）
+                    Spacer().frame(height: navBarOffset)
+                    
+                    FlightStatusBar(viewModel: viewModel, flightPhase: flightPhase)
+                    
+                    Spacer()
+                    
+                    // 底部控制面板（在 TabBar 上方）
+                    FlightControlPanel(
+                        viewModel: viewModel,
+                        flightPhase: $flightPhase,
+                        showAirplaneWindow: $showAirplaneWindow
+                    )
+                    
+                    Spacer().frame(height: tabBarOffset)
+                }
+                
+                // 叙事文字
+                if showNarrative, !viewModel.currentNarrative.isEmpty {
+                    NarrativeOverlay(text: viewModel.currentNarrative)
+                        .transition(.opacity)
+                }
             }
         }
         .onAppear {

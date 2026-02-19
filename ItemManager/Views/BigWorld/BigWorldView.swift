@@ -377,148 +377,160 @@ struct EnhancedCheckInView: View {
     @State private var rotation: Double = 0
     
     var body: some View {
-        ZStack {
-            // 背景
-            Color.black.ignoresSafeArea()
+        GeometryReader { geometry in
+            let safeAreaTop = geometry.safeAreaInsets.top
+            let safeAreaBottom = geometry.safeAreaInsets.bottom
+            // 导航栏高度约 44pt，加上间距
+            let navBarOffset = safeAreaTop + 70
+            // TabBar 高度约 49pt，加上间距
+            let tabBarOffset = safeAreaBottom + 90
             
-            // 彩带效果
-            if showConfetti {
-                ConfettiView()
-            }
-            
-            VStack(spacing: 30) {
-                Spacer()
+            ZStack {
+                // 背景
+                Color.black.ignoresSafeArea()
                 
-                // 打卡成功文字
-                VStack(spacing: 12) {
-                    Text("打卡成功！")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                    
-                    if let landmark = viewModel.selectedLandmark {
-                        Text("欢迎来到\(landmark.name)")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                        
-                        Text("参加了\(landmark.teaPartyTheme)")
-                            .font(.subheadline)
-                            .foregroundStyle(landmark.type.themeColor)
-                    }
+                // 彩带效果
+                if showConfetti {
+                    ConfettiView()
                 }
                 
-                // 徽章展示
-                if let badge = viewModel.unlockedBadges.last, showBadge {
-                    ZStack {
-                        // 光晕
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        badge.themeColor.opacity(0.5),
-                                        badge.themeColor.opacity(0.2),
-                                        Color.clear
-                                    ],
-                                    center: .center,
-                                    startRadius: 50,
-                                    endRadius: 150
+                VStack(spacing: 0) {
+                    // 顶部安全区域偏移
+                    Spacer().frame(height: navBarOffset)
+                    
+                    // 打卡成功文字
+                    VStack(spacing: 12) {
+                        Text("打卡成功！")
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
                             )
-                            .frame(width: 300, height: 300)
                         
-                        // 徽章
+                        if let landmark = viewModel.selectedLandmark {
+                            Text("欢迎来到\(landmark.name)")
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                            
+                            Text("参加了\(landmark.teaPartyTheme)")
+                                .font(.subheadline)
+                                .foregroundStyle(landmark.type.themeColor)
+                        }
+                    }
+                    
+                    // 徽章展示
+                    if let badge = viewModel.unlockedBadges.last, showBadge {
                         ZStack {
+                            // 光晕
                             Circle()
                                 .fill(
-                                    LinearGradient(
+                                    RadialGradient(
                                         colors: [
-                                            Color(red: 0.2, green: 0.2, blue: 0.25),
-                                            Color(red: 0.1, green: 0.1, blue: 0.15)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 150, height: 150)
-                                .shadow(color: badge.themeColor.opacity(0.6), radius: 30)
-                            
-                            Circle()
-                                .stroke(
-                                    AngularGradient(
-                                        colors: [
-                                            badge.themeColor,
                                             badge.themeColor.opacity(0.5),
-                                            badge.themeColor
+                                            badge.themeColor.opacity(0.2),
+                                            Color.clear
                                         ],
                                         center: .center,
-                                        angle: .degrees(rotation)
-                                    ),
-                                    lineWidth: 3
+                                        startRadius: 50,
+                                        endRadius: 150
+                                    )
                                 )
-                                .frame(width: 140, height: 140)
+                                .frame(width: 300, height: 300)
                             
-                            Image(systemName: badge.iconName)
-                                .font(.system(size: 60))
-                                .foregroundStyle(badge.themeColor)
+                            // 徽章
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.2, green: 0.2, blue: 0.25),
+                                                Color(red: 0.1, green: 0.1, blue: 0.15)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 150, height: 150)
+                                    .shadow(color: badge.themeColor.opacity(0.6), radius: 30)
+                                
+                                Circle()
+                                    .stroke(
+                                        AngularGradient(
+                                            colors: [
+                                                badge.themeColor,
+                                                badge.themeColor.opacity(0.5),
+                                                badge.themeColor
+                                            ],
+                                            center: .center,
+                                            angle: .degrees(rotation)
+                                        ),
+                                        lineWidth: 3
+                                    )
+                                    .frame(width: 140, height: 140)
+                                
+                                Image(systemName: badge.iconName)
+                                    .font(.system(size: 60))
+                                    .foregroundStyle(badge.themeColor)
+                            }
+                            .scaleEffect(badgeScale)
+                            .rotation3DEffect(.degrees(rotation * 0.5), axis: (x: 0, y: 1, z: 0))
                         }
-                        .scaleEffect(badgeScale)
-                        .rotation3DEffect(.degrees(rotation * 0.5), axis: (x: 0, y: 1, z: 0))
-                    }
-                    
-                    Text("获得徽章：\(badge.name)")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .padding(.top, 20)
-                }
-                
-                Spacer()
-                
-                // 按钮组
-                VStack(spacing: 16) {
-                    // 分享按钮
-                    Button {
-                        // 分享
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("分享打卡")
-                        }
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(25)
-                    }
-                    
-                    // 返回按钮
-                    Button {
-                        viewModel.resetFlight()
-                    } label: {
-                        Text("继续探索")
-                            .font(.system(size: 17, weight: .medium))
+                        
+                        Text("获得徽章：\(badge.name)")
+                            .font(.headline)
                             .foregroundStyle(.white)
+                            .padding(.top, 20)
+                    }
+                    
+                    Spacer()
+                    
+                    // 按钮组
+                    VStack(spacing: 16) {
+                        // 分享按钮
+                        Button {
+                            // 分享
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("分享打卡")
+                            }
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.black)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                LinearGradient(
+                                    colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
+                            .cornerRadius(25)
+                        }
+                        
+                        // 返回按钮
+                        Button {
+                            viewModel.resetFlight()
+                        } label: {
+                            Text("继续探索")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                )
+                        }
                     }
+                    .padding(.horizontal, 40)
+                    
+                    // 底部安全区域偏移
+                    Spacer().frame(height: tabBarOffset)
                 }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 50)
             }
         }
         .onAppear {

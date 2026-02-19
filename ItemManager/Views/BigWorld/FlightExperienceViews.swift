@@ -10,86 +10,110 @@ import SwiftUI
 // MARK: - 飞行准备视图
 struct FlightPreparationView: View {
     @ObservedObject var viewModel: BigWorldViewModel
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        VStack(spacing: 40) {
-            Spacer()
-            
-            if let landmark = viewModel.selectedLandmark {
-                // 目的地预览
-                VStack(spacing: 20) {
-                    ZStack {
-                        Circle()
-                            .fill(landmark.type.themeColor.opacity(0.2))
-                            .frame(width: 150, height: 150)
-                        
-                        Image(systemName: landmark.type.icon)
-                            .font(.system(size: 80))
-                            .foregroundStyle(landmark.type.themeColor)
-                    }
-                    
-                    VStack(spacing: 8) {
-                        Text("即将前往")
-                            .font(.subheadline)
-                            .foregroundStyle(.gray)
-                        
-                        Text(landmark.name)
-                            .font(.system(size: 28, weight: .bold, design: .serif))
-                            .foregroundStyle(.white)
-                        
-                        Text(landmark.subtitle)
-                            .font(.title3)
-                            .foregroundStyle(landmark.type.themeColor)
-                    }
-                }
-            }
-            
-            Spacer()
-            
-            // 隐私设置
-            VStack(spacing: 16) {
-                Toggle(isOn: $viewModel.isDepartureHidden) {
-                    HStack {
-                        Image(systemName: viewModel.isDepartureHidden ? "eye.slash" : "eye")
-                            .foregroundStyle(.gray)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("隐藏出发地")
-                                .font(.subheadline)
-                                .foregroundStyle(.white)
-                            Text("分享时出发地将显示为???")
-                                .font(.caption)
-                                .foregroundStyle(.gray)
-                        }
-                    }
-                }
-                .toggleStyle(SwitchToggleStyle(tint: Color(red: 1.0, green: 0.41, blue: 0.71)))
-                .padding(.horizontal, 30)
+        NavigationStack {
+            GeometryReader { geometry in
+                let safeAreaTop = geometry.safeAreaInsets.top
+                let safeAreaBottom = geometry.safeAreaInsets.bottom
+                let navBarOffset = safeAreaTop + 60
+                let tabBarOffset = safeAreaBottom + 90
                 
-                // 开始登机按钮
-                Button {
-                    viewModel.startBoarding()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "airplane")
-                        Text("开始登机")
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: navBarOffset)
+                        
+                        if let landmark = viewModel.selectedLandmark {
+                            // 目的地预览
+                            VStack(spacing: 20) {
+                                ZStack {
+                                    Circle()
+                                        .fill(landmark.type.themeColor.opacity(0.2))
+                                        .frame(width: 150, height: 150)
+                                    
+                                    Image(systemName: landmark.type.icon)
+                                        .font(.system(size: 80))
+                                        .foregroundStyle(landmark.type.themeColor)
+                                }
+                                
+                                VStack(spacing: 8) {
+                                    Text("即将前往")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.gray)
+                                    
+                                    Text(landmark.name)
+                                        .font(.system(size: 28, weight: .bold, design: .serif))
+                                        .foregroundStyle(.white)
+                                    
+                                    Text(landmark.subtitle)
+                                        .font(.title3)
+                                        .foregroundStyle(landmark.type.themeColor)
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        // 隐私设置
+                        VStack(spacing: 16) {
+                            Toggle(isOn: $viewModel.isDepartureHidden) {
+                                HStack {
+                                    Image(systemName: viewModel.isDepartureHidden ? "eye.slash" : "eye")
+                                        .foregroundStyle(.gray)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("隐藏出发地")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.white)
+                                        Text("分享时出发地将显示为???")
+                                            .font(.caption)
+                                            .foregroundStyle(.gray)
+                                    }
+                                }
+                            }
+                            .toggleStyle(SwitchToggleStyle(tint: Color(red: 1.0, green: 0.41, blue: 0.71)))
+                            .padding(.horizontal, 30)
+                            
+                            // 开始登机按钮
+                            Button {
+                                viewModel.startBoarding()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "airplane")
+                                    Text("开始登机")
+                                }
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(25)
+                            }
+                            .padding(.horizontal, 30)
+                        }
+                        
+                        Spacer().frame(height: tabBarOffset)
                     }
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .cornerRadius(25)
                 }
-                .padding(.horizontal, 30)
             }
-            
-            Spacer(minLength: 50)
+            .navigationTitle("飞行准备")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                    .foregroundStyle(Color(red: 1.0, green: 0.41, blue: 0.71))
+                }
+            }
         }
     }
 }
@@ -100,74 +124,89 @@ struct BoardingView: View {
     @State private var pulseAnimation = false
     
     var body: some View {
-        VStack(spacing: 40) {
-            Spacer()
-            
-            // 登机牌动画
-            ZStack {
-                // 背景光晕
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.3),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 50,
-                            endRadius: 150
-                        )
-                    )
-                    .frame(width: 300, height: 300)
-                    .scaleEffect(pulseAnimation ? 1.2 : 0.8)
-                    .opacity(pulseAnimation ? 0.5 : 1)
-                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulseAnimation)
+        NavigationStack {
+            GeometryReader { geometry in
+                let safeAreaTop = geometry.safeAreaInsets.top
+                let safeAreaBottom = geometry.safeAreaInsets.bottom
+                let navBarOffset = safeAreaTop + 60
+                let tabBarOffset = safeAreaBottom + 90
                 
-                // 登机牌
-                BoardingPassCard(viewModel: viewModel)
-                    .rotation3DEffect(
-                        .degrees(pulseAnimation ? 5 : -5),
-                        axis: (x: 0, y: 1, z: 0)
-                    )
-                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: pulseAnimation)
-            }
-            .onAppear {
-                pulseAnimation = true
-            }
-            
-            // 登机信息
-            VStack(spacing: 12) {
-                Text("正在登机...")
-                    .font(.title2)
-                    .foregroundStyle(.white)
-                
-                if case .boarding(let seatNumber) = viewModel.flightStatus {
-                    Text("座位号: \(seatNumber)")
-                        .font(.system(size: 36, weight: .bold, design: .monospaced))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: navBarOffset)
+                        
+                        // 登机牌动画
+                        ZStack {
+                            // 背景光晕
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.3),
+                                            Color.clear
+                                        ],
+                                        center: .center,
+                                        startRadius: 50,
+                                        endRadius: 150
+                                    )
+                                )
+                                .frame(width: 300, height: 300)
+                                .scaleEffect(pulseAnimation ? 1.2 : 0.8)
+                                .opacity(pulseAnimation ? 0.5 : 1)
+                                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulseAnimation)
+                            
+                            // 登机牌
+                            BoardingPassCard(viewModel: viewModel)
+                                .rotation3DEffect(
+                                    .degrees(pulseAnimation ? 5 : -5),
+                                    axis: (x: 0, y: 1, z: 0)
+                                )
+                                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: pulseAnimation)
+                        }
+                        .onAppear {
+                            pulseAnimation = true
+                        }
+                        
+                        // 登机信息
+                        VStack(spacing: 12) {
+                            Text("正在登机...")
+                                .font(.title2)
+                                .foregroundStyle(.white)
+                            
+                            if case .boarding(let seatNumber) = viewModel.flightStatus {
+                                Text("座位号: \(seatNumber)")
+                                    .font(.system(size: 36, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            }
+                            
+                            Text(viewModel.currentNarrative)
+                                .font(.subheadline)
+                                .foregroundStyle(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                        
+                        Spacer()
+                        
+                        // 进度指示
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(Color(red: 1.0, green: 0.84, blue: 0.0))
+                        
+                        Spacer().frame(height: tabBarOffset)
+                    }
                 }
-                
-                Text(viewModel.currentNarrative)
-                    .font(.subheadline)
-                    .foregroundStyle(.gray)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
             }
-            
-            Spacer()
-            
-            // 进度指示
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(Color(red: 1.0, green: 0.84, blue: 0.0))
-            
-            Spacer(minLength: 80)
+            .navigationTitle("正在登机")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
@@ -294,147 +333,155 @@ struct FlightExperienceView: View {
     @State private var planeBounce: CGFloat = 0
     
     var body: some View {
-        ZStack {
-            // 天空背景
-            LinearGradient(
-                colors: [
-                    Color(red: 0.1, green: 0.15, blue: 0.3),
-                    Color(red: 0.3, green: 0.4, blue: 0.7),
-                    Color(red: 0.6, green: 0.7, blue: 0.9)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            // 云朵层
-            CloudsView(offset: cloudOffset)
-            
-            // 飞机舷窗效果
-            VStack {
-                Spacer()
+        NavigationStack {
+            GeometryReader { geometry in
+                let safeAreaTop = geometry.safeAreaInsets.top
+                let safeAreaBottom = geometry.safeAreaInsets.bottom
+                let navBarOffset = safeAreaTop + 60
+                let tabBarOffset = safeAreaBottom + 90
                 
                 ZStack {
-                    // 舷窗外框
-                    RoundedRectangle(cornerRadius: 80)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.9, green: 0.9, blue: 0.95),
-                                    Color(red: 0.7, green: 0.75, blue: 0.85)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 280, height: 380)
-                        .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                    // 天空背景
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.1, green: 0.15, blue: 0.3),
+                            Color(red: 0.3, green: 0.4, blue: 0.7),
+                            Color(red: 0.6, green: 0.7, blue: 0.9)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
                     
-                    // 舷窗玻璃
-                    RoundedRectangle(cornerRadius: 70)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.4, green: 0.6, blue: 0.9).opacity(0.8),
-                                    Color(red: 0.6, green: 0.8, blue: 1.0).opacity(0.6)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 260, height: 360)
-                        .overlay(
-                            // 玻璃反光
+                    // 云朵层
+                    CloudsView(offset: cloudOffset)
+                    
+                    // 主内容
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: navBarOffset)
+                        
+                        // 飞机舷窗效果
+                        ZStack {
+                            // 舷窗外框
+                            RoundedRectangle(cornerRadius: 80)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.9, green: 0.9, blue: 0.95),
+                                            Color(red: 0.7, green: 0.75, blue: 0.85)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 280, height: 380)
+                                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                            
+                            // 舷窗玻璃
                             RoundedRectangle(cornerRadius: 70)
                                 .fill(
                                     LinearGradient(
                                         colors: [
-                                            Color.white.opacity(0.4),
-                                            Color.white.opacity(0)
+                                            Color(red: 0.4, green: 0.6, blue: 0.9).opacity(0.8),
+                                            Color(red: 0.6, green: 0.8, blue: 1.0).opacity(0.6)
                                         ],
-                                        startPoint: .topLeading,
-                                        endPoint: .center
+                                        startPoint: .top,
+                                        endPoint: .bottom
                                     )
                                 )
-                        )
-                    
-                    // 飞机图标
-                    Image(systemName: "airplane")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .rotationEffect(.degrees(45))
-                        .offset(y: planeBounce)
-                }
-                .padding(.bottom, 40)
-                
-                Spacer()
-            }
-            
-            // 底部信息面板
-            VStack {
-                Spacer()
-                
-                VStack(spacing: 20) {
-                    // 进度条
-                    VStack(spacing: 8) {
-                        HStack {
-                            Text("飞行中")
-                                .font(.caption)
-                                .foregroundStyle(.gray)
+                                .frame(width: 260, height: 360)
+                                .overlay(
+                                    // 玻璃反光
+                                    RoundedRectangle(cornerRadius: 70)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.4),
+                                                    Color.white.opacity(0)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .center
+                                            )
+                                        )
+                                )
                             
-                            Spacer()
-                            
-                            Text("\(Int(viewModel.flightProgress * 100))%")
-                                .font(.caption)
-                                .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))
+                            // 飞机图标
+                            Image(systemName: "airplane")
+                                .font(.system(size: 60))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .rotationEffect(.degrees(45))
+                                .offset(y: planeBounce)
                         }
                         
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.white.opacity(0.1))
-                                    .frame(height: 8)
+                        Spacer()
+                        
+                        // 底部信息面板
+                        VStack(spacing: 20) {
+                            // 进度条
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Text("飞行中")
+                                        .font(.caption)
+                                        .foregroundStyle(.gray)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(Int(viewModel.flightProgress * 100))%")
+                                        .font(.caption)
+                                        .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))
+                                }
                                 
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: geo.size.width * viewModel.flightProgress, height: 8)
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color.white.opacity(0.1))
+                                            .frame(height: 8)
+                                        
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: geo.size.width * viewModel.flightProgress, height: 8)
+                                    }
+                                }
+                                .frame(height: 8)
                             }
+                            
+                            // 叙事文字
+                            Text(viewModel.currentNarrative)
+                                .font(.subheadline)
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
+                                .frame(height: 40)
                         }
-                        .frame(height: 8)
+                        .padding(24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.black.opacity(0.5))
+                                .background(.ultraThinMaterial)
+                        )
+                        .padding(.horizontal, 20)
+                        
+                        Spacer().frame(height: tabBarOffset)
                     }
-                    
-                    // 叙事文字
-                    Text(viewModel.currentNarrative)
-                        .font(.subheadline)
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .frame(height: 40)
                 }
-                .padding(24)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.black.opacity(0.5))
-                        .background(.ultraThinMaterial)
-                )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
             }
-        }
-        .onAppear {
-            // 云朵动画
-            withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
-                cloudOffset = -200
-            }
-            
-            // 飞机颠簸动画
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                planeBounce = 10
+            .navigationTitle("飞行体验")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                // 云朵动画
+                withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
+                    cloudOffset = -200
+                }
+                
+                // 飞机颠簸动画
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    planeBounce = 10
+                }
             }
         }
     }
@@ -502,95 +549,110 @@ struct ArrivalView: View {
     @State private var scale: CGFloat = 0.8
     
     var body: some View {
-        VStack(spacing: 40) {
-            Spacer()
-            
-            if let landmark = viewModel.selectedLandmark {
-                // 到达动画
+        NavigationStack {
+            GeometryReader { geometry in
+                let safeAreaTop = geometry.safeAreaInsets.top
+                let safeAreaBottom = geometry.safeAreaInsets.bottom
+                let navBarOffset = safeAreaTop + 60
+                let tabBarOffset = safeAreaBottom + 90
+                
                 ZStack {
-                    // 光环
-                    Circle()
-                        .fill(landmark.type.themeColor.opacity(0.2))
-                        .frame(width: 250, height: 250)
-                        .scaleEffect(showContent ? 1.2 : 0.8)
+                    Color.black.ignoresSafeArea()
                     
-                    Circle()
-                        .fill(landmark.type.themeColor.opacity(0.1))
-                        .frame(width: 350, height: 350)
-                        .scaleEffect(showContent ? 1.0 : 0.6)
-                    
-                    // 地标图标
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.1))
-                            .frame(width: 180, height: 180)
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: navBarOffset)
                         
-                        Image(systemName: landmark.type.icon)
-                            .font(.system(size: 100))
-                            .foregroundStyle(landmark.type.themeColor)
+                        if let landmark = viewModel.selectedLandmark {
+                            // 到达动画
+                            ZStack {
+                                // 光环
+                                Circle()
+                                    .fill(landmark.type.themeColor.opacity(0.2))
+                                    .frame(width: 250, height: 250)
+                                    .scaleEffect(showContent ? 1.2 : 0.8)
+                                
+                                Circle()
+                                    .fill(landmark.type.themeColor.opacity(0.1))
+                                    .frame(width: 350, height: 350)
+                                    .scaleEffect(showContent ? 1.0 : 0.6)
+                                
+                                // 地标图标
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.1))
+                                        .frame(width: 180, height: 180)
+                                    
+                                    Image(systemName: landmark.type.icon)
+                                        .font(.system(size: 100))
+                                        .foregroundStyle(landmark.type.themeColor)
+                                }
+                                .scaleEffect(scale)
+                            }
+                            
+                            // 到达信息
+                            VStack(spacing: 16) {
+                                Text("已抵达")
+                                    .font(.title3)
+                                    .foregroundStyle(.gray)
+                                
+                                Text(landmark.name)
+                                    .font(.system(size: 32, weight: .bold, design: .serif))
+                                    .foregroundStyle(.white)
+                                
+                                Text(landmark.subtitle)
+                                    .font(.title3)
+                                    .foregroundStyle(landmark.type.themeColor)
+                                
+                                Text(viewModel.currentNarrative)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.gray)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 40)
+                            }
+                            .opacity(showContent ? 1 : 0)
+                            .offset(y: showContent ? 0 : 20)
+                        }
+                        
+                        Spacer()
+                        
+                        // 打卡按钮
+                        Button {
+                            viewModel.checkIn()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("茶会打卡")
+                            }
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(25)
+                        }
+                        .padding(.horizontal, 30)
+                        .opacity(showContent ? 1 : 0)
+                        
+                        Spacer().frame(height: tabBarOffset)
                     }
-                    .scaleEffect(scale)
+                }
+            }
+            .navigationTitle("抵达目的地")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.6)) {
+                    showContent = true
                 }
                 
-                // 到达信息
-                VStack(spacing: 16) {
-                    Text("已抵达")
-                        .font(.title3)
-                        .foregroundStyle(.gray)
-                    
-                    Text(landmark.name)
-                        .font(.system(size: 32, weight: .bold, design: .serif))
-                        .foregroundStyle(.white)
-                    
-                    Text(landmark.subtitle)
-                        .font(.title3)
-                        .foregroundStyle(landmark.type.themeColor)
-                    
-                    Text(viewModel.currentNarrative)
-                        .font(.subheadline)
-                        .foregroundStyle(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+                    scale = 1.0
                 }
-                .opacity(showContent ? 1 : 0)
-                .offset(y: showContent ? 0 : 20)
-            }
-            
-            Spacer()
-            
-            // 打卡按钮
-            Button {
-                viewModel.checkIn()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("茶会打卡")
-                }
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(25)
-            }
-            .padding(.horizontal, 30)
-            .opacity(showContent ? 1 : 0)
-            
-            Spacer(minLength: 50)
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.6)) {
-                showContent = true
-            }
-            
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-                scale = 1.0
             }
         }
     }
@@ -603,69 +665,84 @@ struct CheckInCompleteView: View {
     @State private var showBadge = false
     
     var body: some View {
-        VStack(spacing: 30) {
-            Spacer()
-            
-            if case .checkedIn(let record) = viewModel.flightStatus {
-                // 徽章获得动画
-                if showBadge {
-                    BadgeEarnedView(badge: record.badgeEarned, landmark: record.landmark)
-                        .transition(.scale.combined(with: .opacity))
-                }
+        NavigationStack {
+            GeometryReader { geometry in
+                let safeAreaTop = geometry.safeAreaInsets.top
+                let safeAreaBottom = geometry.safeAreaInsets.bottom
+                let navBarOffset = safeAreaTop + 60
+                let tabBarOffset = safeAreaBottom + 90
                 
-                Spacer()
-                
-                // 操作按钮
-                VStack(spacing: 16) {
-                    // 分享按钮
-                    Button {
-                        showShareCard = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "square.and.arrow.up")
-                            Text("分享登机牌")
-                        }
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(25)
-                    }
+                ZStack {
+                    Color.black.ignoresSafeArea()
                     
-                    // 返回按钮
-                    Button {
-                        viewModel.resetFlight()
-                    } label: {
-                        Text("继续探索")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 25)
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                            )
+                    VStack(spacing: 0) {
+                        Spacer().frame(height: navBarOffset)
+                        
+                        if case .checkedIn(let record) = viewModel.flightStatus {
+                            // 徽章获得动画
+                            if showBadge {
+                                BadgeEarnedView(badge: record.badgeEarned, landmark: record.landmark)
+                                    .transition(.scale.combined(with: .opacity))
+                            }
+                            
+                            Spacer()
+                            
+                            // 操作按钮
+                            VStack(spacing: 16) {
+                                // 分享按钮
+                                Button {
+                                    showShareCard = true
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "square.and.arrow.up")
+                                        Text("分享登机牌")
+                                    }
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .cornerRadius(25)
+                                }
+                                
+                                // 返回按钮
+                                Button {
+                                    viewModel.resetFlight()
+                                } label: {
+                                    Text("继续探索")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 14)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 25)
+                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        )
+                                }
+                            }
+                            .padding(.horizontal, 30)
+                            .sheet(isPresented: $showShareCard) {
+                                ShareCardView(boardingPass: viewModel.generateBoardingPass(for: record))
+                            }
+                        }
+                        
+                        Spacer().frame(height: tabBarOffset)
                     }
-                }
-                .padding(.horizontal, 30)
-                .sheet(isPresented: $showShareCard) {
-                    ShareCardView(boardingPass: viewModel.generateBoardingPass(for: record))
                 }
             }
-            
-            Spacer(minLength: 50)
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
-                    showBadge = true
+            .navigationTitle("打卡完成")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+                        showBadge = true
+                    }
                 }
             }
         }
