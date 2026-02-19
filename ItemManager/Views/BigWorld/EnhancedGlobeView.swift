@@ -60,8 +60,9 @@ struct EnhancedGlobeView: View {
             .onMapCameraChange { context in
                 isMapLoaded = true
             }
+            .safeAreaPadding(.top, 110)
             .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: 80)
+                Color.clear.frame(height: 85)
             }
             .overlay(
                 // 大气层光晕效果
@@ -82,10 +83,12 @@ struct EnhancedGlobeView: View {
             // UI 覆盖层
             GeometryReader { geometry in
                 let safeAreaTop = geometry.safeAreaInsets.top
+                // 导航栏高度约44pt，加上一些间距，让内容显示在导航栏下方
+                let navBarOffset = safeAreaTop + 60
                 
-                // 左侧：标题（在导航栏下方，使用safeAreaInsets）
+                // 左侧：标题（在导航栏下方）
                 VStack {
-                    Spacer().frame(height: safeAreaTop + 8)
+                    Spacer().frame(height: navBarOffset)
                     
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
@@ -107,7 +110,7 @@ struct EnhancedGlobeView: View {
                 
                 // 右侧：等级入口（在导航栏下方，与标题对齐）
                 VStack {
-                    Spacer().frame(height: safeAreaTop + 8)
+                    Spacer().frame(height: navBarOffset)
                     
                     HStack {
                         Spacer()
