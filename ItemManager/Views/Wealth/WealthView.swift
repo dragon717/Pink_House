@@ -56,9 +56,15 @@ struct WealthView: View {
                         )
                         .tag(WealthMainTab.moneyCounting)
                         
-                        // 安财
-                        WealthStorageContainerView(viewModel: viewModel)
-                            .tag(WealthMainTab.wealthStorage)
+                        // 安财 - 只在选中时创建，避免物理模拟提前启动
+                        Group {
+                            if selectedMainTab == .wealthStorage {
+                                WealthStorageContainerView(viewModel: viewModel)
+                            } else {
+                                Color.clear
+                            }
+                        }
+                        .tag(WealthMainTab.wealthStorage)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
@@ -244,9 +250,14 @@ enum WealthMainTab: String, CaseIterable, Identifiable {
 
 struct DivinationView: View {
     @State private var currentFortune: Fortune?
-    @State private var isShaking = false
-    @State private var showResult = false
-    @State private var shakeCount = 0
+    @State private var videoState: VideoState = .initial
+    @State private var showFortuneText = false
+    
+    enum VideoState {
+        case initial      // 显示首帧
+        case playing      // 播放视频中
+        case finished     // 显示尾帧+签文
+    }
     
     private let fortunes: [Fortune] = [
         Fortune(level: .supreme, text: "上上签", description: "财运亨通，福星高照", detail: "今日财运极佳，适合投资理财，可能会有意外之财降临。"),
@@ -257,165 +268,208 @@ struct DivinationView: View {
         Fortune(level: .good, text: "上签", description: "贵人相助，财运可期", detail: "有望得到贵人提携，财运有所提升。"),
     ]
     
+    // 圆角大小
+    private let cornerRadius: CGFloat = 20
+    // 容器尺寸比例（相对于屏幕宽度）
+    private let containerScale: CGFloat = 0.75
+    // 最大容器尺寸
+    private let maxContainerSize: CGFloat = 360
+    // 最小容器尺寸
+    private let minContainerSize: CGFloat = 280
+    
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        GeometryReader { geometry in
+            let containerSize = calculateContainerSize(for: geometry.size)
             
-            // 签筒
             ZStack {
-                // 签筒主体
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.6, green: 0.3, blue: 0.1),
-                                Color(red: 0.4, green: 0.2, blue: 0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 120, height: 180)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color(red: 0.8, green: 0.6, blue: 0.2), lineWidth: 3)
-                    )
-                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-                    .rotationEffect(.degrees(isShaking ? Double.random(in: -15...15) : 0))
-                    .offset(x: isShaking ? CGFloat.random(in: -10...10) : 0)
-                    .animation(isShaking ? .linear(duration: 0.05).repeatCount(20) : .spring(), value: isShaking)
-                
-                // 签筒文字
-                VStack {
-                    Text("财")
-                        .font(.system(size: 48, weight: .bold, design: .serif))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 0.9, green: 0.7, blue: 0.1)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                // 主要内容区域 - 使用固定布局避免按钮影响
+                VStack(spacing: 0) {
+                    Spacer()
+                    
+                    // 圆角矩形容器 - 固定位置，不受按钮影响
+                    ZStack {
+                        // 初始状态：显示首帧
+                        if videoState == .initial {
+                            Image("divination_first_frame")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: containerSize, height: containerSize)
+                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                .transition(.opacity)
+                        }
+                        
+                        // 播放中：显示视频
+                        if videoState == .playing {
+                            DivinationVideoPlayer(
+                                videoName: "请签",
+                                onFinished: {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        videoState = .finished
+                                    }
+                                    // 延迟显示签文
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                                            showFortuneText = true
+                                        }
+                                    }
+                                }
                             )
-                        )
-                        .shadow(color: .black.opacity(0.3), radius: 2)
-                    
-                    Text("运")
-                        .font(.system(size: 36, weight: .bold, design: .serif))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 0.9, green: 0.7, blue: 0.1)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                            .frame(width: containerSize, height: containerSize)
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                            .transition(.opacity)
+                        }
+                        
+                        // 结束状态：显示尾帧 + 签文
+                        if videoState == .finished {
+                            // 尾帧背景
+                            Image("divination_last_frame")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: containerSize, height: containerSize)
+                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                .transition(.opacity)
+                            
+                            // 半透明遮罩，让签文更清晰
+                            RoundedRectangle(cornerRadius: cornerRadius)
+                                .fill(.ultraThinMaterial.opacity(0.3))
+                                .frame(width: containerSize, height: containerSize)
+                            
+                            // 竖向签文（居中偏上）
+                            if showFortuneText {
+                                VerticalFortuneText(fortune: currentFortune ?? fortunes[0], containerSize: containerSize)
+                                    .transition(.asymmetric(
+                                        insertion: .scale.combined(with: .opacity),
+                                        removal: .opacity
+                                    ))
+                            }
+                        }
+                        
+                        // 边框装饰
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.9, green: 0.75, blue: 0.4),
+                                        Color(red: 0.7, green: 0.5, blue: 0.2)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 3
                             )
-                        )
-                        .shadow(color: .black.opacity(0.3), radius: 2)
-                }
-                
-                // 签（当显示结果时）
-                if showResult, let fortune = currentFortune {
-                    FortuneStickView(fortune: fortune)
-                        .offset(y: -80)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal: .opacity
-                        ))
-                }
-            }
-            
-            Spacer()
-            
-            // 结果展示
-            if showResult, let fortune = currentFortune {
-                VStack(spacing: 12) {
-                    Text(fortune.text)
-                        .font(.system(size: 36, weight: .bold, design: .serif))
-                        .foregroundStyle(fortune.level == .supreme ? 
-                            LinearGradient(colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 0.9, green: 0.5, blue: 0.1)], startPoint: .top, endPoint: .bottom) :
-                            LinearGradient(colors: [Color(red: 0.5, green: 0.7, blue: 0.9), Color(red: 0.3, green: 0.5, blue: 0.8)], startPoint: .top, endPoint: .bottom)
-                        )
+                            .frame(width: containerSize, height: containerSize)
+                        
+                        // 外发光阴影
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(Color(red: 0.9, green: 0.75, blue: 0.4).opacity(0.3), lineWidth: 8)
+                            .frame(width: containerSize + 6, height: containerSize + 6)
+                            .blur(radius: 4)
+                    }
+                    .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 8)
+                    // 固定偏移量，确保位置不变
+                    .offset(y: -40)
                     
-                    Text(fortune.description)
-                        .font(.title3)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
+                    Spacer()
                     
-                    Text(fortune.detail)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                    // 解签内容区域 - 固定高度占位，不受显示/隐藏影响
+                    ZStack {
+                        if videoState == .finished && showFortuneText, let fortune = currentFortune {
+                            FortuneInterpretationView(fortune: fortune)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
+                    }
+                    .frame(height: 100)
+                    
+                    // 按钮区域 - 固定高度占位，保持布局稳定
+                    ZStack {
+                        // 开始求签按钮
+                        if videoState == .initial {
+                            Button {
+                                startDivination()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "wand.and.stars")
+                                    Text("开始求签")
+                                }
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 32)
+                                .padding(.vertical, 16)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(Capsule())
+                                .shadow(color: Color(red: 0.8, green: 0.3, blue: 0.3).opacity(0.4), radius: 8, x: 0, y: 4)
+                            }
+                            .transition(.opacity)
+                        }
+                        
+                        // 再求一签按钮
+                        if videoState == .finished && showFortuneText {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showFortuneText = false
+                                    videoState = .playing
+                                }
+                                // 重新随机选择
+                                currentFortune = fortunes.randomElement()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                    Text("再求一签")
+                                }
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 32)
+                                .padding(.vertical, 16)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(Capsule())
+                                .shadow(color: Color(red: 0.8, green: 0.3, blue: 0.3).opacity(0.4), radius: 8, x: 0, y: 4)
+                            }
+                            .transition(.opacity)
+                        }
+                    }
+                    // 固定高度，确保布局稳定
+                    .frame(height: 80)
+                    .padding(.bottom, 40)
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(uiColor: .secondarySystemBackground).opacity(0.8))
-                        .background(.ultraThinMaterial)
-                )
-                .padding(.horizontal)
             }
-            
-            // 求签按钮
-            Button {
-                performDivination()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "wand.and.stars")
-                    Text(showResult ? "再求一签" : "开始求签")
-                }
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 16)
-                .background(
-                    LinearGradient(
-                        colors: [Color(red: 0.8, green: 0.3, blue: 0.3), Color(red: 0.6, green: 0.2, blue: 0.2)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(Capsule())
-                .shadow(color: Color(red: 0.8, green: 0.3, blue: 0.3).opacity(0.4), radius: 8, x: 0, y: 4)
-            }
-            .disabled(isShaking)
-            .padding(.bottom, 40)
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
     }
     
-    private func performDivination() {
-        // 重置状态
-        withAnimation {
-            showResult = false
-            currentFortune = nil
-        }
+    // 计算自适应容器尺寸
+    private func calculateContainerSize(for size: CGSize) -> CGFloat {
+        let minDimension = min(size.width, size.height)
+        let calculatedSize = minDimension * containerScale
+        return min(max(calculatedSize, minContainerSize), maxContainerSize)
+    }
+    
+    private func startDivination() {
+        // 随机选择一个签
+        currentFortune = fortunes.randomElement()
         
-        // 开始摇晃动画
-        isShaking = true
+        // 播放成功反馈
+        let notificationGenerator = UINotificationFeedbackGenerator()
+        notificationGenerator.notificationOccurred(.success)
         
-        // 播放震动反馈
-        let generator = UIImpactFeedbackGenerator(style: .heavy)
-        generator.prepare()
-        
-        // 定时触发震动
-        var shakeTimer: Timer?
-        shakeTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            generator.impactOccurred()
-        }
-        
-        // 1秒后停止摇晃并显示结果
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            shakeTimer?.invalidate()
-            isShaking = false
-            
-            // 随机选择一个签
-            currentFortune = fortunes.randomElement()
-            
-            // 播放成功反馈
-            let notificationGenerator = UINotificationFeedbackGenerator()
-            notificationGenerator.notificationOccurred(.success)
-            
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                showResult = true
-            }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            videoState = .playing
         }
     }
 }
@@ -433,6 +487,70 @@ struct Fortune: Identifiable {
 enum FortuneLevel {
     case supreme  // 上上签
     case good     // 上签
+}
+
+// MARK: - 解签内容视图（Lolita风格）
+
+struct FortuneInterpretationView: View {
+    let fortune: Fortune
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // 标题
+            HStack {
+                Image(systemName: "sparkles")
+                    .font(.caption)
+                    .foregroundStyle(Color(red: 0.8, green: 0.5, blue: 0.6))
+                
+                Text(fortune.description)
+                    .font(.system(size: 16, weight: .medium, design: .serif))
+                    .foregroundStyle(Color(red: 0.6, green: 0.35, blue: 0.45))
+                
+                Image(systemName: "sparkles")
+                    .font(.caption)
+                    .foregroundStyle(Color(red: 0.8, green: 0.5, blue: 0.6))
+            }
+            
+            // 详细解签
+            Text(fortune.detail)
+                .font(.system(size: 13, weight: .regular, design: .serif))
+                .foregroundStyle(Color(red: 0.5, green: 0.4, blue: 0.45))
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.horizontal, 24)
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 1.0, green: 0.96, blue: 0.98).opacity(0.95),
+                            Color(red: 0.98, green: 0.94, blue: 0.96).opacity(0.95)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.9, green: 0.7, blue: 0.8).opacity(0.6),
+                                    Color(red: 0.8, green: 0.6, blue: 0.7).opacity(0.4)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: Color(red: 0.8, green: 0.5, blue: 0.6).opacity(0.15), radius: 8, x: 0, y: 4)
+        )
+        .padding(.horizontal, 32)
+    }
 }
 
 // MARK: - 签条视图
@@ -584,11 +702,11 @@ struct WealthStorageContainerView: View {
             // 内容区域
             TabView(selection: $selectedStorageTab) {
                 // 黄金
-                GoldStorageView(viewModel: viewModel)
+                GoldStorageView(viewModel: viewModel, isActive: selectedStorageTab == .gold)
                     .tag(StorageTab.gold)
                 
                 // 白银
-                SilverStorageView(viewModel: viewModel)
+                SilverStorageView(viewModel: viewModel, isActive: selectedStorageTab == .silver)
                     .tag(StorageTab.silver)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -616,6 +734,7 @@ enum StorageTab: String, CaseIterable, Identifiable {
 
 struct GoldStorageView: View {
     @Bindable var viewModel: WealthViewModel
+    let isActive: Bool
     
     var body: some View {
         VStack(spacing: 16) {
@@ -647,22 +766,28 @@ struct GoldStorageView: View {
             .font(.caption2)
             .foregroundStyle(.tertiary)
             
-            // 物理模拟视图
-            if viewModel.isGoldReady {
-                GoldPhysicsView(
-                    totalWeightGrams: viewModel.totalGoldWeightGrams,
-                    beanWeight: viewModel.goldBeanWeightGrams
-                )
-            } else {
-                VStack {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("正在计算金克重...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
+            // 物理模拟视图 - 只在当前 Tab 激活时创建
+            if isActive {
+                if viewModel.isGoldReady {
+                    GoldPhysicsView(
+                        totalWeightGrams: viewModel.totalGoldWeightGrams,
+                        beanWeight: viewModel.goldBeanWeightGrams
+                    )
+                } else {
+                    VStack {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("正在计算金克重...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // 非激活状态显示占位
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -705,6 +830,7 @@ struct GoldStorageView: View {
 
 struct SilverStorageView: View {
     @Bindable var viewModel: WealthViewModel
+    let isActive: Bool
     
     var body: some View {
         VStack(spacing: 16) {
@@ -736,22 +862,28 @@ struct SilverStorageView: View {
             .font(.caption2)
             .foregroundStyle(.tertiary)
             
-            // 物理模拟视图
-            if viewModel.isSilverReady {
-                SilverPhysicsView(
-                    totalWeightGrams: viewModel.totalSilverWeightGrams,
-                    beanWeight: viewModel.silverBeanWeightGrams
-                )
-            } else {
-                VStack {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("正在计算白银重量...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
+            // 物理模拟视图 - 只在当前 Tab 激活时创建
+            if isActive {
+                if viewModel.isSilverReady {
+                    SilverPhysicsView(
+                        totalWeightGrams: viewModel.totalSilverWeightGrams,
+                        beanWeight: viewModel.silverBeanWeightGrams
+                    )
+                } else {
+                    VStack {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("正在计算白银重量...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // 非激活状态显示占位
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }

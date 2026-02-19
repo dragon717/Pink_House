@@ -7,3 +7,4 @@ ItemManager/asserts/*.mp3
 ItemManager/asserts/*.ttf
 temp/*
 ItemManager/GenerativeAI-Info.plist
+ItemManager/asserts/*.mov
