@@ -53,13 +53,48 @@ struct ModernTabView: View {
     // 修复：添加 selectedTab 状态来跟踪当前选中的 Tab，用于 SmallWorldMenuOverlay
     @State private var selectedTab: Int = 1
     
+    // MARK: - 动态 Tab 标题和图标
+    private var smallWorldTabTitle: String {
+        switch smallWorldDestination {
+        case .bigWorld:
+            return "大世界"
+        case .calendar:
+            return "梦裙日历"
+        case .wealth:
+            return "来财"
+        case .pet:
+            return petDataManager.status.displayName
+        case .ootd:
+            return "穿搭手帐"
+        case .menu:
+            return "小世界"
+        }
+    }
+    
+    private var smallWorldTabIcon: String {
+        switch smallWorldDestination {
+        case .bigWorld:
+            return "airplane"
+        case .calendar:
+            return "calendar"
+        case .wealth:
+            return "yensign.circle"
+        case .pet:
+            return "pawprint"
+        case .ootd:
+            return "book.pages"
+        case .menu:
+            return "map"
+        }
+    }
+    
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
                 WardrobeTabContent(homeTabSelection: $homeTabSelection)
             }
             
-            Tab("小世界", systemImage: "map", value: 1) {
+            Tab(smallWorldTabTitle, systemImage: smallWorldTabIcon, value: 1) {
                 SmallWorldTabContent(
                     homeTab: $homeTabSelection,
                     destination: $smallWorldDestination,
