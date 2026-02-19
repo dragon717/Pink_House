@@ -22,12 +22,28 @@ struct ImageViewer: View {
             Color.black.ignoresSafeArea()
             
             TabView(selection: $selectedIndex) {
-                ForEach(0..<imagePaths.count, id: \.self) { index in
-                    ZoomableImageView(imagePath: imagePaths[index])
-                        .tag(index)
+                if imagePaths.isEmpty {
+                    // 空状态占位
+                    Color.black
+                        .tag(0)
+                } else {
+                    // 使用 enumerated 避免索引问题
+                    ForEach(Array(imagePaths.enumerated()), id: \.element) { index, imagePath in
+                        ZoomableImageView(imagePath: imagePath)
+                            .tag(index)
+                    }
                 }
             }
+            .id("viewer-\(imagePaths.count)") // 强制刷新当图片数量变化
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            .onChange(of: imagePaths) { _, newPaths in
+                // 当图片路径变化时，验证 selectedIndex
+                if newPaths.isEmpty {
+                    selectedIndex = 0
+                } else if selectedIndex >= newPaths.count {
+                    selectedIndex = max(0, newPaths.count - 1)
+                }
+            }
             
             // Overlay controls
             VStack {
@@ -45,7 +61,7 @@ struct ImageViewer: View {
                     Spacer()
                     
                     if imagePaths.count > 1 {
-                        Text("\(selectedIndex + 1) / \(imagePaths.count)")
+                        Text("\(min(selectedIndex + 1, imagePaths.count)) / \(imagePaths.count)")
                             .foregroundStyle(.white)
                             .font(.headline)
                     }

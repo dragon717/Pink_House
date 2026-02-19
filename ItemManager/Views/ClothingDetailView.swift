@@ -179,7 +179,9 @@ struct ClothingDetailView: View {
             )
         }
         .fullScreenCover(isPresented: $showingImageViewer) {
-            ImageViewer(imagePaths: clothing.imagePaths, selectedIndex: $currentImageIndex)
+            if !clothing.imagePaths.isEmpty {
+                ImageViewer(imagePaths: clothing.imagePaths, selectedIndex: $currentImageIndex)
+            }
         }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
@@ -210,6 +212,20 @@ struct ClothingDetailView: View {
                     clothing.price = newTotal
                 }
             }
+            // 确保 currentImageIndex 不会越界
+            validateCurrentImageIndex()
+        }
+        .onChange(of: clothing.imagePaths) { _, _ in
+            // 当图片路径变化时（如删除图片），验证索引
+            validateCurrentImageIndex()
+        }
+    }
+    
+    private func validateCurrentImageIndex() {
+        if clothing.imagePaths.isEmpty {
+            currentImageIndex = 0
+        } else if currentImageIndex >= clothing.imagePaths.count {
+            currentImageIndex = max(0, clothing.imagePaths.count - 1)
         }
     }
     
@@ -295,6 +311,7 @@ struct ClothingDetailView: View {
     @ViewBuilder
     private func imageCarousel(height: CGFloat, width: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
+            // 使用 ID 强制刷新整个 TabView 当图片数量变化时
             TabView(selection: $currentImageIndex) {
                 if clothing.imagePaths.isEmpty {
                     Rectangle()
@@ -306,27 +323,29 @@ struct ClothingDetailView: View {
                         }
                         .tag(0)
                 } else {
-                    ForEach(0..<clothing.imagePaths.count, id: \.self) { index in
-                        // 修正：直接使用 Points 尺寸，ImageManager 内部会乘以 UIScreen.main.scale
-                        // 之前可能错误地在调用端乘了 Scale，导致加载了 Scale^2 倍的像素
+                    // 使用 enumerated 避免索引问题
+                    ForEach(Array(clothing.imagePaths.enumerated()), id: \.element) { index, imagePath in
                         let targetSize = CGSize(width: width, height: height)
                         
-                        CarouselItemView(imagePath: clothing.imagePaths[index], targetSize: targetSize)
+                        CarouselItemView(imagePath: imagePath, targetSize: targetSize)
                             .tag(index)
-                            .id(clothing.imagePaths[index]) // Ensure view refreshes when image path changes
                             .onTapGesture {
-                                showingImageViewer = true
+                                // 只有在有图片时才允许打开查看器
+                                if !clothing.imagePaths.isEmpty {
+                                    showingImageViewer = true
+                                }
                             }
                     }
                 }
             }
+            .id("carousel-\(clothing.imagePaths.count)") // 强制刷新当图片数量变化
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             .frame(height: height)
             
             // Page Indicator Overlay
             if !clothing.imagePaths.isEmpty {
                 HStack(spacing: 4) {
-                    Text("\(currentImageIndex + 1)")
+                    Text("\(min(currentImageIndex + 1, clothing.imagePaths.count))")
                     Text("/")
                     Text("\(clothing.imagePaths.count)")
                 }

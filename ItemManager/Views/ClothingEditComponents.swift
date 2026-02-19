@@ -10,7 +10,7 @@ import Foundation
 
 // MARK: - Data Models
 
-struct AccessoryItemData: Identifiable, Equatable {
+struct AccessoryItemData: Identifiable, Equatable, Codable {
     var id: UUID = UUID()
     var name: String
     var price: Double

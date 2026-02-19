@@ -9,13 +9,130 @@ import SwiftUI
 import SwiftData
 import Foundation
 
+// MARK: - 编辑草稿数据结构
+struct ClothingEditDraft: Codable {
+    let id: UUID
+    let name: String
+    let brandName: String
+    let types: String
+    let colors: String
+    let sizes: String
+    let length: String
+    let condition: String
+    let accessories: String
+    let imagePaths: [String]
+    let isShared: Bool
+    let originalPrice: Double
+    let priceTotal: Double
+    let deposit: Double
+    let balance: Double
+    let accessoriesPrice: Double
+    let stock: Int
+    let purchaseDate: Date
+    let depositDate: Date
+    let isDepositPlan: Bool
+    let finalPaymentDate: Date
+    let finalPaymentEndDate: Date
+    let note: String
+    let accessoryList: [AccessoryItemData]
+    let timestamp: Date
+    
+    init(id: UUID = UUID(),
+         name: String,
+         brandName: String,
+         types: String,
+         colors: String,
+         sizes: String,
+         length: String,
+         condition: String,
+         accessories: String,
+         imagePaths: [String],
+         isShared: Bool,
+         originalPrice: Double,
+         priceTotal: Double,
+         deposit: Double,
+         balance: Double,
+         accessoriesPrice: Double,
+         stock: Int,
+         purchaseDate: Date,
+         depositDate: Date,
+         isDepositPlan: Bool,
+         finalPaymentDate: Date,
+         finalPaymentEndDate: Date,
+         note: String,
+         accessoryList: [AccessoryItemData]) {
+        self.id = id
+        self.name = name
+        self.brandName = brandName
+        self.types = types
+        self.colors = colors
+        self.sizes = sizes
+        self.length = length
+        self.condition = condition
+        self.accessories = accessories
+        self.imagePaths = imagePaths
+        self.isShared = isShared
+        self.originalPrice = originalPrice
+        self.priceTotal = priceTotal
+        self.deposit = deposit
+        self.balance = balance
+        self.accessoriesPrice = accessoriesPrice
+        self.stock = stock
+        self.purchaseDate = purchaseDate
+        self.depositDate = depositDate
+        self.isDepositPlan = isDepositPlan
+        self.finalPaymentDate = finalPaymentDate
+        self.finalPaymentEndDate = finalPaymentEndDate
+        self.note = note
+        self.accessoryList = accessoryList
+        self.timestamp = Date()
+    }
+}
+
+// MARK: - 草稿管理器
+final class ClothingEditDraftManager {
+    static let shared = ClothingEditDraftManager()
+    
+    private let userDefaults = UserDefaults.standard
+    private let draftKey = "ClothingEditDraft"
+    
+    private init() {}
+    
+    func saveDraft(_ draft: ClothingEditDraft) {
+        if let data = try? JSONEncoder().encode(draft) {
+            userDefaults.set(data, forKey: draftKey)
+            userDefaults.synchronize()
+        }
+    }
+    
+    func loadDraft() -> ClothingEditDraft? {
+        guard let data = userDefaults.data(forKey: draftKey),
+              let draft = try? JSONDecoder().decode(ClothingEditDraft.self, from: data) else {
+            return nil
+        }
+        return draft
+    }
+    
+    func clearDraft() {
+        userDefaults.removeObject(forKey: draftKey)
+        userDefaults.synchronize()
+    }
+    
+    func hasDraft() -> Bool {
+        return loadDraft() != nil
+    }
+}
+
 struct ClothingEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+    @State private var draftManager = ClothingEditDraftManager.shared
     
     @State private var clothing: Clothing?
+    @State private var draftID: UUID = UUID()
     
     // Form States
     @State private var name: String = ""
@@ -57,6 +174,9 @@ struct ClothingEditView: View {
     @State private var finalPaymentDate: Date = Date()
     @State private var finalPaymentEndDate: Date = Date()
     @State private var note: String = ""
+    
+    // 标记是否已从草稿恢复
+    @State private var hasRestoredFromDraft = false
     
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
@@ -129,6 +249,8 @@ struct ClothingEditView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") {
+                    // 清除草稿
+                    draftManager.clearDraft()
                     // 如果是新建状态且用户取消，需要清理已上传的图片
                     if !isEditing {
                         for path in imagePaths {
@@ -141,6 +263,8 @@ struct ClothingEditView: View {
             
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") {
+                    // 保存前清除草稿
+                    draftManager.clearDraft()
                     save()
                 }
                 .disabled(name.isEmpty)
@@ -172,7 +296,13 @@ struct ClothingEditView: View {
             // 加载自动补全数据
             SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
             
-            if let c = clothing {
+            // 首先检查是否有未保存的草稿需要恢复
+            if !hasRestoredFromDraft, !isEditing, let draft = draftManager.loadDraft() {
+                print("ClothingEditView: Restoring from draft")
+                restoreFromDraft(draft)
+                hasRestoredFromDraft = true
+            } else if let c = clothing {
+                // 编辑模式：从数据库加载
                 name = c.name
                 brandName = c.brand?.name ?? ""
                 types = c.types
@@ -230,6 +360,20 @@ struct ClothingEditView: View {
                 }
             }
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background || newPhase == .inactive {
+                // 应用进入后台或非活跃状态时保存草稿
+                if !isEditing {
+                    saveCurrentStateAsDraft()
+                }
+            } else if newPhase == .active {
+                // 应用回到前台，如果是新建模式且还没有恢复过草稿，尝试恢复
+                if !isEditing && !hasRestoredFromDraft, let draft = draftManager.loadDraft() {
+                    restoreFromDraft(draft)
+                    hasRestoredFromDraft = true
+                }
+            }
+        }
         .onChange(of: deposit) { oldValue, newValue in
             updateTotalPrice()
         }
@@ -239,6 +383,67 @@ struct ClothingEditView: View {
     }
     
     // MARK: - Helpers
+    
+    // 保存当前状态为草稿
+    private func saveCurrentStateAsDraft() {
+        let draft = ClothingEditDraft(
+            id: draftID,
+            name: name,
+            brandName: brandName,
+            types: types,
+            colors: colors,
+            sizes: sizes,
+            length: length,
+            condition: condition,
+            accessories: accessories,
+            imagePaths: imagePaths,
+            isShared: isShared,
+            originalPrice: originalPrice,
+            priceTotal: priceTotal,
+            deposit: deposit,
+            balance: balance,
+            accessoriesPrice: accessoriesPrice,
+            stock: stock,
+            purchaseDate: purchaseDate,
+            depositDate: depositDate,
+            isDepositPlan: isDepositPlan,
+            finalPaymentDate: finalPaymentDate,
+            finalPaymentEndDate: finalPaymentEndDate,
+            note: note,
+            accessoryList: accessoryList
+        )
+        draftManager.saveDraft(draft)
+        print("ClothingEditView: Draft saved")
+    }
+    
+    // 从草稿恢复状态
+    private func restoreFromDraft(_ draft: ClothingEditDraft) {
+        name = draft.name
+        brandName = draft.brandName
+        types = draft.types
+        colors = draft.colors
+        sizes = draft.sizes
+        length = draft.length
+        condition = draft.condition
+        accessories = draft.accessories
+        imagePaths = draft.imagePaths
+        isShared = draft.isShared
+        originalPrice = draft.originalPrice
+        priceTotal = draft.priceTotal
+        deposit = draft.deposit
+        balance = draft.balance
+        accessoriesPrice = draft.accessoriesPrice
+        stock = draft.stock
+        purchaseDate = draft.purchaseDate
+        depositDate = draft.depositDate
+        isDepositPlan = draft.isDepositPlan
+        finalPaymentDate = draft.finalPaymentDate
+        finalPaymentEndDate = draft.finalPaymentEndDate
+        note = draft.note
+        accessoryList = draft.accessoryList
+        draftID = draft.id
+        print("ClothingEditView: Draft restored")
+    }
     
     private func normalizeTags(_ input: String) -> String {
         let components = input.replacingOccurrences(of: "，", with: ",")
