@@ -133,6 +133,10 @@ struct BoardingExperienceView: View {
                             withAnimation(.spring()) {
                                 boardingStage = .boardingPass
                             }
+                        } onBack: {
+                            withAnimation(.spring()) {
+                                boardingStage = .privacyCheck
+                            }
                         }
                         
                     case .boardingPass:
@@ -498,6 +502,7 @@ struct PrivacyCheckView: View {
 struct SeatSelectionView: View {
     @Binding var selectedSeat: String
     let onConfirm: () -> Void
+    let onBack: () -> Void
     @State private var selectedClass: SeatClass = .business
     @Environment(\.colorScheme) var colorScheme
     
@@ -603,24 +608,41 @@ struct SeatSelectionView: View {
                 .padding(.vertical, 8)
             }
             
-            Button(action: onConfirm) {
-                Text("确认选座")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        selectedSeat.isEmpty ?
-                        AnyView(Color.gray) :
-                        AnyView(LinearGradient(
-                            colors: [monicaPrimary, monicaSecondary],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ))
-                    )
-                    .cornerRadius(25)
+            // 底部按钮：左边上一步，右边确定选座
+            HStack(spacing: 16) {
+                // 上一步按钮
+                Button(action: onBack) {
+                    Text("上一步")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(colorScheme == .dark ? .white : .primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 25)
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.15) : Color.gray.opacity(0.15))
+                        )
+                }
+                
+                // 确定选座按钮
+                Button(action: onConfirm) {
+                    Text("确定选座")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            selectedSeat.isEmpty ?
+                            AnyView(Color.gray) :
+                            AnyView(LinearGradient(
+                                colors: [monicaPrimary, monicaSecondary],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                        )
+                        .cornerRadius(25)
+                }
+                .disabled(selectedSeat.isEmpty)
             }
-            .disabled(selectedSeat.isEmpty)
             .padding(.horizontal, 30)
         }
     }
