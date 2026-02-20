@@ -14,6 +14,10 @@ struct UserProfileEditView: View {
     @State private var showActionSheet = false
     @State private var showClearAvatarConfirm = false
     
+    // 裁剪相关状态
+    @State private var cropRequest: CropRequest?
+    @State private var pendingCameraImage: UIImage? // 临时存储相机图片
+    
     private var canSave: Bool {
         nickname != authManager.customNickname || avatarImage != nil
     }
@@ -94,7 +98,33 @@ struct UserProfileEditView: View {
                 Text("确定要删除当前头像吗？")
             }
             .sheet(isPresented: $showCamera) {
-                CameraPicker(image: $avatarImage)
+                CameraPicker(image: $pendingCameraImage)
+            }
+            .onChange(of: pendingCameraImage) { _, newValue in
+                // 相机拍照后，进入裁剪视图
+                if let newImage = newValue {
+                    // 延迟一点执行，确保sheet关闭后再打开裁剪视图
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        cropRequest = CropRequest(image: newImage, isNewSelection: true)
+                        pendingCameraImage = nil // 清空临时变量
+                    }
+                }
+            }
+            // 头像裁剪视图
+            .sheet(item: $cropRequest) { request in
+                ImageCropView(
+                    image: request.image,
+                    aspectRatio: 1.0, // 1:1 正方形
+                    targetWidth: 512, // 输出512x512
+                    overlayType: .circle, // 圆形裁剪框
+                    onCrop: { croppedImage in
+                        avatarImage = croppedImage
+                        cropRequest = nil
+                    },
+                    onCancel: {
+                        cropRequest = nil
+                    }
+                )
             }
         }
     }
@@ -113,13 +143,21 @@ struct UserProfileEditView: View {
                             .scaledToFill()
                             .frame(width: 120, height: 120)
                             .clipShape(Circle())
-                    } else if authManager.hasCustomAvatar,
-                              let image = UIImage(contentsOfFile: authManager.customAvatarPath) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 120, height: 120)
-                            .clipShape(Circle())
+                    } else if authManager.hasCustomAvatar {
+                        let fileURL = authManager.avatarFileURL
+                        if let image = UIImage(contentsOfFile: fileURL.path) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 120, height: 120)
+                                .clipShape(Circle())
+                        } else {
+                            DefaultAvatarView(
+                                givenName: authManager.givenName,
+                                familyName: authManager.familyName,
+                                size: 120
+                            )
+                        }
                     } else {
                         // 使用默认头像
                         DefaultAvatarView(
@@ -191,9 +229,11 @@ struct UserProfileEditView: View {
     // MARK: - 方法
     
     private func loadCurrentAvatar() {
-        if authManager.hasCustomAvatar,
-           let image = UIImage(contentsOfFile: authManager.customAvatarPath) {
-            avatarImage = image
+        if authManager.hasCustomAvatar {
+            let fileURL = authManager.avatarFileURL
+            if let image = UIImage(contentsOfFile: fileURL.path) {
+                avatarImage = image
+            }
         }
     }
     
@@ -204,7 +244,8 @@ struct UserProfileEditView: View {
             if let data = try? await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
                 await MainActor.run {
-                    self.avatarImage = image
+                    // 进入裁剪视图，而不是直接设置头像
+                    self.cropRequest = CropRequest(image: image, isNewSelection: true)
                 }
             }
         }

@@ -289,7 +289,7 @@ struct CloudSyncSheetView: View {
                         showingSyncAlert: $showingSyncAlert
                     )
                 } header: {
-                    Text("iCloud 文件同步管理")
+                    Text("iCloud 同步管理")
                 } footer: {
                     Text("请确保您的 iCloud 空间充足。")
                 }
@@ -640,7 +640,7 @@ struct CloudSyncControlsView: View {
                 HStack {
                     Image(systemName: "icloud")
                         .foregroundStyle(.indigo)
-                    Text("云端备份管理")
+                    Text("云端文件备份管理")
                         .font(.headline)
                     Spacer()
                     if cloudManager.isSyncing {
@@ -649,7 +649,7 @@ struct CloudSyncControlsView: View {
                 }
                 
                 if let lastDate = cloudManager.lastCloudBackupDate {
-                    Text("云端备份: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
+                    Text("云端文件备份: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

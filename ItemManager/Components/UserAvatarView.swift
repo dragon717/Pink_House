@@ -24,10 +24,17 @@ struct UserAvatarView: View {
         return formatter.string(from: components)
     }
     
+    // 动态构建头像文件的完整路径
+    private var avatarFileURL: URL? {
+        guard let filename = customAvatarPath, !filename.isEmpty else { return nil }
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let avatarDir = documentsPath.appendingPathComponent("UserAvatars", isDirectory: true)
+        return avatarDir.appendingPathComponent(filename)
+    }
+    
     var body: some View {
-        if let avatarPath = customAvatarPath,
-           !avatarPath.isEmpty,
-           let image = UIImage(contentsOfFile: avatarPath) {
+        if let fileURL = avatarFileURL,
+           let image = UIImage(contentsOfFile: fileURL.path) {
             // 显示自定义头像
             Image(uiImage: image)
                 .resizable()

@@ -177,12 +177,27 @@ struct WardrobeView: View {
             return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
         }
         
-        // Ensure the order is correct immediately after editing, before the Query updates
-        if sortOption == .custom {
+        // Apply sorting based on sortOption
+        // Note: @Query doesn't update dynamically when sortOption changes,
+        // so we need to sort here explicitly
+        switch sortOption {
+        case .custom:
             return result.sorted { $0.sortIndex < $1.sortIndex }
+        case .priceAsc:
+            return result.sorted { $0.price < $1.price }
+        case .priceDesc:
+            return result.sorted { $0.price > $1.price }
+        case .nameAsc:
+            return result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .nameDesc:
+            return result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedDescending }
+        case .purchaseDateAsc:
+            return result.sorted { $0.purchaseDate < $1.purchaseDate }
+        case .purchaseDateDesc:
+            return result.sorted { $0.purchaseDate > $1.purchaseDate }
+        case .createdAtDesc:
+            return result.sorted { $0.createdAt > $1.createdAt }
         }
-        
-        return result
     }
     
     // Helper for splitting strings with support for both English and Chinese commas
@@ -689,7 +704,7 @@ struct WardrobeView: View {
     
     private func copyItem(_ item: Clothing) {
         let newItem = Clothing(
-            name: "\(item.name) ",//不用+(副本)",
+            name: "\(item.name) 副本",
             brand: item.brand,
             types: item.types,
             colors: item.colors,

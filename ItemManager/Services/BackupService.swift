@@ -637,7 +637,7 @@ class BackupService {
             var userAvatarFileName: String? = nil
             
             // 从主线程获取用户资料信息
-            let userProfileInfo = await MainActor.run { () -> (isAuthenticated: Bool, userId: String, nickname: String, hasAvatar: Bool, avatarPath: String)? in
+            let userProfileInfo = await MainActor.run { () -> (isAuthenticated: Bool, userId: String, nickname: String, hasAvatar: Bool, avatarFileURL: URL)? in
                 let auth = AuthenticationManager.shared
                 guard auth.isAuthenticated else { return nil }
                 return (
@@ -645,7 +645,7 @@ class BackupService {
                     userId: auth.userIdentifier,
                     nickname: auth.customNickname,
                     hasAvatar: auth.hasCustomAvatar,
-                    avatarPath: auth.customAvatarPath
+                    avatarFileURL: auth.avatarFileURL
                 )
             }
             
@@ -657,14 +657,13 @@ class BackupService {
                 )
                 // 如果有自定义头像，添加到备份文件列表
                 if info.hasAvatar {
-                    let avatarPath = info.avatarPath
-                    let fileName = (avatarPath as NSString).lastPathComponent
-                    let avatarURL = URL(fileURLWithPath: avatarPath)
-                    if fileManager.fileExists(atPath: avatarPath) {
-                        imageFiles[fileName] = avatarURL
+                    let fileURL = info.avatarFileURL
+                    let fileName = fileURL.lastPathComponent
+                    if fileManager.fileExists(atPath: fileURL.path) {
+                        imageFiles[fileName] = fileURL
                         userAvatarFileName = fileName
                         // 添加到 externalHashes 用于增量同步
-                        if let h = fileHash(avatarURL) {
+                        if let h = fileHash(fileURL) {
                             externalHashes[fileName] = h
                         }
                         print("### Export: Added user avatar: \(fileName)")
@@ -834,12 +833,25 @@ class BackupService {
         
         // 2a. Brands
         let existingBrands = try context.fetch(FetchDescriptor<Brand>())
-        var brandMap: [UUID: Brand] = Dictionary(uniqueKeysWithValues: existingBrands.map { ($0.id, $0) })
+        var brandMap: [UUID: Brand] = [:]
+        var duplicateBrands: [Brand] = []
+        for brand in existingBrands {
+            if brandMap[brand.id] != nil {
+                print("### Restore: Warning - Duplicate Brand ID detected: \(brand.id), will merge and delete duplicate")
+                duplicateBrands.append(brand)
+            } else {
+                brandMap[brand.id] = brand
+            }
+        }
         for dto in manifest.brands {
             if let existing = brandMap[dto.id] {
+                // Smart merge: backup data overwrites existing
                 existing.name = dto.name
                 existing.colorHex = dto.colorHex
-                existing.imagePath = dto.imagePath
+                // Image: only update if backup has value and existing doesn't, or backup is different
+                if let newImagePath = dto.imagePath {
+                    existing.imagePath = newImagePath
+                }
             } else {
                 let newBrand = Brand(name: dto.name, colorHex: dto.colorHex, imagePath: dto.imagePath)
                 newBrand.id = dto.id
@@ -847,12 +859,36 @@ class BackupService {
                 brandMap[dto.id] = newBrand
             }
         }
+        // Delete duplicate brands after merging
+        for duplicate in duplicateBrands {
+            if let keeper = brandMap[duplicate.id] {
+                // Merge data from duplicate to keeper before deleting
+                if keeper.name.isEmpty && !duplicate.name.isEmpty {
+                    keeper.name = duplicate.name
+                }
+                if keeper.imagePath == nil && duplicate.imagePath != nil {
+                    keeper.imagePath = duplicate.imagePath
+                }
+            }
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate Brand with ID: \(duplicate.id)")
+        }
         
         // 2b. Tags
         let existingTags = try context.fetch(FetchDescriptor<Tag>())
-        var tagMap: [UUID: Tag] = Dictionary(uniqueKeysWithValues: existingTags.map { ($0.id, $0) })
+        var tagMap: [UUID: Tag] = [:]
+        var duplicateTags: [Tag] = []
+        for tag in existingTags {
+            if tagMap[tag.id] != nil {
+                print("### Restore: Warning - Duplicate Tag ID detected: \(tag.id), will merge and delete duplicate")
+                duplicateTags.append(tag)
+            } else {
+                tagMap[tag.id] = tag
+            }
+        }
         for dto in manifest.tags {
             if let existing = tagMap[dto.id] {
+                // Smart merge: backup data overwrites existing
                 existing.name = dto.name
                 existing.colorHex = dto.colorHex
             } else {
@@ -862,13 +898,34 @@ class BackupService {
                 tagMap[dto.id] = newTag
             }
         }
+        // Delete duplicate tags after merging
+        for duplicate in duplicateTags {
+            if let keeper = tagMap[duplicate.id] {
+                // Merge data from duplicate to keeper before deleting
+                if keeper.name.isEmpty && !duplicate.name.isEmpty {
+                    keeper.name = duplicate.name
+                }
+            }
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate Tag with ID: \(duplicate.id)")
+        }
         
         // 2c. StoredImages (Metadata)
         let existingImgMeta = try context.fetch(FetchDescriptor<StoredImage>())
-        var imageMetaMap: [UUID: StoredImage] = Dictionary(uniqueKeysWithValues: existingImgMeta.map { ($0.id, $0) })
+        var imageMetaMap: [UUID: StoredImage] = [:]
+        var duplicateImages: [StoredImage] = []
+        for img in existingImgMeta {
+            if imageMetaMap[img.id] != nil {
+                print("### Restore: Warning - Duplicate StoredImage ID detected: \(img.id), will merge and delete duplicate")
+                duplicateImages.append(img)
+            } else {
+                imageMetaMap[img.id] = img
+            }
+        }
         for dto in manifest.storedImages {
             if let existing = imageMetaMap[dto.id] {
-                existing.refCount = dto.refCount
+                // Smart merge: use backup refCount if it's higher (more references)
+                existing.refCount = max(existing.refCount, dto.refCount)
                 existing.fileName = dto.fileName
                 existing.imageHash = dto.imageHash
             } else {
@@ -878,6 +935,15 @@ class BackupService {
                 context.insert(newImg)
                 imageMetaMap[dto.id] = newImg
             }
+        }
+        // Delete duplicate stored images after merging
+        for duplicate in duplicateImages {
+            if let keeper = imageMetaMap[duplicate.id] {
+                // Merge: use higher refCount
+                keeper.refCount = max(keeper.refCount, duplicate.refCount)
+            }
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate StoredImage with ID: \(duplicate.id)")
         }
         
         // 提交阶段 2
@@ -891,16 +957,58 @@ class BackupService {
         var descriptor = FetchDescriptor<Clothing>()
         descriptor.includePendingChanges = true
         let existingClothings = try context.fetch(descriptor)
-        
+
         // Debug Log: Check for soft-deleted items specifically using deletedAt to avoid property shadowing issues
         let softDeletedItems = existingClothings.filter { $0.isDeleted || $0.deletedAt != nil }
         print("### Restore: Found \(existingClothings.count) existing clothings in local DB (Soft Deleted: \(softDeletedItems.count))")
-        
+
         if softDeletedItems.count > 0 {
             print("### Restore: Soft deleted items sample: \(softDeletedItems.prefix(3).map { "\($0.name) (isDeleted:\($0.isDeleted), deletedAt:\($0.deletedAt != nil))" })")
         }
+
+        var clothingMap: [UUID: Clothing] = [:]
+        var duplicateClothings: [Clothing] = []
+        for clothing in existingClothings {
+            if clothingMap[clothing.id] != nil {
+                print("### Restore: Warning - Duplicate Clothing ID detected: \(clothing.id), will merge and delete duplicate")
+                duplicateClothings.append(clothing)
+            } else {
+                clothingMap[clothing.id] = clothing
+            }
+        }
         
-        var clothingMap: [UUID: Clothing] = Dictionary(uniqueKeysWithValues: existingClothings.map { ($0.id, $0) })
+        // Merge duplicate clothings into the keeper before processing backup
+        for duplicate in duplicateClothings {
+            if let keeper = clothingMap[duplicate.id] {
+                // Merge strategy: if keeper has empty/default values, use duplicate's values
+                if keeper.name.isEmpty && !duplicate.name.isEmpty {
+                    keeper.name = duplicate.name
+                }
+                // Merge image paths without duplicates
+                let existingPaths = Set(keeper.imagePaths)
+                for path in duplicate.imagePaths where !existingPaths.contains(path) {
+                    keeper.imagePaths.append(path)
+                }
+                // Use higher stock value
+                keeper.stock = max(keeper.stock, duplicate.stock)
+                // Use higher prices if duplicate has them
+                if keeper.price == 0 && duplicate.price > 0 {
+                    keeper.price = duplicate.price
+                }
+                if keeper.deposit == 0 && duplicate.deposit > 0 {
+                    keeper.deposit = duplicate.deposit
+                }
+                if keeper.balance == 0 && duplicate.balance > 0 {
+                    keeper.balance = duplicate.balance
+                }
+                // Use earlier purchase date if available
+                if let dupDate = duplicate.purchaseDate as Date?, dupDate < keeper.purchaseDate {
+                    keeper.purchaseDate = dupDate
+                }
+            }
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate Clothing with ID: \(duplicate.id)")
+        }
         
         for dto in manifest.clothings {
             // Logic:
@@ -949,7 +1057,8 @@ class BackupService {
                 }
             }
             
-            // Update properties
+            // Update properties - Smart merge strategy
+            // Basic info: backup overwrites
             clothingBack.name = dto.name
             clothingBack.types = dto.types
             clothingBack.colors = dto.colors
@@ -957,19 +1066,35 @@ class BackupService {
             clothingBack.length = dto.length
             clothingBack.condition = dto.condition
             clothingBack.accessories = dto.accessories
-            clothingBack.imagePaths = dto.imagePaths
+            
+            // Image paths: merge without duplicates (backup paths take priority)
+            var mergedImagePaths = dto.imagePaths
+            let existingPaths = Set(dto.imagePaths)
+            for path in clothingBack.imagePaths where !existingPaths.contains(path) {
+                mergedImagePaths.append(path)
+            }
+            clothingBack.imagePaths = mergedImagePaths
+            
             clothingBack.isShared = dto.isShared
+            
+            // Prices: backup data overwrites (user may have updated prices)
             clothingBack.price = dto.price
             clothingBack.deposit = dto.deposit
             clothingBack.balance = dto.balance
             clothingBack.accessoriesPrice = dto.accessoriesPrice
+            
+            // Dates: backup data overwrites
             clothingBack.purchaseDate = dto.purchaseDate
             clothingBack.depositDate = dto.depositDate
             clothingBack.isDepositPlan = dto.isDepositPlan
             clothingBack.finalPaymentDate = dto.finalPaymentDate
             clothingBack.finalPaymentEndDate = dto.finalPaymentEndDate
+            
             clothingBack.note = dto.note
+            
+            // Stock: use backup value (backup is source of truth for inventory)
             clothingBack.stock = dto.stock
+            
             clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
             
             // CRITICAL: If local item was deleted, FORCE it to remain deleted.
@@ -1024,7 +1149,31 @@ class BackupService {
         
         // Cutouts
         let existingCutouts = try context.fetch(FetchDescriptor<CutoutItem>())
-        var cutoutMap: [UUID: CutoutItem] = Dictionary(uniqueKeysWithValues: existingCutouts.map { ($0.id, $0) })
+        var cutoutMap: [UUID: CutoutItem] = [:]
+        var duplicateCutouts: [CutoutItem] = []
+        for cutout in existingCutouts {
+            if cutoutMap[cutout.id] != nil {
+                print("### Restore: Warning - Duplicate CutoutItem ID detected: \(cutout.id), will merge and delete duplicate")
+                duplicateCutouts.append(cutout)
+            } else {
+                cutoutMap[cutout.id] = cutout
+            }
+        }
+        // Merge duplicate cutouts before processing backup
+        for duplicate in duplicateCutouts {
+            if let keeper = cutoutMap[duplicate.id] {
+                // Merge: if keeper has empty category, use duplicate's
+                if keeper.category.isEmpty || keeper.category == "未分类" {
+                    keeper.category = duplicate.category
+                }
+                // Keep the linkedClothingID if keeper doesn't have one
+                if keeper.linkedClothingID == nil && duplicate.linkedClothingID != nil {
+                    keeper.linkedClothingID = duplicate.linkedClothingID
+                }
+            }
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate CutoutItem with ID: \(duplicate.id)")
+        }
         for dto in manifest.cutouts {
             let cutout: CutoutItem
             if let existing = cutoutMap[dto.id] {
@@ -1050,11 +1199,50 @@ class BackupService {
         
         // Outfits
         let existingOutfits = try context.fetch(FetchDescriptor<Outfit>())
-        var outfitMap: [UUID: Outfit] = Dictionary(uniqueKeysWithValues: existingOutfits.map { ($0.id, $0) })
-        
+        var outfitMap: [UUID: Outfit] = [:]
+        var duplicateOutfits: [Outfit] = []
+        for outfit in existingOutfits {
+            if outfitMap[outfit.id] != nil {
+                print("### Restore: Warning - Duplicate Outfit ID detected: \(outfit.id), will merge and delete duplicate")
+                duplicateOutfits.append(outfit)
+            } else {
+                outfitMap[outfit.id] = outfit
+            }
+        }
+        // Merge duplicate outfits
+        for duplicate in duplicateOutfits {
+            if let keeper = outfitMap[duplicate.id] {
+                // Merge: use non-empty note
+                if keeper.note.isEmpty && !duplicate.note.isEmpty {
+                    keeper.note = duplicate.note
+                }
+                // Merge items without duplicates
+                let existingItemIDs = Set(keeper.items?.map { $0.id } ?? [])
+                for item in duplicate.items ?? [] where !existingItemIDs.contains(item.id) {
+                    keeper.items?.append(item)
+                }
+            }
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate Outfit with ID: \(duplicate.id)")
+        }
+
         // Fetch ALL OutfitItems globally to avoid ID collision
         let allOutfitItems = try context.fetch(FetchDescriptor<OutfitItem>())
-        var globalItemMap: [UUID: OutfitItem] = Dictionary(uniqueKeysWithValues: allOutfitItems.map { ($0.id, $0) })
+        var globalItemMap: [UUID: OutfitItem] = [:]
+        var duplicateOutfitItems: [OutfitItem] = []
+        for item in allOutfitItems {
+            if globalItemMap[item.id] != nil {
+                print("### Restore: Warning - Duplicate OutfitItem ID detected: \(item.id), will merge and delete duplicate")
+                duplicateOutfitItems.append(item)
+            } else {
+                globalItemMap[item.id] = item
+            }
+        }
+        // Delete duplicate outfit items
+        for duplicate in duplicateOutfitItems {
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate OutfitItem with ID: \(duplicate.id)")
+        }
         print("### Restore: Found \(globalItemMap.count) global OutfitItems.")
         
         // 建立 Cutout 反向查找表 (FileName -> CutoutItem) 以支持 Snapshot 恢复
@@ -1067,7 +1255,32 @@ class BackupService {
         
         // Pre-fetch BookGroups for Outfit relationship restoration
         let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
-        var bookGroupMap: [UUID: BookGroup] = Dictionary(uniqueKeysWithValues: existingBookGroups.map { ($0.id, $0) })
+        var bookGroupMap: [UUID: BookGroup] = [:]
+        var duplicateBookGroups: [BookGroup] = []
+        for bookGroup in existingBookGroups {
+            if bookGroupMap[bookGroup.id] != nil {
+                print("### Restore: Warning - Duplicate BookGroup ID detected: \(bookGroup.id), will merge and delete duplicate")
+                duplicateBookGroups.append(bookGroup)
+            } else {
+                bookGroupMap[bookGroup.id] = bookGroup
+            }
+        }
+        // Merge duplicate book groups
+        for duplicate in duplicateBookGroups {
+            if let keeper = bookGroupMap[duplicate.id] {
+                // Merge: use non-empty title
+                if keeper.title.isEmpty && !duplicate.title.isEmpty {
+                    keeper.title = duplicate.title
+                }
+                // Merge pages without duplicates
+                let existingPageIDs = Set(keeper.pages?.map { $0.id } ?? [])
+                for page in duplicate.pages ?? [] where !existingPageIDs.contains(page.id) {
+                    keeper.pages?.append(page)
+                }
+            }
+            context.delete(duplicate)
+            print("### Restore: Deleted duplicate BookGroup with ID: \(duplicate.id)")
+        }
         
         // 1. 优先尝试恢复 Snapshots (新版备份格式)
         if let snapshots = manifest.snapshots {
@@ -1174,7 +1387,14 @@ class BackupService {
                 // 仅当没有 Snapshot 数据时，才使用旧格式恢复 Items
                 if manifest.snapshots == nil {
                     let existingItems = outfit.items ?? []
-                    var itemMap: [UUID: OutfitItem] = Dictionary(uniqueKeysWithValues: existingItems.map { ($0.id, $0) })
+                    var itemMap: [UUID: OutfitItem] = [:]
+                    for item in existingItems {
+                        if itemMap[item.id] != nil {
+                            print("### Restore: Warning - Duplicate OutfitItem ID detected: \(item.id), skipping duplicate")
+                        } else {
+                            itemMap[item.id] = item
+                        }
+                    }
                     for itemDTO in dto.items {
                         let item: OutfitItem
                         if let ex = itemMap[itemDTO.id] {
@@ -1222,7 +1442,32 @@ class BackupService {
             print("### Restore: Found \(model3DDTOs.count) Model3Ds.")
             
             let existingModel3Ds = try context.fetch(FetchDescriptor<Model3D>())
-            model3DMap = Dictionary(uniqueKeysWithValues: existingModel3Ds.map { ($0.id, $0) })
+            model3DMap = [:]
+            var duplicateModel3Ds: [Model3D] = []
+            for model in existingModel3Ds {
+                if model3DMap[model.id] != nil {
+                    print("### Restore: Warning - Duplicate Model3D ID detected: \(model.id), will merge and delete duplicate")
+                    duplicateModel3Ds.append(model)
+                } else {
+                    model3DMap[model.id] = model
+                }
+            }
+            // Merge duplicate Model3Ds
+            for duplicate in duplicateModel3Ds {
+                if let keeper = model3DMap[duplicate.id] {
+                    // Merge: use non-empty name
+                    if keeper.name.isEmpty && !duplicate.name.isEmpty {
+                        keeper.name = duplicate.name
+                    }
+                    // Merge source image paths without duplicates
+                    let existingPaths = Set(keeper.sourceImagePaths)
+                    for path in duplicate.sourceImagePaths where !existingPaths.contains(path) {
+                        keeper.sourceImagePaths.append(path)
+                    }
+                }
+                context.delete(duplicate)
+                print("### Restore: Deleted duplicate Model3D with ID: \(duplicate.id)")
+            }
             
             for dto in model3DDTOs {
                 // Skip deleted models in backup
@@ -1281,14 +1526,36 @@ class BackupService {
             print("### Restore: Found \(bookGroupDTOs.count) book groups.")
             
             let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
-            var bookGroupMap: [UUID: BookGroup] = Dictionary(uniqueKeysWithValues: existingBookGroups.map { ($0.id, $0) })
+            var localBookGroupMap: [UUID: BookGroup] = [:]
+            var duplicateLocalBookGroups: [BookGroup] = []
+            for bookGroup in existingBookGroups {
+                if localBookGroupMap[bookGroup.id] != nil {
+                    print("### Restore: Warning - Duplicate BookGroup ID detected: \(bookGroup.id), will merge and delete duplicate")
+                    duplicateLocalBookGroups.append(bookGroup)
+                } else {
+                    localBookGroupMap[bookGroup.id] = bookGroup
+                }
+            }
+            // Merge duplicate book groups
+            for duplicate in duplicateLocalBookGroups {
+                if let keeper = localBookGroupMap[duplicate.id] {
+                    if keeper.title.isEmpty && !duplicate.title.isEmpty {
+                        keeper.title = duplicate.title
+                    }
+                    if keeper.coverImage == nil && duplicate.coverImage != nil {
+                        keeper.coverImage = duplicate.coverImage
+                    }
+                }
+                context.delete(duplicate)
+                print("### Restore: Deleted duplicate BookGroup with ID: \(duplicate.id)")
+            }
             
             for dto in bookGroupDTOs {
                 // Skip deleted book groups in backup
                 if dto.isDeleted { continue }
-                
+
                 let bookGroup: BookGroup
-                if let existing = bookGroupMap[dto.id] {
+                if let existing = localBookGroupMap[dto.id] {
                     bookGroup = existing
                     bookGroup.title = dto.title
                     bookGroup.coverImage = dto.coverImage
@@ -1298,7 +1565,7 @@ class BackupService {
                     bookGroup.id = dto.id
                     bookGroup.createdAt = dto.createdAt
                     context.insert(bookGroup)
-                    bookGroupMap[dto.id] = bookGroup
+                    localBookGroupMap[dto.id] = bookGroup
                 }
                 
                 // Ensure local deleted state is preserved
@@ -1322,7 +1589,29 @@ class BackupService {
             print("### Restore: Found \(spaceBookGroupDTOs.count) space book groups.")
             
             let existingSpaceBookGroups = try context.fetch(FetchDescriptor<SpaceBookGroup>())
-            var spaceBookGroupMap: [UUID: SpaceBookGroup] = Dictionary(uniqueKeysWithValues: existingSpaceBookGroups.map { ($0.id, $0) })
+            var spaceBookGroupMap: [UUID: SpaceBookGroup] = [:]
+            var duplicateSpaceBookGroups: [SpaceBookGroup] = []
+            for spaceBookGroup in existingSpaceBookGroups {
+                if spaceBookGroupMap[spaceBookGroup.id] != nil {
+                    print("### Restore: Warning - Duplicate SpaceBookGroup ID detected: \(spaceBookGroup.id), will merge and delete duplicate")
+                    duplicateSpaceBookGroups.append(spaceBookGroup)
+                } else {
+                    spaceBookGroupMap[spaceBookGroup.id] = spaceBookGroup
+                }
+            }
+            // Merge duplicate space book groups
+            for duplicate in duplicateSpaceBookGroups {
+                if let keeper = spaceBookGroupMap[duplicate.id] {
+                    if keeper.title.isEmpty && !duplicate.title.isEmpty {
+                        keeper.title = duplicate.title
+                    }
+                    if keeper.coverImage == nil && duplicate.coverImage != nil {
+                        keeper.coverImage = duplicate.coverImage
+                    }
+                }
+                context.delete(duplicate)
+                print("### Restore: Deleted duplicate SpaceBookGroup with ID: \(duplicate.id)")
+            }
             
             for dto in spaceBookGroupDTOs {
                 // Skip deleted space book groups in backup
@@ -1352,11 +1641,45 @@ class BackupService {
                 print("### Restore: Found \(spaceOutfitDTOs.count) space outfits.")
                 
                 let existingSpaceOutfits = try context.fetch(FetchDescriptor<SpaceOutfit>())
-                var spaceOutfitMap: [UUID: SpaceOutfit] = Dictionary(uniqueKeysWithValues: existingSpaceOutfits.map { ($0.id, $0) })
-                
+                var spaceOutfitMap: [UUID: SpaceOutfit] = [:]
+                var duplicateSpaceOutfits: [SpaceOutfit] = []
+                for spaceOutfit in existingSpaceOutfits {
+                    if spaceOutfitMap[spaceOutfit.id] != nil {
+                        print("### Restore: Warning - Duplicate SpaceOutfit ID detected: \(spaceOutfit.id), will merge and delete duplicate")
+                        duplicateSpaceOutfits.append(spaceOutfit)
+                    } else {
+                        spaceOutfitMap[spaceOutfit.id] = spaceOutfit
+                    }
+                }
+                // Merge duplicate space outfits
+                for duplicate in duplicateSpaceOutfits {
+                    if let keeper = spaceOutfitMap[duplicate.id] {
+                        if keeper.note.isEmpty && !duplicate.note.isEmpty {
+                            keeper.note = duplicate.note
+                        }
+                        // Scene objects are linked via spaceOutfitID, they will be handled below
+                    }
+                    context.delete(duplicate)
+                    print("### Restore: Deleted duplicate SpaceOutfit with ID: \(duplicate.id)")
+                }
+
                 // Fetch all existing scene objects to avoid collision
                 let existingSceneObjects = try context.fetch(FetchDescriptor<SceneObjectData>())
-                var sceneObjectMap: [UUID: SceneObjectData] = Dictionary(uniqueKeysWithValues: existingSceneObjects.map { ($0.id, $0) })
+                var sceneObjectMap: [UUID: SceneObjectData] = [:]
+                var duplicateSceneObjects: [SceneObjectData] = []
+                for sceneObject in existingSceneObjects {
+                    if sceneObjectMap[sceneObject.id] != nil {
+                        print("### Restore: Warning - Duplicate SceneObjectData ID detected: \(sceneObject.id), will merge and delete duplicate")
+                        duplicateSceneObjects.append(sceneObject)
+                    } else {
+                        sceneObjectMap[sceneObject.id] = sceneObject
+                    }
+                }
+                // Delete duplicate scene objects
+                for duplicate in duplicateSceneObjects {
+                    context.delete(duplicate)
+                    print("### Restore: Deleted duplicate SceneObjectData with ID: \(duplicate.id)")
+                }
                 
                 for dto in spaceOutfitDTOs {
                     // Skip deleted space outfits in backup
@@ -1555,13 +1878,13 @@ class BackupService {
                     try? fileManager.copyItem(at: avatarSourceURL, to: avatarDestURL)
                 }
                 
-                // 更新用户资料中的头像路径
+                // 更新用户资料中的头像路径（只存储文件名）
                 if let userProfilesData = UserDefaults.standard.string(forKey: "userProfiles"),
                    let data = userProfilesData.data(using: .utf8),
                    var profiles = try? JSONDecoder().decode([String: AuthenticationManager.UserProfile].self, from: data) {
                     
                     if var profile = profiles[userProfile.userIdentifier] {
-                        profile.avatarPath = avatarDestURL.path
+                        profile.avatarPath = avatarFileName  // 只存储文件名
                         profiles[userProfile.userIdentifier] = profile
                         
                         if let updatedData = try? JSONEncoder().encode(profiles),

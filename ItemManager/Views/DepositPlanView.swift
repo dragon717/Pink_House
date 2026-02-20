@@ -60,6 +60,9 @@ struct DepositPlanView: View {
     let selectedConditions: Set<String>
     let selectedAccessories: Set<String>
     
+    // Sort option - stored to apply sorting manually since @Query doesn't update dynamically
+    let sortOption: SortOption
+    
     init(searchText: Binding<String>, 
          displayMode: Binding<DepositDisplayMode>,
          sortOption: SortOption,
@@ -74,7 +77,8 @@ struct DepositPlanView: View {
         _searchText = searchText
         _displayMode = displayMode
         let filter = #Predicate<Clothing> { $0.isDepositPlan == true && $0.isDeleted == false }
-        _depositClothings = Query(filter: filter, sort: sortOption.sortDescriptors)
+        // Use default sort since we'll apply sorting manually in updateBaseClothings
+        _depositClothings = Query(filter: filter, sort: \Clothing.createdAt, order: .reverse)
         
         self.selectedTagIDs = selectedTagIDs
         self.selectedBrandIDs = selectedBrandIDs
@@ -84,6 +88,7 @@ struct DepositPlanView: View {
         self.selectedLengths = selectedLengths
         self.selectedConditions = selectedConditions
         self.selectedAccessories = selectedAccessories
+        self.sortOption = sortOption
     }
     
     // Helper for splitting strings with support for both English and Chinese commas
@@ -147,7 +152,30 @@ struct DepositPlanView: View {
             return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesYear
         }
         
-        self.baseClothings = result
+        // Apply sorting based on sortOption
+        // Note: @Query doesn't update dynamically when sortOption changes,
+        // so we need to sort here explicitly
+        let sortedResult: [Clothing]
+        switch sortOption {
+        case .custom:
+            sortedResult = result.sorted { $0.sortIndex < $1.sortIndex }
+        case .priceAsc:
+            sortedResult = result.sorted { $0.price < $1.price }
+        case .priceDesc:
+            sortedResult = result.sorted { $0.price > $1.price }
+        case .nameAsc:
+            sortedResult = result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .nameDesc:
+            sortedResult = result.sorted { $0.name.localizedStandardCompare($1.name) == .orderedDescending }
+        case .purchaseDateAsc:
+            sortedResult = result.sorted { $0.purchaseDate < $1.purchaseDate }
+        case .purchaseDateDesc:
+            sortedResult = result.sorted { $0.purchaseDate > $1.purchaseDate }
+        case .createdAtDesc:
+            sortedResult = result.sorted { $0.createdAt > $1.createdAt }
+        }
+        
+        self.baseClothings = sortedResult
         updateFilteredClothings()
     }
     

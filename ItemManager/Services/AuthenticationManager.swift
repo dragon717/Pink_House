@@ -59,7 +59,14 @@ class AuthenticationManager: NSObject, ObservableObject {
     
     // 是否有自定义头像
     var hasCustomAvatar: Bool {
-        !customAvatarPath.isEmpty && FileManager.default.fileExists(atPath: customAvatarPath)
+        !customAvatarPath.isEmpty && FileManager.default.fileExists(atPath: avatarFileURL.path)
+    }
+    
+    // 获取头像文件的完整 URL（动态构建，避免绝对路径失效）
+    var avatarFileURL: URL {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let avatarDir = documentsPath.appendingPathComponent("UserAvatars", isDirectory: true)
+        return avatarDir.appendingPathComponent(customAvatarPath)
     }
     
     override private init() {
@@ -144,15 +151,18 @@ class AuthenticationManager: NSObject, ObservableObject {
                 try data.write(to: fileURL)
                 
                 // 删除旧头像
-                if !customAvatarPath.isEmpty && customAvatarPath != fileURL.path {
-                    try? FileManager.default.removeItem(atPath: customAvatarPath)
+                if !customAvatarPath.isEmpty {
+                    let oldFileURL = avatarDir.appendingPathComponent(customAvatarPath)
+                    if oldFileURL.path != fileURL.path {
+                        try? FileManager.default.removeItem(at: oldFileURL)
+                    }
                 }
                 
                 var profile = currentUserProfile
-                profile.avatarPath = fileURL.path
+                profile.avatarPath = filename  // 只存储文件名，不是完整路径
                 profile.updatedAt = Date()
                 currentUserProfile = profile
-                customAvatarPath = fileURL.path
+                customAvatarPath = filename  // 只存储文件名
                 
                 AppLogger.info("头像已保存到: \(fileURL.path)")
             } catch {
@@ -163,7 +173,8 @@ class AuthenticationManager: NSObject, ObservableObject {
     
     func clearCustomAvatar() {
         if !customAvatarPath.isEmpty {
-            try? FileManager.default.removeItem(atPath: customAvatarPath)
+            let fileURL = avatarFileURL
+            try? FileManager.default.removeItem(at: fileURL)
         }
         
         var profile = currentUserProfile

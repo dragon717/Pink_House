@@ -143,6 +143,8 @@ struct HomeView: View {
                         filterDescription: getFilterDescription(),
                         onClearFilter: clearAllFilters
                     )
+                    // Force recreation when sortOption changes to ensure proper sorting
+                    .id("wardrobe_\(sortOption.id)")
                 } else {
                     DepositPlanView(
                         searchText: $depositSearchText,
@@ -157,6 +159,8 @@ struct HomeView: View {
                         selectedConditions: selectedConditions,
                         selectedAccessories: selectedAccessories
                     )
+                    // Force recreation when sortOption changes to ensure proper sorting
+                    .id("deposit_\(sortOption.id)")
                 }
             }
             .onChange(of: viewLayout) { _, _ in
