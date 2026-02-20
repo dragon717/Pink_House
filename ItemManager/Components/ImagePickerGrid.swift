@@ -325,21 +325,34 @@ struct ImagePickerGrid: View {
     }
     
     private func saveImage(_ image: UIImage) {
+        print("ImagePickerGrid: Saving image, current imagePaths count: \(imagePaths.count)")
         if let fileName = ImageManager.shared.saveImage(image, context: modelContext) {
-            imagePaths.append(fileName)
+            // 使用 withAnimation 确保状态更新被 SwiftUI 捕获
+            withAnimation {
+                imagePaths.append(fileName)
+            }
+            print("ImagePickerGrid: Image saved, new imagePaths count: \(imagePaths.count), fileName: \(fileName)")
+            // 强制触发一次状态更新，确保父视图同步
+            DispatchQueue.main.async {
+                print("ImagePickerGrid: Triggering state sync, imagePaths now has \(self.imagePaths.count) items")
+            }
         } else {
             errorMessage = "保存图片失败"
             showingErrorAlert = true
+            print("ImagePickerGrid: Failed to save image")
         }
     }
-    
+
     private func saveImageAsMain(_ image: UIImage) {
         // Use PNG to preserve transparency for cropped images
+        print("ImagePickerGrid: Saving image as main, current imagePaths count: \(imagePaths.count)")
         if let fileName = ImageManager.shared.saveImage(image, context: modelContext, format: .png) {
             imagePaths.insert(fileName, at: 0)
+            print("ImagePickerGrid: Image saved as main, new imagePaths count: \(imagePaths.count), fileName: \(fileName)")
         } else {
             errorMessage = "保存图片失败"
             showingErrorAlert = true
+            print("ImagePickerGrid: Failed to save image as main")
         }
     }
     

@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import Combine
 
 // MARK: - 编辑草稿数据结构
 struct ClothingEditDraft: Codable {
@@ -92,41 +93,88 @@ struct ClothingEditDraft: Codable {
 // MARK: - 草稿管理器
 final class ClothingEditDraftManager {
     static let shared = ClothingEditDraftManager()
-    
+
     private let userDefaults = UserDefaults.standard
     private let draftKey = "ClothingEditDraft"
-    
-    private init() {}
-    
+    private let draftIDKey = "ClothingEditDraftID"
+
+    // 当前编辑状态（用于后台保存）
+    @Published var currentDraft: ClothingEditDraft?
+
+    private init() {
+        // 监听应用进入后台通知
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("DraftManager: Background notification received")
+            if let draft = self?.currentDraft {
+                print("DraftManager: Saving current draft on background, images: \(draft.imagePaths.count)")
+                self?.saveDraft(draft)
+            } else {
+                print("DraftManager: No current draft to save on background")
+            }
+        }
+    }
+
     func saveDraft(_ draft: ClothingEditDraft) {
+        print("DraftManager: Saving draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
         if let data = try? JSONEncoder().encode(draft) {
             userDefaults.set(data, forKey: draftKey)
+            userDefaults.set(draft.id.uuidString, forKey: draftIDKey)
             userDefaults.synchronize()
+            print("DraftManager: Draft saved successfully")
+        } else {
+            print("DraftManager: Failed to encode draft")
         }
     }
-    
+
     func loadDraft() -> ClothingEditDraft? {
-        guard let data = userDefaults.data(forKey: draftKey),
-              let draft = try? JSONDecoder().decode(ClothingEditDraft.self, from: data) else {
+        guard let data = userDefaults.data(forKey: draftKey) else {
+            print("DraftManager: No draft data found in UserDefaults")
             return nil
         }
+        guard let draft = try? JSONDecoder().decode(ClothingEditDraft.self, from: data) else {
+            print("DraftManager: Failed to decode draft data")
+            return nil
+        }
+        print("DraftManager: Loaded draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
         return draft
     }
-    
-    func clearDraft() {
-        userDefaults.removeObject(forKey: draftKey)
-        userDefaults.synchronize()
+
+    func loadDraftID() -> UUID? {
+        guard let idString = userDefaults.string(forKey: draftIDKey) else {
+            print("DraftManager: No draftID found in UserDefaults")
+            return nil
+        }
+        guard let uuid = UUID(uuidString: idString) else {
+            print("DraftManager: Failed to parse draftID: \(idString)")
+            return nil
+        }
+        print("DraftManager: Loaded draftID: \(uuid)")
+        return uuid
     }
-    
+
+    func clearDraft() {
+        print("DraftManager: Clearing draft")
+        currentDraft = nil
+        userDefaults.removeObject(forKey: draftKey)
+        userDefaults.removeObject(forKey: draftIDKey)
+        userDefaults.synchronize()
+        print("DraftManager: Draft cleared")
+    }
+
     func hasDraft() -> Bool {
-        return loadDraft() != nil
+        let hasDraft = loadDraft() != nil
+        print("DraftManager: hasDraft = \(hasDraft)")
+        return hasDraft
     }
 }
 
 struct ClothingEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @State private var draftManager = ClothingEditDraftManager.shared
@@ -175,8 +223,8 @@ struct ClothingEditView: View {
     @State private var finalPaymentEndDate: Date = Date()
     @State private var note: String = ""
     
-    // 标记是否已从草稿恢复
-    @State private var hasRestoredFromDraft = false
+    // 标记是否是通过"保存"按钮离开的
+    @State private var isSaving = false
     
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
@@ -185,6 +233,7 @@ struct ClothingEditView: View {
         _clothing = State(initialValue: clothing)
         self.initialBrandID = initialBrandID
         self.initialTypes = initialTypes
+        print("ClothingEditView: INIT called, isEditing: \(clothing != nil)")
     }
     
     var isEditing: Bool { clothing != nil }
@@ -263,6 +312,8 @@ struct ClothingEditView: View {
             
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") {
+                    // 标记为保存操作
+                    isSaving = true
                     // 保存前清除草稿
                     draftManager.clearDraft()
                     save()
@@ -292,16 +343,25 @@ struct ClothingEditView: View {
             }
         }
         .onAppear {
-            print("ClothingEditView: onAppear triggered")
+            print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID)")
             // 加载自动补全数据
             SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
-            
-            // 首先检查是否有未保存的草稿需要恢复
-            if !hasRestoredFromDraft, !isEditing, let draft = draftManager.loadDraft() {
-                print("ClothingEditView: Restoring from draft")
+
+            // 尝试恢复草稿（视图可能被重新创建）
+            if isEditing {
+                print("ClothingEditView: Skipping draft restore, in editing mode")
+            } else if let draft = draftManager.loadDraft() {
+                print("ClothingEditView: Found draft with \(draft.imagePaths.count) images")
+                // 恢复草稿
                 restoreFromDraft(draft)
-                hasRestoredFromDraft = true
-            } else if let c = clothing {
+            } else {
+                print("ClothingEditView: No draft found to restore")
+            }
+
+            // 更新当前草稿到管理器（用于后台保存）
+            updateCurrentDraft()
+            
+            if let c = clothing {
                 // 编辑模式：从数据库加载
                 name = c.name
                 brandName = c.brand?.name ?? ""
@@ -360,18 +420,27 @@ struct ClothingEditView: View {
                 }
             }
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .background || newPhase == .inactive {
-                // 应用进入后台或非活跃状态时保存草稿
-                if !isEditing {
-                    saveCurrentStateAsDraft()
-                }
-            } else if newPhase == .active {
-                // 应用回到前台，如果是新建模式且还没有恢复过草稿，尝试恢复
-                if !isEditing && !hasRestoredFromDraft, let draft = draftManager.loadDraft() {
-                    restoreFromDraft(draft)
-                    hasRestoredFromDraft = true
-                }
+        .onChange(of: imagePaths) { oldValue, newValue in
+            print("ClothingEditView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
+            // 更新当前草稿到管理器
+            updateCurrentDraft()
+        }
+        .onChange(of: name) { _, _ in updateCurrentDraft() }
+        .onChange(of: brandName) { _, _ in updateCurrentDraft() }
+        .onChange(of: types) { _, _ in updateCurrentDraft() }
+        .onChange(of: colors) { _, _ in updateCurrentDraft() }
+        .onChange(of: sizes) { _, _ in updateCurrentDraft() }
+        .onChange(of: length) { _, _ in updateCurrentDraft() }
+        .onChange(of: condition) { _, _ in updateCurrentDraft() }
+        .onChange(of: accessories) { _, _ in updateCurrentDraft() }
+        .onDisappear {
+            print("ClothingEditView: onDisappear, isSaving: \(isSaving), isEditing: \(isEditing)")
+            // 如果不是保存操作且不是编辑模式，保存草稿（作为后备方案）
+            if !isSaving && !isEditing {
+                print("ClothingEditView: Saving draft on disappear")
+                saveCurrentStateAsDraft()
+            } else {
+                print("ClothingEditView: Not saving draft on disappear (isSaving: \(isSaving), isEditing: \(isEditing))")
             }
         }
         .onChange(of: deposit) { oldValue, newValue in
@@ -386,6 +455,7 @@ struct ClothingEditView: View {
     
     // 保存当前状态为草稿
     private func saveCurrentStateAsDraft() {
+        print("ClothingEditView: saveCurrentStateAsDraft called, draftID: \(draftID), imagePaths count: \(imagePaths.count), name: \(name)")
         let draft = ClothingEditDraft(
             id: draftID,
             name: name,
@@ -413,11 +483,47 @@ struct ClothingEditView: View {
             accessoryList: accessoryList
         )
         draftManager.saveDraft(draft)
-        print("ClothingEditView: Draft saved")
+        print("ClothingEditView: Draft saved successfully with \(draft.imagePaths.count) images")
     }
-    
+
+    // 更新当前草稿到管理器（用于后台保存）
+    private func updateCurrentDraft() {
+        // 只有在新建模式下才更新草稿
+        guard !isEditing else { return }
+
+        let draft = ClothingEditDraft(
+            id: draftID,
+            name: name,
+            brandName: brandName,
+            types: types,
+            colors: colors,
+            sizes: sizes,
+            length: length,
+            condition: condition,
+            accessories: accessories,
+            imagePaths: imagePaths,
+            isShared: isShared,
+            originalPrice: originalPrice,
+            priceTotal: priceTotal,
+            deposit: deposit,
+            balance: balance,
+            accessoriesPrice: accessoriesPrice,
+            stock: stock,
+            purchaseDate: purchaseDate,
+            depositDate: depositDate,
+            isDepositPlan: isDepositPlan,
+            finalPaymentDate: finalPaymentDate,
+            finalPaymentEndDate: finalPaymentEndDate,
+            note: note,
+            accessoryList: accessoryList
+        )
+        draftManager.currentDraft = draft
+        print("ClothingEditView: Updated current draft with \(draft.imagePaths.count) images")
+    }
+
     // 从草稿恢复状态
     private func restoreFromDraft(_ draft: ClothingEditDraft) {
+        print("ClothingEditView: restoreFromDraft called, draft has \(draft.imagePaths.count) images, current has \(imagePaths.count) images")
         name = draft.name
         brandName = draft.brandName
         types = draft.types
@@ -426,7 +532,14 @@ struct ClothingEditView: View {
         length = draft.length
         condition = draft.condition
         accessories = draft.accessories
-        imagePaths = draft.imagePaths
+        // 只有当草稿中的图片数量 >= 当前图片数量时才恢复图片
+        // 避免覆盖用户刚添加但还没保存到草稿的图片
+        if draft.imagePaths.count >= imagePaths.count {
+            print("ClothingEditView: Restoring \(draft.imagePaths.count) images from draft")
+            imagePaths = draft.imagePaths
+        } else {
+            print("ClothingEditView: Skipping image restore, draft has \(draft.imagePaths.count) images, current has \(imagePaths.count)")
+        }
         isShared = draft.isShared
         originalPrice = draft.originalPrice
         priceTotal = draft.priceTotal
@@ -442,7 +555,7 @@ struct ClothingEditView: View {
         note = draft.note
         accessoryList = draft.accessoryList
         draftID = draft.id
-        print("ClothingEditView: Draft restored")
+        print("ClothingEditView: Draft restored, draftID set to \(draftID)")
     }
     
     private func normalizeTags(_ input: String) -> String {

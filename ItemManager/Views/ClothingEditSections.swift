@@ -39,6 +39,9 @@ struct ClothingBasicInfoView: View {
                 .font(.headline)
             
             ImagePickerGrid(imagePaths: $imagePaths)
+                .onChange(of: imagePaths) { oldValue, newValue in
+                    print("ClothingBasicInfoView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
+                }
             
             AutoCompleteTextField(title: "裙子名称", placeholder: "请输入裙子名称", text: $name, field: .name, isRequired: true)
             
