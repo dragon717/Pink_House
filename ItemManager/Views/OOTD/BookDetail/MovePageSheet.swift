@@ -18,7 +18,7 @@ struct MovePageSheet: View {
                         HStack {
                             Text(targetBook.title)
                             Spacer()
-                            Text("\(targetBook.pages.filter({ !$0.isDeleted }).count) 页").foregroundStyle(.secondary)
+                            Text("\((targetBook.pages ?? []).filter({ !$0.isDeleted }).count) 页").foregroundStyle(.secondary)
                         }
                     }
                 }

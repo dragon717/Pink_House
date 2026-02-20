@@ -200,7 +200,7 @@ struct BookShelfView: View {
     private func deleteBook(_ book: BookGroup) {
         book.isDeleted = true
         book.deletedAt = Date()
-        for page in book.pages {
+        for page in book.pages ?? [] {
             page.isDeleted = true
             page.deletedAt = Date()
         }

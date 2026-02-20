@@ -689,7 +689,7 @@ struct WardrobeView: View {
     
     private func copyItem(_ item: Clothing) {
         let newItem = Clothing(
-            name: "\(item.name) (副本)",
+            name: "\(item.name) ",//不用+(副本)",
             brand: item.brand,
             types: item.types,
             colors: item.colors,

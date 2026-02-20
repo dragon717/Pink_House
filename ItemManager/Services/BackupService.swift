@@ -295,7 +295,7 @@ class BackupService {
                 }
                 
                 var items: [OOTDSnapshotItemDTO] = []
-                for item in o.items {
+                for item in o.items ?? [] {
                     if item.isDeleted { continue }
                     guard let cutout = item.cutout else { continue }
                     
@@ -442,9 +442,14 @@ class BackupService {
                 }
                 
                 // Fetch scene objects for this space outfit
-                // Note: Using filter instead of predicate due to SwiftData macro limitations
-                let allSceneObjects = try? context.fetch(FetchDescriptor<SceneObjectData>())
-                let sceneObjects = allSceneObjects?.filter { $0.spaceOutfit?.id == so.id }
+                // Note: Using spaceOutfitID instead of relationship
+                let outfitId = so.id
+                let descriptor = FetchDescriptor<SceneObjectData>(
+                    predicate: #Predicate { data in
+                        data.spaceOutfitID == outfitId
+                    }
+                )
+                let sceneObjects = try? context.fetch(descriptor)
                 
                 let sceneObjectDTOs = sceneObjects?.map { obj in
                     SceneObjectDataDTO(
@@ -1129,12 +1134,15 @@ class BackupService {
                     
                     // Ensure item is in outfit's list
                     // Use ID check to avoid object comparison which might trigger faults
-                    if !outfit.items.contains(where: { $0.id == item.id }) {
-                        outfit.items.append(item)
+                    if outfit.items == nil {
+                        outfit.items = []
+                    }
+                    if !(outfit.items?.contains(where: { $0.id == item.id }) ?? false) {
+                        outfit.items?.append(item)
                     }
                 }
                 
-                print("### Restore: Outfit \(outfit.note) now has \(outfit.items.count) items in memory before save.")
+                print("### Restore: Outfit \(outfit.note) now has \(outfit.items?.count ?? 0) items in memory before save.")
             }
         }
         
@@ -1165,7 +1173,7 @@ class BackupService {
                 
                 // 仅当没有 Snapshot 数据时，才使用旧格式恢复 Items
                 if manifest.snapshots == nil {
-                    let existingItems = outfit.items
+                    let existingItems = outfit.items ?? []
                     var itemMap: [UUID: OutfitItem] = Dictionary(uniqueKeysWithValues: existingItems.map { ($0.id, $0) })
                     for itemDTO in dto.items {
                         let item: OutfitItem
@@ -1427,7 +1435,7 @@ class BackupService {
                                 usdzModelPath: sceneDTO.usdzModelPath,
                                 color: SIMD4<Float>(Float(sceneDTO.colorR), Float(sceneDTO.colorG), Float(sceneDTO.colorB), Float(sceneDTO.colorA)),
                                 sortIndex: sceneDTO.sortIndex,
-                                spaceOutfit: spaceOutfit,
+                                spaceOutfitID: spaceOutfit.id,
                                 model3D: sceneDTO.model3DID.flatMap { model3DMap[$0] }
                             )
                             context.insert(sceneObject)

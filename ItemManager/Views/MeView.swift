@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import AuthenticationServices
 import SwiftData
+import CloudKit
 
 struct MeView: View {
     @Environment(\.modelContext) private var modelContext
@@ -288,7 +289,7 @@ struct CloudSyncSheetView: View {
                         showingSyncAlert: $showingSyncAlert
                     )
                 } header: {
-                    Text("iCloud 同步管理")
+                    Text("iCloud 文件同步管理")
                 } footer: {
                     Text("请确保您的 iCloud 空间充足。")
                 }
@@ -548,74 +549,186 @@ struct UserInfoView: View {
 struct CloudSyncControlsView: View {
     @ObservedObject var authManager: AuthenticationManager
     @ObservedObject var cloudManager: CloudSyncManager
-    @Environment(\.modelContext) private var modelContext // Use environment instead of passing
+    @StateObject private var migrationManager = SwiftDataMigrationManager.shared
+    @Environment(\.modelContext) private var modelContext
     @Binding var showingLoginRequiredAlert: Bool
     @Binding var showingSyncAlert: Bool
     
+    @State private var showingRestartAlert = false
+    @State private var pendingCloudSyncEnabled = false
+    @State private var iCloudAccountStatus: CKAccountStatus = .couldNotDetermine
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "icloud")
-                    .foregroundStyle(.blue)
-                Text("iCloud 同步")
-                    .font(.headline)
-                Spacer()
-                if cloudManager.isSyncing {
-                    ProgressView()
-                }
-            }
-            
-            if let lastDate = cloudManager.lastCloudBackupDate {
-                Text("云端备份: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                // Text("云端无备份")
-                //     .font(.caption)
-                //     .foregroundStyle(.secondary)
-            }
-            
-            if let error = cloudManager.syncError {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-            
-            HStack(spacing: 16) {
-                Button {
-                    if !authManager.isAuthenticated {
-                        showingLoginRequiredAlert = true
-                    } else {
-                        Task {
-                            await cloudManager.uploadBackup(modelContainer: modelContext.container)
-                        }
+        VStack(alignment: .leading, spacing: 16) {
+            // MARK: - SwiftData iCloud 同步开关
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath.icloud")
+                        .foregroundStyle(.blue)
+                        .font(.title3)
+                    
+                    VStack(alignment: .leading) {
+                        Text("iCloud 及时同步")
+                            .font(.headline)
+                        Text("自动同步所有数据到 iCloud")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                } label: {
-                    Label("备份到云端", systemImage: "icloud.and.arrow.up")
-                        .font(.subheadline)
-                        .foregroundStyle(.white)
+                    
+                    Spacer()
+                    
+                    // 迁移中显示进度
+                    if migrationManager.isMigrating {
+                        ProgressView(value: migrationManager.migrationProgress)
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Toggle("", isOn: Binding(
+                            get: { migrationManager.isCloudSyncEnabled },
+                            set: { newValue in
+                                handleCloudSyncToggle(newValue)
+                            }
+                        ))
+                        .labelsHidden()
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-                .disabled(cloudManager.isSyncing)
                 
-                Button {
-                    if !authManager.isAuthenticated {
-                        showingLoginRequiredAlert = true
-                    } else {
-                        showingSyncAlert = true
+                // iCloud 账户状态警告
+                if iCloudAccountStatus != .available && migrationManager.isCloudSyncEnabled {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("iCloud 账户不可用，请检查设置")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
                     }
-                } label: {
-                    Label("从云端恢复", systemImage: "icloud.and.arrow.down")
-                        .font(.subheadline)
                 }
-                .buttonStyle(.bordered)
-                .disabled(cloudManager.isSyncing)
+                
+                // 迁移进度条
+                if migrationManager.isMigrating {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ProgressView(value: migrationManager.migrationProgress)
+                            .progressViewStyle(LinearProgressViewStyle())
+                        Text("正在迁移数据到 iCloud... \(Int(migrationManager.migrationProgress * 100))%")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                // 错误信息
+                if let error = migrationManager.migrationError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                
+                // 上次迁移时间
+                if let lastDate = migrationManager.lastMigrationDate {
+                    Text("上次同步: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .onAppear {
+                checkiCloudAccountStatus()
             }
             
+            Divider()
             
+            // MARK: - 传统 CloudKit 备份（保留原有功能）
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "icloud")
+                        .foregroundStyle(.indigo)
+                    Text("云端备份管理")
+                        .font(.headline)
+                    Spacer()
+                    if cloudManager.isSyncing {
+                        ProgressView()
+                    }
+                }
+                
+                if let lastDate = cloudManager.lastCloudBackupDate {
+                    Text("云端备份: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                if let error = cloudManager.syncError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                
+                HStack(spacing: 16) {
+                    Button {
+                        if !authManager.isAuthenticated {
+                            showingLoginRequiredAlert = true
+                        } else {
+                            Task {
+                                await cloudManager.uploadBackup(modelContainer: modelContext.container)
+                            }
+                        }
+                    } label: {
+                        Label("备份到云端", systemImage: "icloud.and.arrow.up")
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.indigo)
+                    .disabled(cloudManager.isSyncing || migrationManager.isMigrating)
+                    
+                    Button {
+                        if !authManager.isAuthenticated {
+                            showingLoginRequiredAlert = true
+                        } else {
+                            showingSyncAlert = true
+                        }
+                    } label: {
+                        Label("从云端恢复", systemImage: "icloud.and.arrow.down")
+                            .font(.subheadline)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(cloudManager.isSyncing || migrationManager.isMigrating)
+                }
+            }
         }
         .padding(.vertical, 8)
+        .alert("需要重启应用", isPresented: $showingRestartAlert) {
+            Button("稍后手动重启", role: .cancel) {
+                // 用户选择稍后重启，设置已经保存
+            }
+        } message: {
+            Text("iCloud 同步设置已更改。需要重启应用才能生效。请手动关闭并重新打开应用。")
+        }
+    }
+    
+    private func handleCloudSyncToggle(_ newValue: Bool) {
+        pendingCloudSyncEnabled = newValue
+        
+        Task {
+            let success = await migrationManager.toggleCloudSync(enabled: newValue)
+            if success {
+                // 设置已更改，需要重启
+                await MainActor.run {
+                    showingRestartAlert = true
+                }
+            }
+        }
+    }
+    
+    private func checkiCloudAccountStatus() {
+        Task {
+            let container = CKContainer(identifier: "iCloud.bugod2.ItemManager")
+            do {
+                let status = try await container.accountStatus()
+                await MainActor.run {
+                    iCloudAccountStatus = status
+                }
+            } catch {
+                print("检查 iCloud 账户状态失败: \(error)")
+            }
+        }
     }
 }
 

@@ -303,7 +303,7 @@ struct SpatialBookShelfView: View {
         book.isDeleted = true
         book.deletedAt = Date()
         // Also mark pages as deleted
-        for page in book.pages {
+        for page in book.pages ?? [] {
             page.isDeleted = true
             page.deletedAt = Date()
         }

@@ -336,9 +336,12 @@ struct BookDetailView: View {
 
         modelContext.insert(newPage)
 
-        for item in page.items {
+        for item in page.items ?? [] {
             let newItem = OutfitItem(cutout: item.cutout, x: item.x, y: item.y, rotation: item.rotation, scale: item.scale, zIndex: item.zIndex)
-            newPage.items.append(newItem)
+            if newPage.items == nil {
+                newPage.items = []
+            }
+            newPage.items?.append(newItem)
         }
 
         if let path = page.snapshotPath,

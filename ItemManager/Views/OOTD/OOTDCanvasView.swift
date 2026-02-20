@@ -148,7 +148,7 @@ struct OOTDCanvasView: View {
             }
             
             // Canvas Content
-            ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
+            ForEach((outfit.items ?? []).sorted(by: { $0.zIndex < $1.zIndex })) { item in
                 CanvasItemView(
                     item: item,
                     selectedItemId: $selectedItemId,
@@ -184,7 +184,7 @@ struct OOTDCanvasView: View {
             VStack {
                 HStack {
                     Spacer()
-                    Text("\(outfit.items.count)/20")
+                    Text("\(outfit.items?.count ?? 0)/20")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 24)
@@ -213,11 +213,12 @@ struct OOTDCanvasView: View {
                     }
                     .onEnded { value in
                         guard let id = selectedItemId,
-                              let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
+                              let items = outfit.items,
+                              let index = items.firstIndex(where: { $0.id == id }) else { return }
                         
-                        outfit.items[index].scale *= value
+                        outfit.items?[index].scale *= value
                         gestureScale = 1.0
-                        print("[OOTD] Scale updated for item \(id): \(outfit.items[index].scale)")
+                        print("[OOTD] Scale updated for item \(id): \(outfit.items?[index].scale ?? 0)")
                         saveContext()
                     },
                 RotationGesture()
@@ -227,11 +228,12 @@ struct OOTDCanvasView: View {
                     }
                     .onEnded { value in
                         guard let id = selectedItemId,
-                              let index = outfit.items.firstIndex(where: { $0.id == id }) else { return }
+                              let items = outfit.items,
+                              let index = items.firstIndex(where: { $0.id == id }) else { return }
                         
-                        outfit.items[index].rotation += value.degrees
+                        outfit.items?[index].rotation += value.degrees
                         gestureRotation = .zero
-                        print("[OOTD] Rotation updated for item \(id): \(outfit.items[index].rotation)")
+                        print("[OOTD] Rotation updated for item \(id): \(outfit.items?[index].rotation ?? 0)")
                         saveContext()
                     }
             )
@@ -253,8 +255,8 @@ struct OOTDCanvasView: View {
             Text("确定要删除这个抠图吗？此操作无法撤销。")
         }
         .onAppear {
-            print("[OOTD] Canvas appeared with \(outfit.items.count) items")
-            for item in outfit.items {
+            print("[OOTD] Canvas appeared with \(outfit.items?.count ?? 0) items")
+            for item in outfit.items ?? [] {
                 print("[OOTD] Item \(item.id): x=\(item.x), y=\(item.y), scale=\(item.scale), rot=\(item.rotation), z=\(item.zIndex)")
             }
         }
@@ -262,9 +264,9 @@ struct OOTDCanvasView: View {
     
     
     private func deleteItem(_ item: OutfitItem) {
-        if let index = outfit.items.firstIndex(where: { $0.id == item.id }) {
+        if let index = outfit.items?.firstIndex(where: { $0.id == item.id }) {
             print("[OOTD] Deleting item \(item.id)")
-            outfit.items.remove(at: index)
+            outfit.items?.remove(at: index)
             selectedItemId = nil
             modelContext.delete(item)
             saveContext()
@@ -284,7 +286,8 @@ struct OOTDCanvasView: View {
     // MARK: - Layer Management
     
     private func bringToFront(_ item: OutfitItem) {
-        guard let maxZIndex = outfit.items.map({ $0.zIndex }).max() else { return }
+        guard let items = outfit.items,
+              let maxZIndex = items.map({ $0.zIndex }).max() else { return }
         item.zIndex = maxZIndex + 1
         reindexLayers()
         print("[OOTD] Brought item \(item.id) to front")
@@ -292,7 +295,7 @@ struct OOTDCanvasView: View {
     }
     
     private func bringForward(_ item: OutfitItem) {
-        let sortedItems = outfit.items.sorted(by: { $0.zIndex < $1.zIndex })
+        let sortedItems = (outfit.items ?? []).sorted(by: { $0.zIndex < $1.zIndex })
         guard let index = sortedItems.firstIndex(where: { $0.id == item.id }),
               index < sortedItems.count - 1 else { return }
         
@@ -311,7 +314,7 @@ struct OOTDCanvasView: View {
     }
     
     private func sendBackward(_ item: OutfitItem) {
-        let sortedItems = outfit.items.sorted(by: { $0.zIndex < $1.zIndex })
+        let sortedItems = (outfit.items ?? []).sorted(by: { $0.zIndex < $1.zIndex })
         guard let index = sortedItems.firstIndex(where: { $0.id == item.id }),
               index > 0 else { return }
         
@@ -326,14 +329,15 @@ struct OOTDCanvasView: View {
     
     private func reindexLayers() {
         // Re-assign zIndexes to be sequential to keep numbers manageable
-        let sortedItems = outfit.items.sorted(by: { $0.zIndex < $1.zIndex })
+        let sortedItems = (outfit.items ?? []).sorted(by: { $0.zIndex < $1.zIndex })
         for (index, item) in sortedItems.enumerated() {
             item.zIndex = index
         }
     }
     
     private func sendToBack(_ item: OutfitItem) {
-        guard let minZIndex = outfit.items.map({ $0.zIndex }).min() else { return }
+        guard let items = outfit.items,
+              let minZIndex = items.map({ $0.zIndex }).min() else { return }
         item.zIndex = minZIndex - 1
         reindexLayers()
         print("[OOTD] Sent item \(item.id) to back")

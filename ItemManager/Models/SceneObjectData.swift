@@ -4,7 +4,7 @@ import simd
 
 @Model
 final class SceneObjectData {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     
     var objectType: String = "usdzModel"
     
@@ -28,11 +28,14 @@ final class SceneObjectData {
     var colorA: Double = 1.0
     
     var sortIndex: Int = 0
-    
-    @Relationship
-    var spaceOutfit: SpaceOutfit?
-    
-    @Relationship
+
+    // 使用 spaceOutfitID 代替关系，避免 CloudKit 的 inverse 要求
+    var spaceOutfitID: UUID? = nil
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
+    @Relationship(deleteRule: .nullify)
     var model3D: Model3D?
     
     init(
@@ -44,7 +47,7 @@ final class SceneObjectData {
         usdzModelPath: String? = nil,
         color: SIMD4<Float> = SIMD4<Float>(0.8, 0.8, 0.8, 1.0),
         sortIndex: Int = 0,
-        spaceOutfit: SpaceOutfit? = nil,
+        spaceOutfitID: UUID? = nil,
         model3D: Model3D? = nil
     ) {
         self.id = id
@@ -64,7 +67,7 @@ final class SceneObjectData {
         self.colorB = Double(color.z)
         self.colorA = Double(color.w)
         self.sortIndex = sortIndex
-        self.spaceOutfit = spaceOutfit
+        self.spaceOutfitID = spaceOutfitID
         self.model3D = model3D
     }
     
@@ -145,8 +148,20 @@ final class SceneObjectData {
     }
 }
 
+// MARK: - SpaceOutfit 扩展
+// 使用 spaceOutfitID 查询关联的 SceneObjectData
+
+import SwiftData
+
 extension SpaceOutfit {
-    var sceneObjects: [SceneObjectData] {
-        return []
+    /// 获取关联的 SceneObjectData 数组
+    func fetchSceneObjects(context: ModelContext) -> [SceneObjectData] {
+        let outfitId = self.id
+        let descriptor = FetchDescriptor<SceneObjectData>(
+            predicate: #Predicate { data in
+                data.spaceOutfitID == outfitId
+            }
+        )
+        return (try? context.fetch(descriptor)) ?? []
     }
 }

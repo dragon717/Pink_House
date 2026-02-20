@@ -38,7 +38,7 @@ struct CanvasStickerBarView: View {
                         
                         Spacer()
                         
-                        Text("\(outfit.items.count)/20")
+                        Text("\(outfit.items?.count ?? 0)/20")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 8)
@@ -52,7 +52,7 @@ struct CanvasStickerBarView: View {
                     Divider()
                     
                     // 贴纸列表
-                    if outfit.items.isEmpty {
+                    if outfit.items?.isEmpty ?? true {
                         emptyView
                     } else {
                         stickerList
@@ -124,7 +124,7 @@ struct CanvasStickerBarView: View {
     private var stickerList: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
-                ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
+                ForEach((outfit.items ?? []).sorted(by: { $0.zIndex < $1.zIndex })) { item in
                     StickerThumbnailCell(
                         item: item,
                         isSelected: selectedItemId == item.id,

@@ -10,13 +10,16 @@ import SwiftData
 
 @Model
 final class Tag: Identifiable {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var colorHex: String
-    
-    @Relationship(inverse: \Clothing.tags)
-    var clothings: [Clothing]?
-    
+    var id: UUID = UUID()
+    var name: String = ""
+    var colorHex: String = "#FFB6C1"
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
+    @Relationship(deleteRule: .nullify)
+    var clothings: [Clothing]? = []
+
     init(name: String, colorHex: String = "#FFB6C1") {
         self.id = UUID()
         self.name = name

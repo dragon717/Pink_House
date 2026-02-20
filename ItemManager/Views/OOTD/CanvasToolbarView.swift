@@ -46,7 +46,7 @@ struct CanvasToolbarView: View {
     
     var selectedItem: OutfitItem? {
         guard let id = selectedItemId else { return nil }
-        return outfit.items.first { $0.id == id }
+        return outfit.items?.first { $0.id == id }
     }
     
     var body: some View {

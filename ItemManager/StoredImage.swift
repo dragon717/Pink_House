@@ -10,12 +10,12 @@ import SwiftData
 
 @Model
 final class StoredImage {
-    @Attribute(.unique) var id: UUID
-    @Attribute(.unique) var imageHash: String // SHA256 hash
-    var fileName: String
-    var refCount: Int
-    var createdAt: Date
-    var updatedAt: Date
+    var id: UUID = UUID()
+    var imageHash: String = "" // SHA256 hash
+    var fileName: String = ""
+    var refCount: Int = 1
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
     
     init(imageHash: String, fileName: String) {
         self.id = UUID()

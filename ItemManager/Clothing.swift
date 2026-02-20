@@ -19,7 +19,7 @@ enum ClothingStatus: String, Codable, CaseIterable, Identifiable {
 
 @Model
 final class Clothing {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     // 基础信息
     var name: String = ""
     // var brand: String = "" // Deprecated
@@ -56,7 +56,8 @@ final class Clothing {
     var deletedAt: Date? = nil // 删除时间
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
-    
+    var lastModified: Date = Date() // iCloud 同步时间戳
+
     // 3D模型信息
     var model3DPath: String? = nil // 3D模型文件路径
     var model3DType: String? = nil // 3D模型类型: "multi"(多图3D), "single"(单图3D)
@@ -156,12 +157,15 @@ final class Clothing {
 
 @Model
 final class AccessoryItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     var name: String = ""
     var price: Decimal = 0.0
     var deposit: Decimal = 0.0 // 定金
     var balance: Decimal = 0.0 // 尾款
     var sortIndex: Int = 0
+    
+    @Relationship(deleteRule: .nullify)
+    var clothing: Clothing?
     
     init(name: String, price: Decimal, deposit: Decimal = 0.0, balance: Decimal = 0.0, sortIndex: Int = 0) {
         self.name = name
@@ -177,24 +181,27 @@ final class AccessoryItem {
 
 @Model
 final class CutoutItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     var originalImageHash: String = ""
     var timestamp: Date = Date()
     var category: String = "未分类" // e.g., 裙装, 上衣, etc.
     var imagePath: String = "" // Path to the cutout image (PNG with transparency)
     var width: Double = 0.0
     var height: Double = 0.0
-    
+
     // 缓存裙子名字，方便在画布中显示（即使原 Clothing 被删除）
     var clothingName: String?
-    
+
     // Use ID instead of Relationship to decouple deletion lifecycle
     var linkedClothingID: UUID?
-    
-    @Relationship(deleteRule: .nullify, inverse: \OutfitItem.cutout)
-    var outfitItems: [OutfitItem] = []
-    
-    init(originalImageHash: String, 
+
+    @Relationship(deleteRule: .nullify)
+    var outfitItems: [OutfitItem]? = []
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
+    init(originalImageHash: String,
          category: String = "未分类",
          imagePath: String,
          width: Double,
@@ -213,17 +220,20 @@ final class CutoutItem {
 
 @Model
 final class BookGroup {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     var title: String = ""
     var coverImage: String? // Optional custom cover
     var createdAt: Date = Date()
     var isDeleted: Bool = false
     var deletedAt: Date? = nil
     var sortIndex: Int = 0 // 自定义排序索引
-    
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
     @Relationship(deleteRule: .cascade, inverse: \Outfit.book)
-    var pages: [Outfit] = []
-    
+    var pages: [Outfit]? = []
+
     init(title: String, coverImage: String? = nil, sortIndex: Int = 0) {
         self.title = title
         self.coverImage = coverImage
@@ -234,24 +244,27 @@ final class BookGroup {
 
 @Model
 final class Outfit {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     var createdAt: Date = Date()
     var note: String = ""
     var snapshotPath: String? // Path to the saved OOTD image
     var canvasType: String = "mannequin" // "mannequin" or "blank"
     var backgroundImagePath: String? // Custom background image path
     var sortIndex: Int = 0 // Custom order index
-    
+
     // Trash Bin Logic
     var isDeleted: Bool = false
     var deletedAt: Date? = nil
-    
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
     @Relationship
     var book: BookGroup?
-    
+
     @Relationship(deleteRule: .cascade)
-    var items: [OutfitItem] = []
-    
+    var items: [OutfitItem]? = []
+
     init(note: String = "", snapshotPath: String? = nil, canvasType: String = "mannequin", backgroundImagePath: String? = nil, book: BookGroup? = nil) {
         self.note = note
         self.snapshotPath = snapshotPath
@@ -263,16 +276,17 @@ final class Outfit {
 
 @Model
 final class OutfitItem {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     var x: Double = 0.0
     var y: Double = 0.0
     var rotation: Double = 0.0
     var scale: Double = 1.0
     var zIndex: Int = 0
     
+    @Relationship(deleteRule: .nullify)
     var cutout: CutoutItem?
     
-    @Relationship
+    @Relationship(deleteRule: .nullify)
     var outfit: Outfit?
     
     init(cutout: CutoutItem?, x: Double, y: Double, rotation: Double, scale: Double, zIndex: Int) {
@@ -289,17 +303,20 @@ final class OutfitItem {
 
 @Model
 final class SpaceBookGroup {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     var title: String = ""
     var coverImage: String? // Optional custom cover
     var createdAt: Date = Date()
     var isDeleted: Bool = false
     var deletedAt: Date? = nil
     var sortIndex: Int = 0 // 自定义排序索引
-    
-    @Relationship(deleteRule: .cascade, inverse: \SpaceOutfit.book)
-    var pages: [SpaceOutfit] = []
-    
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
+    @Relationship(deleteRule: .cascade)
+    var pages: [SpaceOutfit]? = []
+
     init(title: String, coverImage: String? = nil, sortIndex: Int = 0) {
         self.title = title
         self.coverImage = coverImage
@@ -310,28 +327,33 @@ final class SpaceBookGroup {
 
 @Model
 final class SpaceOutfit {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     var createdAt: Date = Date()
     var note: String = ""
     var snapshotPath: String? // Path to the saved 3D snapshot
-    
+
     // Sorting
     var sortIndex: Int = 0
-    
+
     // 3D Scene Configuration
     var modelPath: String? // Path to the 3D model file (e.g. .usdz, .ply)
     var camPosX: Double = 0.0
     var camPosY: Double = 1.5
     var camPosZ: Double = 5.0
     var lightingIntensity: Double = 1000.0
-    
+
     // Trash Bin Logic
     var isDeleted: Bool = false
     var deletedAt: Date? = nil
-    
-    @Relationship
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
+    @Relationship(deleteRule: .nullify)
     var book: SpaceBookGroup?
-    
+
+    // pages 关系通过 SceneObjectData.spaceOutfitID 查询获取
+
     init(note: String = "", snapshotPath: String? = nil, book: SpaceBookGroup? = nil, sortIndex: Int = 0) {
         self.note = note
         self.snapshotPath = snapshotPath

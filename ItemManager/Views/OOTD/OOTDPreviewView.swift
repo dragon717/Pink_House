@@ -33,7 +33,7 @@ struct OOTDPreviewView: View {
                     .clipped()
             }
             
-            ForEach(outfit.items.sorted(by: { $0.zIndex < $1.zIndex })) { item in
+            ForEach((outfit.items ?? []).sorted(by: { $0.zIndex < $1.zIndex })) { item in
                 if let cutout = item.cutout, 
                    let uiImage = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
                     Image(uiImage: uiImage)

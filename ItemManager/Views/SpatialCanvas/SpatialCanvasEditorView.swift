@@ -431,9 +431,12 @@ struct SpatialCanvasEditorView: View {
         
         // 从 SceneObjectData 加载所有场景对象
         do {
+            let targetId = outfitId
             let objectDataList = try modelContext.fetch(
                 FetchDescriptor<SceneObjectData>(
-                    predicate: #Predicate<SceneObjectData> { $0.spaceOutfit?.id == outfitId },
+                    predicate: #Predicate<SceneObjectData> { data in
+                        data.spaceOutfitID == targetId
+                    },
                     sortBy: [SortDescriptor(\.sortIndex)]
                 )
             )
@@ -960,10 +963,12 @@ struct SpatialCanvasEditorView: View {
         }
         
         // 删除旧的场景对象数据
-        let outfitId = outfit.id
+        let targetOutfitId = outfit.id
         if let existingObjects = try? modelContext.fetch(
             FetchDescriptor<SceneObjectData>(
-                predicate: #Predicate<SceneObjectData> { $0.spaceOutfit?.id == outfitId }
+                predicate: #Predicate<SceneObjectData> { data in
+                    data.spaceOutfitID == targetOutfitId
+                }
             )
         ) {
             print("[Scene] 删除 \(existingObjects.count) 个旧对象")
@@ -993,7 +998,7 @@ struct SpatialCanvasEditorView: View {
                 usdzModelPath: nil, // 先设为 nil，下面用 setModelPath 设置相对路径
                 color: object.color,
                 sortIndex: index,
-                spaceOutfit: outfit,
+                spaceOutfitID: outfit.id,
                 model3D: model3D
             )
             // 使用相对路径存储

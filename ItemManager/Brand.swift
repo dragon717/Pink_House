@@ -10,14 +10,17 @@ import SwiftData
 
 @Model
 final class Brand: Identifiable {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var colorHex: String
-    var imagePath: String? // Optional path to brand image
-    
-    @Relationship(inverse: \Clothing.brand)
-    var clothings: [Clothing]?
-    
+    var id: UUID = UUID()
+    var name: String = ""
+    var colorHex: String = "#FFB6C1"
+    var imagePath: String? = nil // Optional path to brand image
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
+
+    @Relationship(deleteRule: .nullify)
+    var clothings: [Clothing]? = []
+
     init(name: String, colorHex: String = "#FFB6C1", imagePath: String? = nil) {
         self.id = UUID()
         self.name = name

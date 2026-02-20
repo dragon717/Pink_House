@@ -224,7 +224,7 @@ struct OOTDSidebarView: View {
         // We can either mark them deleted, OR rely on the fact that if book is deleted, we don't fetch it.
         // But the requirement says "recover individually or as group".
         // So marking pages as deleted is better for consistency if we query "all deleted outfits".
-        for page in book.pages {
+        for page in book.pages ?? [] {
             page.isDeleted = true
             page.deletedAt = Date()
         }
@@ -261,7 +261,7 @@ struct BookGroupView: View {
     
     // We need to sort pages
     var sortedPages: [Outfit] {
-        book.pages.filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
+        (book.pages ?? []).filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
     }
     
     var body: some View {

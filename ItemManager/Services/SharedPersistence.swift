@@ -13,10 +13,72 @@ import SwiftUI
 class SharedPersistence {
     static let shared = SharedPersistence()
     
-    // 使用默认配置，即存储在 App 的 Documents/Library 目录，不共享
-    // 这样保证了数据安全且无需迁移现有数据
-    var sharedModelContainer: ModelContainer = {
-        #if WIDGET_EXTENSION
+    // 使用 MigrationManager 创建 ModelContainer，支持本地和 iCloud 双模式
+    var sharedModelContainer: ModelContainer
+    
+    private init() {
+        // 使用 SwiftDataMigrationManager 创建合适的 ModelContainer
+        do {
+            #if WIDGET_EXTENSION
+            // 小组件扩展使用简化的本地存储配置
+            self.sharedModelContainer = try Self.createWidgetModelContainer()
+            print("✅ 小组件 ModelContainer 创建成功")
+            #else
+            // 主应用使用 MigrationManager
+            self.sharedModelContainer = try SwiftDataMigrationManager.shared.createModelContainer()
+            #endif
+        } catch {
+            // 最后的回退方案 - 如果 MigrationManager 也失败了
+            print("⚠️ MigrationManager 创建失败: \(error)")
+            print("🔄 使用最后的回退方案...")
+            
+            do {
+                #if WIDGET_EXTENSION
+                // 小组件扩展使用简化的 schema
+                let schema = Schema([
+                    Clothing.self,
+                    Item.self,
+                    Tag.self,
+                    Brand.self,
+                    AccessoryItem.self,
+                    CutoutItem.self,
+                    Outfit.self,
+                    OutfitItem.self,
+                    BookGroup.self,
+                    SpaceBookGroup.self,
+                    SpaceOutfit.self
+                ])
+                #else
+                // 主应用使用完整的 schema
+                let schema = Schema([
+                    Clothing.self,
+                    Item.self,
+                    Tag.self,
+                    Brand.self,
+                    AccessoryItem.self,
+                    CutoutItem.self,
+                    Outfit.self,
+                    OutfitItem.self,
+                    BookGroup.self,
+                    SpaceBookGroup.self,
+                    SpaceOutfit.self,
+                    SceneObjectData.self,
+                    Model3D.self,
+                    StoredImage.self
+                ])
+                #endif
+                let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
+                self.sharedModelContainer = try ModelContainer(for: schema, configurations: [fallbackConfig])
+                print("✅ 回退到本地存储成功")
+            } catch {
+                fatalError("无法创建 ModelContainer: \(error)")
+            }
+        }
+    }
+    
+    #if WIDGET_EXTENSION
+    /// 为小组件扩展创建简化的 ModelContainer
+    private static func createWidgetModelContainer() throws -> ModelContainer {
         let schema = Schema([
             Clothing.self,
             Item.self,
@@ -30,42 +92,18 @@ class SharedPersistence {
             SpaceBookGroup.self,
             SpaceOutfit.self
         ])
-        #else
-        let schema = Schema([
-            Clothing.self,
-            Item.self,
-            Tag.self,
-            Brand.self,
-            AccessoryItem.self,
-            CutoutItem.self,
-            Outfit.self,
-            OutfitItem.self,
-            BookGroup.self,
-            SpaceBookGroup.self,
-            SpaceOutfit.self,
-            SceneObjectData.self,
-            Model3D.self
-        ])
+        
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [modelConfiguration])
+    }
+    #endif
+    
+    /// 重新创建 ModelContainer（切换 iCloud 同步设置后调用）
+    func recreateModelContainer() throws {
+        #if !WIDGET_EXTENSION
+        self.sharedModelContainer = try SwiftDataMigrationManager.shared.createModelContainer()
         #endif
-        
-        // 检查 iCloud 同步设置
-        // let isCloudSyncEnabled = UserDefaults.standard.bool(forKey: "useCloudSync")
-        
-        let modelConfiguration: ModelConfiguration
-        // if isCloudSyncEnabled {
-        //     // 启用 iCloud 同步 (.automatic 通常使用 Application Support 目录)
-        //     modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
-        // } else {
-            // 仅本地存储
-            modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
-        // }
-        
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    }
     
     // 同步数据给小组件
     // 这个方法应该在数据发生变化时调用（如添加、修改、删除衣物后）

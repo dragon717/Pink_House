@@ -378,7 +378,7 @@ struct RecycleBinView: View {
             book.isDeleted = false
             book.deletedAt = nil
             // Restore all pages in this book
-            for page in book.pages {
+            for page in book.pages ?? [] {
                 page.isDeleted = false
                 page.deletedAt = nil
             }
@@ -388,7 +388,7 @@ struct RecycleBinView: View {
     private func permanentlyDeleteBook(_ book: BookGroup) {
         withAnimation {
             // Delete snapshot files for all pages
-            for page in book.pages {
+            for page in book.pages ?? [] {
                 if let path = page.snapshotPath {
                     ImageManager.shared.deleteImage(fileName: path, context: modelContext)
                 }
@@ -418,17 +418,17 @@ struct RecycleBinView: View {
             book.isDeleted = false
             book.deletedAt = nil
             // Restore all pages in this book
-            for page in book.pages {
+            for page in book.pages ?? [] {
                 page.isDeleted = false
                 page.deletedAt = nil
             }
         }
     }
-    
+
     private func permanentlyDeleteSpaceBook(_ book: SpaceBookGroup) {
         withAnimation {
             // Delete snapshot files for all pages
-            for page in book.pages {
+            for page in book.pages ?? [] {
                 if let path = page.snapshotPath {
                     ImageManager.shared.deleteImage(fileName: path, context: modelContext)
                 }
@@ -590,14 +590,14 @@ struct DeletedBookRow: View {
                         
                         Spacer()
                         
-                        Text("\(book.pages.count) 页")
+                        Text("\(book.pages?.count ?? 0) 页")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 .buttonStyle(.plain)
                 .disabled(isEditing)
-                
+
                 // Actions
                 if !isEditing {
                     HStack(spacing: 16) {
@@ -607,7 +607,7 @@ struct DeletedBookRow: View {
                                 .font(.title3)
                         }
                         .buttonStyle(.plain)
-                        
+
                         Button(action: onDelete) {
                             Image(systemName: "trash.circle.fill")
                                 .foregroundStyle(.red)
@@ -617,9 +617,9 @@ struct DeletedBookRow: View {
                     }
                 }
             }
-            
+
             if isExpanded {
-                ForEach(book.pages) { page in
+                ForEach(book.pages ?? []) { page in
                     HStack {
                         Image(systemName: "doc.text")
                             .font(.caption)
@@ -734,14 +734,14 @@ struct DeletedSpaceBookRow: View {
                         
                         Spacer()
                         
-                        Text("\(book.pages.count) 页")
+                        Text("\(book.pages?.count ?? 0) 页")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 .buttonStyle(.plain)
                 .disabled(isEditing)
-                
+
                 // Actions
                 if !isEditing {
                     HStack(spacing: 16) {
@@ -751,7 +751,7 @@ struct DeletedSpaceBookRow: View {
                                 .font(.title3)
                         }
                         .buttonStyle(.plain)
-                        
+
                         Button(action: onDelete) {
                             Image(systemName: "trash.circle.fill")
                                 .foregroundStyle(.red)
@@ -763,7 +763,7 @@ struct DeletedSpaceBookRow: View {
             }
 
             if isExpanded {
-                ForEach(book.pages) { page in
+                ForEach(book.pages ?? []) { page in
                     HStack {
                         Image(systemName: "cube.transparent")
                             .font(.caption)

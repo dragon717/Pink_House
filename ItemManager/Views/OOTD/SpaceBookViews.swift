@@ -56,7 +56,7 @@ struct SpaceBookCoverVisuals: View {
             return image
         }
         // Fallback to first page
-        if let firstPage = book.pages.filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
+        if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
            let snapshotPath = firstPage.snapshotPath,
            let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
             return image
@@ -253,7 +253,7 @@ struct SpaceBookOpeningAnimationView: View {
 
     private func loadPageImages() {
         // 获取书页数据（过滤已删除的，按创建时间倒序）
-        let validPages = book.pages.filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
+        let validPages = (book.pages ?? []).filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
 
         // 如果没有书页，直接返回
         if validPages.isEmpty { return }
@@ -316,7 +316,7 @@ struct SpaceBookCoverForAnimation: View {
             return image
         }
         // Fallback to first page
-        if let firstPage = book.pages.filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
+        if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
            let snapshotPath = firstPage.snapshotPath,
            let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
             return image
@@ -488,7 +488,7 @@ struct SpaceMovePageSheet: View {
                         HStack {
                             Text(targetBook.title)
                             Spacer()
-                            Text("\(targetBook.pages.filter({ !$0.isDeleted }).count) 页").foregroundStyle(.secondary)
+                            Text("\((targetBook.pages ?? []).filter({ !$0.isDeleted }).count) 页").foregroundStyle(.secondary)
                         }
                     }
                 }

@@ -294,9 +294,12 @@ struct OOTDEditorView: View {
             y: 0,
             rotation: 0,
             scale: 1.0,
-            zIndex: outfit.items.count
+            zIndex: outfit.items?.count ?? 0
         )
-        outfit.items.append(item)
+        if outfit.items == nil {
+            outfit.items = []
+        }
+        outfit.items?.append(item)
         saveSnapshot()
     }
     
@@ -351,12 +354,15 @@ struct OOTDEditorView: View {
     
     private func batchAddCutouts(_ cutouts: [CutoutItem]) {
         // 检查是否超过限制
-        if outfit.items.count + cutouts.count > 20 {
+        if (outfit.items?.count ?? 0) + cutouts.count > 20 {
             showingLimitAlert = true
             return
         }
         
         // 批量添加
+        if outfit.items == nil {
+            outfit.items = []
+        }
         for (index, cutout) in cutouts.enumerated() {
             let item = OutfitItem(
                 cutout: cutout,
@@ -364,9 +370,9 @@ struct OOTDEditorView: View {
                 y: Double(index * 20),
                 rotation: 0,
                 scale: 1.0,
-                zIndex: outfit.items.count
+                zIndex: outfit.items?.count ?? 0
             )
-            outfit.items.append(item)
+            outfit.items?.append(item)
         }
         
         saveSnapshot()
@@ -434,9 +440,12 @@ struct OOTDEditorView: View {
                             onSelect: { cutout in addToOutfit(cutout) },
                             onAddPhoto: { showingActionSheet = true },
                             onBatchAdd: { cutouts in
-                                if outfit.items.count + cutouts.count > 20 {
+                                if (outfit.items?.count ?? 0) + cutouts.count > 20 {
                                     showingLimitAlert = true
                                     return false
+                                }
+                                if outfit.items == nil {
+                                    outfit.items = []
                                 }
                                 for (index, cutout) in cutouts.enumerated() {
                                     let item = OutfitItem(
@@ -445,9 +454,9 @@ struct OOTDEditorView: View {
                                         y: Double(index * 20),
                                         rotation: 0,
                                         scale: 1.0,
-                                        zIndex: outfit.items.count
+                                        zIndex: outfit.items?.count ?? 0
                                     )
-                                    outfit.items.append(item)
+                                    outfit.items?.append(item)
                                 }
                                 saveSnapshot()
                                 return true
@@ -487,9 +496,12 @@ struct OOTDEditorView: View {
                                 onSelect: { cutout in addToOutfit(cutout) },
                                 onAddPhoto: { showingActionSheet = true },
                                 onBatchAdd: { cutouts in
-                                    if outfit.items.count + cutouts.count > 20 {
+                                    if (outfit.items?.count ?? 0) + cutouts.count > 20 {
                                         showingLimitAlert = true
                                         return false
+                                    }
+                                    if outfit.items == nil {
+                                        outfit.items = []
                                     }
                                     for (index, cutout) in cutouts.enumerated() {
                                         let item = OutfitItem(
@@ -498,9 +510,9 @@ struct OOTDEditorView: View {
                                             y: Double(index * 20),
                                             rotation: 0,
                                             scale: 1.0,
-                                            zIndex: outfit.items.count
+                                            zIndex: outfit.items?.count ?? 0
                                         )
-                                        outfit.items.append(item)
+                                        outfit.items?.append(item)
                                     }
                                     saveSnapshot()
                                     return true

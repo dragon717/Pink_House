@@ -12,7 +12,7 @@ import SwiftUI
 
 @Model
 final class Model3D {
-    @Attribute(.unique) var id: UUID = UUID()
+    var id: UUID = UUID()
     
     var name: String = ""
     var types: String = ""
@@ -26,8 +26,10 @@ final class Model3D {
     var deletedAt: Date? = nil
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
-    
     var sortIndex: Int = 0
+
+    // iCloud 同步时间戳
+    var lastModified: Date = Date()
     
     var cameraPositionX: Float = 0
     var cameraPositionY: Float = 0
@@ -35,6 +37,9 @@ final class Model3D {
     var cameraRotationX: Float = 0
     var cameraRotationY: Float = 0
     var cameraRotationZ: Float = 0
+    
+    @Relationship(deleteRule: .cascade)
+    var sceneObjects: [SceneObjectData]? = []
     
     init(
         name: String,
