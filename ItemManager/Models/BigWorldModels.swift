@@ -22,14 +22,14 @@ enum LandmarkType: String, CaseIterable, Codable {
     
     var icon: String {
         switch self {
-        case .glacier: return "snowflake"
-        case .canyon: return "mountain.2"
-        case .oasis: return "drop.fill"
-        case .prairie: return "leaf.fill"
-        case .aurora: return "sparkles"
-        case .castle: return "building.columns.fill"
-        case .sakura: return "flower.fill"
-        case .lavender: return "camera.macro"
+        case .glacier: return "❄️"
+        case .canyon: return "⛰️"
+        case .oasis: return "💧"
+        case .prairie: return "🌿"
+        case .aurora: return "✨"
+        case .castle: return "🏰"
+        case .sakura: return "🌸"
+        case .lavender: return "🪻"
         }
     }
     

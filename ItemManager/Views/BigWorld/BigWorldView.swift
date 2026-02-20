@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import UIKit
 
 struct BigWorldView: View {
     @StateObject private var viewModel = BigWorldViewModel()
@@ -375,6 +376,7 @@ struct EnhancedCheckInView: View {
     @State private var badgeScale: CGFloat = 0
     @State private var showConfetti = false
     @State private var rotation: Double = 0
+    @State private var isGeneratingShareImage = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -471,9 +473,8 @@ struct EnhancedCheckInView: View {
                                     )
                                     .frame(width: 140, height: 140)
                                 
-                                Image(systemName: badge.iconName)
+                                Text(badge.iconName)
                                     .font(.system(size: 60))
-                                    .foregroundStyle(badge.themeColor)
                             }
                             .scaleEffect(badgeScale)
                             .rotation3DEffect(.degrees(rotation * 0.5), axis: (x: 0, y: 1, z: 0))
@@ -491,7 +492,9 @@ struct EnhancedCheckInView: View {
                     VStack(spacing: 16) {
                         // 分享按钮
                         Button {
-                            // 分享
+                            Task {
+                                await generateShareImage()
+                            }
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "square.and.arrow.up")
@@ -510,6 +513,7 @@ struct EnhancedCheckInView: View {
                             )
                             .cornerRadius(25)
                         }
+                        .disabled(isGeneratingShareImage)
                         
                         // 返回按钮
                         Button {
@@ -525,11 +529,17 @@ struct EnhancedCheckInView: View {
                                         .stroke(Color.white.opacity(0.3), lineWidth: 1)
                                 )
                         }
+                        .disabled(isGeneratingShareImage)
                     }
                     .padding(.horizontal, 40)
                     
                     // 底部安全区域偏移
                     Spacer().frame(height: tabBarOffset)
+                }
+                
+                // 加载遮罩
+                if isGeneratingShareImage {
+                    CheckInShareLoadingOverlay()
                 }
             }
         }
@@ -546,6 +556,280 @@ struct EnhancedCheckInView: View {
                     rotation = 360
                 }
             }
+        }
+
+    }
+    
+    @MainActor
+    private func generateShareImage() async {
+        guard let badge = viewModel.unlockedBadges.last,
+              let landmark = viewModel.selectedLandmark else { 
+            print("DEBUG: Missing badge or landmark")
+            return 
+        }
+        
+        // 显示加载动画
+        isGeneratingShareImage = true
+        
+        // 记录开始时间
+        let startTime = Date()
+        
+        // 给 UI 一些时间来显示加载动画
+        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3秒
+        
+        print("DEBUG: Generating share image for badge: \(badge.name), landmark: \(landmark.name)")
+        
+        // 在主线程生成图片（UIGraphicsImageRenderer 必须在主线程）
+        let image = await MainActor.run {
+            let shareCard = CheckInShareCard(badge: badge, landmark: landmark)
+            
+            // 使用 UIHostingController + UIGraphicsImageRenderer 渲染
+            let controller = UIHostingController(rootView: shareCard)
+            let view = controller.view
+            
+            let size = CGSize(width: 390, height: 844)
+            view?.bounds = CGRect(origin: .zero, size: size)
+            view?.backgroundColor = .clear
+            
+            // 强制布局
+            view?.layoutIfNeeded()
+            
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = UIScreen.main.scale
+            format.opaque = false
+            
+            let renderer = UIGraphicsImageRenderer(size: size, format: format)
+            let image = renderer.image { _ in
+                view?.drawHierarchy(in: view?.bounds ?? CGRect(origin: .zero, size: size), afterScreenUpdates: true)
+            }
+            
+            controller.removeFromParent()
+            
+            return image
+        }
+        
+        // 计算已经过的时间
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        let minimumDisplayTime: TimeInterval = 2.0 // 最少显示 2 秒
+        
+        // 如果生成时间少于 2 秒，等待剩余时间
+        if elapsedTime < minimumDisplayTime {
+            let remainingTime = minimumDisplayTime - elapsedTime
+            try? await Task.sleep(nanoseconds: UInt64(remainingTime * 1_000_000_000))
+        }
+        
+        // 隐藏加载动画
+        isGeneratingShareImage = false
+        
+        print("DEBUG: Generated image size: \(image.size)")
+        
+        // 直接弹出系统分享界面
+        print("DEBUG: About to call presentShareSheet")
+        presentShareSheet(with: image)
+        print("DEBUG: After calling presentShareSheet")
+    }
+    
+    @MainActor
+    private func presentShareSheet(with image: UIImage) {
+        print("DEBUG: Presenting share sheet...")
+        
+        let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        
+        // 获取当前窗口场景来呈现分享表
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            print("DEBUG: No window scene found")
+            return
+        }
+        
+        guard let rootVC = windowScene.windows.first?.rootViewController else {
+            print("DEBUG: No root view controller found")
+            return
+        }
+        
+        // 找到最顶部的视图控制器
+        var topVC = rootVC
+        while let presentedVC = topVC.presentedViewController {
+            topVC = presentedVC
+        }
+        
+        print("DEBUG: Top view controller: \(type(of: topVC))")
+        
+        // iPad 需要设置弹出位置
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = topVC.view
+            popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        // 延迟一点再呈现，确保视图层级稳定
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            print("DEBUG: Presenting activity view controller")
+            topVC.present(activityVC, animated: true) {
+                print("DEBUG: Activity view controller presented")
+            }
+        }
+    }
+}
+
+// MARK: - 打卡分享卡片
+struct CheckInShareCard: View {
+    let badge: TeaPartyBadge
+    let landmark: Landmark
+    
+    var body: some View {
+        ZStack {
+            // 主题背景渐变
+            LinearGradient(
+                colors: backgroundColors,
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            
+            // 简单的装饰圆圈
+            decorationCircles
+            
+            VStack(spacing: 30) {
+                Spacer()
+                
+                // 打卡成功标题
+                VStack(spacing: 8) {
+                    Text("打卡成功！")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    Text("欢迎来到\(landmark.name)")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                    
+                    Text("参加了\(landmark.teaPartyTheme)")
+                        .font(.subheadline)
+                        .foregroundStyle(landmark.type.themeColor)
+                }
+                
+                // 徽章展示
+                ZStack {
+                    // 光晕
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    badge.themeColor.opacity(0.5),
+                                    badge.themeColor.opacity(0.2),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 50,
+                                endRadius: 150
+                            )
+                        )
+                        .frame(width: 280, height: 280)
+                    
+                    // 徽章
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.2, green: 0.2, blue: 0.25),
+                                        Color(red: 0.1, green: 0.1, blue: 0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 140, height: 140)
+                            .shadow(color: badge.themeColor.opacity(0.6), radius: 20)
+                        
+                        Circle()
+                            .stroke(
+                                AngularGradient(
+                                    colors: [
+                                        badge.themeColor,
+                                        badge.themeColor.opacity(0.5),
+                                        badge.themeColor
+                                    ],
+                                    center: .center,
+                                    angle: .degrees(0)
+                                ),
+                                lineWidth: 3
+                            )
+                            .frame(width: 130, height: 130)
+                        
+                        // 徽章图标 - 使用 Text 显示 emoji
+                        Text(badge.iconName)
+                            .font(.system(size: 56))
+                    }
+                }
+                
+                // 徽章名称
+                Text("获得徽章：\(badge.name)")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                // App Logo
+                HStack(spacing: 8) {
+                    Image(systemName: "airplane")
+                        .font(.title3)
+                        .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0))
+                    
+                    Text("LOLITA AIR")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .padding(.bottom, 30)
+            }
+            .padding()
+        }
+        .frame(width: 390, height: 844)
+    }
+    
+    // 简化的装饰圆圈
+    private var decorationCircles: some View {
+        ZStack {
+            Circle()
+                .fill(badge.themeColor.opacity(0.1))
+                .frame(width: 200, height: 200)
+                .offset(x: -100, y: -200)
+            
+            Circle()
+                .fill(badge.themeColor.opacity(0.08))
+                .frame(width: 150, height: 150)
+                .offset(x: 120, y: 150)
+            
+            Circle()
+                .fill(Color.white.opacity(0.05))
+                .frame(width: 100, height: 100)
+                .offset(x: 80, y: -300)
+        }
+    }
+    
+    private var backgroundColors: [Color] {
+        switch landmark.type {
+        case .glacier:
+            return [Color(red: 0.4, green: 0.7, blue: 0.9), Color(red: 0.2, green: 0.4, blue: 0.6)]
+        case .canyon:
+            return [Color(red: 0.9, green: 0.5, blue: 0.3), Color(red: 0.6, green: 0.3, blue: 0.2)]
+        case .oasis:
+            return [Color(red: 0.4, green: 0.8, blue: 0.6), Color(red: 0.2, green: 0.5, blue: 0.4)]
+        case .prairie:
+            return [Color(red: 0.6, green: 0.8, blue: 0.3), Color(red: 0.4, green: 0.6, blue: 0.2)]
+        case .aurora:
+            return [Color(red: 0.2, green: 0.4, blue: 0.5), Color(red: 0.1, green: 0.2, blue: 0.3)]
+        case .castle:
+            return [Color(red: 0.8, green: 0.6, blue: 0.7), Color(red: 0.5, green: 0.3, blue: 0.4)]
+        case .sakura:
+            return [Color(red: 0.95, green: 0.7, blue: 0.8), Color(red: 0.8, green: 0.5, blue: 0.6)]
+        case .lavender:
+            return [Color(red: 0.7, green: 0.5, blue: 0.9), Color(red: 0.5, green: 0.3, blue: 0.7)]
         }
     }
 }
@@ -585,6 +869,101 @@ struct ConfettiView: View {
                     rotation: Double.random(in: 0...360),
                     delay: Double.random(in: 0...2)
                 )
+            }
+        }
+    }
+}
+
+// MARK: - 打卡分享加载遮罩
+struct CheckInShareLoadingOverlay: View {
+    @State private var rotation: Double = 0
+    @State private var scale: CGFloat = 1.0
+    @State private var opacity: Double = 1.0
+    @State private var breatheScale: CGFloat = 1.0
+    @State private var glowOpacity: Double = 0.5
+    
+    var body: some View {
+        ZStack {
+            // 半透明背景
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+            
+            // 加载内容
+            VStack(spacing: 24) {
+                // 猫爪旋转动画
+                ZStack {
+                    // 外发光圈
+                    Circle()
+                        .fill(Color(red: 1.0, green: 0.84, blue: 0.0).opacity(glowOpacity * 0.3))
+                        .frame(width: 120, height: 120)
+                        .scaleEffect(breatheScale)
+                    
+                    // 外圈装饰
+                    Circle()
+                        .stroke(Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.4), lineWidth: 2)
+                        .frame(width: 100, height: 100)
+                        .scaleEffect(scale)
+                    
+                    // 内圈装饰
+                    Circle()
+                        .stroke(Color(red: 1.0, green: 0.6, blue: 0.4).opacity(0.6), lineWidth: 1)
+                        .frame(width: 80, height: 80)
+                        .scaleEffect(scale * 0.9)
+                    
+                    // 猫爪图标
+                    Image(systemName: "pawprint.fill")
+                        .font(.system(size: 50, weight: .bold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .rotationEffect(.degrees(rotation))
+                        .shadow(color: Color(red: 1.0, green: 0.84, blue: 0.0).opacity(glowOpacity), radius: 15, x: 0, y: 5)
+                        .scaleEffect(breatheScale)
+                }
+                
+                // 加载文字
+                Text("正在生成分享卡片...")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                    .opacity(opacity)
+                    .scaleEffect(breatheScale)
+            }
+            .padding(40)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
+            )
+        }
+        .transition(.opacity)
+        .onAppear {
+            // 旋转动画 - 持续旋转
+            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
+            
+            // 脉冲缩放动画 - 快速的脉冲
+            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                scale = 1.15
+            }
+            
+            // 文字闪烁动画
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                opacity = 0.5
+            }
+            
+            // 呼吸动画 - 明显的呼吸效果
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                breatheScale = 1.15
+            }
+            
+            // 发光呼吸动画 - 强烈的发光变化
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                glowOpacity = 1.0
             }
         }
     }

@@ -255,9 +255,14 @@ struct BadgeCell: View {
                             .frame(width: 50, height: 50)
                         
                         // 徽章图标
-                        Image(systemName: isUnlocked ? landmark.type.icon : "lock.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(isUnlocked ? landmark.type.themeColor : .gray)
+                        if isUnlocked {
+                            Text(landmark.type.icon)
+                                .font(.system(size: 24))
+                        } else {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.gray)
+                        }
                     }
                     
                     Text(landmark.badgeName)
@@ -400,9 +405,8 @@ struct BadgeDetailView: View {
                             )
                             .frame(width: 170, height: 170)
                         
-                        Image(systemName: badge.iconName)
+                        Text(badge.iconName)
                             .font(.system(size: 70))
-                            .foregroundStyle(badge.themeColor)
                     }
                     .rotation3DEffect(.degrees(rotation * 0.5), axis: (x: 0, y: 1, z: 0))
                 }
@@ -601,9 +605,8 @@ struct AchievementCard: View {
                     .fill(achievement.isUnlocked ? achievement.themeColor.opacity(0.2) : Color.gray.opacity(0.1))
                     .frame(width: 56, height: 56)
                 
-                Image(systemName: achievement.iconName)
+                Text(achievement.iconName)
                     .font(.system(size: 24))
-                    .foregroundStyle(achievement.isUnlocked ? achievement.themeColor : .gray)
             }
             
             // 信息
@@ -679,9 +682,8 @@ struct AchievementRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: achievement.iconName)
+            Text(achievement.iconName)
                 .font(.system(size: 18))
-                .foregroundStyle(achievement.isUnlocked ? achievement.themeColor : .gray)
                 .frame(width: 32, height: 32)
                 .background(
                     Circle()

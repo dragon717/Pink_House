@@ -1005,78 +1005,106 @@ struct ScannerView: View {
     private var monicaSecondary: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.7, blue: 1.0) : Color(red: 0.3, green: 0.7, blue: 1.0) }
     private var scanLineColor: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0).opacity(0.9) : Color(red: 0.2, green: 0.5, blue: 0.9).opacity(0.8) }
     private var progressBgColor: Color { colorScheme == .dark ? Color(red: 0.2, green: 0.2, blue: 0.22) : Color.gray.opacity(0.2) }
+    private var cardBackground: Color { colorScheme == .dark ? Color(red: 0.15, green: 0.17, blue: 0.22) : Color.white }
     
     var body: some View {
-        VStack(spacing: 30) {
-            // 扫描框
-            ZStack {
-                // 外框
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(monicaPrimary, lineWidth: 3)
-                    .frame(width: 280, height: 180)
+        VStack(spacing: 0) {
+            Spacer()
+            
+            // 中下内容容器 - 圆角矩形主题色美化
+            VStack(spacing: 24) {
+                // 扫描框
+                ZStack {
+                    // 外框
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(monicaPrimary, lineWidth: 3)
+                        .frame(width: 280, height: 180)
 
                     // 扫描线
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                scanLineColor,
-                                Color.clear
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: 260, height: 2)
-                    .offset(y: scanLineOffset)
-
-                // 登机牌缩略图
-                VStack(spacing: 8) {
-                    Image(systemName: "airplane")
-                        .font(.system(size: 40))
-                        .foregroundStyle(monicaPrimary)
-
-                    HStack {
-                        Text(viewModel.isDepartureHidden ? "***" : (viewModel.departureCity?.prefix(3).uppercased() ?? "???"))
-                            .foregroundStyle(.primary)
-                        Image(systemName: "arrow.right")
-                            .foregroundStyle(.secondary)
-                        Text(viewModel.selectedLandmark?.code ?? "???")
-                            .foregroundStyle(.primary)
-                    }
-                    .font(.system(size: 16, weight: .semibold))
-                }
-            }
-
-            // 扫描文字
-            VStack(spacing: 8) {
-                Text("正在检票...")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.primary)
-
-                // 进度条
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(progressBgColor)
-                            .frame(height: 6)
-                            .cornerRadius(3)
-
-                        Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [monicaPrimary, monicaSecondary],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.clear,
+                                    scanLineColor,
+                                    Color.clear
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
                             )
-                            .frame(width: geo.size.width * scanProgress, height: 6)
-                            .cornerRadius(3)
+                        )
+                        .frame(width: 260, height: 2)
+                        .offset(y: scanLineOffset)
+
+                    // 登机牌缩略图
+                    VStack(spacing: 8) {
+                        Image(systemName: "airplane")
+                            .font(.system(size: 40))
+                            .foregroundStyle(monicaPrimary)
+
+                        HStack {
+                            Text(viewModel.isDepartureHidden ? "***" : (viewModel.departureCity?.prefix(3).uppercased() ?? "???"))
+                                .foregroundStyle(.primary)
+                            Image(systemName: "arrow.right")
+                                .foregroundStyle(.secondary)
+                            Text(viewModel.selectedLandmark?.code ?? "???")
+                                .foregroundStyle(.primary)
+                        }
+                        .font(.system(size: 16, weight: .semibold))
                     }
                 }
-                .frame(width: 200, height: 6)
+
+                // 扫描文字
+                VStack(spacing: 12) {
+                    Text("正在检票...")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.primary)
+
+                    // 进度条
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(progressBgColor)
+                                .frame(height: 6)
+                                .cornerRadius(3)
+
+                            Rectangle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [monicaPrimary, monicaSecondary],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geo.size.width * scanProgress, height: 6)
+                                .cornerRadius(3)
+                        }
+                    }
+                    .frame(width: 200, height: 6)
+                }
             }
+            .padding(.horizontal, 30)
+            .padding(.vertical, 30)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(cardBackground)
+                    .shadow(
+                        color: monicaPrimary.opacity(colorScheme == .dark ? 0.2 : 0.15),
+                        radius: 20,
+                        x: 0,
+                        y: 8
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(
+                        monicaPrimary.opacity(colorScheme == .dark ? 0.3 : 0.2),
+                        lineWidth: 1.5
+                    )
+            )
+            .padding(.horizontal, 20)
+            
+            Spacer().frame(height: 100)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -1153,50 +1181,78 @@ struct BoardingCompleteView: View {
     private var successColor: Color { colorScheme == .dark ? Color(red: 0.3, green: 0.8, blue: 0.5) : Color.green }
     private var successBgColor: Color { colorScheme == .dark ? Color(red: 0.08, green: 0.25, blue: 0.15) : Color.green.opacity(0.2) }
     private var monicaPrimary: Color { colorScheme == .dark ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color(red: 0.2, green: 0.5, blue: 0.9) }
+    private var cardBackground: Color { colorScheme == .dark ? Color(red: 0.15, green: 0.17, blue: 0.22) : Color.white }
     
     var body: some View {
-        VStack(spacing: 24) {
-            // 成功图标
-            ZStack {
-                Circle()
-                    .fill(successBgColor)
-                    .frame(width: 120, height: 120)
-                
-                Circle()
-                    .stroke(successColor, lineWidth: 3)
-                    .frame(width: 100, height: 100)
-                
-                Image(systemName: "checkmark")
-                    .font(.system(size: 50, weight: .bold))
-                    .foregroundStyle(successColor)
-            }
-            .scaleEffect(scale)
+        VStack(spacing: 0) {
+            Spacer()
             
-            VStack(spacing: 8) {
-                Text("检票成功")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.primary)
-                
-                Text("欢迎搭乘 LOLITA AIR")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                if let landmark = viewModel.selectedLandmark {
-                    Text("目的地: \(landmark.name)")
-                        .font(.headline)
-                        .foregroundStyle(landmark.type.themeColor)
-                        .padding(.top, 8)
+            // 中下内容容器 - 圆角矩形主题色美化
+            VStack(spacing: 24) {
+                // 成功图标
+                ZStack {
+                    Circle()
+                        .fill(successBgColor)
+                        .frame(width: 120, height: 120)
+                    
+                    Circle()
+                        .stroke(successColor, lineWidth: 3)
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 50, weight: .bold))
+                        .foregroundStyle(successColor)
                 }
+                .scaleEffect(scale)
+                
+                VStack(spacing: 8) {
+                    Text("检票成功")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.primary)
+                    
+                    Text("欢迎搭乘 LOLITA AIR")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    if let landmark = viewModel.selectedLandmark {
+                        Text("目的地: \(landmark.name)")
+                            .font(.headline)
+                            .foregroundStyle(landmark.type.themeColor)
+                            .padding(.top, 8)
+                    }
+                }
+                .opacity(opacity)
+                
+                // 登机口信息
+                HStack(spacing: 30) {
+                    BoardingInfoItem(icon: "number", title: "登机口", value: viewModel.currentBoardingPass?.gate ?? "A1", colorScheme: colorScheme)
+                    BoardingInfoItem(icon: "airplane", title: "座位", value: viewModel.currentBoardingPass?.seatNumber ?? "--", colorScheme: colorScheme)
+                }
+                .padding(.top, 20)
+                .opacity(opacity)
             }
-            .opacity(opacity)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 30)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(cardBackground)
+                    .shadow(
+                        color: successColor.opacity(colorScheme == .dark ? 0.2 : 0.15),
+                        radius: 20,
+                        x: 0,
+                        y: 8
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(
+                        successColor.opacity(colorScheme == .dark ? 0.3 : 0.2),
+                        lineWidth: 1.5
+                    )
+            )
+            .padding(.horizontal, 20)
             
-            // 登机口信息
-            HStack(spacing: 30) {
-                BoardingInfoItem(icon: "number", title: "登机口", value: viewModel.currentBoardingPass?.gate ?? "A1", colorScheme: colorScheme)
-                BoardingInfoItem(icon: "airplane", title: "座位", value: viewModel.currentBoardingPass?.seatNumber ?? "--", colorScheme: colorScheme)
-            }
-            .padding(.top, 20)
-            .opacity(opacity)
+            Spacer().frame(height: 100)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {

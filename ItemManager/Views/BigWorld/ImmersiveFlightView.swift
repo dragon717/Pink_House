@@ -153,10 +153,10 @@ struct AirplaneWindowView: View {
 
     struct CloudLayer: Identifiable {
         let id = UUID()
-        let offset: CGFloat
         let scale: CGFloat
         let opacity: Double
         let speed: Double
+        let yPosition: CGFloat  // 固定的垂直位置
     }
 
     var body: some View {
@@ -177,45 +177,140 @@ struct AirplaneWindowView: View {
 
                     // 舷窗视图
                     ZStack {
-                        // 窗外景色（使用遮罩裁剪为大圆角矩形）
-                        RoundedRectangle(cornerRadius: cornerRadius - 8)
-                            .fill(Color.clear)
-                            .frame(width: windowWidth - 16, height: windowHeight - 16)
-                            .overlay(
-                                ZStack {
-                                    // 天空渐变背景
-                                    SkyGradientView(phase: flightPhase, progress: progress)
+                        // 外层深色背景（机身内壁）
+                        RoundedRectangle(cornerRadius: cornerRadius + 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.15, green: 0.15, blue: 0.18),
+                                        Color(red: 0.08, green: 0.08, blue: 0.10),
+                                        Color(red: 0.12, green: 0.12, blue: 0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: windowWidth + 24, height: windowHeight + 24)
+                            .shadow(color: Color.black.opacity(0.8), radius: 20, x: 0, y: 8)
 
-                                    // 太阳/月亮
-                                    CelestialBodyView(phase: flightPhase, progress: progress)
-                                        .offset(y: sunPosition)
+                        // 中层窗框（白色/灰色边框）
+                        RoundedRectangle(cornerRadius: cornerRadius + 4)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.85, green: 0.87, blue: 0.90),
+                                        Color(red: 0.70, green: 0.72, blue: 0.75),
+                                        Color(red: 0.55, green: 0.57, blue: 0.60)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: windowWidth + 8, height: windowHeight + 8)
+                            .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 5)
 
-                                    // 云层
-                                    ForEach(cloudLayers) { cloud in
-                                        CloudView(scale: cloud.scale, opacity: cloud.opacity)
-                                            .offset(x: cloud.offset)
-                                            .animation(
-                                                .linear(duration: cloud.speed)
-                                                    .repeatForever(autoreverses: false),
-                                                value: cloud.offset
-                                            )
-                                    }
+                        // 主窗框（更亮的边框）
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.95, green: 0.96, blue: 0.98),
+                                        Color(red: 0.80, green: 0.82, blue: 0.85),
+                                        Color(red: 0.65, green: 0.67, blue: 0.70)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: windowWidth + 4, height: windowHeight + 4)
 
-                                    // 地面景观（仅在低空显示）
-                                    if flightPhase == .takeoff || flightPhase == .landing || progress < 0.1 || progress > 0.9 {
-                                        GroundView(destination: destination)
-                                            .offset(y: windowHeight * 0.3)
-                                    }
-                                }
-                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 8))
+                        // 窗外景色（在边框内部）
+                        ZStack {
+                            // 天空渐变背景 - 使用明确的颜色
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.2, green: 0.5, blue: 0.9),
+                                    Color(red: 0.6, green: 0.8, blue: 0.95)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
 
-                        // 舷窗边框（在最上层）- 大圆角矩形
-                        WindowFrameView(
-                            width: windowWidth,
-                            height: windowHeight,
-                            cornerRadius: cornerRadius
-                        )
+                            // 太阳/月亮
+                            CelestialBodyView(phase: flightPhase, progress: progress)
+                                .offset(y: sunPosition)
+
+                            // 远景薄雾层（增加深度感）
+                            MistLayerView()
+
+                            // 云层
+                            ForEach(cloudLayers) { cloud in
+                                CloudView(
+                                    scale: cloud.scale,
+                                    opacity: cloud.opacity,
+                                    speed: cloud.speed
+                                )
+                                .position(
+                                    x: (windowWidth - 16) * 0.5,
+                                    y: (windowHeight - 16) * cloud.yPosition
+                                )
+                            }
+
+                            // 近景雾气层（增加氛围感）
+                            ForegroundMistView()
+
+                            // 地面景观（仅在低空显示）
+                            if flightPhase == .takeoff || flightPhase == .landing || progress < 0.1 || progress > 0.9 {
+                                GroundView(destination: destination)
+                                    .offset(y: (windowHeight - 16) * 0.3)
+                            }
+                        }
+                        .frame(width: windowWidth - 16, height: windowHeight - 16)
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius - 8))
+
+                        // 内部阴影边缘（叠加在景色上）
+                        RoundedRectangle(cornerRadius: cornerRadius - 2)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.black.opacity(0.6),
+                                        Color.clear,
+                                        Color.black.opacity(0.4)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 6
+                            )
+                            .frame(width: windowWidth - 6, height: windowHeight - 6)
+
+                        // 顶部高光（玻璃反光效果）
+                        RoundedRectangle(cornerRadius: cornerRadius - 4)
+                            .trim(from: 0.0, to: 0.5)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.4),
+                                        Color.white.opacity(0.1),
+                                        Color.clear
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 4
+                            )
+                            .frame(width: windowWidth - 12, height: windowHeight - 12)
+                            .offset(y: -3)
+
+                        // 左侧边缘光
+                        RoundedRectangle(cornerRadius: cornerRadius - 4)
+                            .trim(from: 0.15, to: 0.35)
+                            .stroke(
+                                Color.white.opacity(0.2),
+                                lineWidth: 3
+                            )
+                            .frame(width: windowWidth - 10, height: windowHeight - 10)
+                            .offset(x: -1)
                     }
 
                     // Lo 裙设计理念文字
@@ -235,39 +330,25 @@ struct AirplaneWindowView: View {
 
                     Spacer()
                 }
-
-                // 关闭按钮
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.secondary)
-                                .background(Color.white.opacity(0.8))
-                                .clipShape(Circle())
-                        }
-                        .padding(.top, 60)
-                        .padding(.trailing, 20)
-                    }
-                    Spacer()
-                }
             }
         }
         .onAppear {
-            // 初始化云层
-            cloudLayers = (0..<5).map { i in
+            // 初始化云层 - 创建多层次的高空云层效果
+            cloudLayers = (0..<6).map { i in
                 CloudLayer(
-                    offset: CGFloat(i) * 200 - 400,
-                    scale: CGFloat.random(in: 0.5...1.5),
-                    opacity: Double.random(in: 0.3...0.8),
-                    speed: Double.random(in: 15...30)
+                    scale: CGFloat.random(in: 0.6...1.4),
+                    opacity: Double.random(in: 0.4...0.9),
+                    speed: Double.random(in: 12...25),
+                    yPosition: CGFloat.random(in: 0.2...0.7)
                 )
             }
             // 随机选择一条理念
             quote = LolitaDesignPhilosophy.randomQuote()
+            
+            // 设置太阳位置
+            withAnimation(.easeInOut(duration: 2)) {
+                sunPosition = -50
+            }
         }
     }
 }
@@ -329,14 +410,11 @@ struct SkyGradientView: View {
     let progress: Double
     
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1/30)) { _ in
-            LinearGradient(
-                colors: skyColors,
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        }
+        LinearGradient(
+            colors: skyColors,
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
     
     private var skyColors: [Color] {
@@ -428,19 +506,34 @@ struct CelestialBodyView: View {
 struct CloudView: View {
     let scale: CGFloat
     let opacity: Double
-    @State private var offset: CGFloat = 0
+    let speed: Double
+    @State private var offset: CGFloat = -300
+    @State private var isAnimating = false
     
     var body: some View {
         Canvas { context, size in
-            // 绘制云朵形状
+            // 绘制云朵形状 - 使用更拟物的高空云层样式
             let cloudPath = createCloudPath(in: CGRect(origin: .zero, size: size))
+            
+            // 绘制云层阴影/深度效果
+            context.fill(cloudPath, with: .color(Color.white.opacity(opacity * 0.3)))
+            
+            // 主云层 - 使用渐变营造立体感
             context.fill(cloudPath, with: .color(Color.white.opacity(opacity)))
+            
+            // 高光部分
+            let highlightPath = createCloudHighlight(in: CGRect(origin: .zero, size: size))
+            context.fill(highlightPath, with: .color(Color.white.opacity(opacity * 0.6)))
         }
-        .frame(width: 150 * scale, height: 80 * scale)
+        .frame(width: 180 * scale, height: 100 * scale)
         .offset(x: offset)
         .onAppear {
-            withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
-                offset = UIScreen.main.bounds.width + 200
+            // 延迟启动动画，创造层次感
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 0...2)) {
+                isAnimating = true
+                withAnimation(.linear(duration: speed).repeatForever(autoreverses: false)) {
+                    offset = 400
+                }
             }
         }
     }
@@ -450,13 +543,105 @@ struct CloudView: View {
         let width = rect.width
         let height = rect.height
         
-        // 简化的云朵形状
-        path.addEllipse(in: CGRect(x: 0, y: height * 0.3, width: width * 0.4, height: height * 0.5))
-        path.addEllipse(in: CGRect(x: width * 0.2, y: 0, width: width * 0.5, height: height * 0.7))
-        path.addEllipse(in: CGRect(x: width * 0.5, y: height * 0.2, width: width * 0.4, height: height * 0.5))
-        path.addEllipse(in: CGRect(x: width * 0.3, y: height * 0.4, width: width * 0.5, height: height * 0.5))
+        // 高空云层 - 更扁平、更飘逸的形状
+        // 主云团
+        path.addEllipse(in: CGRect(x: width * 0.1, y: height * 0.4, width: width * 0.5, height: height * 0.4))
+        path.addEllipse(in: CGRect(x: width * 0.25, y: height * 0.2, width: width * 0.55, height: height * 0.5))
+        path.addEllipse(in: CGRect(x: width * 0.5, y: height * 0.35, width: width * 0.4, height: height * 0.4))
+        path.addEllipse(in: CGRect(x: width * 0.35, y: height * 0.5, width: width * 0.45, height: height * 0.35))
+        
+        // 添加飘逸的云尾
+        path.addEllipse(in: CGRect(x: -width * 0.1, y: height * 0.5, width: width * 0.3, height: height * 0.25))
+        path.addEllipse(in: CGRect(x: width * 0.8, y: height * 0.45, width: width * 0.25, height: height * 0.3))
         
         return path
+    }
+    
+    private func createCloudHighlight(in rect: CGRect) -> Path {
+        var path = Path()
+        let width = rect.width
+        let height = rect.height
+        
+        // 云层顶部高光
+        path.addEllipse(in: CGRect(x: width * 0.3, y: height * 0.25, width: width * 0.35, height: height * 0.25))
+        path.addEllipse(in: CGRect(x: width * 0.4, y: height * 0.3, width: width * 0.25, height: height * 0.2))
+        
+        return path
+    }
+}
+
+// MARK: - 远景薄雾层
+struct MistLayerView: View {
+    @State private var offset: CGFloat = 0
+    
+    var body: some View {
+        Canvas { context, size in
+            // 绘制多层薄雾
+            for i in 0..<3 {
+                let yOffset = CGFloat(i) * size.height * 0.3
+                let path = Path { path in
+                    path.move(to: CGPoint(x: 0, y: yOffset))
+                    path.addCurve(
+                        to: CGPoint(x: size.width, y: yOffset + 20),
+                        control1: CGPoint(x: size.width * 0.3, y: yOffset - 30),
+                        control2: CGPoint(x: size.width * 0.7, y: yOffset + 50)
+                    )
+                    path.addLine(to: CGPoint(x: size.width, y: size.height))
+                    path.addLine(to: CGPoint(x: 0, y: size.height))
+                }
+                context.fill(path, with: .color(Color.white.opacity(0.08 - Double(i) * 0.02)))
+            }
+        }
+        .offset(x: offset)
+        .onAppear {
+            withAnimation(.linear(duration: 40).repeatForever(autoreverses: false)) {
+                offset = -100
+            }
+        }
+    }
+}
+
+// MARK: - 近景雾气层
+struct ForegroundMistView: View {
+    @State private var opacity: Double = 0
+    
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color.clear,
+                Color.white.opacity(0.1),
+                Color.white.opacity(0.05),
+                Color.clear
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .mask(
+            Canvas { context, size in
+                // 绘制流动的雾气带
+                for i in 0..<2 {
+                    let path = Path { path in
+                        let baseY = size.height * (0.6 + CGFloat(i) * 0.2)
+                        path.move(to: CGPoint(x: 0, y: baseY))
+                        
+                        for x in stride(from: 0, to: Int(size.width), by: 10) {
+                            let wave = sin(Double(x) * 0.02 + Double(i) * 2) * 15
+                            path.addLine(to: CGPoint(x: CGFloat(x), y: baseY + CGFloat(wave)))
+                        }
+                        
+                        path.addLine(to: CGPoint(x: size.width, y: size.height))
+                        path.addLine(to: CGPoint(x: 0, y: size.height))
+                    }
+                    context.fill(path, with: .color(Color.white))
+                }
+            }
+        )
+        .opacity(opacity)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                opacity = 0.6
+            }
+        }
     }
 }
 

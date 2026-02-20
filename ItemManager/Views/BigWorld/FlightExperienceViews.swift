@@ -34,9 +34,8 @@ struct FlightPreparationView: View {
                                         .fill(landmark.type.themeColor.opacity(0.2))
                                         .frame(width: 150, height: 150)
                                     
-                                    Image(systemName: landmark.type.icon)
+                                    Text(landmark.type.icon)
                                         .font(.system(size: 80))
-                                        .foregroundStyle(landmark.type.themeColor)
                                 }
                                 
                                 VStack(spacing: 8) {
@@ -582,9 +581,8 @@ struct ArrivalView: View {
                                         .fill(Color.white.opacity(0.1))
                                         .frame(width: 180, height: 180)
                                     
-                                    Image(systemName: landmark.type.icon)
+                                    Text(landmark.type.icon)
                                         .font(.system(size: 100))
-                                        .foregroundStyle(landmark.type.themeColor)
                                 }
                                 .scaleEffect(scale)
                             }

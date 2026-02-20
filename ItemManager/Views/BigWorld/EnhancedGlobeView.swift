@@ -252,9 +252,8 @@ struct BadgeIcon: View {
                 .frame(width: 28, height: 28)
                 .shadow(color: badge.themeColor.opacity(0.5), radius: 4)
             
-            Image(systemName: badge.iconName)
+            Text(badge.iconName)
                 .font(.system(size: 14))
-                .foregroundStyle(badge.themeColor)
         }
         .offset(x: offsetX, y: offsetY)
         .scaleEffect(scale)
@@ -387,9 +386,8 @@ struct UserLevelSheet: View {
                                             .stroke(badge.themeColor, lineWidth: 2)
                                             .frame(width: 56, height: 56)
                                         
-                                        Image(systemName: badge.iconName)
+                                        Text(badge.iconName)
                                             .font(.system(size: 24))
-                                            .foregroundStyle(badge.themeColor)
                                     }
                                     
                                     Text(badge.name)
@@ -436,9 +434,8 @@ struct LandmarkDetailSheet: View {
                             .fill(landmark.type.themeColor.opacity(0.2))
                             .frame(width: 60, height: 60)
                         
-                        Image(systemName: landmark.type.icon)
+                        Text(landmark.type.icon)
                             .font(.system(size: 30))
-                            .foregroundStyle(landmark.type.themeColor)
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
@@ -704,9 +701,8 @@ struct LandmarkAnnotationView: View {
                     .stroke(landmark.type.themeColor, lineWidth: 2)
                     .frame(width: 40, height: 40)
                 
-                Image(systemName: landmark.type.icon)
+                Text(landmark.type.icon)
                     .font(.system(size: 18))
-                    .foregroundStyle(landmark.type.themeColor)
             }
             
             // 标签

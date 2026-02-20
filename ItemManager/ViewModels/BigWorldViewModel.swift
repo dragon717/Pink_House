@@ -288,7 +288,7 @@ class BigWorldViewModel: ObservableObject {
                 description: "参加第一次茶会",
                 requirement: 1,
                 currentProgress: totalTeaParties,
-                iconName: "airplane.departure",
+                iconName: "✈️",
                 rewardBadge: nil,
                 isUnlocked: totalTeaParties >= 1,
                 themeColorName: "gold"
@@ -298,7 +298,7 @@ class BigWorldViewModel: ObservableObject {
                 description: "参加5次不同地点的茶会",
                 requirement: 5,
                 currentProgress: totalTeaParties,
-                iconName: "globe",
+                iconName: "🌍",
                 rewardBadge: "环球旅行家",
                 isUnlocked: totalTeaParties >= 5,
                 themeColorName: "cinderella"
@@ -308,7 +308,7 @@ class BigWorldViewModel: ObservableObject {
                 description: "收集10个不同徽章",
                 requirement: 10,
                 currentProgress: unlockedBadges.count,
-                iconName: "medal.fill",
+                iconName: "🏅",
                 rewardBadge: nil,
                 isUnlocked: unlockedBadges.count >= 10,
                 themeColorName: "monica"
@@ -318,7 +318,7 @@ class BigWorldViewModel: ObservableObject {
                 description: "参加冰川和极光茶会",
                 requirement: 2,
                 currentProgress: unlockedBadges.filter { $0.landmarkType == .glacier || $0.landmarkType == .aurora }.count,
-                iconName: "snowflake",
+                iconName: "❄️",
                 rewardBadge: nil,
                 isUnlocked: unlockedBadges.contains { $0.landmarkType == .glacier } && unlockedBadges.contains { $0.landmarkType == .aurora },
                 themeColorName: "cinderella"
@@ -328,7 +328,7 @@ class BigWorldViewModel: ObservableObject {
                 description: "参加樱花和薰衣草茶会",
                 requirement: 2,
                 currentProgress: unlockedBadges.filter { $0.landmarkType == .sakura || $0.landmarkType == .lavender }.count,
-                iconName: "flower.fill",
+                iconName: "🌸",
                 rewardBadge: nil,
                 isUnlocked: unlockedBadges.contains { $0.landmarkType == .sakura } && unlockedBadges.contains { $0.landmarkType == .lavender },
                 themeColorName: "hotpink"
