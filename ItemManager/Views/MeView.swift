@@ -136,7 +136,7 @@ struct MeView: View {
                     cloudManager: cloudManager,
                     modelContext: modelContext
                 )
-                .presentationDetents([.medium])
+                .presentationDetents([.fraction(0.9)])
             }
             // 文件导入逻辑
             .fileImporter(
@@ -260,13 +260,20 @@ struct CloudSyncSheetView: View {
     @State private var showingLoginRequiredAlert = false
     @State private var showingSyncAlert = false
     @State private var showingRestoreSuccessAlert = false
+    @State private var showingProfileEdit = false
+    @State private var showingSignOutConfirm = false
     
     var body: some View {
         NavigationStack {
             List {
                 // 账户部分：在此处显示登录/用户信息
                 Section {
-                    UserInfoView(authManager: authManager, colorScheme: colorScheme)
+                    EnhancedUserInfoView(
+                        authManager: authManager,
+                        colorScheme: colorScheme,
+                        onEditProfile: { showingProfileEdit = true },
+                        onSignOut: { showingSignOutConfirm = true }
+                    )
                 } header: {
                     Text("账户信息")
                 }
@@ -315,8 +322,142 @@ struct CloudSyncSheetView: View {
             } message: {
                 Text("云端数据已成功恢复到本地。")
             }
+            .alert("确认退出", isPresented: $showingSignOutConfirm) {
+                Button("取消", role: .cancel) { }
+                Button("退出", role: .destructive) {
+                    authManager.signOut()
+                }
+            } message: {
+                Text("退出后将无法使用 iCloud 同步功能，确定要退出吗？")
+            }
+            .sheet(isPresented: $showingProfileEdit) {
+                UserProfileEditView(authManager: authManager)
+            }
         }
         .environment(\.modelContext, modelContext) // Inject context
+    }
+}
+
+// MARK: - 增强版用户信息视图
+struct EnhancedUserInfoView: View {
+    @ObservedObject var authManager: AuthenticationManager
+    let colorScheme: ColorScheme
+    let onEditProfile: () -> Void
+    let onSignOut: () -> Void
+    
+    var body: some View {
+        Group {
+            if authManager.isAuthenticated {
+                VStack(spacing: 20) {
+                    // 头像和编辑按钮
+                    Button(action: onEditProfile) {
+                        ZStack {
+                            UserAvatarView(
+                                givenName: authManager.givenName,
+                                familyName: authManager.familyName,
+                                customAvatarPath: authManager.customAvatarPath,
+                                size: 80
+                            )
+                            
+                            // 编辑图标
+                            VStack {
+                                Spacer()
+                                HStack {
+                                    Spacer()
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.blue)
+                                            .frame(width: 28, height: 28)
+                                        
+                                        Image(systemName: "pencil")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(.white)
+                                    }
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color(.systemBackground), lineWidth: 2)
+                                    )
+                                }
+                            }
+                            .frame(width: 80, height: 80)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // 用户信息
+                    VStack(spacing: 8) {
+                        Text(authManager.displayName)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        if !authManager.email.isEmpty {
+                            Text(authManager.email)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        // 显示Apple ID名称（如果有自定义昵称）
+                        if !authManager.customNickname.isEmpty && !authManager.givenName.isEmpty {
+                            Text("Apple ID: \(authManager.givenName)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 4)
+                        }
+                    }
+                    
+                    // 操作按钮
+                    HStack(spacing: 16) {
+                        Button(action: onEditProfile) {
+                            Label("编辑资料", systemImage: "pencil")
+                                .font(.subheadline)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.blue)
+                        
+                        Button(action: onSignOut) {
+                            Label("退出", systemImage: "arrow.right.square")
+                                .font(.subheadline)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+            } else {
+                if authManager.isLoggingIn {
+                    HStack {
+                        Spacer()
+                        ProgressView("正在登录...")
+                            .controlSize(.regular)
+                        Spacer()
+                    }
+                    .frame(height: 44)
+                    .padding(.vertical, 4)
+                } else {
+                    SignInWithAppleButton(
+                        onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                        },
+                        onCompletion: { result in
+                            authManager.handleSignIn(result: result)
+                        }
+                    )
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                    .frame(height: 44)
+                    .padding(.vertical, 4)
+                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                }
+                
+                if let errorMessage = authManager.errorMessage {
+                    Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal)
+                }
+            }
+        }
     }
 }
 
@@ -326,19 +467,26 @@ struct CloudSyncSheetView: View {
 struct UserInfoView: View {
     @ObservedObject var authManager: AuthenticationManager
     let colorScheme: ColorScheme
+    @State private var showingProfileEdit = false
     
     var body: some View {
         Group {
             if authManager.isAuthenticated {
                 HStack(spacing: 12) {
-                    UserAvatarView(
-                        givenName: authManager.givenName,
-                        familyName: authManager.familyName,
-                        size: 40
-                    )
+                    Button {
+                        showingProfileEdit = true
+                    } label: {
+                        UserAvatarView(
+                            givenName: authManager.givenName,
+                            familyName: authManager.familyName,
+                            customAvatarPath: authManager.customAvatarPath,
+                            size: 50
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
                     
-                    VStack(alignment: .leading) {
-                        Text(authManager.givenName.isEmpty ? "已登录用户" : "\(authManager.familyName)\(authManager.givenName)")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(authManager.displayName)
                             .font(.headline)
                         if !authManager.email.isEmpty {
                             Text(authManager.email)
@@ -348,13 +496,19 @@ struct UserInfoView: View {
                     }
                     Spacer()
                     
-                    Button("退出") {
-                        authManager.signOut()
+                    Button {
+                        showingProfileEdit = true
+                    } label: {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.blue)
                     }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 8)
+                .sheet(isPresented: $showingProfileEdit) {
+                    UserProfileEditView(authManager: authManager)
+                }
             } else {
                 if authManager.isLoggingIn {
                     HStack {

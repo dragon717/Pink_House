@@ -4,7 +4,15 @@ import Foundation
 struct UserAvatarView: View {
     let givenName: String
     let familyName: String
+    let customAvatarPath: String?
     let size: CGFloat
+    
+    init(givenName: String, familyName: String, customAvatarPath: String? = nil, size: CGFloat) {
+        self.givenName = givenName
+        self.familyName = familyName
+        self.customAvatarPath = customAvatarPath
+        self.size = size
+    }
     
     var initials: String {
         var components = PersonNameComponents()
@@ -17,7 +25,16 @@ struct UserAvatarView: View {
     }
     
     var body: some View {
-        if givenName.isEmpty && familyName.isEmpty {
+        if let avatarPath = customAvatarPath,
+           !avatarPath.isEmpty,
+           let image = UIImage(contentsOfFile: avatarPath) {
+            // 显示自定义头像
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+        } else if givenName.isEmpty && familyName.isEmpty {
             Image(systemName: "person.circle.fill")
                 .resizable()
                 .scaledToFit()

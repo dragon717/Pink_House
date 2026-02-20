@@ -25,13 +25,152 @@ class AuthenticationManager: NSObject, ObservableObject {
     @AppStorage("cachedFamilyName") private var cachedFamilyName: String = ""
     @AppStorage("cachedEmail") private var cachedEmail: String = ""
     
+    // 自定义头像和昵称 - 按用户ID存储
+    @AppStorage("customNickname") var customNickname: String = ""
+    @AppStorage("customAvatarPath") var customAvatarPath: String = ""
+    
+    // 存储每个Apple ID对应的自定义资料 (格式: userID: {"nickname": "xxx", "avatarPath": "xxx"})
+    @AppStorage("userProfiles") private var userProfilesData: String = "{}"
+    
     @Published var isAuthenticated: Bool = false
     @Published var isLoggingIn: Bool = false
     @Published var errorMessage: String?
     
+    // 当前用户的完整资料
+    var currentUserProfile: UserProfile {
+        get {
+            loadUserProfile(for: userIdentifier)
+        }
+        set {
+            saveUserProfile(newValue, for: userIdentifier)
+        }
+    }
+    
+    // 显示用的昵称（优先使用自定义昵称）
+    var displayName: String {
+        if !customNickname.isEmpty {
+            return customNickname
+        }
+        if !givenName.isEmpty {
+            return givenName
+        }
+        return "已登录用户"
+    }
+    
+    // 是否有自定义头像
+    var hasCustomAvatar: Bool {
+        !customAvatarPath.isEmpty && FileManager.default.fileExists(atPath: customAvatarPath)
+    }
+    
     override private init() {
         super.init()
         checkCredentialState()
+        loadCurrentUserProfile()
+    }
+    
+    // MARK: - 用户资料管理
+    
+    struct UserProfile: Codable {
+        var nickname: String = ""
+        var avatarPath: String = ""
+        var updatedAt: Date = Date()
+    }
+    
+    // 公开方法供 BackupService 使用
+     func loadUserProfile(for userID: String) -> UserProfile {
+         guard !userID.isEmpty else { return UserProfile() }
+         
+         if let data = userProfilesData.data(using: .utf8),
+            let profiles = try? JSONDecoder().decode([String: UserProfile].self, from: data),
+            let profile = profiles[userID] {
+             return profile
+         }
+         return UserProfile()
+     }
+     
+     func saveUserProfile(_ profile: UserProfile, for userID: String) {
+         guard !userID.isEmpty else { return }
+         
+         var profiles: [String: UserProfile] = [:]
+         if let data = userProfilesData.data(using: .utf8),
+            let existing = try? JSONDecoder().decode([String: UserProfile].self, from: data) {
+             profiles = existing
+         }
+         
+         profiles[userID] = profile
+         
+         if let data = try? JSONEncoder().encode(profiles),
+            let json = String(data: data, encoding: .utf8) {
+             userProfilesData = json
+         }
+         
+         // 同步到当前属性
+         if userID == self.userIdentifier {
+             customNickname = profile.nickname
+             customAvatarPath = profile.avatarPath
+         }
+     }
+    
+    func loadCurrentUserProfile() {
+        let profile = loadUserProfile(for: userIdentifier)
+        customNickname = profile.nickname
+        customAvatarPath = profile.avatarPath
+    }
+    
+    func updateCustomNickname(_ nickname: String) {
+        var profile = currentUserProfile
+        profile.nickname = nickname
+        profile.updatedAt = Date()
+        currentUserProfile = profile
+        customNickname = nickname
+    }
+    
+    func updateCustomAvatar(image: UIImage) {
+        guard !userIdentifier.isEmpty else { return }
+        
+        // 保存头像到应用沙盒
+        let filename = "avatar_\(userIdentifier.suffix(8))_\(Int(Date().timeIntervalSince1970)).jpg"
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let avatarDir = documentsPath.appendingPathComponent("UserAvatars", isDirectory: true)
+        
+        // 创建目录
+        try? FileManager.default.createDirectory(at: avatarDir, withIntermediateDirectories: true)
+        
+        let fileURL = avatarDir.appendingPathComponent(filename)
+        
+        // 压缩并保存图片
+        if let data = image.jpegData(compressionQuality: 0.8) {
+            do {
+                try data.write(to: fileURL)
+                
+                // 删除旧头像
+                if !customAvatarPath.isEmpty && customAvatarPath != fileURL.path {
+                    try? FileManager.default.removeItem(atPath: customAvatarPath)
+                }
+                
+                var profile = currentUserProfile
+                profile.avatarPath = fileURL.path
+                profile.updatedAt = Date()
+                currentUserProfile = profile
+                customAvatarPath = fileURL.path
+                
+                AppLogger.info("头像已保存到: \(fileURL.path)")
+            } catch {
+                AppLogger.error("保存头像失败: \(error)")
+            }
+        }
+    }
+    
+    func clearCustomAvatar() {
+        if !customAvatarPath.isEmpty {
+            try? FileManager.default.removeItem(atPath: customAvatarPath)
+        }
+        
+        var profile = currentUserProfile
+        profile.avatarPath = ""
+        profile.updatedAt = Date()
+        currentUserProfile = profile
+        customAvatarPath = ""
     }
     
     // 检查用户的 Apple ID 凭证状态
@@ -65,6 +204,8 @@ class AuthenticationManager: NSObject, ObservableObject {
         givenName = ""
         familyName = ""
         email = ""
+        customNickname = ""
+        customAvatarPath = ""
         isAuthenticated = false
         errorMessage = nil
     }
@@ -119,6 +260,7 @@ class AuthenticationManager: NSObject, ObservableObject {
                     self.saveUserInfo(credential: appleIDCredential)
                     self.isAuthenticated = true
                     self.isLoggingIn = false
+                    self.loadCurrentUserProfile() // 加载该用户的自定义资料
                     AppLogger.info("登录成功: \(userId)")
                 }
             } catch {

@@ -52,6 +52,10 @@ struct BackupManifest: Codable {
     // Version 1.5: Model3D
     let model3Ds: [Model3DDTO]?
     
+    // Version 1.6: User Profile (头像和昵称)
+    let userProfile: UserProfileDTO?
+    let userAvatarFile: String?
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int
@@ -60,6 +64,13 @@ struct BackupManifest: Codable {
     let spaceBookGroupCount: Int?
     let spaceOutfitCount: Int?
     let model3DCount: Int?
+}
+
+// MARK: - User Profile DTO (v1.6)
+struct UserProfileDTO: Codable {
+    let userIdentifier: String
+    let nickname: String
+    let updatedAt: Date
 }
 
 struct BrandDTO: Codable {

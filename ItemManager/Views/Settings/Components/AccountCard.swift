@@ -5,6 +5,7 @@ struct AccountCard: View {
     @ObservedObject var authManager: AuthenticationManager
     @ObservedObject var cloudManager: CloudSyncManager
     let action: () -> Void
+    @State private var showingProfileEdit = false
     
     var body: some View {
         Button(action: action) {
@@ -16,6 +17,7 @@ struct AccountCard: View {
                             UserAvatarView(
                                 givenName: authManager.givenName,
                                 familyName: authManager.familyName,
+                                customAvatarPath: authManager.customAvatarPath,
                                 size: 40
                             )
                         } else {
@@ -48,7 +50,7 @@ struct AccountCard: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     if authManager.isAuthenticated {
-                        Text(authManager.givenName.isEmpty ? "已登录用户" : authManager.givenName)
+                        Text(authManager.displayName)
                             .font(.headline)
                             .foregroundStyle(.primary)
                             .lineLimit(1)
@@ -86,6 +88,9 @@ struct AccountCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showingProfileEdit) {
+            UserProfileEditView(authManager: authManager)
+        }
     }
     
     private var icloudStatusText: String {

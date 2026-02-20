@@ -70,7 +70,8 @@ class BackupService {
         "voiceModelId",
         "voiceToneId",
         "UserCustomFontFileName",
-        "HasRedeemedVIP_Prince"
+        "HasRedeemedVIP_Prince",
+        "userProfiles"  // v1.6: 用户资料（包含所有用户的昵称和头像路径）
     ]
     
     // MARK: - Internal Helpers
@@ -626,8 +627,48 @@ class BackupService {
             // App Version
             let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
             
+            // v1.6: User Profile (当前登录用户的头像和昵称)
+            var userProfileDTO: UserProfileDTO? = nil
+            var userAvatarFileName: String? = nil
+            
+            // 从主线程获取用户资料信息
+            let userProfileInfo = await MainActor.run { () -> (isAuthenticated: Bool, userId: String, nickname: String, hasAvatar: Bool, avatarPath: String)? in
+                let auth = AuthenticationManager.shared
+                guard auth.isAuthenticated else { return nil }
+                return (
+                    isAuthenticated: auth.isAuthenticated,
+                    userId: auth.userIdentifier,
+                    nickname: auth.customNickname,
+                    hasAvatar: auth.hasCustomAvatar,
+                    avatarPath: auth.customAvatarPath
+                )
+            }
+            
+            if let info = userProfileInfo {
+                userProfileDTO = UserProfileDTO(
+                    userIdentifier: info.userId,
+                    nickname: info.nickname,
+                    updatedAt: Date()
+                )
+                // 如果有自定义头像，添加到备份文件列表
+                if info.hasAvatar {
+                    let avatarPath = info.avatarPath
+                    let fileName = (avatarPath as NSString).lastPathComponent
+                    let avatarURL = URL(fileURLWithPath: avatarPath)
+                    if fileManager.fileExists(atPath: avatarPath) {
+                        imageFiles[fileName] = avatarURL
+                        userAvatarFileName = fileName
+                        // 添加到 externalHashes 用于增量同步
+                        if let h = fileHash(avatarURL) {
+                            externalHashes[fileName] = h
+                        }
+                        print("### Export: Added user avatar: \(fileName)")
+                    }
+                }
+            }
+            
             let manifest = BackupManifest(
-                version: "1.5",
+                version: "1.6",
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -652,6 +693,8 @@ class BackupService {
                 spaceBookGroups: spaceBookGroupDTOs,
                 spaceOutfits: spaceOutfitDTOs,
                 model3Ds: model3DDTOs,
+                userProfile: userProfileDTO,
+                userAvatarFile: userAvatarFileName,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: snapshotDTOs.count,
@@ -1462,6 +1505,74 @@ class BackupService {
             // Reload Pet AI Service
             DispatchQueue.main.async {
                 PetAIService.shared.reloadHistory()
+            }
+        }
+        
+        // v1.6: Restore User Profile (头像和昵称)
+        if let userProfile = manifest.userProfile {
+            print("Restore: Restoring User Profile...")
+            
+            // 恢复用户资料到 UserDefaults
+            if let userProfilesData = UserDefaults.standard.string(forKey: "userProfiles"),
+               let data = userProfilesData.data(using: .utf8),
+               var profiles = try? JSONDecoder().decode([String: AuthenticationManager.UserProfile].self, from: data) {
+                
+                // 更新或添加当前用户的资料
+                let profile = AuthenticationManager.UserProfile(
+                    nickname: userProfile.nickname,
+                    avatarPath: "", // 将在下面设置
+                    updatedAt: userProfile.updatedAt
+                )
+                profiles[userProfile.userIdentifier] = profile
+                
+                if let updatedData = try? JSONEncoder().encode(profiles),
+                   let updatedJson = String(data: updatedData, encoding: .utf8) {
+                    UserDefaults.standard.set(updatedJson, forKey: "userProfiles")
+                }
+            }
+            
+            // 恢复头像文件
+            if let avatarFileName = manifest.userAvatarFile,
+               let avatarSourceURL = imageFiles[avatarFileName] {
+                let avatarDir = documentsDir.appendingPathComponent("UserAvatars", isDirectory: true)
+                try? fileManager.createDirectory(at: avatarDir, withIntermediateDirectories: true)
+                
+                let avatarDestURL = avatarDir.appendingPathComponent(avatarFileName)
+                
+                // 如果源和目标不同，则复制
+                if avatarSourceURL.standardizedFileURL != avatarDestURL.standardizedFileURL {
+                    if fileManager.fileExists(atPath: avatarDestURL.path) {
+                        try? fileManager.removeItem(at: avatarDestURL)
+                    }
+                    try? fileManager.copyItem(at: avatarSourceURL, to: avatarDestURL)
+                }
+                
+                // 更新用户资料中的头像路径
+                if let userProfilesData = UserDefaults.standard.string(forKey: "userProfiles"),
+                   let data = userProfilesData.data(using: .utf8),
+                   var profiles = try? JSONDecoder().decode([String: AuthenticationManager.UserProfile].self, from: data) {
+                    
+                    if var profile = profiles[userProfile.userIdentifier] {
+                        profile.avatarPath = avatarDestURL.path
+                        profiles[userProfile.userIdentifier] = profile
+                        
+                        if let updatedData = try? JSONEncoder().encode(profiles),
+                           let updatedJson = String(data: updatedData, encoding: .utf8) {
+                            UserDefaults.standard.set(updatedJson, forKey: "userProfiles")
+                        }
+                    }
+                }
+                
+                print("Restore: User avatar restored to \(avatarDestURL.path)")
+            }
+            
+            // 如果当前登录用户与备份用户相同，刷新 AuthenticationManager
+            DispatchQueue.main.async {
+                let authManager = AuthenticationManager.shared
+                if authManager.isAuthenticated && authManager.userIdentifier == userProfile.userIdentifier {
+                    authManager.loadCurrentUserProfile()
+                    print("Restore: Current user profile refreshed")
+                }
             }
         }
         
