@@ -207,7 +207,8 @@ struct HomeView: View {
                     ClothingEditView(
                         clothing: nil,
                         initialBrandID: selectedBrandIDs.first,
-                        initialTypes: selectedTypes
+                        initialTypes: selectedTypes,
+                        continueFromDraft: continueFromDraft
                     )
                 }
             }
@@ -691,10 +692,35 @@ struct HomeView: View {
         }
     }
     
+    // 草稿管理器
+    private var draftManager: ClothingEditDraftManager { ClothingEditDraftManager.shared }
+    
+    // 标记是否从草稿继续
+    @State private var continueFromDraft = false
+    
     private var addButton: some View {
         Menu {
-            Button { showingAddSheet = true } label: { Label("手动添加", systemImage: "square.and.pencil") }
+            // 如果有草稿，显示"从上次未保存继续"选项
+            if draftManager.hasDraft() {
+                Button { 
+                    continueFromDraft = true
+                    showingAddSheet = true 
+                } label: { 
+                    Label("从上次未保存继续", systemImage: "doc.badge.clock") 
+                }
+                
+                Divider()
+            }
+            
+            Button { 
+                continueFromDraft = false
+                showingAddSheet = true 
+            } label: { 
+                Label("手动创建", systemImage: "square.and.pencil") 
+            }
+            
             Button { showingBatchImportSheet = true } label: { Label("批量导入", systemImage: "square.and.arrow.down.on.square") }
+            
             Button { showingCommunityImportAlert = true } label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
         } label: {
             Image(systemName: "plus")

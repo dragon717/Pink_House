@@ -226,14 +226,21 @@ struct ClothingEditView: View {
     // 标记是否是通过"保存"按钮离开的
     @State private var isSaving = false
     
+    // 标记是否从草稿继续（false表示新建，清除草稿）
+    private var continueFromDraft: Bool
+    
+    // 标记是否已经处理过草稿逻辑（防止onAppear多次执行）
+    @State private var hasProcessedDraft = false
+    
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
     
-    init(clothing: Clothing?, initialBrandID: UUID? = nil, initialTypes: Set<String>? = nil) {
+    init(clothing: Clothing?, initialBrandID: UUID? = nil, initialTypes: Set<String>? = nil, continueFromDraft: Bool = true) {
         _clothing = State(initialValue: clothing)
         self.initialBrandID = initialBrandID
         self.initialTypes = initialTypes
-        print("ClothingEditView: INIT called, isEditing: \(clothing != nil)")
+        self.continueFromDraft = continueFromDraft
+        print("ClothingEditView: INIT called, isEditing: \(clothing != nil), continueFromDraft: \(continueFromDraft)")
     }
     
     var isEditing: Bool { clothing != nil }
@@ -293,7 +300,7 @@ struct ClothingEditView: View {
                 .padding()
             }
         }
-        .navigationTitle(isEditing ? "编辑" : "手动添加")
+        .navigationTitle(isEditing ? "编辑" : "手动创建")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -343,17 +350,30 @@ struct ClothingEditView: View {
             }
         }
         .onAppear {
-            print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID)")
+            print("ClothingEditView: onAppear triggered, isEditing: \(isEditing), draftID: \(draftID), continueFromDraft: \(continueFromDraft), hasProcessedDraft: \(hasProcessedDraft)")
+            
+            // 防止多次处理草稿逻辑
+            guard !hasProcessedDraft else {
+                print("ClothingEditView: Draft already processed, skipping")
+                return
+            }
+            hasProcessedDraft = true
+            
             // 加载自动补全数据
             SuggestionManager.shared.loadDataAndBuildIndex(modelContext: modelContext)
 
             // 尝试恢复草稿（视图可能被重新创建）
             if isEditing {
                 print("ClothingEditView: Skipping draft restore, in editing mode")
-            } else if let draft = draftManager.loadDraft() {
+            } else if continueFromDraft, let draft = draftManager.loadDraft() {
                 print("ClothingEditView: Found draft with \(draft.imagePaths.count) images")
                 // 恢复草稿
                 restoreFromDraft(draft)
+            } else if !continueFromDraft {
+                // 用户选择"手动创建"，需要清除草稿并重新开始
+                print("ClothingEditView: Creating new item (manual creation), clearing draft")
+                draftManager.clearDraft()
+                resetAllStates()
             } else {
                 print("ClothingEditView: No draft found to restore")
             }
@@ -424,6 +444,11 @@ struct ClothingEditView: View {
             print("ClothingEditView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
             // 更新当前草稿到管理器
             updateCurrentDraft()
+            // 图片变化后立即保存草稿到磁盘，防止丢失
+            if !isEditing {
+                print("ClothingEditView: Image paths changed, immediately saving draft to disk")
+                saveCurrentStateAsDraft()
+            }
         }
         .onChange(of: name) { _, _ in updateCurrentDraft() }
         .onChange(of: brandName) { _, _ in updateCurrentDraft() }
@@ -556,6 +581,37 @@ struct ClothingEditView: View {
         accessoryList = draft.accessoryList
         draftID = draft.id
         print("ClothingEditView: Draft restored, draftID set to \(draftID)")
+    }
+    
+    // 重置所有状态（用于新建时清除草稿）
+    private func resetAllStates() {
+        print("ClothingEditView: resetAllStates called")
+        name = ""
+        brandName = ""
+        types = ""
+        colors = ""
+        sizes = ""
+        length = ""
+        condition = "全新"
+        accessories = ""
+        imagePaths = []
+        isShared = false
+        originalPrice = 0.0
+        priceTotal = 0.0
+        deposit = 0.0
+        balance = 0.0
+        accessoriesPrice = 0.0
+        stock = 1
+        purchaseDate = Date()
+        depositDate = Date()
+        isDepositPlan = false
+        finalPaymentDate = Date()
+        finalPaymentEndDate = Date()
+        note = ""
+        accessoryList = []
+        selectedTags = []
+        draftID = UUID()
+        print("ClothingEditView: All states reset, new draftID: \(draftID)")
     }
     
     private func normalizeTags(_ input: String) -> String {
