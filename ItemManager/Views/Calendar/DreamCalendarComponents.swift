@@ -90,12 +90,12 @@ struct DreamCalendarCell: View {
                                 // Status Label (Rendered only if NOT bottomTrailing, or handled separately)
                                 if let statusInfo = getStatusInfo(), statusInfo.alignment != .bottomTrailing {
                                     Text(statusInfo.text)
-                                        .font(.system(size: 9, weight: .bold))
+                                        .font(.system(size: 8, weight: .bold))
                                         .foregroundStyle(.white)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 2)
+                                        .padding(.horizontal, 3)
+                                        .padding(.vertical, 1)
                                         .background(Color(uiColor: statusInfo.color))
-                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        .clipShape(RoundedRectangle(cornerRadius: 3))
                                         .padding(2)
                                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: statusInfo.alignment)
                                 }
@@ -106,19 +106,19 @@ struct DreamCalendarCell: View {
                                     // Inject Status Label here if alignment is bottomTrailing
                                     if let statusInfo = getStatusInfo(), statusInfo.alignment == .bottomTrailing {
                                         Text(statusInfo.text)
-                                            .font(.system(size: 9, weight: .bold))
+                                            .font(.system(size: 8, weight: .bold))
                                             .foregroundStyle(.white)
-                                            .padding(.horizontal, 4)
-                                            .padding(.vertical, 2)
+                                            .padding(.horizontal, 3)
+                                            .padding(.vertical, 1)
                                             .background(Color(uiColor: statusInfo.color))
-                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                            .clipShape(RoundedRectangle(cornerRadius: 3))
                                     }
                                     
                                     Text("\(CalendarHelper.shared.dayOfMonth(dateObj.date))")
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(.system(size: 9, weight: .bold))
                                         .foregroundStyle(dateTextColor(hasImage: hasImage))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
                                         .background {
                                             if hasImage {
                                                 Capsule()
@@ -262,46 +262,46 @@ struct CalendarEventRow: View {
     
     var body: some View {
         GlassCard {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 // 1. Image
                 if let imagePath = clothing.imagePaths.first {
                     AsyncDownsampledImage(
                         fileName: imagePath,
-                        targetSize: CGSize(width: 60, height: 60),
+                        targetSize: CGSize(width: 50, height: 50),
                         content: { uiImage in
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: 60, height: 60)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .frame(width: 50, height: 50)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
                         },
                         placeholder: {
                             Rectangle()
                                 .fill(Color.gray.opacity(0.1))
-                                .frame(width: 60, height: 60)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .frame(width: 50, height: 50)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
                                 .overlay(Image(systemName: "tshirt").foregroundStyle(.secondary))
                         }
                     )
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.1))
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .frame(width: 50, height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(Image(systemName: "tshirt").foregroundStyle(.secondary))
                 }
                 
                 // 2. Info
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(clothing.name)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     
                     HStack(spacing: 6) {
                         if let brand = clothing.brand {
                             Text(brand.name)
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                         
@@ -309,16 +309,16 @@ struct CalendarEventRow: View {
                         if isDepositDay {
                             Text("定金日")
                                 .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
                                 .background(Color(uiColor: theme.depositColor).opacity(0.2))
                                 .foregroundStyle(Color(uiColor: theme.depositColor))
                                 .clipShape(Capsule())
                         } else if isFinalPaymentDay {
                             Text("预计尾款日")
                                 .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
                                 .background(Color(uiColor: theme.finalPaymentColor).opacity(0.2))
                                 .foregroundStyle(Color(uiColor: theme.finalPaymentColor))
                                 .clipShape(Capsule())
@@ -332,18 +332,18 @@ struct CalendarEventRow: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     if clothing.isDepositPlan {
                         Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
-                            .font(.caption)
+                            .font(.caption2)
                             .bold()
                             .foregroundStyle(Color(uiColor: theme.depositColor))
                         
                         Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
-                            .font(.caption)
+                            .font(.caption2)
                             .bold()
                             .foregroundStyle(Color(uiColor: theme.finalPaymentColor))
                     }
                 }
             }
-            .padding(12)
+            .padding(10)
         }
     }
     
@@ -454,8 +454,18 @@ struct UnifiedEventsPopup: View {
         let groupedDict = Dictionary(grouping: events, by: { $0.0 })
         
         // Convert to [(Date, [Clothing])] and Sort
-        return groupedDict.map { (key, value) in
-            (key, value.map { $0.1 })
+        // Remove duplicates within each day (same clothing might appear multiple times due to different event types)
+        return groupedDict.map { (date, eventList) in
+            var seenIDs = Set<UUID>()
+            let uniqueClothings = eventList.compactMap { event -> Clothing? in
+                let clothing = event.1
+                if seenIDs.contains(clothing.id) {
+                    return nil
+                }
+                seenIDs.insert(clothing.id)
+                return clothing
+            }
+            return (date, uniqueClothings)
         }.sorted { $0.0 < $1.0 }
     }
     
@@ -495,22 +505,22 @@ struct UnifiedEventsPopup: View {
                         .frame(height: 300)
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 16) {
+                        LazyVStack(spacing: 12) {
                             ForEach(groupedClothings, id: \.0) { date, items in
-                                VStack(alignment: .leading, spacing: 8) {
+                                VStack(alignment: .leading, spacing: 6) {
                                     // Date Header (Only show if we have multiple groups or if it's a month view context)
                                     // If we are in "Day View" (title is the date), showing it again is redundant?
                                     // Let's check if the title already contains the date string.
                                     if !title.contains(date.formatted(date: .complete, time: .omitted)) && 
                                        !title.contains(date.formatted(date: .abbreviated, time: .omitted)) {
                                         Text(date.formatted(date: .complete, time: .omitted))
-                                            .font(.headline)
+                                            .font(.subheadline)
                                             .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
                                             .padding(.horizontal)
                                     }
                                     
                                     // Items Grid
-                                    LazyVStack(spacing: 12) {
+                                    LazyVStack(spacing: 8) {
                                         ForEach(items) { clothing in
                                             Button {
                                                 // If we have a drill-down action (e.g. Month -> Day), use it.
@@ -533,7 +543,7 @@ struct UnifiedEventsPopup: View {
                                     }
                                     .padding(.horizontal)
                                 }
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 6)
                                 .background(
                                     colorScheme == .dark
                                         ? Color(uiColor: .tertiarySystemGroupedBackground).opacity(0.6)
@@ -543,9 +553,9 @@ struct UnifiedEventsPopup: View {
                                 .padding(.horizontal)
                             }
                         }
-                        .padding(.vertical)
+                        .padding(.vertical, 8)
                     }
-                    .frame(maxHeight: 500)
+                    .frame(maxHeight: 450)
                 }
             }
             .background(
