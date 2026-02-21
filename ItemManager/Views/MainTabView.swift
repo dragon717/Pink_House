@@ -108,7 +108,7 @@ struct ModernTabView: View {
             }
             
             Tab(value: 3, role: .search) {
-                SearchContainerView(searchText: $searchText)
+                GlobalSearchView(searchText: $searchText)
             }
         }
         .tabViewStyle(.sidebarAdaptable)

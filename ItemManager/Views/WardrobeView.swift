@@ -134,15 +134,14 @@ struct WardrobeView: View {
     }
     
     var filteredClothings: [Clothing] {
-        let result = clothings.filter { clothing in
-            let matchesSearch: Bool
-            if searchText.isEmpty {
-                matchesSearch = true
-            } else {
-                matchesSearch = clothing.name.localizedCaseInsensitiveContains(searchText) ||
-                (clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false)
-            }
-            
+        // 使用 ClothingSearchService 进行搜索
+        let searchService = ClothingSearchService(clothings: clothings)
+        let searchResults = searchService.search(query: searchText)
+        
+        // 如果没有搜索词，返回所有衣物
+        let baseResults = searchText.isEmpty ? clothings : searchResults
+        
+        let result = baseResults.filter { clothing in
             let matchesTag: Bool
             if selectedTagIDs.isEmpty {
                 matchesTag = true
@@ -174,7 +173,7 @@ struct WardrobeView: View {
             
             let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
+            return matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
         }
         
         // Apply sorting based on sortOption
