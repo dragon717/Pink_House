@@ -196,7 +196,7 @@ struct HomeView: View {
                 ),
                 isPresented: $isSearchActive,
                 placement: .toolbar,//.navigationBarDrawer(displayMode: .automatic),
-                prompt: "搜索名称、品牌、标签、类型、颜色、尺码、价格(2000-3000)等..."
+                prompt: "搜索名称、品牌、标签、类型、颜色、尺码、价格范围等..."
             )
             .onAppear {
                 // 确保初始状态下搜索栏不显示

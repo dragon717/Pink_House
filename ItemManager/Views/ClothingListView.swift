@@ -327,7 +327,7 @@ struct ClothingListView: View {
             }
             }
             .scrollContentBackground(.hidden)
-            .searchable(text: $searchText, prompt: "搜索名称、品牌、标签、属性...")
+            .searchable(text: $searchText, prompt: "衣橱里搜索名称、品牌、标签、属性...")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
