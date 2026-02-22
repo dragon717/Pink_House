@@ -67,9 +67,11 @@ struct ModernTabView: View {
             return "穿搭手帐"
         case .menu:
             return "小世界"
+        case .perler:
+            return "拼豆"
         }
     }
-    
+
     private var smallWorldTabIcon: String {
         switch smallWorldDestination {
         case .bigWorld:
@@ -84,6 +86,8 @@ struct ModernTabView: View {
             return "book.pages"
         case .menu:
             return "map"
+        case .perler:
+            return "circle.grid.2x2"
         }
     }
     
@@ -305,6 +309,8 @@ struct SmallWorldContainerView: View {
                 DreamDressCalendarView()
             case .bigWorld:
                 BigWorldView()
+            case .perler:
+                PerlerBeadsView()
             }
         }
     }

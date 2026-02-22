@@ -3,36 +3,49 @@ import SwiftUI
 import UIKit
 #endif
 
+// MARK: - 轮盘菜单数据模型
+struct WheelMenuCategory: Identifiable {
+    let id = UUID()
+    let title: String
+    let icon: String
+    let items: [WheelMenuItem]
+}
+
+struct WheelMenuItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let icon: String
+    let destination: SmallWorldDestination
+    let color: Color
+}
+
 struct SmallWorldMenuOverlay: View {
     @Binding var selectedTab: Int
     @Binding var smallWorldDestination: SmallWorldDestination
 
-    // 环境遍历，用于监听 App 生命周期
     @Environment(\.scenePhase) private var scenePhase
 
-    // 菜单状态
     @State private var showMenu = false
-
-    // 长按动画状态
     @State private var pressProgress: CGFloat = 0.0
     @State private var isPressing: Bool = false
     @State private var didLongPressTrigger: Bool = false
-    @State private var touchLocation: CGPoint = .zero
-    @State private var startLocation: CGPoint = .zero // 记录拖动起始位置
-    @State private var menuOrigin: CGPoint = .zero // 菜单发射源点
+    @State private var menuOrigin: CGPoint = .zero
+    @State private var startLocation: CGPoint = .zero
     @State private var timer: Timer?
-    private let longPressDuration: TimeInterval = 0.35 // 缩短长按时间，提升响应速度，缓解系统手势冲突
+    private let longPressDuration: TimeInterval = 0.35
 
-    // 震动管理器
+    // 轮盘旋转状态
+    @State private var outerRotation: Double = 0
+    @State private var lastOuterRotation: Double = 0
+    @State private var selectedCategoryIndex: Int = 0
+
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
 
-    // 性能优化：检测低内存设备 (小于 4GB 内存)
     private let isLowMemoryDevice: Bool = {
         return ProcessInfo.processInfo.physicalMemory < 4 * 1024 * 1024 * 1024
     }()
 
-    // 检测 iPad
     private var isIPad: Bool {
         #if canImport(UIKit)
         return UIDevice.current.userInterfaceIdiom == .pad
@@ -41,132 +54,119 @@ struct SmallWorldMenuOverlay: View {
         #endif
     }
 
-    // 菜单项数据
-    struct MenuItem: Identifiable {
-        let id = UUID()
-        let title: String
-        let icon: String
-        let destination: SmallWorldDestination
-        let color: Color
-    }
+    // 莫妮卡粉色
+    private let monicaPink = Color(red: 1.0, green: 0.41, blue: 0.71)
 
-    private var menuItems: [MenuItem] {
+    // MARK: - 菜单数据
+    private var categories: [WheelMenuCategory] {
         [
-            // 萌宠: 莫妮卡珊瑚 (自定义暖色，对应萌宠活力)
-            MenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55)),
-            // 穿搭: 莫妮卡热粉 (对应 MonicaTheme FinalPayment)
-            MenuItem(title: "穿搭手帐", icon: "book.pages", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
-            // 来财: 莫妮卡金 (对应 MonicaTheme Deposit)
-            MenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
-            // 日历: 莫妮卡紫 (对应 MonicaTheme Accent，略加深以提升白色图标对比度)
-            MenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80)),
-            // 大世界: 梦幻渐变 (对应全球茶会主题)
-            MenuItem(title: "大世界", icon: "airplane", destination: .bigWorld, color: Color(red: 0.4, green: 0.8, blue: 0.9)),
+            // 常用
+            WheelMenuCategory(
+                title: "常用",
+                icon: "star.fill",
+                items: [
+                    WheelMenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55)),
+                    WheelMenuItem(title: "穿搭手帐", icon: "book.pages", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
+                    WheelMenuItem(title: "小世界", icon: "map", destination: .menu, color: Color(red: 0.4, green: 0.8, blue: 0.9)),
+                ]
+            ),
+            // 乐玩
+            WheelMenuCategory(
+                title: "乐玩",
+                icon: "gamecontroller.fill",
+                items: [
+                    WheelMenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
+                    WheelMenuItem(title: "手帐", icon: "book.closed", destination: .ootd, color: Color(red: 1.0, green: 0.5, blue: 0.7)),
+                    WheelMenuItem(title: "拼豆", icon: "circle.grid.2x2", destination: .perler, color: Color(red: 1.0, green: 0.55, blue: 0.75)),
+                    WheelMenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80)),
+                ]
+            ),
+            // 大世界
+            WheelMenuCategory(
+                title: "大世界",
+                icon: "globe",
+                items: [
+                    WheelMenuItem(title: "大世界", icon: "airplane", destination: .bigWorld, color: Color(red: 0.4, green: 0.8, blue: 0.9)),
+                ]
+            ),
         ]
     }
 
     // 布局参数
-    // 根据屏幕宽度动态计算半径，适配小屏设备 (如 iPhone SE) 和 iPad
-    private func getRadius(geometry: GeometryProxy) -> CGFloat {
-        // 基础半径 110，但在小屏上适当缩小，在大屏上适当增加
-        let baseRadius: CGFloat = 110
+    private func getInnerRadius(geometry: GeometryProxy) -> CGFloat {
         let screenWidth = geometry.size.width
-
-        if screenWidth < 380 { // iPhone SE, mini 等
-            return 90
-        } else if screenWidth > 700 { // iPad
-            return 140
-        } else {
-            return baseRadius
-        }
+        if screenWidth < 380 { return 70 }
+        else if screenWidth > 700 { return 100 }
+        else { return 85 }
     }
 
-    private let bubbleSize: CGFloat = 50
+    private func getOuterRadius(geometry: GeometryProxy) -> CGFloat {
+        let screenWidth = geometry.size.width
+        if screenWidth < 380 { return 160 }
+        else if screenWidth > 700 { return 220 }
+        else { return 190 }
+    }
 
     var body: some View {
         GeometryReader { geometry in
             let safeAreaBottom = geometry.safeAreaInsets.bottom
             let safeAreaTop = geometry.safeAreaInsets.top
-
-            // 动态计算交互区域高度
-            // iPhone: 底部 TabBar (标准高度 49 + 安全区域)，增加到 65 以覆盖图标
-            // iPad: 顶部区域，同样使用 65 + 安全区域
             let tabBarHeight = 65.0 + safeAreaBottom
             let topBarHeight = 65.0 + safeAreaTop
-
             let triggerHeight = isIPad ? topBarHeight : tabBarHeight
-
-            // 动态计算触发区域宽度 (限制最大宽度以适配 iPad)
             let triggerAreaWidth = min(geometry.size.width / 4, 100)
-
-            // 计算小世界 TabBar 按钮的中心位置
-            // 使用屏幕宽度的比例：4 个 Tab，小世界是第 2 个，中心在 3/8 处
-            let smallWorldTabCenterX = geometry.size.width * 0.375 // 3/8
+            let smallWorldTabCenterX = geometry.size.width * 0.375
             let smallWorldTabCenterY = isIPad ? triggerHeight / 2 : geometry.size.height - triggerHeight / 2
 
             ZStack(alignment: .bottom) {
-                // 1. 背景遮罩 (当菜单显示时)
+                // 背景遮罩
                 if showMenu {
-                    Color.black.opacity(0.2)
+                    Color.black.opacity(0.25)
                         .ignoresSafeArea()
-                        .onTapGesture {
-                            closeMenu()
-                        }
+                        .onTapGesture { closeMenu() }
                         .transition(.opacity)
                 }
 
-                        // 2. 菜单气泡
-                ZStack(alignment: .topLeading) {
-                    ForEach(menuItems.indices, id: \.self) { index in
-                        let item = menuItems[index]
-
-                        // 计算角度
-                        // iPhone: 分布在 -160 (左下) 到 -20 (右下) 之间，上方是 -90 (向上发射)
-                        // iPad: 分布在 160 (左上) 到 20 (右上) 之间，下方是 90 (向下发射)
-                        let totalAngle: Double = isIPad ? -140 : 140
-                        let startAngle: Double = isIPad ? 160 : -160
-                        let step = totalAngle / Double(menuItems.count - 1)
-                        let degrees = startAngle + Double(index) * step
-
-                        // 转换为弧度
-                        let radians = degrees * .pi / 180
-
-                        // 计算相对于中心的偏移
-                        let currentRadius = getRadius(geometry: geometry)
-                        let xOffset = currentRadius * cos(radians)
-                        let yOffset = currentRadius * sin(radians)
-
-                        MenuBubbleView(item: item, isLowMemoryDevice: isLowMemoryDevice) {
+                // 轮盘菜单
+                ZStack {
+                    // 外层二级菜单
+                    OuterWheelView(
+                        categories: categories,
+                        selectedIndex: selectedCategoryIndex,
+                        rotation: outerRotation,
+                        radius: getOuterRadius(geometry: geometry),
+                        isLowMemoryDevice: isLowMemoryDevice,
+                        monicaPink: monicaPink,
+                        onItemSelected: { item in
                             selectItem(item.destination)
                         }
-                        // 调整修饰符顺序：
-                        // 1. 先应用缩放和透明度 (作用于气泡自身)
-                        .scaleEffect(showMenu ? 1.0 : 0.1)
-                        .opacity(showMenu ? 1.0 : 0.0)
-                        // 2. 应用展开位移 (相对于中心点)
-                        .offset(
-                            x: showMenu ? xOffset : 0,
-                            y: showMenu ? yOffset : 0
-                        )
-                        // 3. 配置动画 (作用于上述属性)
-                        .animation(
-                            .spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.5)
-                            .delay(showMenu ? Double(index) * 0.03 : 0),
-                            value: showMenu
-                        )
-                        // 4. 最后进行绝对定位 (将气泡中心放置在发射源点)
-                        // 注意：position 必须放在最后，因为它会改变视图大小为占满父视图，
-                        // 如果放在 scaleEffect 之前，会导致缩放中心变为屏幕中心。
-                        .position(
-                            x: menuOrigin.x,
-                            y: menuOrigin.y
-                        )
+                    )
+                    .position(x: menuOrigin.x, y: menuOrigin.y)
+                    .opacity(showMenu ? 1 : 0)
+                    .scaleEffect(showMenu ? 1 : 0.1)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showMenu)
+
+                    // 内层固定分类菜单（带轮廓线和背景）
+                    InnerWheelView(
+                        categories: categories,
+                        selectedIndex: $selectedCategoryIndex,
+                        radius: getInnerRadius(geometry: geometry),
+                        isLowMemoryDevice: isLowMemoryDevice,
+                        monicaPink: monicaPink
+                    )
+                    .position(x: menuOrigin.x, y: menuOrigin.y)
+                    .opacity(showMenu ? 1 : 0)
+                    .scaleEffect(showMenu ? 1 : 0.1)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showMenu)
+                    .onChange(of: selectedCategoryIndex) { newIndex in
+                        // 内层选中变化时，震动反馈
+                        hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .light)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity) // 确保 ZStack 占满全屏，使内部 position 坐标系与全屏一致
-                .allowsHitTesting(showMenu) // 只有显示时才允许点击，避免隐藏时遮挡
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(showMenu)
 
-                // 3. 长按进度指示器 - 定位在小世界 TabBar 按钮中心
+                // 长按进度指示器
                 if isPressing && !showMenu {
                     ZStack {
                         Circle()
@@ -178,8 +178,8 @@ struct SmallWorldMenuOverlay: View {
                             .stroke(
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 1.0, green: 0.41, blue: 0.71), // Hot Pink
-                                        Color(red: 0.85, green: 0.75, blue: 0.85) // Thistle
+                                        monicaPink,
+                                        Color(red: 0.85, green: 0.75, blue: 0.85)
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -188,13 +188,12 @@ struct SmallWorldMenuOverlay: View {
                             )
                             .rotationEffect(.degrees(-90))
                             .frame(width: 60, height: 60)
-                            .shadow(color: Color(red: 1.0, green: 0.41, blue: 0.71).opacity(0.5), radius: 5)
+                            .shadow(color: monicaPink.opacity(0.5), radius: 5)
                     }
                     .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
                 }
 
-                // 4. 触发区域 - 定位在小世界 TabBar 按钮位置
-                // 使用绝对定位确保触发区域精确跟随小世界 Tab 位置
+                // 触发区域
                 Color.black.opacity(0.001)
                     .contentShape(Rectangle())
                     .frame(width: triggerAreaWidth, height: triggerHeight)
@@ -204,31 +203,22 @@ struct SmallWorldMenuOverlay: View {
                         maximumDistance: 20,
                         pressing: { isPressing in
                             if isPressing {
-                                print("SmallWorldMenuOverlay: Long press started")
                                 self.isPressing = true
-
-                                // 使用小世界 TabBar 按钮中心作为触发位置
                                 self.startLocation = CGPoint(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
-                                self.touchLocation = self.startLocation
-
                                 #if canImport(UIKit)
                                 let generator = UIImpactFeedbackGenerator(style: .light)
                                 generator.impactOccurred()
                                 #endif
-
                                 startLongPressTimer()
                             } else {
-                                print("SmallWorldMenuOverlay: Long press ended")
                                 handlePressEnded()
                             }
                         },
                         perform: {
-                            print("SmallWorldMenuOverlay: Long press performed")
                             triggerMenu(smallWorldTabCenterX: smallWorldTabCenterX, smallWorldTabCenterY: smallWorldTabCenterY)
                         }
                     )
                     .onTapGesture {
-                        print("SmallWorldMenuOverlay: Tap detected")
                         if showMenu {
                             closeMenu()
                         } else {
@@ -236,39 +226,246 @@ struct SmallWorldMenuOverlay: View {
                         }
                     }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity) // 确保外层 ZStack 占满全屏
-            .coordinateSpace(name: "MenuOverlay")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .ignoresSafeArea() // 让 GeometryReader 获取全屏尺寸
+        .ignoresSafeArea()
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .background || newPhase == .inactive {
                 closeMenu()
             }
         }
         .onChange(of: selectedTab) { newValue in
-            // 如果切换到其他 Tab，关闭菜单
             if newValue != 1 {
                 closeMenu()
             }
         }
     }
 
+    // MARK: - 内层固定轮盘（右上角90度）
+    struct InnerWheelView: View {
+        let categories: [WheelMenuCategory]
+        @Binding var selectedIndex: Int
+        let radius: CGFloat
+        let isLowMemoryDevice: Bool
+        let monicaPink: Color
+
+        private let startAngle: Double = -90
+        private let endAngle: Double = 0
+
+        var body: some View {
+            ZStack {
+                // 轮盘背景（淡淡的莫妮卡粉）
+                WheelBackground(
+                    radius: radius + 35,
+                    startAngle: startAngle,
+                    endAngle: endAngle,
+                    monicaPink: monicaPink
+                )
+
+                // 三个分类分布在右上角90度范围内
+                ForEach(0..<3) { index in
+                    // 在-90°到0°之间均匀分布
+                    let angle = startAngle + Double(index) * 45 // -90, -45, 0
+                    let radians = angle * .pi / 180
+                    let x = radius * cos(radians)
+                    let y = radius * sin(radians)
+
+                    CategoryBubble(
+                        category: categories[index],
+                        isSelected: selectedIndex == index,
+                        isLowMemoryDevice: isLowMemoryDevice,
+                        monicaPink: monicaPink
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedIndex = index
+                        }
+                    }
+                    .offset(x: x, y: y)
+                }
+            }
+        }
+    }
+
+    // MARK: - 外层二级菜单（右上角90度）
+    struct OuterWheelView: View {
+        let categories: [WheelMenuCategory]
+        let selectedIndex: Int
+        let rotation: Double
+        let radius: CGFloat
+        let isLowMemoryDevice: Bool
+        let monicaPink: Color
+        let onItemSelected: (WheelMenuItem) -> Void
+
+        // 右上角90度范围
+        private let startAngle: Double = -90
+        private let endAngle: Double = 0
+
+        var body: some View {
+            ZStack {
+                // 根据选中的分类显示对应的二级菜单
+                let items = categories[selectedIndex].items
+                ForEach(items.indices, id: \.self) { itemIndex in
+                    // 在右上角90度范围内分布
+                    let totalAngle = 80.0
+                    let itemStartAngle = startAngle + 5 // 从-85°开始
+                    let step = items.count > 1 ? totalAngle / Double(items.count - 1) : 0
+                    let angle = itemStartAngle + Double(itemIndex) * step
+                    let radians = angle * .pi / 180
+                    let x = radius * cos(radians)
+                    let y = radius * sin(radians)
+
+                    ItemBubble(
+                        item: items[itemIndex],
+                        isLowMemoryDevice: isLowMemoryDevice
+                    ) {
+                        onItemSelected(items[itemIndex])
+                    }
+                    .offset(x: x, y: y)
+                    .transition(.scale.combined(with: .opacity))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(itemIndex) * 0.03), value: selectedIndex)
+                }
+            }
+        }
+    }
+
+    // MARK: - 轮盘背景
+    struct WheelBackground: View {
+        let radius: CGFloat
+        let startAngle: Double
+        let endAngle: Double
+        let monicaPink: Color
+
+        var body: some View {
+            // 淡淡的莫妮卡粉背景扇形
+            SectorShape(
+                radius: radius,
+                startAngle: .degrees(startAngle),
+                endAngle: .degrees(endAngle)
+            )
+            .fill(monicaPink.opacity(0.08))
+        }
+    }
+
+    // MARK: - 扇形形状
+    struct SectorShape: Shape {
+        let radius: CGFloat
+        let startAngle: Angle
+        let endAngle: Angle
+
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+
+            path.move(to: center)
+            path.addArc(
+                center: center,
+                radius: radius,
+                startAngle: startAngle,
+                endAngle: endAngle,
+                clockwise: false
+            )
+            path.closeSubpath()
+
+            return path
+        }
+    }
+
+    // MARK: - 分类气泡
+    struct CategoryBubble: View {
+        let category: WheelMenuCategory
+        let isSelected: Bool
+        let isLowMemoryDevice: Bool
+        let monicaPink: Color
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: 4) {
+                    ZStack {
+                        Circle()
+                            .fill(isSelected ? monicaPink : Color.white)
+                            .frame(width: 50, height: 50)
+                            .shadow(
+                                color: isSelected ? monicaPink.opacity(0.4) : Color.black.opacity(0.1),
+                                radius: isSelected ? 8 : 4,
+                                x: 0,
+                                y: isSelected ? 4 : 2
+                            )
+
+                        Image(systemName: category.icon)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(isSelected ? .white : Color(red: 0.4, green: 0.4, blue: 0.4))
+                    }
+
+                    Text(category.title)
+                        .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                        .foregroundColor(isSelected ? monicaPink : .primary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background {
+                            if isLowMemoryDevice {
+                                Color.white.opacity(0.9)
+                            } else {
+                                Rectangle().fill(.ultraThinMaterial)
+                            }
+                        }
+                        .clipShape(Capsule())
+                }
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    // MARK: - 功能项气泡
+    struct ItemBubble: View {
+        let item: WheelMenuItem
+        let isLowMemoryDevice: Bool
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: 6) {
+                    ZStack {
+                        Circle()
+                            .fill(item.color)
+                            .frame(width: 56, height: 56)
+                            .shadow(color: item.color.opacity(isLowMemoryDevice ? 0 : 0.4), radius: isLowMemoryDevice ? 0 : 8, x: 0, y: 4)
+
+                        Image(systemName: item.icon)
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+
+                    Text(item.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background {
+                            if isLowMemoryDevice {
+                                Color.white.opacity(0.95)
+                            } else {
+                                Rectangle().fill(.regularMaterial)
+                            }
+                        }
+                        .clipShape(Capsule())
+                        .shadow(color: .black.opacity(isLowMemoryDevice ? 0 : 0.1), radius: isLowMemoryDevice ? 0 : 2, x: 0, y: 1)
+                }
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
     private func startLongPressTimer() {
-        // 重置状态
         pressProgress = 0.0
         didLongPressTrigger = false
 
-        // 进度条动画 - 与 onLongPressGesture 的 minimumDuration 同步
         withAnimation(.linear(duration: longPressDuration)) {
             pressProgress = 1.0
         }
 
-        // 注意：不再使用 Timer 触发菜单
-        // 菜单触发现在由 onLongPressGesture 的 perform 闭包处理
-        // Timer 仅用于在长按被取消时清理状态
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: longPressDuration + 0.1, repeats: false) { _ in
-            // 如果定时器触发但菜单未显示，说明长按被取消，清理状态
             if !self.showMenu && self.isPressing {
                 DispatchQueue.main.async {
                     self.isPressing = false
@@ -278,41 +475,22 @@ struct SmallWorldMenuOverlay: View {
         }
     }
 
-    // 抽取单击逻辑
     private func handleTapAction() {
-        print("SmallWorldMenuOverlay: handleTapAction executed")
-
-        // 使用 DispatchQueue 避免在手势回调中直接触发 Tab 切换导致的层级重建问题
         DispatchQueue.main.async {
             if self.selectedTab == 1 {
                 if self.smallWorldDestination != .menu {
-                    print("SmallWorldMenuOverlay: Switching Destination to .menu")
                     self.smallWorldDestination = .menu
-                } else {
-                    print("SmallWorldMenuOverlay: Already at .menu")
                 }
             } else {
-                print("SmallWorldMenuOverlay: Switching Tab to 1")
                 self.selectedTab = 1
             }
         }
-    }
-
-    private func cancelLongPress() {
-        timer?.invalidate()
-        timer = nil
-        isPressing = false
-        withAnimation(.easeOut(duration: 0.2)) {
-            pressProgress = 0.0
-        }
-        didLongPressTrigger = false
     }
 
     private func handlePressEnded() {
         timer?.invalidate()
         timer = nil
 
-        // 如果是长按刚刚触发了菜单，则忽略此次抬起事件
         if didLongPressTrigger {
             didLongPressTrigger = false
             isPressing = false
@@ -320,40 +498,31 @@ struct SmallWorldMenuOverlay: View {
             return
         }
 
-        // 长按被取消（未达到触发时间），视为普通按压结束
-        // 立即停止长按动画
         isPressing = false
         withAnimation(.easeOut(duration: 0.2)) {
             pressProgress = 0.0
         }
-
-        // 注意：点击逻辑现在由 onTapGesture 处理，这里不再重复处理
-        // 以避免与 onTapGesture 冲突导致重复触发
-        print("SmallWorldMenuOverlay: Press ended without triggering menu")
     }
 
     private func triggerMenu(smallWorldTabCenterX: CGFloat, smallWorldTabCenterY: CGFloat) {
-        // 使用 HapticEngineManager 播放强震动 (模拟 Heavy Impact)
-        // Intensity: 0.8 (强烈), Sharpness: 0.7 (较脆), Fallback: .heavy
         hapticManager.playUIFeedback(intensity: 0.8, sharpness: 0.7, fallbackStyle: .heavy)
-
-        // 标记长按已触发
         didLongPressTrigger = true
 
-        // 锁定小世界 TabBar 按钮中心为菜单发射源点，并禁用动画防止位置跳变
+        // 重置轮盘状态
+        selectedCategoryIndex = 0
+        outerRotation = 0
+        lastOuterRotation = 0
+
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             menuOrigin = CGPoint(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
-            print("SmallWorldMenuOverlay: Trigger Menu. menuOrigin locked at: \(menuOrigin)")
         }
 
-        // 显示菜单
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             showMenu = true
         }
 
-        // 进度条消失
         isPressing = false
         pressProgress = 0.0
     }
@@ -365,17 +534,11 @@ struct SmallWorldMenuOverlay: View {
     }
 
     private func selectItem(_ dest: SmallWorldDestination) {
-        // 性能优化：立即跳转，减少等待感
-        // 关闭菜单
         withAnimation(.easeOut(duration: 0.15)) {
             showMenu = false
         }
 
-        // 使用 DispatchQueue 避免在手势处理回调中直接触发布局剧烈变化
-        // 这有助于规避 '_UIReparentingView' 相关的层级错误
         DispatchQueue.main.async {
-            // 立即切换状态，不使用延迟
-            // 使用 Transaction 禁用动画或加速过渡，提升"跟手"感
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
@@ -383,49 +546,6 @@ struct SmallWorldMenuOverlay: View {
                 smallWorldDestination = dest
             }
         }
-    }
-}
-
-struct MenuBubbleView: View {
-    let item: SmallWorldMenuOverlay.MenuItem
-    // 传入低内存模式标志
-    var isLowMemoryDevice: Bool = false
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(item.color)
-                        .frame(width: 56, height: 56)
-                        // 性能优化：低内存设备移除阴影
-                        .shadow(color: item.color.opacity(isLowMemoryDevice ? 0 : 0.4), radius: isLowMemoryDevice ? 0 : 8, x: 0, y: 4)
-
-                    Image(systemName: item.icon)
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
-
-                Text(item.title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    // 性能优化：低内存设备使用普通颜色代替 Material 模糊效果
-                    .background {
-                        if isLowMemoryDevice {
-                            Color.white.opacity(0.95)
-                        } else {
-                            Rectangle().fill(.regularMaterial)
-                        }
-                    }
-                    .clipShape(Capsule())
-                    // 性能优化：低内存设备移除文字阴影
-                    .shadow(color: .black.opacity(isLowMemoryDevice ? 0 : 0.1), radius: isLowMemoryDevice ? 0 : 2, x: 0, y: 1)
-            }
-        }
-        .buttonStyle(ScaleButtonStyle())
     }
 }
 

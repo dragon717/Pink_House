@@ -7,4 +7,5 @@ enum SmallWorldDestination {
     case wealth
     case calendar
     case bigWorld
+    case perler // 拼豆
 }
