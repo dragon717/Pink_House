@@ -9,7 +9,9 @@ import SwiftUI
 import SwiftData
 import UIKit
 import RealityKit
+import ARKit
 import simd
+import Combine
 
 // MARK: - SpatialAsset 类型
 
@@ -942,7 +944,6 @@ struct Model3DAssetCard: View {
     @State private var showingRenameAlert = false
     @State private var showingDeleteAlert = false
     @State private var showingUsageAlert = false
-    @State private var showingThumbnailEditor = false
     @State private var showingShareSheet = false
     @State private var newName: String = ""
     @State private var usageCount: Int = 0
@@ -1016,8 +1017,8 @@ struct Model3DAssetCard: View {
                     Label("重命名", systemImage: "pencil")
                 }
                 
-                Button {
-                    showingThumbnailEditor = true
+                NavigationLink {
+                    ModelThumbnailEditorView(model: model)
                 } label: {
                     Label("设置缩略图", systemImage: "camera.viewfinder")
                 }
@@ -1057,8 +1058,8 @@ struct Model3DAssetCard: View {
                 Label("重命名", systemImage: "pencil")
             }
             
-            Button {
-                showingThumbnailEditor = true
+            NavigationLink {
+                ModelThumbnailEditorView(model: model)
             } label: {
                 Label("设置缩略图", systemImage: "camera.viewfinder")
             }
@@ -1096,9 +1097,6 @@ struct Model3DAssetCard: View {
             Button("确定", role: .cancel) { }
         } message: {
             Text("该模型正在被 \(usageCount) 个场景使用，请先从场景中移除后再删除。")
-        }
-        .sheet(isPresented: $showingThumbnailEditor) {
-            ModelThumbnailEditorView(model: model)
         }
         .sheet(isPresented: $showingShareSheet) {
             if let resolvedPath = model.resolvedModelPath {
@@ -1166,204 +1164,591 @@ struct ModelThumbnailEditorView: View {
     @State private var cameraPosition: SIMD3<Float> = SIMD3<Float>(0, 0, 3)
     @State private var cameraRotation: SIMD3<Float> = SIMD3<Float>(0, 0, 0)
     @State private var isSaving = false
+    @StateObject private var arViewHolder = ARViewHolder()
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                (colorScheme == .dark ? Color(red: 0.15, green: 0.15, blue: 0.15) : Color(red: 0.96, green: 0.95, blue: 0.93))
-                    .ignoresSafeArea()
-                
-                if let resolvedPath = model.resolvedModelPath {
-                    SingleModelRealityView(
-                        modelPath: resolvedPath,
-                        cameraPosition: $cameraPosition,
-                        cameraRotation: $cameraRotation
-                    )
-                } else {
-                    VStack(spacing: 16) {
-                        Image(systemName: "cube.box")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        
-                        Text("无法加载模型")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                    }
+        ZStack {
+            (colorScheme == .dark ? Color(red: 0.15, green: 0.15, blue: 0.15) : Color(red: 0.96, green: 0.95, blue: 0.93))
+                .ignoresSafeArea()
+            
+            if let resolvedPath = model.resolvedModelPath {
+                SingleModelRealityView(
+                    modelPath: resolvedPath,
+                    cameraPosition: $cameraPosition,
+                    cameraRotation: $cameraRotation,
+                    arViewHolder: arViewHolder
+                )
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "cube.box")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("无法加载模型")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
                 }
+            }
+            
+            // 白框辅助定位 - 正方形，与缩略图比例一致
+            GeometryReader { geometry in
+                // 使用屏幕较短的边来计算正方形尺寸
+                let size = min(geometry.size.width, geometry.size.height) * 0.5
                 
-                VStack {
+                ZStack {
+                    // 半透明遮罩
+                    Color.black.opacity(0.3)
+                        .mask(
+                            Rectangle()
+                                .overlay(
+                                    Rectangle()
+                                        .frame(width: size, height: size)
+                                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                                        .blendMode(.destinationOut)
+                                )
+                        )
+                    
+                    // 白色边框
+                    Rectangle()
+                        .strokeBorder(Color.white, lineWidth: 2)
+                        .frame(width: size, height: size)
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                    
+                    // 角落标记
+                    ThumbnailCornerMarkers(size: size)
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                }
+                .allowsHitTesting(false)
+            }
+            
+            VStack {
+                // 顶部标题栏
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.title3)
+                            .foregroundStyle(.primary)
+                            .frame(width: 40, height: 40)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                    }
+                    
                     Spacer()
                     
-                    HStack(spacing: 16) {
-                        Button {
-                            resetCamera()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.counterclockwise")
-                                Text("重置视角")
-                            }
-                            .font(.subheadline)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(Color.gray.opacity(0.2))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    Text("设置缩略图")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    Button {
+                        saveThumbnail()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .frame(width: 40, height: 40)
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.purple)
+                                .clipShape(Circle())
                         }
-                        
-                        Spacer()
-                        
-                        Button {
-                            dismiss()
-                        } label: {
-                            Text("取消")
-                                .font(.subheadline)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(Color.gray.opacity(0.2))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        
-                        Button {
-                            saveThumbnail()
-                        } label: {
-                            HStack(spacing: 4) {
-                                if isSaving {
-                                    ProgressView()
-                                } else {
-                                    Image(systemName: "checkmark")
-                                }
-                                Text("保存")
-                            }
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(Color.purple)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .disabled(isSaving)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                    .disabled(isSaving)
                 }
-            }
-            .navigationTitle("设置缩略图")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") {
-                        dismiss()
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                
+                Spacer()
+                
+                // 手势提示
+                HStack(spacing: 20) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "hand.tap.fill")
+                        Text("单指旋转")
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "hand.point.up.braille.fill")
+                        Text("双指移动")
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.and.down.circle.fill")
+                        Text("双指缩放")
                     }
                 }
-            }
-            .onAppear {
-                cameraPosition = model.cameraPosition
-                cameraRotation = model.cameraRotation
+                .font(.caption)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .padding(.bottom, 8)
+                
+                // 底部按钮栏
+                HStack(spacing: 16) {
+                    Button {
+                        resetCamera()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("重置视角")
+                        }
+                        .font(.subheadline)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
             }
         }
+        .onAppear {
+            cameraPosition = model.cameraPosition
+            cameraRotation = model.cameraRotation
+        }
+        // 禁用右滑返回手势 - 使用空手势覆盖
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in }
+                .onEnded { _ in },
+            including: .all
+        )
+        // 禁用系统导航返回手势
+        .interactiveDismissDisabled()
+        // 隐藏原生导航栏
+        .toolbar(.hidden, for: .navigationBar)
     }
     
     private func resetCamera() {
         cameraPosition = SIMD3<Float>(0, 0, 3)
         cameraRotation = SIMD3<Float>(0, 0, 0)
+        // 重置 CameraController
+        arViewHolder.cameraController?.reset()
     }
     
     private func saveThumbnail() {
         isSaving = true
+        print("[ThumbnailEditor] 开始保存缩略图...")
         
         Task {
+            // 保存相机位置
             await MainActor.run {
                 model.cameraPosition = cameraPosition
                 model.cameraRotation = cameraRotation
                 model.updatedAt = Date()
-                
-                let modelID = model.id
-                let fileManager = FileManager.default
-                guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                print("[ThumbnailEditor] 相机位置已保存: \(cameraPosition), \(cameraRotation)")
+            }
+            
+            // 使用 ARView 捕获缩略图
+            guard let arView = arViewHolder.arView else {
+                print("[ThumbnailEditor] 错误: arViewHolder.arView 为 nil")
+                await MainActor.run {
                     isSaving = false
-                    return
                 }
-                
-                let modelDir = documentsPath.appendingPathComponent("Models/\(modelID.uuidString)")
-                try? fileManager.createDirectory(at: modelDir, withIntermediateDirectories: true)
-                
-                if let firstImagePath = model.resolvedSourceImagePaths.first,
-                   let data = try? Data(contentsOf: URL(fileURLWithPath: firstImagePath)),
-                   let image = UIImage(data: data) {
-                    
-                    let thumbnailSize = CGSize(width: 200, height: 200)
-                    let renderer = UIGraphicsImageRenderer(size: thumbnailSize)
-                    let thumbnail = renderer.image { context in
-                        let bgColor = UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0)
-                        bgColor.setFill()
-                        context.fill(CGRect(origin: .zero, size: thumbnailSize))
-                        image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
-                    }
-                    
-                    let thumbnailFileName = "thumbnail.jpg"
-                    let thumbnailPath = modelDir.appendingPathComponent(thumbnailFileName)
-                    if let data = thumbnail.jpegData(compressionQuality: 0.8) {
-                        try? data.write(to: thumbnailPath)
-                        let relativePath = "Models/\(modelID.uuidString)/\(thumbnailFileName)"
-                        model.setThumbnailPath(relativePath)
+                return
+            }
+            print("[ThumbnailEditor] arView 已获取")
+            
+            // 等待一帧确保渲染完成
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            
+            // 捕获快照
+            await withCheckedContinuation { continuation in
+                arView.snapshot(saveToHDR: false) { image in
+                    Task { @MainActor in
+                        let modelID = model.id
+                        let fileManager = FileManager.default
+                        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                            isSaving = false
+                            continuation.resume()
+                            return
+                        }
+                        
+                        let modelDir = documentsPath.appendingPathComponent("Models/\(modelID.uuidString)")
+                        try? fileManager.createDirectory(at: modelDir, withIntermediateDirectories: true)
+                        
+                        let thumbnailFileName = "thumbnail.jpg"
+                        let thumbnailPath = modelDir.appendingPathComponent(thumbnailFileName)
+                        
+                        // 从屏幕快照中裁剪中央正方形区域，然后缩放为200x200
+                        let thumbnailSize = CGSize(width: 200, height: 200)
+                        var thumbnail: UIImage?
+                        if let image = image {
+                            let imageSize = image.size
+                            
+                            // 计算中央正方形裁剪区域（与白框对应）
+                            let minDimension = min(imageSize.width, imageSize.height)
+                            let cropSize = minDimension * 0.5 // 白框是屏幕的50%
+                            let cropX = (imageSize.width - cropSize) / 2
+                            let cropY = (imageSize.height - cropSize) / 2
+                            let cropRect = CGRect(x: cropX, y: cropY, width: cropSize, height: cropSize)
+                            
+                            // 裁剪中央区域
+                            if let croppedCGImage = image.cgImage?.cropping(to: cropRect) {
+                                let croppedImage = UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+                                
+                                // 缩放为200x200
+                                UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
+                                croppedImage.draw(in: CGRect(origin: .zero, size: thumbnailSize))
+                                thumbnail = UIGraphicsGetImageFromCurrentImageContext()
+                                UIGraphicsEndImageContext()
+                            }
+                        }
+                        
+                        if let thumbnail = thumbnail {
+                            print("[ThumbnailEditor] 缩略图已生成，尺寸: \(thumbnail.size)")
+                            if let data = thumbnail.jpegData(compressionQuality: 0.9) {
+                                do {
+                                    try data.write(to: thumbnailPath)
+                                    let relativePath = "Models/\(modelID.uuidString)/\(thumbnailFileName)"
+                                    model.setThumbnailPath(relativePath)
+                                    print("[ThumbnailEditor] 缩略图已保存: \(thumbnailPath.path)")
+                                } catch {
+                                    print("[ThumbnailEditor] 保存缩略图失败: \(error)")
+                                }
+                            } else {
+                                print("[ThumbnailEditor] 错误: 无法生成 JPEG 数据")
+                            }
+                        } else {
+                            print("[ThumbnailEditor] 错误: 缩略图为 nil")
+                        }
+                        
+                        do {
+                            try modelContext.save()
+                            print("[ThumbnailEditor] 数据库已保存")
+                        } catch {
+                            print("[ThumbnailEditor] 保存数据库失败: \(error)")
+                        }
+                        isSaving = false
+                        dismiss()
+                        continuation.resume()
                     }
                 }
-                
-                try? modelContext.save()
-                isSaving = false
-                dismiss()
             }
         }
     }
+}
+
+// MARK: - 缩略图角落标记组件
+
+struct ThumbnailCornerMarkers: View {
+    let size: CGFloat
+    let markerLength: CGFloat = 20
+    let markerThickness: CGFloat = 3
+    
+    var body: some View {
+        ZStack {
+            // 左上角
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    Rectangle()
+                        .frame(width: markerLength, height: markerThickness)
+                    Spacer()
+                }
+                HStack(spacing: 0) {
+                    Rectangle()
+                        .frame(width: markerThickness, height: markerLength)
+                    Spacer()
+                }
+                Spacer()
+            }
+            
+            // 右上角
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    Spacer()
+                    Rectangle()
+                        .frame(width: markerLength, height: markerThickness)
+                }
+                HStack(spacing: 0) {
+                    Spacer()
+                    Rectangle()
+                        .frame(width: markerThickness, height: markerLength)
+                }
+                Spacer()
+            }
+            
+            // 左下角
+            VStack(spacing: 0) {
+                Spacer()
+                HStack(spacing: 0) {
+                    Rectangle()
+                        .frame(width: markerThickness, height: markerLength)
+                    Spacer()
+                }
+                HStack(spacing: 0) {
+                    Rectangle()
+                        .frame(width: markerLength, height: markerThickness)
+                    Spacer()
+                }
+            }
+            
+            // 右下角
+            VStack(spacing: 0) {
+                Spacer()
+                HStack(spacing: 0) {
+                    Spacer()
+                    Rectangle()
+                        .frame(width: markerThickness, height: markerLength)
+                }
+                HStack(spacing: 0) {
+                    Spacer()
+                    Rectangle()
+                        .frame(width: markerLength, height: markerThickness)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .foregroundStyle(.white)
+    }
+}
+
+// MARK: - ARView Holder
+
+class ARViewHolder: ObservableObject {
+    @Published var arView: ARView?
+    var cameraController: CameraController?
 }
 
 struct SingleModelRealityView: View {
     let modelPath: String
     @Binding var cameraPosition: SIMD3<Float>
     @Binding var cameraRotation: SIMD3<Float>
+    var arViewHolder: ARViewHolder
     
     @StateObject private var cameraController = CameraController()
     
     var body: some View {
         GeometryReader { geometry in
-            RealityView { content in
-                let rootEntity = Entity()
-                rootEntity.name = "sceneRoot"
-                content.add(rootEntity)
-                
-                cameraController.distance = cameraPosition.z
-                cameraController.rotationY = cameraRotation.y
-                cameraController.rotationX = cameraRotation.x
-                
-                _ = cameraController.setupCamera(in: rootEntity)
-                
-                if let modelEntity = try? Entity.load(contentsOf: URL(fileURLWithPath: modelPath)) {
-                    modelEntity.position = SIMD3<Float>(0, 0, 0)
-                    rootEntity.addChild(modelEntity)
-                }
+            ARModelViewWithGestures(
+                modelPath: modelPath,
+                cameraController: cameraController,
+                arViewHolder: arViewHolder
+            )
+            .onAppear {
+                arViewHolder.cameraController = cameraController
             }
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        let delta = value.translation
-                        let rotationSpeed: Float = 0.005
-                        cameraController.rotationY += Float(delta.width) * rotationSpeed
-                        cameraController.rotationX += Float(delta.height) * rotationSpeed
-                        cameraRotation.y = cameraController.rotationY
-                        cameraRotation.x = cameraController.rotationX
-                    }
-            )
-            .gesture(
-                MagnificationGesture()
-                    .onChanged { value in
-                        let scaleFactor: Float = Float(value)
-                        let baseDistance: Float = 3.0
-                        cameraController.distance = baseDistance / scaleFactor
-                        cameraController.distance = max(0.5, min(10, cameraController.distance))
-                        cameraPosition.z = cameraController.distance
-                    }
-            )
+            .onChange(of: cameraController.distance) { _, newValue in
+                cameraPosition.z = newValue
+            }
+            .onChange(of: cameraController.rotationX) { _, newValue in
+                cameraRotation.x = newValue
+            }
+            .onChange(of: cameraController.rotationY) { _, newValue in
+                cameraRotation.y = newValue
+            }
         }
+    }
+}
+
+// MARK: - AR Model View with Gestures
+
+struct ARModelViewWithGestures: UIViewRepresentable {
+    let modelPath: String
+    @ObservedObject var cameraController: CameraController
+    var arViewHolder: ARViewHolder
+    
+    func makeUIView(context: Context) -> ARModelContainerView {
+        print("[ARModelViewWithGestures] makeUIView called")
+        let containerView = ARModelContainerView(frame: .zero)
+        containerView.setup(modelPath: modelPath, cameraController: cameraController, arViewHolder: arViewHolder)
+        return containerView
+    }
+    
+    func updateUIView(_ uiView: ARModelContainerView, context: Context) {
+        uiView.updateCamera()
+    }
+}
+
+// MARK: - AR Model Container View
+
+class ARModelContainerView: UIView {
+    private var arView: ARView?
+    private var cameraController: CameraController?
+    
+    // 手势状态
+    private var lastRotationLocation: CGPoint?
+    private var lastPanLocation: CGPoint?
+    private var lastPinchScale: CGFloat = 1.0
+    
+    func setup(modelPath: String, cameraController: CameraController, arViewHolder: ARViewHolder) {
+        print("[ARModelContainerView] setup called")
+        self.cameraController = cameraController
+        
+        // 创建 ARView
+        let arView = ARView(frame: bounds, cameraMode: .nonAR, automaticallyConfigureSession: false)
+        arView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(arView)
+        self.arView = arView
+        arViewHolder.arView = arView
+        print("[ARModelContainerView] ARView created and set to holder")
+        
+        // 设置背景色
+        arView.environment.background = .color(UIColor(red: 0.96, green: 0.95, blue: 0.93, alpha: 1.0))
+        
+        // 加载模型
+        if let modelEntity = try? Entity.load(contentsOf: URL(fileURLWithPath: modelPath)) {
+            modelEntity.position = SIMD3<Float>(0, 0, 0)
+            let modelAnchor = AnchorEntity(world: .zero)
+            modelAnchor.addChild(modelEntity)
+            arView.scene.addAnchor(modelAnchor)
+        }
+        
+        // 设置相机
+        setupCamera()
+        
+        // 设置手势
+        setupGestures()
+    }
+    
+    private func setupCamera() {
+        guard let arView = arView else { return }
+        
+        let camera = PerspectiveCamera()
+        let cameraAnchor = AnchorEntity(world: .zero)
+        cameraAnchor.addChild(camera)
+        arView.scene.addAnchor(cameraAnchor)
+        
+        updateCamera()
+    }
+    
+    func updateCamera() {
+        guard let arView = arView, let controller = cameraController else { return }
+        
+        let distance = controller.distance
+        let rotationX = controller.rotationX
+        let rotationY = controller.rotationY
+        let target = controller.target
+        
+        let cosPitch = cos(rotationX)
+        let sinPitch = sin(rotationX)
+        let cosYaw = cos(rotationY)
+        let sinYaw = sin(rotationY)
+        
+        // 相机位置基于 target 偏移
+        let position = SIMD3<Float>(
+            target.x + distance * cosPitch * sinYaw,
+            target.y + distance * sinPitch,
+            target.z + distance * cosPitch * cosYaw
+        )
+        
+        if let cameraAnchor = arView.scene.anchors.first(where: { $0.children.contains(where: { $0 is PerspectiveCamera }) }) {
+            cameraAnchor.position = position
+            cameraAnchor.look(at: target, from: position, relativeTo: nil)
+        }
+    }
+    
+    private func setupGestures() {
+        // 单指旋转
+        let singlePanGesture = UIPanGestureRecognizer(target: self, action: #selector(handleSinglePan(_:)))
+        singlePanGesture.maximumNumberOfTouches = 1
+        singlePanGesture.delegate = self
+        addGestureRecognizer(singlePanGesture)
+        
+        // 双指平移
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        panGesture.minimumNumberOfTouches = 2
+        panGesture.maximumNumberOfTouches = 2
+        panGesture.delegate = self
+        addGestureRecognizer(panGesture)
+        
+        // 双指缩放
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinchGesture.delegate = self
+        addGestureRecognizer(pinchGesture)
+        
+        
+        // 确保手势优先于ARView的手势
+        if let arView = arView {
+            for gesture in arView.gestureRecognizers ?? [] {
+                singlePanGesture.require(toFail: gesture)
+                panGesture.require(toFail: gesture)
+                pinchGesture.require(toFail: gesture)
+            }
+        }
+    }
+    
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard let controller = cameraController else { 
+            print("[Gesture] Pan: cameraController is nil")
+            return 
+        }
+        
+        let location = gesture.location(in: self)
+        let touchCount = gesture.numberOfTouches
+        
+        switch gesture.state {
+        case .began:
+            print("[Gesture] Pan began, touches: \(touchCount), location: \(location)")
+            lastPanLocation = location
+        case .changed:
+            guard let lastLocation = lastPanLocation else { return }
+            let deltaX = Float(location.x - lastLocation.x)
+            let deltaY = Float(location.y - lastLocation.y)
+            print("[Gesture] Pan changed, delta: (\(deltaX), \(deltaY))")
+            controller.pan(deltaX: deltaX, deltaY: deltaY)
+            lastPanLocation = location
+        case .ended, .cancelled:
+            print("[Gesture] Pan ended/cancelled")
+            lastPanLocation = nil
+        default:
+            break
+        }
+    }
+    
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let controller = cameraController else { return }
+        
+        switch gesture.state {
+        case .began:
+            lastPinchScale = gesture.scale
+        case .changed:
+            let scale = Float(gesture.scale / lastPinchScale)
+            let zoomDelta = (1.0 - scale) * controller.distance * 2
+            controller.zoom(delta: zoomDelta)
+            lastPinchScale = gesture.scale
+        case .ended, .cancelled:
+            lastPinchScale = 1.0
+        default:
+            break
+        }
+    }
+    
+    @objc private func handleSinglePan(_ gesture: UIPanGestureRecognizer) {
+        guard let controller = cameraController else { return }
+        
+        let location = gesture.location(in: self)
+        
+        switch gesture.state {
+        case .began:
+            lastRotationLocation = location
+        case .changed:
+            guard let lastLocation = lastRotationLocation else { return }
+            let deltaX = Float(location.x - lastLocation.x) * 0.01
+            let deltaY = Float(location.y - lastLocation.y) * 0.01
+            controller.rotate(deltaX: deltaX, deltaY: deltaY)
+            lastRotationLocation = location
+        case .ended, .cancelled:
+            lastRotationLocation = nil
+        default:
+            break
+        }
+    }
+}
+
+extension ARModelContainerView: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
 }
 

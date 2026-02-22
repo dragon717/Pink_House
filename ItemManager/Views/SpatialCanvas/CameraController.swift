@@ -88,7 +88,8 @@ public class CameraController: ObservableObject {
         let right = SIMD3<Float>(cosYaw, 0, -sinYaw)
         let up = SIMD3<Float>(0, 1, 0)
         
-        let panSpeed = distance * 0.001
+        // 使用固定的平移速度，避免距离影响
+        let panSpeed: Float = 0.005
         target += right * deltaX * panSpeed + up * (-deltaY) * panSpeed
         updateCameraTransform()
     }
