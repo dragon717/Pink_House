@@ -43,6 +43,7 @@ extension View {
 // MARK: - iOS 18+ 现代 TabView
 @available(iOS 18.0, *)
 struct ModernTabView: View {
+    @Binding var selectedTab: Int
     @Binding var homeTabSelection: HomeTab
     @Binding var smallWorldDestination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
@@ -50,9 +51,6 @@ struct ModernTabView: View {
     @StateObject private var mediaStateManager = MediaStateManager.shared
     
     @State private var searchText = ""
-    // 修复：添加 selectedTab 状态来跟踪当前选中的 Tab，用于 SmallWorldMenuOverlay
-    // 默认选中 Tab 1 (小世界)，与 smallWorldDestination 初始值 .menu 保持一致
-    @State private var selectedTab: Int = 1
     
     // MARK: - 动态 Tab 标题和图标
     private var smallWorldTabTitle: String {
@@ -97,6 +95,7 @@ struct ModernTabView: View {
             
             Tab(smallWorldTabTitle, systemImage: smallWorldTabIcon, value: 1) {
                 SmallWorldTabContent(
+                    selectedTab: $selectedTab,
                     homeTab: $homeTabSelection,
                     destination: $smallWorldDestination,
                     isPlayingOpeningAnimation: $isPlayingOpeningAnimation
@@ -152,6 +151,7 @@ struct WardrobeTabContent: View {
 // MARK: - 小世界 Tab 内容
 @available(iOS 18.0, *)
 struct SmallWorldTabContent: View {
+    @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
@@ -159,7 +159,7 @@ struct SmallWorldTabContent: View {
     var body: some View {
         NavigationStack {
             SmallWorldContainerView(
-                selectedTab: .constant(1),
+                selectedTab: $selectedTab,
                 homeTab: $homeTab,
                 destination: $destination,
                 isPlayingOpeningAnimation: $isPlayingOpeningAnimation
@@ -323,6 +323,7 @@ struct MainTabView: View {
         Group {
             if #available(iOS 18.0, *) {
                 ModernTabView(
+                    selectedTab: $selectedTab,
                     homeTabSelection: $homeTabSelection,
                     smallWorldDestination: $smallWorldDestination,
                     isPlayingOpeningAnimation: $isPlayingOpeningAnimation
