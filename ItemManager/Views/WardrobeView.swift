@@ -671,33 +671,47 @@ struct WardrobeView: View {
     
     private func deleteSelectedItems() {
         let itemsToDelete = clothings.filter { selectedItemIDs.contains($0.id) }
-        
+
         // Use autoreleasepool to optimize memory usage during batch operations
         autoreleasepool {
             for item in itemsToDelete {
                 item.isDeleted = true
                 item.deletedAt = Date()
+                item.lastModified = Date()
             }
         }
-        
+
         // Force save immediately to persist changes before any view switching
         do {
             try modelContext.save()
             print("WardrobeView: Successfully saved deletion of \(itemsToDelete.count) items.")
+
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            for item in itemsToDelete {
+                DeleteTracker.shared.recordDeletedClothing(id: item.id)
+            }
         } catch {
             print("WardrobeView: Failed to save deletion: \(error)")
         }
-        
+
         withAnimation {
             isSelectionMode = false
             selectedItemIDs.removeAll()
         }
     }
-    
+
     private func deleteItem(_ item: Clothing) {
         item.isDeleted = true
         item.deletedAt = Date()
-        try? modelContext.save()
+        item.lastModified = Date()
+        do {
+            try modelContext.save()
+
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            DeleteTracker.shared.recordDeletedClothing(id: item.id)
+        } catch {
+            print("WardrobeView: Failed to save deletion: \(error)")
+        }
         itemToDelete = nil
     }
     
@@ -885,17 +899,20 @@ struct WardrobeStatsView: View {
         clothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
     }
     
-    // 获取默认手帐，如果没有则创建
+    // 获取默认手帐，如果没有则创建（只考虑未删除的手帐）
     var defaultBook: BookGroup {
-        if let existingDefault = books.first(where: { $0.title == "默认手帐" }) {
+        // 只考虑未删除的手帐
+        let activeBooks = books.filter { !$0.isDeleted }
+        if let existingDefault = activeBooks.first(where: { $0.title == "默认手帐" }) {
             return existingDefault
-        } else if let firstBook = books.first {
+        } else if let firstBook = activeBooks.first {
             return firstBook
         } else {
             // 创建默认手帐
             let newBook = BookGroup(title: "默认手帐")
             modelContext.insert(newBook)
             try? modelContext.save()
+            print("WardrobeView: Created new default book")
             return newBook
         }
     }

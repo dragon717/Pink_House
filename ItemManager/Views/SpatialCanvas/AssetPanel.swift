@@ -1143,10 +1143,13 @@ struct Model3DAssetCard: View {
         model.isDeleted = true
         model.deletedAt = Date()
         model.updatedAt = Date()
-        
+
         do {
             try modelContext.save()
             print("[Model3D] 模型已移至回收站: \(model.name) (ID: \(model.id))")
+
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            DeleteTracker.shared.recordDeletedModel3D(id: model.id)
         } catch {
             print("[Model3D] 软删除失败: \(error)")
         }

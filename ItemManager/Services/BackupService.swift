@@ -191,9 +191,7 @@ class BackupService {
             var clothingDescriptor = FetchDescriptor<Clothing>()
             clothingDescriptor.relationshipKeyPathsForPrefetching = [\Clothing.brand, \Clothing.tags, \Clothing.accessoryItems]
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
-                // Skip deleted items during backup
-                if c.isDeleted { return nil }
-                
+                // 备份所有数据，包括已删除的，以支持回收站同步和跨设备恢复
                 // No need to track cutoutIDToClothingID here anymore since we use direct ID on CutoutItem
                 // for cutout in c.cutouts {
                 //    cutoutIDToClothingID[cutout.id] = c.id
@@ -335,7 +333,9 @@ class BackupService {
                     backgroundImagePath: safeBackgroundImagePath,
                     bookID: o.book?.id,
                     items: items,
-                    lastModified: o.lastModified
+                    lastModified: o.lastModified,
+                    isDeleted: o.isDeleted,
+                    deletedAt: o.deletedAt
                 )
             }
             
@@ -1160,16 +1160,17 @@ class BackupService {
             
             clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
             
-            // CRITICAL: If local item was deleted, FORCE it to remain deleted.
-            if isLocalDeleted {
+            // 恢复删除状态：优先使用备份的删除状态
+            clothingBack.isDeleted = dto.isDeleted ?? false
+            clothingBack.deletedAt = dto.deletedAt
+
+            // 如果本地被删除但备份未删除，保持本地删除状态（避免已删除数据复活）
+            if isLocalDeleted && !(dto.isDeleted ?? false) {
                 clothingBack.isDeleted = true
                 if clothingBack.deletedAt == nil {
                     clothingBack.deletedAt = Date()
                 }
-                print("### Restore: FORCE DELETED applied to '\(clothingBack.name)'")
-            } else {
-                clothingBack.isDeleted = false
-                clothingBack.deletedAt = nil
+                print("### Restore: FORCE DELETED applied to '\(clothingBack.name)' (local deleted but backup not deleted)")
             }
             
             clothingBack.createdAt = dto.createdAt
@@ -1266,7 +1267,7 @@ class BackupService {
             if let lastModified = dto.lastModified {
                 cutout.lastModified = lastModified
             }
-            
+
             // 修复：确保 CutoutItem 的图片有对应的 StoredImage 记录
             // 这很重要，因为 CutoutItem 图片是通过 ImageManager.saveImage 创建的
             // 恢复时需要确保 StoredImage 记录存在，否则图片可能被误删
@@ -1411,6 +1412,10 @@ class BackupService {
                 if let lastModified = dto.lastModified {
                     outfit.lastModified = lastModified
                 }
+                
+                // 恢复删除状态
+                outfit.isDeleted = dto.isDeleted
+                outfit.deletedAt = dto.deletedAt
                 
                 print("### Restore: Processing Outfit \(dto.note) (\(dto.id)) with \(dto.items.count) items...")
                 
@@ -1617,9 +1622,9 @@ class BackupService {
                     model3DMap[dto.id] = model3D
                 }
                 
-                // Ensure local deleted state is preserved
-                model3D.isDeleted = false
-                model3D.deletedAt = nil
+                // 恢复删除状态
+                model3D.isDeleted = dto.isDeleted
+                model3D.deletedAt = dto.deletedAt
                 
                 // 恢复 lastModified
                 if let lastModified = dto.lastModified {
@@ -1678,9 +1683,9 @@ class BackupService {
                     localBookGroupMap[dto.id] = bookGroup
                 }
                 
-                // Ensure local deleted state is preserved
-                bookGroup.isDeleted = false
-                bookGroup.deletedAt = nil
+                // 恢复删除状态
+                bookGroup.isDeleted = dto.isDeleted
+                bookGroup.deletedAt = dto.deletedAt
                 
                 // 恢复 lastModified
                 if let lastModified = dto.lastModified {
@@ -1746,9 +1751,9 @@ class BackupService {
                     spaceBookGroupMap[dto.id] = spaceBookGroup
                 }
                 
-                // Ensure local deleted state is preserved
-                spaceBookGroup.isDeleted = false
-                spaceBookGroup.deletedAt = nil
+                // 恢复删除状态
+                spaceBookGroup.isDeleted = dto.isDeleted
+                spaceBookGroup.deletedAt = dto.deletedAt
                 
                 // 恢复 lastModified
                 if let lastModified = dto.lastModified {
@@ -1834,9 +1839,9 @@ class BackupService {
                         spaceOutfitMap[dto.id] = spaceOutfit
                     }
                     
-                    // Ensure local deleted state is preserved
-                    spaceOutfit.isDeleted = false
-                    spaceOutfit.deletedAt = nil
+                    // 恢复删除状态
+                    spaceOutfit.isDeleted = dto.isDeleted
+                    spaceOutfit.deletedAt = dto.deletedAt
                     
                     // 恢复 lastModified
                     if let lastModified = dto.lastModified {

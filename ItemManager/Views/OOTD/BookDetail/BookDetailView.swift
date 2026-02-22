@@ -14,15 +14,23 @@ struct BookDetailView: View {
     var showLeadingToolbar: Bool = true
     var onPageTap: ((Outfit) -> Void)? = nil
 
-    // 使用 @Query 获取书页数据，这样删除后会自动刷新
-    @Query(filter: #Predicate<Outfit> { $0.isDeleted == false }, sort: \Outfit.sortIndex) private var allPages: [Outfit]
+    // 使用 @State 存储书页数据，确保每次进入视图都重新获取
+    @State private var pages: [Outfit] = []
 
     var sortedPages: [Outfit] {
-        allPages.filter { $0.book?.id == book.id }.sorted {
+        pages.filter { $0.book?.id == book.id }.sorted {
             if $0.sortIndex == $1.sortIndex {
                 return $0.createdAt < $1.createdAt
             }
             return $0.sortIndex < $1.sortIndex
+        }
+    }
+
+    var deleteConfirmationMessage: String {
+        if let page = pageToDelete {
+            return "确定要删除书页「\(page.note)」吗？删除后可在回收站中恢复。"
+        } else {
+            return "确定要删除此书页吗？删除后可在回收站中恢复。"
         }
     }
 
@@ -59,6 +67,10 @@ struct BookDetailView: View {
     @State var isBatchProcessing = false
     @State var batchProcessingProgress = 0
     @State var batchTotalCount = 0
+    
+    // 删除确认对话框
+    @State var showingDeleteConfirmation = false
+    @State var pageToDelete: Outfit?
 
     @AppStorage("bookDetailGridMode") var gridModeValue = 2
 
@@ -117,6 +129,16 @@ struct BookDetailView: View {
             showingMoveSheet: $showingMoveSheet,
             movePageSheet: { movePageSheet }
         )
+        .alert("确认删除", isPresented: $showingDeleteConfirmation, actions: {
+            Button("取消", role: .cancel) {
+                pageToDelete = nil
+            }
+            Button("删除", role: .destructive) {
+                confirmDeletePage()
+            }
+        }, message: {
+            Text(deleteConfirmationMessage)
+        })
         .fullScreenCover(isPresented: $showingShareCard) {
             if let page = pageToShare {
                 ShareCardSheet(
@@ -165,6 +187,50 @@ struct BookDetailView: View {
                     .cornerRadius(16)
                 }
             }
+        }
+        .onAppear {
+            // 每次进入视图时重新获取书页数据
+            loadPages()
+            // 打印当前手帐的书页状态
+            printBookPagesStatus()
+        }
+    }
+
+    // 打印当前手帐的书页状态
+    func printBookPagesStatus() {
+        print("=== 手帐『\(book.title)』书页状态 ===")
+        print("手帐ID: \(book.id)")
+        print("书页数量: \(sortedPages.count)")
+        for page in sortedPages {
+            print("  - 书页: \(page.note), isDeleted: \(page.isDeleted), deletedAt: \(String(describing: page.deletedAt)), book: \(String(describing: page.book?.title ?? "nil"))")
+        }
+        print("========================")
+    }
+
+    private func loadPages() {
+        // 先查询所有书页（包括已删除的），用于调试
+        let allDescriptor = FetchDescriptor<Outfit>(sortBy: [SortDescriptor(\Outfit.sortIndex)])
+        do {
+            let allPages = try modelContext.fetch(allDescriptor)
+            print("### LOAD: Total pages in database: \(allPages.count)")
+            for p in allPages {
+                print("### LOAD: Page '\(p.note)' - isDeleted:\(p.isDeleted), deletedAt:\(String(describing: p.deletedAt)), book:\(p.book?.title ?? "nil")")
+            }
+        } catch {
+            print("### LOAD: Failed to fetch all pages: \(error)")
+        }
+
+        // 正常查询只加载未删除的书页
+        let descriptor = FetchDescriptor<Outfit>(
+            predicate: #Predicate { $0.isDeleted == false },
+            sortBy: [SortDescriptor(\Outfit.sortIndex)]
+        )
+        do {
+            pages = try modelContext.fetch(descriptor)
+            print("BookDetailView: Loaded \(pages.count) pages")
+        } catch {
+            print("BookDetailView: Failed to load pages: \(error)")
+            pages = []
         }
     }
     
@@ -271,22 +337,28 @@ struct BookDetailView: View {
     }
 
     func movePage(from source: Outfit, to destination: Outfit) {
-        var pages = sortedPages
-        guard let sourceIndex = pages.firstIndex(where: { $0.id == source.id }),
-              let destIndex = pages.firstIndex(where: { $0.id == destination.id }) else { return }
+        var localPages = sortedPages
+        guard let sourceIndex = localPages.firstIndex(where: { $0.id == source.id }),
+              let destIndex = localPages.firstIndex(where: { $0.id == destination.id }) else { return }
 
         if sourceIndex == destIndex { return }
 
         withAnimation {
-            let item = pages.remove(at: sourceIndex)
-            pages.insert(item, at: destIndex)
+            let item = localPages.remove(at: sourceIndex)
+            localPages.insert(item, at: destIndex)
 
-            for (index, page) in pages.enumerated() {
+            for (index, page) in localPages.enumerated() {
                 page.sortIndex = index
             }
         }
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            // 重新加载数据以更新排序
+            loadPages()
+        } catch {
+            print("BookDetailView: Failed to save move: \(error)")
+        }
     }
 
     func addNewPage(canvasType: String = "mannequin", customImage: UIImage? = nil) {
@@ -301,45 +373,48 @@ struct BookDetailView: View {
         }
 
         modelContext.insert(newPage)
+        loadPages()
     }
 
     func insertPage(after page: Outfit) {
         let newPage = Outfit(note: "新书页", book: book)
 
-        let pages = sortedPages
-        if let index = pages.firstIndex(of: page) {
+        let localPages = sortedPages
+        if let index = localPages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex + 1
-            for p in pages where p.sortIndex > page.sortIndex {
+            for p in localPages where p.sortIndex > page.sortIndex {
                 p.sortIndex += 1
             }
         } else {
-            newPage.sortIndex = (pages.last?.sortIndex ?? 0) + 1
+            newPage.sortIndex = (localPages.last?.sortIndex ?? 0) + 1
         }
 
         modelContext.insert(newPage)
+        loadPages()
     }
 
     func insertPage(before page: Outfit) {
         let newPage = Outfit(note: "新书页", book: book)
 
-        let pages = sortedPages
-        if let index = pages.firstIndex(of: page) {
+        let localPages = sortedPages
+        if let index = localPages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex
-            for p in pages where p.sortIndex >= page.sortIndex {
+            for p in localPages where p.sortIndex >= page.sortIndex {
                 p.sortIndex += 1
             }
         }
 
         modelContext.insert(newPage)
+        loadPages()
     }
 
     func duplicatePage(_ page: Outfit) {
         let newPage = Outfit(note: page.note + " 副本", canvasType: page.canvasType, backgroundImagePath: page.backgroundImagePath, book: book)
 
-        let pages = sortedPages
-        if let index = pages.firstIndex(of: page) {
+        let localPages = sortedPages
+        if let index = localPages.firstIndex(of: page) {
             newPage.sortIndex = page.sortIndex + 1
-            for p in pages where p.sortIndex > page.sortIndex {
+            for p in localPages where p.sortIndex > page.sortIndex {
                 p.sortIndex += 1
             }
         }
@@ -359,15 +434,39 @@ struct BookDetailView: View {
            let newPath = ImageManager.shared.saveImage(image, context: modelContext) {
             newPage.snapshotPath = newPath
         }
+        loadPages()
     }
 
     func deletePage(_ page: Outfit) {
         withAnimation {
+            print("### DELETE: Setting isDeleted=true for page '\(page.note)' (ID: \(page.id))")
+
+            // 设置删除标记
             page.isDeleted = true
             page.deletedAt = Date()
-            try? modelContext.save()
-            // 强制刷新视图
-            refreshTrigger.toggle()
+            page.lastModified = Date()
+
+            print("### DELETE: Before save - isDeleted=\(page.isDeleted)")
+
+            do {
+                try modelContext.save()
+                print("### DELETE: Saved successfully")
+            } catch {
+                print("### DELETE: Failed to save: \(error)")
+            }
+
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            DeleteTracker.shared.recordDeletedOutfit(id: page.id)
+
+            // 删除成功后重新加载数据
+            loadPages()
+        }
+    }
+
+    func confirmDeletePage() {
+        if let page = pageToDelete {
+            deletePage(page)
+            pageToDelete = nil
         }
     }
 

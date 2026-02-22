@@ -25,7 +25,7 @@ struct BookShelfView: View {
     @State var newBookName = ""
     
     // Migration
-    @Query(filter: #Predicate<Outfit> { $0.deletedAt == nil }) private var allOutfits: [Outfit]
+    @Query(filter: #Predicate<Outfit> { $0.deletedAt == nil && $0.isDeleted == false }) private var allOutfits: [Outfit]
     
     @State var showingBatchConfirmation = false
     @State var showingRepairConfirmation = false
@@ -200,11 +200,23 @@ struct BookShelfView: View {
     private func deleteBook(_ book: BookGroup) {
         book.isDeleted = true
         book.deletedAt = Date()
+        book.lastModified = Date()
         for page in book.pages ?? [] {
             page.isDeleted = true
             page.deletedAt = Date()
+            page.lastModified = Date()
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            DeleteTracker.shared.recordDeletedBookGroup(id: book.id)
+            for page in book.pages ?? [] {
+                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
+            }
+        } catch {
+            print("BookShelfView: Failed to save deletion: \(error)")
+        }
     }
     
     private func updateCover(for book: BookGroup, with item: PhotosPickerItem) {
@@ -224,8 +236,9 @@ struct BookShelfView: View {
     }
     
     private func performMigration() {
-        let orphanOutfits = allOutfits.filter { $0.book == nil }
-        
+        // 只迁移未删除的孤儿书页，避免已删除的书页被复活
+        let orphanOutfits = allOutfits.filter { $0.book == nil && !$0.isDeleted }
+
         if !orphanOutfits.isEmpty {
             let defaultBook: BookGroup
             if let existingDefault = books.first(where: { $0.title == "默认手帐" }) {
@@ -236,12 +249,33 @@ struct BookShelfView: View {
                 defaultBook = BookGroup(title: "默认手帐")
                 modelContext.insert(defaultBook)
             }
-            
+
             for outfit in orphanOutfits {
                 outfit.book = defaultBook
             }
-            
-            try? modelContext.save()
+
+            do {
+                try modelContext.save()
+                print("BookShelfView: Migrated \(orphanOutfits.count) orphan outfits to default book")
+            } catch {
+                print("BookShelfView: Failed to save migration: \(error)")
+            }
+        }
+
+        // 打印默认手帐的书页状态
+        printDefaultBookPagesStatus()
+    }
+
+    // 打印默认手帐的书页状态
+    func printDefaultBookPagesStatus() {
+        if let defaultBook = books.first(where: { $0.title == "默认手帐" }) {
+            print("=== 默认手帐书页状态 ===")
+            print("手帐ID: \(defaultBook.id)")
+            print("书页数量: \(defaultBook.pages?.count ?? 0)")
+            for page in defaultBook.pages ?? [] {
+                print("  - 书页: \(page.note), isDeleted: \(page.isDeleted), deletedAt: \(String(describing: page.deletedAt))")
+            }
+            print("========================")
         }
     }
     

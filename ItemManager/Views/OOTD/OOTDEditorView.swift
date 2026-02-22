@@ -206,7 +206,15 @@ struct OOTDEditorView: View {
             Button("删除", role: .destructive) {
                 outfit.isDeleted = true
                 outfit.deletedAt = Date()
-                try? modelContext.save()
+                outfit.lastModified = Date()
+                do {
+                    try modelContext.save()
+
+                    // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+                    DeleteTracker.shared.recordDeletedOutfit(id: outfit.id)
+                } catch {
+                    print("OOTDEditorView: Failed to save deletion: \(error)")
+                }
                 dismiss()
             }
         } message: {

@@ -101,12 +101,13 @@ extension BookDetailView {
         }
 
         Button(role: .destructive) {
-            deletePage(page)
+            pageToDelete = page
+            showingDeleteConfirmation = true
         } label: {
             Label("删除", systemImage: "trash")
         }
     }
-    
+
     private func sharePage(_ page: Outfit) {
         // 打开分享卡片动画界面
         pageToShare = page

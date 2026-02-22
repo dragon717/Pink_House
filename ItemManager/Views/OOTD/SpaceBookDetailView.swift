@@ -339,7 +339,15 @@ struct SpaceBookDetailView: View {
         withAnimation {
             page.isDeleted = true
             page.deletedAt = Date()
-            try? modelContext.save()
+            page.lastModified = Date()
+            do {
+                try modelContext.save()
+
+                // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
+            } catch {
+                print("SpaceBookDetailView: Failed to save deletion: \(error)")
+            }
             // 强制刷新视图
             refreshTrigger.toggle()
         }

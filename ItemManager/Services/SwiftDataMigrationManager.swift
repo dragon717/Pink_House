@@ -628,6 +628,7 @@ class SwiftDataMigrationManager: ObservableObject {
         new.deletedAt = source.deletedAt
         new.createdAt = source.createdAt
         new.updatedAt = source.updatedAt
+        new.lastModified = source.lastModified
         new.model3DPath = source.model3DPath
         new.model3DType = source.model3DType
         new.model3DThumbnailPath = source.model3DThumbnailPath
@@ -671,6 +672,7 @@ class SwiftDataMigrationManager: ObservableObject {
         )
         new.id = source.id
         new.timestamp = source.timestamp
+        new.lastModified = source.lastModified
         return new
     }
     
@@ -687,9 +689,10 @@ class SwiftDataMigrationManager: ObservableObject {
         new.sortIndex = source.sortIndex
         new.isDeleted = source.isDeleted
         new.deletedAt = source.deletedAt
+        new.lastModified = source.lastModified
         return new
     }
-    
+
     private func createOutfitItemCopy(from source: OutfitItem) -> OutfitItem {
         let new = OutfitItem(
             cutout: nil, // 关系需要单独处理
@@ -709,18 +712,20 @@ class SwiftDataMigrationManager: ObservableObject {
         new.createdAt = source.createdAt
         new.isDeleted = source.isDeleted
         new.deletedAt = source.deletedAt
+        new.lastModified = source.lastModified
         return new
     }
-    
+
     private func createSpaceBookGroupCopy(from source: SpaceBookGroup) -> SpaceBookGroup {
         let new = SpaceBookGroup(title: source.title, coverImage: source.coverImage, sortIndex: source.sortIndex)
         new.id = source.id
         new.createdAt = source.createdAt
         new.isDeleted = source.isDeleted
         new.deletedAt = source.deletedAt
+        new.lastModified = source.lastModified
         return new
     }
-    
+
     private func createSpaceOutfitCopy(from source: SpaceOutfit) -> SpaceOutfit {
         let new = SpaceOutfit(
             note: source.note,
@@ -737,6 +742,7 @@ class SwiftDataMigrationManager: ObservableObject {
         new.lightingIntensity = source.lightingIntensity
         new.isDeleted = source.isDeleted
         new.deletedAt = source.deletedAt
+        new.lastModified = source.lastModified
         return new
     }
     
@@ -771,6 +777,7 @@ class SwiftDataMigrationManager: ObservableObject {
         new.deletedAt = source.deletedAt
         new.createdAt = source.createdAt
         new.updatedAt = source.updatedAt
+        new.lastModified = source.lastModified
         new.cameraPositionX = source.cameraPositionX
         new.cameraPositionY = source.cameraPositionY
         new.cameraPositionZ = source.cameraPositionZ

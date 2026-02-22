@@ -218,8 +218,9 @@ struct OOTDSidebarView: View {
         // Soft delete book
         book.isDeleted = true
         book.deletedAt = Date()
-        
-        // Also soft delete all pages? 
+        book.lastModified = Date()
+
+        // Also soft delete all pages?
         // Logic: If we delete a book, pages should "disappear" from active view.
         // We can either mark them deleted, OR rely on the fact that if book is deleted, we don't fetch it.
         // But the requirement says "recover individually or as group".
@@ -227,10 +228,21 @@ struct OOTDSidebarView: View {
         for page in book.pages ?? [] {
             page.isDeleted = true
             page.deletedAt = Date()
+            page.lastModified = Date()
         }
-        
-        try? modelContext.save()
-        
+
+        do {
+            try modelContext.save()
+
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            DeleteTracker.shared.recordDeletedBookGroup(id: book.id)
+            for page in book.pages ?? [] {
+                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
+            }
+        } catch {
+            print("OOTDSidebarView: Failed to save deletion: \(error)")
+        }
+
         if currentBook?.id == book.id {
             currentBook = nil
             currentOutfit = nil

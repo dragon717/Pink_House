@@ -16,7 +16,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1005"
             endingLineNumber = "1005"
-            landmarkName = "dropEntered(info:)"
+            landmarkName = "dropUpdated(info:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

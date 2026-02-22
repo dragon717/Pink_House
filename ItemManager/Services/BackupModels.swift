@@ -189,6 +189,8 @@ struct OOTDSnapshotDTO: Codable {
     let bookID: UUID? // Reference to parent BookGroup (v1.5)
     let items: [OOTDSnapshotItemDTO]
     let lastModified: Date?
+    let isDeleted: Bool
+    let deletedAt: Date?
 }
 
 struct OOTDSnapshotItemDTO: Codable {

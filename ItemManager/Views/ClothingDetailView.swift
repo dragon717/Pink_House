@@ -190,6 +190,11 @@ struct ClothingDetailView: View {
                 // Soft delete
                 clothing.isDeleted = true
                 clothing.deletedAt = Date()
+                clothing.lastModified = Date()
+
+                // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+                DeleteTracker.shared.recordDeletedClothing(id: clothing.id)
+
                 Task { await SharedPersistence.shared.syncWidgetData() }
                 dismiss()
             }
