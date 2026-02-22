@@ -837,7 +837,7 @@ struct WardrobeView: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(showStats ? "隐藏统计" : "显示统计")
+                        Text(showStats ? "隐藏" : "显示")
                         Image(systemName: showStats ? "chevron.up" : "chevron.down")
                     }
                     .font(.caption)
@@ -866,6 +866,9 @@ struct WardrobeStatsView: View {
     @AppStorage("showStatsDressValue") private var showDressValue = true
     @AppStorage("showStatsTotalValue") private var showTotalValue = true
     
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
+    
     var styleCount: Int {
         clothings.count
     }
@@ -880,6 +883,26 @@ struct WardrobeStatsView: View {
     
     var totalValue: Decimal {
         clothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
+    }
+    
+    // 获取默认手帐，如果没有则创建
+    var defaultBook: BookGroup {
+        if let existingDefault = books.first(where: { $0.title == "默认手帐" }) {
+            return existingDefault
+        } else if let firstBook = books.first {
+            return firstBook
+        } else {
+            // 创建默认手帐
+            let newBook = BookGroup(title: "默认手帐")
+            modelContext.insert(newBook)
+            try? modelContext.save()
+            return newBook
+        }
+    }
+    
+    // OOTD 跳转目标 - 从衣橱进入的特殊版本
+    var defaultBookDestination: some View {
+        BookDetailViewFromWardrobe(book: defaultBook)
     }
     
     var body: some View {
@@ -900,20 +923,33 @@ struct WardrobeStatsView: View {
                     statItem(title: "总价值", value: "¥\(NSDecimalNumber(decimal: totalValue).stringValue)", isVisible: $showTotalValue)
                 }
                 
-                // Bottom Action
-                NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
-                    HStack {
-                        Image(systemName: "chart.bar.fill")
-                        Text("查看详细统计")
-                        Spacer()
-                        Image(systemName: "heart.fill")
-                            .font(.caption)
-                        Text("少女专属")
+                // Bottom Actions
+                HStack(spacing: 12) {
+                    // OOTD Button - 跳转到默认手帐
+                    NavigationLink(destination: defaultBookDestination) {
+                        HStack {
+                            Image(systemName: "tshirt.fill")
+                            Text("OOTD")
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.pink.opacity(0.1))
+                        .foregroundStyle(Color.pink)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .padding()
-                    .background(Color.brown.opacity(0.1))
-                    .foregroundStyle(Color.brown)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    
+                    // Statistics Button
+                    NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
+                        HStack {
+                            Image(systemName: "chart.bar.fill")
+                            Text("查看详细统计")
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.brown.opacity(0.1))
+                        .foregroundStyle(Color.brown)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
                 }
             }
         }
@@ -1026,21 +1062,57 @@ struct DropViewDelegate: DropDelegate {
 struct ScrollDropDelegate: DropDelegate {
     let onEnter: () -> Void
     let onExit: () -> Void
-    
+
     func dropEntered(info: DropInfo) {
         onEnter()
     }
-    
+
     func dropExited(info: DropInfo) {
         onExit()
     }
-    
+
     func performDrop(info: DropInfo) -> Bool {
         onExit()
         return false
     }
-    
+
     func dropUpdated(info: DropInfo) -> DropProposal? {
         return DropProposal(operation: .move)
+    }
+}
+
+// MARK: - 从衣橱进入的默认手帐视图
+
+struct BookDetailViewFromWardrobe: View {
+    let book: BookGroup
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedOutfit: Outfit? = nil
+
+    var body: some View {
+        NavigationStack {
+            BookDetailView(
+                book: book,
+                navigationPath: .constant(NavigationPath()),
+                isSidebarVisible: .constant(false),
+                onBack: {
+                    dismiss()
+                },
+                showLeadingToolbar: false,
+                onPageTap: { outfit in
+                    selectedOutfit = outfit
+                }
+            )
+            // 从衣橱进入时的特殊配置
+            .background(LiquidBackground().ignoresSafeArea())
+            .navigationTitle(book.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+        .sheet(item: $selectedOutfit) { outfit in
+            NavigationStack {
+                PageFlipEditorContainer(initialOutfit: outfit)
+            }
+        }
     }
 }

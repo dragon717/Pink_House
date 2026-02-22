@@ -87,7 +87,7 @@ extension BookDetailView {
             } label: {
                 Label("修改封面", systemImage: "photo")
             }
-            
+
             Button {
                 showingRenameBookAlert = true
             } label: {

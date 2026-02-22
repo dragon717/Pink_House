@@ -11,6 +11,8 @@ struct BookDetailView: View {
 
     @Binding var isSidebarVisible: Bool
     var onBack: (() -> Void)?
+    var showLeadingToolbar: Bool = true
+    var onPageTap: ((Outfit) -> Void)? = nil
 
     // 使用 @Query 获取书页数据，这样删除后会自动刷新
     @Query(filter: #Predicate<Outfit> { $0.isDeleted == false }, sort: \Outfit.sortIndex) private var allPages: [Outfit]
@@ -72,14 +74,20 @@ struct BookDetailView: View {
     @State private var refreshTrigger = false
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: gridColumns, spacing: 16) {
-                ForEach(sortedPages) { page in
-                    pageCell(for: page)
+        Group {
+            if sortedPages.isEmpty {
+                emptyStateView
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: gridColumns, spacing: 16) {
+                        ForEach(sortedPages) { page in
+                            pageCell(for: page)
+                        }
+                    }
+                    .padding()
+                    .animation(.default, value: sortedPages)
                 }
             }
-            .padding()
-            .animation(.default, value: sortedPages)
         }
         .id(refreshTrigger)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -87,7 +95,9 @@ struct BookDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
-            leadingToolbarContent
+            if showLeadingToolbar {
+                leadingToolbarContent
+            }
             trailingToolbarContent
         }
         .bookDetailSheets(
@@ -375,5 +385,28 @@ struct BookDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Empty State View
+
+    private var emptyStateView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "book.closed")
+                .font(.system(size: 60))
+                .foregroundStyle(.secondary.opacity(0.5))
+
+            Text("还没有穿搭书页")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+
+            Text("点击右上角的+号新建新的穿搭书页")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

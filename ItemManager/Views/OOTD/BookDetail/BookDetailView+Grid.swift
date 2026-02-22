@@ -36,11 +36,26 @@ extension BookDetailView {
     }
 
     private func normalPageCell(for page: Outfit) -> some View {
-        NavigationLink(value: page) {
-            PageThumbnailView(page: page, gridMode: gridMode)
-        }
-        .contextMenu {
-            pageContextMenu(for: page)
+        Group {
+            if let onPageTap = onPageTap {
+                // 使用自定义点击回调（从衣橱进入时使用）
+                Button {
+                    onPageTap(page)
+                } label: {
+                    PageThumbnailView(page: page, gridMode: gridMode)
+                }
+                .contextMenu {
+                    pageContextMenu(for: page)
+                }
+            } else {
+                // 使用 NavigationLink（正常导航时使用）
+                NavigationLink(value: page) {
+                    PageThumbnailView(page: page, gridMode: gridMode)
+                }
+                .contextMenu {
+                    pageContextMenu(for: page)
+                }
+            }
         }
     }
 
