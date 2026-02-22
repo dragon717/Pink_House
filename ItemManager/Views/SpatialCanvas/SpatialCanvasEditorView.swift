@@ -786,6 +786,9 @@ struct SpatialCanvasEditorView: View {
         
         hasUnsavedChanges = true
         
+        // 清理源图片缓存，只保留模型文件
+        cleanupSourceImages(for: modelID)
+        
         print("[ObjectCapture] 创建3D模型记录: \(modelID)")
         print("[ObjectCapture] =====================")
     }
@@ -895,6 +898,7 @@ struct SpatialCanvasEditorView: View {
     }
     
     /// 保存源图片，返回相对路径数组
+    /// 注意：源图片仅用于模型生成，生成后会被清理以节省磁盘空间
     private func saveSourceImages(_ images: [UIImage], modelID: UUID) -> [String] {
         let fileManager = FileManager.default
         guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
@@ -918,6 +922,25 @@ struct SpatialCanvasEditorView: View {
         return paths
     }
     
+    /// 清理模型的源图片缓存（模型生成完成后调用）
+    private func cleanupSourceImages(for modelID: UUID) {
+        let fileManager = FileManager.default
+        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+        
+        let sourceDir = documentsPath.appendingPathComponent("Models/\(modelID.uuidString)/source")
+        
+        do {
+            if fileManager.fileExists(atPath: sourceDir.path) {
+                try fileManager.removeItem(at: sourceDir)
+                print("[ObjectCapture] 已清理源图片缓存: \(sourceDir.path)")
+            }
+        } catch {
+            print("[ObjectCapture] 清理源图片缓存失败: \(error)")
+        }
+    }
+    
     // MARK: - Transform
     
     private func deleteSelectedObject() {
@@ -934,13 +957,6 @@ struct SpatialCanvasEditorView: View {
     // MARK: - Save
     
     private func saveScene(completion: (() -> Void)? = nil) {
-        guard !sceneObjects.isEmpty else {
-            print("[Scene] 场景为空，无需保存")
-            hasUnsavedChanges = false
-            completion?()
-            return
-        }
-        
         print("[Scene] 开始保存场景，对象数: \(sceneObjects.count)")
         
         // 获取或创建 SpaceOutfit
@@ -975,6 +991,30 @@ struct SpatialCanvasEditorView: View {
             for obj in existingObjects {
                 modelContext.delete(obj)
             }
+        }
+        
+        // 如果场景为空，保存清空状态后返回
+        guard !sceneObjects.isEmpty else {
+            print("[Scene] 场景为空，保存清空状态")
+            
+            // 清空 outfit 的模型路径
+            outfit.setModelPath(nil)
+            
+            // 保存上下文
+            do {
+                try modelContext.save()
+                hasUnsavedChanges = false
+                showingSaveSuccess = true
+                print("[Scene] 场景清空保存成功，outfit.id: \(outfit.id)")
+                
+                // 调用保存回调
+                onSave?(outfit)
+                completion?()
+            } catch {
+                print("[Scene] 保存失败: \(error)")
+                completion?()
+            }
+            return
         }
         
         // 保存新的场景对象

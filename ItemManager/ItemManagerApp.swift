@@ -95,6 +95,9 @@ struct MainContentView: View {
                 // 0.5 Migrate 3D models from Clothing to Model3D
                 await Model3DMigrationService.shared.migrateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
                 
+                // 0.6 Validate Model3D references integrity
+                await Model3DValidationService.shared.validateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
+                
                 // 1. Minimum splash duration (aesthetic + buffer)
                 try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
                 

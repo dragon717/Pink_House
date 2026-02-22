@@ -890,22 +890,25 @@ struct Model3DAssetList: View {
                 }
             } else {
                 ForEach(filteredModels.prefix(20)) { model in
-                    Model3DAssetCard(model: model) {
-                        let resolvedPath = model.resolvedModelPath ?? ""
-                        let asset = SpatialAsset(
-                            type: .model,
-                            name: model.name,
-                            imagePath: model.thumbnailPath,
-                            thumbnail: loadThumbnail(for: model),
-                            metadata: [
-                                "modelPath": resolvedPath,
-                                "modelType": model.modelType ?? "multi",
-                                "typeDescription": model.modelTypeDescription ?? "3D",
-                                "model3DID": model.id.uuidString
-                            ]
-                        )
-                        onSelect(asset)
-                    }
+                    Model3DAssetCard(
+                        model: model,
+                        onAddToScene: {
+                            let resolvedPath = model.resolvedModelPath ?? ""
+                            let asset = SpatialAsset(
+                                type: .model,
+                                name: model.name,
+                                imagePath: model.thumbnailPath,
+                                thumbnail: loadThumbnail(for: model),
+                                metadata: [
+                                    "modelPath": resolvedPath,
+                                    "modelType": model.modelType ?? "multi",
+                                    "typeDescription": model.modelTypeDescription ?? "3D",
+                                    "model3DID": model.id.uuidString
+                                ]
+                            )
+                            onSelect(asset)
+                        }
+                    )
                 }
                 .onAppear {
                     print("[Model3DAssetList] 显示 \(filteredModels.count) 个 3D 模型")
@@ -933,7 +936,7 @@ struct Model3DAssetList: View {
 
 struct Model3DAssetCard: View {
     let model: Model3D
-    let onTap: () -> Void
+    let onAddToScene: () -> Void
     
     @Environment(\.modelContext) private var modelContext
     @State private var showingRenameAlert = false
@@ -959,56 +962,94 @@ struct Model3DAssetCard: View {
     }
     
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                if let image = thumbnailImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.purple.opacity(0.3))
-                        .frame(width: 60, height: 60)
-                        .overlay(
-                            Image(systemName: "cube.box")
-                                .foregroundStyle(.purple)
-                        )
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.name)
-                        .font(.subheadline)
-                        .lineLimit(1)
-                    
-                    HStack(spacing: 4) {
-                        Text(model.modelTypeDescription ?? "3D")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.purple.opacity(0.2))
+        HStack(spacing: 12) {
+            if let image = thumbnailImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 60, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.purple.opacity(0.3))
+                    .frame(width: 60, height: 60)
+                    .overlay(
+                        Image(systemName: "cube.box")
                             .foregroundStyle(.purple)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                        
-                        Text(model.types)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    )
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.name)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                
+                HStack(spacing: 4) {
+                    Text(model.modelTypeDescription ?? "3D")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.purple.opacity(0.2))
+                        .foregroundStyle(.purple)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                    
+                    Text(model.types)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            Menu {
+                Button {
+                    onAddToScene()
+                } label: {
+                    Label("添加到场景", systemImage: "plus.circle")
                 }
                 
-                Spacer()
+                Button {
+                    newName = model.name
+                    showingRenameAlert = true
+                } label: {
+                    Label("重命名", systemImage: "pencil")
+                }
                 
-                Image(systemName: "plus.circle.fill")
+                Button {
+                    showingThumbnailEditor = true
+                } label: {
+                    Label("设置缩略图", systemImage: "camera.viewfinder")
+                }
+                
+                Button {
+                    showingShareSheet = true
+                } label: {
+                    Label("导出模型分享", systemImage: "square.and.arrow.up")
+                }
+                
+                Button(role: .destructive) {
+                    checkUsageAndShowDeleteAlert()
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle.fill")
                     .foregroundStyle(.purple)
+                    .font(.title3)
             }
-            .padding()
-            .background(Color.white.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle())
         .contextMenu {
+            Button {
+                onAddToScene()
+            } label: {
+                Label("添加到场景", systemImage: "plus.circle")
+            }
+            
             Button {
                 newName = model.name
                 showingRenameAlert = true
@@ -1027,6 +1068,8 @@ struct Model3DAssetCard: View {
             } label: {
                 Label("导出模型分享", systemImage: "square.and.arrow.up")
             }
+            
+            Divider()
             
             Button(role: .destructive) {
                 checkUsageAndShowDeleteAlert()
@@ -1074,9 +1117,21 @@ struct Model3DAssetCard: View {
     }
     
     private func checkUsageAndShowDeleteAlert() {
+        // 检查活跃场景中的引用（不包括已删除的场景）
         let descriptor = FetchDescriptor<SceneObjectData>()
         let allObjects = (try? modelContext.fetch(descriptor)) ?? []
-        usageCount = allObjects.filter { $0.model3D?.id == model.id }.count
+        
+        // 获取所有未删除的 SpaceOutfit ID
+        let outfitDescriptor = FetchDescriptor<SpaceOutfit>(
+            predicate: #Predicate<SpaceOutfit> { $0.deletedAt == nil }
+        )
+        let activeOutfitIDs = Set((try? modelContext.fetch(outfitDescriptor))?.map { $0.id } ?? [])
+        
+        // 只统计活跃场景中的引用
+        usageCount = allObjects.filter { 
+            $0.model3D?.id == model.id && 
+            activeOutfitIDs.contains($0.spaceOutfitID ?? UUID())
+        }.count
         
         if usageCount > 0 {
             showingUsageAlert = true
@@ -1086,14 +1141,17 @@ struct Model3DAssetCard: View {
     }
     
     private func performDelete() {
-        let fileManager = FileManager.default
-        if let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let modelDir = documentsPath.appendingPathComponent("Models/\(model.id.uuidString)")
-            try? fileManager.removeItem(at: modelDir)
-        }
+        // 软删除：标记为已删除，而不是物理删除
+        model.isDeleted = true
+        model.deletedAt = Date()
+        model.updatedAt = Date()
         
-        modelContext.delete(model)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            print("[Model3D] 模型已移至回收站: \(model.name) (ID: \(model.id))")
+        } catch {
+            print("[Model3D] 软删除失败: \(error)")
+        }
     }
 }
 

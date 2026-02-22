@@ -30,6 +30,10 @@ struct RecycleBinView: View {
     @Query(filter: #Predicate<SpaceOutfit> { $0.deletedAt != nil }, sort: \SpaceOutfit.deletedAt, order: .reverse)
     private var allDeletedSpaceOutfits: [SpaceOutfit]
     
+    // Model3D Query
+    @Query(filter: #Predicate<Model3D> { $0.isDeleted == true }, sort: \Model3D.deletedAt, order: .reverse)
+    private var deletedModel3Ds: [Model3D]
+    
     // Filter out outfits that belong to deleted books (to avoid duplicates in the list)
     var isolatedDeletedOutfits: [Outfit] {
         allDeletedOutfits.filter { $0.book == nil || $0.book?.deletedAt == nil }
@@ -44,7 +48,7 @@ struct RecycleBinView: View {
     @State private var editMode: EditMode = .inactive
     
     // Alerts
-    @State private var itemToDelete: Any? // Can be Clothing, BookGroup, or Outfit
+    @State private var itemToDelete: Any? // Can be Clothing, BookGroup, Outfit, or Model3D
     @State private var showingDeleteAlert = false
     @State private var showingDeleteAllAlert = false
     @State private var showingRestoreAllAlert = false
@@ -64,6 +68,7 @@ struct RecycleBinView: View {
                 Text("衣橱").tag(0)
                 Text("手帐").tag(1)
                 Text("空间").tag(2)
+                Text("模型").tag(3)
             }
             .pickerStyle(.segmented)
             .padding()
@@ -72,8 +77,10 @@ struct RecycleBinView: View {
                 wardrobeList
             } else if selectedTab == 1 {
                 ootdList
-            } else {
+            } else if selectedTab == 2 {
                 spaceOOTDList
+            } else {
+                model3DList
             }
         }
         .environment(\.editMode, $editMode)
@@ -153,6 +160,8 @@ struct RecycleBinView: View {
                     permanentlyDeleteSpaceBook(spaceBook)
                 } else if let spaceOutfit = itemToDelete as? SpaceOutfit {
                     permanentlyDeleteSpaceOutfit(spaceOutfit)
+                } else if let model3D = itemToDelete as? Model3D {
+                    permanentlyDeleteModel3D(model3D)
                 }
                 itemToDelete = nil
             }
@@ -206,6 +215,8 @@ struct RecycleBinView: View {
                     restoreSpaceBook(spaceBook)
                 } else if let spaceOutfit = itemToDelete as? SpaceOutfit {
                     restoreSpaceOutfit(spaceOutfit)
+                } else if let model3D = itemToDelete as? Model3D {
+                    restoreModel3D(model3D)
                 }
                 itemToDelete = nil
             }
@@ -357,6 +368,34 @@ struct RecycleBinView: View {
         .scrollContentBackground(.hidden)
     }
     
+    // MARK: - Model3D View
+    
+    var model3DList: some View {
+        List(selection: $selectedItems) {
+            if deletedModel3Ds.isEmpty {
+                ContentUnavailableView(
+                    "回收站是空的",
+                    systemImage: "cube.box",
+                    description: Text("删除的3D模型会出现在这里")
+                )
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(deletedModel3Ds) { model in
+                    DeletedModel3DRow(model: model, isEditing: editMode == .active, onRestore: {
+                        itemToDelete = model
+                        showingRestoreAlert = true
+                    }, onDelete: {
+                        itemToDelete = model
+                        showingDeleteAlert = true
+                    })
+                    .listRowBackground(Color.clear)
+                    .tag(model.id)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+    }
+    
     // MARK: - Actions
     
     private func restoreClothing(_ clothing: Clothing) {
@@ -453,6 +492,30 @@ struct RecycleBinView: View {
         }
     }
     
+    private func restoreModel3D(_ model: Model3D) {
+        withAnimation {
+            model.isDeleted = false
+            model.deletedAt = nil
+            model.updatedAt = Date()
+        }
+    }
+    
+    private func permanentlyDeleteModel3D(_ model: Model3D) {
+        withAnimation {
+            // 删除模型文件和目录
+            let fileManager = FileManager.default
+            if let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let modelDir = documentsPath.appendingPathComponent("Models/\(model.id.uuidString)")
+                try? fileManager.removeItem(at: modelDir)
+            }
+            
+            // 删除数据库记录
+            modelContext.delete(model)
+            
+            print("[RecycleBin] 彻底删除 Model3D: \(model.name) (ID: \(model.id))")
+        }
+    }
+    
     // MARK: - Batch Actions
     
     private func restoreAll() {
@@ -467,12 +530,16 @@ struct RecycleBinView: View {
             for outfit in isolatedDeletedOutfits {
                 restoreOutfit(outfit)
             }
-        } else {
+        } else if selectedTab == 2 {
             for book in deletedSpaceBooks {
                 restoreSpaceBook(book)
             }
             for outfit in isolatedDeletedSpaceOutfits {
                 restoreSpaceOutfit(outfit)
+            }
+        } else {
+            for model in deletedModel3Ds {
+                restoreModel3D(model)
             }
         }
     }
@@ -489,12 +556,16 @@ struct RecycleBinView: View {
             for outfit in isolatedDeletedOutfits {
                 permanentlyDeleteOutfit(outfit)
             }
-        } else {
+        } else if selectedTab == 2 {
             for book in deletedSpaceBooks {
                 permanentlyDeleteSpaceBook(book)
             }
             for outfit in isolatedDeletedSpaceOutfits {
                 permanentlyDeleteSpaceOutfit(outfit)
+            }
+        } else {
+            for model in deletedModel3Ds {
+                permanentlyDeleteModel3D(model)
             }
         }
     }
@@ -515,7 +586,7 @@ struct RecycleBinView: View {
             for outfit in outfitsToRestore {
                 restoreOutfit(outfit)
             }
-        } else {
+        } else if selectedTab == 2 {
             let booksToRestore = deletedSpaceBooks.filter { selectedItems.contains($0.id) }
             for book in booksToRestore {
                 restoreSpaceBook(book)
@@ -524,6 +595,11 @@ struct RecycleBinView: View {
             let outfitsToRestore = isolatedDeletedSpaceOutfits.filter { selectedItems.contains($0.id) }
             for outfit in outfitsToRestore {
                 restoreSpaceOutfit(outfit)
+            }
+        } else {
+            let modelsToRestore = deletedModel3Ds.filter { selectedItems.contains($0.id) }
+            for model in modelsToRestore {
+                restoreModel3D(model)
             }
         }
         selectedItems.removeAll()
@@ -545,7 +621,7 @@ struct RecycleBinView: View {
             for outfit in outfitsToDelete {
                 permanentlyDeleteOutfit(outfit)
             }
-        } else {
+        } else if selectedTab == 2 {
             let booksToDelete = deletedSpaceBooks.filter { selectedItems.contains($0.id) }
             for book in booksToDelete {
                 permanentlyDeleteSpaceBook(book)
@@ -554,6 +630,11 @@ struct RecycleBinView: View {
             let outfitsToDelete = isolatedDeletedSpaceOutfits.filter { selectedItems.contains($0.id) }
             for outfit in outfitsToDelete {
                 permanentlyDeleteSpaceOutfit(outfit)
+            }
+        } else {
+            let modelsToDelete = deletedModel3Ds.filter { selectedItems.contains($0.id) }
+            for model in modelsToDelete {
+                permanentlyDeleteModel3D(model)
             }
         }
         selectedItems.removeAll()
@@ -641,6 +722,71 @@ struct DeletedBookRow: View {
                         }
                     }
                     .padding(.vertical, 2)
+                }
+            }
+        }
+        .padding()
+        .background(Color(uiColor: .secondarySystemBackground).opacity(0.5))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - DeletedModel3DRow
+
+struct DeletedModel3DRow: View {
+    let model: Model3D
+    var isEditing: Bool = false
+    let onRestore: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        HStack {
+            // 缩略图
+            if let thumbnailPath = model.resolvedThumbnailPath,
+               let uiImage = UIImage(contentsOfFile: thumbnailPath) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 50, height: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                Image(systemName: "cube.box")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 50, height: 50)
+                    .background(Color.gray.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.name)
+                    .font(.headline)
+                
+                if let deletedAt = model.deletedAt {
+                    Text("删除于 \(deletedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            // Actions
+            if !isEditing {
+                HStack(spacing: 16) {
+                    Button(action: onRestore) {
+                        Image(systemName: "arrow.uturn.backward.circle.fill")
+                            .foregroundStyle(.blue)
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: onDelete) {
+                        Image(systemName: "trash.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
