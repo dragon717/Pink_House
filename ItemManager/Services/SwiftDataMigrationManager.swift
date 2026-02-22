@@ -789,6 +789,7 @@ class SwiftDataMigrationManager: ObservableObject {
         new.refCount = source.refCount
         new.createdAt = source.createdAt
         new.updatedAt = source.updatedAt
+        new.lastModified = source.lastModified
         return new
     }
     

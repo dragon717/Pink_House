@@ -238,6 +238,7 @@ extension Clothing: SyncableModel {
 - ✅ Brand
 - ✅ SceneObjectData
 - ✅ Model3D
+- ✅ StoredImage
 
 已移除 `@Attribute(.unique)` 的模型：
 - ✅ 所有模型

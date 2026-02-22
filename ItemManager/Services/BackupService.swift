@@ -17,6 +17,10 @@ import CryptoKit
 class BackupService {
     static let shared = BackupService()
     
+    // MARK: - 可重入性保护
+    private var isRestoring = false
+    private let restoreLock = NSLock()
+    
     enum BackupError: Error, LocalizedError {
         case dataFetchFailed
         case fileCreateFailed
@@ -27,6 +31,7 @@ class BackupService {
         case decompressionFailed(reason: String)
         case unknownFormat
         case corruptedArchive(reason: String)
+        case restoreInProgress
         
         var errorDescription: String? {
             switch self {
@@ -39,6 +44,7 @@ class BackupService {
             case .decompressionFailed(let reason): return "解压失败: \(reason)"
             case .unknownFormat: return "无法识别的文件格式。请确保选择的是有效的 .save 或 .json 备份文件。"
             case .corruptedArchive(let reason): return "备份文件已损坏: \(reason)"
+            case .restoreInProgress: return "恢复操作正在进行中，请稍后再试"
             }
         }
     }
@@ -176,7 +182,7 @@ class BackupService {
             // 3. Stored Images
             let storedImageDTOs: [StoredImageDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<StoredImage>(), entityName: "StoredImages") { img in
                 standardImagesToBackup.insert(img.fileName)
-                return StoredImageDTO(id: img.id, imageHash: img.imageHash, fileName: img.fileName, refCount: img.refCount)
+                return StoredImageDTO(id: img.id, imageHash: img.imageHash, fileName: img.fileName, refCount: img.refCount, lastModified: img.lastModified)
             }
             
             // 4. Clothings
@@ -250,6 +256,7 @@ class BackupService {
                     createdAt: c.createdAt,
                     updatedAt: c.updatedAt,
                     sortIndex: c.sortIndex,
+                    lastModified: c.lastModified,
                     replacedCutoutID: c.replacedCutoutID,
                     accessoryItems: accItems
                 )
@@ -272,7 +279,8 @@ class BackupService {
                     imagePath: fileName,
                     width: c.width,
                     height: c.height,
-                    linkedClothingID: linkedClothingID
+                    linkedClothingID: linkedClothingID,
+                    lastModified: c.lastModified
                 )
             }
             
@@ -326,7 +334,8 @@ class BackupService {
                     canvasType: o.canvasType,
                     backgroundImagePath: safeBackgroundImagePath,
                     bookID: o.book?.id,
-                    items: items
+                    items: items,
+                    lastModified: o.lastModified
                 )
             }
             
@@ -379,7 +388,8 @@ class BackupService {
                     cameraPositionZ: m.cameraPositionZ,
                     cameraRotationX: m.cameraRotationX,
                     cameraRotationY: m.cameraRotationY,
-                    cameraRotationZ: m.cameraRotationZ
+                    cameraRotationZ: m.cameraRotationZ,
+                    lastModified: m.lastModified
                 )
             }
             
@@ -397,7 +407,8 @@ class BackupService {
                     createdAt: bg.createdAt,
                     isDeleted: bg.isDeleted,
                     deletedAt: bg.deletedAt,
-                    sortIndex: bg.sortIndex
+                    sortIndex: bg.sortIndex,
+                    lastModified: bg.lastModified
                 )
             }
             
@@ -415,7 +426,8 @@ class BackupService {
                     createdAt: sbg.createdAt,
                     isDeleted: sbg.isDeleted,
                     deletedAt: sbg.deletedAt,
-                    sortIndex: sbg.sortIndex
+                    sortIndex: sbg.sortIndex,
+                    lastModified: sbg.lastModified
                 )
             }
             
@@ -488,7 +500,8 @@ class BackupService {
                     isDeleted: so.isDeleted,
                     deletedAt: so.deletedAt,
                     bookID: so.book?.id,
-                    sceneObjects: sceneObjectDTOs
+                    sceneObjects: sceneObjectDTOs,
+                    lastModified: so.lastModified
                 )
             }
             
@@ -759,6 +772,18 @@ class BackupService {
     
     /// Low-level restore function that takes a Manifest and a map of Image Filenames to Local URLs
     func restoreFromManifest(manifest: BackupManifest, imageFiles: [String: URL], context: ModelContext) throws {
+        // 可重入性保护
+        restoreLock.lock()
+        defer { restoreLock.unlock() }
+        
+        if isRestoring {
+            print("### Restore: Warning - Restore already in progress, skipping...")
+            throw BackupError.restoreInProgress
+        }
+        
+        isRestoring = true
+        defer { isRestoring = false }
+        
         print("### Restore: Starting restore from manifest...")
         
         // --- 开始分阶段恢复 ---
@@ -812,7 +837,37 @@ class BackupService {
                 continue
             }
             
-            if !fileManager.fileExists(atPath: destinationURL.path) || isThemeFile || isWealthFile || isWidgetFile {
+            // 修复：对于 CutoutItem 图片（PNG格式），总是恢复以确保完整性
+            // 因为 CutoutItem 图片是贴纸库的核心，必须确保文件正确
+            let isCutoutImage = fileName.hasSuffix(".png") && !isThemeFile && !isWealthFile && !isWidgetFile
+            
+            // 改进：使用哈希值验证文件是否需要恢复
+            var shouldRestore = false
+            if !fileManager.fileExists(atPath: destinationURL.path) {
+                shouldRestore = true
+            } else if isThemeFile || isWealthFile || isWidgetFile || isCutoutImage {
+                shouldRestore = true
+            } else if let externalHashes = manifest.externalFileHashes,
+                      let backupHash = externalHashes[fileName] {
+                // 如果备份中有哈希值，比较本地文件和备份文件的哈希
+                if let localData = try? Data(contentsOf: destinationURL) {
+                    let localHash = SHA256.hash(data: localData).compactMap { String(format: "%02x", $0) }.joined()
+                    if localHash != backupHash {
+                        print("Restore: File \(fileName) hash mismatch (local: \(localHash.prefix(8))..., backup: \(backupHash.prefix(8))...), will restore")
+                        shouldRestore = true
+                    } else {
+                        print("Restore: File \(fileName) hash matches, skipping")
+                    }
+                } else {
+                    shouldRestore = true
+                }
+            } else {
+                // 没有哈希值信息，默认恢复以确保数据完整性
+                print("Restore: No hash info for \(fileName), will restore to ensure integrity")
+                shouldRestore = true
+            }
+            
+            if shouldRestore {
                 if fileManager.fileExists(atPath: destinationURL.path) {
                     try? fileManager.removeItem(at: destinationURL)
                 }
@@ -821,6 +876,10 @@ class BackupService {
                     try fileManager.copyItem(at: sourceURL, to: destinationURL)
                     if isThemeFile {
                         print("Restore: Successfully restored theme file: \(fileName) to \(destinationURL.path)")
+                    } else if isCutoutImage {
+                        print("Restore: Successfully restored CutoutItem image: \(fileName)")
+                    } else {
+                        print("Restore: Successfully restored file: \(fileName)")
                     }
                 } catch {
                     print("Restore: Failed to copy file \(fileName): \(error)")
@@ -928,10 +987,14 @@ class BackupService {
                 existing.refCount = max(existing.refCount, dto.refCount)
                 existing.fileName = dto.fileName
                 existing.imageHash = dto.imageHash
+                if let lastModified = dto.lastModified {
+                    existing.lastModified = lastModified
+                }
             } else {
                 let newImg = StoredImage(imageHash: dto.imageHash, fileName: dto.fileName)
                 newImg.id = dto.id
                 newImg.refCount = dto.refCount
+                newImg.lastModified = dto.lastModified ?? Date()
                 context.insert(newImg)
                 imageMetaMap[dto.id] = newImg
             }
@@ -1113,6 +1176,9 @@ class BackupService {
             clothingBack.updatedAt = dto.updatedAt
             clothingBack.sortIndex = dto.sortIndex ?? 0
             clothingBack.replacedCutoutID = dto.replacedCutoutID
+            if let lastModified = dto.lastModified {
+                clothingBack.lastModified = lastModified
+            }
             
             // Restore AccessoryItems
             if let accDTOs = dto.accessoryItems {
@@ -1194,6 +1260,40 @@ class BackupService {
                 cutout.linkedClothingID = lid
             } else {
                 cutout.linkedClothingID = nil
+            }
+            
+            // 恢复 lastModified
+            if let lastModified = dto.lastModified {
+                cutout.lastModified = lastModified
+            }
+            
+            // 修复：确保 CutoutItem 的图片有对应的 StoredImage 记录
+            // 这很重要，因为 CutoutItem 图片是通过 ImageManager.saveImage 创建的
+            // 恢复时需要确保 StoredImage 记录存在，否则图片可能被误删
+            if !dto.imagePath.isEmpty {
+                let fileName = dto.imagePath
+                let storedImageDescriptor = FetchDescriptor<StoredImage>(predicate: #Predicate { $0.fileName == fileName })
+                if let existingStoredImage = try? context.fetch(storedImageDescriptor).first {
+                    // 确保 refCount 至少为 1
+                    if existingStoredImage.refCount < 1 {
+                        existingStoredImage.refCount = 1
+                        print("### Restore: Fixed refCount for CutoutItem image: \(fileName)")
+                    }
+                } else {
+                    // 如果 StoredImage 记录不存在，创建一个
+                    // 计算图片哈希（如果文件存在）
+                    let imageFileURL = imagesDir.appendingPathComponent(fileName)
+                    var imageHash = "restored_cutout_\(fileName)"
+                    if let fileData = try? Data(contentsOf: imageFileURL) {
+                        let hash = SHA256.hash(data: fileData)
+                        imageHash = hash.compactMap { String(format: "%02x", $0) }.joined()
+                    }
+                    let newStoredImage = StoredImage(imageHash: imageHash, fileName: fileName)
+                    newStoredImage.refCount = 1
+                    newStoredImage.lastModified = Date()
+                    context.insert(newStoredImage)
+                    print("### Restore: Created missing StoredImage for CutoutItem: \(fileName)")
+                }
             }
         }
         
@@ -1305,6 +1405,11 @@ class BackupService {
                 // Restore book relationship (v1.5+)
                 if let bookID = dto.bookID {
                     outfit.book = bookGroupMap[bookID]
+                }
+                
+                // 恢复 lastModified
+                if let lastModified = dto.lastModified {
+                    outfit.lastModified = lastModified
                 }
                 
                 print("### Restore: Processing Outfit \(dto.note) (\(dto.id)) with \(dto.items.count) items...")
@@ -1515,6 +1620,11 @@ class BackupService {
                 // Ensure local deleted state is preserved
                 model3D.isDeleted = false
                 model3D.deletedAt = nil
+                
+                // 恢复 lastModified
+                if let lastModified = dto.lastModified {
+                    model3D.lastModified = lastModified
+                }
             }
         }
         
@@ -1571,6 +1681,11 @@ class BackupService {
                 // Ensure local deleted state is preserved
                 bookGroup.isDeleted = false
                 bookGroup.deletedAt = nil
+                
+                // 恢复 lastModified
+                if let lastModified = dto.lastModified {
+                    bookGroup.lastModified = lastModified
+                }
             }
             
             // 2. 恢复平面书页与手帐的关联
@@ -1634,6 +1749,11 @@ class BackupService {
                 // Ensure local deleted state is preserved
                 spaceBookGroup.isDeleted = false
                 spaceBookGroup.deletedAt = nil
+                
+                // 恢复 lastModified
+                if let lastModified = dto.lastModified {
+                    spaceBookGroup.lastModified = lastModified
+                }
             }
             
             // 4. 恢复空间书页 (SpaceOutfit) 与场景对象
@@ -1717,6 +1837,11 @@ class BackupService {
                     // Ensure local deleted state is preserved
                     spaceOutfit.isDeleted = false
                     spaceOutfit.deletedAt = nil
+                    
+                    // 恢复 lastModified
+                    if let lastModified = dto.lastModified {
+                        spaceOutfit.lastModified = lastModified
+                    }
                     
                     // Re-link to book
                     if let bookID = dto.bookID {

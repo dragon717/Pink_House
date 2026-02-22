@@ -116,6 +116,7 @@ struct ClothingDTO: Codable {
     let createdAt: Date
     let updatedAt: Date
     let sortIndex: Int?
+    let lastModified: Date?
     
     // New Fields (v1.4)
     let replacedCutoutID: UUID?
@@ -139,6 +140,7 @@ struct StoredImageDTO: Codable {
     let imageHash: String
     let fileName: String
     let refCount: Int
+    let lastModified: Date?
 }
 
 struct CutoutItemDTO: Codable {
@@ -150,6 +152,7 @@ struct CutoutItemDTO: Codable {
     let width: Double
     let height: Double
     let linkedClothingID: UUID?
+    let lastModified: Date?
 }
 
 struct OutfitDTO: Codable {
@@ -185,6 +188,7 @@ struct OOTDSnapshotDTO: Codable {
     var backgroundImagePath: String?
     let bookID: UUID? // Reference to parent BookGroup (v1.5)
     let items: [OOTDSnapshotItemDTO]
+    let lastModified: Date?
 }
 
 struct OOTDSnapshotItemDTO: Codable {
@@ -219,6 +223,7 @@ struct Model3DDTO: Codable {
     let cameraRotationX: Float
     let cameraRotationY: Float
     let cameraRotationZ: Float
+    let lastModified: Date?
 }
 
 // MARK: - Book Group DTOs (v1.5)
@@ -231,6 +236,7 @@ struct BookGroupDTO: Codable {
     let isDeleted: Bool
     let deletedAt: Date?
     let sortIndex: Int
+    let lastModified: Date?
 }
 
 struct SpaceBookGroupDTO: Codable {
@@ -241,6 +247,7 @@ struct SpaceBookGroupDTO: Codable {
     let isDeleted: Bool
     let deletedAt: Date?
     let sortIndex: Int
+    let lastModified: Date?
 }
 
 // MARK: - Space Outfit DTOs (v1.5)
@@ -260,6 +267,7 @@ struct SpaceOutfitDTO: Codable {
     let deletedAt: Date?
     let bookID: UUID? // Reference to parent SpaceBookGroup
     let sceneObjects: [SceneObjectDataDTO]
+    let lastModified: Date?
 }
 
 struct SceneObjectDataDTO: Codable {

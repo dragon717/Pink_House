@@ -229,6 +229,7 @@ class ImageManager {
                 // Already exists: Increment ref count
                 existingImage.refCount += 1
                 existingImage.updatedAt = Date()
+                existingImage.lastModified = Date()
                 AppLogger.info("Image exists (Hash: \(hash)), incrementing refCount to \(existingImage.refCount)")
                 
                 // Ensure it's in cache
@@ -358,6 +359,7 @@ class ImageManager {
             if let storedImage = results.first {
                 storedImage.refCount += 1
                 storedImage.updatedAt = Date()
+                storedImage.lastModified = Date()
                 AppLogger.info("Incremented refCount for \(fileName) to \(storedImage.refCount)")
             } else {
                 AppLogger.info("WARNING: Attempted to increment refCount for non-existent image: \(fileName)")

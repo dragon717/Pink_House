@@ -16,6 +16,7 @@ final class StoredImage {
     var refCount: Int = 1
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var lastModified: Date = Date() // iCloud 同步时间戳
     
     init(imageHash: String, fileName: String) {
         self.id = UUID()
@@ -24,5 +25,6 @@ final class StoredImage {
         self.refCount = 1
         self.createdAt = Date()
         self.updatedAt = Date()
+        self.lastModified = Date()
     }
 }
