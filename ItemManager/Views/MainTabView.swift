@@ -69,6 +69,10 @@ struct ModernTabView: View {
             return "小世界"
         case .perler:
             return "拼豆"
+        case .wardrobe:
+            return "衣橱"
+        case .depositPlan:
+            return "尾款天使"
         }
     }
 
@@ -88,6 +92,10 @@ struct ModernTabView: View {
             return "map"
         case .perler:
             return "circle.grid.2x2"
+        case .wardrobe:
+            return "cabinet.fill"
+        case .depositPlan:
+            return "tag.fill"
         }
     }
     
@@ -129,7 +137,8 @@ struct ModernTabView: View {
             // 修复：使用正确的 Binding 传递 selectedTab
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
-                smallWorldDestination: $smallWorldDestination
+                smallWorldDestination: $smallWorldDestination,
+                homeTab: $homeTabSelection
             )
         }
     }
@@ -290,28 +299,34 @@ struct SmallWorldContainerView: View {
     @Binding var isPlayingOpeningAnimation: Bool
     
     var body: some View {
-        Group {
-            switch destination {
-            case .menu:
-                SmallWorldView(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    destination: $destination,
-                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
-                )
-            case .ootd:
-                OOTDView()
-            case .pet:
-                PetHomeView()
-            case .wealth:
-                WealthView()
-            case .calendar:
-                DreamDressCalendarView()
-            case .bigWorld:
-                BigWorldView()
-            case .perler:
-                PerlerBeadsView()
-            }
+        content
+    }
+    
+    @ViewBuilder
+    private var content: some View {
+        switch destination {
+        case .menu:
+            SmallWorldView(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination,
+                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+            )
+        case .ootd:
+            OOTDView()
+        case .pet:
+            PetHomeView()
+        case .wealth:
+            WealthView()
+        case .calendar:
+            DreamDressCalendarView()
+        case .bigWorld:
+            BigWorldView()
+        case .perler:
+            PerlerBeadsView()
+        case .wardrobe, .depositPlan:
+            // 这些功能直接跳转到 Tab 0，不会在这里显示
+            EmptyView()
         }
     }
 }

@@ -84,6 +84,17 @@ struct MeView: View {
                         // 梦裙日历
                         CalendarSettingsCard()
                         
+                        // 常用菜单设置
+                        NavigationLink(destination: FavoriteMenuSettingsView()) {
+                            SettingsGridItem(
+                                title: "常用菜单",
+                                subtitle: "长按菜单 · 常用设置",
+                                icon: "star.fill",
+                                iconColor: .yellow
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
                         // 小组件
                         WidgetSettingsCard()
                         

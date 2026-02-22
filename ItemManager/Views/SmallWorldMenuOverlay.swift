@@ -3,6 +3,22 @@ import SwiftUI
 import UIKit
 #endif
 
+// MARK: - 轮盘配置（统一管理角度范围）
+enum WheelConfig {
+    // 轮盘角度范围（以正左方为0°，顺时针为正）
+    static let startAngle: Double = -135  // 左边界
+    static let endAngle: Double = -45     // 右边界
+    static var totalAngle: Double { endAngle - startAngle }  // 总角度范围
+
+    // 内层一级菜单配置
+    static let innerMenuCount = 3
+    static var innerMenuStep: Double { totalAngle / Double(innerMenuCount - 1) }
+
+    // 外层二级菜单配置
+    static let outerMenuPadding: Double = 5  // 边距
+    static var outerMenuTotalAngle: Double { totalAngle - outerMenuPadding * 2 }
+}
+
 // MARK: - 轮盘菜单数据模型
 struct WheelMenuCategory: Identifiable {
     let id = UUID()
@@ -22,6 +38,7 @@ struct WheelMenuItem: Identifiable {
 struct SmallWorldMenuOverlay: View {
     @Binding var selectedTab: Int
     @Binding var smallWorldDestination: SmallWorldDestination
+    @Binding var homeTab: HomeTab
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -57,18 +74,17 @@ struct SmallWorldMenuOverlay: View {
     // 莫妮卡粉色
     private let monicaPink = Color(red: 1.0, green: 0.41, blue: 0.71)
 
+    // 常用菜单设置管理器
+    @ObservedObject private var favoriteMenuManager = FavoriteMenuSettingsManager.shared
+
     // MARK: - 菜单数据
     private var categories: [WheelMenuCategory] {
         [
-            // 常用
+            // 常用（根据用户设置动态生成）
             WheelMenuCategory(
                 title: "常用",
                 icon: "star.fill",
-                items: [
-                    WheelMenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55)),
-                    WheelMenuItem(title: "穿搭手帐", icon: "book.pages", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71)),
-                    WheelMenuItem(title: "小世界", icon: "map", destination: .menu, color: Color(red: 0.4, green: 0.8, blue: 0.9)),
-                ]
+                items: favoriteMenuItems
             ),
             // 乐玩
             WheelMenuCategory(
@@ -90,6 +106,32 @@ struct SmallWorldMenuOverlay: View {
                 ]
             ),
         ]
+    }
+
+    // 根据用户设置生成常用菜单项
+    private var favoriteMenuItems: [WheelMenuItem] {
+        favoriteMenuManager.selectedItems.map { item in
+            switch item {
+            case .wardrobe:
+                return WheelMenuItem(title: "衣橱", icon: "cabinet.fill", destination: .wardrobe, color: Color(red: 1.0, green: 0.41, blue: 0.71))
+            case .finalPayment:
+                return WheelMenuItem(title: "尾款天使", icon: "tag.fill", destination: .depositPlan, color: Color(red: 1.0, green: 0.07, blue: 0.58))
+            case .pet:
+                return WheelMenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55))
+            case .ootd:
+                return WheelMenuItem(title: "穿搭手帐", icon: "book.pages", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71))
+            case .smallWorld:
+                return WheelMenuItem(title: "小世界", icon: "map", destination: .menu, color: Color(red: 0.4, green: 0.8, blue: 0.9))
+            case .wealth:
+                return WheelMenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0))
+            case .perler:
+                return WheelMenuItem(title: "拼豆", icon: "circle.grid.2x2", destination: .perler, color: Color(red: 1.0, green: 0.55, blue: 0.75))
+            case .calendar:
+                return WheelMenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80))
+            case .bigWorld:
+                return WheelMenuItem(title: "大世界", icon: "airplane", destination: .bigWorld, color: Color(red: 0.4, green: 0.8, blue: 0.9))
+            }
+        }
     }
 
     // 布局参数
@@ -249,23 +291,19 @@ struct SmallWorldMenuOverlay: View {
         let isLowMemoryDevice: Bool
         let monicaPink: Color
 
-        private let startAngle: Double = -90
-        private let endAngle: Double = 0
-
         var body: some View {
             ZStack {
                 // 轮盘背景（淡淡的莫妮卡粉）
                 WheelBackground(
                     radius: radius + 35,
-                    startAngle: startAngle,
-                    endAngle: endAngle,
+                    startAngle: WheelConfig.startAngle,
+                    endAngle: WheelConfig.endAngle,
                     monicaPink: monicaPink
                 )
 
-                // 三个分类分布在右上角90度范围内
-                ForEach(0..<3) { index in
-                    // 在-90°到0°之间均匀分布
-                    let angle = startAngle + Double(index) * 45 // -90, -45, 0
+                // 三个分类分布在-45°到45°范围内
+                ForEach(0..<WheelConfig.innerMenuCount) { index in
+                    let angle = WheelConfig.startAngle + Double(index) * WheelConfig.innerMenuStep
                     let radians = angle * .pi / 180
                     let x = radius * cos(radians)
                     let y = radius * sin(radians)
@@ -296,19 +334,14 @@ struct SmallWorldMenuOverlay: View {
         let monicaPink: Color
         let onItemSelected: (WheelMenuItem) -> Void
 
-        // 右上角90度范围
-        private let startAngle: Double = -90
-        private let endAngle: Double = 0
-
         var body: some View {
             ZStack {
                 // 根据选中的分类显示对应的二级菜单
                 let items = categories[selectedIndex].items
                 ForEach(items.indices, id: \.self) { itemIndex in
-                    // 在右上角90度范围内分布
-                    let totalAngle = 80.0
-                    let itemStartAngle = startAngle + 5 // 从-85°开始
-                    let step = items.count > 1 ? totalAngle / Double(items.count - 1) : 0
+                    // 在-45°到45°范围内分布
+                    let itemStartAngle = WheelConfig.startAngle + WheelConfig.outerMenuPadding
+                    let step = items.count > 1 ? WheelConfig.outerMenuTotalAngle / Double(items.count - 1) : 0
                     let angle = itemStartAngle + Double(itemIndex) * step
                     let radians = angle * .pi / 180
                     let x = radius * cos(radians)
@@ -542,8 +575,20 @@ struct SmallWorldMenuOverlay: View {
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                selectedTab = 1
-                smallWorldDestination = dest
+                switch dest {
+                case .wardrobe:
+                    // 跳转到衣橱 Tab
+                    selectedTab = 0
+                    homeTab = .wardrobe
+                case .depositPlan:
+                    // 跳转到尾款天使 Tab
+                    selectedTab = 0
+                    homeTab = .depositPlan
+                default:
+                    // 其他功能在小世界 Tab 内跳转
+                    selectedTab = 1
+                    smallWorldDestination = dest
+                }
             }
         }
     }
