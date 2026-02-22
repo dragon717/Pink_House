@@ -25,6 +25,9 @@ public class CameraController: ObservableObject {
     public var lastPanLocation: CGPoint?
     public var lastPinchScale: CGFloat = 1.0
     
+    // 标记是否自动更新相机实体（用于RealityKitSceneView）
+    public var autoUpdateCameraEntity: Bool = true
+    
     public init() {}
     
     public func setupCamera(in rootEntity: Entity) -> Entity {
@@ -46,7 +49,7 @@ public class CameraController: ObservableObject {
     }
     
     public func updateCameraTransform() {
-        guard let cameraEntity = cameraEntity else { return }
+        guard autoUpdateCameraEntity, let cameraEntity = cameraEntity else { return }
         
         let clampedDistance = max(minDistance, min(maxDistance, distance))
         let clampedRotationX = max(minPitch, min(maxPitch, rotationX))
@@ -180,7 +183,6 @@ public class CameraGestureUIView: UIView {
         case .changed:
             let rotation = Float(gesture.rotation)
             controller.rotationY += rotation * 0.5
-            controller.updateCameraTransform()
             gesture.rotation = 0
         default:
             break

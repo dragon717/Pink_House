@@ -1536,6 +1536,8 @@ struct SingleModelRealityView: View {
                 arViewHolder: arViewHolder
             )
             .onAppear {
+                // 禁用自动更新相机实体，由 ARModelContainerView 管理相机
+                cameraController.autoUpdateCameraEntity = false
                 arViewHolder.cameraController = cameraController
             }
             .onChange(of: cameraController.distance) { _, newValue in
@@ -1566,7 +1568,7 @@ struct ARModelViewWithGestures: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: ARModelContainerView, context: Context) {
-        uiView.updateCamera()
+        // 相机更新通过 Combine 监听 CameraController 的变化
     }
 }
 
@@ -1580,6 +1582,8 @@ class ARModelContainerView: UIView {
     private var lastRotationLocation: CGPoint?
     private var lastPanLocation: CGPoint?
     private var lastPinchScale: CGFloat = 1.0
+    
+    private var cancellables = Set<AnyCancellable>()
     
     func setup(modelPath: String, cameraController: CameraController, arViewHolder: ARViewHolder) {
         print("[ARModelContainerView] setup called")
@@ -1609,6 +1613,20 @@ class ARModelContainerView: UIView {
         
         // 设置手势
         setupGestures()
+        
+        // 监听 CameraController 的变化
+        cameraController.$distance
+            .sink { [weak self] _ in self?.updateCamera() }
+            .store(in: &cancellables)
+        cameraController.$rotationX
+            .sink { [weak self] _ in self?.updateCamera() }
+            .store(in: &cancellables)
+        cameraController.$rotationY
+            .sink { [weak self] _ in self?.updateCamera() }
+            .store(in: &cancellables)
+        cameraController.$target
+            .sink { [weak self] _ in self?.updateCamera() }
+            .store(in: &cancellables)
     }
     
     private func setupCamera() {
@@ -1667,7 +1685,6 @@ class ARModelContainerView: UIView {
         pinchGesture.delegate = self
         addGestureRecognizer(pinchGesture)
         
-        
         // 确保手势优先于ARView的手势
         if let arView = arView {
             for gesture in arView.gestureRecognizers ?? [] {
@@ -1680,26 +1697,21 @@ class ARModelContainerView: UIView {
     
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
         guard let controller = cameraController else { 
-            print("[Gesture] Pan: cameraController is nil")
             return 
         }
         
         let location = gesture.location(in: self)
-        let touchCount = gesture.numberOfTouches
         
         switch gesture.state {
         case .began:
-            print("[Gesture] Pan began, touches: \(touchCount), location: \(location)")
             lastPanLocation = location
         case .changed:
             guard let lastLocation = lastPanLocation else { return }
             let deltaX = Float(location.x - lastLocation.x)
             let deltaY = Float(location.y - lastLocation.y)
-            print("[Gesture] Pan changed, delta: (\(deltaX), \(deltaY))")
             controller.pan(deltaX: deltaX, deltaY: deltaY)
             lastPanLocation = location
         case .ended, .cancelled:
-            print("[Gesture] Pan ended/cancelled")
             lastPanLocation = nil
         default:
             break
@@ -1748,7 +1760,18 @@ class ARModelContainerView: UIView {
 
 extension ARModelContainerView: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        return true
+        // 允许双指平移和缩放同时识别
+        let isPan = gestureRecognizer is UIPanGestureRecognizer && (gestureRecognizer as? UIPanGestureRecognizer)?.minimumNumberOfTouches == 2
+        let isPinch = gestureRecognizer is UIPinchGestureRecognizer
+        let otherIsPan = otherGestureRecognizer is UIPanGestureRecognizer && (otherGestureRecognizer as? UIPanGestureRecognizer)?.minimumNumberOfTouches == 2
+        let otherIsPinch = otherGestureRecognizer is UIPinchGestureRecognizer
+        
+        // 双指平移和缩放可以同时识别
+        if (isPan && otherIsPinch) || (isPinch && otherIsPan) {
+            return true
+        }
+        
+        return false
     }
 }
 
