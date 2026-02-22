@@ -33,10 +33,13 @@ final class HapticEngineManager: ObservableObject {
     
     // 硬件支持标志
     private var supportsCoreHaptics: Bool = false
-    
+
     // 系统震感开启状态 (移除自动检测，改为手动测试状态)
     // @Published var isSystemHapticsEnabled: Bool = true
-    
+
+    // 暂停状态 - 当视图消失时设置为 true
+    @Published var isPaused: Bool = false
+
     private init() {
         prepareHaptics()
         setupLifecycleObserver()
@@ -44,9 +47,10 @@ final class HapticEngineManager: ObservableObject {
 
     /// 停止所有震动反馈
     func stopHaptics() {
-        guard isEngineRunning else { return }
-        
-        // 停止持续震动
+        // 设置暂停状态，防止重新启动
+        isPaused = true
+
+        // 停止持续震动 - 无论引擎状态如何都尝试停止
         do {
             try continuousPlayer?.stop(atTime: 0)
             try rollingPlayer?.stop(atTime: 0)
@@ -54,17 +58,21 @@ final class HapticEngineManager: ObservableObject {
         } catch {
             print("Failed to stop continuous/rolling player: \(error)")
         }
-        
+
         // 停止引擎
         engine?.stop(completionHandler: { error in
             if let error = error {
                 print("Error stopping haptic engine: \(error)")
-            } else {
-                Task { @MainActor in
-                    self.isEngineRunning = false
-                }
+            }
+            Task { @MainActor in
+                self.isEngineRunning = false
             }
         })
+    }
+
+    /// 恢复震动反馈
+    func resumeHaptics() {
+        isPaused = false
     }
     
     private func setupLifecycleObserver() {
@@ -286,12 +294,12 @@ final class HapticEngineManager: ObservableObject {
     ///   - type: 碰撞类型 (撞墙/撞豆)
     func playCollisionHaptic(intensity: Float, sharpness: Float, position: CGPoint? = nil, type: SoundManager.ImpactType = .soft) {
         // print("playCollisionHaptic called with intensity: \(intensity), sharpness: \(sharpness)")
-        
-        // 检查物理计算是否被暂停
-        if MediaStateManager.shared.isPhysicsPaused {
+
+        // 检查物理计算是否被暂停或本地暂停状态
+        if MediaStateManager.shared.isPhysicsPaused || isPaused {
             return
         }
-        
+
         // 声音总是尝试播放（即使没有震动引擎）
         // 参数限制
         // 即使 intensity 很小，我们也给一个最小音量，确保能听到反馈
@@ -401,8 +409,8 @@ final class HapticEngineManager: ObservableObject {
     /// 播放连续的滚动纹理（当大量金豆移动时）
     /// - Parameter intensity: 整体滚动的剧烈程度
     func playRollingTexture(intensity: Float) {
-        // 检查物理计算是否被暂停
-        if MediaStateManager.shared.isPhysicsPaused {
+        // 检查物理计算是否被暂停或本地暂停状态
+        if MediaStateManager.shared.isPhysicsPaused || isPaused {
             // 如果暂停了，停止滚动音效和震动
             soundManager.updateRollingSound(intensity: 0)
             if rollingPlayer != nil {

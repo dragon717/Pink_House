@@ -5,36 +5,37 @@ import CoreMotion
 struct GoldPhysicsView: View {
     let totalWeightGrams: Double
     let beanWeight: Double // Weight per real bean (e.g. 1g)
-    
+
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.isSimulationActive) var isSimulationActive
-    
+    @Environment(\.isWealthStorageActive) var isWealthStorageActive
+
     // Scene Configuration
     @State private var scene: GoldScene?
     @State private var isViewVisible: Bool = false
-    
+
     // Appearance Manager (for background toggle)
     private var appearanceManager = WealthAppearanceManager.shared
-    
+
     // Media State Manager
     @StateObject private var mediaStateManager = MediaStateManager.shared
-    
+
     init(totalWeightGrams: Double, beanWeight: Double) {
         self.totalWeightGrams = totalWeightGrams
         self.beanWeight = beanWeight
     }
-    
+
     // Computed pause state for SpriteView
     private var shouldPause: Bool {
         // print("GoldPhysicsView: shouldPause check - Visible: \(isViewVisible), SimActive: \(isSimulationActive), Scene: \(scenePhase)")
-        return !isViewVisible || !isSimulationActive || scenePhase != .active || mediaStateManager.isPhysicsPaused
+        return !isViewVisible || !isSimulationActive || !isWealthStorageActive || scenePhase != .active || mediaStateManager.isPhysicsPaused
     }
     
     var body: some View {
         GeometryReader { proxy in
             let backgroundInfo = getBackgroundInfo(proxySize: proxy.size)
-            
+
             ZStack {
                 // Background Image
                 if appearanceManager.shouldShowWealthContainerBackground {
@@ -47,7 +48,7 @@ struct GoldPhysicsView: View {
                             .clipped()
                     }
                 }
-                
+
                 SpriteView(scene: createScene(size: proxy.size, boundary: backgroundInfo.physicsBoundary), isPaused: shouldPause, options: [.allowsTransparency])
                     // Transparent to let ZStack background show through
                     .background(Color.clear)
@@ -55,15 +56,9 @@ struct GoldPhysicsView: View {
                         isViewVisible = true
                         // Update bean count when view appears
                         scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
-                        
+
                         // Update boundary in case it changed
                         scene?.updateBoundary(backgroundInfo.physicsBoundary)
-                    }
-                    .onDisappear {
-                        isViewVisible = false
-                        // 暂停物理模拟
-                        scene?.pauseSimulation()
-                        print("🛑 GoldPhysicsView.onDisappear: 物理模拟已暂停")
                     }
                     .onChange(of: totalWeightGrams) { _, newValue in
                         // Ensure update runs on main thread and scene is ready
@@ -85,6 +80,20 @@ struct GoldPhysicsView: View {
                         scene?.updateBoundary(newBoundary)
                     }
             }
+        }
+        .onAppear {
+            isViewVisible = true
+            // 恢复震动状态
+            HapticEngineManager.shared.resumeHaptics()
+        }
+        .onDisappear {
+            isViewVisible = false
+            // 暂停物理模拟
+            scene?.pauseSimulation()
+            // 停止音效和震动
+            HapticEngineManager.shared.stopHaptics()
+            SoundManager.shared.stopAllSounds()
+            print("🛑 GoldPhysicsView.onDisappear: 物理模拟已暂停")
         }
     }
     
@@ -204,8 +213,11 @@ class GoldScene: SKScene, SKPhysicsContactDelegate {
     func pauseSimulation() {
         self.isPaused = true
         motionManager.stopDeviceMotionUpdates()
-        // Stop any continuous haptics
+        // Stop any continuous haptics and rolling haptics
         HapticEngineManager.shared.updateHapticParameters(intensity: 0, sharpness: 0)
+        HapticEngineManager.shared.stopHaptics()
+        // Stop rolling sound
+        SoundManager.shared.stopAllSounds()
     }
     
     func resumeSimulation() {

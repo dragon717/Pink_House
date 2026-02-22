@@ -2,6 +2,19 @@ import SwiftUI
 import SwiftData
 import Combine
 
+// MARK: - 环境变量 Key
+
+private struct IsWealthStorageActiveKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    var isWealthStorageActive: Bool {
+        get { self[IsWealthStorageActiveKey.self] }
+        set { self[IsWealthStorageActiveKey.self] = newValue }
+    }
+}
+
 // MARK: - 马上来财主页面
 
 struct WealthView: View {
@@ -13,6 +26,11 @@ struct WealthView: View {
     
     // 主页面签选择
     @State private var selectedMainTab: WealthMainTab = .divination
+    
+    // 用于控制物理模拟的激活状态
+    private var isWealthStorageActive: Bool {
+        selectedMainTab == .wealthStorage
+    }
     
     // 用于监听媒体状态通知
     @State private var cancellables = Set<AnyCancellable>()
@@ -67,6 +85,14 @@ struct WealthView: View {
                         .tag(WealthMainTab.wealthStorage)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
+                    .environment(\.isWealthStorageActive, isWealthStorageActive)
+                    .onChange(of: selectedMainTab) { oldValue, newValue in
+                        // 当从安财页签切换到其他页签时，停止音效和震动
+                        if oldValue == .wealthStorage && newValue != .wealthStorage {
+                            soundManager.stopAllSounds()
+                            hapticManager.stopHaptics()
+                        }
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -735,6 +761,8 @@ enum StorageTab: String, CaseIterable, Identifiable {
 struct GoldStorageView: View {
     @Bindable var viewModel: WealthViewModel
     let isActive: Bool
+    @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @ObservedObject private var soundManager = SoundManager.shared
     
     var body: some View {
         VStack(spacing: 16) {
@@ -790,6 +818,13 @@ struct GoldStorageView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .onChange(of: isActive) { oldValue, newValue in
+            if oldValue && !newValue {
+                // 从激活变为非激活，停止音效和震动
+                soundManager.stopAllSounds()
+                hapticManager.stopHaptics()
+            }
+        }
     }
     
     private var goldDisplay: some View {
@@ -831,6 +866,8 @@ struct GoldStorageView: View {
 struct SilverStorageView: View {
     @Bindable var viewModel: WealthViewModel
     let isActive: Bool
+    @ObservedObject private var hapticManager = HapticEngineManager.shared
+    @ObservedObject private var soundManager = SoundManager.shared
     
     var body: some View {
         VStack(spacing: 16) {
@@ -884,6 +921,13 @@ struct SilverStorageView: View {
                 // 非激活状态显示占位
                 Color.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onChange(of: isActive) { oldValue, newValue in
+            if oldValue && !newValue {
+                // 从激活变为非激活，停止音效和震动
+                soundManager.stopAllSounds()
+                hapticManager.stopHaptics()
             }
         }
     }
