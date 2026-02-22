@@ -198,6 +198,11 @@ public class CameraGestureUIView: UIView {
         case .began:
             lastPanLocation = location
         case .changed:
+            // 如果手指数量少于2个（有一个手指离开），停止移动
+            guard gesture.numberOfTouches == 2 else {
+                lastPanLocation = nil
+                return
+            }
             guard let lastLocation = lastPanLocation else { return }
             let deltaX = Float(location.x - lastLocation.x)
             let deltaY = Float(location.y - lastLocation.y)

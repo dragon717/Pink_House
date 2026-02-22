@@ -1582,7 +1582,7 @@ class ARModelContainerView: UIView {
     private var lastRotationLocation: CGPoint?
     private var lastPanLocation: CGPoint?
     private var lastPinchScale: CGFloat = 1.0
-    
+
     private var cancellables = Set<AnyCancellable>()
     
     func setup(modelPath: String, cameraController: CameraController, arViewHolder: ARViewHolder) {
@@ -1672,19 +1672,23 @@ class ARModelContainerView: UIView {
         singlePanGesture.maximumNumberOfTouches = 1
         singlePanGesture.delegate = self
         addGestureRecognizer(singlePanGesture)
-        
+
         // 双指平移
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         panGesture.minimumNumberOfTouches = 2
         panGesture.maximumNumberOfTouches = 2
         panGesture.delegate = self
         addGestureRecognizer(panGesture)
-        
+
         // 双指缩放
         let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinchGesture.delegate = self
         addGestureRecognizer(pinchGesture)
-        
+
+        // 手势冲突处理：单指和双指互斥
+        singlePanGesture.require(toFail: panGesture)
+        panGesture.require(toFail: singlePanGesture)
+
         // 确保手势优先于ARView的手势
         if let arView = arView {
             for gesture in arView.gestureRecognizers ?? [] {
@@ -1696,16 +1700,19 @@ class ARModelContainerView: UIView {
     }
     
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
-        guard let controller = cameraController else { 
-            return 
-        }
-        
+        guard let controller = cameraController else { return }
+
         let location = gesture.location(in: self)
-        
+
         switch gesture.state {
         case .began:
             lastPanLocation = location
         case .changed:
+            // 如果手指数量少于2个（有一个手指离开），停止移动
+            guard gesture.numberOfTouches == 2 else {
+                lastPanLocation = nil
+                return
+            }
             guard let lastLocation = lastPanLocation else { return }
             let deltaX = Float(location.x - lastLocation.x)
             let deltaY = Float(location.y - lastLocation.y)
@@ -1738,9 +1745,9 @@ class ARModelContainerView: UIView {
     
     @objc private func handleSinglePan(_ gesture: UIPanGestureRecognizer) {
         guard let controller = cameraController else { return }
-        
+
         let location = gesture.location(in: self)
-        
+
         switch gesture.state {
         case .began:
             lastRotationLocation = location
@@ -1760,18 +1767,39 @@ class ARModelContainerView: UIView {
 
 extension ARModelContainerView: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        // 允许双指平移和缩放同时识别
-        let isPan = gestureRecognizer is UIPanGestureRecognizer && (gestureRecognizer as? UIPanGestureRecognizer)?.minimumNumberOfTouches == 2
+        // 只允许双指平移和缩放同时识别
+        let isDoublePan = gestureRecognizer is UIPanGestureRecognizer &&
+                         (gestureRecognizer as? UIPanGestureRecognizer)?.minimumNumberOfTouches == 2
         let isPinch = gestureRecognizer is UIPinchGestureRecognizer
-        let otherIsPan = otherGestureRecognizer is UIPanGestureRecognizer && (otherGestureRecognizer as? UIPanGestureRecognizer)?.minimumNumberOfTouches == 2
+        let otherIsDoublePan = otherGestureRecognizer is UIPanGestureRecognizer &&
+                              (otherGestureRecognizer as? UIPanGestureRecognizer)?.minimumNumberOfTouches == 2
         let otherIsPinch = otherGestureRecognizer is UIPinchGestureRecognizer
-        
+
         // 双指平移和缩放可以同时识别
-        if (isPan && otherIsPinch) || (isPinch && otherIsPan) {
+        if (isDoublePan && otherIsPinch) || (isPinch && otherIsDoublePan) {
             return true
         }
-        
+
+        // 其他所有手势都不允许同时识别
         return false
+    }
+
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        // 获取当前所有手势识别器的状态
+        let allGestures = self.gestureRecognizers ?? []
+
+        // 检查是否有其他手势正在识别中（began 或 changed 状态）
+        let hasActiveGesture = allGestures.contains { gesture in
+            guard gesture !== gestureRecognizer else { return false }
+            return gesture.state == .began || gesture.state == .changed
+        }
+
+        // 如果有其他手势正在识别，阻止新手势开始
+        if hasActiveGesture {
+            return false
+        }
+
+        return true
     }
 }
 
