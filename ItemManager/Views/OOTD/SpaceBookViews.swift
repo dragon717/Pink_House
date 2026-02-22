@@ -49,31 +49,29 @@ struct SpaceBookView: View {
 struct SpaceBookCoverVisuals: View {
     let book: SpaceBookGroup
     @Environment(\.colorScheme) private var colorScheme
-
-    var coverImage: UIImage? {
-        if let coverPath = book.coverImage,
-           let image = ImageManager.shared.loadImage(fileName: coverPath) {
-            return image
-        }
-        // Fallback to first page
-        if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
-           let snapshotPath = firstPage.snapshotPath,
-           let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-            return image
-        }
-        return nil
-    }
+    @State private var loadedCoverImage: UIImage?
+    @State private var isLoading = true
 
     var body: some View {
         ZStack {
             colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
 
-            if let image = coverImage {
+            if let image = loadedCoverImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 160, height: 220)
                     .clipped()
+            } else if isLoading {
+                // 加载中状态
+                VStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text(book.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                }
             } else {
                 VStack {
                     Image(systemName: "cube.transparent")
@@ -88,7 +86,7 @@ struct SpaceBookCoverVisuals: View {
             }
 
             // Title Overlay if has image
-            if coverImage != nil {
+            if loadedCoverImage != nil {
                 VStack {
                     Spacer()
                     ZStack {
@@ -112,6 +110,69 @@ struct SpaceBookCoverVisuals: View {
             }
         }
         .clipShape(RoundedCorner(radius: 4, corners: [.topRight, .bottomRight]))
+        .task(id: book.id) {
+            await loadCoverImage()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .spaceOutfitThumbnailUpdated)) { notification in
+            // 监听缩略图更新通知，重新加载封面
+            if let updatedPageID = notification.object as? UUID {
+                // 检查更新的书页是否属于这本书
+                let validPages = (book.pages ?? []).filter { !$0.isDeleted }
+                if validPages.contains(where: { $0.id == updatedPageID }) {
+                    Task {
+                        await loadCoverImage()
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadCoverImage() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        // 1. 优先加载用户设置的封面图片
+        if let coverPath = book.coverImage {
+            let image = await ImageManager.shared.loadImageAsync(fileName: coverPath)
+            if let image = image {
+                await MainActor.run {
+                    self.loadedCoverImage = image
+                }
+                return
+            }
+        }
+
+        // 2. 如果没有设置封面，查找第一个有缩略图的空间书页
+        let validPages = (book.pages ?? [])
+            .filter { !$0.isDeleted }
+            .sorted(by: { $0.createdAt > $1.createdAt })
+        
+        // 优先查找有缓存缩略图的书页
+        for page in validPages {
+            if let thumbnail = SpaceOutfitThumbnailCache.shared.getThumbnail(for: page.id) {
+                await MainActor.run {
+                    self.loadedCoverImage = thumbnail
+                }
+                return
+            }
+        }
+        
+        // 3. 如果没有缓存缩略图，查找有snapshotPath的书页
+        if let firstPageWithSnapshot = validPages.first(where: { $0.snapshotPath != nil }),
+           let snapshotPath = firstPageWithSnapshot.snapshotPath {
+            let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+            if let image = image {
+                await MainActor.run {
+                    self.loadedCoverImage = image
+                }
+                return
+            }
+        }
+        
+        // 4. 都没有找到，显示占位符
+        await MainActor.run {
+            self.loadedCoverImage = nil
+        }
     }
 }
 
@@ -148,33 +209,16 @@ struct SpaceOutfitCard: View {
 struct SpaceOutfitCover: View {
     let page: SpaceOutfit
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 colorScheme == .dark ? Color(uiColor: .systemGray6) : Color.white
 
-                if let snapshotPath = page.snapshotPath,
-                   let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                } else {
-                    // 空白页纹理
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Image(systemName: "cube.transparent")
-                                .font(.system(size: 20))
-                                .foregroundStyle(.gray.opacity(0.3))
-                            Spacer()
-                        }
-                        Spacer()
-                    }
-                }
+                // 使用ARView实时渲染3D场景预览
+                SpaceOutfitPreviewView(page: page)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
     }
@@ -245,13 +289,13 @@ struct SpaceBookOpeningAnimationView: View {
             )
             .offset(y: isMovingToCenter ? 0 : 300)
         }
-        .onAppear {
-            loadPageImages()
+        .task {
+            await loadPageImages()
             startAnimationSequence()
         }
     }
 
-    private func loadPageImages() {
+    private func loadPageImages() async {
         // 获取书页数据（过滤已删除的，按创建时间倒序）
         let validPages = (book.pages ?? []).filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
 
@@ -264,9 +308,11 @@ struct SpaceBookOpeningAnimationView: View {
             let pageIndex = i % validPages.count
             let page = validPages[pageIndex]
 
-            if let snapshotPath = page.snapshotPath,
-               let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-                pageImages[i] = image
+            if let snapshotPath = page.snapshotPath {
+                let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+                await MainActor.run {
+                    self.pageImages[i] = image
+                }
             }
         }
     }
@@ -309,31 +355,33 @@ struct SpaceBookCoverForAnimation: View {
     let width: CGFloat
     let height: CGFloat
     var isFront: Bool = false
-
-    var coverImage: UIImage? {
-        if let coverPath = book.coverImage,
-           let image = ImageManager.shared.loadImage(fileName: coverPath) {
-            return image
-        }
-        // Fallback to first page
-        if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
-           let snapshotPath = firstPage.snapshotPath,
-           let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
-            return image
-        }
-        return nil
-    }
+    @State private var loadedCoverImage: UIImage?
+    @State private var isLoading = true
 
     var body: some View {
         ZStack {
             // Base Cover
-            if let image = coverImage {
+            if let image = loadedCoverImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: width, height: height)
                     .clipped()
                     .cornerRadius(4)
+            } else if isLoading {
+                Rectangle()
+                    .fill(Color.white)
+                    .frame(width: width, height: height)
+                    .cornerRadius(4)
+
+                VStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text(book.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                }
             } else {
                 Rectangle()
                     .fill(Color.white)
@@ -388,6 +436,34 @@ struct SpaceBookCoverForAnimation: View {
             }
         }
         .frame(width: width, height: height)
+        .task(id: book.id) {
+            await loadCoverImage()
+        }
+    }
+
+    private func loadCoverImage() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        // 优先加载封面图片
+        if let coverPath = book.coverImage {
+            let image = await ImageManager.shared.loadImageAsync(fileName: coverPath)
+            if let image = image {
+                await MainActor.run {
+                    self.loadedCoverImage = image
+                }
+                return
+            }
+        }
+
+        // 如果没有封面，使用第一页作为封面
+        if let firstPage = (book.pages ?? []).filter({ !$0.isDeleted }).sorted(by: { $0.createdAt > $1.createdAt }).first,
+           let snapshotPath = firstPage.snapshotPath {
+            let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+            await MainActor.run {
+                self.loadedCoverImage = image
+            }
+        }
     }
 }
 

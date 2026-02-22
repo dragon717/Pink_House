@@ -55,6 +55,10 @@ struct SpaceBookDetailView: View {
     // 分享卡片
     @State private var showingShareCard = false
     @State private var pageToShare: SpaceOutfit?
+    
+    // 设置缩略图
+    @State private var showingThumbnailEditor = false
+    @State private var pageToEditThumbnail: SpaceOutfit?
 
     // Grid Layout
     enum GridMode: Int, CaseIterable, Identifiable {
@@ -149,6 +153,11 @@ struct SpaceBookDetailView: View {
                         shareType: .spaceOutfit(page),
                         onDismiss: { showingShareCard = false }
                     )
+                }
+            }
+            .fullScreenCover(isPresented: $showingThumbnailEditor) {
+                if let page = pageToEditThumbnail {
+                    SpaceOutfitThumbnailEditorView(page: page)
                 }
             }
             .photosPicker(isPresented: $showingCoverPicker, selection: $selectedCoverItem, matching: .images)
@@ -267,6 +276,13 @@ struct SpaceBookDetailView: View {
             sharePage(page)
         } label: {
             Label("分享成图片", systemImage: "square.and.arrow.up")
+        }
+
+        Button {
+            pageToEditThumbnail = page
+            showingThumbnailEditor = true
+        } label: {
+            Label("设置缩略图", systemImage: "photo")
         }
 
         Button {
