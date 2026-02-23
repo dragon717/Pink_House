@@ -2,7 +2,7 @@
 //  PetConfigManager.swift
 //  ItemManager
 //
-//  Created by Pink House Dev on 2/8/26.
+//  Created by 少女心愿 Dev on 2/8/26.
 //
 
 import Foundation

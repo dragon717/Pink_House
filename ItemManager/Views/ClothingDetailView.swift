@@ -2,7 +2,7 @@
 //  ClothingDetailView.swift
 //  ItemManager
 //
-//  Created by Pink House Dev on 1/17/26.
+//  Created by 少女心愿 Dev on 1/17/26.
 //
 
 import SwiftUI

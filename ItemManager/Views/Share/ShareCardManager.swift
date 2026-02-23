@@ -477,7 +477,7 @@ struct ClothingShareCardContainerView: View {
                                     .font(.system(size: 64))
                                     .foregroundColor(MonicaColors.warmWhite.opacity(0.8))
                                 
-                                Text("Pink House")
+                                Text("少女心愿")
                                     .font(.system(size: 20, weight: .bold))
                                     .foregroundColor(MonicaColors.warmWhite.opacity(0.9))
                             }
@@ -744,7 +744,7 @@ struct BookPageShareCardContainerView: View {
                                     .font(.system(size: 64))
                                     .foregroundColor(MonicaColors.warmWhite.opacity(0.8))
                                 
-                                Text("Pink House")
+                                Text("少女心愿")
                                     .font(.system(size: 20, weight: .bold))
                                     .foregroundColor(MonicaColors.warmWhite.opacity(0.9))
                             }

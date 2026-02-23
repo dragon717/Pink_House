@@ -110,6 +110,10 @@ struct PerlerBeadsView: View {
             )
             .onChange(of: selectedItem) { _, newItem in
                 Task {
+                    // 重置之前裁剪的图片，避免使用缓存
+                    await MainActor.run {
+                        croppedImage = nil
+                    }
                     if let data = try? await newItem?.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
                         await MainActor.run {
@@ -129,8 +133,9 @@ struct PerlerBeadsView: View {
                     ImageCropPreviewView(
                         sourceImage: image,
                         isPresented: $showCropPreview,
-                        onConfirm: { resolution, paletteSize, style in
-                            // 创建画布模型并处理图片
+                        onConfirm: { croppedImage, resolution, paletteSize, style in
+                            // 直接接收裁剪后的图片，创建画布模型
+                            self.croppedImage = croppedImage
                             let canvasModel = PixelCanvasModel(
                                 resolution: resolution,
                                 paletteSize: paletteSize,
@@ -146,12 +151,6 @@ struct PerlerBeadsView: View {
                             }
                         }
                     )
-                }
-            }
-            // 监听裁剪完成通知
-            .onReceive(NotificationCenter.default.publisher(for: .imageCropCompleted)) { notification in
-                if let image = notification.userInfo?["croppedImage"] as? UIImage {
-                    croppedImage = image
                 }
             }
             // 新建画布配置
@@ -318,6 +317,7 @@ struct NewCanvasConfigSheet: View {
                 Section("预览") {
                     CanvasPreview(
                         resolution: selectedResolution,
+                        paletteSize: selectedPaletteSize,
                         style: selectedStyle
                     )
                     .frame(height: 200)
@@ -348,7 +348,13 @@ struct NewCanvasConfigSheet: View {
 // MARK: - 画布预览
 struct CanvasPreview: View {
     let resolution: PerlerBeadsConfig.Resolution
+    let paletteSize: PerlerBeadsConfig.PaletteSize
     let style: PerlerBeadsConfig.CanvasStyle
+
+    // 获取当前调色板
+    private var palette: [BeadColor] {
+        BeadColorPalette.colors(for: paletteSize)
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -364,7 +370,7 @@ struct CanvasPreview: View {
                     with: .color(.white)
                 )
 
-                // 绘制示例图案（简单的渐变效果）
+                // 绘制示例图案（使用实际调色板颜色）
                 for y in 0..<gridSize {
                     for x in 0..<gridSize {
                         let rect = CGRect(
@@ -374,15 +380,15 @@ struct CanvasPreview: View {
                             height: cellSize - gap
                         )
 
-                        // 根据位置计算颜色
-                        let hue = Double(x + y) / Double(gridSize * 2)
-                        let color = Color(hue: hue, saturation: 0.7, brightness: 0.9)
+                        // 根据位置计算调色板索引，实现颜色量化效果
+                        let colorIndex = colorIndexAt(x: x, y: y, gridSize: gridSize)
+                        let color = palette[colorIndex]
 
                         switch style {
                         case .pixelArt:
-                            context.fill(Path(rect), with: .color(color))
+                            context.fill(Path(rect), with: .color(color.color))
                         case .perlerBeads:
-                            context.fill(Path(ellipseIn: rect), with: .color(color))
+                            context.fill(Path(ellipseIn: rect), with: .color(color.color))
                         }
 
                         // 网格线
@@ -412,6 +418,17 @@ struct CanvasPreview: View {
             .background(Color.gray.opacity(0.1))
             .cornerRadius(8)
         }
+    }
+
+    /// 根据坐标计算调色板索引，展示颜色量化效果
+    private func colorIndexAt(x: Int, y: Int, gridSize: Int) -> Int {
+        let paletteCount = palette.count
+
+        // 使用对角线渐变模式，将连续颜色映射到有限的调色板索引
+        let position = Double(x + y) / Double(gridSize * 2)
+        let index = Int(position * Double(paletteCount - 1))
+
+        return min(max(index, 0), paletteCount - 1)
     }
 }
 

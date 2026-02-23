@@ -2,7 +2,7 @@
 //  CloudSyncManager.swift
 //  ItemManager
 //
-//  Created by Pink House Dev on 1/28/26.
+//  Created by 少女心愿 Dev on 1/28/26.
 //
 
 import Foundation

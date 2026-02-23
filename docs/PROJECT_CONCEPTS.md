@@ -1,6 +1,6 @@
 # 项目概念与专有词汇指南 (Project Concepts & Terminology)
 
-本文档旨在总结 "Pink House" (ItemManager) 项目中的核心场景、专有词汇及其在系统中的含义，帮助 AI 助手和开发者快速理解业务逻辑。
+本文档旨在总结 "少女心愿" (ItemManager) 项目中的核心场景、专有词汇及其在系统中的含义，帮助 AI 助手和开发者快速理解业务逻辑。
 
 ## 1. 核心场景 (Core Scenarios)
 

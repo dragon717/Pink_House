@@ -2,7 +2,7 @@
 //  DepositPlanView.swift
 //  ItemManager
 //
-//  Created by Pink House Dev on 1/16/26.
+//  Created by 少女心愿 Dev on 1/16/26.
 //
 
 import SwiftUI
@@ -634,7 +634,7 @@ struct SeriesSelectorView: View {
                     .alert("系列分类规则", isPresented: $showTips) {
                         Button("知道了", role: .cancel) { }
                     } message: {
-                        Text("系统会自动根据商品名称的前2-4个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n“Pink House 连衣裙”\n“Pink House 半裙”\n\n都会被归类为 “Pink” 系列。\n注：同名属于同一款商品。")
+                        Text("系统会自动根据商品名称的前2-4个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n“少女心愿 连衣裙”\n“少女心愿 半裙”\n\n都会被归类为 “Pink” 系列。\n注：同名属于同一款商品。")
                     }
                     
                     if isAnalyzing {

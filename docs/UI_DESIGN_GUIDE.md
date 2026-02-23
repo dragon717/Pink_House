@@ -22,7 +22,7 @@
     *   圆角：Continuous, 24pt。
 
 ### 2.2 色彩系统 (Color Palette)
-基于 Pink House 主题：
+基于 少女心愿 主题：
 
 *   **Primary Pink**: `#FFB6C1` (浅粉红) - 用于高亮、按钮背景。
 *   **Secondary Purple**: `#E6E6FA` (薰衣草紫) - 用于渐变辅助。

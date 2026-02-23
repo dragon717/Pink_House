@@ -17,6 +17,7 @@ struct PerlerBeadsEditorView: View {
     @State private var showMaterialList = false
     @State private var showSettings = false
     @State private var showShareSheet = false
+    @State private var showExportSheet = false
     @State private var showSaveSuccess = false
     @State private var generatedImage: UIImage?
     @State private var isProcessing = false
@@ -26,7 +27,7 @@ struct PerlerBeadsEditorView: View {
     
     // 返回确认状态
     @State private var showBackConfirmation = false
-    @State private var hasUnsavedChanges = true
+    @State private var hasUnsavedChanges: Bool
     
     // 色卡缩放状态
     @State private var paletteScale: CGFloat = 1.0
@@ -60,14 +61,20 @@ struct PerlerBeadsEditorView: View {
             _canvasModel = State(initialValue: pattern.toCanvasModel())
             _patternName = State(initialValue: pattern.name)
             _patternType = State(initialValue: pattern.typeEnum)
+            // 已有作品，初始状态视为未修改
+            _hasUnsavedChanges = State(initialValue: false)
         } else if let model = initialCanvasModel {
             _canvasModel = State(initialValue: model)
             _patternName = State(initialValue: "")
             _patternType = State(initialValue: .perlerBeads)
+            // 新创建的作品（从图片生成），视为已修改
+            _hasUnsavedChanges = State(initialValue: true)
         } else {
             _canvasModel = State(initialValue: PixelCanvasModel())
             _patternName = State(initialValue: "")
             _patternType = State(initialValue: .perlerBeads)
+            // 空白新作品，初始状态视为未修改（因为没有内容）
+            _hasUnsavedChanges = State(initialValue: false)
         }
     }
 
@@ -132,8 +139,15 @@ struct PerlerBeadsEditorView: View {
                             onSave: {
                                 savePattern()
                             },
+                            onSaveToCollection: {
+                                if existingPattern != nil || !patternName.isEmpty {
+                                    savePatternToDatabase()
+                                } else {
+                                    showSaveDialog = true
+                                }
+                            },
                             onShare: {
-                                showShareSheet = true
+                                showExportSheet = true
                             },
                             onIron: {
                                 canvasModel.toggleIronMode()
@@ -173,12 +187,18 @@ struct PerlerBeadsEditorView: View {
                         hasExistingPattern: existingPattern != nil,
                         onSaveToDatabase: { 
                             if existingPattern != nil || !patternName.isEmpty {
+                                // 已有名称，直接保存并退出
                                 savePatternToDatabase()
+                                return true // 应该关闭编辑器
                             } else {
+                                // 需要输入名称，显示保存对话框
                                 showSaveDialog = true
+                                return false // 不关闭编辑器，等待用户输入
                             }
                         },
-                        onSaveToPhotos: { savePattern() },
+                        onSaveToPhotos: { 
+                            savePattern()
+                        },
                         onDismiss: { dismiss() }
                     )
                 }
@@ -190,10 +210,13 @@ struct PerlerBeadsEditorView: View {
                     patternType: $patternType,
                     onSave: {
                         savePatternToDatabase()
+                        showSaveDialog = false
+                        // 保存成功后关闭编辑器
                         dismiss()
                     },
                     onCancel: {
                         showSaveDialog = false
+                        // 取消保存时不关闭编辑器，让用户可以继续编辑
                     }
                 )
             }
@@ -209,6 +232,13 @@ struct PerlerBeadsEditorView: View {
                     }
                 }
             }
+            // 监听画布数据变化，标记为已修改
+            .onChange(of: canvasModel.pixelData) { _, _ in
+                // 只有当画布有实际内容时，才标记为已修改
+                if canvasModel.hasDrawing {
+                    hasUnsavedChanges = true
+                }
+            }
             // 材料清单
             .sheet(isPresented: $showMaterialList) {
                 MaterialListView(canvasModel: canvasModel)
@@ -222,6 +252,10 @@ struct PerlerBeadsEditorView: View {
                 if let image = generatedImage ?? canvasModel.toUIImage() {
                     ShareSheet(items: [image])
                 }
+            }
+            // 图纸导出设置
+            .sheet(isPresented: $showExportSheet) {
+                PatternExportSheet(canvasModel: canvasModel)
             }
             // 保存成功提示
             .overlay {
@@ -286,7 +320,7 @@ struct PerlerBeadsEditorView: View {
         // 使用简单的确认对话框
         let alert = UIAlertController(
             title: "清空画布",
-            message: "确定要清空所有内容吗？此操作不可撤销。",
+            message: "确定要清空所有内容吗？",
             preferredStyle: .alert
         )
 
@@ -367,7 +401,8 @@ struct PerlerBeadsEditorView: View {
 struct BackButtonWithConfirmation: View {
     let hasUnsavedChanges: Bool
     let hasExistingPattern: Bool
-    let onSaveToDatabase: () -> Void
+    // 返回是否需要显示保存对话框（用于延迟关闭）
+    let onSaveToDatabase: () -> Bool
     let onSaveToPhotos: () -> Void
     let onDismiss: () -> Void
     
@@ -391,13 +426,17 @@ struct BackButtonWithConfirmation: View {
         .confirmationDialog("确认返回？", isPresented: $showConfirmation, titleVisibility: .visible) {
             if hasExistingPattern {
                 Button("保存修改") {
-                    onSaveToDatabase()
-                    onDismiss()
+                    let shouldDismiss = onSaveToDatabase()
+                    if shouldDismiss {
+                        onDismiss()
+                    }
                 }
             } else {
                 Button("保存到作品集") {
-                    onSaveToDatabase()
-                    onDismiss()
+                    let shouldDismiss = onSaveToDatabase()
+                    if shouldDismiss {
+                        onDismiss()
+                    }
                 }
             }
             Button("保存到相册") {
@@ -684,11 +723,13 @@ struct EditorSettingsSheet: View {
 
 // MARK: - 保存成功提示
 struct SaveSuccessToast: View {
+    var message: String = "已保存～"
+    
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.green)
-            Text("已保存到相册")
+            Text(message)
                 .font(.subheadline)
                 .fontWeight(.medium)
         }

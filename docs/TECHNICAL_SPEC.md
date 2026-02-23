@@ -1,7 +1,7 @@
 # 技术规格说明书 (Technical Specification)
 
 ## 1. 项目概况
-*   **项目名称**: Pink House - ItemManager
+*   **项目名称**: 少女心愿 - ItemManager
 *   **平台**: iOS 26 (Target), macOS (Compatible via Catalyst/SwiftUI)
 *   **语言**: Swift 6.0+
 *   **UI 框架**: SwiftUI

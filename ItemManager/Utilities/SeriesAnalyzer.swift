@@ -2,7 +2,7 @@
 //  SeriesAnalyzer.swift
 //  ItemManager
 //
-//  Created by Pink House Dev on 1/18/26.
+//  Created by 少女心愿 Dev on 1/18/26.
 //
 
 import Foundation
@@ -71,7 +71,7 @@ class SeriesAnalyzer {
             // Get all valid candidates (style count >= 2)
             // Or should we just take the longest prefix that matches?
             // The requirement says "First 2-4 chars".
-            // If we have "Pink House" and "Pink", do we keep both?
+            // If we have "少女心愿" and "Pink", do we keep both?
             // "Only look at the front 2-4 words" implies grouping by prefix.
             
             // Strategy: Group everything by their prefixes.
@@ -92,7 +92,7 @@ class SeriesAnalyzer {
             
             // Strict Redundancy Check:
             // A shorter candidate is redundant if ALL its items are also present in a longer candidate.
-            // Since we generate candidates from the SAME name, "Pink" will always contain the items of "Pink House" (if we generated prefixes).
+            // Since we generate candidates from the SAME name, "Pink" will always contain the items of "少女心愿" (if we generated prefixes).
             // But here we generate prefixes of length 2, 3, 4.
             // "Pin" (3) and "Pink" (4).
             // "Pink" items are a subset of "Pin" items? 

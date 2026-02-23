@@ -27,7 +27,9 @@ enum CropAspectRatio: String, CaseIterable {
 struct ImageCropPreviewView: View {
     let sourceImage: UIImage
     @Binding var isPresented: Bool
-    var onConfirm: (PerlerBeadsConfig.Resolution, PerlerBeadsConfig.PaletteSize, PerlerBeadsConfig.CanvasStyle) -> Void
+    var onConfirm: (UIImage, PerlerBeadsConfig.Resolution, PerlerBeadsConfig.PaletteSize, PerlerBeadsConfig.CanvasStyle) -> Void
+    
+    @Environment(\.dismiss) private var dismiss
 
     @State private var selectedResolution: PerlerBeadsConfig.Resolution = .x64
     @State private var selectedPaletteSize: PerlerBeadsConfig.PaletteSize = .c48
@@ -46,45 +48,142 @@ struct ImageCropPreviewView: View {
     // 裁剪区域比例选择
     @State private var selectedAspectRatio: CropAspectRatio = .oneToOne
     
-    // 变换后的图片缓存
-    @State private var transformedImage: UIImage
+    // 变换后的图片缓存 - 使用 @State 缓存避免重复计算
+    @State private var transformedImageCache: UIImage? = nil
+    @State private var cachedTransformState: TransformState = TransformState()
     
-    init(sourceImage: UIImage, isPresented: Binding<Bool>, onConfirm: @escaping (PerlerBeadsConfig.Resolution, PerlerBeadsConfig.PaletteSize, PerlerBeadsConfig.CanvasStyle) -> Void) {
+    // 变换状态结构体，用于检测变化
+    private struct TransformState: Equatable {
+        var rotation: CGFloat = 0
+        var isFlippedHorizontally: Bool = false
+        var isFlippedVertically: Bool = false
+        
+        init() {}
+        
+        init(rotation: CGFloat, isFlippedHorizontally: Bool, isFlippedVertically: Bool) {
+            self.rotation = rotation
+            self.isFlippedHorizontally = isFlippedHorizontally
+            self.isFlippedVertically = isFlippedVertically
+        }
+    }
+    
+    // 获取变换后的图片，带缓存
+    private func getTransformedImage() -> UIImage {
+        let currentState = TransformState(
+            rotation: rotation,
+            isFlippedHorizontally: isFlippedHorizontally,
+            isFlippedVertically: isFlippedVertically
+        )
+        
+        // 如果变换状态没有变化，直接返回缓存
+        if let cached = transformedImageCache, currentState == cachedTransformState {
+            return cached
+        }
+        
+        // 应用变换并缓存
+        let result = applyTransformationsToImage(sourceImage)
+        transformedImageCache = result
+        cachedTransformState = currentState
+        return result
+    }
+    
+    // 预览用的缩略图 - 延迟加载
+    @State private var previewImage: UIImage? = nil
+    @State private var isLoadingPreview = false
+    
+    init(sourceImage: UIImage, isPresented: Binding<Bool>, onConfirm: @escaping (UIImage, PerlerBeadsConfig.Resolution, PerlerBeadsConfig.PaletteSize, PerlerBeadsConfig.CanvasStyle) -> Void) {
         self.sourceImage = sourceImage
         self._isPresented = isPresented
         self.onConfirm = onConfirm
-        self._transformedImage = State(initialValue: sourceImage)
         print("[ImageCropPreviewView] Initialized with image size: \(sourceImage.size)")
     }
     
-    // 应用变换并更新缓存
-    private func applyTransformations() {
+    // 应用变换 - 实时计算，不缓存
+    private func applyTransformationsToImage(_ image: UIImage) -> UIImage {
+        var result = image
+        
+        // 应用水平翻转
+        if isFlippedHorizontally {
+            result = result.flippedHorizontally()
+        }
+        
+        // 应用垂直翻转
+        if isFlippedVertically {
+            result = result.flippedVertically()
+        }
+        
+        // 应用旋转
+        if rotation != 0 {
+            result = result.rotated(by: rotation)
+        }
+        
+        return result
+    }
+    
+    // 异步生成预览缩略图
+    private func loadPreviewImage() {
+        guard !isLoadingPreview else { return }
+        isLoadingPreview = true
+        
+        // 在主线程获取当前变换后的图片
+        let imageToProcess = getTransformedImage()
+        let maxDimension: CGFloat = 1024
+        
+        // 获取容器尺寸（预览区域是正方形，边长为屏幕宽度）
+        let containerSize = CGSize(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.width)
+        
         DispatchQueue.global(qos: .userInitiated).async {
-            var image = sourceImage
+            let size = imageToProcess.size
+            let scale = min(maxDimension / size.width, maxDimension / size.height, 1.0)
             
-            // 应用水平翻转
-            if isFlippedHorizontally {
-                image = image.flippedHorizontally()
+            let resultImage: UIImage
+            if scale < 1.0 {
+                let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+                UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+                imageToProcess.draw(in: CGRect(origin: .zero, size: newSize))
+                resultImage = UIGraphicsGetImageFromCurrentImageContext() ?? imageToProcess
+                UIGraphicsEndImageContext()
+            } else {
+                resultImage = imageToProcess
             }
             
-            // 应用垂直翻转
-            if isFlippedVertically {
-                image = image.flippedVertically()
+            // 计算图片在容器中的显示尺寸（scaledToFill 模式）
+            let imageAspectRatio = resultImage.size.width / resultImage.size.height
+            let containerAspectRatio = containerSize.width / containerSize.height
+            
+            var displayImageSize: CGSize
+            if imageAspectRatio > containerAspectRatio {
+                // 图片比容器更宽，以容器高度为基准，宽度会超出
+                displayImageSize = CGSize(
+                    width: containerSize.height * imageAspectRatio,
+                    height: containerSize.height
+                )
+            } else {
+                // 图片比容器更高，以容器宽度为基准，高度会超出
+                displayImageSize = CGSize(
+                    width: containerSize.width,
+                    height: containerSize.width / imageAspectRatio
+                )
             }
             
-            // 应用旋转
-            if rotation != 0 {
-                image = image.rotated(by: rotation)
-            }
+            // 计算使图片居中的初始偏移
+            let initialOffset = CGSize(
+                width: (containerSize.width - displayImageSize.width) / 2,
+                height: (containerSize.height - displayImageSize.height) / 2
+            )
             
-            DispatchQueue.main.async {
-                transformedImage = image
+            DispatchQueue.main.async { [self] in
+                previewImage = resultImage
+                // 设置初始偏移使图片居中
+                offset = initialOffset
+                lastOffset = initialOffset
+                isLoadingPreview = false
             }
         }
     }
 
     var body: some View {
-        print("[ImageCropPreviewView] Body rendering")
+        print("[ImageCropPreviewView] Body rendering, previewImage: \(previewImage != nil)")
         return NavigationStack {
             VStack(spacing: 0) {
                 // 图片预览区域
@@ -97,35 +196,44 @@ struct ImageCropPreviewView: View {
                         Color.black.opacity(0.5)
                             .ignoresSafeArea()
 
-                        // 可拖动的图片（应用变换）
-                        Image(uiImage: transformedImage)
-                            .resizable()
-                            .scaledToFill()
-                            .scaleEffect(scale)
-                            .offset(offset)
-                            .gesture(
-                                MagnificationGesture()
-                                    .onChanged { value in
-                                        let delta = value / lastScale
-                                        lastScale = value
-                                        scale = min(max(scale * delta, 0.5), 5.0)
-                                    }
-                                    .onEnded { _ in
-                                        lastScale = 1.0
-                                    }
-                            )
-                            .simultaneousGesture(
-                                DragGesture()
-                                    .onChanged { value in
-                                        offset = CGSize(
-                                            width: lastOffset.width + value.translation.width,
-                                            height: lastOffset.height + value.translation.height
-                                        )
-                                    }
-                                    .onEnded { _ in
-                                        lastOffset = offset
-                                    }
-                            )
+                        // 可拖动的图片（应用变换）- 使用缩略图提高性能
+                        Group {
+                            if let preview = previewImage {
+                                Image(uiImage: preview)
+                                    .resizable()
+                                    .scaledToFit()
+                            } else {
+                                // 加载中显示占位
+                                ProgressView("加载中...")
+                                    .scaleEffect(1.2)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .scaleEffect(scale)
+                        .offset(offset)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    let delta = value / lastScale
+                                    lastScale = value
+                                    scale = min(max(scale * delta, 0.5), 5.0)
+                                }
+                                .onEnded { _ in
+                                    lastScale = 1.0
+                                }
+                        )
+                        .simultaneousGesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    offset = CGSize(
+                                        width: lastOffset.width + value.translation.width,
+                                        height: lastOffset.height + value.translation.height
+                                    )
+                                }
+                                .onEnded { _ in
+                                    lastOffset = offset
+                                }
+                        )
 
                         // 裁剪框遮罩 - 使用统一容器确保对齐
                         GeometryReader { cropGeometry in
@@ -181,7 +289,9 @@ struct ImageCropPreviewView: View {
                         isActive: isFlippedHorizontally
                     ) {
                         isFlippedHorizontally.toggle()
-                        applyTransformations()
+                        // 清除预览图缓存，触发重新生成
+                        previewImage = nil
+                        loadPreviewImage()
                     }
 
                     Divider()
@@ -197,7 +307,9 @@ struct ImageCropPreviewView: View {
                         if rotation >= 360 {
                             rotation = 0
                         }
-                        applyTransformations()
+                        // 清除预览图缓存，触发重新生成
+                        previewImage = nil
+                        loadPreviewImage()
                     }
 
                     Divider()
@@ -216,7 +328,7 @@ struct ImageCropPreviewView: View {
                         isActive: false
                     ) {
                         resetTransform()
-                        applyTransformations()
+                        // 变换状态改变会自动触发重新渲染
                     }
                 }
                 .padding(.vertical, 8)
@@ -305,7 +417,7 @@ struct ImageCropPreviewView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") {
-                        isPresented = false
+                        dismiss()
                     }
                 }
 
@@ -324,6 +436,12 @@ struct ImageCropPreviewView: View {
                 }
             }
         }
+        .onAppear {
+            // 在视图出现时加载预览图
+            if previewImage == nil && !isLoadingPreview {
+                loadPreviewImage()
+            }
+        }
     }
 
     private func generatePattern() {
@@ -335,24 +453,13 @@ struct ImageCropPreviewView: View {
 
             DispatchQueue.main.async {
                 self.isGenerating = false
-                self.isPresented = false
-                // 将裁剪后的图片传递给回调
-                self.onConfirmWithCroppedImage(croppedImage)
+                // 调用回调并关闭视图，直接传递裁剪后的图片
+                if let image = croppedImage {
+                    self.onConfirm(image, self.selectedResolution, self.selectedPaletteSize, self.selectedStyle)
+                }
+                self.dismiss()
             }
         }
-    }
-
-    private func onConfirmWithCroppedImage(_ croppedImage: UIImage?) {
-        // 创建一个回调闭包来传递裁剪后的图片
-        // 这里通过通知中心发送裁剪后的图片
-        if let image = croppedImage {
-            NotificationCenter.default.post(
-                name: .imageCropCompleted,
-                object: nil,
-                userInfo: ["croppedImage": image]
-            )
-        }
-        onConfirm(selectedResolution, selectedPaletteSize, selectedStyle)
     }
 
     // 重置所有变换
@@ -362,11 +469,11 @@ struct ImageCropPreviewView: View {
             isFlippedHorizontally = false
             isFlippedVertically = false
             scale = 1.0
-            offset = .zero
             lastScale = 1.0
-            lastOffset = .zero
             selectedAspectRatio = .oneToOne
-            transformedImage = sourceImage
+            // 重新加载预览图，会自动计算居中的初始偏移
+            previewImage = nil
+            loadPreviewImage()
         }
     }
 
@@ -390,7 +497,7 @@ struct ImageCropPreviewView: View {
 
     // 裁剪图片
     private func cropImage() -> UIImage? {
-        let image = transformedImage
+        let image = getTransformedImage()
         let imageSize = image.size
 
         // 容器尺寸（预览区域）
@@ -680,6 +787,6 @@ extension UIImage {
     ImageCropPreviewView(
         sourceImage: UIImage(systemName: "photo")!,
         isPresented: .constant(true),
-        onConfirm: { _, _, _ in }
+        onConfirm: { _, _, _, _ in }
     )
 }

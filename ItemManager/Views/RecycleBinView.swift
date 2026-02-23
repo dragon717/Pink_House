@@ -2,7 +2,7 @@
 //  RecycleBinView.swift
 //  ItemManager
 //
-//  Created by Pink House Dev on 1/31/26.
+//  Created by 少女心愿 Dev on 1/31/26.
 //
 
 import SwiftUI
@@ -495,6 +495,8 @@ struct RecycleBinView: View {
             clothing.isDeleted = false
             clothing.deletedAt = nil
         }
+        // 从 DeleteTracker 中移除删除记录，防止被再次删除
+        DeleteTracker.shared.removeDeletedClothing(id: clothing.id)
     }
     
     private func permanentlyDeleteClothing(_ clothing: Clothing) {
@@ -512,8 +514,12 @@ struct RecycleBinView: View {
             for page in book.pages ?? [] {
                 page.isDeleted = false
                 page.deletedAt = nil
+                // 从 DeleteTracker 中移除书页的删除记录
+                DeleteTracker.shared.removeDeletedOutfit(id: page.id)
             }
         }
+        // 从 DeleteTracker 中移除手帐本的删除记录
+        DeleteTracker.shared.removeDeletedBookGroup(id: book.id)
     }
     
     private func permanentlyDeleteBook(_ book: BookGroup) {
@@ -533,6 +539,8 @@ struct RecycleBinView: View {
             outfit.isDeleted = false
             outfit.deletedAt = nil
         }
+        // 从 DeleteTracker 中移除删除记录，防止被再次删除
+        DeleteTracker.shared.removeDeletedOutfit(id: outfit.id)
     }
     
     private func permanentlyDeleteOutfit(_ outfit: Outfit) {
@@ -590,6 +598,8 @@ struct RecycleBinView: View {
             model.deletedAt = nil
             model.updatedAt = Date()
         }
+        // 从 DeleteTracker 中移除删除记录，防止被再次删除
+        DeleteTracker.shared.removeDeletedModel3D(id: model.id)
     }
     
     private func permanentlyDeleteModel3D(_ model: Model3D) {
@@ -615,6 +625,8 @@ struct RecycleBinView: View {
             pattern.updatedAt = Date()
             pattern.lastModified = Date()
         }
+        // 从 DeleteTracker 中移除删除记录，防止被再次删除
+        DeleteTracker.shared.removeDeletedPerlerPattern(id: pattern.id)
     }
     
     private func permanentlyDeletePerlerPattern(_ pattern: PerlerBeadPattern) {

@@ -2,7 +2,7 @@
 //  ImageViewer.swift
 //  ItemManager
 //
-//  Created by Pink House Dev on 2/4/26.
+//  Created by 少女心愿 Dev on 2/4/26.
 //
 
 import SwiftUI

@@ -5,11 +5,11 @@ import UIKit
 struct PixelCanvasView: View {
     @Bindable var canvasModel: PixelCanvasModel
 
-    // 视图状态
+    // 视图状态 - 使用 @GestureState 优化手势性能
     @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
+    @GestureState private var gestureScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
+    @GestureState private var gestureOffset: CGSize = .zero
     @State private var isDragging = false
     
     // 编辑手势状态
@@ -34,9 +34,14 @@ struct PixelCanvasView: View {
     var body: some View {
         GeometryReader { geometry in
             let canvasSize = min(geometry.size.width, geometry.size.height) * 0.9
+            let totalScale = scale * gestureScale
+            let totalOffset = CGSize(
+                width: offset.width + gestureOffset.width,
+                height: offset.height + gestureOffset.height
+            )
             
             ZStack {
-                // 画布内容
+                // 画布内容 - 使用 drawingGroup 优化渲染性能
                 Canvas { context, size in
                     drawCanvas(context: context, size: size)
                 }
@@ -44,16 +49,22 @@ struct PixelCanvasView: View {
                 .background(Color.white)
                 .cornerRadius(8)
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                .scaleEffect(scale)
-                .offset(offset)
+                .scaleEffect(totalScale)
+                .offset(totalOffset)
+                // 使用 drawingGroup 将画布内容渲染到离屏缓冲区，大幅提升性能
+                .drawingGroup(opaque: false, colorMode: .linear)
                 
                 // 手势识别层
                 CanvasGestureView(
                     isEditMode: isEditMode,
                     isEditable: isEditable,
                     canvasSize: canvasSize,
+                    scale: totalScale,
                     offset: $offset,
-                    lastOffset: $lastOffset,
+                    onPan: { newOffset in
+                        // 更新 offset
+                        offset = newOffset
+                    },
                     handleDraw: { location, size in
                         handleDraw(at: location, in: size)
                     },
@@ -64,16 +75,15 @@ struct PixelCanvasView: View {
                 .frame(width: canvasSize, height: canvasSize)
             }
             .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            // 双指缩放（所有模式都支持）
+            // 双指缩放（所有模式都支持）- 使用 @GestureState 优化
             .gesture(
                 MagnificationGesture()
-                    .onChanged { value in
-                        let delta = value / lastScale
-                        lastScale = value
-                        scale = min(max(scale * delta, PerlerBeadsConfig.minZoomScale), PerlerBeadsConfig.maxZoomScale)
+                    .updating($gestureScale) { value, state, _ in
+                        state = value
                     }
-                    .onEnded { _ in
-                        lastScale = 1.0
+                    .onEnded { value in
+                        let newScale = scale * value
+                        scale = min(max(newScale, PerlerBeadsConfig.minZoomScale), PerlerBeadsConfig.maxZoomScale)
                     }
             )
         }
@@ -89,77 +99,93 @@ struct PixelCanvasView: View {
             drawGrid(context: context, size: size, pixelSize: pixelSize)
         }
         
-        // 绘制像素
+        // 使用更高效的批量绘制
+        if canvasModel.isIronMode {
+            // 熨斗模式：批量绘制矩形
+            drawIronModePixels(context: context, resolution: resolution, pixelSize: pixelSize)
+        } else {
+            // 正常模式：批量绘制圆形
+            drawBeadModePixels(context: context, resolution: resolution, pixelSize: pixelSize)
+        }
+    }
+    
+    // MARK: - 熨斗模式绘制（批量矩形）
+    private func drawIronModePixels(context: GraphicsContext, resolution: Int, pixelSize: CGFloat) {
         for y in 0..<resolution {
             for x in 0..<resolution {
                 let colorIndex = canvasModel.getPixel(at: x, y: y)
+                guard colorIndex >= 0 && colorIndex < canvasModel.palette.count else { continue }
                 
-                if colorIndex >= 0 && colorIndex < canvasModel.palette.count {
-                    let beadColor = canvasModel.palette[colorIndex]
-                    let color = beadColor.color
+                let beadColor = canvasModel.palette[colorIndex]
+                let rect = CGRect(
+                    x: CGFloat(x) * pixelSize,
+                    y: CGFloat(y) * pixelSize,
+                    width: pixelSize,
+                    height: pixelSize
+                )
+                
+                context.fill(Path(rect), with: .color(beadColor.color))
+            }
+        }
+    }
+    
+    // MARK: - 拼豆模式绘制（批量圆形）
+    private func drawBeadModePixels(context: GraphicsContext, resolution: Int, pixelSize: CGFloat) {
+        let drawSize = pixelSize * 0.85
+        let holeSize = drawSize * 0.25
+        let showText = pixelSize > 16
+        
+        for y in 0..<resolution {
+            for x in 0..<resolution {
+                let colorIndex = canvasModel.getPixel(at: x, y: y)
+                guard colorIndex >= 0 && colorIndex < canvasModel.palette.count else { continue }
+                
+                let beadColor = canvasModel.palette[colorIndex]
+                let rect = CGRect(
+                    x: CGFloat(x) * pixelSize,
+                    y: CGFloat(y) * pixelSize,
+                    width: pixelSize,
+                    height: pixelSize
+                )
+                
+                // 绘制拼豆圆形
+                let beadRect = CGRect(
+                    x: rect.midX - drawSize / 2,
+                    y: rect.midY - drawSize / 2,
+                    width: drawSize,
+                    height: drawSize
+                )
+                context.fill(Path(ellipseIn: beadRect), with: .color(beadColor.color))
+                
+                // 绘制中心孔
+                let holeRect = CGRect(
+                    x: rect.midX - holeSize / 2,
+                    y: rect.midY - holeSize / 2,
+                    width: holeSize,
+                    height: holeSize
+                )
+                context.fill(Path(ellipseIn: holeRect), with: .color(.white.opacity(0.6)))
+                
+                // 绘制颜色编号
+                if showText {
+                    let text = pixelSize > 24 ? beadColor.id : String(beadColor.id.dropFirst())
+                    let textColor = textColorForBackground(beadColor.color)
+                    let fontSize = pixelSize > 24 ? min(pixelSize * 0.35, 10) : min(pixelSize * 0.4, 8)
                     
-                    let rect = CGRect(
-                        x: CGFloat(x) * pixelSize,
-                        y: CGFloat(y) * pixelSize,
-                        width: pixelSize,
-                        height: pixelSize
+                    var textRenderer = Text(text)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundColor(textColor)
+                    
+                    let resolvedText = context.resolve(textRenderer)
+                    let textSize = resolvedText.measure(in: CGSize(width: pixelSize, height: pixelSize))
+                    let textRect = CGRect(
+                        x: rect.midX - textSize.width / 2,
+                        y: rect.midY - textSize.height / 2,
+                        width: textSize.width,
+                        height: textSize.height
                     )
                     
-                    if canvasModel.isIronMode {
-                        // 熨斗模式：填充整个格子的纯色块
-                        context.fill(
-                            Path(rect),
-                            with: .color(color)
-                        )
-                    } else {
-                        // 正常模式：绘制拼豆风格圆形
-                        let drawSize = pixelSize * 0.85
-                        let beadRect = CGRect(
-                            x: rect.midX - drawSize / 2,
-                            y: rect.midY - drawSize / 2,
-                            width: drawSize,
-                            height: drawSize
-                        )
-                        context.fill(
-                            Path(ellipseIn: beadRect),
-                            with: .color(color)
-                        )
-                        
-                        // 绘制中心孔（小圆点）
-                        let holeSize = drawSize * 0.25
-                        let holeRect = CGRect(
-                            x: rect.midX - holeSize / 2,
-                            y: rect.midY - holeSize / 2,
-                            width: holeSize,
-                            height: holeSize
-                        )
-                        context.fill(
-                            Path(ellipseIn: holeRect),
-                            with: .color(.white.opacity(0.6))
-                        )
-                        
-                        // 绘制颜色编号（当格子足够大时显示完整编号，否则只显示数字）
-                        if pixelSize > 16 {
-                            let text = pixelSize > 24 ? beadColor.id : String(beadColor.id.dropFirst())
-                            let textColor = textColorForBackground(color)
-                            let fontSize = pixelSize > 24 ? min(pixelSize * 0.35, 10) : min(pixelSize * 0.4, 8)
-                            
-                            var textRenderer = Text(text)
-                                .font(.system(size: fontSize, weight: .bold))
-                                .foregroundColor(textColor)
-                            
-                            let resolvedText = context.resolve(textRenderer)
-                            let textSize = resolvedText.measure(in: CGSize(width: pixelSize, height: pixelSize))
-                            let textRect = CGRect(
-                                x: rect.midX - textSize.width / 2,
-                                y: rect.midY - textSize.height / 2,
-                                width: textSize.width,
-                                height: textSize.height
-                            )
-                            
-                            context.draw(resolvedText, in: textRect)
-                        }
-                    }
+                    context.draw(resolvedText, in: textRect)
                 }
             }
         }
@@ -214,28 +240,50 @@ struct PixelCanvasView: View {
         let x = Int(location.x / pixelSize)
         let y = Int(location.y / pixelSize)
 
+        // 打印详细的坐标转换日志
+        print("[PerlerBeads][Draw] ========== 坐标转换日志 ==========")
+        print("[PerlerBeads][Draw] 手指触摸坐标: location=(\(String(format: "%.2f", location.x)), \(String(format: "%.2f", location.y)))")
+        print("[PerlerBeads][Draw] 画布尺寸: size=(\(String(format: "%.2f", size.width)), \(String(format: "%.2f", size.height)))")
+        print("[PerlerBeads][Draw] 像素大小: pixelSize=\(String(format: "%.4f", pixelSize))")
+        print("[PerlerBeads][Draw] 分辨率: resolution=\(resolution)x\(resolution)")
+        print("[PerlerBeads][Draw] 计算后的网格坐标: x=\(x), y=\(y)")
+        print("[PerlerBeads][Draw] 当前工具模式: toolMode=\(toolMode)")
+        print("[PerlerBeads][Draw] 当前偏移量: offset=(\(String(format: "%.2f", offset.width)), \(String(format: "%.2f", offset.height)))")
+        print("[PerlerBeads][Draw] 当前缩放: scale=\(String(format: "%.2f", scale))")
+
         // 检查坐标是否有效
-        guard x >= 0, x < resolution, y >= 0, y < resolution else { return }
+        guard x >= 0, x < resolution, y >= 0, y < resolution else {
+            print("[PerlerBeads][Draw] 坐标超出范围，忽略绘制")
+            return
+        }
+
+        print("[PerlerBeads][Draw] 坐标有效，执行绘制操作")
 
         switch toolMode {
         case .brush:
+            print("[PerlerBeads][Draw] 执行: 画笔绘制 at (\(x), \(y))")
             canvasModel.drawPixel(at: x, y: y)
 
         case .eraser:
+            print("[PerlerBeads][Draw] 执行: 橡皮擦除 at (\(x), \(y))")
             canvasModel.erasePixel(at: x, y: y)
 
         case .picker:
+            print("[PerlerBeads][Draw] 执行: 取色器 at (\(x), \(y))")
             let colorIndex = canvasModel.getPixel(at: x, y: y)
+            print("[PerlerBeads][Draw] 取色结果: colorIndex=\(colorIndex)")
             if colorIndex >= 0 {
                 canvasModel.selectedColorIndex = colorIndex
             }
             
         case .fill:
+            print("[PerlerBeads][Draw] 执行: 填充工具 at (\(x), \(y))")
             // 填充连通区域，然后自动切换回画笔
             canvasModel.floodFill(at: x, y: y)
             // 通知父视图切换回画笔模式
             NotificationCenter.default.post(name: .fillToolCompleted, object: nil)
         }
+        print("[PerlerBeads][Draw] =================================")
     }
 }
 
@@ -249,8 +297,9 @@ struct CanvasGestureView: UIViewRepresentable {
     let isEditMode: Bool
     let isEditable: Bool
     let canvasSize: CGFloat
+    let scale: CGFloat
     @Binding var offset: CGSize
-    @Binding var lastOffset: CGSize
+    let onPan: ((CGSize) -> Void)?
     let handleDraw: (CGPoint, CGSize) -> Void
     let saveHistory: () -> Void
     
@@ -258,12 +307,26 @@ struct CanvasGestureView: UIViewRepresentable {
         let view = UIView()
         view.backgroundColor = .clear
         
-        // 单指手势（绘制或移动）
+        // 单指点击手势（用于轻点绘制）
+        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        tapGesture.numberOfTapsRequired = 1
+        tapGesture.numberOfTouchesRequired = 1
+        tapGesture.delegate = context.coordinator
+        view.addGestureRecognizer(tapGesture)
+        
+        // 单指拖动手势（绘制或移动）
         let singlePan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSinglePan(_:)))
         singlePan.minimumNumberOfTouches = 1
         singlePan.maximumNumberOfTouches = 1
         singlePan.delegate = context.coordinator
         view.addGestureRecognizer(singlePan)
+        
+        // 长按手势（用于更灵敏的绘制触发）
+        let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
+        longPress.minimumPressDuration = 0.01 // 非常短的按压时间，几乎立即触发
+        longPress.numberOfTouchesRequired = 1
+        longPress.delegate = context.coordinator
+        view.addGestureRecognizer(longPress)
         
         // 双指手势（移动画布）
         let doublePan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleDoublePan(_:)))
@@ -279,8 +342,11 @@ struct CanvasGestureView: UIViewRepresentable {
         context.coordinator.isEditMode = isEditMode
         context.coordinator.isEditable = isEditable
         context.coordinator.canvasSize = canvasSize
+        context.coordinator.scale = scale
+        context.coordinator.offset = offset
         context.coordinator.handleDraw = handleDraw
         context.coordinator.saveHistory = saveHistory
+        context.coordinator.onPan = onPan
     }
     
     func makeCoordinator() -> Coordinator {
@@ -292,9 +358,13 @@ struct CanvasGestureView: UIViewRepresentable {
         var isEditMode: Bool = false
         var isEditable: Bool = false
         var canvasSize: CGFloat = 0
+        var scale: CGFloat = 1.0
+        var offset: CGSize = .zero
         var handleDraw: ((CGPoint, CGSize) -> Void)?
         var saveHistory: (() -> Void)?
+        var onPan: ((CGSize) -> Void)?
         private var lastDrawLocation: CGPoint?
+        private var panStartOffset: CGSize = .zero
         
         init(_ parent: CanvasGestureView) {
             self.parent = parent
@@ -304,20 +374,117 @@ struct CanvasGestureView: UIViewRepresentable {
             return true
         }
         
+        /// 将手势坐标转换为画布坐标（考虑缩放和偏移）
+        private func convertToCanvasCoordinates(_ location: CGPoint) -> CGPoint {
+            // 手势视图的中心点
+            let centerX = canvasSize / 2
+            let centerY = canvasSize / 2
+            
+            // 1. 将坐标转换为相对于中心的坐标
+            let relativeX = location.x - centerX
+            let relativeY = location.y - centerY
+            
+            // 2. 考虑缩放：将缩放后的坐标转换为原始坐标
+            let scaledX = relativeX / scale
+            let scaledY = relativeY / scale
+            
+            // 3. 考虑偏移：减去偏移量
+            let finalX = scaledX - (offset.width / scale)
+            let finalY = scaledY - (offset.height / scale)
+            
+            // 4. 转换回左上角坐标系
+            let canvasX = finalX + centerX
+            let canvasY = finalY + centerY
+            
+            print("[PerlerBeads][Coordinate] 坐标转换: input=(\(String(format: "%.2f", location.x)), \(String(format: "%.2f", location.y))) -> output=(\(String(format: "%.2f", canvasX)), \(String(format: "%.2f", canvasY)))")
+            print("[PerlerBeads][Coordinate] 参数: scale=\(String(format: "%.2f", scale)), offset=(\(String(format: "%.2f", offset.width)), \(String(format: "%.2f", offset.height)))")
+            
+            return CGPoint(x: canvasX, y: canvasY)
+        }
+        
+        // MARK: - 点击手势处理（单指轻点）
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            let location = gesture.location(in: gesture.view)
+            let size = CGSize(width: canvasSize, height: canvasSize)
+            
+            print("[PerlerBeads][Tap] 单指点击手势触发，location=(\(String(format: "%.2f", location.x)), \(String(format: "%.2f", location.y)))")
+            print("[PerlerBeads][Tap] isEditMode=\(isEditMode), isEditable=\(isEditable)")
+            
+            guard isEditMode && isEditable else {
+                print("[PerlerBeads][Tap] 非编辑模式或不可编辑，忽略点击")
+                return
+            }
+            
+            // 将手势坐标转换为画布坐标
+            let canvasLocation = convertToCanvasCoordinates(location)
+            
+            print("[PerlerBeads][Tap] 触发绘制操作")
+            handleDraw?(canvasLocation, size)
+            saveHistory?()
+        }
+        
+        // MARK: - 长按手势处理（用于快速响应）
+        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+            let location = gesture.location(in: gesture.view)
+            let size = CGSize(width: canvasSize, height: canvasSize)
+            
+            print("[PerlerBeads][LongPress] 长按手势 state=\(gesture.state.rawValue), location=(\(String(format: "%.2f", location.x)), \(String(format: "%.2f", location.y)))")
+            
+            guard isEditMode && isEditable else { return }
+            
+            // 将手势坐标转换为画布坐标
+            let canvasLocation = convertToCanvasCoordinates(location)
+            
+            switch gesture.state {
+            case .began:
+                print("[PerlerBeads][LongPress] 长按开始，触发绘制")
+                handleDraw?(canvasLocation, size)
+                lastDrawLocation = canvasLocation
+            case .changed:
+                // 长按移动时也可以绘制
+                if lastDrawLocation == nil || distance(canvasLocation, lastDrawLocation!) > 3 {
+                    print("[PerlerBeads][LongPress] 长按移动中，触发绘制")
+                    handleDraw?(canvasLocation, size)
+                    lastDrawLocation = canvasLocation
+                }
+            case .ended, .cancelled:
+                print("[PerlerBeads][LongPress] 长按结束")
+                lastDrawLocation = nil
+                saveHistory?()
+            default:
+                break
+            }
+        }
+        
+        // MARK: - 单指拖动手势处理
         @objc func handleSinglePan(_ gesture: UIPanGestureRecognizer) {
             let location = gesture.location(in: gesture.view)
             let size = CGSize(width: canvasSize, height: canvasSize)
             
+            // 打印手势识别日志
+            if gesture.state == .began || gesture.state == .changed {
+                print("[PerlerBeads][Pan] 单指拖动手势 state=\(gesture.state == .began ? "began" : "changed"), rawLocation=(\(String(format: "%.2f", location.x)), \(String(format: "%.2f", location.y)))")
+                print("[PerlerBeads][Pan] isEditMode=\(isEditMode), isEditable=\(isEditable)")
+            }
+            
             if isEditMode && isEditable {
                 // 编辑模式：单指使用工具
+                
+                // 将手势坐标转换为画布坐标
+                let canvasLocation = convertToCanvasCoordinates(location)
+                
                 switch gesture.state {
                 case .began, .changed:
                     // 限制绘制频率以提高性能但保持跟手
-                    if lastDrawLocation == nil || distance(location, lastDrawLocation!) > 3 {
-                        handleDraw?(location, size)
-                        lastDrawLocation = location
+                    if lastDrawLocation == nil || distance(canvasLocation, lastDrawLocation!) > 3 {
+                        print("[PerlerBeads][Pan] 触发绘制，距离过滤通过")
+                        handleDraw?(canvasLocation, size)
+                        lastDrawLocation = canvasLocation
+                    } else {
+                        print("[PerlerBeads][Pan] 绘制被距离过滤跳过，lastDrawLocation=(\(String(format: "%.2f", lastDrawLocation?.x ?? 0)), \(String(format: "%.2f", lastDrawLocation?.y ?? 0)))")
                     }
                 case .ended, .cancelled:
+                    print("[PerlerBeads][Pan] 单指拖动结束/取消")
                     lastDrawLocation = nil
                     saveHistory?()
                 default:
@@ -327,13 +494,21 @@ struct CanvasGestureView: UIViewRepresentable {
                 // 非编辑模式：单指移动画布
                 let translation = gesture.translation(in: gesture.view)
                 switch gesture.state {
+                case .began:
+                    panStartOffset = parent.offset
+                    print("[PerlerBeads][Pan] 开始移动画布，panStartOffset=(\(String(format: "%.2f", panStartOffset.width)), \(String(format: "%.2f", panStartOffset.height)))")
                 case .changed:
-                    parent.offset = CGSize(
-                        width: parent.lastOffset.width + translation.x,
-                        height: parent.lastOffset.height + translation.y
+                    // 实时更新 offset
+                    let newOffset = CGSize(
+                        width: panStartOffset.width + translation.x,
+                        height: panStartOffset.height + translation.y
                     )
+                    print("[PerlerBeads][Pan] 移动画布中，translation=(\(String(format: "%.2f", translation.x)), \(String(format: "%.2f", translation.y))), newOffset=(\(String(format: "%.2f", newOffset.width)), \(String(format: "%.2f", newOffset.height)))")
+                    parent.offset = newOffset
+                    onPan?(newOffset)
                 case .ended, .cancelled:
-                    parent.lastOffset = parent.offset
+                    print("[PerlerBeads][Pan] 移动画布结束")
+                    panStartOffset = .zero
                 default:
                     break
                 }
@@ -341,18 +516,30 @@ struct CanvasGestureView: UIViewRepresentable {
         }
         
         @objc func handleDoublePan(_ gesture: UIPanGestureRecognizer) {
-            guard isEditMode && isEditable else { return }
+            guard isEditMode && isEditable else { 
+                print("[PerlerBeads][DoublePan] 非编辑模式或不可编辑，忽略双指手势")
+                return 
+            }
             
             // 编辑模式：双指移动画布
             let translation = gesture.translation(in: gesture.view)
+            print("[PerlerBeads][DoublePan] 双指手势 state=\(gesture.state.rawValue), translation=(\(String(format: "%.2f", translation.x)), \(String(format: "%.2f", translation.y)))")
+            
             switch gesture.state {
+            case .began:
+                panStartOffset = parent.offset
+                print("[PerlerBeads][DoublePan] 开始双指移动画布，panStartOffset=(\(String(format: "%.2f", panStartOffset.width)), \(String(format: "%.2f", panStartOffset.height)))")
             case .changed:
-                parent.offset = CGSize(
-                    width: parent.lastOffset.width + translation.x,
-                    height: parent.lastOffset.height + translation.y
+                let newOffset = CGSize(
+                    width: panStartOffset.width + translation.x,
+                    height: panStartOffset.height + translation.y
                 )
+                print("[PerlerBeads][DoublePan] 双指移动画布中，newOffset=(\(String(format: "%.2f", newOffset.width)), \(String(format: "%.2f", newOffset.height)))")
+                parent.offset = newOffset
+                onPan?(newOffset)
             case .ended, .cancelled:
-                parent.lastOffset = parent.offset
+                print("[PerlerBeads][DoublePan] 双指移动画布结束")
+                panStartOffset = .zero
             default:
                 break
             }
@@ -377,6 +564,7 @@ struct PerlerCanvasToolbar: View {
     var onClear: () -> Void
     var onFill: () -> Void
     var onSave: () -> Void
+    var onSaveToCollection: () -> Void
     var onShare: () -> Void
     var onIron: () -> Void = {} // 熨斗功能回调
 
@@ -565,12 +753,33 @@ struct PerlerCanvasToolbar: View {
             
             Divider().frame(height: 24)
             
-            PerlerToolbarButtonWithLabel(
-                icon: "square.and.arrow.down",
-                label: "保存",
-                isPrimary: true,
-                action: onSave
-            )
+            // 保存菜单按钮
+            Menu {
+                Button {
+                    onSaveToCollection()
+                } label: {
+                    Label("保存到作品集", systemImage: "folder")
+                }
+                
+                Button {
+                    onSave()
+                } label: {
+                    Label("保存图片", systemImage: "photo")
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 18, weight: .medium))
+                    Text("保存")
+                        .font(.system(size: 9))
+                }
+                .foregroundColor(.pink)
+                .frame(width: 50, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.pink.opacity(0.15))
+                )
+            }
             
             PerlerToolbarButtonWithLabel(
                 icon: "square.and.arrow.up",
