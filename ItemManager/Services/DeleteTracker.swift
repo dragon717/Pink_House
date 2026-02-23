@@ -12,6 +12,7 @@ final class DeleteTracker {
     private let deletedClothingsKey = "deletedClothings"
     private let deletedBookGroupsKey = "deletedBookGroups"
     private let deletedModel3DsKey = "deletedModel3Ds"
+    private let deletedPerlerPatternsKey = "deletedPerlerPatterns"
     
     // MARK: - 记录删除
     
@@ -43,6 +44,13 @@ final class DeleteTracker {
         print("DeleteTracker: Recorded deleted 3D model \(id)")
     }
 
+    func recordDeletedPerlerPattern(id: UUID) {
+        var deletedIDs = getDeletedPerlerPatternIDs()
+        deletedIDs.append(id)
+        userDefaults.set(deletedIDs.map { $0.uuidString }, forKey: deletedPerlerPatternsKey)
+        print("DeleteTracker: Recorded deleted perler pattern \(id)")
+    }
+
     // MARK: - 获取记录的删除
     
     func getDeletedOutfitIDs() -> [UUID] {
@@ -62,6 +70,11 @@ final class DeleteTracker {
 
     func getDeletedModel3DIDs() -> [UUID] {
         guard let strings = userDefaults.stringArray(forKey: deletedModel3DsKey) else { return [] }
+        return strings.compactMap { UUID(uuidString: $0) }
+    }
+
+    func getDeletedPerlerPatternIDs() -> [UUID] {
+        guard let strings = userDefaults.stringArray(forKey: deletedPerlerPatternsKey) else { return [] }
         return strings.compactMap { UUID(uuidString: $0) }
     }
 
@@ -196,6 +209,38 @@ final class DeleteTracker {
         }
     }
 
+    func applyDeletedPerlerPatterns(context: ModelContext) {
+        let deletedIDs = getDeletedPerlerPatternIDs()
+        guard !deletedIDs.isEmpty else { return }
+
+        print("DeleteTracker: Applying \(deletedIDs.count) deleted perler patterns")
+
+        let descriptor = FetchDescriptor<PerlerBeadPattern>()
+        do {
+            let allPatterns = try context.fetch(descriptor)
+            var appliedCount = 0
+
+            for pattern in allPatterns {
+                if deletedIDs.contains(pattern.id) && !pattern.isDeleted {
+                    pattern.isDeleted = true
+                    pattern.deletedAt = Date()
+                    pattern.lastModified = Date()
+                    appliedCount += 1
+                    print("DeleteTracker: Applied delete to perler pattern '\(pattern.name)' (ID: \(pattern.id))")
+                }
+            }
+
+            if appliedCount > 0 {
+                try context.save()
+                print("DeleteTracker: Applied \(appliedCount) perler pattern deletes")
+            }
+
+            clearDeletedPerlerPatterns()
+        } catch {
+            print("DeleteTracker: Failed to apply perler pattern deletes: \(error)")
+        }
+    }
+
     // MARK: - 清理记录
 
     func clearDeletedOutfits() {
@@ -218,6 +263,11 @@ final class DeleteTracker {
         print("DeleteTracker: Cleared 3D model delete records")
     }
 
+    func clearDeletedPerlerPatterns() {
+        userDefaults.removeObject(forKey: deletedPerlerPatternsKey)
+        print("DeleteTracker: Cleared perler pattern delete records")
+    }
+
     // MARK: - 应用所有删除
 
     func applyAllDeletes(context: ModelContext) {
@@ -226,6 +276,7 @@ final class DeleteTracker {
         applyDeletedClothings(context: context)
         applyDeletedModel3Ds(context: context)
         applyDeletedBookGroups(context: context)
+        applyDeletedPerlerPatterns(context: context)
         print("DeleteTracker: Finished applying deletes")
     }
 }

@@ -178,7 +178,12 @@ struct FrenchRetroSmallWorldView: View {
                 selectedTab = 0
                 homeTab = .depositPlan
             }
-            
+
+            // 6. 拼豆工坊
+            InteractionHotspot(rect: CGRect(x: 0.85, y: 0.15, width: 0.1, height: 0.15), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .pink, label: "拼豆工坊", labelStyle: .horizontal(angle: -15), labelPosition: CGPoint(x: 0.92, y: 0.32)) {
+                destination = .perler
+            }
+
             // 中心锚点，用于初始定位
             Color.clear
                 .frame(width: 1, height: 1)

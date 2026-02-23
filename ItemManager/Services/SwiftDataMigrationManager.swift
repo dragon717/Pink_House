@@ -97,7 +97,8 @@ class SwiftDataMigrationManager: ObservableObject {
             SpaceOutfit.self,
             SceneObjectData.self,
             Model3D.self,
-            StoredImage.self
+            StoredImage.self,
+            PerlerBeadPattern.self
         ])
         #endif
     }

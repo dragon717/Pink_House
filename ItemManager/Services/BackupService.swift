@@ -505,6 +505,35 @@ class BackupService {
                 )
             }
             
+            // 10. Perler Bead Patterns (拼豆/像素画)
+            let perlerBeadPatternDTOs: [PerlerBeadPatternDTO] = try self.processByIDs(context: context, descriptor: FetchDescriptor<PerlerBeadPattern>(), entityName: "PerlerBeadPatterns") { pattern in
+                // Thumbnail image
+                if let thumbnailPath = pattern.thumbnailPath {
+                    let fileName = (thumbnailPath as NSString).lastPathComponent
+                    if !fileName.isEmpty {
+                        standardImagesToBackup.insert(fileName)
+                    }
+                }
+                
+                return PerlerBeadPatternDTO(
+                    id: pattern.id,
+                    name: pattern.name,
+                    patternType: pattern.patternType,
+                    resolution: pattern.resolution,
+                    paletteSize: pattern.paletteSize,
+                    canvasStyle: pattern.canvasStyle,
+                    pixelData: pattern.pixelData,
+                    paletteSortOrder: pattern.paletteSortOrder,
+                    thumbnailPath: pattern.thumbnailPath,
+                    isDeleted: pattern.isDeleted,
+                    deletedAt: pattern.deletedAt,
+                    createdAt: pattern.createdAt,
+                    updatedAt: pattern.updatedAt,
+                    lastModified: pattern.lastModified,
+                    sortIndex: pattern.sortIndex
+                )
+            }
+            
             var themeFiles: [String] = []
             let possibleThemeFiles = ["theme_background_image.png", "theme_background_image_original.png"]
             for file in possibleThemeFiles {
@@ -685,7 +714,7 @@ class BackupService {
             }
             
             let manifest = BackupManifest(
-                version: "1.6",
+                version: "1.7",
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -712,13 +741,15 @@ class BackupService {
                 model3Ds: model3DDTOs,
                 userProfile: userProfileDTO,
                 userAvatarFile: userAvatarFileName,
+                perlerBeadPatterns: perlerBeadPatternDTOs,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: snapshotDTOs.count,
                 bookGroupCount: bookGroupDTOs.count,
                 spaceBookGroupCount: spaceBookGroupDTOs.count,
                 spaceOutfitCount: spaceOutfitDTOs.count,
-                model3DCount: model3DDTOs.count
+                model3DCount: model3DDTOs.count,
+                perlerBeadPatternCount: perlerBeadPatternDTOs.count
             )
             
             print("### Export: Prepared data. Total files: \(imageFiles.count)")
@@ -791,6 +822,7 @@ class BackupService {
         var model3DMap: [UUID: Model3D] = [:]
         var bookGroupMap: [UUID: BookGroup] = [:]
         var spaceBookGroupMap: [UUID: SpaceBookGroup] = [:]
+        var perlerBeadPatternMap: [UUID: PerlerBeadPattern] = [:]
 
         init(manifest: BackupManifest, imageFiles: [String: URL], context: ModelContext) throws {
             self.manifest = manifest
@@ -1116,6 +1148,9 @@ class BackupService {
         
         // 3c. 恢复书册数据 (BookGroup, SpaceBookGroup, SpaceOutfit)
         try restoreBookGroups(context: &context)
+        
+        // 3d. 恢复拼豆图案 (PerlerBeadPattern)
+        try restorePerlerBeadPatterns(context: &context)
     }
     
     private func restoreClothingAndOutfits(context: inout RestoreContext) throws {
@@ -2037,6 +2072,94 @@ class BackupService {
         // 保存映射表到上下文
         context.bookGroupMap = localBookGroupMap
         context.spaceBookGroupMap = spaceBookGroupMap
+    }
+    
+    // MARK: - 阶段 3d: 恢复拼豆图案
+    
+    private func restorePerlerBeadPatterns(context: inout RestoreContext) throws {
+        let modelContext = context.context
+        let manifest = context.manifest
+        
+        print("--- Stage 3d: Restoring Perler Bead Patterns ---")
+        
+        if let patternDTOs = manifest.perlerBeadPatterns {
+            print("### Restore: Found \(patternDTOs.count) perler bead patterns.")
+            
+            let existingPatterns = try modelContext.fetch(FetchDescriptor<PerlerBeadPattern>())
+            var patternMap: [UUID: PerlerBeadPattern] = [:]
+            var duplicatePatterns: [PerlerBeadPattern] = []
+            for pattern in existingPatterns {
+                if patternMap[pattern.id] != nil {
+                    print("### Restore: Warning - Duplicate PerlerBeadPattern ID detected: \(pattern.id), will merge and delete duplicate")
+                    duplicatePatterns.append(pattern)
+                } else {
+                    patternMap[pattern.id] = pattern
+                }
+            }
+            // Merge duplicate patterns
+            for duplicate in duplicatePatterns {
+                if let keeper = patternMap[duplicate.id] {
+                    // Merge: use non-empty name
+                    if keeper.name.isEmpty && !duplicate.name.isEmpty {
+                        keeper.name = duplicate.name
+                    }
+                    // Merge thumbnail paths
+                    if keeper.thumbnailPath == nil && duplicate.thumbnailPath != nil {
+                        keeper.thumbnailPath = duplicate.thumbnailPath
+                    }
+                }
+                modelContext.delete(duplicate)
+                print("### Restore: Deleted duplicate PerlerBeadPattern with ID: \(duplicate.id)")
+            }
+            
+            for dto in patternDTOs {
+                // Skip deleted patterns in backup
+                if dto.isDeleted { continue }
+                
+                let pattern: PerlerBeadPattern
+                if let existing = patternMap[dto.id] {
+                    pattern = existing
+                    pattern.name = dto.name
+                    pattern.patternType = dto.patternType
+                    pattern.resolution = dto.resolution
+                    pattern.paletteSize = dto.paletteSize
+                    pattern.canvasStyle = dto.canvasStyle
+                    pattern.pixelData = dto.pixelData
+                    pattern.paletteSortOrder = dto.paletteSortOrder
+                    pattern.thumbnailPath = dto.thumbnailPath
+                    pattern.sortIndex = dto.sortIndex
+                } else {
+                    pattern = PerlerBeadPattern(
+                        name: dto.name,
+                        patternType: PerlerPatternType(rawValue: dto.patternType) ?? .perlerBeads,
+                        resolution: PerlerBeadsConfig.Resolution(rawValue: dto.resolution) ?? .x64,
+                        paletteSize: PerlerBeadsConfig.PaletteSize(rawValue: dto.paletteSize) ?? .c48,
+                        canvasStyle: dto.canvasStyle == "pixelArt" ? .pixelArt : .perlerBeads,
+                        pixelData: dto.pixelData,
+                        paletteSortOrder: dto.paletteSortOrder == "byHue" ? .byHue : .byId,
+                        thumbnailPath: dto.thumbnailPath
+                    )
+                    pattern.id = dto.id
+                    pattern.createdAt = dto.createdAt
+                    pattern.updatedAt = dto.updatedAt
+                    pattern.sortIndex = dto.sortIndex
+                    modelContext.insert(pattern)
+                    patternMap[dto.id] = pattern
+                }
+                
+                // 恢复删除状态
+                pattern.isDeleted = dto.isDeleted
+                pattern.deletedAt = dto.deletedAt
+                
+                // 恢复 lastModified
+                if let lastModified = dto.lastModified {
+                    pattern.lastModified = lastModified
+                }
+            }
+            
+            // 保存映射表到上下文
+            context.perlerBeadPatternMap = patternMap
+        }
     }
     
     // MARK: - 阶段 4: 恢复设置

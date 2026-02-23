@@ -56,6 +56,9 @@ struct BackupManifest: Codable {
     let userProfile: UserProfileDTO?
     let userAvatarFile: String?
     
+    // Version 1.7: Perler Bead Patterns (拼豆/像素画)
+    let perlerBeadPatterns: [PerlerBeadPatternDTO]?
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int
@@ -64,6 +67,7 @@ struct BackupManifest: Codable {
     let spaceBookGroupCount: Int?
     let spaceOutfitCount: Int?
     let model3DCount: Int?
+    let perlerBeadPatternCount: Int?
 }
 
 // MARK: - User Profile DTO (v1.6)
@@ -291,4 +295,24 @@ struct SceneObjectDataDTO: Codable {
     let colorA: Double
     let sortIndex: Int
     let model3DID: UUID? // Reference to Model3D if applicable
+}
+
+// MARK: - Perler Bead Pattern DTO (v1.7)
+
+struct PerlerBeadPatternDTO: Codable {
+    let id: UUID
+    let name: String
+    let patternType: String
+    let resolution: Int
+    let paletteSize: Int
+    let canvasStyle: String
+    let pixelData: [Int]
+    let paletteSortOrder: String
+    let thumbnailPath: String?
+    let isDeleted: Bool
+    let deletedAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+    let lastModified: Date?
+    let sortIndex: Int
 }

@@ -82,9 +82,13 @@ struct RococoSmallWorldView: View {
 //            HotspotData(name: "萌宠", rect: CGRect(x: 0.45, y: 0.48, width: 0.13, height: 0.21), color: .pink) {
 //                destination = .pet
 //            },
-            
+
             HotspotData(name: "日历", rect: CGRect(x: 0.44, y: 0.77, width: 0.082, height: 0.121), color: .purple, label: "梦裙日历", labelStyle: .diagonal(angle: 35), labelPosition: CGPoint(x: 0.45, y: 0.92)) {
                 destination = .calendar
+            },
+
+            HotspotData(name: "拼豆工坊", rect: CGRect(x: 0.70, y: 0.45, width: 0.12, height: 0.15), color: .pink, label: "拼豆工坊", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.78, y: 0.62)) {
+                destination = .perler
             }
         ]
     }

@@ -70,7 +70,7 @@ struct ModernTabView: View {
         case .menu:
             return "小世界"
         case .perler:
-            return "拼豆"
+            return "拼豆工坊"
         case .wardrobe:
             return "衣橱"
         case .depositPlan:
@@ -333,7 +333,7 @@ struct SmallWorldContainerView: View {
         case .bigWorld:
             BigWorldView()
         case .perler:
-            PerlerBeadsView()
+            PerlerBeadPatternListView()
         case .recycleBin:
             RecycleBinView()
         case .wardrobe, .depositPlan:

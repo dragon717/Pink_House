@@ -22,41 +22,48 @@ struct OOTDDefaultBookView: View {
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            Group {
-                if let book = defaultBook {
-                    BookDetailView(
-                        book: book,
-                        navigationPath: $navigationPath,
-                        isSidebarVisible: $isSidebarVisible,
-                        onBack: nil,
-                        showLeadingToolbar: false
-                    )
-                } else {
-                    // 如果没有手帐，显示创建提示
-                    VStack(spacing: 20) {
-                        Image(systemName: "book.pages")
-                            .font(.system(size: 60))
-                            .foregroundColor(.pink.opacity(0.6))
-                        
-                        Text("还没有手帐")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                        
-                        Text("请先创建一本手帐")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Button("创建默认手帐") {
-                            createDefaultBook()
+            ZStack {
+                // 背景
+                LiquidBackground()
+                    .ignoresSafeArea()
+                
+                Group {
+                    if let book = defaultBook {
+                        BookDetailView(
+                            book: book,
+                            navigationPath: $navigationPath,
+                            isSidebarVisible: $isSidebarVisible,
+                            onBack: nil,
+                            showLeadingToolbar: false
+                        )
+                    } else {
+                        // 如果没有手帐，显示创建提示
+                        VStack(spacing: 20) {
+                            Image(systemName: "book.pages")
+                                .font(.system(size: 60))
+                                .foregroundColor(.pink.opacity(0.6))
+                            
+                            Text("还没有手帐")
+                                .font(.title2)
+                                .foregroundColor(.primary)
+                            
+                            Text("请先创建一本手帐")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Button("创建默认手帐") {
+                                createDefaultBook()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.pink)
+                            .padding(.top)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.pink)
-                        .padding(.top)
                     }
                 }
             }
             .navigationTitle("OOTD")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
         }
     }
     
