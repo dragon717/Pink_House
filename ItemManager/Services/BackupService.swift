@@ -769,32 +769,87 @@ class BackupService {
     }
     
     // MARK: - Import
-    
+
+    /// 恢复上下文，用于在恢复过程中共享状态
+    private struct RestoreContext {
+        let manifest: BackupManifest
+        let imageFiles: [String: URL]
+        let context: ModelContext
+        let fileManager: FileManager
+        let imagesDir: URL
+        let documentsDir: URL
+
+        // 阶段2产生的映射表，供后续阶段使用
+        var brandMap: [UUID: Brand] = [:]
+        var tagMap: [UUID: Tag] = [:]
+        var imageMetaMap: [UUID: StoredImage] = [:]
+
+        // 阶段3产生的映射表，供后续阶段使用
+        var clothingMap: [UUID: Clothing] = [:]
+        var cutoutMap: [UUID: CutoutItem] = [:]
+        var outfitMap: [UUID: Outfit] = [:]
+        var model3DMap: [UUID: Model3D] = [:]
+        var bookGroupMap: [UUID: BookGroup] = [:]
+        var spaceBookGroupMap: [UUID: SpaceBookGroup] = [:]
+
+        init(manifest: BackupManifest, imageFiles: [String: URL], context: ModelContext) throws {
+            self.manifest = manifest
+            self.imageFiles = imageFiles
+            self.context = context
+            self.fileManager = FileManager.default
+            self.imagesDir = ImageManager.shared.imagesDirectory
+            guard let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                throw BackupError.fileCreateFailed
+            }
+            self.documentsDir = documentsDir
+        }
+    }
+
     /// Low-level restore function that takes a Manifest and a map of Image Filenames to Local URLs
     func restoreFromManifest(manifest: BackupManifest, imageFiles: [String: URL], context: ModelContext) throws {
         // 可重入性保护
         restoreLock.lock()
         defer { restoreLock.unlock() }
-        
+
         if isRestoring {
             print("### Restore: Warning - Restore already in progress, skipping...")
             throw BackupError.restoreInProgress
         }
-        
+
         isRestoring = true
         defer { isRestoring = false }
-        
+
         print("### Restore: Starting restore from manifest...")
-        
+
+        // 创建恢复上下文
+        var ctx = try RestoreContext(manifest: manifest, imageFiles: imageFiles, context: context)
+
         // --- 开始分阶段恢复 ---
-        
+
         // 阶段 1: 恢复文件 (图片、主题、小组件背景等)
+        try restoreFiles(context: &ctx)
+
+        // 阶段 2: 恢复基础模型 (Brand, Tag, StoredImage)
+        try restoreBasicModels(context: &ctx)
+
+        // 阶段 3: 恢复复杂模型与关系 (Clothing, CutoutItem, Outfit, Model3D, BookGroup, SpaceBookGroup, SpaceOutfit)
+        try restoreComplexModels(context: &ctx)
+
+        // 阶段 4: 恢复设置 (UserDefaults, Pet Status, Chat History, User Profile)
+        try restoreSettings(context: ctx)
+
+        print("--- Import Successful! ---")
+    }
+
+    // MARK: - 阶段 1: 恢复文件
+
+    private func restoreFiles(context: inout RestoreContext) throws {
         print("--- Stage 1: Restoring Files ---")
-        let fileManager = FileManager.default
-        let imagesDir = ImageManager.shared.imagesDirectory
-        guard let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-             throw BackupError.fileCreateFailed
-        }
+        let manifest = context.manifest
+        let imageFiles = context.imageFiles
+        let fileManager = context.fileManager
+        let imagesDir = context.imagesDir
+        let documentsDir = context.documentsDir
         
         let themeFilesSet = Set(manifest.themeFiles ?? [])
         let wealthFilesSet = Set(manifest.wealthFiles ?? [])
@@ -886,12 +941,33 @@ class BackupService {
                 }
             }
         }
-        
-        // 阶段 2: 恢复基础模型 (Brand, Tag, StoredImage)
+    }
+    
+    // MARK: - 阶段 2: 恢复基础模型
+    
+    private func restoreBasicModels(context: inout RestoreContext) throws {
         print("--- Stage 2: Restoring Basis Models (Brands, Tags, StoredImages) ---")
+        let modelContext = context.context
         
         // 2a. Brands
-        let existingBrands = try context.fetch(FetchDescriptor<Brand>())
+        try restoreBrands(context: &context)
+        
+        // 2b. Tags
+        try restoreTags(context: &context)
+        
+        // 2c. StoredImages (Metadata)
+        try restoreStoredImages(context: &context)
+        
+        // 提交阶段 2
+        try modelContext.save()
+        print("--- Stage 2 Complete ---")
+    }
+    
+    private func restoreBrands(context: inout RestoreContext) throws {
+        let modelContext = context.context
+        let manifest = context.manifest
+        
+        let existingBrands = try modelContext.fetch(FetchDescriptor<Brand>())
         var brandMap: [UUID: Brand] = [:]
         var duplicateBrands: [Brand] = []
         for brand in existingBrands {
@@ -914,7 +990,7 @@ class BackupService {
             } else {
                 let newBrand = Brand(name: dto.name, colorHex: dto.colorHex, imagePath: dto.imagePath)
                 newBrand.id = dto.id
-                context.insert(newBrand)
+                modelContext.insert(newBrand)
                 brandMap[dto.id] = newBrand
             }
         }
@@ -929,12 +1005,19 @@ class BackupService {
                     keeper.imagePath = duplicate.imagePath
                 }
             }
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate Brand with ID: \(duplicate.id)")
         }
         
-        // 2b. Tags
-        let existingTags = try context.fetch(FetchDescriptor<Tag>())
+        // 保存映射表到上下文
+        context.brandMap = brandMap
+    }
+    
+    private func restoreTags(context: inout RestoreContext) throws {
+        let modelContext = context.context
+        let manifest = context.manifest
+        
+        let existingTags = try modelContext.fetch(FetchDescriptor<Tag>())
         var tagMap: [UUID: Tag] = [:]
         var duplicateTags: [Tag] = []
         for tag in existingTags {
@@ -953,7 +1036,7 @@ class BackupService {
             } else {
                 let newTag = Tag(name: dto.name, colorHex: dto.colorHex)
                 newTag.id = dto.id
-                context.insert(newTag)
+                modelContext.insert(newTag)
                 tagMap[dto.id] = newTag
             }
         }
@@ -965,12 +1048,19 @@ class BackupService {
                     keeper.name = duplicate.name
                 }
             }
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate Tag with ID: \(duplicate.id)")
         }
         
-        // 2c. StoredImages (Metadata)
-        let existingImgMeta = try context.fetch(FetchDescriptor<StoredImage>())
+        // 保存映射表到上下文
+        context.tagMap = tagMap
+    }
+    
+    private func restoreStoredImages(context: inout RestoreContext) throws {
+        let modelContext = context.context
+        let manifest = context.manifest
+        
+        let existingImgMeta = try modelContext.fetch(FetchDescriptor<StoredImage>())
         var imageMetaMap: [UUID: StoredImage] = [:]
         var duplicateImages: [StoredImage] = []
         for img in existingImgMeta {
@@ -995,7 +1085,7 @@ class BackupService {
                 newImg.id = dto.id
                 newImg.refCount = dto.refCount
                 newImg.lastModified = dto.lastModified ?? Date()
-                context.insert(newImg)
+                modelContext.insert(newImg)
                 imageMetaMap[dto.id] = newImg
             }
         }
@@ -1005,21 +1095,40 @@ class BackupService {
                 // Merge: use higher refCount
                 keeper.refCount = max(keeper.refCount, duplicate.refCount)
             }
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate StoredImage with ID: \(duplicate.id)")
         }
         
-        // 提交阶段 2
-        try context.save()
-        print("--- Stage 2 Complete ---")
-        
-        // 阶段 3: 恢复复杂模型与关系 (Clothing, CutoutItem, Outfit)
+        // 保存映射表到上下文
+        context.imageMetaMap = imageMetaMap
+    }
+    
+    // MARK: - 阶段 3: 恢复复杂模型与关系
+    
+    private func restoreComplexModels(context: inout RestoreContext) throws {
         print("--- Stage 3: Rebuilding Relationships ---")
+        
+        // 3a. 恢复 Clothing、CutoutItem、Outfit
+        try restoreClothingAndOutfits(context: &context)
+        
+        // 3b. 恢复 Model3D
+        try restoreModel3Ds(context: &context)
+        
+        // 3c. 恢复书册数据 (BookGroup, SpaceBookGroup, SpaceOutfit)
+        try restoreBookGroups(context: &context)
+    }
+    
+    private func restoreClothingAndOutfits(context: inout RestoreContext) throws {
+        let modelContext = context.context
+        let manifest = context.manifest
+        let brandMap = context.brandMap
+        let tagMap = context.tagMap
+        let imagesDir = context.imagesDir
         
         // 尝试直接获取所有对象，不做任何过滤
         var descriptor = FetchDescriptor<Clothing>()
         descriptor.includePendingChanges = true
-        let existingClothings = try context.fetch(descriptor)
+        let existingClothings = try modelContext.fetch(descriptor)
 
         // Debug Log: Check for soft-deleted items specifically using deletedAt to avoid property shadowing issues
         let softDeletedItems = existingClothings.filter { $0.isDeleted || $0.deletedAt != nil }
@@ -1069,7 +1178,7 @@ class BackupService {
                     keeper.purchaseDate = dupDate
                 }
             }
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate Clothing with ID: \(duplicate.id)")
         }
         
@@ -1103,7 +1212,7 @@ class BackupService {
                 var specificDesc = specificDescriptor
                 specificDesc.includePendingChanges = true
                 
-                if let found = try? context.fetch(specificDesc).first {
+                if let found = try? modelContext.fetch(specificDesc).first {
                     // Enhanced check here too
                     let foundIsDeleted = found.isDeleted || found.deletedAt != nil
                     print("### Restore: CRITICAL - Found item '\(dto.name)' (\(dto.id)) via specific fetch which was missed in batch fetch! isDeleted=\(found.isDeleted), deletedAt=\(String(describing: found.deletedAt))")
@@ -1114,7 +1223,7 @@ class BackupService {
                     print("### Restore: Item '\(dto.name)' (\(dto.id)) NOT found locally. Creating new (isDeleted=false).")
                     clothingBack = Clothing(name: dto.name)
                     clothingBack.id = dto.id
-                    context.insert(clothingBack)
+                    modelContext.insert(clothingBack)
                     clothingMap[dto.id] = clothingBack
                     isLocalDeleted = false
                 }
@@ -1186,7 +1295,7 @@ class BackupService {
                 // Delete existing (strategy: replace all)
                 if let existingItems = clothingBack.accessoryItems {
                     for item in existingItems {
-                        context.delete(item)
+                        modelContext.delete(item)
                     }
                 }
                 
@@ -1215,7 +1324,7 @@ class BackupService {
         }
         
         // Cutouts
-        let existingCutouts = try context.fetch(FetchDescriptor<CutoutItem>())
+        let existingCutouts = try modelContext.fetch(FetchDescriptor<CutoutItem>())
         var cutoutMap: [UUID: CutoutItem] = [:]
         var duplicateCutouts: [CutoutItem] = []
         for cutout in existingCutouts {
@@ -1238,7 +1347,7 @@ class BackupService {
                     keeper.linkedClothingID = duplicate.linkedClothingID
                 }
             }
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate CutoutItem with ID: \(duplicate.id)")
         }
         for dto in manifest.cutouts {
@@ -1253,7 +1362,7 @@ class BackupService {
             } else {
                 cutout = CutoutItem(originalImageHash: dto.originalImageHash, category: dto.category, imagePath: dto.imagePath, width: dto.width, height: dto.height)
                 cutout.id = dto.id
-                context.insert(cutout)
+                modelContext.insert(cutout)
                 cutoutMap[dto.id] = cutout
                 cutout.timestamp = dto.timestamp
             }
@@ -1274,7 +1383,7 @@ class BackupService {
             if !dto.imagePath.isEmpty {
                 let fileName = dto.imagePath
                 let storedImageDescriptor = FetchDescriptor<StoredImage>(predicate: #Predicate { $0.fileName == fileName })
-                if let existingStoredImage = try? context.fetch(storedImageDescriptor).first {
+                if let existingStoredImage = try? modelContext.fetch(storedImageDescriptor).first {
                     // 确保 refCount 至少为 1
                     if existingStoredImage.refCount < 1 {
                         existingStoredImage.refCount = 1
@@ -1292,14 +1401,14 @@ class BackupService {
                     let newStoredImage = StoredImage(imageHash: imageHash, fileName: fileName)
                     newStoredImage.refCount = 1
                     newStoredImage.lastModified = Date()
-                    context.insert(newStoredImage)
+                    modelContext.insert(newStoredImage)
                     print("### Restore: Created missing StoredImage for CutoutItem: \(fileName)")
                 }
             }
         }
         
         // Outfits
-        let existingOutfits = try context.fetch(FetchDescriptor<Outfit>())
+        let existingOutfits = try modelContext.fetch(FetchDescriptor<Outfit>())
         var outfitMap: [UUID: Outfit] = [:]
         var duplicateOutfits: [Outfit] = []
         for outfit in existingOutfits {
@@ -1323,12 +1432,12 @@ class BackupService {
                     keeper.items?.append(item)
                 }
             }
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate Outfit with ID: \(duplicate.id)")
         }
 
         // Fetch ALL OutfitItems globally to avoid ID collision
-        let allOutfitItems = try context.fetch(FetchDescriptor<OutfitItem>())
+        let allOutfitItems = try modelContext.fetch(FetchDescriptor<OutfitItem>())
         var globalItemMap: [UUID: OutfitItem] = [:]
         var duplicateOutfitItems: [OutfitItem] = []
         for item in allOutfitItems {
@@ -1341,7 +1450,7 @@ class BackupService {
         }
         // Delete duplicate outfit items
         for duplicate in duplicateOutfitItems {
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate OutfitItem with ID: \(duplicate.id)")
         }
         print("### Restore: Found \(globalItemMap.count) global OutfitItems.")
@@ -1355,7 +1464,7 @@ class BackupService {
         print("### Restore: Built cutoutFileMap with \(cutoutFileMap.count) entries from \(cutoutMap.count) cutouts.")
         
         // Pre-fetch BookGroups for Outfit relationship restoration
-        let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
+        let existingBookGroups = try modelContext.fetch(FetchDescriptor<BookGroup>())
         var bookGroupMap: [UUID: BookGroup] = [:]
         var duplicateBookGroups: [BookGroup] = []
         for bookGroup in existingBookGroups {
@@ -1379,7 +1488,7 @@ class BackupService {
                     keeper.pages?.append(page)
                 }
             }
-            context.delete(duplicate)
+            modelContext.delete(duplicate)
             print("### Restore: Deleted duplicate BookGroup with ID: \(duplicate.id)")
         }
         
@@ -1399,7 +1508,7 @@ class BackupService {
                     outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin", backgroundImagePath: dto.backgroundImagePath)
                     outfit.id = dto.id
                     outfit.createdAt = dto.createdAt
-                    context.insert(outfit)
+                    modelContext.insert(outfit)
                     outfitMap[dto.id] = outfit
                 }
                 
@@ -1449,7 +1558,7 @@ class BackupService {
                     } else {
                         item = OutfitItem(cutout: cutout, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: scale, zIndex: itemDTO.zIndex)
                         item.id = itemDTO.id
-                        context.insert(item)
+                        modelContext.insert(item)
                         globalItemMap[item.id] = item // Update global map
                     }
                     
@@ -1490,7 +1599,7 @@ class BackupService {
                     outfit = Outfit(note: dto.note, snapshotPath: dto.snapshotPath, canvasType: dto.canvasType ?? "mannequin")
                     outfit.id = dto.id
                     outfit.createdAt = dto.createdAt
-                    context.insert(outfit)
+                    modelContext.insert(outfit)
                     outfitMap[dto.id] = outfit
                 }
                 
@@ -1517,7 +1626,7 @@ class BackupService {
                         } else {
                             item = OutfitItem(cutout: nil, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: itemDTO.scale, zIndex: itemDTO.zIndex)
                             item.id = itemDTO.id
-                            context.insert(item)
+                            modelContext.insert(item)
                             item.outfit = outfit
                         }
                         if let cid = itemDTO.cutoutID, let found = cutoutMap[cid] {
@@ -1525,7 +1634,7 @@ class BackupService {
                         } else if let backupPath = itemDTO.backupImagePath, !backupPath.isEmpty {
                             // Fallback logic...
                             let fallbackDescriptor = FetchDescriptor<CutoutItem>(predicate: #Predicate<CutoutItem> { $0.imagePath == backupPath })
-                            if let existingFallback = try context.fetch(fallbackDescriptor).first {
+                            if let existingFallback = try modelContext.fetch(fallbackDescriptor).first {
                                 item.cutout = existingFallback
                             } else {
                                 let newCutout = CutoutItem(
@@ -1535,7 +1644,7 @@ class BackupService {
                                     width: itemDTO.backupImageWidth ?? 200,
                                     height: itemDTO.backupImageHeight ?? 200
                                 )
-                                context.insert(newCutout)
+                                modelContext.insert(newCutout)
                                 item.cutout = newCutout
                             }
                         }
@@ -1544,6 +1653,16 @@ class BackupService {
             }
         }
         
+        // 保存映射表到上下文
+        context.clothingMap = clothingMap
+        context.cutoutMap = cutoutMap
+        context.outfitMap = outfitMap
+    }
+    
+    private func restoreModel3Ds(context: inout RestoreContext) throws {
+        let modelContext = context.context
+        let manifest = context.manifest
+        
         // MARK: - 阶段 3b: 恢复 Model3D (v1.5)
         print("--- Stage 3b: Restoring Model3Ds ---")
         
@@ -1551,7 +1670,7 @@ class BackupService {
         if let model3DDTOs = manifest.model3Ds {
             print("### Restore: Found \(model3DDTOs.count) Model3Ds.")
             
-            let existingModel3Ds = try context.fetch(FetchDescriptor<Model3D>())
+            let existingModel3Ds = try modelContext.fetch(FetchDescriptor<Model3D>())
             model3DMap = [:]
             var duplicateModel3Ds: [Model3D] = []
             for model in existingModel3Ds {
@@ -1575,7 +1694,7 @@ class BackupService {
                         keeper.sourceImagePaths.append(path)
                     }
                 }
-                context.delete(duplicate)
+                modelContext.delete(duplicate)
                 print("### Restore: Deleted duplicate Model3D with ID: \(duplicate.id)")
             }
             
@@ -1618,7 +1737,7 @@ class BackupService {
                     model3D.cameraRotationX = dto.cameraRotationX
                     model3D.cameraRotationY = dto.cameraRotationY
                     model3D.cameraRotationZ = dto.cameraRotationZ
-                    context.insert(model3D)
+                    modelContext.insert(model3D)
                     model3DMap[dto.id] = model3D
                 }
                 
@@ -1633,6 +1752,22 @@ class BackupService {
             }
         }
         
+        // 保存映射表到上下文
+        context.model3DMap = model3DMap
+    }
+    
+    private func restoreBookGroups(context: inout RestoreContext) throws {
+        let modelContext = context.context
+        let manifest = context.manifest
+        let clothingMap = context.clothingMap
+        let cutoutMap = context.cutoutMap
+        let outfitMap = context.outfitMap
+        let model3DMap = context.model3DMap
+        
+        // 初始化映射表
+        var localBookGroupMap: [UUID: BookGroup] = [:]
+        var spaceBookGroupMap: [UUID: SpaceBookGroup] = [:]
+        
         // MARK: - 阶段 3c: 恢复书册数据 (v1.5)
         print("--- Stage 3c: Restoring Book Groups ---")
         
@@ -1640,8 +1775,8 @@ class BackupService {
         if let bookGroupDTOs = manifest.bookGroups {
             print("### Restore: Found \(bookGroupDTOs.count) book groups.")
             
-            let existingBookGroups = try context.fetch(FetchDescriptor<BookGroup>())
-            var localBookGroupMap: [UUID: BookGroup] = [:]
+            let existingBookGroups = try modelContext.fetch(FetchDescriptor<BookGroup>())
+            localBookGroupMap = [:]
             var duplicateLocalBookGroups: [BookGroup] = []
             for bookGroup in existingBookGroups {
                 if localBookGroupMap[bookGroup.id] != nil {
@@ -1661,7 +1796,7 @@ class BackupService {
                         keeper.coverImage = duplicate.coverImage
                     }
                 }
-                context.delete(duplicate)
+                modelContext.delete(duplicate)
                 print("### Restore: Deleted duplicate BookGroup with ID: \(duplicate.id)")
             }
             
@@ -1679,7 +1814,7 @@ class BackupService {
                     bookGroup = BookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
                     bookGroup.id = dto.id
                     bookGroup.createdAt = dto.createdAt
-                    context.insert(bookGroup)
+                    modelContext.insert(bookGroup)
                     localBookGroupMap[dto.id] = bookGroup
                 }
                 
@@ -1695,7 +1830,7 @@ class BackupService {
             
             // 2. 恢复平面书页与手帐的关联
             // Re-fetch outfits to establish book relationships
-            let allOutfits = try context.fetch(FetchDescriptor<Outfit>())
+            let allOutfits = try modelContext.fetch(FetchDescriptor<Outfit>())
             for outfit in allOutfits {
                 // Find if this outfit should belong to a book
                 // Note: In current data model, Outfit doesn't have a direct book reference
@@ -1708,8 +1843,8 @@ class BackupService {
         if let spaceBookGroupDTOs = manifest.spaceBookGroups {
             print("### Restore: Found \(spaceBookGroupDTOs.count) space book groups.")
             
-            let existingSpaceBookGroups = try context.fetch(FetchDescriptor<SpaceBookGroup>())
-            var spaceBookGroupMap: [UUID: SpaceBookGroup] = [:]
+            let existingSpaceBookGroups = try modelContext.fetch(FetchDescriptor<SpaceBookGroup>())
+            spaceBookGroupMap = [:]
             var duplicateSpaceBookGroups: [SpaceBookGroup] = []
             for spaceBookGroup in existingSpaceBookGroups {
                 if spaceBookGroupMap[spaceBookGroup.id] != nil {
@@ -1729,7 +1864,7 @@ class BackupService {
                         keeper.coverImage = duplicate.coverImage
                     }
                 }
-                context.delete(duplicate)
+                modelContext.delete(duplicate)
                 print("### Restore: Deleted duplicate SpaceBookGroup with ID: \(duplicate.id)")
             }
             
@@ -1747,7 +1882,7 @@ class BackupService {
                     spaceBookGroup = SpaceBookGroup(title: dto.title, coverImage: dto.coverImage, sortIndex: dto.sortIndex)
                     spaceBookGroup.id = dto.id
                     spaceBookGroup.createdAt = dto.createdAt
-                    context.insert(spaceBookGroup)
+                    modelContext.insert(spaceBookGroup)
                     spaceBookGroupMap[dto.id] = spaceBookGroup
                 }
                 
@@ -1765,7 +1900,7 @@ class BackupService {
             if let spaceOutfitDTOs = manifest.spaceOutfits {
                 print("### Restore: Found \(spaceOutfitDTOs.count) space outfits.")
                 
-                let existingSpaceOutfits = try context.fetch(FetchDescriptor<SpaceOutfit>())
+                let existingSpaceOutfits = try modelContext.fetch(FetchDescriptor<SpaceOutfit>())
                 var spaceOutfitMap: [UUID: SpaceOutfit] = [:]
                 var duplicateSpaceOutfits: [SpaceOutfit] = []
                 for spaceOutfit in existingSpaceOutfits {
@@ -1784,12 +1919,12 @@ class BackupService {
                         }
                         // Scene objects are linked via spaceOutfitID, they will be handled below
                     }
-                    context.delete(duplicate)
+                    modelContext.delete(duplicate)
                     print("### Restore: Deleted duplicate SpaceOutfit with ID: \(duplicate.id)")
                 }
 
                 // Fetch all existing scene objects to avoid collision
-                let existingSceneObjects = try context.fetch(FetchDescriptor<SceneObjectData>())
+                let existingSceneObjects = try modelContext.fetch(FetchDescriptor<SceneObjectData>())
                 var sceneObjectMap: [UUID: SceneObjectData] = [:]
                 var duplicateSceneObjects: [SceneObjectData] = []
                 for sceneObject in existingSceneObjects {
@@ -1802,7 +1937,7 @@ class BackupService {
                 }
                 // Delete duplicate scene objects
                 for duplicate in duplicateSceneObjects {
-                    context.delete(duplicate)
+                    modelContext.delete(duplicate)
                     print("### Restore: Deleted duplicate SceneObjectData with ID: \(duplicate.id)")
                 }
                 
@@ -1835,7 +1970,7 @@ class BackupService {
                         spaceOutfit.camPosY = dto.camPosY
                         spaceOutfit.camPosZ = dto.camPosZ
                         spaceOutfit.lightingIntensity = dto.lightingIntensity
-                        context.insert(spaceOutfit)
+                        modelContext.insert(spaceOutfit)
                         spaceOutfitMap[dto.id] = spaceOutfit
                     }
                     
@@ -1891,7 +2026,7 @@ class BackupService {
                                 spaceOutfitID: spaceOutfit.id,
                                 model3D: sceneDTO.model3DID.flatMap { model3DMap[$0] }
                             )
-                            context.insert(sceneObject)
+                            modelContext.insert(sceneObject)
                             sceneObjectMap[sceneDTO.id] = sceneObject
                         }
                     }
@@ -1899,14 +2034,43 @@ class BackupService {
             }
         }
         
-        try context.save()
-        
-        // 阶段 4: 恢复设置
+        // 保存映射表到上下文
+        context.bookGroupMap = localBookGroupMap
+        context.spaceBookGroupMap = spaceBookGroupMap
+    }
+    
+    // MARK: - 阶段 4: 恢复设置
+    
+    private func restoreSettings(context: RestoreContext) throws {
         print("--- Stage 4: Restoring Settings ---")
+        let manifest = context.manifest
+        let imageFiles = context.imageFiles
+        let documentsDir = context.documentsDir
+        let fileManager = context.fileManager
         
+        // 1. 恢复 UserDefaults 设置
+        restoreUserDefaultsSettings(manifest: manifest)
+        
+        // 2. 恢复 Pet Status
+        restorePetStatus(manifest: manifest)
+        
+        // 3. 恢复 Chat History
+        restoreChatHistory(manifest: manifest, documentsDir: documentsDir, fileManager: fileManager)
+        
+        // 4. 恢复 User Profile (头像和昵称)
+        restoreUserProfile(manifest: manifest, imageFiles: imageFiles, documentsDir: documentsDir, fileManager: fileManager)
+        
+        // 5. 刷新主题和小组件
+        refreshThemeAndWidget(documentsDir: documentsDir, fileManager: fileManager)
+        
+        // 6. 版本检查与缓存清理
+        performVersionCheckAndCacheClear(manifest: manifest)
+    }
+    
+    private func restoreUserDefaultsSettings(manifest: BackupManifest) {
         // 1. Reset all known keys to default (remove from UserDefaults)
         // This ensures that if a key is missing in the backup (e.g. user was using default),
-        // we don't keep the dirty state from current session.
+        // we don't keep dirty state from current session.
         for key in BackupService.keysToBackup {
             UserDefaults.standard.removeObject(forKey: key)
         }
@@ -1943,7 +2107,9 @@ class BackupService {
             UserDefaults.standard.synchronize()
         }
         
-        // Restore Pet Status
+    }
+    
+    private func restorePetStatus(manifest: BackupManifest) {
         if let petData = manifest.petStatusData {
             print("Restore: Restoring Pet Status...")
             UserDefaults.standard.set(petData, forKey: "PetStatus_Data")
@@ -1953,8 +2119,9 @@ class BackupService {
                 PetDataManager.shared.reloadFromDisk()
             }
         }
-        
-        // Restore Chat History
+    }
+    
+    private func restoreChatHistory(manifest: BackupManifest, documentsDir: URL, fileManager: FileManager) {
         if let chatData = manifest.chatHistoryData {
             print("Restore: Restoring Chat History (JSON)...")
             let chatHistoryURL = documentsDir.appendingPathComponent("chat_history.json")
@@ -1968,7 +2135,9 @@ class BackupService {
                 PetAIService.shared.reloadHistory()
             }
         }
-        
+    }
+    
+    private func restoreUserProfile(manifest: BackupManifest, imageFiles: [String: URL], documentsDir: URL, fileManager: FileManager) {
         // v1.6: Restore User Profile (头像和昵称)
         if let userProfile = manifest.userProfile {
             print("Restore: Restoring User Profile...")
@@ -2036,7 +2205,9 @@ class BackupService {
                 }
             }
         }
-        
+    }
+    
+    private func refreshThemeAndWidget(documentsDir: URL, fileManager: FileManager) {
         // Refresh Theme & Widget
         print("Restore: Reloading Theme Background...")
         ThemeManager.shared.reloadBackgroundImage()
@@ -2050,7 +2221,9 @@ class BackupService {
         }
         
         WidgetCenter.shared.reloadAllTimelines()
-        
+    }
+    
+    private func performVersionCheckAndCacheClear(manifest: BackupManifest) {
         // Version Check & Cache Clearing
         // 若 app版本不一致，则清理缓存（尤其是小世界空间照片缓存）
         if let backupAppVersion = manifest.appVersion {
@@ -2060,8 +2233,6 @@ class BackupService {
                 SpatialAssetManager.shared.clearAllCache()
             }
         }
-        
-        print("--- Import Successful! ---")
     }
 
     nonisolated func importBackup(from url: URL, context: ModelContext) async throws {
