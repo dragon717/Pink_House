@@ -9,3 +9,4 @@ temp/*
 ItemManager/GenerativeAI-Info.plist
 ItemManager/asserts/*.mov
 ItemManager/asserts*.zip
+*.mov

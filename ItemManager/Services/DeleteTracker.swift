@@ -14,6 +14,9 @@ final class DeleteTracker {
     /// 本地 UserDefaults - 作为 iCloud 的备份
     private let userDefaults = UserDefaults.standard
 
+    /// 待处理的 ModelContext（用于 iCloud 同步完成后应用删除）
+    private var pendingContext: ModelContext?
+
     // MARK: - Keys
     private let deletedOutfitsKey = "deletedOutfits_v2"  // v2: 存储 [UUID: Date] 字典
     private let deletedClothingsKey = "deletedClothings_v2"
@@ -49,7 +52,14 @@ final class DeleteTracker {
     }
 
     @objc private func persistentStoreRemoteChange(_ notification: Notification) {
-        print("DeleteTracker: iCloud 同步通知收到")
+        print("DeleteTracker: iCloud 同步通知收到，重新应用删除...")
+        // iCloud 同步完成后，重新应用删除（防止同步覆盖删除状态）
+        // 注意：这里不清除记录，让24小时自动过期机制处理
+        if let context = pendingContext {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.applyAllDeletes(context: context, clearRecords: true)
+            }
+        }
     }
 
     // MARK: - 记录删除（带时间戳）
@@ -141,11 +151,12 @@ final class DeleteTracker {
 
     // MARK: - 应用删除（基于时间戳比较）
 
-    func applyDeletedOutfits(context: ModelContext) {
+    func applyDeletedOutfits(context: ModelContext, clearRecords: Bool = true) {
         applyDeletedItems(
             context: context,
             key: deletedOutfitsKey,
-            typeName: "outfit"
+            typeName: "outfit",
+            clearRecords: clearRecords
         ) { (item: Outfit, deleteTime: Date) -> Bool in
             // 比较删除时间和数据最后修改时间
             let itemModifiedTime = item.lastModified
@@ -167,11 +178,12 @@ final class DeleteTracker {
         }
     }
 
-    func applyDeletedClothings(context: ModelContext) {
+    func applyDeletedClothings(context: ModelContext, clearRecords: Bool = true) {
         applyDeletedItems(
             context: context,
             key: deletedClothingsKey,
-            typeName: "clothing"
+            typeName: "clothing",
+            clearRecords: clearRecords
         ) { (item: Clothing, deleteTime: Date) -> Bool in
             let itemModifiedTime = item.lastModified
 
@@ -190,11 +202,12 @@ final class DeleteTracker {
         }
     }
 
-    func applyDeletedBookGroups(context: ModelContext) {
+    func applyDeletedBookGroups(context: ModelContext, clearRecords: Bool = true) {
         applyDeletedItems(
             context: context,
             key: deletedBookGroupsKey,
-            typeName: "book group"
+            typeName: "book group",
+            clearRecords: clearRecords
         ) { (item: BookGroup, deleteTime: Date) -> Bool in
             let itemModifiedTime = item.lastModified
 
@@ -213,11 +226,12 @@ final class DeleteTracker {
         }
     }
 
-    func applyDeletedModel3Ds(context: ModelContext) {
+    func applyDeletedModel3Ds(context: ModelContext, clearRecords: Bool = true) {
         applyDeletedItems(
             context: context,
             key: deletedModel3DsKey,
-            typeName: "3D model"
+            typeName: "3D model",
+            clearRecords: clearRecords
         ) { (item: Model3D, deleteTime: Date) -> Bool in
             let itemModifiedTime = item.lastModified
 
@@ -236,24 +250,30 @@ final class DeleteTracker {
         }
     }
 
-    func applyDeletedPerlerPatterns(context: ModelContext) {
+    func applyDeletedPerlerPatterns(context: ModelContext, clearRecords: Bool = true) {
         applyDeletedItems(
             context: context,
             key: deletedPerlerPatternsKey,
-            typeName: "perler pattern"
+            typeName: "perler pattern",
+            clearRecords: clearRecords
         ) { (item: PerlerBeadPattern, deleteTime: Date) -> Bool in
             let itemModifiedTime = item.lastModified
+            let timeDiff = deleteTime.timeIntervalSince(itemModifiedTime)
+
+            print("DeleteTracker: [\(item.name)] deleteTime:\(deleteTime), lastModified:\(itemModifiedTime), diff:\(timeDiff)s, isDeleted:\(item.isDeleted)")
 
             if deleteTime > itemModifiedTime {
                 if !item.isDeleted {
                     item.isDeleted = true
                     item.deletedAt = deleteTime
                     item.lastModified = Date()
-                    print("DeleteTracker: Applied delete to perler pattern '\(item.name)' (deleted after last modify)")
+                    print("DeleteTracker: ✓ Applied delete to '\(item.name)' (deleted after last modify)")
+                } else {
+                    print("DeleteTracker: ✓ Already deleted '\(item.name)'")
                 }
                 return true
             } else {
-                print("DeleteTracker: Keeping perler pattern '\(item.name)' (modified after delete)")
+                print("DeleteTracker: ✗ Keeping '\(item.name)' (modified \(abs(timeDiff))s after delete)")
                 return false
             }
         }
@@ -264,12 +284,16 @@ final class DeleteTracker {
         context: ModelContext,
         key: String,
         typeName: String,
-        shouldDelete: (T, Date) -> Bool
+        shouldDelete: (T, Date) -> Bool,
+        clearRecords: Bool = true
     ) {
         let deletedRecords = getDeletedDates(for: key)
-        guard !deletedRecords.isEmpty else { return }
+        guard !deletedRecords.isEmpty else {
+            print("DeleteTracker: No deleted \(typeName) records found")
+            return
+        }
 
-        print("DeleteTracker: Checking \(deletedRecords.count) deleted \(typeName)(s)")
+        print("DeleteTracker: Checking \(deletedRecords.count) deleted \(typeName)(s), IDs: \(Array(deletedRecords.keys).map { $0.uuidString.prefix(8) })")
 
         do {
             let descriptor = FetchDescriptor<T>()
@@ -280,15 +304,30 @@ final class DeleteTracker {
 
             for item in allItems {
                 // 获取该 item 的 ID
-                guard let itemID = getItemID(item) else { continue }
+                guard let itemID = getItemID(item) else {
+                    print("DeleteTracker: Warning - Could not get ID for \(typeName)")
+                    continue
+                }
 
                 if let deleteTime = deletedRecords[itemID] {
+                    print("DeleteTracker: Found matching record for \(typeName) ID:\(itemID.uuidString.prefix(8))")
                     if shouldDelete(item, deleteTime) {
                         appliedCount += 1
-                        clearedRecords.append(itemID)
+                        if clearRecords {
+                            clearedRecords.append(itemID)
+                        }
                     } else {
                         // 数据被修改过，清除删除记录
-                        clearedRecords.append(itemID)
+                        if clearRecords {
+                            clearedRecords.append(itemID)
+                        }
+                    }
+                } else {
+                    // 检查是否是已删除的项目（ID不在记录中但isDeleted=true）
+                    if let perlerPattern = item as? PerlerBeadPattern {
+                        if perlerPattern.isDeleted {
+                            print("DeleteTracker: \(typeName) '\(perlerPattern.name)' is already deleted (no record)")
+                        }
                     }
                 }
             }
@@ -298,8 +337,10 @@ final class DeleteTracker {
                 print("DeleteTracker: Applied \(appliedCount) \(typeName) deletes")
             }
 
-            // 清理已处理的删除记录
-            clearProcessedRecords(ids: clearedRecords, key: key, typeName: typeName)
+            // 清理已处理的删除记录（仅在启动时清理，同步后不清除）
+            if clearRecords && !clearedRecords.isEmpty {
+                clearProcessedRecords(ids: clearedRecords, key: key, typeName: typeName)
+            }
 
         } catch {
             print("DeleteTracker: Failed to apply \(typeName) deletes: \(error)")
@@ -323,15 +364,24 @@ final class DeleteTracker {
         return nil
     }
 
-    /// 清理已处理的删除记录
+    /// 清理已处理的删除记录（保留24小时，防止iCloud同步延迟导致的问题）
     private func clearProcessedRecords(ids: [UUID], key: String, typeName: String) {
         guard !ids.isEmpty else { return }
 
         var records = getDeletedRecords(for: key)
         let beforeCount = records.count
 
+        // 只清理超过24小时的记录，保留最近的删除记录以应对iCloud同步延迟
+        let now = Date().timeIntervalSince1970
+        let retentionPeriod: Double = 24 * 60 * 60  // 24小时
+
         for id in ids {
-            records.removeValue(forKey: id.uuidString)
+            if let timestamp = records[id.uuidString] {
+                // 只清理超过24小时的记录
+                if now - timestamp > retentionPeriod {
+                    records.removeValue(forKey: id.uuidString)
+                }
+            }
         }
 
         let afterCount = records.count
@@ -339,7 +389,9 @@ final class DeleteTracker {
 
         if clearedCount > 0 {
             saveDeletedRecords(records: records, key: key)
-            print("DeleteTracker: Cleared \(clearedCount) processed \(typeName) delete records, \(afterCount) remaining")
+            print("DeleteTracker: Cleared \(clearedCount) processed \(typeName) delete records (retained recent), \(afterCount) remaining")
+        } else {
+            print("DeleteTracker: Retained \(ids.count) recent \(typeName) delete records for iCloud sync protection")
         }
     }
 
@@ -403,18 +455,21 @@ final class DeleteTracker {
 
     // MARK: - 应用所有删除
 
-    func applyAllDeletes(context: ModelContext) {
+    func applyAllDeletes(context: ModelContext, clearRecords: Bool = true) {
         print("DeleteTracker: Applying all tracked deletes with timestamp comparison...")
+
+        // 保存 context 用于 iCloud 同步通知
+        pendingContext = context
 
         // 同步 iCloud 数据
         iCloudStore.synchronize()
 
         // 应用各类删除
-        applyDeletedOutfits(context: context)
-        applyDeletedClothings(context: context)
-        applyDeletedModel3Ds(context: context)
-        applyDeletedBookGroups(context: context)
-        applyDeletedPerlerPatterns(context: context)
+        applyDeletedOutfits(context: context, clearRecords: clearRecords)
+        applyDeletedClothings(context: context, clearRecords: clearRecords)
+        applyDeletedModel3Ds(context: context, clearRecords: clearRecords)
+        applyDeletedBookGroups(context: context, clearRecords: clearRecords)
+        applyDeletedPerlerPatterns(context: context, clearRecords: clearRecords)
 
         print("DeleteTracker: Finished applying deletes")
     }
