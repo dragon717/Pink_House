@@ -8,12 +8,14 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case wardrobe = "衣橱"
     case finalPayment = "尾款天使"
     case pet = "萌宠"
-    case ootd = "穿搭手帐"
+    case ootd = "OOTD"
+    case fashionJournal = "穿搭手帐"
     case smallWorld = "小世界"
     case wealth = "来财"
     case perler = "拼豆"
     case calendar = "梦裙日历"
     case bigWorld = "大世界"
+    case recycleBin = "回收站"
     
     var id: String { rawValue }
     
@@ -23,11 +25,13 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .finalPayment: return "tag.fill"
         case .pet: return "pawprint.fill"
         case .ootd: return "book.pages.fill"
+        case .fashionJournal: return "book.closed.fill"
         case .smallWorld: return "map.fill"
         case .wealth: return "yensign.circle.fill"
         case .perler: return "circle.grid.2x2.fill"
         case .calendar: return "calendar"
         case .bigWorld: return "airplane"
+        case .recycleBin: return "trash.fill"
         }
     }
     
@@ -37,11 +41,13 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .finalPayment: return "#FF1493"
         case .pet: return "#FF7F50"
         case .ootd: return "#FF69B4"
+        case .fashionJournal: return "#FF85C1"
         case .smallWorld: return "#87CEEB"
         case .wealth: return "#FFD700"
         case .perler: return "#FF8C94"
         case .calendar: return "#DDA0DD"
         case .bigWorld: return "#87CEEB"
+        case .recycleBin: return "#808080"
         }
     }
     
@@ -51,12 +57,14 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .wardrobe: return .wardrobe
         case .finalPayment: return .depositPlan
         case .pet: return .pet
-        case .ootd: return .ootd
+        case .ootd: return .ootdDefaultBook
+        case .fashionJournal: return .ootd
         case .smallWorld: return .menu
         case .wealth: return .wealth
         case .perler: return .perler
         case .calendar: return .calendar
         case .bigWorld: return .bigWorld
+        case .recycleBin: return .recycleBin
         }
     }
     
@@ -73,7 +81,7 @@ class FavoriteMenuSettings {
     var selectedItemIDs: [String]
     var lastUpdated: Date
     
-    init(selectedItemIDs: [String] = ["萌宠", "穿搭手帐", "小世界"]) {
+    init(selectedItemIDs: [String] = ["萌宠", "OOTD", "小世界"]) {
         self.selectedItemIDs = selectedItemIDs
         self.lastUpdated = Date()
     }

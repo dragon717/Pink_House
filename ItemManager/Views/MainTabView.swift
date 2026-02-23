@@ -65,6 +65,8 @@ struct ModernTabView: View {
             return petDataManager.status.displayName
         case .ootd:
             return "穿搭手帐"
+        case .ootdDefaultBook:
+            return "OOTD"
         case .menu:
             return "小世界"
         case .perler:
@@ -73,6 +75,8 @@ struct ModernTabView: View {
             return "衣橱"
         case .depositPlan:
             return "尾款天使"
+        case .recycleBin:
+            return "回收站"
         }
     }
 
@@ -88,6 +92,8 @@ struct ModernTabView: View {
             return "pawprint"
         case .ootd:
             return "book.pages"
+        case .ootdDefaultBook:
+            return "book.pages"
         case .menu:
             return "map"
         case .perler:
@@ -96,6 +102,8 @@ struct ModernTabView: View {
             return "cabinet.fill"
         case .depositPlan:
             return "tag.fill"
+        case .recycleBin:
+            return "trash.fill"
         }
     }
     
@@ -314,6 +322,8 @@ struct SmallWorldContainerView: View {
             )
         case .ootd:
             OOTDView()
+        case .ootdDefaultBook:
+            OOTDDefaultBookView()
         case .pet:
             PetHomeView()
         case .wealth:
@@ -324,6 +334,8 @@ struct SmallWorldContainerView: View {
             BigWorldView()
         case .perler:
             PerlerBeadsView()
+        case .recycleBin:
+            RecycleBinView()
         case .wardrobe, .depositPlan:
             // 这些功能直接跳转到 Tab 0，不会在这里显示
             EmptyView()

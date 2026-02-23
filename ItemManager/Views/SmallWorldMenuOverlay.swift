@@ -92,7 +92,7 @@ struct SmallWorldMenuOverlay: View {
                 icon: "gamecontroller.fill",
                 items: [
                     WheelMenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
-                    WheelMenuItem(title: "手帐", icon: "book.closed", destination: .ootd, color: Color(red: 1.0, green: 0.5, blue: 0.7)),
+                    WheelMenuItem(title: "穿搭手帐", icon: "book.closed", destination: .ootd, color: Color(red: 1.0, green: 0.5, blue: 0.7)),
                     WheelMenuItem(title: "拼豆", icon: "circle.grid.2x2", destination: .perler, color: Color(red: 1.0, green: 0.55, blue: 0.75)),
                     WheelMenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80)),
                 ]
@@ -119,7 +119,9 @@ struct SmallWorldMenuOverlay: View {
             case .pet:
                 return WheelMenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55))
             case .ootd:
-                return WheelMenuItem(title: "穿搭手帐", icon: "book.pages", destination: .ootd, color: Color(red: 1.0, green: 0.41, blue: 0.71))
+                return WheelMenuItem(title: "OOTD", icon: "book.pages", destination: .ootdDefaultBook, color: Color(red: 1.0, green: 0.41, blue: 0.71))
+            case .fashionJournal:
+                return WheelMenuItem(title: "穿搭手帐", icon: "book.closed", destination: .ootd, color: Color(red: 1.0, green: 0.53, blue: 0.76))
             case .smallWorld:
                 return WheelMenuItem(title: "小世界", icon: "map", destination: .menu, color: Color(red: 0.4, green: 0.8, blue: 0.9))
             case .wealth:
@@ -130,6 +132,8 @@ struct SmallWorldMenuOverlay: View {
                 return WheelMenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80))
             case .bigWorld:
                 return WheelMenuItem(title: "大世界", icon: "airplane", destination: .bigWorld, color: Color(red: 0.4, green: 0.8, blue: 0.9))
+            case .recycleBin:
+                return WheelMenuItem(title: "回收站", icon: "trash.fill", destination: .recycleBin, color: Color(red: 0.5, green: 0.5, blue: 0.5))
             }
         }
     }
