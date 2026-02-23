@@ -26,6 +26,17 @@ class SharedPersistence {
             #else
             // 主应用使用 MigrationManager
             self.sharedModelContainer = try SwiftDataMigrationManager.shared.createModelContainer()
+            
+            // ⚠️ 关键：延迟应用删除，确保数据已经从 iCloud 同步过来
+            // 因为 ModelContainer 创建后，iCloud 同步是异步的，需要等待一段时间
+            let context = self.sharedModelContainer.mainContext
+            DeleteTracker.shared.pendingContext = context
+            
+            // 延迟3秒应用删除，确保 iCloud 同步完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                print("DeleteTracker: 延迟应用删除...")
+                DeleteTracker.shared.applyAllDeletes(context: context)
+            }
             #endif
         } catch {
             // 最后的回退方案 - 如果 MigrationManager 也失败了

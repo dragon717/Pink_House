@@ -545,53 +545,12 @@ class SeamlessVideoPlayerView: UIView {
     }
     
     private func findVideoURL(name: String) -> URL? {
-        // 提取查找逻辑为闭包，方便复用
-        // 注意：lookup 是递归安全的，但我们这里不需要递归
-        func lookup(_ videoName: String) -> URL? {
-            // 1. 绝对路径
-            if videoName.hasPrefix("/") {
-                let url = URL(fileURLWithPath: videoName)
-                // 检查文件是否存在且可读
-                // 注意：在沙盒环境或模拟器中，直接访问宿主机绝对路径通常会失败
-                if (try? url.checkResourceIsReachable()) == true {
-                    return url
-                }
-                
-                print("SeamlessPlayer: Absolute path not reachable: \(videoName). Trying to extract filename.")
-                // 如果绝对路径不可达，提取文件名继续查找 (Fallback)
-                let filename = url.lastPathComponent
-                let nameWithoutExt = url.deletingPathExtension().lastPathComponent
-                
-                // 尝试用提取出的文件名在 Bundle 中查找
-                if let bundleUrl = lookup(nameWithoutExt) {
-                    return bundleUrl
-                }
-                
-                // 如果带后缀的文件名也没找到，尝试不带后缀的（lookup内部会处理后缀）
-                // 上面的 lookup(nameWithoutExt) 已经涵盖了大部分情况
-                return nil
-            }
-            
-            // 2. Bundle 根目录查找
-            if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4") { return url }
-            // 3. asserts 子目录查找
-            if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4", subdirectory: "asserts") { return url }
-            // 4. asserts 子目录查找 (旧方式)
-            if let url = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: "mp4") { return url }
-            // 5. 无后缀尝试 (Bundle 根目录)
-            if let url = Bundle.main.url(forResource: videoName, withExtension: nil) { return url }
-            // 6. 无后缀尝试 (asserts 子目录)
-            if let url = Bundle.main.url(forResource: videoName, withExtension: nil, subdirectory: "asserts") { return url }
-            
-            return nil
-        }
-        
-        // 尝试查找原始名称
-        if let url = lookup(name) {
+        // 使用 VideoResourceManager 查找视频
+        if let url = VideoResourceManager.shared.findVideoURL(name: name) {
             return url
         }
         
-        // 7. Fallback logic
+        // Fallback logic
         print("SeamlessPlayer: Failed to find video '\(name)'. Trying fallbacks.")
         
         // Try prefix fallback (e.g. maomao_eating -> maomao_idle)
@@ -599,7 +558,7 @@ class SeamlessVideoPlayerView: UIView {
             let prefix = name.prefix(upTo: underscoreIndex)
             let fallbackName = "\(prefix)_idle"
             if fallbackName != name {
-                if let url = lookup(fallbackName) {
+                if let url = VideoResourceManager.shared.findVideoURL(name: String(fallbackName)) {
                     print("SeamlessPlayer: Fallback found: \(fallbackName)")
                     return url
                 }
@@ -607,12 +566,12 @@ class SeamlessVideoPlayerView: UIView {
         }
         
         // Try naicha_idle (Default)
-        if let url = lookup("naicha_idle") {
+        if let url = VideoResourceManager.shared.findVideoURL(name: "naicha_idle") {
              return url
         }
         
         // Fallback to legacy idle
-        return lookup("idle")
+        return VideoResourceManager.shared.findVideoURL(name: "idle")
     }
     
     deinit {

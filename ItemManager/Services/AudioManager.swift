@@ -477,31 +477,38 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
             setupAudioSession(isRecording: false)
         }
         
-        // 确保引擎正在运行
-        if !engine.isRunning {
-            do {
-                try engine.start()
-            } catch {
-                print("AudioManager: Failed to start engine for BGM: \(error)")
-                return
-            }
-        }
-        
+        // 检查 BGM 缓冲区是否可用
         guard let buffer = bgmBuffer else {
             print("AudioManager: No BGM buffer available")
             return
         }
         
-        if !bgmPlayerNode.isPlaying {
-            bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
-            bgmPlayerNode.play()
-        }
-        
-        // 如果处于倾听状态，静音播放
-        if interactionState == .listening || interactionState == .recording {
-            bgmPlayerNode.volume = 0
-        } else {
-            bgmPlayerNode.volume = Float(bgmVolume)
+        // 延迟启动引擎，确保音频会话已完全激活
+        // 错误码 2003329396 通常发生在引擎在会话激活前启动
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+            
+            // 确保引擎正在运行
+            if !self.engine.isRunning {
+                do {
+                    try self.engine.start()
+                } catch {
+                    print("AudioManager: Failed to start engine for BGM: \(error)")
+                    return
+                }
+            }
+            
+            if !self.bgmPlayerNode.isPlaying {
+                self.bgmPlayerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+                self.bgmPlayerNode.play()
+            }
+            
+            // 如果处于倾听状态，静音播放
+            if self.interactionState == .listening || self.interactionState == .recording {
+                self.bgmPlayerNode.volume = 0
+            } else {
+                self.bgmPlayerNode.volume = Float(self.bgmVolume)
+            }
         }
     }
     

@@ -161,7 +161,7 @@ struct PerlerBeadPatternListView: View {
             if filteredPatterns.isEmpty {
                 emptyStateView
             } else {
-                patternGrid
+                patternGrid 
             }
         }
     }

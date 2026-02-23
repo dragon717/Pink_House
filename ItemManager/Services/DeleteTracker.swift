@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import CoreData
+import SwiftUI
 
 /// 删除追踪器 - 基于时间戳的冲突解决方案
 /// 核心思想：记录删除时间戳，在冲突时比较删除时间和数据修改时间
@@ -15,7 +16,7 @@ final class DeleteTracker {
     private let userDefaults = UserDefaults.standard
 
     /// 待处理的 ModelContext（用于 iCloud 同步完成后应用删除）
-    private var pendingContext: ModelContext?
+    var pendingContext: ModelContext?
 
     // MARK: - Keys
     private let deletedOutfitsKey = "deletedOutfits_v2"  // v2: 存储 [UUID: Date] 字典
@@ -52,14 +53,26 @@ final class DeleteTracker {
     }
 
     @objc private func persistentStoreRemoteChange(_ notification: Notification) {
-        print("DeleteTracker: iCloud 同步通知收到，重新应用删除...")
-        // iCloud 同步完成后，重新应用删除（防止同步覆盖删除状态）
-        // 注意：这里不清除记录，让24小时自动过期机制处理
-        if let context = pendingContext {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.applyAllDeletes(context: context, clearRecords: true)
-            }
-        }
+        // 暂时注释掉，避免死循环
+        // print("DeleteTracker: iCloud 同步通知收到")
+        
+        // // 检查是否是远程同步（不是本地保存触发的）
+        // guard let userInfo = notification.userInfo,
+        //       let storeUUID = userInfo["NSStoreUUID"] as? String else {
+        //     print("DeleteTracker: 忽略本地保存通知")
+        //     return
+        // }
+        
+        // print("DeleteTracker: 远程同步完成，准备重新应用删除...")
+        
+        // // iCloud 同步完成后，重新应用删除（防止同步覆盖删除状态）
+        // if let context = pendingContext {
+        //     // 延迟1秒确保同步完全完成
+        //     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        //         print("DeleteTracker: 开始重新应用删除...")
+        //         self.applyAllDeletes(context: context, clearRecords: true)
+        //     }
+        // }
     }
 
     // MARK: - 记录删除（带时间戳）
@@ -262,20 +275,17 @@ final class DeleteTracker {
 
             print("DeleteTracker: [\(item.name)] deleteTime:\(deleteTime), lastModified:\(itemModifiedTime), diff:\(timeDiff)s, isDeleted:\(item.isDeleted)")
 
-            if deleteTime > itemModifiedTime {
-                if !item.isDeleted {
-                    item.isDeleted = true
-                    item.deletedAt = deleteTime
-                    item.lastModified = Date()
-                    print("DeleteTracker: ✓ Applied delete to '\(item.name)' (deleted after last modify)")
-                } else {
-                    print("DeleteTracker: ✓ Already deleted '\(item.name)'")
-                }
-                return true
+            // 策略：如果项目在删除记录中，强制删除（不管时间戳）
+            // 因为 iCloud 同步可能会在 DeleteTracker 之前更新 lastModified
+            if !item.isDeleted {
+                item.isDeleted = true
+                item.deletedAt = deleteTime
+                item.lastModified = Date()
+                print("DeleteTracker: ✓ Force deleted '\(item.name)' (in delete record)")
             } else {
-                print("DeleteTracker: ✗ Keeping '\(item.name)' (modified \(abs(timeDiff))s after delete)")
-                return false
+                print("DeleteTracker: ✓ Already deleted '\(item.name)'")
             }
+            return true
         }
     }
 
@@ -298,6 +308,8 @@ final class DeleteTracker {
         do {
             let descriptor = FetchDescriptor<T>()
             let allItems = try context.fetch(descriptor)
+            
+            print("DeleteTracker: Fetched \(allItems.count) \(typeName)(s) from database")
 
             var appliedCount = 0
             var clearedRecords: [UUID] = []
@@ -333,8 +345,14 @@ final class DeleteTracker {
             }
 
             if appliedCount > 0 {
-                try context.save()
-                print("DeleteTracker: Applied \(appliedCount) \(typeName) deletes")
+                do {
+                    try context.save()
+                    print("DeleteTracker: ✓ Saved \(appliedCount) \(typeName) deletes to database")
+                } catch {
+                    print("DeleteTracker: ✗ Failed to save \(typeName) deletes: \(error)")
+                }
+            } else {
+                print("DeleteTracker: No \(typeName) deletes to apply")
             }
 
             // 清理已处理的删除记录（仅在启动时清理，同步后不清除）

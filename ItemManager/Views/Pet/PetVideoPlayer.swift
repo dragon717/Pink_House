@@ -39,37 +39,8 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             }
         }
 
-        // 1. 尝试直接作为绝对路径加载 (用户指定路径)
-        var url: URL?
-        if videoName.hasPrefix("/") {
-            url = URL(fileURLWithPath: videoName)
-        }
-        
-        // 2. 尝试在 Bundle 根目录查找
-        if url == nil {
-            url = Bundle.main.url(forResource: videoName, withExtension: "mp4")
-        }
-        
-        // 3. 尝试在 asserts 子目录查找 (标准方式)
-        if url == nil {
-            url = Bundle.main.url(forResource: videoName, withExtension: "mp4", subdirectory: "asserts")
-        }
-        
-        // 4. 尝试在 asserts 子目录查找 (兼容方式)
-        if url == nil {
-            url = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: "mp4")
-        }
-        
-        // 5. 尝试查找无后缀的文件
-        if url == nil {
-             if let bundleUrl = Bundle.main.url(forResource: videoName, withExtension: nil) {
-                 url = bundleUrl
-             } else if let bundleUrl = Bundle.main.url(forResource: videoName, withExtension: nil, subdirectory: "asserts") {
-                 url = bundleUrl
-             } else if let bundleUrl = Bundle.main.url(forResource: "asserts/\(videoName)", withExtension: nil) {
-                 url = bundleUrl
-             }
-        }
+        // 使用 VideoResourceManager 查找视频
+        var url = VideoResourceManager.shared.findVideoURL(name: videoName)
 
         // 如果找不到目标视频，尝试回退逻辑
         if url == nil {
@@ -80,11 +51,23 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                 let prefix = videoName.prefix(upTo: underscoreIndex)
                 let fallbackName = "\(prefix)_idle"
                 if fallbackName != videoName {
-                     url = Bundle.main.url(forResource: fallbackName, withExtension: "mp4", subdirectory: "asserts")
+                    // 优先尝试 mov 透明视频
+                    if fallbackName.hasPrefix("naicha_") {
+                        url = Bundle.main.url(forResource: fallbackName, withExtension: "mov", subdirectory: "asserts/naicha")
+                    } else if fallbackName.hasPrefix("maomao_") {
+                        url = Bundle.main.url(forResource: fallbackName, withExtension: "mov", subdirectory: "asserts/maomao")
+                    }
+                    // 回退到 mp4
+                    if url == nil {
+                        url = Bundle.main.url(forResource: fallbackName, withExtension: "mp4", subdirectory: "asserts")
+                    }
                 }
             }
             
             // 2. 尝试默认角色 (奶茶) 的 idle
+            if url == nil {
+                url = Bundle.main.url(forResource: "naicha_idle", withExtension: "mov", subdirectory: "asserts/naicha")
+            }
             if url == nil {
                 url = Bundle.main.url(forResource: "naicha_idle", withExtension: "mp4", subdirectory: "asserts")
             }

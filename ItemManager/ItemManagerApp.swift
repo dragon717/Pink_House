@@ -110,11 +110,7 @@ struct MainContentView: View {
                     await CloudSyncManager.shared.checkAndSilentRestore(container: SharedPersistence.shared.sharedModelContainer)
                 }
 
-                // 4. 应用记录的删除（防止iCloud同步覆盖删除状态）
-                let context = SharedPersistence.shared.sharedModelContainer.mainContext
-                DeleteTracker.shared.applyAllDeletes(context: context)
-
-                // 5. Dismiss Splash
+                // 4. Dismiss Splash
                 withAnimation(.easeOut(duration: 0.5)) {
                     showSplash = false
                 }
