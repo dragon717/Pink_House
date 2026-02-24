@@ -396,6 +396,7 @@ struct MainTabView: View {
                         )
                     }
                 }
+                .noticePopup() // 添加公告弹窗
             }
         }
     }

@@ -82,7 +82,8 @@ class SharedPersistence {
                     SceneObjectData.self,
                     Model3D.self,
                     StoredImage.self,
-                    PerlerBeadPattern.self
+                    PerlerBeadPattern.self,
+                    Notice.self
                 ])
                 #endif
                 let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)

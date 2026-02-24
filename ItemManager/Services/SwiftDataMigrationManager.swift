@@ -98,7 +98,8 @@ class SwiftDataMigrationManager: ObservableObject {
             SceneObjectData.self,
             Model3D.self,
             StoredImage.self,
-            PerlerBeadPattern.self
+            PerlerBeadPattern.self,
+            Notice.self
         ])
         #endif
     }
@@ -871,19 +872,4 @@ class SwiftDataMigrationManager: ObservableObject {
 
 // MARK: - Helper Extensions
 
-extension CKContainer {
-    /// 异步获取用户记录 ID
-    func userRecordID() async throws -> CKRecord.ID {
-        try await withCheckedThrowingContinuation { continuation in
-            self.fetchUserRecordID { recordID, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else if let recordID = recordID {
-                    continuation.resume(returning: recordID)
-                } else {
-                    continuation.resume(throwing: NSError(domain: "CloudKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法获取用户记录ID"]))
-                }
-            }
-        }
-    }
-}
+// CKContainer.userRecordID() 扩展定义在 NoticeService.swift 中

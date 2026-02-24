@@ -15,7 +15,7 @@ struct BigWorldView: View {
     @State private var selectedTab: BigWorldTab = .explore
     
     enum BigWorldTab: String, CaseIterable, Identifiable {
-        case explore = "探索"
+        case explore = "蓝星"
         case dream = "梦幻"
         
         var id: String { rawValue }
@@ -72,7 +72,7 @@ struct BigWorldView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.clear, for: .navigationBar)
             .toolbar {
-                // 顶部导航栏 - 探索/梦幻页签（参考马上来财的分段选择器）
+                // 顶部导航栏 - 蓝星/梦幻页签（参考马上来财的分段选择器）
                 if case .idle = viewModel.flightStatus {
                     ToolbarItem(placement: .principal) {
                         Picker("功能", selection: $selectedTab) {
@@ -85,7 +85,7 @@ struct BigWorldView: View {
                     }
                 }
 
-                // 关闭按钮 - 仅在非探索页面显示
+                // 关闭按钮 - 仅在非蓝星页面显示
                 if case .idle = viewModel.flightStatus, selectedTab != .explore {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {

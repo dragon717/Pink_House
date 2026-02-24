@@ -713,7 +713,7 @@ struct CheckInCompleteView: View {
                                 Button {
                                     viewModel.resetFlight()
                                 } label: {
-                                    Text("继续探索")
+                                    Text("返回始发地")
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundStyle(.white)
                                         .frame(maxWidth: .infinity)
