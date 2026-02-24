@@ -1,6 +1,36 @@
 import SwiftUI
 import UIKit
 
+// MARK: - 耗材项视图
+struct MaterialItemView: View {
+    let color: BeadColor
+    let count: Int
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            // 颜色圆点
+            Circle()
+                .fill(Color(color.uiColor))
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Circle()
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                )
+            
+            // 色号
+            Text(color.id)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.primary)
+            
+            // 数量
+            Text("×\(count)")
+                .font(.system(size: 10))
+                .foregroundColor(.gray)
+        }
+        .frame(width: 50)
+    }
+}
+
 // MARK: - 图纸导出设置
 struct PatternExportSettings {
     var showGrid: Bool = true
@@ -146,8 +176,13 @@ struct PatternExportSheet: View {
     
     // MARK: - 预览区域
     private func previewSection() -> some View {
-        VStack(spacing: 12) {
-            // 预览图（支持缩放和拖动）
+        VStack(spacing: 16) {
+            // 耗材列表（在预览容器上方）
+            if settings.showMaterials {
+                materialsSection()
+            }
+            
+            // 预览图容器（只包含拼豆图，包含行列标签）
             GeometryReader { geometry in
                 let containerSize = geometry.size
                 
@@ -168,7 +203,7 @@ struct PatternExportSheet: View {
                                     .onChanged { value in
                                         let delta = value / lastPreviewScale
                                         lastPreviewScale = value
-                                        previewScale = min(max(previewScale * delta, 0.5), 5.0)
+                                        previewScale = min(max(previewScale * delta, 0.5), 10.0)
                                     }
                                     .onEnded { _ in
                                         lastPreviewScale = 1.0
@@ -210,19 +245,19 @@ struct PatternExportSheet: View {
                     }
                 }
             }
-            .frame(minHeight: 350)
+            .frame(minHeight: 400)
             
-            // 缩放提示
-            HStack(spacing: 4) {
-                Image(systemName: "hand.tap.fill")
-                    .font(.caption2)
-                Text("双击重置")
-                    .font(.caption2)
-            }
-            .foregroundColor(.gray.opacity(0.6))
-            
-            // 尺寸信息
+            // 缩放提示和尺寸信息
             HStack(spacing: 20) {
+                // 缩放提示
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.tap.fill")
+                        .font(.caption2)
+                    Text("双击重置")
+                        .font(.caption2)
+                }
+                .foregroundColor(.gray.opacity(0.6))
+                
                 if settings.showImageSize {
                     Label("\(canvasModel.resolution.rawValue)×\(canvasModel.resolution.rawValue)", systemImage: "ruler")
                         .font(.caption)
@@ -236,6 +271,37 @@ struct PatternExportSheet: View {
                 }
             }
         }
+    }
+    
+    // MARK: - 耗材列表区域
+    private func materialsSection() -> some View {
+        let usedColors = canvasModel.usedColors
+        guard !usedColors.isEmpty else { return AnyView(EmptyView()) }
+        
+        return AnyView(
+            VStack(alignment: .leading, spacing: 12) {
+                // 标题
+                HStack {
+                    Text("耗材对照")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                    Spacer()
+                }
+                
+                // 耗材网格
+                FlowLayout(spacing: 16) {
+                    ForEach(usedColors.sorted(by: { $0.key < $1.key }), id: \.key) { colorIndex, count in
+                        if colorIndex >= 0 && colorIndex < canvasModel.palette.count {
+                            let color = canvasModel.palette[colorIndex]
+                            MaterialItemView(color: color, count: count)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color.gray.opacity(0.05))
+            .cornerRadius(12)
+        )
     }
     
     // MARK: - 底部按钮
@@ -383,8 +449,8 @@ struct PatternExportSheet: View {
     // MARK: - 生成图纸图片（优化内存使用）
     private func generatePatternImage() -> UIImage? {
         let size = canvasModel.resolution.rawValue
-        // 根据分辨率动态调整格子大小，优化内存
-        let cellSize: CGFloat = size <= 32 ? 60 : (size <= 64 ? 40 : 30)
+        // 根据分辨率动态调整格子大小，确保清晰度
+        let cellSize: CGFloat = size <= 32 ? 80 : (size <= 64 ? 50 : 35)
         let labelSize: CGFloat = settings.showRowColLabels ? 60 : 0
         let margin: CGFloat = 40
         let headerHeight: CGFloat = settings.showMaterials ? 240 : 80
@@ -865,8 +931,8 @@ struct PatternExportSheet: View {
     // MARK: - 生成PDF（矢量图，优化内存）
     private func generatePatternPDF() -> Data? {
         let size = canvasModel.resolution.rawValue
-        // 根据分辨率动态调整格子大小
-        let cellSize: CGFloat = size <= 32 ? 60 : (size <= 64 ? 40 : 30)
+        // 根据分辨率动态调整格子大小，确保清晰度
+        let cellSize: CGFloat = size <= 32 ? 80 : (size <= 64 ? 50 : 35)
         let labelSize: CGFloat = settings.showRowColLabels ? 60 : 0
         let margin: CGFloat = 40
         let headerHeight: CGFloat = settings.showMaterials ? 240 : 80
@@ -1306,43 +1372,28 @@ struct PatternPreviewView: View {
     
     private func drawPattern(in context: inout GraphicsContext, size: CGSize) {
         let resolution = canvasModel.resolution.rawValue
-        let usedColors = canvasModel.usedColors
         
-        // 布局参数
-        let margin: CGFloat = 12
-        let labelSpace: CGFloat = settings.showRowColLabels ? 30 : 0
+        // 布局参数 - 预览容器只包含拼豆图和行列标签
+        let margin: CGFloat = 16
+        let labelSpace: CGFloat = settings.showRowColLabels ? 32 : 0
         
-        // 计算耗材区域所需高度
-        let materialsHeight: CGFloat
-        if settings.showMaterials && !usedColors.isEmpty {
-            let itemWidth: CGFloat = 50
-            let spacing: CGFloat = 8
-            let itemsPerRow = max(Int((size.width - margin * 2 - labelSpace) / (itemWidth + spacing)), 1)
-            let rows = Int(ceil(Double(usedColors.count) / Double(itemsPerRow)))
-            materialsHeight = CGFloat(rows) * 45 + 20 // 每行45pt + 标题20pt
-        } else {
-            materialsHeight = 0
-        }
+        // 计算可用空间
+        let availableWidth = size.width - margin * 2
+        let availableHeight = size.height - margin * 2
         
-        // 计算可用空间（给拼豆图留出足够空间）
-        let availableWidth = size.width - margin * 2 - labelSpace
-        let availableHeight = size.height - margin * 2 - materialsHeight - labelSpace
-        
-        // 计算格子大小
-        let cellSize = min(availableWidth / CGFloat(resolution), availableHeight / CGFloat(resolution))
+        // 计算格子大小 - 确保画布能完整显示在可用空间内
+        let cellSize = min(
+            (availableWidth - labelSpace) / CGFloat(resolution),
+            (availableHeight - labelSpace) / CGFloat(resolution)
+        )
         
         // 计算画布尺寸
         let canvasWidth = CGFloat(resolution) * cellSize
         let canvasHeight = CGFloat(resolution) * cellSize
         
-        // 计算布局位置
-        let offsetX = margin + labelSpace
-        let offsetY = margin + materialsHeight + labelSpace
-        
-        // 绘制耗材列表（在最上方）
-        if settings.showMaterials && !usedColors.isEmpty {
-            drawMaterialsInPreview(in: &context, at: CGPoint(x: offsetX, y: margin), width: size.width - margin * 2)
-        }
+        // 计算布局位置 - 居中显示，行列标签在两边
+        let offsetX = margin + labelSpace + (availableWidth - labelSpace - canvasWidth) / 2
+        let offsetY = margin + labelSpace + (availableHeight - labelSpace - canvasHeight) / 2
         
         // 绘制画布背景
         let backgroundRect = CGRect(x: offsetX, y: offsetY, width: canvasWidth, height: canvasHeight)
@@ -1368,11 +1419,11 @@ struct PatternPreviewView: View {
                     // 绘制颜色块
                     context.fill(Path(rect), with: .color(Color(beadColor.uiColor)))
                     
-                    // 绘制耗材型号 - 增大字体确保可见
-                    if showIds && cellSize >= 8 {
+                    // 绘制耗材型号 - 使用相对于格子的比例，确保放大时可见
+                    if showIds {
                         let colorId = beadColor.id
-                        // 根据格子大小动态调整字体，最小10pt确保可读
-                        let fontSize = max(min(cellSize * 0.5, 14), 10)
+                        // 字体大小为格子的 40%，确保放大缩小都能看清
+                        let fontSize = cellSize * 0.4
                         
                         // 根据背景亮度选择文字颜色
                         let brightness = beadColor.brightness
@@ -1386,8 +1437,8 @@ struct PatternPreviewView: View {
                         let resolved = context.resolve(text)
                         let textSize = resolved.measure(in: CGSize(width: cellSize, height: cellSize))
                         
-                        // 只在能放下时绘制
-                        if textSize.width <= cellSize - 2 && textSize.height <= cellSize - 2 {
+                        // 只在能放下时绘制（留出边距）
+                        if textSize.width <= cellSize * 0.85 && textSize.height <= cellSize * 0.85 {
                             let textRect = CGRect(
                                 x: rect.midX - textSize.width / 2,
                                 y: rect.midY - textSize.height / 2,
@@ -1440,70 +1491,6 @@ struct PatternPreviewView: View {
         }
     }
     
-    private func drawMaterialsInPreview(in context: inout GraphicsContext, at position: CGPoint, width: CGFloat) {
-        let usedColors = canvasModel.usedColors
-        guard !usedColors.isEmpty else { return }
-        
-        // 标题
-        var titleText = Text("耗材对照")
-            .font(.system(size: 12, weight: .medium))
-            .foregroundColor(.gray)
-        let titleSize = context.resolve(titleText).measure(in: CGSize(width: 100, height: 20))
-        context.draw(titleText, in: CGRect(x: position.x, y: position.y, width: titleSize.width, height: titleSize.height))
-        
-        // 布局参数
-        let itemWidth: CGFloat = 50
-        let itemHeight: CGFloat = 35
-        let colorSize: CGFloat = 20
-        let spacing: CGFloat = 8
-        let maxPerRow = max(Int((width - position.x) / (itemWidth + spacing)), 1)
-        
-        var index = 0
-        let startY = position.y + titleSize.height + 6
-        
-        for (colorIndex, count) in usedColors.sorted(by: { $0.key < $1.key }) {
-            if colorIndex >= 0 && colorIndex < canvasModel.palette.count {
-                let color = canvasModel.palette[colorIndex]
-                let row = index / maxPerRow
-                let col = index % maxPerRow
-                
-                let x = position.x + CGFloat(col) * (itemWidth + spacing)
-                let y = startY + CGFloat(row) * itemHeight
-                
-                // 绘制颜色圆点
-                var circlePath = Path()
-                circlePath.addEllipse(in: CGRect(x: x + (itemWidth - colorSize) / 2, y: y, width: colorSize, height: colorSize))
-                context.fill(circlePath, with: .color(Color(color.uiColor)))
-                
-                // 绘制色号
-                var idText = Text(color.id)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.primary)
-                let idSize = context.resolve(idText).measure(in: CGSize(width: 40, height: 12))
-                context.draw(idText, in: CGRect(
-                    x: x + (itemWidth - idSize.width) / 2,
-                    y: y + colorSize + 2,
-                    width: idSize.width,
-                    height: idSize.height
-                ))
-                
-                // 绘制数量
-                var countText = Text("×\(count)")
-                    .font(.system(size: 9))
-                    .foregroundColor(.gray)
-                let countSize = context.resolve(countText).measure(in: CGSize(width: 40, height: 10))
-                context.draw(countText, in: CGRect(
-                    x: x + (itemWidth - countSize.width) / 2,
-                    y: y + colorSize + 14,
-                    width: countSize.width,
-                    height: countSize.height
-                ))
-                
-                index += 1
-            }
-        }
-    }
-    
     private func drawFooterInPreview(in context: inout GraphicsContext, at position: CGPoint, width: CGFloat) {
         var infoParts: [String] = []
         
@@ -1533,10 +1520,12 @@ struct PatternPreviewView: View {
     }
     
     private func drawLabels(in context: inout GraphicsContext, offsetX: CGFloat, offsetY: CGFloat, cellSize: CGFloat, resolution: Int, labelSpace: CGFloat) {
-        let labelFont = Font.system(size: 10)
+        // 标签字体大小相对于 labelSpace，确保放大时可见
+        let labelFontSize = labelSpace * 0.35
+        let labelFont = Font.system(size: labelFontSize)
         let labelColor = Color.gray
         
-        // 列标签（顶部）- 在画布上方
+        // 列标签（顶部）- 固定在容器顶部边缘
         for x in 0..<resolution {
             if x % 5 == 0 || x == resolution - 1 {
                 let label = "\(x + 1)"
@@ -1544,7 +1533,8 @@ struct PatternPreviewView: View {
                     .font(labelFont)
                     .foregroundColor(labelColor)
                 
-                let textSize = context.resolve(text).measure(in: CGSize(width: 30, height: 20))
+                let textSize = context.resolve(text).measure(in: CGSize(width: labelSpace, height: labelSpace))
+                // 标签固定在容器顶部，与格子对齐
                 let textRect = CGRect(
                     x: offsetX + CGFloat(x) * cellSize + cellSize / 2 - textSize.width / 2,
                     y: offsetY - labelSpace + (labelSpace - textSize.height) / 2,
@@ -1555,7 +1545,7 @@ struct PatternPreviewView: View {
             }
         }
         
-        // 行标签（左侧）- 在画布左方
+        // 行标签（左侧）- 固定在容器左侧边缘
         for y in 0..<resolution {
             if y % 5 == 0 || y == resolution - 1 {
                 let label = "\(y + 1)"
@@ -1563,7 +1553,8 @@ struct PatternPreviewView: View {
                     .font(labelFont)
                     .foregroundColor(labelColor)
                 
-                let textSize = context.resolve(text).measure(in: CGSize(width: 20, height: 30))
+                let textSize = context.resolve(text).measure(in: CGSize(width: labelSpace, height: labelSpace))
+                // 标签固定在容器左侧，与格子对齐
                 let textRect = CGRect(
                     x: offsetX - labelSpace + (labelSpace - textSize.width) / 2,
                     y: offsetY + CGFloat(y) * cellSize + cellSize / 2 - textSize.height / 2,
