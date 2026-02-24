@@ -163,7 +163,9 @@ final class DeleteTracker {
 }
 ```
 
-### 3. 在 SharedPersistence 中立即应用删除（关键！）
+### 3. 在 SharedPersistence 中延迟应用删除（关键！）
+
+由于 iCloud 同步是异步的，我们需要等待同步完成后再应用删除：
 
 ```swift
 // SharedPersistence.swift
@@ -172,9 +174,21 @@ private init() {
         // 创建 ModelContainer
         self.sharedModelContainer = try SwiftDataMigrationManager.shared.createModelContainer()
         
-        // ⚠️ 关键：在 ModelContainer 创建后立即应用删除，在 iCloud 同步之前
+        // ⚠️ 关键：延迟应用删除，确保 iCloud 同步完成
         let context = self.sharedModelContainer.mainContext
-        DeleteTracker.shared.applyAllDeletes(context: context)
+        DeleteTracker.shared.pendingContext = context
+        
+        // 延迟5秒首次应用删除，确保 iCloud 同步完成
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            print("DeleteTracker: 首次应用删除...")
+            DeleteTracker.shared.applyAllDeletes(context: context)
+        }
+        
+        // 10秒后再次应用删除（处理同步延迟较大的情况）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+            print("DeleteTracker: 第二次应用删除...")
+            DeleteTracker.shared.applyAllDeletes(context: context)
+        }
         
     } catch {
         // ... 错误处理
@@ -238,6 +252,28 @@ func restoreItem(_ item: MyModel) {
         // 2. 从 DeleteTracker 中移除删除记录（关键！）
         DeleteTracker.shared.removeDeletedItem(id: item.id)
     }
+}
+```
+
+### 7. 手动同步按钮（用户体验优化）
+
+为用户提供手动触发删除同步的选项：
+
+```swift
+// 在工具栏菜单中添加
+Menu {
+    // ... 其他选项
+    
+    Divider()
+    
+    Button {
+        // 手动触发删除同步
+        DeleteTracker.shared.applyAllDeletes(context: modelContext)
+    } label: {
+        Label("同步删除状态", systemImage: "arrow.triangle.2.circlepath")
+    }
+} label: {
+    Image(systemName: "plus")
 }
 ```
 
@@ -359,14 +395,37 @@ DeleteTracker: ✗ Keeping 'xxx' (modified after delete)
 
 ---
 
+## 关于 NSPersistentCloudKitContainer
+
+**不需要切换！** SwiftData 的 `cloudKitDatabase: .automatic` 底层就是 `NSPersistentCloudKitContainer`。SwiftData 是 Core Data + CloudKit 的封装层。
+
+### 切换成本
+
+如果直接迁移到 `NSPersistentCloudKitContainer`：
+
+| 方面 | 工作量 |
+|------|--------|
+| 模型重写 | 所有 `@Model` → `NSManagedObject` 子类 |
+| 查询重写 | 所有 `@Query` → `NSFetchRequest` |
+| 数据绑定 | 自动 → 手动 KVO |
+| 预计时间 | **1-2 周重构** |
+
+### 更好的选择
+
+继续使用 SwiftData + DeleteTracker，优化策略：
+1. **多次延迟执行**：5秒和10秒各执行一次
+2. **手动同步按钮**：让用户可以主动触发
+3. **强制删除策略**：忽略时间戳，只要在删除记录中就删除
+
 ## 总结
 
-SwiftData + iCloud 同步的删除冲突是一个常见问题，解决方案的关键是**时机**：
+SwiftData + iCloud 同步的删除冲突是一个常见问题，解决方案的关键是**多次尝试 + 强制策略**：
 
-1. **记录删除时间戳**：使用 `[UUID: Date]` 字典存储到 iCloud
-2. **立即应用删除**：在 `SharedPersistence.init()` 中、`ModelContainer` 创建后立即应用
-3. **时间戳比较**：冲突时比较删除时间和数据修改时间
-4. **24小时保留期**：防止 iCloud 同步延迟导致的问题
-5. **恢复清理**：恢复时清除 DeleteTracker 记录
+1. **记录删除时间戳**：使用 `[UUID: Date]` 字典存储到 iCloud Key-Value Store
+2. **多次延迟应用删除**：5秒和10秒各执行一次，处理不同网络延迟
+3. **强制删除策略**：只要在删除记录中，就强制设置 `isDeleted = true`
+4. **24小时保留期**：删除记录保留24小时，防止同步延迟
+5. **手动同步按钮**：给用户主动触发的选项
+6. **恢复时清理 DeleteTracker**：防止恢复的数据被再次删除
 
-**核心原则**：在 iCloud 同步开始之前，就已经设置好删除状态。这样可以确保即使 iCloud 同步覆盖了删除状态，应用启动时也会根据时间戳自动修复，用户不会看到已删除的数据"复活"。
+**核心原则**：由于 iCloud 同步是异步且不可控的，我们采用"多次尝试 + 强制策略"来确保删除状态最终被正确应用。

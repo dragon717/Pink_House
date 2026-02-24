@@ -319,6 +319,15 @@ struct PerlerBeadPatternListView: View {
             } label: {
                 Label("自由绘制", systemImage: "pencil")
             }
+            
+            Divider()
+            
+            Button {
+                // 手动触发删除同步
+                DeleteTracker.shared.applyAllDeletes(context: modelContext)
+            } label: {
+                Label("同步删除状态", systemImage: "arrow.triangle.2.circlepath")
+            }
         } label: {
             Image(systemName: "plus")
         }

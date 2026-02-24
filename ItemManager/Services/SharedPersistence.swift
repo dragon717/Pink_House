@@ -32,9 +32,15 @@ class SharedPersistence {
             let context = self.sharedModelContainer.mainContext
             DeleteTracker.shared.pendingContext = context
             
-            // 延迟3秒应用删除，确保 iCloud 同步完成
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                print("DeleteTracker: 延迟应用删除...")
+            // 延迟5秒首次应用删除，确保 iCloud 同步完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                print("DeleteTracker: 首次应用删除...")
+                DeleteTracker.shared.applyAllDeletes(context: context)
+            }
+            
+            // 10秒后再次应用删除（处理同步延迟较大的情况）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                print("DeleteTracker: 第二次应用删除...")
                 DeleteTracker.shared.applyAllDeletes(context: context)
             }
             #endif
