@@ -235,9 +235,11 @@ struct SpaceBookOpeningAnimationView: View {
     @State private var isMovingToCenter = false
     @State private var isOpening = false
     @State private var pagesFlipped: [Bool] = Array(repeating: false, count: 6)
+    @State private var isReady = false
 
     // 书页图片缓存
     @State private var pageImages: [UIImage?] = Array(repeating: nil, count: 6)
+    @State private var coverImage: UIImage? = nil
 
     // 配置参数
     private let bookWidth: CGFloat = 200
@@ -254,7 +256,7 @@ struct SpaceBookOpeningAnimationView: View {
             // 3D 书本容器
             ZStack {
                 // 1. 封底
-                SpaceBookCoverForAnimation(book: book, width: bookWidth, height: bookHeight, isFront: false)
+                SpaceBookCoverWithImage(book: book, width: bookWidth, height: bookHeight, isFront: false, image: coverImage)
 
                 // 2. 书页 (多层)
                 ForEach(0..<6) { index in
@@ -271,7 +273,7 @@ struct SpaceBookOpeningAnimationView: View {
                 }
 
                 // 3. 封面
-                SpaceBookCoverForAnimation(book: book, width: bookWidth, height: bookHeight, isFront: true)
+                SpaceBookCoverWithImage(book: book, width: bookWidth, height: bookHeight, isFront: true, image: coverImage)
                     .rotation3DEffect(
                         .degrees(isOpening ? -180 : 0),
                         axis: (x: 0.0, y: 1.0, z: 0.0),
@@ -288,11 +290,46 @@ struct SpaceBookOpeningAnimationView: View {
                 axis: (x: 0.0, y: 1.0, z: 0.0)
             )
             .offset(y: isMovingToCenter ? 0 : 300)
+            .opacity(isReady ? 1 : 0)
         }
         .task {
-            await loadPageImages()
+            await preloadAllImages()
+            isReady = true
             startAnimationSequence()
         }
+    }
+
+    private func preloadAllImages() async {
+        // 并行加载封面和书页图片
+        async let coverTask = loadCoverImage()
+        async let pagesTask = loadPageImages()
+
+        coverImage = await coverTask
+        await pagesTask
+    }
+
+    private func loadCoverImage() async -> UIImage? {
+        // 优先加载用户设置的封面图片
+        if let coverPath = book.coverImage {
+            if let image = await ImageManager.shared.loadImageAsync(fileName: coverPath) {
+                return image
+            }
+        }
+
+        // 如果没有封面，使用第一页作为封面
+        let validPages = (book.pages ?? []).filter { !$0.isDeleted }.sorted { $0.createdAt > $1.createdAt }
+        if let firstPage = validPages.first {
+            // 优先使用缩略图缓存（ARView预览）
+            if let thumbnail = SpaceOutfitThumbnailCache.shared.getThumbnail(for: firstPage.id) {
+                return thumbnail
+            }
+            // 其次使用 snapshotPath
+            if let snapshotPath = firstPage.snapshotPath {
+                return await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+            }
+        }
+
+        return nil
     }
 
     private func loadPageImages() async {
@@ -302,16 +339,29 @@ struct SpaceBookOpeningAnimationView: View {
         // 如果没有书页，直接返回
         if validPages.isEmpty { return }
 
-        // 填充 6 张图片
-        for i in 0..<6 {
-            // 循环使用书页内容，如果书页少于 6 页
-            let pageIndex = i % validPages.count
-            let page = validPages[pageIndex]
+        // 并行加载所有书页图片
+        await withTaskGroup(of: (Int, UIImage?).self) { group in
+            for i in 0..<6 {
+                let pageIndex = i % validPages.count
+                let page = validPages[pageIndex]
 
-            if let snapshotPath = page.snapshotPath {
-                let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+                group.addTask {
+                    // 优先使用缩略图缓存（ARView预览）
+                    if let thumbnail = SpaceOutfitThumbnailCache.shared.getThumbnail(for: page.id) {
+                        return (i, thumbnail)
+                    }
+                    // 其次使用 snapshotPath
+                    if let snapshotPath = page.snapshotPath {
+                        let image = await ImageManager.shared.loadImageAsync(fileName: snapshotPath)
+                        return (i, image)
+                    }
+                    return (i, nil)
+                }
+            }
+
+            for await (index, image) in group {
                 await MainActor.run {
-                    self.pageImages[i] = image
+                    self.pageImages[index] = image
                 }
             }
         }
@@ -349,6 +399,80 @@ struct SpaceBookOpeningAnimationView: View {
 }
 
 // MARK: - Animation Subviews
+
+struct SpaceBookCoverWithImage: View {
+    let book: SpaceBookGroup
+    let width: CGFloat
+    let height: CGFloat
+    var isFront: Bool = false
+    let image: UIImage?
+
+    var body: some View {
+        ZStack {
+            // Base Cover
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: width, height: height)
+                    .clipped()
+                    .cornerRadius(4)
+            } else {
+                Rectangle()
+                    .fill(Color.white)
+                    .frame(width: width, height: height)
+                    .cornerRadius(4)
+
+                VStack {
+                    Image(systemName: "cube.transparent")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary)
+                    Text(book.title)
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                }
+            }
+
+            // Shadow
+            RoundedRectangle(cornerRadius: 4)
+                .strokeBorder(Color.black.opacity(0.1), lineWidth: 1)
+                .frame(width: width, height: height)
+                .shadow(radius: 5)
+
+            // 装饰线条 (仅封面)
+            if isFront {
+                Rectangle()
+                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 2)
+                    .frame(width: width - 16, height: height - 16)
+
+                // Title at bottom
+                VStack {
+                    Spacer()
+                    ZStack {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .frame(height: 40)
+                        Text(book.title)
+                            .font(.headline)
+                            .lineLimit(2)
+                            .padding(.horizontal, 8)
+                    }
+                }
+                .frame(width: width, height: height)
+            }
+
+            // 书脊纹理
+            HStack {
+                LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 8)
+                Spacer()
+            }
+        }
+        .frame(width: width, height: height)
+    }
+}
 
 struct SpaceBookCoverForAnimation: View {
     let book: SpaceBookGroup

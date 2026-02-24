@@ -3,8 +3,10 @@ import SwiftUI
 import SwiftData
 
 struct OOTDView: View {
+    var hideBackButton: Bool = false
+    
     var body: some View {
-        BookShelfView()
+        BookShelfView(hideBackButton: hideBackButton)
     }
 }
 

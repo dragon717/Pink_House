@@ -942,11 +942,10 @@ struct WardrobeStatsView: View {
                 
                 // Bottom Actions
                 HStack(spacing: 12) {
-                    // OOTD Button - 跳转到默认手帐
-                    NavigationLink(destination: defaultBookDestination) {
+                    NavigationLink(destination: OOTDView(hideBackButton: true)) {
                         HStack {
-                            Image(systemName: "tshirt.fill")
-                            Text("OOTD")
+                            Image(systemName: "book.closed.fill")
+                            Text("穿搭手帐")
                         }
                         .padding()
                         .frame(maxWidth: .infinity)

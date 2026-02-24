@@ -119,7 +119,7 @@ struct SmallWorldMenuOverlay: View {
             case .pet:
                 return WheelMenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55))
             case .ootd:
-                return WheelMenuItem(title: "OOTD", icon: "book.pages", destination: .ootdDefaultBook, color: Color(red: 1.0, green: 0.41, blue: 0.71))
+                return WheelMenuItem(title: "快捷OOTD", icon: "book.pages", destination: .ootdDefaultBook, color: Color(red: 1.0, green: 0.41, blue: 0.71))
             case .fashionJournal:
                 return WheelMenuItem(title: "穿搭手帐", icon: "book.closed", destination: .ootd, color: Color(red: 1.0, green: 0.53, blue: 0.76))
             case .smallWorld:

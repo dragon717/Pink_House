@@ -66,7 +66,7 @@ struct ModernTabView: View {
         case .ootd:
             return "穿搭手帐"
         case .ootdDefaultBook:
-            return "OOTD"
+            return "快捷OOTD"
         case .menu:
             return "小世界"
         case .perler:

@@ -74,6 +74,9 @@ public struct RealityKitSceneView: View {
     @State private var sceneUpdateTrigger = false
     private let maxConcurrentLoads = 3
     
+    // ARView 引用，用于截图
+    @State private var arView: ARView?
+    
     public init(
         selectedObject: Binding<SceneObject?>,
         objects: Binding<[SceneObject]>,
@@ -126,6 +129,30 @@ public struct RealityKitSceneView: View {
                 pointLightComponent.color = .white
                 pointLight.components.set(pointLightComponent)
                 rootEntity.addChild(pointLight)
+                
+                // 保存ARView引用用于截图
+                if let arView = content as? ARView {
+                    self.arView = arView
+                }
+                
+                // 监听截图请求
+                NotificationCenter.default.addObserver(
+                    forName: Notification.Name("SpatialCanvasARViewCaptureRequest"),
+                    object: nil,
+                    queue: .main
+                ) { notification in
+                    guard let userInfo = notification.userInfo,
+                          let completion = userInfo["completion"] as? (UIImage?) -> Void else {
+                        return
+                    }
+                    
+                    // 使用ARView的snapshot方法捕获截图
+                    self.arView?.snapshot(saveToHDR: false) { image in
+                        DispatchQueue.main.async {
+                            completion(image)
+                        }
+                    }
+                }
                 
             } update: { content in
                 _ = sceneUpdateTrigger

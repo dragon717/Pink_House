@@ -13,6 +13,9 @@ struct BookShelfView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
     
+    // 从衣橱进入时隐藏返回按钮
+    var hideBackButton: Bool = false
+    
     // View Mode Switcher
     enum ViewMode: String, CaseIterable, Identifiable {
         case planar = "平面"
@@ -86,6 +89,7 @@ struct BookShelfView: View {
             )
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(hideBackButton)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 BookShelfToolbar(

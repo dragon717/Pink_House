@@ -1061,6 +1061,11 @@ struct SpatialCanvasEditorView: View {
             showingSaveSuccess = true
             print("[Scene] 场景保存成功，共 \(sceneObjects.count) 个对象，outfit.id: \(outfit.id)")
             
+            // 自动生成缩略图
+            Task {
+                await generateAndSaveThumbnail(for: outfit)
+            }
+            
             // 调用保存回调
             onSave?(outfit)
             completion?()
@@ -1068,6 +1073,109 @@ struct SpatialCanvasEditorView: View {
             print("[Scene] 保存失败: \(error)")
             completion?()
         }
+    }
+    
+    /// 自动生成并保存缩略图
+    private func generateAndSaveThumbnail(for outfit: SpaceOutfit) async {
+        print("[Scene] 开始生成缩略图...")
+        
+        // 请求ARView截图
+        guard let screenshot = await captureARViewScreenshot() else {
+            print("[Scene] ARView截图失败，使用占位缩略图")
+            generatePlaceholderThumbnail(for: outfit)
+            return
+        }
+        
+        // 裁剪为竖向3:4比例
+        let croppedImage = cropToPortrait3x4(image: screenshot)
+        
+        // 保存到缓存
+        SpaceOutfitThumbnailCache.shared.saveThumbnail(croppedImage, for: outfit.id)
+        
+        // 发送通知，通知预览视图和封面视图更新
+        NotificationCenter.default.post(name: .spaceOutfitThumbnailUpdated, object: outfit.id)
+        
+        print("[Scene] 缩略图生成并保存成功")
+    }
+    
+    /// 捕获ARView截图
+    private func captureARViewScreenshot() async -> UIImage? {
+        // 通过通知获取ARView引用
+        let notificationName = Notification.Name("SpatialCanvasARViewCaptureRequest")
+        
+        return await withCheckedContinuation { continuation in
+            // 发送截图请求通知
+            NotificationCenter.default.post(
+                name: notificationName,
+                object: nil,
+                userInfo: ["completion": { (image: UIImage?) in
+                    continuation.resume(returning: image)
+                }]
+            )
+        }
+    }
+    
+    /// 生成占位缩略图（当ARView截图失败时使用）
+    private func generatePlaceholderThumbnail(for outfit: SpaceOutfit) {
+        let thumbnailSize = CGSize(width: 300, height: 400)
+        UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 1.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        let context = UIGraphicsGetCurrentContext()
+        
+        // 绘制背景
+        context?.setFillColor(UIColor.systemGray6.cgColor)
+        context?.fill(CGRect(origin: .zero, size: thumbnailSize))
+        
+        // 绘制3D图标
+        let iconRect = CGRect(x: thumbnailSize.width/2 - 40, y: thumbnailSize.height/2 - 40, width: 80, height: 80)
+        context?.setFillColor(UIColor.systemPink.cgColor)
+        context?.fillEllipse(in: iconRect)
+        
+        // 添加文字
+        let text = "3D"
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: 24),
+            .foregroundColor: UIColor.white
+        ]
+        let textSize = text.size(withAttributes: attributes)
+        text.draw(at: CGPoint(x: thumbnailSize.width/2 - textSize.width/2, y: thumbnailSize.height/2 - textSize.height/2), withAttributes: attributes)
+        
+        if let image = UIGraphicsGetImageFromCurrentImageContext() {
+            SpaceOutfitThumbnailCache.shared.saveThumbnail(image, for: outfit.id)
+            NotificationCenter.default.post(name: .spaceOutfitThumbnailUpdated, object: outfit.id)
+        }
+    }
+    
+    /// 裁剪图片为竖向3:4比例
+    private func cropToPortrait3x4(image: UIImage) -> UIImage {
+        let imageSize = image.size
+        let targetRatio: CGFloat = 3.0 / 4.0
+        
+        var cropWidth: CGFloat
+        var cropHeight: CGFloat
+        
+        let imageRatio = imageSize.width / imageSize.height
+        
+        if imageRatio > targetRatio {
+            // 图片太宽，裁剪宽度
+            cropHeight = imageSize.height
+            cropWidth = cropHeight * targetRatio
+        } else {
+            // 图片太高，裁剪高度
+            cropWidth = imageSize.width
+            cropHeight = cropWidth / targetRatio
+        }
+        
+        let cropX = (imageSize.width - cropWidth) / 2
+        let cropY = (imageSize.height - cropHeight) / 2
+        let cropRect = CGRect(x: cropX, y: cropY, width: cropWidth, height: cropHeight)
+        
+        guard let croppedCGImage = image.cgImage?.cropping(to: cropRect) else {
+            return image
+        }
+        
+        return UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
     }
 
     // MARK: - 3D建模暂停/恢复

@@ -8,7 +8,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case wardrobe = "衣橱"
     case finalPayment = "尾款天使"
     case pet = "萌宠"
-    case ootd = "OOTD"
+    case ootd = "快捷OOTD"
     case fashionJournal = "穿搭手帐"
     case smallWorld = "小世界"
     case wealth = "来财"
@@ -81,7 +81,7 @@ class FavoriteMenuSettings {
     var selectedItemIDs: [String]
     var lastUpdated: Date
     
-    init(selectedItemIDs: [String] = ["萌宠", "OOTD", "小世界"]) {
+    init(selectedItemIDs: [String] = ["萌宠", "快捷OOTD", "小世界"]) {
         self.selectedItemIDs = selectedItemIDs
         self.lastUpdated = Date()
     }
