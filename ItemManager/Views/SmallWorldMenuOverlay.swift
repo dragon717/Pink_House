@@ -249,9 +249,9 @@ struct SmallWorldMenuOverlay: View {
             case 4:
                 return (22, 11, 54)
             case 5:
-                return (20, 10, 50)
+                return (22, 11, 54)
             default:
-                return (20, 10, 50)
+                return (22, 11, 54)
             }
         }
 
@@ -267,27 +267,73 @@ struct SmallWorldMenuOverlay: View {
                     monicaPink: monicaPink
                 )
 
-                // 菜单项分布在角度范围内
-                ForEach(items.indices, id: \.self) { index in
-                    let itemStartAngle = WheelConfig.startAngle + WheelConfig.menuPadding
-                    let step = items.count > 1 ? WheelConfig.menuTotalAngle / Double(items.count - 1) : 0
-                    let angle = itemStartAngle + Double(index) * step
-                    let radians = angle * .pi / 180
-                    let x = radius * cos(radians)
-                    let y = radius * sin(radians)
+                // 5个菜单项使用上下两排布局：下面2个，上面3个
+                if items.count == 5 {
+                    // 下排：2个菜单项（角度 -120° 到 -60°）
+                    ForEach(0..<2) { index in
+                        let angle = -120 + Double(index) * 60
+                        let radians = angle * .pi / 180
+                        let innerRadius = radius * 0.6
+                        let x = innerRadius * cos(radians)
+                        let y = innerRadius * sin(radians)
 
-                    ItemBubble(
-                        item: items[index],
-                        isLowMemoryDevice: isLowMemoryDevice,
-                        iconSize: sizes.iconSize,
-                        fontSize: sizes.fontSize,
-                        circleSize: sizes.circleSize
-                    ) {
-                        onItemSelected(items[index])
+                        ItemBubble(
+                            item: items[index],
+                            isLowMemoryDevice: isLowMemoryDevice,
+                            iconSize: sizes.iconSize,
+                            fontSize: sizes.fontSize,
+                            circleSize: sizes.circleSize
+                        ) {
+                            onItemSelected(items[index])
+                        }
+                        .offset(x: x, y: y)
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
                     }
-                    .offset(x: x, y: y)
-                    .transition(.scale.combined(with: .opacity))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
+
+                    // 上排：3个菜单项（角度 -135° 到 -45°）
+                    ForEach(2..<5) { index in
+                        let angle = -135 + Double(index - 2) * 45
+                        let radians = angle * .pi / 180
+                        let x = radius * cos(radians)
+                        let y = radius * sin(radians)
+
+                        ItemBubble(
+                            item: items[index],
+                            isLowMemoryDevice: isLowMemoryDevice,
+                            iconSize: sizes.iconSize,
+                            fontSize: sizes.fontSize,
+                            circleSize: sizes.circleSize
+                        ) {
+                            onItemSelected(items[index])
+                        }
+                        .offset(x: x, y: y)
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
+                    }
+                } else {
+                    // 其他数量使用原来的弧形布局
+                    ForEach(items.indices, id: \.self) { index in
+                        let itemStartAngle = WheelConfig.startAngle + WheelConfig.menuPadding
+                        let step = items.count > 1 ? WheelConfig.menuTotalAngle / Double(items.count - 1) : 0
+                        let angle = itemStartAngle + Double(index) * step
+                        let radians = angle * .pi / 180
+                        let x = radius * cos(radians)
+                        let y = radius * sin(radians)
+
+                        ItemBubble(
+                            item: items[index],
+                            isLowMemoryDevice: isLowMemoryDevice,
+                            iconSize: sizes.iconSize,
+                            fontSize: sizes.fontSize,
+                            circleSize: sizes.circleSize
+                        ) {
+                            onItemSelected(items[index])
+                        }
+                        .offset(x: x, y: y)
+                        .transition(.scale.combined(with: .opacity))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
+                    }
                 }
             }
         }
