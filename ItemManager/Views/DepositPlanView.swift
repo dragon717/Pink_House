@@ -353,6 +353,8 @@ struct DepositStatsView: View {
     let clothings: [Clothing]
     var onCountMoney: ((Decimal) -> Void)? = nil
     
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    
     // Deduplicated clothings based on name, deposit, balance for Style Count
     // We ignore stock for style counting
     private var uniqueStyles: [Clothing] {
@@ -390,25 +392,89 @@ struct DepositStatsView: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
-            
-            Divider()
-                .frame(height: 30)
-            
-            statItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
-            
-            Divider()
-                .frame(height: 30)
-            
-            Button {
-                onCountMoney?(pendingBalance)
-            } label: {
-                statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
+                
+                Divider()
+                    .frame(height: 30)
+                
+                statItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
+                
+                Divider()
+                    .frame(height: 30)
+                
+                Button {
+                    onCountMoney?(pendingBalance)
+                } label: {
+                    statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding()
+            
+            Divider()
+                .padding(.horizontal)
+            
+            // 三个功能入口
+            HStack(spacing: 0) {
+                // 梦裙日历
+                Button {
+                    tabNavigationManager.navigate(to: .smallWorld(.calendar))
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 16))
+                        Text("梦裙日历")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.pink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // 马上来财
+                Button {
+                    tabNavigationManager.navigate(to: .smallWorld(.wealth))
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "dollarsign.circle")
+                            .font(.system(size: 16))
+                        Text("马上来财")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // 裙子股市
+                Button {
+                    tabNavigationManager.navigate(to: .smallWorld(.bigWorld))
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 16))
+                        Text("裙子股市")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
         }
-        .padding()
         .background(CardBackgroundView(cornerRadius: 24))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)

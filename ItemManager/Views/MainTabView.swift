@@ -49,6 +49,7 @@ struct ModernTabView: View {
     @Binding var isPlayingOpeningAnimation: Bool
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
     
     @State private var searchText = ""
     
@@ -148,6 +149,29 @@ struct ModernTabView: View {
                 smallWorldDestination: $smallWorldDestination,
                 homeTab: $homeTabSelection
             )
+        }
+        .onReceive(tabNavigationManager.$navigateToTab) { tab in
+            if let tab = tab {
+                withAnimation {
+                    selectedTab = tab
+                }
+            }
+        }
+        .onReceive(tabNavigationManager.$navigateToHomeTab) { homeTab in
+            if let homeTab = homeTab {
+                withAnimation {
+                    homeTabSelection = homeTab
+                }
+                tabNavigationManager.navigateToHomeTab = nil
+            }
+        }
+        .onReceive(tabNavigationManager.$navigateToSmallWorld) { destination in
+            if let destination = destination {
+                withAnimation {
+                    smallWorldDestination = destination
+                }
+                tabNavigationManager.navigateToSmallWorld = nil
+            }
         }
     }
     

@@ -4,9 +4,11 @@ struct FavoriteMenuSettingsView: View {
     @StateObject private var settingsManager = FavoriteMenuSettingsManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
-    
+    @State private var showMaxItemsAlert = false
+
     // 所有可选功能
     private let allItems = FavoriteMenuItem.allCases
+    private let maxItems = 5
     
     var body: some View {
         NavigationStack {
@@ -31,21 +33,30 @@ struct FavoriteMenuSettingsView: View {
                             }
                         }
                     } header: {
-                        Text("已选中的常用功能（左滑删除）")
+                        Text("已选中的常用功能（左滑删除，最多 \(maxItems) 个）")
                     } footer: {
                         Text("长按小世界 Tab 按钮，常用分类将显示这些功能")
                     }
 
                     // 可选功能列表
-                    Section("可选功能") {
+                    Section {
                         ForEach(availableItems) { item in
                             AvailableItemRow(
                                 item: item,
-                                isSelected: false
+                                isSelected: false,
+                                isDisabled: settingsManager.selectedItems.count >= maxItems
                             ) {
-                                settingsManager.addItem(item)
+                                if settingsManager.selectedItems.count >= maxItems {
+                                    showMaxItemsAlert = true
+                                } else {
+                                    settingsManager.addItem(item)
+                                }
                             }
                         }
+                    } header: {
+                        Text("可选功能")
+                    } footer: {
+                        Text("最多可选择 \(maxItems) 个常用功能")
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -59,6 +70,11 @@ struct FavoriteMenuSettingsView: View {
                             }
                         }
                     }
+                }
+                .alert("常用菜单已满", isPresented: $showMaxItemsAlert) {
+                    Button("我知道了", role: .cancel) {}
+                } message: {
+                    Text("最多只能添加 \(maxItems) 个常用功能，请先删除一些再添加新的")
                 }
             }
         }
@@ -105,27 +121,28 @@ private struct SelectedItemRow: View {
 private struct AvailableItemRow: View {
     let item: FavoriteMenuItem
     let isSelected: Bool
+    let isDisabled: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack {
                 Image(systemName: item.icon)
                     .font(.title3)
-                    .foregroundColor(Color(hex: item.color))
+                    .foregroundColor(isDisabled ? .gray : Color(hex: item.color))
                     .frame(width: 36, height: 36)
-                    .background(Color(hex: item.color).opacity(0.15))
+                    .background((isDisabled ? Color.gray : Color(hex: item.color)).opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                
+
                 Text(item.rawValue)
                     .font(.body)
-                    .foregroundColor(.primary)
-                
+                    .foregroundColor(isDisabled ? .gray : .primary)
+
                 Spacer()
-                
-                Image(systemName: "plus.circle.fill")
+
+                Image(systemName: isDisabled ? "plus.circle" : "plus.circle.fill")
                     .font(.title3)
-                    .foregroundColor(.pink)
+                    .foregroundColor(isDisabled ? .gray : .pink)
             }
             .padding(.vertical, 4)
         }

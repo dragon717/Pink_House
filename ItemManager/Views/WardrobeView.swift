@@ -883,6 +883,8 @@ struct WardrobeStatsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
     
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    
     var styleCount: Int {
         clothings.count
     }
@@ -942,7 +944,9 @@ struct WardrobeStatsView: View {
                 
                 // Bottom Actions
                 HStack(spacing: 12) {
-                    NavigationLink(destination: OOTDView(hideBackButton: true)) {
+                    Button {
+                        tabNavigationManager.navigate(to: .smallWorld(.ootd))
+                    } label: {
                         HStack {
                             Image(systemName: "book.closed.fill")
                             Text("穿搭手帐")
