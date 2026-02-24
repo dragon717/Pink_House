@@ -15,6 +15,9 @@ struct PixelCanvasView: View {
     // 编辑手势状态
     @State private var lastDrawLocation: CGPoint? = nil
     @State private var isDrawing = false
+    
+    // 填充工具防抖状态
+    @State private var isFillInProgress = false
 
     // 配置
     var showGrid: Bool = true
@@ -277,11 +280,24 @@ struct PixelCanvasView: View {
             }
             
         case .fill:
+            // 防抖检查：防止填充操作被多次触发
+            guard !isFillInProgress else {
+                print("[PerlerBeads][Draw] 填充操作正在进行中，忽略重复触发")
+                return
+            }
+            
             print("[PerlerBeads][Draw] 执行: 填充工具 at (\(x), \(y))")
-            // 填充连通区域，然后自动切换回画笔
-            canvasModel.floodFill(at: x, y: y)
-            // 通知父视图切换回画笔模式
-            NotificationCenter.default.post(name: .fillToolCompleted, object: nil)
+            isFillInProgress = true
+            
+            // 填充连通区域
+            canvasModel.floodFill(at: x, at: y)
+            
+            // 延迟重置防抖状态并通知父视图切换回画笔
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isFillInProgress = false
+                // 通知父视图切换回画笔模式
+                NotificationCenter.default.post(name: .fillToolCompleted, object: nil)
+            }
         }
         print("[PerlerBeads][Draw] =================================")
     }
@@ -420,7 +436,9 @@ struct CanvasGestureView: UIViewRepresentable {
             
             print("[PerlerBeads][Tap] 触发绘制操作")
             handleDraw?(canvasLocation, size)
-            saveHistory?()
+            
+            // 填充工具在手势结束时自动保存历史，其他工具立即保存
+            // 注意：填充工具的 saveHistory 在 floodFill 内部已经调用
         }
         
         // MARK: - 长按手势处理（用于快速响应）
@@ -441,7 +459,7 @@ struct CanvasGestureView: UIViewRepresentable {
                 handleDraw?(canvasLocation, size)
                 lastDrawLocation = canvasLocation
             case .changed:
-                // 长按移动时也可以绘制
+                // 长按移动时也可以绘制（仅适用于画笔和橡皮，不适用于填充）
                 if lastDrawLocation == nil || distance(canvasLocation, lastDrawLocation!) > 3 {
                     print("[PerlerBeads][LongPress] 长按移动中，触发绘制")
                     handleDraw?(canvasLocation, size)
@@ -450,7 +468,7 @@ struct CanvasGestureView: UIViewRepresentable {
             case .ended, .cancelled:
                 print("[PerlerBeads][LongPress] 长按结束")
                 lastDrawLocation = nil
-                saveHistory?()
+                // 注意：填充工具的历史记录在其内部已经保存，其他工具在这里保存
             default:
                 break
             }
@@ -474,7 +492,13 @@ struct CanvasGestureView: UIViewRepresentable {
                 let canvasLocation = convertToCanvasCoordinates(location)
                 
                 switch gesture.state {
-                case .began, .changed:
+                case .began:
+                    // 手势开始时触发一次绘制（适用于所有工具，包括填充）
+                    print("[PerlerBeads][Pan] 手势开始，触发绘制")
+                    handleDraw?(canvasLocation, size)
+                    lastDrawLocation = canvasLocation
+                case .changed:
+                    // 手势移动时连续绘制（仅适用于画笔和橡皮，不适用于填充和取色）
                     // 限制绘制频率以提高性能但保持跟手
                     if lastDrawLocation == nil || distance(canvasLocation, lastDrawLocation!) > 3 {
                         print("[PerlerBeads][Pan] 触发绘制，距离过滤通过")
@@ -486,7 +510,7 @@ struct CanvasGestureView: UIViewRepresentable {
                 case .ended, .cancelled:
                     print("[PerlerBeads][Pan] 单指拖动结束/取消")
                     lastDrawLocation = nil
-                    saveHistory?()
+                    // 注意：填充工具的历史记录在其内部已经保存，其他工具需要在这里保存
                 default:
                     break
                 }
@@ -748,8 +772,13 @@ struct PerlerCanvasToolbar: View {
                 label: "填充",
                 isSelected: toolMode == .fill,
                 isEnabled: isEditMode,
-                action: { toolMode = .fill }
+                action: { 
+                    withAnimation(.spring(response: 0.2)) {
+                        toolMode = .fill 
+                    }
+                }
             )
+            .help("点击画布填充连通区域")
             
             Divider().frame(height: 24)
             

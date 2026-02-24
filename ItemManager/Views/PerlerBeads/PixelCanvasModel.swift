@@ -122,50 +122,122 @@ class PixelCanvasModel {
     }
     
     /// 填充指定位置的连通区域（洪水填充算法）
-    func floodFill(at x: Int, y: Int) {
-        guard x >= 0, x < resolution.rawValue,
-              y >= 0, y < resolution.rawValue else { return }
+    /// 使用扫描线填充算法优化性能，支持大面积填充
+    func floodFill(at startX: Int, at startY: Int) {
+        // 边界检查
+        guard startX >= 0, startX < resolution.rawValue,
+              startY >= 0, startY < resolution.rawValue else {
+            print("[floodFill] 起始坐标超出边界: (\(startX), \(startY))")
+            return
+        }
         
-        let targetIndex = y * resolution.rawValue + x
-        guard targetIndex < pixelData.count else { return }
+        let targetIndex = startY * resolution.rawValue + startX
+        guard targetIndex < pixelData.count else {
+            print("[floodFill] 索引超出范围: \(targetIndex)")
+            return
+        }
         
         let targetColor = pixelData[targetIndex]
         let fillColor = selectedColorIndex
         
         // 如果目标颜色已经是填充颜色，无需操作
-        if targetColor == fillColor { return }
+        if targetColor == fillColor {
+            print("[floodFill] 目标颜色与填充颜色相同，跳过")
+            return
+        }
         
-        // 洪水填充
-        var stack: [(Int, Int)] = [(x, y)]
+        print("[floodFill] 开始填充: 起始点=(\(startX), \(startY)), 目标颜色=\(targetColor), 填充颜色=\(fillColor)")
+        
+        let width = resolution.rawValue
+        let height = resolution.rawValue
+        var filledCount = 0
+        
+        // 使用扫描线填充算法（Scanline Flood Fill）优化性能
+        var stack: [(Int, Int)] = [(startX, startY)]
         var visited = Set<Int>()
         
         while !stack.isEmpty {
-            let (cx, cy) = stack.removeLast()
-            let index = cy * resolution.rawValue + cx
+            let (x, y) = stack.removeLast()
+            let index = y * width + x
             
+            // 跳过已访问或颜色不匹配的像素
             guard !visited.contains(index),
-                  index < pixelData.count,
+                  x >= 0, x < width,
+                  y >= 0, y < height,
                   pixelData[index] == targetColor else { continue }
             
-            visited.insert(index)
-            pixelData[index] = fillColor
+            // 找到当前扫描线的左右边界
+            var leftX = x
+            var rightX = x
             
-            // 检查四个方向
-            let directions = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-            for (dx, dy) in directions {
-                let nx = cx + dx
-                let ny = cy + dy
-                if nx >= 0, nx < resolution.rawValue,
-                   ny >= 0, ny < resolution.rawValue {
-                    let nIndex = ny * resolution.rawValue + nx
-                    if !visited.contains(nIndex) && pixelData[nIndex] == targetColor {
+            // 向左扩展
+            while leftX > 0 {
+                let leftIndex = y * width + (leftX - 1)
+                if pixelData[leftIndex] == targetColor && !visited.contains(leftIndex) {
+                    leftX -= 1
+                } else {
+                    break
+                }
+            }
+            
+            // 向右扩展
+            while rightX < width - 1 {
+                let rightIndex = y * width + (rightX + 1)
+                if pixelData[rightIndex] == targetColor && !visited.contains(rightIndex) {
+                    rightX += 1
+                } else {
+                    break
+                }
+            }
+            
+            // 填充当前扫描线
+            for fx in leftX...rightX {
+                let fillIndex = y * width + fx
+                pixelData[fillIndex] = fillColor
+                visited.insert(fillIndex)
+                filledCount += 1
+            }
+            
+            // 检查上下行，将需要填充的点加入栈
+            for dy in [-1, 1] {
+                let ny = y + dy
+                guard ny >= 0, ny < height else { continue }
+                
+                var nx = leftX
+                while nx <= rightX {
+                    let nIndex = ny * width + nx
+                    
+                    // 跳过已访问的像素
+                    if visited.contains(nIndex) {
+                        nx += 1
+                        continue
+                    }
+                    
+                    // 如果当前像素需要填充
+                    if pixelData[nIndex] == targetColor {
                         stack.append((nx, ny))
+                        
+                        // 跳过连续的同色像素
+                        while nx <= rightX {
+                            let skipIndex = ny * width + nx
+                            if visited.contains(skipIndex) || pixelData[skipIndex] != targetColor {
+                                break
+                            }
+                            nx += 1
+                        }
+                    } else {
+                        nx += 1
                     }
                 }
             }
         }
         
-        saveToHistory()
+        print("[floodFill] 填充完成: 共填充 \(filledCount) 个像素")
+        
+        // 只有在实际填充了像素时才保存历史
+        if filledCount > 0 {
+            saveToHistory()
+        }
     }
 
     // MARK: - 历史记录（撤销/重做）
