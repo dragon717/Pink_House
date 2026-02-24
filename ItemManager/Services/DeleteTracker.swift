@@ -171,23 +171,17 @@ final class DeleteTracker {
             typeName: "outfit",
             clearRecords: clearRecords
         ) { (item: Outfit, deleteTime: Date) -> Bool in
-            // 比较删除时间和数据最后修改时间
-            let itemModifiedTime = item.lastModified
-
-            if deleteTime > itemModifiedTime {
-                // 删除操作发生在数据修改之后，应该删除
-                if !item.isDeleted {
-                    item.isDeleted = true
-                    item.deletedAt = deleteTime
-                    item.lastModified = Date()  // 更新修改时间，确保同步到其他设备
-                    print("DeleteTracker: Applied delete to outfit '\(item.note)' (deleted after last modify)")
-                }
-                return true
+            // 强制删除策略：只要在删除记录中，就强制删除
+            // 避免 iCloud 同步覆盖导致的删除失效
+            if !item.isDeleted {
+                item.isDeleted = true
+                item.deletedAt = deleteTime
+                item.lastModified = Date()
+                print("DeleteTracker: ✓ Force deleted outfit '\(item.note)'")
             } else {
-                // 数据在删除后被修改过，保留数据，清除删除记录
-                print("DeleteTracker: Keeping outfit '\(item.note)' (modified after delete)")
-                return false
+                print("DeleteTracker: ✓ Outfit '\(item.note)' already deleted")
             }
+            return true
         }
     }
 
@@ -198,20 +192,16 @@ final class DeleteTracker {
             typeName: "clothing",
             clearRecords: clearRecords
         ) { (item: Clothing, deleteTime: Date) -> Bool in
-            let itemModifiedTime = item.lastModified
-
-            if deleteTime > itemModifiedTime {
-                if !item.isDeleted {
-                    item.isDeleted = true
-                    item.deletedAt = deleteTime
-                    item.lastModified = Date()
-                    print("DeleteTracker: Applied delete to clothing '\(item.name)' (deleted after last modify)")
-                }
-                return true
+            // 强制删除策略：只要在删除记录中，就强制删除
+            if !item.isDeleted {
+                item.isDeleted = true
+                item.deletedAt = deleteTime
+                item.lastModified = Date()
+                print("DeleteTracker: ✓ Force deleted clothing '\(item.name)'")
             } else {
-                print("DeleteTracker: Keeping clothing '\(item.name)' (modified after delete)")
-                return false
+                print("DeleteTracker: ✓ Clothing '\(item.name)' already deleted")
             }
+            return true
         }
     }
 
@@ -222,20 +212,16 @@ final class DeleteTracker {
             typeName: "book group",
             clearRecords: clearRecords
         ) { (item: BookGroup, deleteTime: Date) -> Bool in
-            let itemModifiedTime = item.lastModified
-
-            if deleteTime > itemModifiedTime {
-                if !item.isDeleted {
-                    item.isDeleted = true
-                    item.deletedAt = deleteTime
-                    item.lastModified = Date()
-                    print("DeleteTracker: Applied delete to book group '\(item.title)' (deleted after last modify)")
-                }
-                return true
+            // 强制删除策略：只要在删除记录中，就强制删除
+            if !item.isDeleted {
+                item.isDeleted = true
+                item.deletedAt = deleteTime
+                item.lastModified = Date()
+                print("DeleteTracker: ✓ Force deleted book group '\(item.title)'")
             } else {
-                print("DeleteTracker: Keeping book group '\(item.title)' (modified after delete)")
-                return false
+                print("DeleteTracker: ✓ Book group '\(item.title)' already deleted")
             }
+            return true
         }
     }
 
@@ -246,20 +232,16 @@ final class DeleteTracker {
             typeName: "3D model",
             clearRecords: clearRecords
         ) { (item: Model3D, deleteTime: Date) -> Bool in
-            let itemModifiedTime = item.lastModified
-
-            if deleteTime > itemModifiedTime {
-                if !item.isDeleted {
-                    item.isDeleted = true
-                    item.deletedAt = deleteTime
-                    item.lastModified = Date()
-                    print("DeleteTracker: Applied delete to 3D model '\(item.name)' (deleted after last modify)")
-                }
-                return true
+            // 强制删除策略：只要在删除记录中，就强制删除
+            if !item.isDeleted {
+                item.isDeleted = true
+                item.deletedAt = deleteTime
+                item.lastModified = Date()
+                print("DeleteTracker: ✓ Force deleted 3D model '\(item.name)'")
             } else {
-                print("DeleteTracker: Keeping 3D model '\(item.name)' (modified after delete)")
-                return false
+                print("DeleteTracker: ✓ 3D model '\(item.name)' already deleted")
             }
+            return true
         }
     }
 
@@ -348,6 +330,16 @@ final class DeleteTracker {
                 do {
                     try context.save()
                     print("DeleteTracker: ✓ Saved \(appliedCount) \(typeName) deletes to database")
+                    
+                    // 立即再次保存，确保 iCloud 同步不会覆盖
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        do {
+                            try context.save()
+                            print("DeleteTracker: ✓ Re-saved \(appliedCount) \(typeName) deletes (anti-race)")
+                        } catch {
+                            print("DeleteTracker: ✗ Failed to re-save \(typeName) deletes: \(error)")
+                        }
+                    }
                 } catch {
                     print("DeleteTracker: ✗ Failed to save \(typeName) deletes: \(error)")
                 }

@@ -76,7 +76,7 @@ final class MyModel {
 }
 ```
 
-### 2. 创建 DeleteTracker
+### 2. 创建 DeleteTracker（强制删除策略）
 
 ```swift
 import Foundation
@@ -100,7 +100,7 @@ final class DeleteTracker {
         print("DeleteTracker: Recorded delete at \(deleteTime)")
     }
     
-    // MARK: - 应用删除（基于时间戳比较）
+    // MARK: - 应用删除（强制删除策略）
     
     func applyDeletedItems(context: ModelContext) {
         let deletedRecords = getDeletedDates()
@@ -113,22 +113,31 @@ final class DeleteTracker {
             
             for item in allItems {
                 if let deleteTime = deletedRecords[item.id] {
-                    // 关键：比较删除时间和数据修改时间
-                    if deleteTime > item.lastModified {
-                        // 删除发生在修改之后，应该删除
+                    // 强制删除策略：只要在删除记录中，就强制删除
+                    // 避免 iCloud 同步覆盖导致的删除失效
+                    if !item.isDeleted {
                         item.isDeleted = true
                         item.deletedAt = deleteTime
                         item.lastModified = Date()
                         appliedCount += 1
-                    } else {
-                        // 数据在删除后被修改过，保留
-                        print("Keeping item (modified after delete)")
+                        print("DeleteTracker: ✓ Force deleted '\(item.name)'")
                     }
                 }
             }
             
             if appliedCount > 0 {
-                try context.save()
+                do {
+                    try context.save()
+                    print("DeleteTracker: ✓ Saved \(appliedCount) deletes to database")
+                    
+                    // 立即再次保存，防止 iCloud 同步覆盖
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        try? context.save()
+                        print("DeleteTracker: ✓ Re-saved \(appliedCount) deletes (anti-race)")
+                    }
+                } catch {
+                    print("DeleteTracker: ✗ Failed to save deletes: \(error)")
+                }
             }
         } catch {
             print("Failed to apply deletes: \(error)")
