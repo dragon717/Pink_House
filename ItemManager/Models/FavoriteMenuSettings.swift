@@ -14,7 +14,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case wealth = "来财"
     case perler = "拼豆工坊"
     case calendar = "梦裙日历"
-    case bigWorld = "大世界"
+    case bigWorld = "蓝星OL"
     case recycleBin = "回收站"
     
     var id: String { rawValue }
@@ -30,7 +30,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .wealth: return "yensign.circle.fill"
         case .perler: return "circle.grid.2x2.fill"
         case .calendar: return "calendar"
-        case .bigWorld: return "airplane"
+        case .bigWorld: return "globe.asia.australia"
         case .recycleBin: return "trash.fill"
         }
     }
@@ -81,7 +81,7 @@ class FavoriteMenuSettings {
     var selectedItemIDs: [String]
     var lastUpdated: Date
     
-    init(selectedItemIDs: [String] = ["萌宠", "快捷OOTD", "小世界"]) {
+    init(selectedItemIDs: [String] = ["萌宠", "拼豆工坊", "蓝星OL", "小世界","来财"]) {
         self.selectedItemIDs = selectedItemIDs
         self.lastUpdated = Date()
     }
@@ -127,7 +127,7 @@ final class FavoriteMenuSettingsManager: ObservableObject {
     }
     
     func addItem(_ item: FavoriteMenuItem) {
-        if !selectedItems.contains(item) {
+        if !selectedItems.contains(item) && selectedItems.count < 5 {
             selectedItems.append(item)
             saveSettings()
         }

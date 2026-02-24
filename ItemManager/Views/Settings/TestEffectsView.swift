@@ -22,6 +22,8 @@ struct TestEffectsView: View {
     @State private var selectedOption: EffectOption = .random
     @State private var currentEffectToPlay: CelebrationEffect?
     @ObservedObject private var vipManager = VIPManager.shared
+    @ObservedObject private var favoriteMenuManager = FavoriteMenuSettingsManager.shared
+    @State private var showClearFavoriteMenuAlert = false
     
     var body: some View {
         ZStack {
@@ -85,7 +87,35 @@ struct TestEffectsView: View {
                         .cornerRadius(16)
                 }
                 .padding(.horizontal)
-                
+
+                Divider()
+                    .padding(.horizontal)
+
+                Text("常用菜单设置")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    showClearFavoriteMenuAlert = true
+                } label: {
+                    Text("清除常用菜单历史")
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(16)
+                }
+                .padding(.horizontal)
+                .alert("确认清除", isPresented: $showClearFavoriteMenuAlert) {
+                    Button("取消", role: .cancel) {}
+                    Button("清除", role: .destructive) {
+                        favoriteMenuManager.selectedItems = [.pet, .perler, .bigWorld, .smallWorld, .wealth]
+                        favoriteMenuManager.saveSettings()
+                    }
+                } message: {
+                    Text("这将清除所有常用菜单设置，恢复为默认状态")
+                }
+
                 Spacer()
             }
             .padding(.top, 50)

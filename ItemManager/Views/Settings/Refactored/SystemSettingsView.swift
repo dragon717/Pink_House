@@ -21,13 +21,13 @@ struct SystemSettingsView: View {
     
     var body: some View {
         AdaptiveSettingsView(title: "系统与更多") {
-            // MARK: - 桌面小组件
-            AdaptiveSection(header: "桌面小组件") {
-                NavigationLink(destination: WidgetSettingsView()) {
-                    Label("小组件背景与样式", systemImage: "rectangle.3.group")
-                }
-                .adaptiveRow(showDivider: false)
-            }
+            // MARK: - 桌面小组件 多余
+            // AdaptiveSection(header: "桌面小组件") {
+            //     NavigationLink(destination: WidgetSettingsView()) {
+            //         Label("小组件背景与样式", systemImage: "rectangle.3.group")
+            //     }
+            //     .adaptiveRow(showDivider: false)
+            // }
             
             // MARK: - 通用设置
             AdaptiveSection(header: "通用设置") {

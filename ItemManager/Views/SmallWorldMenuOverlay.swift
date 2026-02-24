@@ -10,13 +10,9 @@ enum WheelConfig {
     static let endAngle: Double = -45     // 右边界
     static var totalAngle: Double { endAngle - startAngle }  // 总角度范围
 
-    // 内层一级菜单配置
-    static let innerMenuCount = 3
-    static var innerMenuStep: Double { totalAngle / Double(innerMenuCount - 1) }
-
-    // 外层二级菜单配置
-    static let outerMenuPadding: Double = 5  // 边距
-    static var outerMenuTotalAngle: Double { totalAngle - outerMenuPadding * 2 }
+    // 单层菜单配置
+    static let menuPadding: Double = 10  // 边距
+    static var menuTotalAngle: Double { totalAngle - menuPadding * 2 }
 }
 
 // MARK: - 轮盘菜单数据模型
@@ -52,9 +48,7 @@ struct SmallWorldMenuOverlay: View {
     private let longPressDuration: TimeInterval = 0.35
 
     // 轮盘旋转状态
-    @State private var outerRotation: Double = 0
-    @State private var lastOuterRotation: Double = 0
-    @State private var selectedCategoryIndex: Int = 0
+    @State private var wheelRotation: Double = 0
 
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
@@ -77,35 +71,9 @@ struct SmallWorldMenuOverlay: View {
     // 常用菜单设置管理器
     @ObservedObject private var favoriteMenuManager = FavoriteMenuSettingsManager.shared
 
-    // MARK: - 菜单数据
-    private var categories: [WheelMenuCategory] {
-        [
-            // 常用（根据用户设置动态生成）
-            WheelMenuCategory(
-                title: "常用",
-                icon: "star.fill",
-                items: favoriteMenuItems
-            ),
-            // 乐玩
-            WheelMenuCategory(
-                title: "乐玩",
-                icon: "gamecontroller.fill",
-                items: [
-                    WheelMenuItem(title: "马上来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0)),
-                    WheelMenuItem(title: "穿搭手帐", icon: "book.closed", destination: .ootd, color: Color(red: 1.0, green: 0.5, blue: 0.7)),
-                    WheelMenuItem(title: "拼豆工坊", icon: "circle.grid.2x2", destination: .perler, color: Color(red: 1.0, green: 0.55, blue: 0.75)),
-                    WheelMenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80)),
-                ]
-            ),
-            // 大世界
-            WheelMenuCategory(
-                title: "大世界",
-                icon: "globe",
-                items: [
-                    WheelMenuItem(title: "大世界", icon: "airplane", destination: .bigWorld, color: Color(red: 0.4, green: 0.8, blue: 0.9)),
-                ]
-            ),
-        ]
+    // MARK: - 菜单数据（单层结构，只显示常用菜单）
+    private var menuItems: [WheelMenuItem] {
+        favoriteMenuItems
     }
 
     // 根据用户设置生成常用菜单项
@@ -131,7 +99,7 @@ struct SmallWorldMenuOverlay: View {
             case .calendar:
                 return WheelMenuItem(title: "梦裙日历", icon: "calendar", destination: .calendar, color: Color(red: 0.80, green: 0.65, blue: 0.80))
             case .bigWorld:
-                return WheelMenuItem(title: "大世界", icon: "airplane", destination: .bigWorld, color: Color(red: 0.4, green: 0.8, blue: 0.9))
+                return WheelMenuItem(title: "蓝星OL", icon: "globe.asia.australia", destination: .bigWorld, color: Color(red: 0.4, green: 0.8, blue: 0.9))
             case .recycleBin:
                 return WheelMenuItem(title: "回收站", icon: "trash.fill", destination: .recycleBin, color: Color(red: 0.5, green: 0.5, blue: 0.5))
             }
@@ -139,18 +107,11 @@ struct SmallWorldMenuOverlay: View {
     }
 
     // 布局参数
-    private func getInnerRadius(geometry: GeometryProxy) -> CGFloat {
+    private func getMenuRadius(geometry: GeometryProxy) -> CGFloat {
         let screenWidth = geometry.size.width
-        if screenWidth < 380 { return 70 }
-        else if screenWidth > 700 { return 100 }
-        else { return 85 }
-    }
-
-    private func getOuterRadius(geometry: GeometryProxy) -> CGFloat {
-        let screenWidth = geometry.size.width
-        if screenWidth < 380 { return 160 }
-        else if screenWidth > 700 { return 220 }
-        else { return 190 }
+        if screenWidth < 380 { return 140 }
+        else if screenWidth > 700 { return 200 }
+        else { return 170 }
     }
 
     var body: some View {
@@ -173,14 +134,12 @@ struct SmallWorldMenuOverlay: View {
                         .transition(.opacity)
                 }
 
-                // 轮盘菜单
+                // 轮盘菜单（单层结构）
                 ZStack {
-                    // 外层二级菜单
-                    OuterWheelView(
-                        categories: categories,
-                        selectedIndex: selectedCategoryIndex,
-                        rotation: outerRotation,
-                        radius: getOuterRadius(geometry: geometry),
+                    // 单层菜单
+                    WheelMenuView(
+                        items: menuItems,
+                        radius: getMenuRadius(geometry: geometry),
                         isLowMemoryDevice: isLowMemoryDevice,
                         monicaPink: monicaPink,
                         onItemSelected: { item in
@@ -191,23 +150,6 @@ struct SmallWorldMenuOverlay: View {
                     .opacity(showMenu ? 1 : 0)
                     .scaleEffect(showMenu ? 1 : 0.1)
                     .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showMenu)
-
-                    // 内层固定分类菜单（带轮廓线和背景）
-                    InnerWheelView(
-                        categories: categories,
-                        selectedIndex: $selectedCategoryIndex,
-                        radius: getInnerRadius(geometry: geometry),
-                        isLowMemoryDevice: isLowMemoryDevice,
-                        monicaPink: monicaPink
-                    )
-                    .position(x: menuOrigin.x, y: menuOrigin.y)
-                    .opacity(showMenu ? 1 : 0)
-                    .scaleEffect(showMenu ? 1 : 0.1)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showMenu)
-                    .onChange(of: selectedCategoryIndex) { newIndex in
-                        // 内层选中变化时，震动反馈
-                        hapticManager.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .light)
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(showMenu)
@@ -287,79 +229,65 @@ struct SmallWorldMenuOverlay: View {
         }
     }
 
-    // MARK: - 内层固定轮盘（右上角90度）
-    struct InnerWheelView: View {
-        let categories: [WheelMenuCategory]
-        @Binding var selectedIndex: Int
-        let radius: CGFloat
-        let isLowMemoryDevice: Bool
-        let monicaPink: Color
-
-        var body: some View {
-            ZStack {
-                // 轮盘背景（淡淡的莫妮卡粉）
-                WheelBackground(
-                    radius: radius + 35,
-                    startAngle: WheelConfig.startAngle,
-                    endAngle: WheelConfig.endAngle,
-                    monicaPink: monicaPink
-                )
-
-                // 三个分类分布在-45°到45°范围内
-                ForEach(0..<WheelConfig.innerMenuCount) { index in
-                    let angle = WheelConfig.startAngle + Double(index) * WheelConfig.innerMenuStep
-                    let radians = angle * .pi / 180
-                    let x = radius * cos(radians)
-                    let y = radius * sin(radians)
-
-                    CategoryBubble(
-                        category: categories[index],
-                        isSelected: selectedIndex == index,
-                        isLowMemoryDevice: isLowMemoryDevice,
-                        monicaPink: monicaPink
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedIndex = index
-                        }
-                    }
-                    .offset(x: x, y: y)
-                }
-            }
-        }
-    }
-
-    // MARK: - 外层二级菜单（右上角90度）
-    struct OuterWheelView: View {
-        let categories: [WheelMenuCategory]
-        let selectedIndex: Int
-        let rotation: Double
+    // MARK: - 单层轮盘菜单
+    struct WheelMenuView: View {
+        let items: [WheelMenuItem]
         let radius: CGFloat
         let isLowMemoryDevice: Bool
         let monicaPink: Color
         let onItemSelected: (WheelMenuItem) -> Void
 
+        // 根据菜单数量计算自适应大小
+        private func getAdaptiveSizes(count: Int) -> (iconSize: CGFloat, fontSize: CGFloat, circleSize: CGFloat) {
+            switch count {
+            case 1:
+                return (28, 14, 64)
+            case 2:
+                return (26, 13, 60)
+            case 3:
+                return (24, 12, 58)
+            case 4:
+                return (22, 11, 54)
+            case 5:
+                return (20, 10, 50)
+            default:
+                return (20, 10, 50)
+            }
+        }
+
         var body: some View {
+            let sizes = getAdaptiveSizes(count: items.count)
+
             ZStack {
-                // 根据选中的分类显示对应的二级菜单
-                let items = categories[selectedIndex].items
-                ForEach(items.indices, id: \.self) { itemIndex in
-                    // 在-45°到45°范围内分布
-                    let itemStartAngle = WheelConfig.startAngle + WheelConfig.outerMenuPadding
-                    let step = items.count > 1 ? WheelConfig.outerMenuTotalAngle / Double(items.count - 1) : 0
-                    let angle = itemStartAngle + Double(itemIndex) * step
+                // 轮盘背景（淡淡的莫妮卡粉）
+                WheelBackground(
+                    radius: radius + 40,
+                    startAngle: WheelConfig.startAngle,
+                    endAngle: WheelConfig.endAngle,
+                    monicaPink: monicaPink
+                )
+
+                // 菜单项分布在角度范围内
+                ForEach(items.indices, id: \.self) { index in
+                    let itemStartAngle = WheelConfig.startAngle + WheelConfig.menuPadding
+                    let step = items.count > 1 ? WheelConfig.menuTotalAngle / Double(items.count - 1) : 0
+                    let angle = itemStartAngle + Double(index) * step
                     let radians = angle * .pi / 180
                     let x = radius * cos(radians)
                     let y = radius * sin(radians)
 
                     ItemBubble(
-                        item: items[itemIndex],
-                        isLowMemoryDevice: isLowMemoryDevice
+                        item: items[index],
+                        isLowMemoryDevice: isLowMemoryDevice,
+                        iconSize: sizes.iconSize,
+                        fontSize: sizes.fontSize,
+                        circleSize: sizes.circleSize
                     ) {
-                        onItemSelected(items[itemIndex])
+                        onItemSelected(items[index])
                     }
                     .offset(x: x, y: y)
                     .transition(.scale.combined(with: .opacity))
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(itemIndex) * 0.03), value: selectedIndex)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
                 }
             }
         }
@@ -407,56 +335,15 @@ struct SmallWorldMenuOverlay: View {
         }
     }
 
-    // MARK: - 分类气泡
-    struct CategoryBubble: View {
-        let category: WheelMenuCategory
-        let isSelected: Bool
-        let isLowMemoryDevice: Bool
-        let monicaPink: Color
-        let action: () -> Void
 
-        var body: some View {
-            Button(action: action) {
-                VStack(spacing: 4) {
-                    ZStack {
-                        Circle()
-                            .fill(isSelected ? monicaPink : Color.white)
-                            .frame(width: 50, height: 50)
-                            .shadow(
-                                color: isSelected ? monicaPink.opacity(0.4) : Color.black.opacity(0.1),
-                                radius: isSelected ? 8 : 4,
-                                x: 0,
-                                y: isSelected ? 4 : 2
-                            )
-
-                        Image(systemName: category.icon)
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(isSelected ? .white : Color(red: 0.4, green: 0.4, blue: 0.4))
-                    }
-
-                    Text(category.title)
-                        .font(.system(size: 11, weight: isSelected ? .bold : .medium))
-                        .foregroundColor(isSelected ? monicaPink : .primary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background {
-                            if isLowMemoryDevice {
-                                Color.white.opacity(0.9)
-                            } else {
-                                Rectangle().fill(.ultraThinMaterial)
-                            }
-                        }
-                        .clipShape(Capsule())
-                }
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-    }
 
     // MARK: - 功能项气泡
     struct ItemBubble: View {
         let item: WheelMenuItem
         let isLowMemoryDevice: Bool
+        let iconSize: CGFloat
+        let fontSize: CGFloat
+        let circleSize: CGFloat
         let action: () -> Void
 
         var body: some View {
@@ -465,19 +352,19 @@ struct SmallWorldMenuOverlay: View {
                     ZStack {
                         Circle()
                             .fill(item.color)
-                            .frame(width: 56, height: 56)
+                            .frame(width: circleSize, height: circleSize)
                             .shadow(color: item.color.opacity(isLowMemoryDevice ? 0 : 0.4), radius: isLowMemoryDevice ? 0 : 8, x: 0, y: 4)
 
                         Image(systemName: item.icon)
-                            .font(.title2)
+                            .font(.system(size: iconSize, weight: .semibold))
                             .foregroundColor(.white)
                     }
 
                     Text(item.title)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: fontSize, weight: .medium))
                         .foregroundColor(.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
                         .background {
                             if isLowMemoryDevice {
                                 Color.white.opacity(0.95)
@@ -546,9 +433,7 @@ struct SmallWorldMenuOverlay: View {
         didLongPressTrigger = true
 
         // 重置轮盘状态
-        selectedCategoryIndex = 0
-        outerRotation = 0
-        lastOuterRotation = 0
+        wheelRotation = 0
 
         var transaction = Transaction()
         transaction.disablesAnimations = true

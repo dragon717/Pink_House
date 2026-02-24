@@ -56,7 +56,7 @@ struct ModernTabView: View {
     private var smallWorldTabTitle: String {
         switch smallWorldDestination {
         case .bigWorld:
-            return "大世界"
+            return "蓝星OL"
         case .calendar:
             return "梦裙日历"
         case .wealth:
@@ -83,7 +83,7 @@ struct ModernTabView: View {
     private var smallWorldTabIcon: String {
         switch smallWorldDestination {
         case .bigWorld:
-            return "airplane"
+            return "globe.asia.australia"
         case .calendar:
             return "calendar"
         case .wealth:
