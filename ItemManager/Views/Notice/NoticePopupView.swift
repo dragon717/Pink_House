@@ -51,12 +51,18 @@ struct NoticePopupView: View {
 // MARK: - 公告卡片视图 (弹窗专用)
 struct NoticeCardView: View {
     let notice: Notice
-    
+    @Environment(\.colorScheme) private var colorScheme
+
+    // 根据颜色模式返回背景色
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color(hex: "C94C72") : NoticeConfig.monicaPink
+    }
+
     var body: some View {
         ZStack {
-            // 第1层：莫妮卡浅粉背景（圆角矩形）- 使用纯色
+            // 第1层：背景色（圆角矩形）- 根据颜色模式变化
             RoundedRectangle(cornerRadius: NoticeConfig.cornerRadius)
-                .fill(NoticeConfig.monicaPink)
+                .fill(backgroundColor)
 
             // 第2层：内容层
             VStack(spacing: 0) {
@@ -108,27 +114,40 @@ struct NoticeCardView: View {
         }
     }
     
+    // 根据颜色模式返回文字颜色
+    private var titleColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+
+    private var contentColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.8) : Color.black.opacity(0.7)
+    }
+
+    private var dateColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.6) : Color.black.opacity(0.5)
+    }
+
     private var textSection: some View {
         VStack(alignment: .center, spacing: 8) {
             Text(notice.title)
                 .font(.headline)
                 .fontWeight(.bold)
-                .foregroundStyle(.primary)
+                .foregroundColor(titleColor)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .center)
-            
+
             ScrollView(.vertical, showsIndicators: true) {
                 Text(notice.content)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(contentColor)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .multilineTextAlignment(.center)
             }
             .frame(maxHeight: NoticeConfig.textMaxHeight)
-            
+
             Text(notice.createdAt, style: .date)
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundColor(dateColor)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
     }
