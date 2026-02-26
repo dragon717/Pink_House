@@ -23,8 +23,7 @@ class NoticeCloudKitService: ObservableObject {
 
     // 管理员 iCloud IDs - 只有这些用户可以发布公告
     private let adminIDs: [String] = [
-        // 在这里添加管理员 iCloud ID
-        // 例如: "_d2a5e8f3..."
+        "_819804d902cb79c2d6e4bf736ed6c50b",  // 主管理员
     ]
 
     private init() {}
