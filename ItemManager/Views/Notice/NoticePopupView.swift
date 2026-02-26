@@ -114,17 +114,17 @@ struct NoticeCardView: View {
         }
     }
     
-    // 白天白字，暗黑黑字
+    // 文字统一使用白色（背景是粉色 #FFE6EF）
     private var titleColor: Color {
-        colorScheme == .dark ? .black : .white
+        .black
     }
 
     private var contentColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.9)
+        .black
     }
 
     private var dateColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.7)
+        .black
     }
 
     private var textSection: some View {

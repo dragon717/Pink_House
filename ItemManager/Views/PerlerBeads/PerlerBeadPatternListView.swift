@@ -254,10 +254,12 @@ struct PerlerBeadPatternListView: View {
     private var toolbarContent: some ToolbarContent {
         Group {
             ToolbarItem(placement: .navigationBarLeading) {
-                layoutMenu
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                trailingToolbarItem
+                HStack(spacing: 16) {
+                    layoutMenu
+                    trailingToolbarItem
+                }
             }
         }
     }

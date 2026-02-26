@@ -78,6 +78,8 @@ struct ModernTabView: View {
             return "尾款天使"
         case .recycleBin:
             return "回收站"
+        case .dressStock:
+            return "裙子股市"
         }
     }
 
@@ -105,6 +107,8 @@ struct ModernTabView: View {
             return "tag.fill"
         case .recycleBin:
             return "trash.fill"
+        case .dressStock:
+            return "chart.line.uptrend.xyaxis"
         }
     }
     
@@ -153,6 +157,10 @@ struct ModernTabView: View {
         .onReceive(tabNavigationManager.$navigateToTab) { tab in
             if let tab = tab {
                 withAnimation {
+                    // 如果是要跳转到小世界Tab(1)，记录是从Tab 0进入的
+                    if tab == 1 && selectedTab != 1 {
+                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
+                    }
                     selectedTab = tab
                 }
             }
@@ -168,6 +176,15 @@ struct ModernTabView: View {
         .onReceive(tabNavigationManager.$navigateToSmallWorld) { destination in
             if let destination = destination {
                 withAnimation {
+                    // 注意：此时 selectedTab 可能已经被 navigateToTab 的处理器设置为 1
+                    // 所以不能依赖 selectedTab 来判断是否是小世界内部导航
+                    // 而是应该依赖 TabNavigationManager 中的 isNavigatingInsideSmallWorld 标记
+                    // 如果 isNavigatingInsideSmallWorld 为 false，说明是从外部进入
+                    if !tabNavigationManager.isNavigatingInsideSmallWorld {
+                        // 从其他Tab进入小世界，记录来源
+                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
+                    }
+                    // 如果 isNavigatingInsideSmallWorld 为 true，保持标记不变（内部导航）
                     smallWorldDestination = destination
                 }
                 tabNavigationManager.navigateToSmallWorld = nil
@@ -345,21 +362,59 @@ struct SmallWorldContainerView: View {
                 isPlayingOpeningAnimation: $isPlayingOpeningAnimation
             )
         case .ootd:
-            OOTDView()
+            OOTDViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .ootdDefaultBook:
-            OOTDDefaultBookView()
+            OOTDDefaultBookViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .pet:
-            PetHomeView()
+            PetHomeViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .wealth:
-            WealthView()
+            WealthViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .calendar:
-            DreamDressCalendarView()
+            DreamDressCalendarViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .bigWorld:
-            BigWorldView()
+            BigWorldViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .perler:
-            PerlerBeadPatternListView()
+            PerlerBeadPatternListViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .recycleBin:
-            RecycleBinView()
+            RecycleBinViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .dressStock:
+            DressStockMarketViewWithBackButton(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
         case .wardrobe, .depositPlan:
             // 这些功能直接跳转到 Tab 0，不会在这里显示
             EmptyView()
@@ -441,6 +496,249 @@ struct OpeningVideoOverlay: View {
         .transition(.opacity)
         .zIndex(200)
         .id("OpeningVideoOverlay")
+    }
+}
+
+// MARK: - 小世界页面返回按钮包装视图
+// 这些包装视图用于在小世界页面显示自定义返回按钮，智能返回上一页
+
+@available(iOS 18.0, *)
+struct SmallWorldBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    var onBackToMenu: () -> Void
+    
+    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
+    
+    var body: some View {
+        Button {
+            withAnimation {
+                switch tabNavigationManager.currentSmallWorldSource {
+                case .wardrobe:
+                    // 返回衣橱
+                    homeTab = .wardrobe
+                    selectedTab = 0
+                case .depositPlan:
+                    // 返回尾款天使
+                    homeTab = .depositPlan
+                    selectedTab = 0
+                case .smallWorld:
+                    // 返回小世界菜单
+                    onBackToMenu()
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+    }
+}
+
+// MARK: - OOTDView 带返回按钮
+@available(iOS 18.0, *)
+struct OOTDViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        OOTDView(hideBackButton: true)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - OOTDDefaultBookView 带返回按钮
+@available(iOS 18.0, *)
+struct OOTDDefaultBookViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        OOTDDefaultBookView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - PetHomeView 带返回按钮
+@available(iOS 18.0, *)
+struct PetHomeViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        PetHomeView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - WealthView 带返回按钮
+@available(iOS 18.0, *)
+struct WealthViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        WealthView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - DreamDressCalendarView 带返回按钮
+@available(iOS 18.0, *)
+struct DreamDressCalendarViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        DreamDressCalendarView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - BigWorldView 带返回按钮
+@available(iOS 18.0, *)
+struct BigWorldViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        BigWorldView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - PerlerBeadPatternListView 带返回按钮
+@available(iOS 18.0, *)
+struct PerlerBeadPatternListViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        PerlerBeadPatternListView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - RecycleBinView 带返回按钮
+@available(iOS 18.0, *)
+struct RecycleBinViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        RecycleBinView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - DressStockMarketView 带返回按钮
+@available(iOS 18.0, *)
+struct DressStockMarketViewWithBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    
+    var body: some View {
+        DressStockMarketView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: {
+                            destination = .menu
+                        }
+                    )
+                }
+            }
     }
 }
 

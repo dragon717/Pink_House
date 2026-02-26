@@ -13,6 +13,8 @@ struct RococoSmallWorldView: View {
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
     
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    
     // Isometric Layout Constants
     private let tileWidth: CGFloat = 100
     private let tileHeight: CGFloat = 50
@@ -53,9 +55,11 @@ struct RococoSmallWorldView: View {
     private var room1Hotspots: [HotspotData] {
         [
             HotspotData(name: "穿搭手帐", rect: CGRect(x: 0.35, y: 0.53, width: 0.08, height: 0.19), color: .orange, label: "穿搭手帐", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.41, y: 0.725)) {
+                tabNavigationManager.markNavigatingInsideSmallWorld()
                 destination = .ootd
             },
             HotspotData(name: "来财", rect: CGRect(x: 0.46, y: 0.68, width: 0.06, height: 0.08), color: .yellow, label: "马上来财", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.52, y: 0.77)) {
+                tabNavigationManager.markNavigatingInsideSmallWorld()
                 destination = .wealth
             },
             HotspotData(name: "衣橱", rect: CGRect(x: 0.45, y: 0.12, width: 0.24, height: 0.24), color: .blue, label: "少女衣橱", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.525, y: 0.12)) {
@@ -84,10 +88,12 @@ struct RococoSmallWorldView: View {
 //            },
 
             HotspotData(name: "日历", rect: CGRect(x: 0.44, y: 0.77, width: 0.082, height: 0.121), color: .purple, label: "梦裙日历", labelStyle: .diagonal(angle: 35), labelPosition: CGPoint(x: 0.45, y: 0.92)) {
+                tabNavigationManager.markNavigatingInsideSmallWorld()
                 destination = .calendar
             },
 
             HotspotData(name: "拼豆工坊", rect: CGRect(x: 0.70, y: 0.45, width: 0.12, height: 0.15), color: .pink, label: "拼豆工坊", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.78, y: 0.62)) {
+                tabNavigationManager.markNavigatingInsideSmallWorld()
                 destination = .perler
             }
         ]

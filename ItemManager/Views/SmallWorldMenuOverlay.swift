@@ -52,6 +52,7 @@ struct SmallWorldMenuOverlay: View {
 
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
+    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
 
     private let isLowMemoryDevice: Bool = {
         return ProcessInfo.processInfo.physicalMemory < 4 * 1024 * 1024 * 1024
@@ -525,6 +526,10 @@ struct SmallWorldMenuOverlay: View {
                 default:
                     // 其他功能在小世界 Tab 内跳转
                     selectedTab = 1
+                    // 如果当前已经在小世界 Tab 内，标记为内部导航
+                    if selectedTab == 1 {
+                        tabNavigationManager.markNavigatingInsideSmallWorld()
+                    }
                     smallWorldDestination = dest
                 }
             }

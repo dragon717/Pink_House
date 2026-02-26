@@ -17,6 +17,8 @@ struct FrenchRetroSmallWorldView: View {
     @Binding var destination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
     
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    
     // 图片原始尺寸 1919x1079
     @State private var imageSize = CGSize(width: 1919, height: 1079)
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
@@ -151,6 +153,7 @@ struct FrenchRetroSmallWorldView: View {
         ZStack(alignment: .topLeading) {
             // 1. OOTD (穿搭手帐) - 最左侧
             InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange, label: "穿搭手帐", labelStyle: .horizontal(angle: -28), labelPosition: CGPoint(x: 0.17, y: 0.86)) {
+                tabNavigationManager.markNavigatingInsideSmallWorld()
                 destination = .ootd
             }
             
@@ -163,12 +166,14 @@ struct FrenchRetroSmallWorldView: View {
             
             // 3. 猪 (来财)
             InteractionHotspot(rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "马上来财", labelPosition: CGPoint(x: 0.85, y: 0.72)) {
+                tabNavigationManager.markNavigatingInsideSmallWorld()
                 destination = .wealth
             }
             
             // 4. 墙上的日历 (梦裙日历)
             if shouldShowCalendar {
                 CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "梦裙日历", labelPosition: CGPoint(x: 0.77, y: 0.27)) {
+                    tabNavigationManager.markNavigatingInsideSmallWorld()
                     destination = .calendar
                 }
             }
@@ -181,6 +186,7 @@ struct FrenchRetroSmallWorldView: View {
 
             // 6. 拼豆工坊
             InteractionHotspot(rect: CGRect(x: 0.85, y: 0.15, width: 0.1, height: 0.15), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .pink, label: "拼豆工坊", labelStyle: .horizontal(angle: -15), labelPosition: CGPoint(x: 0.92, y: 0.32)) {
+                tabNavigationManager.markNavigatingInsideSmallWorld()
                 destination = .perler
             }
 
