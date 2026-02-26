@@ -105,12 +105,7 @@ struct MainContentView: View {
                 // Optimized syncWidgetData (now async to offload image processing)
                 await SharedPersistence.shared.syncWidgetData()
                 
-                // 3. Cloud Sync Check (async) - 仅在未启用 SwiftData iCloud 同步时执行
-                if !migrationManager.isCloudSyncEnabled {
-                    await CloudSyncManager.shared.checkAndSilentRestore(container: SharedPersistence.shared.sharedModelContainer)
-                }
-
-                // 4. Dismiss Splash
+                // 3. Dismiss Splash
                 withAnimation(.easeOut(duration: 0.5)) {
                     showSplash = false
                 }

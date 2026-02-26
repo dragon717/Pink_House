@@ -221,7 +221,7 @@ struct CustomFontProvider: FontProvider {
             }
         } else {
             // 尝试从文件路径直接加载（开发调试使用）
-            let directPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/\(chineseFontFile).ttf"
+            let directPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/asserts/\(chineseFontFile).ttf"
             if FileManager.default.fileExists(atPath: directPath) {
                 let url = URL(fileURLWithPath: directPath)
                 if let name = registerFontIfNeeded(from: url) {
@@ -241,7 +241,7 @@ struct CustomFontProvider: FontProvider {
             }
         } else {
             // 尝试从文件路径直接加载（开发调试使用）
-            let directPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts/\(englishFontFile).ttf"
+            let directPath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/asserts/\(englishFontFile).ttf"
             if FileManager.default.fileExists(atPath: directPath) {
                 let url = URL(fileURLWithPath: directPath)
                 if let name = registerFontIfNeeded(from: url) {

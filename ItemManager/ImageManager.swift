@@ -97,7 +97,38 @@ class ImageManager {
     }
     
     // MARK: - Directory Management
+    
+    /// iCloud Documents 目录（用于自动同步图片）
     var imagesDirectory: URL {
+        // 使用 iCloud Documents 实现图片自动同步
+        // 优先使用 iCloud Documents，如果不可用则回退到本地 Documents
+        let fileManager = FileManager.default
+        
+        // 尝试获取 iCloud Documents URL
+        if let iCloudURL = fileManager.url(forUbiquityContainerIdentifier: nil)?.appendingPathComponent("Documents") {
+            let imagesDirectory = iCloudURL.appendingPathComponent("Images")
+            
+            // 确保目录存在（包括中间目录）
+            if !fileManager.fileExists(atPath: imagesDirectory.path) {
+                do {
+                    try fileManager.createDirectory(at: imagesDirectory, withIntermediateDirectories: true, attributes: nil)
+                    print("✅ 创建 iCloud Images 目录: \(imagesDirectory.path)")
+                } catch {
+                    print("❌ 创建 iCloud Images 目录失败: \(error)")
+                    // 回退到本地存储
+                    return localImagesDirectory
+                }
+            }
+            return imagesDirectory
+        }
+        
+        // 回退到本地 Documents
+        print("⚠️ iCloud 不可用，使用本地存储")
+        return localImagesDirectory
+    }
+    
+    /// 本地 Documents 目录（回退使用）
+    private var localImagesDirectory: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         let documentsDirectory = paths[0]
         let imagesDirectory = documentsDirectory.appendingPathComponent("Images")
@@ -107,6 +138,85 @@ class ImageManager {
         }
         
         return imagesDirectory
+    }
+    
+    /// 检查 iCloud 是否可用
+    var isICloudAvailable: Bool {
+        return FileManager.default.url(forUbiquityContainerIdentifier: nil) != nil
+    }
+    
+    /// 确保文件上传到 iCloud
+    /// - Parameter fileURL: 文件 URL
+    private func ensureFileUploadedToiCloud(fileURL: URL) throws {
+        let fileManager = FileManager.default
+        
+        // 设置文件属性，确保上传到 iCloud
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = false
+        
+        var mutableURL = fileURL
+        try mutableURL.setResourceValues(resourceValues)
+        
+        // 开始下载/上传（如果需要在不同设备间同步）
+        try fileManager.startDownloadingUbiquitousItem(at: fileURL)
+        
+        AppLogger.info("已设置 iCloud 同步: \(fileURL.lastPathComponent)")
+    }
+    
+    /// 检查文件是否已在本地下载
+    func isFileDownloaded(fileName: String) -> Bool {
+        let fileURL = imagesDirectory.appendingPathComponent(fileName)
+        
+        do {
+            let resourceValues = try fileURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+            if let status = resourceValues.ubiquitousItemDownloadingStatus {
+                return status == .current
+            }
+            // 如果不是 iCloud 文件，直接检查文件是否存在
+            return FileManager.default.fileExists(atPath: fileURL.path)
+        } catch {
+            return FileManager.default.fileExists(atPath: fileURL.path)
+        }
+    }
+    
+    /// 下载 iCloud 文件（如果尚未下载）
+    func downloadFileIfNeeded(fileName: String) async -> Bool {
+        let fileURL = imagesDirectory.appendingPathComponent(fileName)
+        let fileManager = FileManager.default
+        
+        // 检查文件是否已存在本地
+        guard fileManager.fileExists(atPath: fileURL.path) else {
+            // 文件不存在，尝试从 iCloud 下载
+            do {
+                try fileManager.startDownloadingUbiquitousItem(at: fileURL)
+                AppLogger.info("开始从 iCloud 下载: \(fileName)")
+                return true
+            } catch {
+                AppLogger.error("下载文件失败: \(error)")
+                return false
+            }
+        }
+        
+        // 检查下载状态
+        do {
+            let resourceValues = try fileURL.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+            if let status = resourceValues.ubiquitousItemDownloadingStatus {
+                switch status {
+                case .current:
+                    return true
+                case .downloaded, .notDownloaded:
+                    // 需要下载
+                    try fileManager.startDownloadingUbiquitousItem(at: fileURL)
+                    return true
+                default:
+                    return false
+                }
+            }
+        } catch {
+            AppLogger.error("检查下载状态失败: \(error)")
+        }
+        
+        return true
     }
     
     // MARK: - Maintenance
@@ -244,6 +354,11 @@ class ImageManager {
                 
                 try data.write(to: fileURL)
                 
+                // 确保文件上传到 iCloud
+                if isICloudAvailable {
+                    try? ensureFileUploadedToiCloud(fileURL: fileURL)
+                }
+                
                 let storedImage = StoredImage(imageHash: hash, fileName: fileName)
                 context.insert(storedImage)
                 
@@ -369,7 +484,7 @@ class ImageManager {
         }
     }
     
-    /// 获取图片
+    /// 获取图片（自动处理 iCloud 下载）
     func loadImage(fileName: String) -> UIImage? {
         // Check cache first
         if let cachedImage = memoryCache.object(forKey: fileName as NSString) {
@@ -377,6 +492,20 @@ class ImageManager {
         }
         
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
+        let fileManager = FileManager.default
+        
+        // 检查文件是否存在，如果不存在可能是 iCloud 文件尚未下载
+        if !fileManager.fileExists(atPath: fileURL.path) && isICloudAvailable {
+            // 尝试触发下载
+            do {
+                try fileManager.startDownloadingUbiquitousItem(at: fileURL)
+                AppLogger.info("触发 iCloud 下载: \(fileName)")
+            } catch {
+                AppLogger.error("触发下载失败: \(error)")
+            }
+            return nil
+        }
+        
         guard let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) else { return nil }
         
         // Cache loaded image
@@ -391,7 +520,7 @@ class ImageManager {
         return memoryCache.object(forKey: cacheKey)
     }
 
-    /// 异步获取图片 (用于列表滚动优化)
+    /// 异步获取图片 (用于列表滚动优化，自动处理 iCloud 下载)
     /// - Parameters:
     ///   - fileName: 文件名
     ///   - targetSize: 目标尺寸 (可选，如果提供则会进行降采样)
@@ -405,6 +534,18 @@ class ImageManager {
         
         // Capture URL on MainActor
         let fileURL = imagesDirectory.appendingPathComponent(fileName)
+        let fileManager = FileManager.default
+        
+        // 检查文件是否存在，如果不存在可能是 iCloud 文件尚未下载
+        if !fileManager.fileExists(atPath: fileURL.path) && isICloudAvailable {
+            // 尝试触发下载
+            let success = await downloadFileIfNeeded(fileName: fileName)
+            if !success {
+                return nil
+            }
+            // 等待一小段时间让下载开始
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
+        }
         
         // Load in background
         let scale = UIScreen.main.scale

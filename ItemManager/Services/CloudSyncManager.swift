@@ -18,9 +18,9 @@ class CloudSyncManager: ObservableObject {
     
     private let container = CKContainer(identifier: "iCloud.bugod2.ItemManager")
     
-    // 使用 Public Database 模拟私有存储 (规避 Private DB 权限问题)
+    // 使用 Private Database 存储用户数据（符合苹果规范）
     private var database: CKDatabase {
-        return container.publicCloudDatabase
+        return container.privateCloudDatabase
     }
     
     @Published var isSyncing = false
@@ -33,6 +33,22 @@ class CloudSyncManager: ObservableObject {
         }
     }
     
+    // MARK: - iCloud 同步开关
+    @Published var isCloudSyncEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isCloudSyncEnabled, forKey: "isCloudSyncEnabled")
+            if isCloudSyncEnabled {
+                // 开启同步时立即检查一次
+                Task {
+                    await checkiCloudAccountStatus()
+                }
+            }
+        }
+    }
+    
+    @Published var iCloudAccountStatus: CKAccountStatus = .couldNotDetermine
+    @Published var iCloudAccountError: Error?
+    
     // Version 4: Incremental Backup Support
     private let indexRecordType = "BackupIndex_v4"
     private let imageRecordType = "BackupImage"
@@ -41,6 +57,62 @@ class CloudSyncManager: ObservableObject {
     
     private init() {
         self.hasSuccessfulBackup = UserDefaults.standard.bool(forKey: "hasSuccessfulBackup")
+        self.isCloudSyncEnabled = UserDefaults.standard.bool(forKey: "isCloudSyncEnabled")
+        
+        // 初始化时检查 iCloud 账户状态
+        Task {
+            await checkiCloudAccountStatus()
+        }
+    }
+    
+    // MARK: - iCloud 账户状态检查
+    
+    /// 检查 iCloud 账户状态
+    func checkiCloudAccountStatus() async {
+        do {
+            let status = try await container.accountStatus()
+            await MainActor.run {
+                self.iCloudAccountStatus = status
+            }
+        } catch {
+            await MainActor.run {
+                self.iCloudAccountStatus = .couldNotDetermine
+                self.iCloudAccountError = error
+            }
+        }
+    }
+    
+    /// 检查是否可以使用 iCloud 同步
+    /// - Returns: (是否可用, 错误信息)
+    func canUseCloudSync() async -> (Bool, String?) {
+        await checkiCloudAccountStatus()
+        
+        switch iCloudAccountStatus {
+        case .available:
+            return (true, nil)
+        case .noAccount:
+            return (false, "请先登录 Apple ID 并开启 iCloud")
+        case .restricted:
+            return (false, "iCloud 功能受限，请检查设置")
+        case .couldNotDetermine:
+            return (false, "无法确定 iCloud 状态，请稍后重试")
+        case .temporarilyUnavailable:
+            return (false, "iCloud 暂时不可用，请稍后重试")
+        @unknown default:
+            return (false, "iCloud 状态异常")
+        }
+    }
+    
+    /// 尝试开启 iCloud 同步，如果 Apple ID 未登录则返回 false
+    func tryEnableCloudSync() async -> Bool {
+        let (canSync, _) = await canUseCloudSync()
+        if canSync {
+            await MainActor.run {
+                self.isCloudSyncEnabled = true
+            }
+            return true
+        }
+        return false
     }
     
     // MARK: - User Identity
@@ -75,6 +147,13 @@ class CloudSyncManager: ObservableObject {
     
     func fetchLatestBackupMetadata() {
         Task {
+            // 先检查 iCloud 账户状态
+            let (canSync, errorMsg) = await canUseCloudSync()
+            guard canSync else {
+                print("fetchLatestBackupMetadata: iCloud 不可用 - \(errorMsg ?? "未知错误")")
+                return
+            }
+            
             do {
                 let recordID = try await getBackupIndexRecordID()
                 let operation = CKFetchRecordsOperation(recordIDs: [recordID])
@@ -120,10 +199,10 @@ class CloudSyncManager: ObservableObject {
             // 0. Check Disk Space (Local) - User Requirement: > 500MB
             try checkDiskSpace(minMB: 500)
             
-            // 0.1 Check iCloud
-            let accountStatus = try await container.accountStatus()
-            guard accountStatus == .available else {
-                throw NSError(domain: "CloudSync", code: 401, userInfo: [NSLocalizedDescriptionKey: "iCloud 账户不可用。"])
+            // 0.1 Check iCloud Account
+            let (canSync, errorMsg) = await canUseCloudSync()
+            guard canSync else {
+                throw NSError(domain: "CloudSync", code: 401, userInfo: [NSLocalizedDescriptionKey: errorMsg ?? "iCloud 账户不可用"])
             }
             
             // 1. Prepare Data
@@ -302,6 +381,12 @@ class CloudSyncManager: ObservableObject {
         syncError = nil
         
         do {
+            // Check iCloud Account
+            let (canSync, errorMsg) = await canUseCloudSync()
+            guard canSync else {
+                throw NSError(domain: "CloudSync", code: 401, userInfo: [NSLocalizedDescriptionKey: errorMsg ?? "iCloud 账户不可用，请检查 Apple ID 登录状态"])
+            }
+            
             // Check Disk Space
             if !silent {
                 try checkDiskSpace(minMB: 500)
@@ -454,7 +539,9 @@ class CloudSyncManager: ObservableObject {
             
         } catch {
             if !silent {
-                self.syncError = error.localizedDescription
+                // 处理特定错误，显示友好提示
+                let friendlyError = self.friendlyErrorMessage(for: error)
+                self.syncError = friendlyError
                 isSyncing = false
             }
             print("Cloud Restore Failed: \(error)")
@@ -462,20 +549,86 @@ class CloudSyncManager: ObservableObject {
         }
     }
     
-    // MARK: - Auto Sync & Silent Restore
-    
-    func checkAndSilentRestore(container: ModelContainer) async {
-        // Condition: Empty Database (No Clothings)
-        let context = ModelContext(container)
-        let count = try? context.fetchCount(FetchDescriptor<Clothing>())
-        
-        if count == 0 {
-            print("SilentRestore: Empty database detected. Checking for cloud backup...")
-            let success = await restoreFromCloudInternal(context: context, silent: true)
-            if success {
-                print("SilentRestore: Data restored successfully.")
+    /// 将技术错误转换为用户友好的提示
+    private func friendlyErrorMessage(for error: Error) -> String {
+        if let ckError = error as? CKError {
+            switch ckError.code {
+            case .unknownItem:
+                return "云端没有备份记录。请先备份数据到云端。"
+            case .networkFailure, .notAuthenticated:
+                return "网络连接失败，请检查网络后重试。"
+            case .quotaExceeded:
+                return "iCloud 空间不足，请清理空间后重试。"
+            case .userDeletedZone:
+                return "备份数据已被删除，无法恢复。"
+            default:
+                break
             }
         }
+        
+        // 检查错误描述中的关键词
+        let errorDesc = error.localizedDescription.lowercased()
+        if errorDesc.contains("record not found") || errorDesc.contains("unknown item") {
+            return "云端没有备份记录。请先备份数据到云端。"
+        }
+        
+        return "恢复失败: \(error.localizedDescription)"
+    }
+
+    // MARK: - Manual Restore Only
+    
+    /// 检查云端是否有备份（供 UI 使用，显示恢复提示）
+    /// 返回：是否有可恢复的云端备份
+    func checkCloudBackupAvailable() async -> Bool {
+        return await checkCloudBackupExists(timeout: 5.0)
+    }
+    
+    /// 快速检查云端是否有备份（带超时）
+    private func checkCloudBackupExists(timeout: TimeInterval) async -> Bool {
+        // 先检查 iCloud 账户状态
+        let (canSync, _) = await canUseCloudSync()
+        guard canSync else {
+            return false
+        }
+        
+        return await withTimeout(seconds: timeout) {
+            do {
+                let indexRecordID = try await self.getBackupIndexRecordID()
+                _ = try await self.database.record(for: indexRecordID)
+                return true
+            } catch {
+                return false
+            }
+        } ?? false
+    }
+    
+    /// 超时包装器
+    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async -> T? {
+        try? await withThrowingTaskGroup(of: T.self) { group in
+            // 添加主任务
+            group.addTask {
+                try await operation()
+            }
+            
+            // 添加超时任务
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw TimeoutError()
+            }
+            
+            // 返回先完成的任务结果
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+    
+    struct TimeoutError: Error {}
+    
+    /// 用户手动触发恢复（不再自动调用）
+    func restoreFromCloudManual(context: ModelContext) async -> Bool {
+        print("ManualRestore: User initiated cloud restore...")
+        return await restoreFromCloudInternal(context: context, silent: false)
     }
     
     // MARK: - Helper

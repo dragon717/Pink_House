@@ -601,6 +601,7 @@ struct CloudSyncControlsView: View {
                             }
                         ))
                         .labelsHidden()
+                        .disabled(!authManager.isAuthenticated)
                     }
                 }
                 
@@ -715,6 +716,12 @@ struct CloudSyncControlsView: View {
     }
     
     private func handleCloudSyncToggle(_ newValue: Bool) {
+        // 如果尝试开启同步但未登录 Apple ID，强制关闭并提示
+        if newValue && !authManager.isAuthenticated {
+            showingLoginRequiredAlert = true
+            return
+        }
+        
         pendingCloudSyncEnabled = newValue
         
         Task {

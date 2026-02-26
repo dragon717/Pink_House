@@ -409,15 +409,44 @@ struct NoticeTestView: View {
     @State private var showNoticePreview = false
     @State private var showResetAlert = false
     @StateObject private var service = NoticeService.shared
+    @StateObject private var cloudKitService = NoticeCloudKitService.shared
     @Environment(\.modelContext) private var modelContext
-    
+    @State private var showSyncAlert = false
+    @State private var syncMessage = ""
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 Text("公告管理功能测试")
                     .foregroundStyle(.secondary)
                     .padding(.top, 20)
-                
+
+                // 同步状态
+                if service.isSyncing || cloudKitService.isSyncing {
+                    HStack {
+                        ProgressView()
+                            .padding(.trailing, 8)
+                        Text("同步中...")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal)
+                }
+
+                // 获取 iCloud ID（配置用）
+                Button {
+                    Task {
+                        await cloudKitService.getCurrentUserID()
+                    }
+                } label: {
+                    LabActionCard(
+                        icon: "person.badge.key",
+                        title: "获取我的 iCloud ID",
+                        subtitle: "配置管理员权限时使用",
+                        color: .orange
+                    )
+                }
+                .padding(.horizontal)
+
                 // 管理公告
                 Button {
                     showNoticeAdmin = true
@@ -425,12 +454,30 @@ struct NoticeTestView: View {
                     LabActionCard(
                         icon: "gear",
                         title: "管理公告",
-                        subtitle: "添加、编辑、删除公告",
+                        subtitle: "添加、编辑、删除公告（需管理员权限）",
                         color: .blue
                     )
                 }
                 .padding(.horizontal)
-                
+
+                // 手动同步
+                Button {
+                    Task {
+                        await service.manualSync()
+                        syncMessage = service.errorMessage ?? "同步完成"
+                        showSyncAlert = true
+                    }
+                } label: {
+                    LabActionCard(
+                        icon: "arrow.clockwise.icloud",
+                        title: "手动同步公告",
+                        subtitle: "从云端拉取最新公告",
+                        color: .purple
+                    )
+                }
+                .disabled(service.isSyncing)
+                .padding(.horizontal)
+
                 // 预览公告
                 Button {
                     showNoticePreview = true
@@ -443,7 +490,7 @@ struct NoticeTestView: View {
                     )
                 }
                 .padding(.horizontal)
-                
+
                 // 重置记录
                 Button {
                     showResetAlert = true
@@ -456,7 +503,15 @@ struct NoticeTestView: View {
                     )
                 }
                 .padding(.horizontal)
-                
+
+                // 显示当前公告数量
+                if !service.notices.isEmpty {
+                    Text("当前有 \(service.notices.count) 条公告")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                }
+
                 Spacer(minLength: 100)
             }
         }
@@ -467,6 +522,11 @@ struct NoticeTestView: View {
             if showNoticePreview, let notice = service.notices.first {
                 NoticePreviewOverlay(isPresented: $showNoticePreview, notice: notice)
             }
+        }
+        .alert("同步结果", isPresented: $showSyncAlert) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text(syncMessage)
         }
         .alert("确认重置", isPresented: $showResetAlert) {
             Button("取消", role: .cancel) {}

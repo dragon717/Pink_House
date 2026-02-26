@@ -328,8 +328,16 @@ struct DataManagementView: View {
             } catch {
                 print("Restore Error: \(error)")
                 await MainActor.run {
-                    // 如果是 BackupError，使用其详细描述，否则使用原生的
-                    let errorDesc = (error as? BackupService.BackupError)?.errorDescription ?? error.localizedDescription
+                    // 处理不同类型的错误
+                    let errorDesc: String
+                    if let backupError = error as? BackupService.BackupError {
+                        errorDesc = backupError.errorDescription ?? "未知错误"
+                    } else if let partialError = error as? BackupService.RestorePartialFailureError {
+                        // 部分恢复失败，显示详细报告
+                        errorDesc = partialError.result.errorReport
+                    } else {
+                        errorDesc = error.localizedDescription
+                    }
                     message = "数据恢复失败: \(errorDesc)"
                     showingMessage = true
                 }

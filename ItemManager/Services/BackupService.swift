@@ -837,7 +837,63 @@ class BackupService {
         }
     }
 
+    /// 恢复结果，包含各模块的成功/失败状态
+    struct RestoreResult {
+        var filesSuccess: Bool = true
+        var filesError: String?
+        var brandsSuccess: Bool = true
+        var brandsError: String?
+        var tagsSuccess: Bool = true
+        var tagsError: String?
+        var storedImagesSuccess: Bool = true
+        var storedImagesError: String?
+        var clothingSuccess: Bool = true
+        var clothingError: String?
+        var cutoutItemsSuccess: Bool = true
+        var cutoutItemsError: String?
+        var outfitsSuccess: Bool = true
+        var outfitsError: String?
+        var model3DsSuccess: Bool = true
+        var model3DsError: String?
+        var bookGroupsSuccess: Bool = true
+        var bookGroupsError: String?
+        var perlerBeadsSuccess: Bool = true
+        var perlerBeadsError: String?
+        var settingsSuccess: Bool = true
+        var settingsError: String?
+
+        /// 是否有任何模块失败
+        var hasFailures: Bool {
+            !filesSuccess || !brandsSuccess || !tagsSuccess || !storedImagesSuccess ||
+            !clothingSuccess || !cutoutItemsSuccess || !outfitsSuccess ||
+            !model3DsSuccess || !bookGroupsSuccess || !perlerBeadsSuccess || !settingsSuccess
+        }
+
+        /// 生成错误报告
+        var errorReport: String {
+            var errors: [String] = []
+            if let e = filesError { errors.append("文件: \(e)") }
+            if let e = brandsError { errors.append("品牌: \(e)") }
+            if let e = tagsError { errors.append("标签: \(e)") }
+            if let e = storedImagesError { errors.append("图片: \(e)") }
+            if let e = clothingError { errors.append("衣橱: \(e)") }
+            if let e = cutoutItemsError { errors.append("贴纸: \(e)") }
+            if let e = outfitsError { errors.append("搭配: \(e)") }
+            if let e = model3DsError { errors.append("3D模型: \(e)") }
+            if let e = bookGroupsError { errors.append("手帐: \(e)") }
+            if let e = perlerBeadsError { errors.append("拼豆: \(e)") }
+            if let e = settingsError { errors.append("设置: \(e)") }
+
+            if errors.isEmpty {
+                return "所有模块恢复成功"
+            } else {
+                return "以下模块恢复失败:\n" + errors.joined(separator: "\n")
+            }
+        }
+    }
+
     /// Low-level restore function that takes a Manifest and a map of Image Filenames to Local URLs
+    /// 采用模块化恢复策略：各模块独立执行，即使某个模块失败也不会影响其他模块
     func restoreFromManifest(manifest: BackupManifest, imageFiles: [String: URL], context: ModelContext) throws {
         // 可重入性保护
         restoreLock.lock()
@@ -851,26 +907,136 @@ class BackupService {
         isRestoring = true
         defer { isRestoring = false }
 
-        print("### Restore: Starting restore from manifest...")
+        print("### Restore: Starting modular restore from manifest...")
 
         // 创建恢复上下文
         var ctx = try RestoreContext(manifest: manifest, imageFiles: imageFiles, context: context)
+        var result = RestoreResult()
 
-        // --- 开始分阶段恢复 ---
+        // --- 阶段 1: 恢复文件 (图片、主题、小组件背景等) ---
+        do {
+            try restoreFiles(context: &ctx)
+            print("✅ Stage 1 (Files): Success")
+        } catch {
+            result.filesSuccess = false
+            result.filesError = error.localizedDescription
+            print("❌ Stage 1 (Files): Failed - \(error)")
+        }
 
-        // 阶段 1: 恢复文件 (图片、主题、小组件背景等)
-        try restoreFiles(context: &ctx)
+        // --- 阶段 2: 恢复基础模型 ---
+        // 2a. Brands
+        do {
+            try restoreBrands(context: &ctx)
+            print("✅ Stage 2a (Brands): Success")
+        } catch {
+            result.brandsSuccess = false
+            result.brandsError = error.localizedDescription
+            print("❌ Stage 2a (Brands): Failed - \(error)")
+        }
 
-        // 阶段 2: 恢复基础模型 (Brand, Tag, StoredImage)
-        try restoreBasicModels(context: &ctx)
+        // 2b. Tags
+        do {
+            try restoreTags(context: &ctx)
+            print("✅ Stage 2b (Tags): Success")
+        } catch {
+            result.tagsSuccess = false
+            result.tagsError = error.localizedDescription
+            print("❌ Stage 2b (Tags): Failed - \(error)")
+        }
 
-        // 阶段 3: 恢复复杂模型与关系 (Clothing, CutoutItem, Outfit, Model3D, BookGroup, SpaceBookGroup, SpaceOutfit)
-        try restoreComplexModels(context: &ctx)
+        // 2c. StoredImages
+        do {
+            try restoreStoredImages(context: &ctx)
+            print("✅ Stage 2c (StoredImages): Success")
+        } catch {
+            result.storedImagesSuccess = false
+            result.storedImagesError = error.localizedDescription
+            print("❌ Stage 2c (StoredImages): Failed - \(error)")
+        }
 
-        // 阶段 4: 恢复设置 (UserDefaults, Pet Status, Chat History, User Profile)
-        try restoreSettings(context: ctx)
+        // 提交基础模型阶段
+        do {
+            try context.save()
+            print("✅ Stage 2 Commit: Success")
+        } catch {
+            print("❌ Stage 2 Commit: Failed - \(error)")
+            // 基础模型提交失败是严重问题，需要抛出
+            throw BackupError.dataFetchFailed
+        }
+
+        // --- 阶段 3: 恢复复杂模型与关系 ---
+        // 3a. Clothing 和 CutoutItem
+        do {
+            try restoreClothingAndOutfits(context: &ctx)
+            print("✅ Stage 3a (Clothing & Cutouts): Success")
+        } catch {
+            result.clothingSuccess = false
+            result.cutoutItemsSuccess = false
+            result.clothingError = error.localizedDescription
+            print("❌ Stage 3a (Clothing & Cutouts): Failed - \(error)")
+        }
+
+        // 3b. Model3D
+        do {
+            try restoreModel3Ds(context: &ctx)
+            print("✅ Stage 3b (Model3Ds): Success")
+        } catch {
+            result.model3DsSuccess = false
+            result.model3DsError = error.localizedDescription
+            print("❌ Stage 3b (Model3Ds): Failed - \(error)")
+        }
+
+        // 3c. BookGroups
+        do {
+            try restoreBookGroups(context: &ctx)
+            print("✅ Stage 3c (BookGroups): Success")
+        } catch {
+            result.bookGroupsSuccess = false
+            result.bookGroupsError = error.localizedDescription
+            print("❌ Stage 3c (BookGroups): Failed - \(error)")
+        }
+
+        // 3d. PerlerBeadPatterns
+        do {
+            try restorePerlerBeadPatterns(context: &ctx)
+            print("✅ Stage 3d (PerlerBeads): Success")
+        } catch {
+            result.perlerBeadsSuccess = false
+            result.perlerBeadsError = error.localizedDescription
+            print("❌ Stage 3d (PerlerBeads): Failed - \(error)")
+        }
+
+        // --- 阶段 4: 恢复设置 ---
+        do {
+            try restoreSettings(context: ctx)
+            print("✅ Stage 4 (Settings): Success")
+        } catch {
+            result.settingsSuccess = false
+            result.settingsError = error.localizedDescription
+            print("❌ Stage 4 (Settings): Failed - \(error)")
+        }
+
+        // --- 最终报告 ---
+        print("\n========== 恢复报告 ==========")
+        print(result.errorReport)
+        print("==============================\n")
+
+        // 如果有任何模块失败，抛出包含详细信息的错误
+        if result.hasFailures {
+            // 创建一个新的错误类型来承载详细报告
+            throw RestorePartialFailureError(result: result)
+        }
 
         print("--- Import Successful! ---")
+    }
+
+    /// 部分恢复失败错误
+    struct RestorePartialFailureError: Error, LocalizedError {
+        let result: RestoreResult
+
+        var errorDescription: String? {
+            result.errorReport
+        }
     }
 
     // MARK: - 阶段 1: 恢复文件
@@ -1282,13 +1448,13 @@ class BackupService {
             }
             clothingBack.imagePaths = mergedImagePaths
             
-            clothingBack.isShared = dto.isShared
-            
+            clothingBack.isShared = dto.isShared ?? false
+
             // Prices: backup data overwrites (user may have updated prices)
             clothingBack.price = dto.price
             clothingBack.deposit = dto.deposit
             clothingBack.balance = dto.balance
-            clothingBack.accessoriesPrice = dto.accessoriesPrice
+            clothingBack.accessoriesPrice = dto.accessoriesPrice ?? 0
             
             // Dates: backup data overwrites
             clothingBack.purchaseDate = dto.purchaseDate
@@ -1302,7 +1468,7 @@ class BackupService {
             // Stock: use backup value (backup is source of truth for inventory)
             clothingBack.stock = dto.stock
             
-            clothingBack.status = ClothingStatus(rawValue: dto.status) ?? .onShelf
+            clothingBack.status = ClothingStatus(rawValue: dto.status ?? "") ?? .onShelf
             
             // 恢复删除状态：优先使用备份的删除状态
             clothingBack.isDeleted = dto.isDeleted ?? false
@@ -1557,8 +1723,8 @@ class BackupService {
                     outfit.lastModified = lastModified
                 }
                 
-                // 恢复删除状态
-                outfit.isDeleted = dto.isDeleted
+                // 恢复删除状态（兼容老版本备份）
+                outfit.isDeleted = dto.isDeleted ?? false
                 outfit.deletedAt = dto.deletedAt
                 
                 print("### Restore: Processing Outfit \(dto.note) (\(dto.id)) with \(dto.items.count) items...")
@@ -1735,7 +1901,7 @@ class BackupService {
             
             for dto in model3DDTOs {
                 // Skip deleted models in backup
-                if dto.isDeleted { continue }
+                if dto.isDeleted ?? false { continue }
                 
                 let model3D: Model3D
                 if let existing = model3DMap[dto.id] {
@@ -1747,12 +1913,12 @@ class BackupService {
                     model3D.thumbnailPath = dto.thumbnailPath
                     model3D.sourceImagePaths = dto.sourceImagePaths
                     model3D.sortIndex = dto.sortIndex
-                    model3D.cameraPositionX = dto.cameraPositionX
-                    model3D.cameraPositionY = dto.cameraPositionY
-                    model3D.cameraPositionZ = dto.cameraPositionZ
-                    model3D.cameraRotationX = dto.cameraRotationX
-                    model3D.cameraRotationY = dto.cameraRotationY
-                    model3D.cameraRotationZ = dto.cameraRotationZ
+                    model3D.cameraPositionX = dto.cameraPositionX ?? 0
+                    model3D.cameraPositionY = dto.cameraPositionY ?? 0
+                    model3D.cameraPositionZ = dto.cameraPositionZ ?? 0
+                    model3D.cameraRotationX = dto.cameraRotationX ?? 0
+                    model3D.cameraRotationY = dto.cameraRotationY ?? 0
+                    model3D.cameraRotationZ = dto.cameraRotationZ ?? 0
                 } else {
                     model3D = Model3D(
                         name: dto.name,
@@ -1766,18 +1932,18 @@ class BackupService {
                     model3D.id = dto.id
                     model3D.createdAt = dto.createdAt
                     model3D.updatedAt = dto.updatedAt
-                    model3D.cameraPositionX = dto.cameraPositionX
-                    model3D.cameraPositionY = dto.cameraPositionY
-                    model3D.cameraPositionZ = dto.cameraPositionZ
-                    model3D.cameraRotationX = dto.cameraRotationX
-                    model3D.cameraRotationY = dto.cameraRotationY
-                    model3D.cameraRotationZ = dto.cameraRotationZ
+                    model3D.cameraPositionX = dto.cameraPositionX ?? 0
+                    model3D.cameraPositionY = dto.cameraPositionY ?? 0
+                    model3D.cameraPositionZ = dto.cameraPositionZ ?? 0
+                    model3D.cameraRotationX = dto.cameraRotationX ?? 0
+                    model3D.cameraRotationY = dto.cameraRotationY ?? 0
+                    model3D.cameraRotationZ = dto.cameraRotationZ ?? 0
                     modelContext.insert(model3D)
                     model3DMap[dto.id] = model3D
                 }
                 
-                // 恢复删除状态
-                model3D.isDeleted = dto.isDeleted
+                // 恢复删除状态（兼容老版本备份）
+                model3D.isDeleted = dto.isDeleted ?? false
                 model3D.deletedAt = dto.deletedAt
                 
                 // 恢复 lastModified
@@ -1837,7 +2003,7 @@ class BackupService {
             
             for dto in bookGroupDTOs {
                 // Skip deleted book groups in backup
-                if dto.isDeleted { continue }
+                if dto.isDeleted ?? false { continue }
 
                 let bookGroup: BookGroup
                 if let existing = localBookGroupMap[dto.id] {
@@ -1853,8 +2019,8 @@ class BackupService {
                     localBookGroupMap[dto.id] = bookGroup
                 }
                 
-                // 恢复删除状态
-                bookGroup.isDeleted = dto.isDeleted
+                // 恢复删除状态（兼容老版本备份）
+                bookGroup.isDeleted = dto.isDeleted ?? false
                 bookGroup.deletedAt = dto.deletedAt
                 
                 // 恢复 lastModified
@@ -1905,7 +2071,7 @@ class BackupService {
             
             for dto in spaceBookGroupDTOs {
                 // Skip deleted space book groups in backup
-                if dto.isDeleted { continue }
+                if dto.isDeleted ?? false { continue }
                 
                 let spaceBookGroup: SpaceBookGroup
                 if let existing = spaceBookGroupMap[dto.id] {
@@ -1921,8 +2087,8 @@ class BackupService {
                     spaceBookGroupMap[dto.id] = spaceBookGroup
                 }
                 
-                // 恢复删除状态
-                spaceBookGroup.isDeleted = dto.isDeleted
+                // 恢复删除状态（兼容老版本备份）
+                spaceBookGroup.isDeleted = dto.isDeleted ?? false
                 spaceBookGroup.deletedAt = dto.deletedAt
                 
                 // 恢复 lastModified
@@ -1978,7 +2144,7 @@ class BackupService {
                 
                 for dto in spaceOutfitDTOs {
                     // Skip deleted space outfits in backup
-                    if dto.isDeleted { continue }
+                    if dto.isDeleted ?? false { continue }
                     
                     let spaceOutfit: SpaceOutfit
                     if let existing = spaceOutfitMap[dto.id] {
@@ -2009,8 +2175,8 @@ class BackupService {
                         spaceOutfitMap[dto.id] = spaceOutfit
                     }
                     
-                    // 恢复删除状态
-                    spaceOutfit.isDeleted = dto.isDeleted
+                    // 恢复删除状态（兼容老版本备份）
+                    spaceOutfit.isDeleted = dto.isDeleted ?? false
                     spaceOutfit.deletedAt = dto.deletedAt
                     
                     // 恢复 lastModified
@@ -2114,7 +2280,7 @@ class BackupService {
             
             for dto in patternDTOs {
                 // Skip deleted patterns in backup
-                if dto.isDeleted { continue }
+                if dto.isDeleted ?? false { continue }
                 
                 let pattern: PerlerBeadPattern
                 if let existing = patternMap[dto.id] {
@@ -2147,8 +2313,8 @@ class BackupService {
                     patternMap[dto.id] = pattern
                 }
                 
-                // 恢复删除状态
-                pattern.isDeleted = dto.isDeleted
+                // 恢复删除状态（兼容老版本备份）
+                pattern.isDeleted = dto.isDeleted ?? false
                 pattern.deletedAt = dto.deletedAt
                 
                 // 恢复 lastModified
@@ -2358,48 +2524,105 @@ class BackupService {
         }
     }
 
-    nonisolated func importBackup(from url: URL, context: ModelContext) async throws {
+    /// 从文件导入备份
+    /// 注意：此方法需要在主线程调用，因为 ModelContext 只能在主线程使用
+    func importBackup(from url: URL, context: ModelContext) async throws {
         print("### Import: Starting native-wrapper based import from \(url.path)")
-        
+
+        // 确保在主线程执行
+        await MainActor.run {
+            print("### Import: Running on MainActor")
+        }
+
         // 1. 读取备份文件数据
         let compressedData = try Data(contentsOf: url)
-        if compressedData.isEmpty { 
-            throw BackupError.invalidArchive 
+        if compressedData.isEmpty {
+            throw BackupError.invalidArchive
         }
-        
+
         // 2. 使用原生方案解压缩和还原打包目录 (内部映射 libcompression)
         print("### Import: Unwrapping package...")
         let fileMap = try NativePackageWrapper.unwrapPackage(data: compressedData)
         print("### Import: Unwrapped \(fileMap.count) files.")
-        
+
         // 3. 提取 Manifest
         guard let manifestData = fileMap["manifest.json"] else {
             print("### Import: CRITICAL ERROR - manifest.json missing in fileMap.")
             throw BackupError.invalidArchive
         }
-        
+
+        print("### Import: Decoding manifest.json (\(manifestData.count) bytes)...")
         let jsonDecoder = JSONDecoder()
         jsonDecoder.dateDecodingStrategy = .iso8601
-        let manifest = try jsonDecoder.decode(BackupManifest.self, from: manifestData)
-        
+
+        // 尝试解码，如果失败则记录详细的解码错误
+        let manifest: BackupManifest
+        do {
+            manifest = try jsonDecoder.decode(BackupManifest.self, from: manifestData)
+            print("### Import: Manifest decoded successfully. Version: \(manifest.version), Backup Date: \(manifest.timestamp)")
+        } catch let decodingError as DecodingError {
+            print("### Import: FAILED to decode manifest - \(decodingError)")
+            // 详细的解码错误信息
+            switch decodingError {
+            case .keyNotFound(let key, let context):
+                print("### Import: Missing key '\(key.stringValue)' in \(context.codingPath)")
+            case .typeMismatch(let type, let context):
+                print("### Import: Type mismatch for \(type) in \(context.codingPath): \(context.debugDescription)")
+            case .valueNotFound(let type, let context):
+                print("### Import: Value not found for \(type) in \(context.codingPath)")
+            case .dataCorrupted(let context):
+                print("### Import: Data corrupted: \(context.debugDescription)")
+            @unknown default:
+                print("### Import: Unknown decoding error: \(decodingError)")
+            }
+            throw BackupError.invalidArchive
+        } catch {
+            print("### Import: Unexpected error decoding manifest: \(error)")
+            throw BackupError.invalidArchive
+        }
+
         // 4. Prepare temporary files for restoration
+        print("### Import: Preparing temporary files...")
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        
+        print("### Import: Created temp directory: \(tempDir.path)")
+
         var tempFileMap: [String: URL] = [:]
-        
+        let fileCount = fileMap.count - 1 // excluding manifest.json
+        var processedCount = 0
+
+        print("### Import: Writing \(fileCount) files to temp directory...")
         for (fileName, data) in fileMap where fileName != "manifest.json" {
             let tempURL = tempDir.appendingPathComponent(fileName)
-            try data.write(to: tempURL)
-            tempFileMap[fileName] = tempURL
+            do {
+                try data.write(to: tempURL)
+                tempFileMap[fileName] = tempURL
+                processedCount += 1
+                if processedCount % 100 == 0 {
+                    print("### Import: Written \(processedCount)/\(fileCount) files...")
+                }
+            } catch {
+                print("### Import: Failed to write file \(fileName): \(error)")
+                throw error
+            }
         }
-        
-        // 5. Call internal restore (Must be on MainActor)
-        await MainActor.run {
-            try? restoreFromManifest(manifest: manifest, imageFiles: tempFileMap, context: context)
+        print("### Import: All \(processedCount) files written to temp directory")
+
+        // 5. Call internal restore (已经在主线程，直接调用)
+        print("### Import: Calling restoreFromManifest...")
+        do {
+            try restoreFromManifest(manifest: manifest, imageFiles: tempFileMap, context: context)
+            print("### Import: restoreFromManifest completed successfully")
+        } catch {
+            print("### Import: restoreFromManifest failed with error: \(error)")
+            // 恢复失败时清理临时目录并抛出错误
+            try? FileManager.default.removeItem(at: tempDir)
+            throw error
         }
-        
+
         // 6. Cleanup
+        print("### Import: Cleaning up temp directory...")
         try? FileManager.default.removeItem(at: tempDir)
+        print("### Import: Cleanup completed")
     }
 }

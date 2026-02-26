@@ -228,6 +228,7 @@
 				A2AE586F2F19377500B4B6EB /* Sources */,
 				A2AE58702F19377500B4B6EB /* Frameworks */,
 				A2AE58712F19377500B4B6EB /* Resources */,
+				B5D7E8F12D1A2B3C4E5F6078 /* Remove Duplicate Resources */,
 				A2AE59DB2F1EB85400B4B6EB /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -395,6 +396,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		B5D7E8F12D1A2B3C4E5F6078 /* Remove Duplicate Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Remove Duplicate Resources";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Remove duplicate resources from App Bundle root\necho \"[Remove Duplicate Resources] Starting...\"\necho \"[Remove Duplicate Resources] BUILT_PRODUCTS_DIR: ${BUILT_PRODUCTS_DIR}\"\necho \"[Remove Duplicate Resources] EXECUTABLE_FOLDER_PATH: ${EXECUTABLE_FOLDER_PATH}\"\necho \"[Remove Duplicate Resources] TARGET_BUILD_DIR: ${TARGET_BUILD_DIR}\"\necho \"[Remove Duplicate Resources] UNLOCALIZED_RESOURCES_FOLDER_PATH: ${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\n\n# Try different possible paths for the app bundle\nif [ -n \"${TARGET_BUILD_DIR}\" ] && [ -n \"${UNLOCALIZED_RESOURCES_FOLDER_PATH}\" ]; then\n    APP_BUNDLE=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nelif [ -n \"${BUILT_PRODUCTS_DIR}\" ] && [ -n \"${EXECUTABLE_FOLDER_PATH}\" ]; then\n    APP_BUNDLE=\"${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}\"\nelse\n    echo \"[Remove Duplicate Resources] ERROR: Cannot determine app bundle path\"\n    exit 0\nfi\n\necho \"[Remove Duplicate Resources] App Bundle: $APP_BUNDLE\"\n\nif [ -d \"$APP_BUNDLE\" ]; then\n    echo \"[Remove Duplicate Resources] App bundle found, cleaning...\"\n    \n    # Count files before deletion\n    MOV_COUNT=$(find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.mov\" -type f | wc -l)\n    MP4_COUNT=$(find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.mp4\" -type f | wc -l)\n    TTF_COUNT=$(find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.ttf\" -type f | wc -l)\n    \n    echo \"[Remove Duplicate Resources] Found $MOV_COUNT .mov files in root\"\n    echo \"[Remove Duplicate Resources] Found $MP4_COUNT .mp4 files in root\"\n    echo \"[Remove Duplicate Resources] Found $TTF_COUNT .ttf files in root\"\n    \n    # Delete duplicate .mov files from root (they should be in asserts folder only)\n    find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.mov\" -type f -print -delete\n    \n    # Delete duplicate .mp4 files from root\n    find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.mp4\" -type f -print -delete\n    \n    # Delete duplicate font files from root\n    find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.ttf\" -type f -print -delete\n    \n    # Delete other duplicate resources\n    find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.mp3\" -type f -print -delete\n    find \"$APP_BUNDLE\" -maxdepth 1 -name \"*.wav\" -type f -print -delete\n    \n    # Delete backup zip if exists\n    if [ -f \"$APP_BUNDLE/asserts 2.zip\" ]; then\n        echo \"[Remove Duplicate Resources] Deleting asserts 2.zip\"\n        rm -f \"$APP_BUNDLE/asserts 2.zip\"\n    fi\n    \n    echo \"[Remove Duplicate Resources] Done!\"\nelse\n    echo \"[Remove Duplicate Resources] WARNING: App bundle not found at $APP_BUNDLE\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A2AE586F2F19377500B4B6EB /* Sources */ = {

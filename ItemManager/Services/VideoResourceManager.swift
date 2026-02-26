@@ -8,7 +8,7 @@ class VideoResourceManager {
     static let shared = VideoResourceManager()
     
     // 视频资源在源代码中的基础路径
-    private let sourceBasePath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/asserts"
+    private let sourceBasePath = "/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/asserts"
     
     // 视频资源在 Bundle 中的子目录
     private let bundleSubdirectory = "asserts"

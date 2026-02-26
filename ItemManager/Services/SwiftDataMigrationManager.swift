@@ -206,12 +206,12 @@ class SwiftDataMigrationManager: ObservableObject {
             print("☁️ 创建 iCloud ModelContainer...")
             print("📦 使用 CloudKit 容器: \(cloudKitContainerIdentifier)")
             
-            // 使用 .automatic 让 SwiftData 自动选择，或明确指定容器
+            // 使用明确指定的 CloudKit 容器，确保数据同步到正确的私有数据库
             // 注意：需要确保 entitlements 中配置了正确的 iCloud 容器
             let cloudConfig = ModelConfiguration(
                 schema: schema,
                 isStoredInMemoryOnly: false,
-                cloudKitDatabase: .automatic
+                cloudKitDatabase: .private(cloudKitContainerIdentifier)
             )
             
             let cloudContainer = try ModelContainer(for: schema, configurations: [cloudConfig])

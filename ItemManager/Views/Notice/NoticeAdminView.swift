@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - 公告管理视图 (管理员专用)
 // 用于创建、编辑、删除公告
@@ -8,7 +9,7 @@ struct NoticeAdminView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    // 表单状态 - 使用 @State 但确保在 Form 外部管理
+    // 表单状态
     @State private var title = ""
     @State private var content = ""
     @State private var priority = 0
@@ -29,44 +30,105 @@ struct NoticeAdminView: View {
 
     // 内置图片选择器
     @State private var showBuiltinImagePicker = false
-    
+
+    // 管理员权限检查
+    @State private var isAdmin = false
+    @State private var isCheckingAdmin = true
+
     var body: some View {
         NavigationStack {
-            adminForm
-                .navigationTitle("公告管理")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成") {
-                            dismiss()
-                        }
+            Group {
+                if isCheckingAdmin {
+                    checkingView
+                } else if isAdmin {
+                    adminForm
+                } else {
+                    noPermissionView
+                }
+            }
+            .navigationTitle("公告管理")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
                     }
                 }
-                .onAppear {
-                    service.setup(with: modelContext)
-                }
-                .alert("提示", isPresented: $showAlert) {
-                    Button("确定", role: .cancel) {}
-                } message: {
-                    Text(alertMessage)
-                }
-                .overlay {
-                    if showPreview, let notice = previewNotice {
-                        NoticePreviewOverlay(
-                            isPresented: $showPreview,
-                            notice: notice
-                        )
-                    }
-                }
-                .sheet(isPresented: $showBuiltinImagePicker) {
-                    BuiltinImagePicker(
-                        selectedImageName: $selectedImageName,
-                        selectedImageData: $selectedImageData
+            }
+            .onAppear {
+                service.setup(with: modelContext)
+                checkAdminPermission()
+            }
+            .alert("提示", isPresented: $showAlert) {
+                Button("确定", role: .cancel) {}
+            } message: {
+                Text(alertMessage)
+            }
+            .overlay {
+                if showPreview, let notice = previewNotice {
+                    NoticePreviewOverlay(
+                        isPresented: $showPreview,
+                        notice: notice
                     )
                 }
+            }
+            .sheet(isPresented: $showBuiltinImagePicker) {
+                BuiltinImagePicker(
+                    selectedImageName: $selectedImageName,
+                    selectedImageData: $selectedImageData
+                )
+            }
         }
     }
-    
+
+    // MARK: - 检查权限中视图
+    private var checkingView: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+            Text("检查管理员权限...")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - 无权限视图
+    private var noPermissionView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 60))
+                .foregroundStyle(.secondary)
+
+            Text("需要管理员权限")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Text("只有管理员可以发布公告。\n如果您是管理员，请确保已登录 iCloud 账户。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Button("重新检查") {
+                checkAdminPermission()
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.top)
+        }
+        .padding()
+    }
+
+    // MARK: - 检查管理员权限
+    private func checkAdminPermission() {
+        isCheckingAdmin = true
+        Task {
+            let hasPermission = await service.isAdmin()
+            await MainActor.run {
+                isAdmin = hasPermission
+                isCheckingAdmin = false
+            }
+        }
+    }
+
     // MARK: - 表单内容
     private var adminForm: some View {
         Form {
@@ -77,12 +139,12 @@ struct NoticeAdminView: View {
             existingNoticesSection
         }
     }
-    
+
     // MARK: - 公告内容区域
     private var contentSection: some View {
         Section("公告内容") {
             TextField("标题", text: $title)
-            
+
             TextEditor(text: $content)
                 .frame(minHeight: 100)
                 .overlay(
@@ -91,7 +153,7 @@ struct NoticeAdminView: View {
                 )
         }
     }
-    
+
     private var placeholderOverlay: some View {
         Group {
             if content.isEmpty {
@@ -102,41 +164,41 @@ struct NoticeAdminView: View {
             }
         }
     }
-    
+
     // MARK: - 优先级区域
     private var prioritySection: some View {
         Section("优先级") {
             Stepper("优先级: \(priority)", value: $priority, in: 0...100)
-            
+
             Text("数字越大，排序越靠前")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
-    
+
     // MARK: - 媒体区域
     private var mediaSection: some View {
         Section("媒体") {
-            // 使用自定义按钮代替 Picker，避免 Form 重建问题
+            // 使用自定义按钮代替 Picker
             VStack(alignment: .leading, spacing: 12) {
                 Text("类型")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
+
                 HStack(spacing: 12) {
                     mediaTypeButton(type: .none, label: "无")
                     mediaTypeButton(type: .image, label: "图片")
                     mediaTypeButton(type: .video, label: "视频")
                 }
             }
-            
+
             if mediaType == .image {
                 imagePickerRow
                 imagePreview
             }
         }
     }
-    
+
     private func mediaTypeButton(type: Notice.MediaType, label: String) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -161,7 +223,7 @@ struct NoticeAdminView: View {
         }
         .buttonStyle(.plain)
     }
-    
+
     private var imagePickerRow: some View {
         Button {
             showBuiltinImagePicker = true
@@ -169,14 +231,14 @@ struct NoticeAdminView: View {
             HStack {
                 Text("选择内置图片")
                 Spacer()
-                if selectedImageData != nil {
+                if selectedImageData != nil || selectedImageName != nil {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 }
             }
         }
     }
-    
+
     @ViewBuilder
     private var imagePreview: some View {
         if let imageName = selectedImageName {
@@ -188,7 +250,7 @@ struct NoticeAdminView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         } else if let imageData = selectedImageData,
                   let uiImage = UIImage(data: imageData) {
-            // 显示从 Data 加载的图片（编辑模式）
+            // 显示从 Data 加载的图片
             Image(uiImage: uiImage)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -196,7 +258,7 @@ struct NoticeAdminView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
-    
+
     // MARK: - 操作按钮区域
     private var actionSection: some View {
         Section {
@@ -205,19 +267,24 @@ struct NoticeAdminView: View {
             cancelEditButton
         }
     }
-    
+
     private var submitButton: some View {
         Button(action: submitNotice) {
             HStack {
                 Spacer()
+                if service.isSyncing {
+                    ProgressView()
+                        .tint(.white)
+                        .padding(.trailing, 8)
+                }
                 Text(editingNotice == nil ? "发布公告" : "更新公告")
                     .fontWeight(.semibold)
                 Spacer()
             }
         }
-        .disabled(title.isEmpty || content.isEmpty)
+        .disabled(title.isEmpty || content.isEmpty || service.isSyncing)
     }
-    
+
     private var previewButton: some View {
         Button(action: previewCurrentNotice) {
             HStack {
@@ -229,7 +296,7 @@ struct NoticeAdminView: View {
         }
         .disabled(title.isEmpty || content.isEmpty)
     }
-    
+
     @ViewBuilder
     private var cancelEditButton: some View {
         if editingNotice != nil {
@@ -243,7 +310,7 @@ struct NoticeAdminView: View {
             }
         }
     }
-    
+
     // MARK: - 现有公告列表区域
     private var existingNoticesSection: some View {
         Section("现有公告") {
@@ -261,20 +328,20 @@ struct NoticeAdminView: View {
             }
         }
     }
-    
+
     // MARK: - 预览当前公告
     private func previewCurrentNotice() {
         let tempNotice = Notice(
             title: title,
             content: content,
-            mediaURL: nil,
-            mediaType: selectedImageData != nil ? .image : mediaType,
+            mediaURL: selectedImageName != nil ? "builtin://\(selectedImageName!)" : nil,
+            mediaType: selectedImageName != nil ? .image : mediaType,
             priority: priority
         )
         previewNotice = tempNotice
         showPreview = true
     }
-    
+
     // MARK: - 提交公告
     private func submitNotice() {
         Task {
@@ -306,27 +373,33 @@ struct NoticeAdminView: View {
                 }
 
                 await service.updateNotice(editing)
-                alertMessage = "公告已更新"
+                alertMessage = service.errorMessage ?? "公告已更新"
             } else {
                 print("📝 创建新公告...")
 
                 // 如果是内置图片，直接使用 builtin:// 前缀存储图片名称
                 var mediaURL: String?
+                let actualMediaType: Notice.MediaType
                 if let imageName = selectedImageName {
                     mediaURL = "builtin://\(imageName)"
-                } else if let imageData = selectedImageData {
-                    // 非内置图片，保存到本地
-                    mediaURL = service.saveMediaData(imageData, type: .image)
+                    actualMediaType = .image
+                } else {
+                    actualMediaType = mediaType
                 }
 
-                let notice = await service.createNoticeWithURL(
+                let notice = await service.createNotice(
                     title: title,
                     content: content,
-                    mediaURL: mediaURL,
-                    mediaType: mediaType,
+                    mediaType: actualMediaType,
                     priority: priority
                 )
+
                 if notice != nil {
+                    // 更新 mediaURL（如果是内置图片）
+                    if let mediaURL = mediaURL {
+                        notice?.mediaURL = mediaURL
+                        try? modelContext.save()
+                    }
                     alertMessage = "公告已发布"
                 } else if let error = service.errorMessage {
                     alertMessage = error
@@ -341,7 +414,7 @@ struct NoticeAdminView: View {
             }
         }
     }
-    
+
     // MARK: - 开始编辑
     private func startEdit(_ notice: Notice) {
         editingNotice = notice
@@ -368,19 +441,19 @@ struct NoticeAdminView: View {
             selectedImageData = nil
         }
     }
-    
+
     // MARK: - 取消编辑
     private func cancelEdit() {
         resetForm()
     }
-    
+
     // MARK: - 删除公告
     private func deleteNotice(_ notice: Notice) {
         Task {
             await service.deleteNotice(notice)
         }
     }
-    
+
     // MARK: - 重置表单
     private func resetForm() {
         editingNotice = nil
@@ -466,11 +539,11 @@ struct NoticeAdminRow: View {
     }
 }
 
-// MARK: - 公告预览遮罩 (支持本地图片)
+// MARK: - 公告预览遮罩
 struct NoticePreviewOverlay: View {
     @Binding var isPresented: Bool
     let notice: Notice
-    
+
     var body: some View {
         ZStack {
             Color.black
@@ -479,7 +552,7 @@ struct NoticePreviewOverlay: View {
                 .onTapGesture {
                     isPresented = false
                 }
-            
+
             NoticeCardView(notice: notice)
                 .frame(maxWidth: 340)
                 .onTapGesture {

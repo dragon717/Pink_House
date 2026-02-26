@@ -14,21 +14,21 @@ class Notice {
     var id: UUID = UUID()
     var title: String = ""
     var content: String = ""
-    var mediaURL: String? = nil  // 图片或视频URL (使用外部存储)
+    var mediaURL: String? = nil  // 图片或视频URL (本地沙盒路径)
+    var cloudKitMediaURL: String? = nil  // CloudKit 媒体资源 URL
     var mediaType: MediaType = MediaType.none
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var isActive: Bool = true  // 是否显示
     var priority: Int = 0   // 优先级，数字越大越靠前
     var version: Int = 1    // 版本号，用于数据迁移兼容
-
-    // MARK: - CloudKit 元数据 (系统自动管理)
-    // creatorUserRecordID 由 CloudKit 自动记录，无法伪造
+    var recordName: String? = nil  // CloudKit Record ID
+    var creatorID: String? = nil  // 创建者 iCloud ID
 
     // MARK: - 预留字段 (用于未来扩展)
     var metadata: String? = nil
 
-    enum MediaType: String, Codable {
+    enum MediaType: String, Codable, CaseIterable {
         case none
         case image
         case video
@@ -39,20 +39,103 @@ class Notice {
         title: String = "",
         content: String = "",
         mediaURL: String? = nil,
+        cloudKitMediaURL: String? = nil,
         mediaType: MediaType = .none,
         priority: Int = 0,
-        isActive: Bool = true
+        isActive: Bool = true,
+        recordName: String? = nil,
+        creatorID: String? = nil
     ) {
         self.id = id
         self.title = title
         self.content = content
         self.mediaURL = mediaURL
+        self.cloudKitMediaURL = cloudKitMediaURL
         self.mediaType = mediaType
         self.createdAt = Date()
         self.updatedAt = Date()
         self.priority = priority
         self.isActive = isActive
         self.version = 1
+        self.recordName = recordName
+        self.creatorID = creatorID
+    }
+}
+
+// MARK: - CloudKit 转换扩展
+extension Notice {
+    // CloudKit Record Type 名称
+    static let recordType = "Notice"
+    static let mediaAssetType = "NoticeMedia"
+
+    // 从 CloudKit Record 创建 Notice
+    convenience init?(from record: CKRecord) {
+        guard let title = record["title"] as? String,
+              let content = record["content"] as? String else {
+            return nil
+        }
+
+        let id = (record["id"] as? String).flatMap { UUID(uuidString: $0) } ?? UUID()
+        let mediaTypeString = record["mediaType"] as? String ?? "none"
+        let mediaType = MediaType(rawValue: mediaTypeString) ?? .none
+        let priority = record["priority"] as? Int ?? 0
+        let isActive = record["isActive"] as? Bool ?? true
+        let createdAt = record["createdAt"] as? Date ?? record.creationDate ?? Date()
+        let updatedAt = record["updatedAt"] as? Date ?? record.modificationDate ?? Date()
+        let creatorID = record.creatorUserRecordID?.recordName
+
+        // 获取媒体 URL
+        var cloudKitMediaURL: String?
+        if let mediaAsset = record["mediaAsset"] as? CKAsset,
+           let fileURL = mediaAsset.fileURL {
+            cloudKitMediaURL = fileURL.absoluteString
+        }
+
+        self.init(
+            id: id,
+            title: title,
+            content: content,
+            mediaURL: nil,  // 本地路径需要下载后设置
+            cloudKitMediaURL: cloudKitMediaURL,
+            mediaType: mediaType,
+            priority: priority,
+            isActive: isActive,
+            recordName: record.recordID.recordName,
+            creatorID: creatorID
+        )
+
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    // 转换为 CloudKit Record
+    func toCloudKitRecord() -> CKRecord {
+        let recordID: CKRecord.ID
+        if let recordName = recordName {
+            recordID = CKRecord.ID(recordName: recordName)
+        } else {
+            recordID = CKRecord.ID(recordName: "Notice_\(id.uuidString)")
+        }
+
+        let record = CKRecord(recordType: Notice.recordType, recordID: recordID)
+        record["id"] = id.uuidString
+        record["title"] = title
+        record["content"] = content
+        record["mediaType"] = mediaType.rawValue
+        record["priority"] = priority
+        record["isActive"] = isActive
+        record["createdAt"] = createdAt
+        record["updatedAt"] = Date()
+        record["version"] = version
+
+        // 如果有本地媒体文件，创建 Asset
+        if let mediaURL = mediaURL,
+           let url = URL(string: mediaURL),
+           FileManager.default.fileExists(atPath: url.path) {
+            record["mediaAsset"] = CKAsset(fileURL: url)
+        }
+
+        return record
     }
 }
 
@@ -69,7 +152,7 @@ enum NoticeConfig {
 
     // 边框内边距 - 边框距离卡片边缘的距离
     static let borderPadding: CGFloat = 12
-    
+
     // 内容内边距 - 内容距离边框内部的距离
     static let contentPadding: CGFloat = 16
 
@@ -84,4 +167,8 @@ enum NoticeConfig {
 
     // 动画时长
     static let animationDuration: Double = 0.3
+
+    // CloudKit 同步配置
+    static let syncInterval: TimeInterval = 300  // 5分钟同步一次
+    static let maxNoticeAge: TimeInterval = 30 * 24 * 60 * 60  // 30天过期
 }

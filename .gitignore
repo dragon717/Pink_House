@@ -10,3 +10,6 @@ ItemManager/GenerativeAI-Info.plist
 ItemManager/asserts/*.mov
 ItemManager/asserts*.zip
 *.mov
+asserts/*.mp4
+asserts/*.ttf
+asserts/*.mp3

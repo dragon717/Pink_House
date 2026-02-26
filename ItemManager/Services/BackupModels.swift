@@ -102,11 +102,11 @@ struct ClothingDTO: Codable {
     let condition: String
     let accessories: String
     let imagePaths: [String]
-    let isShared: Bool
+    let isShared: Bool? // v1.2+ 共享到广场标记，老版本备份可能不存在
     let price: Decimal
     let deposit: Decimal
     let balance: Decimal
-    let accessoriesPrice: Decimal
+    let accessoriesPrice: Decimal? // v1.3+ 小物总价，老版本备份可能不存在
     let purchaseDate: Date
     let depositDate: Date?
     let isDepositPlan: Bool
@@ -114,19 +114,19 @@ struct ClothingDTO: Codable {
     let finalPaymentEndDate: Date?
     let note: String
     let stock: Int
-    let status: String
-    let isDeleted: Bool?
-    let deletedAt: Date?
+    let status: String? // v1.2+ 上架状态，老版本备份可能不存在
+    let isDeleted: Bool? // v1.4+ 软删除标记，老版本备份可能不存在
+    let deletedAt: Date? // v1.4+ 删除时间，老版本备份可能不存在
     let createdAt: Date
     let updatedAt: Date
-    let sortIndex: Int?
-    let lastModified: Date?
-    
+    let sortIndex: Int? // v1.2+ 排序索引，老版本备份可能不存在
+    let lastModified: Date? // v1.4+ 最后修改时间，老版本备份可能不存在
+
     // New Fields (v1.4)
-    let replacedCutoutID: UUID?
-    
+    let replacedCutoutID: UUID? // v1.4+ 替换主图所用的抠图ID，老版本备份可能不存在
+
     // Custom Accessories (Added in v1.3)
-    let accessoryItems: [AccessoryItemDTO]?
+    let accessoryItems: [AccessoryItemDTO]? // v1.3+ 自定义小物列表，老版本备份可能不存在
 }
 
 struct AccessoryItemDTO: Codable {
@@ -193,8 +193,8 @@ struct OOTDSnapshotDTO: Codable {
     let bookID: UUID? // Reference to parent BookGroup (v1.5)
     let items: [OOTDSnapshotItemDTO]
     let lastModified: Date?
-    let isDeleted: Bool
-    let deletedAt: Date?
+    let isDeleted: Bool? // v1.5+ 软删除标记，老版本备份可能不存在
+    let deletedAt: Date? // v1.5+ 删除时间，老版本备份可能不存在
 }
 
 struct OOTDSnapshotItemDTO: Codable {
@@ -218,17 +218,17 @@ struct Model3DDTO: Codable {
     let modelType: String?
     let thumbnailPath: String?
     let sourceImagePaths: [String]
-    let isDeleted: Bool
-    let deletedAt: Date?
+    let isDeleted: Bool? // v1.5+ 软删除标记，老版本备份可能不存在
+    let deletedAt: Date? // v1.5+ 删除时间，老版本备份可能不存在
     let createdAt: Date
     let updatedAt: Date
     let sortIndex: Int
-    let cameraPositionX: Float
-    let cameraPositionY: Float
-    let cameraPositionZ: Float
-    let cameraRotationX: Float
-    let cameraRotationY: Float
-    let cameraRotationZ: Float
+    let cameraPositionX: Float? // v1.5+ 相机位置，老版本备份可能不存在
+    let cameraPositionY: Float? // v1.5+ 相机位置，老版本备份可能不存在
+    let cameraPositionZ: Float? // v1.5+ 相机位置，老版本备份可能不存在
+    let cameraRotationX: Float? // v1.5+ 相机旋转，老版本备份可能不存在
+    let cameraRotationY: Float? // v1.5+ 相机旋转，老版本备份可能不存在
+    let cameraRotationZ: Float? // v1.5+ 相机旋转，老版本备份可能不存在
     let lastModified: Date?
 }
 
@@ -239,8 +239,8 @@ struct BookGroupDTO: Codable {
     let title: String
     let coverImage: String?
     let createdAt: Date
-    let isDeleted: Bool
-    let deletedAt: Date?
+    let isDeleted: Bool? // v1.5+ 软删除标记，老版本备份可能不存在
+    let deletedAt: Date? // v1.5+ 删除时间，老版本备份可能不存在
     let sortIndex: Int
     let lastModified: Date?
 }
@@ -250,8 +250,8 @@ struct SpaceBookGroupDTO: Codable {
     let title: String
     let coverImage: String?
     let createdAt: Date
-    let isDeleted: Bool
-    let deletedAt: Date?
+    let isDeleted: Bool? // v1.5+ 软删除标记，老版本备份可能不存在
+    let deletedAt: Date? // v1.5+ 删除时间，老版本备份可能不存在
     let sortIndex: Int
     let lastModified: Date?
 }
@@ -269,8 +269,8 @@ struct SpaceOutfitDTO: Codable {
     let camPosY: Double
     let camPosZ: Double
     let lightingIntensity: Double
-    let isDeleted: Bool
-    let deletedAt: Date?
+    let isDeleted: Bool? // v1.5+ 软删除标记，老版本备份可能不存在
+    let deletedAt: Date? // v1.5+ 删除时间，老版本备份可能不存在
     let bookID: UUID? // Reference to parent SpaceBookGroup
     let sceneObjects: [SceneObjectDataDTO]
     let lastModified: Date?
@@ -309,8 +309,8 @@ struct PerlerBeadPatternDTO: Codable {
     let pixelData: [Int]
     let paletteSortOrder: String
     let thumbnailPath: String?
-    let isDeleted: Bool
-    let deletedAt: Date?
+    let isDeleted: Bool? // v1.7+ 软删除标记，老版本备份可能不存在
+    let deletedAt: Date? // v1.7+ 删除时间，老版本备份可能不存在
     let createdAt: Date
     let updatedAt: Date
     let lastModified: Date?
