@@ -268,14 +268,15 @@ struct SmallWorldMenuOverlay: View {
                 )
 
                 // 5个菜单项使用上下两排布局：下面2个，上面3个
+                // 顺序：上排[0,2,4] 下排[1,3]（按选择顺序交叉排列）
                 if items.count == 5 {
-                    // 下排：2个菜单项（角度 -120° 到 -60°）
-                    ForEach(0..<2) { index in
-                        let angle = -120 + Double(index) * 60
+                    // 上排：3个菜单项（items[0,2,4]从左到右，间距更紧凑）
+                    ForEach(0..<3) { position in
+                        let index = position * 2  // 0, 2, 4
+                        let angle = -135 + Double(position) * 40
                         let radians = angle * .pi / 180
-                        let innerRadius = radius * 0.6
-                        let x = innerRadius * cos(radians)
-                        let y = innerRadius * sin(radians)
+                        let x = radius * cos(radians)
+                        let y = radius * sin(radians)
 
                         ItemBubble(
                             item: items[index],
@@ -291,12 +292,14 @@ struct SmallWorldMenuOverlay: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
                     }
 
-                    // 上排：3个菜单项（角度 -135° 到 -45°）
-                    ForEach(2..<5) { index in
-                        let angle = -135 + Double(index - 2) * 45
+                    // 下排：2个菜单项（items[1,3]从左到右）
+                    ForEach(0..<2) { position in
+                        let index = position * 2 + 1  // 1, 3
+                        let angle = -120 + Double(position) * 60
                         let radians = angle * .pi / 180
-                        let x = radius * cos(radians)
-                        let y = radius * sin(radians)
+                        let innerRadius = radius * 0.6
+                        let x = innerRadius * cos(radians)
+                        let y = innerRadius * sin(radians)
 
                         ItemBubble(
                             item: items[index],

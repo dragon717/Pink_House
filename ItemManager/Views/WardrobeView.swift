@@ -962,7 +962,7 @@ struct WardrobeStatsView: View {
                     NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
                         HStack {
                             Image(systemName: "chart.bar.fill")
-                            Text("查看详细统计")
+                            Text("详细统计")
                         }
                         .padding()
                         .frame(maxWidth: .infinity)

@@ -37,7 +37,8 @@ struct DepositPlanView: View {
     @State private var selectedSeries: Set<String> = []
     @State private var seriesList: [SeriesInfo] = []
     @State private var isAnalyzing: Bool = false
-    @State private var showStats = true
+    @State private var showStats = false // 默认隐藏总待付尾款统计
+    @State private var showYearStats = false // 默认隐藏年份统计（独立控制）
     
     @State private var filteredClothings: [Clothing] = []
     @State private var baseClothings: [Clothing] = []
@@ -49,6 +50,9 @@ struct DepositPlanView: View {
     }
     
     @State private var moneyCountingState: MoneyCountingState?
+    
+    // 显示确认弹窗
+    @State private var showConfirmDialog = false
     
     // Filter properties
     let selectedTagIDs: Set<UUID>
@@ -207,9 +211,34 @@ struct DepositPlanView: View {
         self.filteredClothings = result
     }
     
+    // 计算所有代付尾款（不受年份筛选影响）
+    private var totalPendingBalanceAll: Decimal {
+        depositClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // 总代付尾款统计（最顶部）
+                TotalBalanceCard(
+                    totalBalance: totalPendingBalanceAll,
+                    isVisible: showStats,
+                    onToggleVisibility: {
+                        if !showStats {
+                            // 要显示时，先弹出确认框
+                            showConfirmDialog = true
+                        } else {
+                            withAnimation {
+                                showStats = false
+                            }
+                        }
+                    },
+                    onCountMoney: {
+                        self.moneyCountingState = MoneyCountingState(amount: totalPendingBalanceAll)
+                    }
+                )
+                .padding(.horizontal)
+                
                 // View Mode Switcher
                 Picker("视图模式", selection: $viewMode) {
                     Text("按月视图").tag(DepositViewMode.monthly)
@@ -259,43 +288,26 @@ struct DepositPlanView: View {
                 .onChange(of: selectedMonths) { updateFilteredClothings() }
                 .onChange(of: selectedSeries) { updateFilteredClothings() }
                 
-                // Stats Section
-                VStack(spacing: 8) {
-                    HStack {
-                        Spacer()
-                        Button {
-                            withAnimation {
-                                showStats.toggle()
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(showStats ? "隐藏统计" : "显示统计")
-                                Image(systemName: showStats ? "chevron.up" : "chevron.down")
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    if showStats {
-                        DepositStatsView(clothings: filteredClothings) { amount in
-                            self.moneyCountingState = MoneyCountingState(amount: amount)
-                        }
-                            .padding(.horizontal)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                }
-                
                 // Selector Area
                 if viewMode == .monthly {
                     // Pass filtered clothings (base) so it knows what months have data?
                     // Or pass baseClothings to calculate stats for each month
-                    MonthSelectorView(selectedMonths: $selectedMonths, year: $selectedYear, clothings: baseClothings)
-                        .padding(.horizontal)
+                    MonthSelectorView(
+                        selectedMonths: $selectedMonths,
+                        year: $selectedYear,
+                        clothings: baseClothings,
+                        showYearStats: $showYearStats
+                    )
+                    .padding(.horizontal)
                 } else {
-                    SeriesSelectorView(selectedSeries: $selectedSeries, year: $selectedYear, seriesList: seriesList, isAnalyzing: isAnalyzing)
-                        .padding(.horizontal)
+                    SeriesSelectorView(
+                        selectedSeries: $selectedSeries,
+                        year: $selectedYear,
+                        seriesList: seriesList,
+                        isAnalyzing: isAnalyzing,
+                        showYearStats: $showYearStats
+                    )
+                    .padding(.horizontal)
                 }
                 
                 // List
@@ -332,6 +344,16 @@ struct DepositPlanView: View {
                 }
             )
         }
+        .alert("真的要看吗？你确定？", isPresented: $showConfirmDialog) {
+            Button("取消", role: .cancel) { }
+            Button("我准备好了！", role: .none) {
+                withAnimation {
+                    showStats = true
+                }
+            }
+        } message: {
+            Text("(๑°o°๑) 前方高能预警！\n准备好面对尾款的暴击了吗？\n记得深呼吸哦~ ✧*｡٩(ˊᗜˋ*)و✧*｡")
+        }
     }
     
     private func analyzeSeries() {
@@ -346,6 +368,141 @@ struct DepositPlanView: View {
                 self.isAnalyzing = false
             }
         }
+    }
+}
+
+// MARK: - 总代付尾款卡片
+struct TotalBalanceCard: View {
+    let totalBalance: Decimal
+    let isVisible: Bool
+    let onToggleVisibility: () -> Void
+    let onCountMoney: () -> Void
+    
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 三个功能入口（放在最上方）
+            HStack(spacing: 0) {
+                // 梦裙日历
+                Button {
+                    tabNavigationManager.navigate(to: .smallWorld(.calendar))
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 16))
+                        Text("梦裙日历")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.pink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // 马上来财
+                Button {
+                    tabNavigationManager.navigate(to: .smallWorld(.wealth))
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "dollarsign.circle")
+                            .font(.system(size: 16))
+                        Text("马上来财")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // 裙子股市
+                Button {
+                    tabNavigationManager.navigate(to: .smallWorld(.bigWorld))
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 16))
+                        Text("裙子股市")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 12)
+            
+            // 分割线
+            Divider()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            
+            // 标题和按钮（始终显示）
+            HStack {
+                Text("总待付尾款")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                // 小眼睛按钮
+                Button(action: onToggleVisibility) {
+                    Image(systemName: isVisible ? "eye.slash" : "eye")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.pink)
+                        .frame(width: 32, height: 32)
+                        .background(Color.pink.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                
+                // 数钱按钮（仅显示时）
+                if isVisible {
+                    Button(action: onCountMoney) {
+                        Image(systemName: "banknote")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.green)
+                            .frame(width: 32, height: 32)
+                            .background(Color.green.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+            
+            // 金额显示（仅显示时）
+            if isVisible {
+                Button(action: onCountMoney) {
+                    Text("¥\(NSDecimalNumber(decimal: totalBalance).stringValue)")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(Color(hex: "C94C72"))
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
+                .padding(.bottom, 12)
+            } else {
+                // 隐藏状态只保留底部间距
+                Spacer()
+                    .frame(height: 8)
+            }
+
+        }
+        .background(CardBackgroundView(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -412,68 +569,6 @@ struct DepositStatsView: View {
                 .buttonStyle(.plain)
             }
             .padding()
-            
-            Divider()
-                .padding(.horizontal)
-            
-            // 三个功能入口
-            HStack(spacing: 0) {
-                // 梦裙日历
-                Button {
-                    tabNavigationManager.navigate(to: .smallWorld(.calendar))
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 16))
-                        Text("梦裙日历")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.pink)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-                
-                Divider()
-                    .frame(height: 30)
-                
-                // 马上来财
-                Button {
-                    tabNavigationManager.navigate(to: .smallWorld(.wealth))
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle")
-                            .font(.system(size: 16))
-                        Text("马上来财")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.orange)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-                
-                Divider()
-                    .frame(height: 30)
-                
-                // 裙子股市
-                Button {
-                    tabNavigationManager.navigate(to: .smallWorld(.bigWorld))
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.system(size: 16))
-                        Text("裙子股市")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.blue)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
         }
         .background(CardBackgroundView(cornerRadius: 24))
         .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -552,6 +647,7 @@ struct MonthSelectorView: View {
     @Binding var selectedMonths: Set<Int>
     @Binding var year: Int
     let clothings: [Clothing] // Pass in all deposit clothings to calculate monthly stats
+    @Binding var showYearStats: Bool
     @State private var expanded: Bool = true
     
     let months = Array(1...12)
@@ -573,6 +669,28 @@ struct MonthSelectorView: View {
         let itemCount = monthlyClothings.reduce(0) { $0 + $1.stock }
         let amount = monthlyClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
         return (itemCount, amount)
+    }
+    
+    // 计算年份统计
+    private var yearStats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal) {
+        // 去重计算款数
+        var seenKeys: Set<String> = []
+        var uniqueStyles: [Clothing] = []
+        
+        for clothing in clothings {
+            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
+            if !seenKeys.contains(key) {
+                seenKeys.insert(key)
+                uniqueStyles.append(clothing)
+            }
+        }
+        
+        let totalCount = clothings.reduce(0) { $0 + $1.stock }
+        let styleCount = uniqueStyles.count
+        let paidDeposit = clothings.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
+        let pendingBalance = clothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        
+        return (totalCount, styleCount, paidDeposit, pendingBalance)
     }
     
     var body: some View {
@@ -597,6 +715,14 @@ struct MonthSelectorView: View {
             if expanded {
                 // Year Selector
                 YearSelectorView(year: $year)
+                
+                // 年份统计（受年份控制，放在年份下面，带独立小眼睛控制）
+                YearStatsCard(
+                    stats: yearStats,
+                    year: year,
+                    isVisible: showYearStats,
+                    onToggleVisibility: { showYearStats.toggle() }
+                )
                 
                 // Month Grid
                 LazyVGrid(columns: columns, spacing: 10) {
@@ -664,16 +790,121 @@ struct MonthSelectorView: View {
     }
 }
 
+// MARK: - 年份统计卡片
+struct YearStatsCard: View {
+    let stats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal)
+    let year: Int
+    var isVisible: Bool = true
+    var onToggleVisibility: (() -> Void)? = nil
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // 标题提示和小眼睛按钮
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("\(year)年统计")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                // 小眼睛按钮（独立控制）
+                if let onToggle = onToggleVisibility {
+                    Button(action: onToggle) {
+                        Image(systemName: isVisible ? "eye.slash" : "eye")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.pink)
+                            .frame(width: 24, height: 24)
+                            .background(Color.pink.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            
+            // 统计内容（可折叠）
+            if isVisible {
+                HStack(spacing: 0) {
+                    DepositStatItem(title: "总件数/款", value: "\(stats.totalCount)/\(stats.styleCount)")
+                    
+                    Divider()
+                        .frame(height: 30)
+                    
+                    DepositStatItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: stats.paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
+                    
+                    Divider()
+                        .frame(height: 30)
+                    
+                    DepositStatItem(title: "代付尾款", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            } else {
+                // 隐藏状态显示提示
+                HStack {
+                    Spacer()
+                    Text("点击眼睛查看统计")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary.opacity(0.6))
+                    Spacer()
+                }
+                .padding(.bottom, 8)
+                .transition(.opacity)
+            }
+        }
+        .background(CardBackgroundView(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
+    }
+}
+
+struct DepositStatItem: View {
+    let title: String
+    let value: String
+    var valueColor: Color = .primary
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(valueColor)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 struct SeriesSelectorView: View {
     @Binding var selectedSeries: Set<String>
     @Binding var year: Int
     let seriesList: [SeriesInfo]
     let isAnalyzing: Bool
+    @Binding var showYearStats: Bool
     @State private var expanded: Bool = true
     @State private var showTips: Bool = false
     
     // Adaptive grid columns
     let columns = [GridItem(.adaptive(minimum: 100), spacing: 10)]
+    
+    // 计算系列视图的年份统计
+    private var yearStats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal) {
+        // 从seriesList计算总计
+        let totalCount = seriesList.reduce(0) { $0 + $1.itemCount }
+        let styleCount = seriesList.count
+        let paidDeposit = seriesList.reduce(0) { $0 + $1.totalDeposit }
+        let pendingBalance = seriesList.reduce(0) { $0 + $1.totalBalance }
+        
+        return (totalCount, styleCount, paidDeposit, pendingBalance)
+    }
     
     var body: some View {
         VStack(spacing: 16) {
@@ -719,6 +950,14 @@ struct SeriesSelectorView: View {
             if expanded {
                 // Year Selector
                 YearSelectorView(year: $year)
+                
+                // 年份统计（受年份控制，放在年份下面，带独立小眼睛控制）
+                YearStatsCard(
+                    stats: yearStats,
+                    year: year,
+                    isVisible: showYearStats,
+                    onToggleVisibility: { showYearStats.toggle() }
+                )
                 
                 if seriesList.isEmpty {
                     if isAnalyzing {

@@ -53,9 +53,9 @@ struct NoticeCardView: View {
     let notice: Notice
     @Environment(\.colorScheme) private var colorScheme
 
-    // 根据颜色模式返回背景色
+    // 背景色统一使用 #FFE6EF
     private var backgroundColor: Color {
-        colorScheme == .dark ? Color(hex: "C94C72") : NoticeConfig.monicaPink
+        Color(hex: "FFE6EF")
     }
 
     var body: some View {
@@ -114,17 +114,17 @@ struct NoticeCardView: View {
         }
     }
     
-    // 根据颜色模式返回文字颜色
+    // 白天白字，暗黑黑字
     private var titleColor: Color {
-        colorScheme == .dark ? .white : .black
+        colorScheme == .dark ? .black : .white
     }
 
     private var contentColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.8) : Color.black.opacity(0.7)
+        colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.9)
     }
 
     private var dateColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.6) : Color.black.opacity(0.5)
+        colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.7)
     }
 
     private var textSection: some View {
