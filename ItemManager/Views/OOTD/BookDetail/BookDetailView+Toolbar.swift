@@ -101,6 +101,26 @@ extension BookDetailView {
             } label: {
                 Label("垃圾篓", systemImage: "trash")
             }
+            
+            Divider()
+            
+            Button {
+                showingBatchConfirmation = true
+            } label: {
+                Label("批量处理小裙子", systemImage: "wand.and.stars")
+            }
+            
+            Button {
+                showingRepairConfirmation = true
+            } label: {
+                Label("修复数据", systemImage: "hammer")
+            }
+            
+            Button {
+                showingBatchReplaceSheet = true
+            } label: {
+                Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
+            }
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 16, weight: .semibold))

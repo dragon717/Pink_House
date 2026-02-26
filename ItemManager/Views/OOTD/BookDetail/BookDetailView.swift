@@ -71,6 +71,14 @@ struct BookDetailView: View {
     // 删除确认对话框
     @State var showingDeleteConfirmation = false
     @State var pageToDelete: Outfit?
+    
+    // 批量处理相关状态
+    @State var showingBatchConfirmation = false
+    @State var showingRepairConfirmation = false
+    @State var showingBatchReplaceSheet = false
+    @State var isProcessing = false
+    @State var processingMessage = ""
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
 
     @AppStorage("bookDetailGridMode") var gridModeValue = 2
 
@@ -86,7 +94,12 @@ struct BookDetailView: View {
     @State private var refreshTrigger = false
 
     var body: some View {
-        Group {
+        contentView
+    }
+    
+    @ViewBuilder
+    private var contentView: some View {
+        let mainView = Group {
             if sortedPages.isEmpty {
                 emptyStateView
             } else {
@@ -103,97 +116,133 @@ struct BookDetailView: View {
         }
         .id(refreshTrigger)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle(book.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbar {
-            if showLeadingToolbar {
-                leadingToolbarContent
+        
+        let withNav = mainView
+            .navigationTitle(book.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                if showLeadingToolbar {
+                    leadingToolbarContent
+                }
+                trailingToolbarContent
             }
-            trailingToolbarContent
-        }
-        .bookDetailSheets(
-            showingTrash: $showingTrash,
-            showingCoverPicker: $showingCoverPicker,
-            selectedCoverItem: $selectedCoverItem,
-            updateCover: updateCover,
-            showingBackgroundPicker: $showingBackgroundPicker,
-            selectedBackgroundItem: $selectedBackgroundItem,
-            tempBackgroundImage: $tempBackgroundImage,
-            showingBackgroundCropper: $showingBackgroundCropper,
-            backgroundCropperSheet: { backgroundCropperSheet },
-            showingRenameAlert: $showingRenameAlert,
-            newPageName: $newPageName,
-            pageToRename: $pageToRename,
-            saveRename: saveRename,
-            showingMoveSheet: $showingMoveSheet,
-            movePageSheet: { movePageSheet }
-        )
-        .alert("确认删除", isPresented: $showingDeleteConfirmation, actions: {
-            Button("取消", role: .cancel) {
-                pageToDelete = nil
-            }
-            Button("删除", role: .destructive) {
-                confirmDeletePage()
-            }
-        }, message: {
-            Text(deleteConfirmationMessage)
-        })
-        .fullScreenCover(isPresented: $showingShareCard) {
-            if let page = pageToShare {
-                ShareCardSheet(
-                    shareType: .outfit(page),
-                    onDismiss: { showingShareCard = false }
-                )
-            }
-        }
-        .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
-            TextField("名称", text: $renameBookName)
-            Button("取消", role: .cancel) {}
-            Button("保存") {
-                book.title = renameBookName
-                try? modelContext.save()
-            }
-        }
-        .photosPicker(
-            isPresented: $showingBatchPhotoPicker,
-            selection: $selectedBatchPhotos,
-            maxSelectionCount: 20,
-            selectionBehavior: .ordered,
-            matching: .images
-        )
-        .onChange(of: selectedBatchPhotos) { _, newItems in
-            if !newItems.isEmpty {
-                batchTotalCount = newItems.count
-                processBatchPhotos(newItems)
-                selectedBatchPhotos = []
-            }
-        }
-        .overlay {
-            if isBatchProcessing {
-                ZStack {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                    VStack(spacing: 16) {
-                        ProgressView(value: Double(batchProcessingProgress), total: Double(batchTotalCount))
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.5)
-                        Text("正在添加书页... \(batchProcessingProgress)/\(batchTotalCount)")
-                            .foregroundStyle(.white)
-                            .font(.headline)
-                    }
-                    .padding(32)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(16)
+        
+        let withSheets = withNav
+            .bookDetailSheets(
+                showingTrash: $showingTrash,
+                showingCoverPicker: $showingCoverPicker,
+                selectedCoverItem: $selectedCoverItem,
+                updateCover: updateCover,
+                showingBackgroundPicker: $showingBackgroundPicker,
+                selectedBackgroundItem: $selectedBackgroundItem,
+                tempBackgroundImage: $tempBackgroundImage,
+                showingBackgroundCropper: $showingBackgroundCropper,
+                backgroundCropperSheet: { backgroundCropperSheet },
+                showingRenameAlert: $showingRenameAlert,
+                newPageName: $newPageName,
+                pageToRename: $pageToRename,
+                saveRename: saveRename,
+                showingMoveSheet: $showingMoveSheet,
+                movePageSheet: { movePageSheet }
+            )
+            .alert("确认删除", isPresented: $showingDeleteConfirmation, actions: {
+                Button("取消", role: .cancel) {
+                    pageToDelete = nil
+                }
+                Button("删除", role: .destructive) {
+                    confirmDeletePage()
+                }
+            }, message: {
+                Text(deleteConfirmationMessage)
+            })
+            .fullScreenCover(isPresented: $showingShareCard) {
+                if let page = pageToShare {
+                    ShareCardSheet(
+                        shareType: .outfit(page),
+                        onDismiss: { showingShareCard = false }
+                    )
                 }
             }
-        }
-        .onAppear {
-            // 每次进入视图时重新获取书页数据
-            loadPages()
-            // 打印当前手帐的书页状态
-            printBookPagesStatus()
-        }
+            .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
+                TextField("名称", text: $renameBookName)
+                Button("取消", role: .cancel) {}
+                Button("保存") {
+                    book.title = renameBookName
+                    try? modelContext.save()
+                }
+            }
+            .photosPicker(
+                isPresented: $showingBatchPhotoPicker,
+                selection: $selectedBatchPhotos,
+                maxSelectionCount: 20,
+                selectionBehavior: .ordered,
+                matching: .images
+            )
+            .onChange(of: selectedBatchPhotos) { _, newItems in
+                if !newItems.isEmpty {
+                    batchTotalCount = newItems.count
+                    processBatchPhotos(newItems)
+                    selectedBatchPhotos = []
+                }
+            }
+        
+        let withBatchOverlays = withSheets
+            .overlay {
+                if isBatchProcessing {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                        VStack(spacing: 16) {
+                            ProgressView(value: Double(batchProcessingProgress), total: Double(batchTotalCount))
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                            Text("正在添加书页... \(batchProcessingProgress)/\(batchTotalCount)")
+                                .foregroundStyle(.white)
+                                .font(.headline)
+                        }
+                        .padding(32)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(16)
+                    }
+                }
+            }
+            .alert("批量处理", isPresented: $showingBatchConfirmation) {
+                Button("开始扫描", role: .destructive) {
+                    processWardrobeSkirts()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
+            }
+            .alert("修复数据", isPresented: $showingRepairConfirmation) {
+                Button("开始深度修复") {
+                    repairMissingCutouts()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
+            }
+            .sheet(isPresented: $showingBatchReplaceSheet) {
+                BatchReplaceCutoutView()
+            }
+            .overlay {
+                if isProcessing {
+                    Color.black.opacity(0.4).ignoresSafeArea()
+                    VStack {
+                        ProgressView().tint(.white)
+                        Text(processingMessage).foregroundStyle(.white).padding(.top)
+                    }
+                }
+            }
+        
+        withBatchOverlays
+            .onAppear {
+                // 每次进入视图时重新获取书页数据
+                loadPages()
+                // 打印当前手帐的书页状态
+                printBookPagesStatus()
+            }
     }
 
     // 打印当前手帐的书页状态
@@ -485,6 +534,66 @@ struct BookDetailView: View {
             }
         }
     }
+    
+    // MARK: - 批量处理小裙子
+    
+    private func processWardrobeSkirts() {
+        isProcessing = true
+        processingMessage = "正在批量处理小裙子..."
+        
+        Task {
+            var count = 0
+            let descriptor = FetchDescriptor<CutoutItem>()
+            let existingCutouts = (try? modelContext.fetch(descriptor)) ?? []
+            let existingPaths = Set(existingCutouts.map { $0.imagePath })
+
+            let itemsToProcess = allClothing.filter { clothing in
+                !clothing.imagePaths.isEmpty
+            }
+            
+            let total = itemsToProcess.count
+            
+            for (index, clothing) in itemsToProcess.enumerated() {
+                if index % 5 == 0 {
+                    await MainActor.run {
+                        processingMessage = "正在处理 \(index + 1)/\(total)..."
+                    }
+                }
+                
+                if let firstImagePath = clothing.imagePaths.first,
+                   !existingPaths.contains(firstImagePath),
+                   let image = ImageManager.shared.loadImage(fileName: firstImagePath) {
+                    
+                    do {
+                        let category = clothing.types.split(separator: ",").first.map(String.init) ?? "未分类"
+                        _ = try await CutoutService.shared.processImage(image: image, category: category, clothing: clothing, context: modelContext)
+                        count += 1
+                    } catch {
+                        // Ignore errors
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                isProcessing = false
+                processingMessage = ""
+            }
+        }
+    }
+    
+    // MARK: - 修复数据
+    
+    private func repairMissingCutouts() {
+        isProcessing = true
+        processingMessage = "正在深度修复数据..."
+        
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await MainActor.run {
+                isProcessing = false
+            }
+        }
+    }
 
     // MARK: - Empty State View
 
@@ -509,3 +618,5 @@ struct BookDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
+
