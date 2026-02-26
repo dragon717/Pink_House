@@ -5,74 +5,40 @@ import SwiftUI
 
 /// 删除追踪器 - 基于时间戳的冲突解决方案
 /// 核心思想：记录删除时间戳，在冲突时比较删除时间和数据修改时间
+/// 注意：删除记录只保存在本地，不同步到 iCloud，避免跨设备删除同步问题
 @MainActor
 final class DeleteTracker {
     static let shared = DeleteTracker()
 
-    /// iCloud Key-Value Store - 用于跨设备同步删除记录
-    private let iCloudStore = NSUbiquitousKeyValueStore.default
-
-    /// 本地 UserDefaults - 作为 iCloud 的备份
+    /// 本地 UserDefaults - 删除记录只保存在本地，不同步到 iCloud
     private let userDefaults = UserDefaults.standard
 
-    /// 待处理的 ModelContext（用于 iCloud 同步完成后应用删除）
+    /// 待处理的 ModelContext
     var pendingContext: ModelContext?
 
-    // MARK: - Keys
-    private let deletedOutfitsKey = "deletedOutfits_v2"  // v2: 存储 [UUID: Date] 字典
-    private let deletedClothingsKey = "deletedClothings_v2"
-    private let deletedBookGroupsKey = "deletedBookGroups_v2"
-    private let deletedModel3DsKey = "deletedModel3Ds_v2"
-    private let deletedPerlerPatternsKey = "deletedPerlerPatterns_v2"
+    // MARK: - Keys (使用新的 key 避免读取旧的 iCloud 同步记录)
+    private let deletedOutfitsKey = "deletedOutfits_local"  // local: 只保存在本地
+    private let deletedClothingsKey = "deletedClothings_local"
+    private let deletedBookGroupsKey = "deletedBookGroups_local"
+    private let deletedModel3DsKey = "deletedModel3Ds_local"
+    private let deletedPerlerPatternsKey = "deletedPerlerPatterns_local"
 
     // MARK: - 初始化
 
     init() {
-        // 监听 iCloud Key-Value Store 的变化
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(ubiquitousKeyValueStoreDidChange),
-            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
-            object: iCloudStore
-        )
-
-        // 监听 SwiftData iCloud 同步完成事件
+        // 不再监听 iCloud Key-Value Store 的变化，因为删除记录不再同步到 iCloud
+        // 保留监听 SwiftData iCloud 同步完成事件，但主要用于其他用途
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(persistentStoreRemoteChange),
             name: .NSPersistentStoreRemoteChange,
             object: nil
         )
-
-        // 同步 iCloud Store
-        iCloudStore.synchronize()
-    }
-
-    @objc private func ubiquitousKeyValueStoreDidChange(_ notification: Notification) {
-        print("DeleteTracker: iCloud Key-Value Store 发生变化")
     }
 
     @objc private func persistentStoreRemoteChange(_ notification: Notification) {
-        // 暂时注释掉，避免死循环
-        // print("DeleteTracker: iCloud 同步通知收到")
-        
-        // // 检查是否是远程同步（不是本地保存触发的）
-        // guard let userInfo = notification.userInfo,
-        //       let storeUUID = userInfo["NSStoreUUID"] as? String else {
-        //     print("DeleteTracker: 忽略本地保存通知")
-        //     return
-        // }
-        
-        // print("DeleteTracker: 远程同步完成，准备重新应用删除...")
-        
-        // // iCloud 同步完成后，重新应用删除（防止同步覆盖删除状态）
-        // if let context = pendingContext {
-        //     // 延迟1秒确保同步完全完成
-        //     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-        //         print("DeleteTracker: 开始重新应用删除...")
-        //         self.applyAllDeletes(context: context, clearRecords: true)
-        //     }
-        // }
+        // iCloud 同步完成时的处理，但不再重新应用删除
+        // 因为删除记录只保存在本地，不需要跨设备同步删除
     }
 
     // MARK: - 记录删除（带时间戳）
@@ -134,12 +100,8 @@ final class DeleteTracker {
     }
 
     /// 获取删除记录 [UUID: 删除时间戳]
+    /// 只从本地 UserDefaults 读取，不再从 iCloud 读取
     private func getDeletedRecords(for key: String) -> [String: Double] {
-        // 优先从 iCloud 读取
-        if let cloudDict = iCloudStore.dictionary(forKey: key) as? [String: Double] {
-            return cloudDict
-        }
-        // 回退到本地
         return userDefaults.dictionary(forKey: key) as? [String: Double] ?? [:]
     }
 
@@ -156,10 +118,10 @@ final class DeleteTracker {
     }
 
     /// 保存删除记录
+    /// 只保存到本地 UserDefaults，不同步到 iCloud
     private func saveDeletedRecords(records: [String: Double], key: String) {
         userDefaults.set(records, forKey: key)
-        iCloudStore.set(records, forKey: key)
-        iCloudStore.synchronize()
+        // 不再同步到 iCloud，避免跨设备删除同步问题
     }
 
     // MARK: - 应用删除（基于时间戳比较）
@@ -429,8 +391,7 @@ final class DeleteTracker {
 
     private func clearDeletedItems(key: String, typeName: String) {
         userDefaults.removeObject(forKey: key)
-        iCloudStore.removeObject(forKey: key)
-        iCloudStore.synchronize()
+        // 不再清理 iCloud 中的记录，因为删除记录不再同步到 iCloud
         print("DeleteTracker: Cleared all \(typeName) delete records")
     }
 
@@ -468,11 +429,8 @@ final class DeleteTracker {
     func applyAllDeletes(context: ModelContext, clearRecords: Bool = true) {
         print("DeleteTracker: Applying all tracked deletes with timestamp comparison...")
 
-        // 保存 context 用于 iCloud 同步通知
+        // 保存 context
         pendingContext = context
-
-        // 同步 iCloud 数据
-        iCloudStore.synchronize()
 
         // 应用各类删除
         applyDeletedOutfits(context: context, clearRecords: clearRecords)
@@ -482,5 +440,26 @@ final class DeleteTracker {
         applyDeletedPerlerPatterns(context: context, clearRecords: clearRecords)
 
         print("DeleteTracker: Finished applying deletes")
+    }
+
+    // MARK: - 清除旧的 iCloud 同步记录（一次性清理）
+
+    /// 清除旧的 iCloud 同步删除记录，防止之前同步到 iCloud 的记录继续影响当前设备
+    /// 这个方法应该在应用升级后调用一次
+    func clearOldICloudSyncRecords() {
+        let iCloudStore = NSUbiquitousKeyValueStore.default
+        let oldKeys = [
+            "deletedOutfits_v2",
+            "deletedClothings_v2",
+            "deletedBookGroups_v2",
+            "deletedModel3Ds_v2",
+            "deletedPerlerPatterns_v2"
+        ]
+
+        for key in oldKeys {
+            iCloudStore.removeObject(forKey: key)
+        }
+        iCloudStore.synchronize()
+        print("DeleteTracker: 已清除旧的 iCloud 同步删除记录")
     }
 }
