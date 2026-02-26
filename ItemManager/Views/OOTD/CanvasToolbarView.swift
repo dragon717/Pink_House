@@ -71,9 +71,11 @@ struct CanvasToolbarView: View {
                             tint: .pink,
                             isEnabled: true
                         ) {
+                            print("[OOTD] 贴纸库按钮被点击，当前状态: \(isStickerLibraryVisible)")
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 isStickerLibraryVisible.toggle()
                             }
+                            print("[OOTD] 贴纸库按钮点击后状态: \(isStickerLibraryVisible)")
                         }
                         
                         Divider()

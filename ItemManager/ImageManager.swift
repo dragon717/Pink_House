@@ -123,7 +123,7 @@ class ImageManager {
         }
         
         // 回退到本地 Documents
-        print("⚠️ iCloud 不可用，使用本地存储")
+        print("⚠️ 图片保存云端失败 iCloud 不可用，使用本地存储")
         return localImagesDirectory
     }
     

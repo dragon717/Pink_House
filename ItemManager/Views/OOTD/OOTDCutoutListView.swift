@@ -428,17 +428,7 @@ struct OOTDCutoutListView: View {
                 .shadow(color: .black.opacity(0.1), radius: 10, x: isLandscape ? -5 : 0, y: isLandscape ? 0 : -5)
         )
         .clipShape(RoundedRectangle(cornerRadius: isLandscape ? 0 : 24, style: .continuous)) // No rounded corners in landscape
-        .onTapGesture {
-            // Expand on tap if not tapping an item
-            // Only relevant for Portrait Minimized view? 
-            // In Landscape Collapsed, tapping empty space might expand?
-            if !isExpanded && !isLandscape && !isCompletelyHidden {
-                 // withAnimation { isExpanded = true } 
-                 // Removing this as it might conflict with item taps if not careful, 
-                 // but originally it was there (implied). 
-                 // Original code had empty onTapGesture comment.
-            }
-        }
+        // 点击空白区域展开贴纸库（仅在竖屏收起状态下）
         .gesture(
             // Drag to expand/collapse/hide - Only for Portrait
             !isLandscape && !isCompletelyHidden ? DragGesture()
@@ -505,9 +495,16 @@ struct OOTDCutoutListView: View {
             }
             .presentationDetents([.height(350)])
         }
-        .task(id: cutouts) { updateDisplayItems() }
+        .task(id: cutouts) {
+            // 当cutouts数据变化时更新显示项目
+            updateDisplayItems()
+        }
         .onChange(of: searchText) { _, _ in updateDisplayItems() }
         .onChange(of: selectedCategory) { _, _ in updateDisplayItems() }
+        .onAppear {
+            // 初始加载时更新显示项目（无动画）
+            displayItems = cutouts
+        }
         .overlay(alignment: .bottom) {
             if showToast {
                 toastView

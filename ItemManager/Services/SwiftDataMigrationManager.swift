@@ -166,8 +166,9 @@ class SwiftDataMigrationManager: ObservableObject {
                 if let error = accountError {
                     print("   错误: \(error.localizedDescription)")
                 }
-                // 不要重置开关设置，只是临时回退到本地存储
-                // 这样用户修复 iCloud 问题后，开关仍然保持开启状态
+                // iCloud 不可用，自动关闭同步开关
+                isCloudSyncEnabled = false
+                print("🔄 已自动关闭 iCloud 同步开关")
                 return try createLocalModelContainer(schema: schema)
             }
             
@@ -234,8 +235,9 @@ class SwiftDataMigrationManager: ObservableObject {
             print("⚠️ 错误详情: \(error.localizedDescription)")
             print("🔄 回退到本地存储模式...")
             
-            // 不要重置开关设置，只是临时回退到本地存储
-            // 这样用户修复 iCloud 问题后，开关仍然保持开启状态
+            // iCloud 创建失败，自动关闭同步开关
+            isCloudSyncEnabled = false
+            print("🔄 已自动关闭 iCloud 同步开关")
             
             // 回退到本地存储
             return try createLocalModelContainer(schema: schema)

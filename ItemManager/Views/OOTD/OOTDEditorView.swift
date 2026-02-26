@@ -41,7 +41,11 @@ struct OOTDEditorView: View {
     
     // 工具栏和贴纸库显示状态
     @State private var isToolbarVisible = true
-    @State private var isStickerLibraryVisible = false
+    @State private var isStickerLibraryVisible = false {
+        didSet {
+            print("[OOTD Editor] isStickerLibraryVisible 变化: \(oldValue) -> \(isStickerLibraryVisible)")
+        }
+    }
     
     // 当前书页索引
     private var currentPageIndex: Int {
@@ -442,6 +446,7 @@ struct OOTDEditorView: View {
 
                     // Right Sidebar (Cutout List) - 贴纸库
                     if isStickerLibraryVisible {
+                        let _ = print("[OOTD Editor] 显示贴纸库（横屏）")
                         OOTDCutoutListView(
                             isExpanded: $isListExpanded,
                             isLandscape: true,
@@ -496,6 +501,7 @@ struct OOTDEditorView: View {
 
                     // 贴纸库 - 底部弹出
                     if isStickerLibraryVisible {
+                        let _ = print("[OOTD Editor] 显示贴纸库（竖屏）")
                         VStack {
                             Spacer()
                             OOTDCutoutListView(

@@ -96,6 +96,8 @@ struct OOTDCanvasView: View {
                     .padding(.leading, isLandscape ? 12 : 8)
                     .frame(width: toolbarWidth)
                     .transition(.move(edge: .leading))
+                    // 确保工具栏在画布之上，避免点击被拦截
+                    .zIndex(1)
                 }
                 
                 // Canvas Area - 占据剩余空间
