@@ -45,15 +45,16 @@ struct OOTDCanvasView: View {
             // 获取安全区域 insets
             let safeArea = geometry.safeAreaInsets
             
-            // 计算可用空间（考虑工具栏宽度）
+            // 计算工具栏宽度
             let toolbarWidth: CGFloat = isToolbarVisible ? 72 : 0
-            let availableWidth = geometry.size.width - toolbarWidth
+            // 画布区域宽度（工具栏右侧的可用空间）
+            let canvasAreaWidth = geometry.size.width - toolbarWidth
             let availableHeight = geometry.size.height
             
             // 计算缩放比例以适应可用空间，保留适当边距
             let margin: CGFloat = isLandscape ? 16 : 8
             let fitScale = min(
-                (availableWidth - margin * 2) / canvasWidth,
+                (canvasAreaWidth - margin * 2) / canvasWidth,
                 (availableHeight - margin * 2) / canvasHeight
             )
             
@@ -99,9 +100,11 @@ struct OOTDCanvasView: View {
                 
                 // Canvas Area - 占据剩余空间
                 ZStack {
-                    // 画布内容
-                    canvasContent(fitScale: fitScale, geometry: geometry, availableWidth: availableWidth, availableHeight: availableHeight)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // 画布内容 - 使用 GeometryReader 获取实际空间并居中
+                    GeometryReader { canvasGeometry in
+                        canvasContent(fitScale: fitScale, canvasAreaWidth: canvasAreaWidth, availableHeight: availableHeight)
+                            .position(x: canvasGeometry.size.width / 2, y: canvasGeometry.size.height / 2)
+                    }
                     
                     // 顶部贴纸管理栏 - 悬浮在画布上方
                     VStack {
@@ -125,7 +128,7 @@ struct OOTDCanvasView: View {
     }
     
     // MARK: - 画布内容
-    private func canvasContent(fitScale: CGFloat, geometry: GeometryProxy, availableWidth: CGFloat, availableHeight: CGFloat) -> some View {
+    private func canvasContent(fitScale: CGFloat, canvasAreaWidth: CGFloat, availableHeight: CGFloat) -> some View {
         ZStack {
             // Background
             if outfit.canvasType == "blank" {
@@ -201,7 +204,6 @@ struct OOTDCanvasView: View {
         .frame(width: canvasWidth, height: canvasHeight)
         .coordinateSpace(name: "ootdCanvas")
         .scaleEffect(fitScale)
-        .position(x: geometry.size.width / 2, y: geometry.size.height / 2) // Center the scaled canvas
         // Global Gestures Area (Canvas Level)
         .contentShape(Rectangle())
         .gesture(

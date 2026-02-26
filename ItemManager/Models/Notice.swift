@@ -67,11 +67,14 @@ enum NoticeConfig {
     // 内边距
     static let padding: CGFloat = 16
 
-    // 边框内边距 - 内容距离边框的距离
-    static let borderPadding: CGFloat = 24
+    // 边框内边距 - 边框距离卡片边缘的距离
+    static let borderPadding: CGFloat = 12
+    
+    // 内容内边距 - 内容距离边框内部的距离
+    static let contentPadding: CGFloat = 16
 
-    // 卡片整体比例 (宽:高)
-    static let cardAspectRatio: CGFloat = 3 / 4
+    // 卡片整体比例 (宽:高) - 正方形
+    static let cardAspectRatio: CGFloat = 1 / 1
 
     // 图片/视频区域比例 (宽高比)
     static let mediaAspectRatio: CGFloat = 16 / 9

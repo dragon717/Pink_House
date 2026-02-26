@@ -10,31 +10,53 @@ struct NoticePopupView: View {
     let onDismiss: () -> Void
     
     @State private var isVisible = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     var body: some View {
-        ZStack {
-            // 灰色蒙版
-            Color.black
-                .opacity(0.5)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    dismiss()
-                }
-            
-            // 公告内容
-            NoticeCardView(notice: notice)
-                .frame(maxWidth: 340)
-                .scaleEffect(isVisible ? 1.0 : 0.8)
-                .opacity(isVisible ? 1.0 : 0.0)
-                .onTapGesture {
-                    // 点击公告内容不关闭
-                }
+        GeometryReader { geometry in
+            ZStack {
+                // 灰色蒙版
+                Color.black
+                    .opacity(0.5)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        dismiss()
+                    }
+                
+                // 公告内容 - 根据屏幕尺寸自适应
+                NoticeCardView(notice: notice)
+                    .frame(width: cardWidth(for: geometry.size))
+                    .scaleEffect(isVisible ? 1.0 : 0.8)
+                    .opacity(isVisible ? 1.0 : 0.0)
+                    .onTapGesture {
+                        // 点击公告内容不关闭
+                    }
+            }
         }
         .zIndex(999) // 置于最顶部
         .onAppear {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 isVisible = true
             }
+        }
+    }
+    
+    // 根据屏幕尺寸计算卡片宽度
+    private func cardWidth(for size: CGSize) -> CGFloat {
+        let horizontalPadding: CGFloat = 32 // 左右边距各 16pt
+        let maxCardWidth: CGFloat = 320
+        let minCardWidth: CGFloat = 260
+        
+        // 可用宽度 = 屏幕宽度 - 左右边距
+        let availableWidth = size.width - (horizontalPadding * 2)
+        
+        if size.width < size.height {
+            // 竖屏：使用屏幕宽度的 85%，确保有足够边距显示完整边框
+            let preferredWidth = min(size.width * 0.85, maxCardWidth)
+            return max(minCardWidth, min(preferredWidth, availableWidth))
+        } else {
+            // 横屏：使用固定最大宽度
+            return min(maxCardWidth, availableWidth)
         }
     }
     
@@ -59,33 +81,36 @@ struct NoticeCardView: View {
     }
 
     var body: some View {
-        ZStack {
-            // 第1层：背景色（圆角矩形）- 根据颜色模式变化
-            RoundedRectangle(cornerRadius: NoticeConfig.cornerRadius)
-                .fill(backgroundColor)
+        GeometryReader { geometry in
+            ZStack {
+                // 第1层：背景色（圆角矩形）
+                RoundedRectangle(cornerRadius: NoticeConfig.cornerRadius)
+                    .fill(backgroundColor)
 
-            // 第2层：内容层
-            VStack(spacing: 0) {
-                // 媒体区域 - 上半部分
-                mediaSection
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(NoticeConfig.borderPadding)
-                    .padding(.bottom, 0)
+                // 第2层：内容层（留出边框空间）
+                VStack(spacing: 0) {
+                    // 媒体区域 - 上半部分
+                    mediaSection
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(NoticeConfig.contentPadding)
+                        .padding(.bottom, 0)
 
-                // 文字区域 - 下半部分
-                textSection
-                    .padding(NoticeConfig.borderPadding)
-                    .padding(.top, 0)
+                    // 文字区域 - 下半部分
+                    textSection
+                        .padding(NoticeConfig.contentPadding)
+                        .padding(.top, 0)
+                }
+                .padding(NoticeConfig.borderPadding) // 为边框留出空间
+
+                // 第3层：边框图片（最上层）
+                Image("notice_bg")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .allowsHitTesting(false)
             }
-
-            // 第3层：边框图片（最上层）
-            Image("notice_bg")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .allowsHitTesting(false)
+            .aspectRatio(NoticeConfig.cardAspectRatio, contentMode: .fit)
+            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
         }
-        .aspectRatio(NoticeConfig.cardAspectRatio, contentMode: .fit)
-        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
     }
     
     @ViewBuilder
