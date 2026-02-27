@@ -62,10 +62,10 @@ struct MeView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         
-                        // 小世界
+                        // House
                         NavigationLink(destination: SmallWorldSettingsView()) {
                             SettingsGridItem(
-                                title: "小世界",
+                                title: "House",
                                 subtitle: "风格 · 场景 · 3D",
                                 icon: "globe.asia.australia.fill",
                                 iconColor: .indigo

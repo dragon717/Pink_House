@@ -225,7 +225,7 @@ struct ModernTabView: View {
                 WardrobeTabContent()
             }
             
-            Tab("小世界", systemImage: "map") {
+            Tab("House", systemImage: "map") {
                 SmallWorldTabContent()
             }
             

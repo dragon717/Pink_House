@@ -2,7 +2,7 @@
 //  DarkModeColors.swift
 //  ItemManager
 //
-//  大世界 - 暗夜模式颜色适配
+//  世界书 - 暗夜模式颜色适配
 //
 
 import SwiftUI

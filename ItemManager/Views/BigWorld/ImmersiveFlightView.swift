@@ -2,7 +2,7 @@
 //  ImmersiveFlightView.swift
 //  ItemManager
 //
-//  大世界 - 沉浸式飞行体验
+//  世界书 - 沉浸式飞行体验
 //
 
 import SwiftUI

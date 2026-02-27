@@ -518,7 +518,7 @@ struct NoticeTestView: View {
                     }
                 } label: {
                     LabActionCard(
-                        icon: "checkmark.circle.icloud",
+                        icon: "arrow.down.icloud",
                         title: "同步已读状态",
                         subtitle: "从 iCloud 同步已读状态",
                         color: .cyan

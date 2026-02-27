@@ -143,7 +143,7 @@ class SpatialAssetManager: ObservableObject {
         spatialImage = nil
     }
     
-    /// 清理所有小世界空间照片缓存
+    /// 清理所有House空间照片缓存
     /// 当 App 版本更新或从备份恢复且版本不一致时调用
     func clearAllCache() {
         print("[SpatialAssetManager] 执行全量缓存清理...")

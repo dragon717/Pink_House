@@ -2,7 +2,7 @@
 
 ## 1. 背景
 
-在开发“洛可可风格小世界” (`RococoSmallWorldView`) 过程中，我们遇到了一系列点击交互失效的问题。这些问题主要出现在视图切换、导航返回以及调试模式下。本文档总结了这些问题的成因、修复方案以及相关的 SwiftUI 开发最佳实践，以供后续开发参考。
+在开发“洛可可风格House” (`RococoSmallWorldView`) 过程中，我们遇到了一系列点击交互失效的问题。这些问题主要出现在视图切换、导航返回以及调试模式下。本文档总结了这些问题的成因、修复方案以及相关的 SwiftUI 开发最佳实践，以供后续开发参考。
 
 ## 2. 核心问题与解决方案
 
@@ -67,7 +67,7 @@ if showDebugHotspots {
 ### 2.3 问题三：从 OOTD 返回后热区失效
 
 **现象**：
-进入 OOTD 页面（通过 NavigationLink 或 Tab 切换），再返回小世界后，热区再次失效。
+进入 OOTD 页面（通过 NavigationLink 或 Tab 切换），再返回House后，热区再次失效。
 
 **原因分析**：
 `RococoSmallWorldView` 内部包裹了一个 `NavigationStack`，仅为了显示 Toolbar 上的“视图模式”菜单。

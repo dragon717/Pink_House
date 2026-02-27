@@ -35,7 +35,7 @@ struct FavoriteMenuSettingsView: View {
                     } header: {
                         Text("已选中的常用功能（左滑删除，最多 \(maxItems) 个）")
                     } footer: {
-                        Text("长按小世界 Tab 按钮，常用分类将显示这些功能")
+                        Text("长按House Tab 按钮，常用分类将显示这些功能")
                     }
 
                     // 可选功能列表

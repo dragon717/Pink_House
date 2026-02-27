@@ -7,6 +7,9 @@
 
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 private struct IsSimulationActiveKey: EnvironmentKey {
     static let defaultValue: Bool = true
@@ -57,7 +60,7 @@ struct ModernTabView: View {
     private var smallWorldTabTitle: String {
         switch smallWorldDestination {
         case .bigWorld:
-            return "蓝星OL"
+            return "世界书"
         case .calendar:
             return "梦裙日历"
         case .wealth:
@@ -67,9 +70,9 @@ struct ModernTabView: View {
         case .ootd:
             return "穿搭手帐"
         case .ootdDefaultBook:
-            return "快捷OOTD"
+            return "魔法贴纸"
         case .menu:
-            return "小世界"
+            return "House"
         case .perler:
             return "拼豆工坊"
         case .wardrobe:
@@ -98,7 +101,7 @@ struct ModernTabView: View {
         case .ootdDefaultBook:
             return "book.pages"
         case .menu:
-            return "map"
+            return "house.fill"
         case .perler:
             return "circle.grid.2x2"
         case .wardrobe:
@@ -135,12 +138,12 @@ struct ModernTabView: View {
                 GlobalSearchView(searchText: $searchText)
             }
         }
-        .tabViewStyle(.sidebarAdaptable)
-        .toolbarBackground(.visible, for: .tabBar)
-        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
         .applyTabBarMinimizeBehavior()
         .applySearchToolbarBehavior()
+        .toolbarBackground(Color(red: 0.698, green: 0.133, blue: 0.133), for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarColorScheme(.dark, for: .tabBar)
         .environment(\.isSimulationActive, isSimulationActive)
         .overlay {
             RewardBubbleView()
@@ -157,7 +160,7 @@ struct ModernTabView: View {
         .onReceive(tabNavigationManager.$navigateToTab) { tab in
             if let tab = tab {
                 withAnimation {
-                    // 如果是要跳转到小世界Tab(1)，记录是从Tab 0进入的
+                    // 如果是要跳转到HouseTab(1)，记录是从Tab 0进入的
                     if tab == 1 && selectedTab != 1 {
                         tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
                     }
@@ -177,11 +180,11 @@ struct ModernTabView: View {
             if let destination = destination {
                 withAnimation {
                     // 注意：此时 selectedTab 可能已经被 navigateToTab 的处理器设置为 1
-                    // 所以不能依赖 selectedTab 来判断是否是小世界内部导航
+                    // 所以不能依赖 selectedTab 来判断是否是House内部导航
                     // 而是应该依赖 TabNavigationManager 中的 isNavigatingInsideSmallWorld 标记
                     // 如果 isNavigatingInsideSmallWorld 为 false，说明是从外部进入
                     if !tabNavigationManager.isNavigatingInsideSmallWorld {
-                        // 从其他Tab进入小世界，记录来源
+                        // 从其他Tab进入House，记录来源
                         tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
                     }
                     // 如果 isNavigatingInsideSmallWorld 为 true，保持标记不变（内部导航）
@@ -210,7 +213,7 @@ struct WardrobeTabContent: View {
     }
 }
 
-// MARK: - 小世界 Tab 内容
+// MARK: - House Tab 内容
 @available(iOS 18.0, *)
 struct SmallWorldTabContent: View {
     @Binding var selectedTab: Int
@@ -339,7 +342,7 @@ struct SearchContainerView: View {
     }
 }
 
-// MARK: - 小世界容器视图
+// MARK: - House容器视图
 @available(iOS 18.0, *)
 struct SmallWorldContainerView: View {
     @Binding var selectedTab: Int
@@ -499,8 +502,8 @@ struct OpeningVideoOverlay: View {
     }
 }
 
-// MARK: - 小世界页面返回按钮包装视图
-// 这些包装视图用于在小世界页面显示自定义返回按钮，智能返回上一页
+// MARK: - House页面返回按钮包装视图
+// 这些包装视图用于在House页面显示自定义返回按钮，智能返回上一页
 
 @available(iOS 18.0, *)
 struct SmallWorldBackButton: View {
@@ -523,7 +526,7 @@ struct SmallWorldBackButton: View {
                     homeTab = .depositPlan
                     selectedTab = 0
                 case .smallWorld:
-                    // 返回小世界菜单
+                    // 返回House菜单
                     onBackToMenu()
                 }
             }

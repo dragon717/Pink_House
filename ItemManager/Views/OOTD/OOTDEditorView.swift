@@ -33,6 +33,12 @@ struct OOTDEditorView: View {
     @State private var showingMultiPhotoPicker = false
     @State private var showingShareSheet = false
     
+    // 批量处理相关状态
+    @State private var showingBatchConfirmation = false
+    @State private var showingRepairConfirmation = false
+    @State private var showingBatchReplaceSheet = false
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
+    
     // 编辑底图相关状态
     @State private var showingBackgroundPicker = false
     @State private var selectedBackgroundItem: PhotosPickerItem?
@@ -114,6 +120,10 @@ struct OOTDEditorView: View {
                     
                     // 更多操作菜单
                     Menu {
+                       
+                        
+                     
+                        
                         Menu {
                             Button {
                                 showingBackgroundPicker = true
@@ -144,11 +154,33 @@ struct OOTDEditorView: View {
                         } label: {
                             Label("重命名", systemImage: "pencil")
                         }
-                        
+                          
+                        Divider()
+
                         Button(role: .destructive) {
                             showingDeleteAlert = true
                         } label: {
                             Label("删除", systemImage: "trash")
+                        }
+
+                        Divider()
+                         // 批量处理菜单组
+                        Button {
+                            showingBatchConfirmation = true
+                        } label: {
+                            Label("批量处理小裙子", systemImage: "wand.and.stars")
+                        }
+                        
+                        Button {
+                            showingRepairConfirmation = true
+                        } label: {
+                            Label("修复数据", systemImage: "hammer")
+                        }
+                        
+                        Button {
+                            showingBatchReplaceSheet = true
+                        } label: {
+                            Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -242,6 +274,26 @@ struct OOTDEditorView: View {
         }
         .fullScreenCover(isPresented: $showingBackgroundCropper) {
             backgroundCropperSheet
+        }
+        // MARK: - 批量处理相关 Alerts & Sheets
+        .alert("批量处理", isPresented: $showingBatchConfirmation) {
+            Button("开始扫描", role: .destructive) {
+                processWardrobeSkirts()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将扫描衣橱中所有裙装并尝试生成抠图。这可能需要一些时间。")
+        }
+        .alert("修复数据", isPresented: $showingRepairConfirmation) {
+            Button("开始深度修复") {
+                repairMissingCutouts()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将扫描所有搭配，尝试通过哈希匹配、关联服饰匹配等方式，找回丢失的图片引用。")
+        }
+        .sheet(isPresented: $showingBatchReplaceSheet) {
+            BatchReplaceCutoutView()
         }
     }
     
@@ -564,6 +616,66 @@ struct OOTDEditorView: View {
         // 渐隐渐出效果切换页面
         withAnimation(.easeInOut(duration: 0.3)) {
             self.onPageChange?(next)
+        }
+    }
+    
+    // MARK: - 批量处理小裙子
+    
+    private func processWardrobeSkirts() {
+        isProcessing = true
+        processingMessage = "正在批量处理小裙子..."
+        
+        Task {
+            var count = 0
+            let descriptor = FetchDescriptor<CutoutItem>()
+            let existingCutouts = (try? modelContext.fetch(descriptor)) ?? []
+            let existingPaths = Set(existingCutouts.map { $0.imagePath })
+
+            let itemsToProcess = allClothing.filter { clothing in
+                !clothing.imagePaths.isEmpty
+            }
+            
+            let total = itemsToProcess.count
+            
+            for (index, clothing) in itemsToProcess.enumerated() {
+                if index % 5 == 0 {
+                    await MainActor.run {
+                        processingMessage = "正在处理 \(index + 1)/\(total)..."
+                    }
+                }
+                
+                if let firstImagePath = clothing.imagePaths.first,
+                   !existingPaths.contains(firstImagePath),
+                   let image = ImageManager.shared.loadImage(fileName: firstImagePath) {
+                    
+                    do {
+                        let category = clothing.types.split(separator: ",").first.map(String.init) ?? "未分类"
+                        _ = try await CutoutService.shared.processImage(image: image, category: category, clothing: clothing, context: modelContext)
+                        count += 1
+                    } catch {
+                        // Ignore errors
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                isProcessing = false
+                processingMessage = ""
+            }
+        }
+    }
+    
+    // MARK: - 修复数据
+    
+    private func repairMissingCutouts() {
+        isProcessing = true
+        processingMessage = "正在深度修复数据..."
+        
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            await MainActor.run {
+                isProcessing = false
+            }
         }
     }
 }

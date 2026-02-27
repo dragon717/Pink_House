@@ -344,7 +344,7 @@ struct DepositPlanView: View {
                 }
             )
         }
-        .alert("真的要看吗？你确定？", isPresented: $showConfirmDialog) {
+        .alert("真的要解锁“钱包瘦身”副本吗？", isPresented: $showConfirmDialog) {
             Button("取消", role: .cancel) { }
             Button("我准备好了！", role: .none) {
                 withAnimation {
@@ -352,7 +352,7 @@ struct DepositPlanView: View {
                 }
             }
         } message: {
-            Text("(๑°o°๑) 前方高能预警！\n准备好面对尾款的暴击了吗？\n记得深呼吸哦~ ✧*｡٩(ˊᗜˋ*)و✧*｡")
+            Text("⚠️ 前方尾款大军已集结！\n温馨提示：看完请抱紧你的钱包，深呼吸是没用的，不如默念“美貌无价”！\n(｡•́ω•̀｡)")
         }
     }
     
@@ -599,6 +599,8 @@ struct DepositStatsView: View {
 
 struct YearSelectorView: View {
     @Binding var year: Int
+    var showStats: Bool = true
+    var onToggleStats: (() -> Void)? = nil
     
     var body: some View {
         HStack {
@@ -633,6 +635,23 @@ struct YearSelectorView: View {
                     .foregroundStyle(.secondary.opacity(0.8))
             }
             .buttonStyle(.plain)
+            
+            // 小眼睛按钮放在年份选择器右侧
+            if let onToggle = onToggleStats {
+                Divider()
+                    .frame(height: 20)
+                    .padding(.horizontal, 4)
+                
+                Button(action: onToggle) {
+                    Image(systemName: showStats ? "eye.slash" : "eye")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.pink)
+                        .frame(width: 28, height: 28)
+                        .background(Color.pink.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
@@ -713,15 +732,18 @@ struct MonthSelectorView: View {
             }
             
             if expanded {
-                // Year Selector
-                YearSelectorView(year: $year)
+                // Year Selector（带小眼睛按钮）
+                YearSelectorView(
+                    year: $year,
+                    showStats: showYearStats,
+                    onToggleStats: { showYearStats.toggle() }
+                )
                 
-                // 年份统计（受年份控制，放在年份下面，带独立小眼睛控制）
+                // 年份统计（简洁显示）
                 YearStatsCard(
                     stats: yearStats,
                     year: year,
-                    isVisible: showYearStats,
-                    onToggleVisibility: { showYearStats.toggle() }
+                    isVisible: showYearStats
                 )
                 
                 // Month Grid
@@ -795,37 +817,9 @@ struct YearStatsCard: View {
     let stats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal)
     let year: Int
     var isVisible: Bool = true
-    var onToggleVisibility: (() -> Void)? = nil
     
     var body: some View {
-        VStack(spacing: 8) {
-            // 标题提示和小眼睛按钮
-            HStack {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text("\(year)年统计")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-                
-                // 小眼睛按钮（独立控制）
-                if let onToggle = onToggleVisibility {
-                    Button(action: onToggle) {
-                        Image(systemName: isVisible ? "eye.slash" : "eye")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.pink)
-                            .frame(width: 24, height: 24)
-                            .background(Color.pink.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            
+        VStack(spacing: 0) {
             // 统计内容（可折叠）
             if isVisible {
                 HStack(spacing: 0) {
@@ -842,19 +836,8 @@ struct YearStatsCard: View {
                     DepositStatItem(title: "代付尾款", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
                 }
                 .padding(.horizontal, 8)
-                .padding(.bottom, 12)
+                .padding(.vertical, 12)
                 .transition(.move(edge: .top).combined(with: .opacity))
-            } else {
-                // 隐藏状态显示提示
-                HStack {
-                    Spacer()
-                    Text("点击眼睛查看统计")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary.opacity(0.6))
-                    Spacer()
-                }
-                .padding(.bottom, 8)
-                .transition(.opacity)
             }
         }
         .background(CardBackgroundView(cornerRadius: 16))
@@ -948,15 +931,18 @@ struct SeriesSelectorView: View {
             }
             
             if expanded {
-                // Year Selector
-                YearSelectorView(year: $year)
+                // Year Selector（带小眼睛按钮）
+                YearSelectorView(
+                    year: $year,
+                    showStats: showYearStats,
+                    onToggleStats: { showYearStats.toggle() }
+                )
                 
-                // 年份统计（受年份控制，放在年份下面，带独立小眼睛控制）
+                // 年份统计（简洁显示）
                 YearStatsCard(
                     stats: yearStats,
                     year: year,
-                    isVisible: showYearStats,
-                    onToggleVisibility: { showYearStats.toggle() }
+                    isVisible: showYearStats
                 )
                 
                 if seriesList.isEmpty {

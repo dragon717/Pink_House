@@ -2,7 +2,7 @@
 //  EnhancedGlobeView.swift
 //  ItemManager
 //
-//  大世界 - 3D地球与航线系统
+//  世界书 - 3D地球与航线系统
 //
 
 import SwiftUI

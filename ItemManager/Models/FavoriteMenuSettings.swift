@@ -8,13 +8,14 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case wardrobe = "衣橱"
     case finalPayment = "尾款天使"
     case pet = "萌宠"
-    case ootd = "快捷OOTD"
+    case ootd = "魔法贴纸"
     case fashionJournal = "穿搭手帐"
-    case smallWorld = "小世界"
+    case smallWorld = "House"
     case wealth = "来财"
+    case dressStock = "裙子股市"
     case perler = "拼豆工坊"
     case calendar = "梦裙日历"
-    case bigWorld = "蓝星OL"
+    case bigWorld = "世界书"
     case recycleBin = "回收站"
     
     var id: String { rawValue }
@@ -26,8 +27,9 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .pet: return "pawprint.fill"
         case .ootd: return "book.pages.fill"
         case .fashionJournal: return "book.closed.fill"
-        case .smallWorld: return "map.fill"
+        case .smallWorld: return "house.fill"
         case .wealth: return "yensign.circle.fill"
+        case .dressStock: return "chart.line.uptrend.xyaxis"
         case .perler: return "circle.grid.2x2.fill"
         case .calendar: return "calendar"
         case .bigWorld: return "globe.asia.australia"
@@ -44,6 +46,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .fashionJournal: return "#FF85C1"
         case .smallWorld: return "#87CEEB"
         case .wealth: return "#FFD700"
+        case .dressStock: return "#FF6B9D"
         case .perler: return "#FF8C94"
         case .calendar: return "#DDA0DD"
         case .bigWorld: return "#87CEEB"
@@ -61,6 +64,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .fashionJournal: return .ootd
         case .smallWorld: return .menu
         case .wealth: return .wealth
+        case .dressStock: return .dressStock
         case .perler: return .perler
         case .calendar: return .calendar
         case .bigWorld: return .bigWorld
@@ -68,7 +72,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         }
     }
     
-    // 是否是小世界内的功能
+    // 是否是House内的功能
     var isSmallWorldFeature: Bool {
         destination != nil
     }
@@ -81,7 +85,7 @@ class FavoriteMenuSettings {
     var selectedItemIDs: [String]
     var lastUpdated: Date
     
-    init(selectedItemIDs: [String] = ["萌宠", "拼豆工坊", "蓝星OL", "小世界","来财"]) {
+    init(selectedItemIDs: [String] = ["萌宠", "拼豆工坊", "世界书", "House","来财"]) {
         self.selectedItemIDs = selectedItemIDs
         self.lastUpdated = Date()
     }

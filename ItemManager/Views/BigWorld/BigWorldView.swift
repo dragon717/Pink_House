@@ -2,7 +2,7 @@
 //  BigWorldView.swift
 //  ItemManager
 //
-//  大世界 - 主入口视图（升级版）
+//  世界书 - 主入口视图（升级版）
 //
 
 import SwiftUI
@@ -15,8 +15,8 @@ struct BigWorldView: View {
     @State private var selectedTab: BigWorldTab = .explore
     
     enum BigWorldTab: String, CaseIterable, Identifiable {
-        case explore = "蓝星"
-        case dream = "梦幻"
+        case explore = "世界书"
+        case dream = "后花园"
         
         var id: String { rawValue }
     }
@@ -72,7 +72,7 @@ struct BigWorldView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.clear, for: .navigationBar)
             .toolbar {
-                // 顶部导航栏 - 蓝星/梦幻页签（参考马上来财的分段选择器）
+                // 顶部导航栏 - 世界书/梦幻页签（参考马上来财的分段选择器）
                 if case .idle = viewModel.flightStatus {
                     ToolbarItem(placement: .principal) {
                         Picker("功能", selection: $selectedTab) {
@@ -85,7 +85,7 @@ struct BigWorldView: View {
                     }
                 }
 
-                // 关闭按钮 - 仅在非蓝星页面显示
+                // 关闭按钮 - 仅在非世界书页面显示
                 if case .idle = viewModel.flightStatus, selectedTab != .explore {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {

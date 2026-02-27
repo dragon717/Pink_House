@@ -2514,7 +2514,7 @@ class BackupService {
     
     private func performVersionCheckAndCacheClear(manifest: BackupManifest) {
         // Version Check & Cache Clearing
-        // 若 app版本不一致，则清理缓存（尤其是小世界空间照片缓存）
+        // 若 app版本不一致，则清理缓存（尤其是House空间照片缓存）
         if let backupAppVersion = manifest.appVersion {
             let currentAppVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
             if backupAppVersion != currentAppVersion {

@@ -2,7 +2,7 @@
 //  FlightExperienceViews.swift
 //  ItemManager
 //
-//  大世界 - 飞行体验视图
+//  世界书 - 飞行体验视图
 //
 
 import SwiftUI

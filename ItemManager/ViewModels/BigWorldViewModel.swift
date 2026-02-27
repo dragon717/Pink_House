@@ -2,7 +2,7 @@
 //  BigWorldViewModel.swift
 //  ItemManager
 //
-//  大世界 - 业务逻辑管理
+//  世界书 - 业务逻辑管理
 //
 
 import Foundation

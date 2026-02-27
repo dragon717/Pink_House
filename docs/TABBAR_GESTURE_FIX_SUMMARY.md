@@ -3,8 +3,8 @@
 ## 问题背景
 
 iOS 18+ 新的 `TabView` API (`.tabViewStyle(.sidebarAdaptable)`) 与自定义手势覆盖层 (`SmallWorldMenuOverlay`) 产生冲突，导致：
-1. 点击小世界 TabBar 无响应
-2. 长按小世界 TabBar 无响应或位置错误
+1. 点击House TabBar 无响应
+2. 长按House TabBar 无响应或位置错误
 
 ## 根本原因
 
@@ -78,7 +78,7 @@ self.touchLocation = CGPoint(x: globalX, y: globalY)
 // TabView 使用 selection 绑定
 TabView(selection: $selectedTab) {
     Tab("衣橱", systemImage: "cabinet.fill", value: 0) { ... }
-    Tab("小世界", systemImage: "map", value: 1) { ... }
+    Tab("House", systemImage: "map", value: 1) { ... }
     Tab("我", systemImage: "face.smiling", value: 2) { ... }
     Tab(value: 3, role: .search) { ... }  // 注意：value 必须在 role 之前
 }
@@ -203,7 +203,7 @@ struct ModernTabView: View {
                 WardrobeTabContent(...)
             }
             
-            Tab("小世界", systemImage: "map", value: 1) {
+            Tab("House", systemImage: "map", value: 1) {
                 SmallWorldTabContent(...)
             }
             

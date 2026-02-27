@@ -2,7 +2,7 @@
 //  BoardingExperienceView.swift
 //  ItemManager
 //
-//  大世界 - 检票登机沉浸式体验
+//  世界书 - 检票登机沉浸式体验
 //
 
 import SwiftUI

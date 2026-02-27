@@ -440,15 +440,17 @@ struct ClothingPriceView: View {
 
 // 时间段选项（用于预计尾款时间计算）
 enum PaymentDurationOption: Int, CaseIterable {
-    case tenDays = 10
+    case fiveteenDays = 15
     case thirtyDays = 30
     case sixtyDays = 60
+    case custom = -1  // 自定义选项，用户手动选择日期
     
     var label: String {
         switch self {
-        case .tenDays: return "10天"
+        case .fiveteenDays: return "15天"
         case .thirtyDays: return "30天"
         case .sixtyDays: return "60天"
+        case .custom: return "自定义"
         }
     }
 }
@@ -461,13 +463,22 @@ struct ClothingPurchaseInfoView: View {
     @Binding var finalPaymentEndDate: Date
     @Binding var note: String
     
-    // 时间段滑块状态（0=10天, 1=30天, 2=60天）
+    // 时间段滑块状态（0=10天, 1=30天, 2=60天, 3=自定义）
     @State private var durationSliderValue: Double = 1.0
     
     // 根据滑块值获取当前选中的时间段
     private var selectedDuration: PaymentDurationOption {
         let index = Int(round(durationSliderValue))
-        return PaymentDurationOption.allCases[min(max(index, 0), 2)]
+        let allCases = PaymentDurationOption.allCases
+        guard index >= 0 && index < allCases.count else {
+            return .thirtyDays
+        }
+        return allCases[index]
+    }
+    
+    // 判断是否为自定义模式
+    private var isCustomMode: Bool {
+        selectedDuration == .custom
     }
     
     var body: some View {
@@ -509,8 +520,10 @@ struct ClothingPurchaseInfoView: View {
                             DatePicker("开始", selection: $finalPaymentDate, displayedComponents: .date)
                                 .environment(\.locale, Locale(identifier: "zh_CN"))
                                 .onChange(of: finalPaymentDate) { _, _ in
-                                    // 开始时间变化时，根据时间段重新计算结束时间
-                                    updateFinalPaymentEndDate()
+                                    // 开始时间变化时，如果不是自定义模式，根据时间段重新计算结束时间
+                                    if !isCustomMode {
+                                        updateFinalPaymentEndDate()
+                                    }
                                 }
                             
                             // 时间段滑块
@@ -522,27 +535,30 @@ struct ClothingPurchaseInfoView: View {
                                     Spacer()
                                     Text(selectedDuration.label)
                                         .font(.subheadline.bold())
-                                        .foregroundStyle(.pink)
+                                        .foregroundStyle(isCustomMode ? .orange : .pink)
                                 }
                                 
-                                // 自定义滑块样式
+                                // 自定义滑块样式（包含自定义选项）
                                 HStack(spacing: 8) {
                                     ForEach(0..<PaymentDurationOption.allCases.count, id: \.self) { index in
                                         Button {
                                             withAnimation(.spring(response: 0.3)) {
                                                 durationSliderValue = Double(index)
-                                                updateFinalPaymentEndDate()
+                                                // 切换到非自定义模式时，自动计算结束时间
+                                                if PaymentDurationOption.allCases[index] != .custom {
+                                                    updateFinalPaymentEndDate()
+                                                }
                                             }
                                         } label: {
                                             Text(PaymentDurationOption.allCases[index].label)
                                                 .font(.caption)
                                                 .fontWeight(durationSliderValue == Double(index) ? .bold : .regular)
                                                 .foregroundStyle(durationSliderValue == Double(index) ? .white : .primary)
-                                                .padding(.horizontal, 12)
+                                                .padding(.horizontal, 10)
                                                 .padding(.vertical, 6)
                                                 .background(
                                                     RoundedRectangle(cornerRadius: 16)
-                                                        .fill(durationSliderValue == Double(index) ? Color.pink : Color(uiColor: .tertiarySystemFill))
+                                                        .fill(buttonBackgroundColor(for: index))
                                                 )
                                         }
                                         .buttonStyle(PlainButtonStyle())
@@ -551,20 +567,27 @@ struct ClothingPurchaseInfoView: View {
                             }
                             .padding(.vertical, 4)
                             
-                            // 结束时间（自动计算，只读显示）
-                            HStack {
-                                Text("结束")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(finalPaymentEndDate, style: .date)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.primary)
+                            // 结束时间显示
+                            if isCustomMode {
+                                // 自定义模式：显示日期选择器
+                                DatePicker("结束", selection: $finalPaymentEndDate, in: finalPaymentDate..., displayedComponents: .date)
+                                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                            } else {
+                                // 预设模式：只读显示自动计算的结束时间
+                                HStack {
+                                    Text("结束")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(finalPaymentEndDate, style: .date)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.primary)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                                .cornerRadius(8)
                             }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .background(Color(uiColor: .tertiarySystemGroupedBackground))
-                            .cornerRadius(8)
                             
                             Text("设置预计尾款时间范围，方便在尾款天使中统计和提醒")
                                 .font(.caption)
@@ -594,8 +617,23 @@ struct ClothingPurchaseInfoView: View {
         }
     }
     
+    // 根据索引返回按钮背景色
+    private func buttonBackgroundColor(for index: Int) -> Color {
+        let isSelected = durationSliderValue == Double(index)
+        let option = PaymentDurationOption.allCases[index]
+        
+        if isSelected {
+            return option == .custom ? Color.orange : Color.pink
+        } else {
+            return Color(uiColor: .tertiarySystemFill)
+        }
+    }
+    
     // 根据开始时间和时间段计算结束时间
     private func updateFinalPaymentEndDate() {
+        // 自定义模式下不自动计算
+        guard selectedDuration != .custom else { return }
+        
         let calendar = Calendar.current
         if let newEndDate = calendar.date(byAdding: .day, value: selectedDuration.rawValue, to: finalPaymentDate) {
             finalPaymentEndDate = newEndDate
@@ -606,14 +644,20 @@ struct ClothingPurchaseInfoView: View {
     private func initializeDurationSlider() {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.day], from: finalPaymentDate, to: finalPaymentEndDate)
+        
         if let days = components.day {
-            // 找到最接近的时间段
-            let closestOption = PaymentDurationOption.allCases.min { option1, option2 in
-                abs(option1.rawValue - days) < abs(option2.rawValue - days)
+            // 检查是否匹配预设的时间段
+            if let exactMatch = PaymentDurationOption.allCases.first(where: { $0.rawValue == days && $0 != .custom }) {
+                // 精确匹配某个预设值
+                if let index = PaymentDurationOption.allCases.firstIndex(of: exactMatch) {
+                    durationSliderValue = Double(index)
+                    return
+                }
             }
-            if let closest = closestOption,
-               let index = PaymentDurationOption.allCases.firstIndex(of: closest) {
-                durationSliderValue = Double(index)
+            
+            // 不匹配任何预设值，使用自定义模式
+            if let customIndex = PaymentDurationOption.allCases.firstIndex(of: .custom) {
+                durationSliderValue = Double(customIndex)
             }
         }
     }

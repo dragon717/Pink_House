@@ -1,7 +1,7 @@
 
 import SwiftUI
 
-/// 小世界悬浮标签样式
+/// House悬浮标签样式
 enum SmallWorldLabelStyle {
     case horizontal(angle: Double)
     case vertical(angle: Double)

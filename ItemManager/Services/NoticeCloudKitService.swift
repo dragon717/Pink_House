@@ -102,6 +102,9 @@ class NoticeCloudKitService: ObservableObject {
 
             lastSyncDate = Date()
             print("✅ 成功拉取 \(notices.count) 条云端公告")
+            for notice in notices {
+                print("   📋 公告标题: \(notice.title)")
+            }
             return notices
 
         } catch let error as CKError {

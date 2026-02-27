@@ -8,7 +8,7 @@ struct SmallWorldSettingsView: View {
     @State private var showingClearCacheAlert = false
     
     var body: some View {
-        AdaptiveSettingsView(title: "小世界设置") {
+        AdaptiveSettingsView(title: "House设置") {
             // 预览区域
             AdaptiveSection(header: "预览") {
                 SmallWorldPreview(
@@ -22,7 +22,7 @@ struct SmallWorldSettingsView: View {
             }
             
             AdaptiveSection(header: "风格选择") {
-                Picker("小世界风格", selection: $smallWorldStyle) {
+                Picker("House风格", selection: $smallWorldStyle) {
                     ForEach(SmallWorldStyle.allCases) { style in
                         Text(style.displayName).tag(style.rawValue)
                     }
@@ -31,7 +31,7 @@ struct SmallWorldSettingsView: View {
                 .adaptiveRow(showDivider: false)
             }
             
-            // 小世界场景设置 (仅在法式复古风格下显示)
+            // House场景设置 (仅在法式复古风格下显示)
             if smallWorldStyle == SmallWorldStyle.frenchRetro.rawValue {
                 AdaptiveSection(header: "场景环境") {
                     VStack(alignment: .leading, spacing: 10) {
@@ -121,7 +121,7 @@ struct SmallWorldSettingsView: View {
         .alert("缓存清理完成", isPresented: $showingClearCacheAlert) {
             Button("确定", role: .cancel) { }
         } message: {
-            Text("所有的 3D 场景缓存文件已被清理。下次进入小世界时将重新生成。")
+            Text("所有的 3D 场景缓存文件已被清理。下次进入House时将重新生成。")
         }
     }
 }

@@ -103,7 +103,7 @@ struct DataManagementView: View {
                 }
                 
                 if #available(iOS 26.0, *) {
-                    Section(header: Text("小世界（空间场景）")) {
+                    Section(header: Text("House（空间场景）")) {
                         Button(action: rebuildSpatialScene) {
                             HStack {
                                 Label("重建空间场景", systemImage: "sparkles")
@@ -182,7 +182,7 @@ struct DataManagementView: View {
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             await MainActor.run {
                 self.isLoading = false
-                self.message = "已触发重建，进入小世界时自动生效"
+                self.message = "已触发重建，进入House时自动生效"
                 self.showingMessage = true
             }
         }

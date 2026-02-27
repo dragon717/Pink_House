@@ -2,7 +2,7 @@
 //  BigWorldModels.swift
 //  ItemManager
 //
-//  大世界 - Lolita茶会环球旅行数据模型
+//  世界书 - Lolita茶会环球旅行数据模型
 //
 
 import Foundation

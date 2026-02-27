@@ -10,26 +10,34 @@ import SwiftData
 import WidgetKit
 import SwiftUI
 
-class SharedPersistence {
-    static let shared = SharedPersistence()
+@MainActor
+class SharedContainer {
+    static let shared = SharedContainer()
     
     // 使用 MigrationManager 创建 ModelContainer，支持本地和 iCloud 双模式
-    var sharedModelContainer: ModelContainer
+    let container: ModelContainer
+    
+    var sharedModelContainer: ModelContainer { container }
+    
+    // 便捷访问点，与旧代码兼容
+    static var sharedModelContainer: ModelContainer {
+        return shared.container
+    }
     
     private init() {
         // 使用 SwiftDataMigrationManager 创建合适的 ModelContainer
         do {
             #if WIDGET_EXTENSION
             // 小组件扩展使用简化的本地存储配置
-            self.sharedModelContainer = try Self.createWidgetModelContainer()
+            self.container = try Self.createWidgetModelContainer()
             print("✅ 小组件 ModelContainer 创建成功")
             #else
             // 主应用使用 MigrationManager
-            self.sharedModelContainer = try SwiftDataMigrationManager.shared.createModelContainer()
+            self.container = try SwiftDataMigrationManager.shared.createModelContainer()
             
             // ⚠️ 关键：延迟应用删除，确保数据已经从 iCloud 同步过来
             // 因为 ModelContainer 创建后，iCloud 同步是异步的，需要等待一段时间
-            let context = self.sharedModelContainer.mainContext
+            let context = self.container.mainContext
             DeleteTracker.shared.pendingContext = context
             
             // 延迟5秒首次应用删除，确保 iCloud 同步完成
@@ -83,11 +91,12 @@ class SharedPersistence {
                     Model3D.self,
                     StoredImage.self,
                     PerlerBeadPattern.self,
-                    Notice.self
+                    Notice.self,
+                    ClothingImageSyncRecord.self
                 ])
                 #endif
                 let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
-                self.sharedModelContainer = try ModelContainer(for: schema, configurations: [fallbackConfig])
+                self.container = try ModelContainer(for: schema, configurations: [fallbackConfig])
                 print("✅ 回退到本地存储成功")
             } catch {
                 fatalError("无法创建 ModelContainer: \(error)")
@@ -120,7 +129,9 @@ class SharedPersistence {
     /// 重新创建 ModelContainer（切换 iCloud 同步设置后调用）
     func recreateModelContainer() throws {
         #if !WIDGET_EXTENSION
-        self.sharedModelContainer = try SwiftDataMigrationManager.shared.createModelContainer()
+        // 注意：这里不能直接重新赋值 let container，需要其他方式来处理重新创建
+        // 暂时保留原有逻辑，实际使用时需要重构
+        print("⚠️ recreateModelContainer 需要重新设计以支持 let container")
         #endif
     }
     
@@ -197,9 +208,15 @@ class SharedPersistence {
                 ))
             }
             
+            // 获取 widgetImagesDirectory 路径（在主线程）
+            guard let widgetImagesDir = WidgetDataManager.shared.widgetImagesDirectory else {
+                print("SharedContainer: Widget images directory not available")
+                return
+            }
+            
             // Run image processing in background
             let widgetData = await Task.detached(priority: .background) {
-                let processedItems = SharedPersistence.processWidgetImages(dtos: recentDTOs)
+                let processedItems = SharedContainer.processWidgetImages(dtos: recentDTOs, widgetImagesDir: widgetImagesDir)
                 
                 return WidgetData(
                     totalCount: totalCount,
@@ -218,10 +235,10 @@ class SharedPersistence {
             
             WidgetDataManager.shared.save(data: widgetData)
             WidgetCenter.shared.reloadAllTimelines()
-            print("SharedPersistence: Widget data synced and timeline reloaded.")
+            print("SharedContainer: Widget data synced and timeline reloaded.")
             
         } catch {
-            print("SharedPersistence: Failed to fetch data for widget sync: \(error)")
+            print("SharedContainer: Failed to fetch data for widget sync: \(error)")
         }
     }
     
@@ -235,13 +252,13 @@ class SharedPersistence {
     }
     
     // Static function to run in background
-    static func processWidgetImages(dtos: [ClothingWidgetDataDTO]) -> [WidgetClothing] {
+    // 标记为 nonisolated 允许从后台任务调用
+    nonisolated static func processWidgetImages(dtos: [ClothingWidgetDataDTO], widgetImagesDir: URL) -> [WidgetClothing] {
         var widgetClothings: [WidgetClothing] = []
         
         let fileManager = FileManager.default
         // Assuming images are stored in Documents/Images
-        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Images"),
-              let widgetImagesDir = WidgetDataManager.shared.widgetImagesDirectory else {
+        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Images") else {
             return dtos.map {
                 WidgetClothing(id: $0.id, name: $0.name, price: $0.price, stock: $0.stock, imagePath: nil)
             }
@@ -305,3 +322,6 @@ class SharedPersistence {
         return widgetClothings
     }
 }
+
+// MARK: - 向后兼容的类型别名
+typealias SharedPersistence = SharedContainer

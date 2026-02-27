@@ -2,7 +2,7 @@
 //  BadgeAndAchievementView.swift
 //  ItemManager
 //
-//  大世界 - 徽章墙与成就系统
+//  世界书 - 徽章墙与成就系统
 //
 
 import SwiftUI

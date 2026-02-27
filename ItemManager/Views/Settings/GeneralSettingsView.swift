@@ -433,11 +433,11 @@ struct GeneralSettingsView: View {
             }
         }
 
-        // 小世界风格更换
+        // House风格更换
         HStack {
             Image(systemName: "paintpalette.fill")
                 .foregroundStyle(.purple)
-            Text("小世界风格")
+            Text("House风格")
             Spacer()
             Picker("", selection: $smallWorldStyle) {
                 ForEach(SmallWorldStyle.allCases) { style in
@@ -448,13 +448,13 @@ struct GeneralSettingsView: View {
             .labelsHidden()
         }
 
-        // 小世界场景设置 (仅在法式复古风格下显示)
+        // House场景设置 (仅在法式复古风格下显示)
         if smallWorldStyle == SmallWorldStyle.frenchRetro.rawValue {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: "sun.haze.fill")
                         .foregroundStyle(.orange)
-                    Text("小世界场景")
+                    Text("House场景")
                 }
                 
                 VStack(spacing: 8) {

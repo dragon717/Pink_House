@@ -367,6 +367,12 @@ class ImageManager {
                 memoryCache.setObject(image, forKey: fileName as NSString, cost: cost)
                 
                 AppLogger.info("New image saved (Hash: \(hash), File: \(fileName))")
+                
+                // 触发 CloudKit 同步（异步，不阻塞主线程）
+                Task {
+                    await ClothingImageSyncService.shared.syncPendingImages()
+                }
+                
                 return fileName
             }
         } catch {
