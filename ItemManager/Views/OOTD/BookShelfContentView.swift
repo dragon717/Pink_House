@@ -88,6 +88,7 @@ struct BookShelfContentView: View {
                         .id(selectedBook.id)
                         .transition(.opacity)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义返回按钮
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             } else {

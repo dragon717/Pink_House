@@ -167,6 +167,7 @@ struct SpaceBookDetailView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
+            .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的返回按钮
             .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
                 TextField("名称", text: $renameBookName)
                 Button("取消", role: .cancel) {}

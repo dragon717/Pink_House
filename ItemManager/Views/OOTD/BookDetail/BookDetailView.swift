@@ -12,6 +12,8 @@ struct BookDetailView: View {
     @Binding var isSidebarVisible: Bool
     var onBack: (() -> Void)?
     var showLeadingToolbar: Bool = true
+    var showBackButton: Bool = true // 控制是否显示返回按钮
+    var showSidebarToggle: Bool = true // 控制是否显示侧边栏切换按钮（在平面模式下从Tab管理器进入时隐藏）
     var onPageTap: ((Outfit) -> Void)? = nil
 
     // 使用 @State 存储书页数据，确保每次进入视图都重新获取

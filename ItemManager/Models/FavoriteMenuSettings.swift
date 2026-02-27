@@ -85,7 +85,7 @@ class FavoriteMenuSettings {
     var selectedItemIDs: [String]
     var lastUpdated: Date
     
-    init(selectedItemIDs: [String] = ["萌宠", "拼豆工坊", "世界书", "House","来财"]) {
+    init(selectedItemIDs: [String] = ["萌宠", "拼豆工坊", "世界书", "穿搭手帐","来财"]) {
         self.selectedItemIDs = selectedItemIDs
         self.lastUpdated = Date()
     }

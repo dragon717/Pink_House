@@ -41,6 +41,9 @@ struct BookShelfView: View {
     @State var selectedBook: BookGroup?
     @State var navigationPath = NavigationPath()
     
+    // 用于外部监听当前是否选中了书（书页列表模式下隐藏全局导航返回按钮）
+    @Binding var isBookSelected: Bool
+    
     // Animation
     @Namespace var animationNamespace
     @State var openingBook: BookGroup?
@@ -51,6 +54,9 @@ struct BookShelfView: View {
     
     // Track spatial book selection state
     @State var isSpatialBookSelected = false
+    
+    // 用于外部监听当前是否选中了空间书（空间书页列表模式下隐藏全局导航返回按钮）
+    @Binding var isSpaceBookSelected: Bool
     
     // Custom Sort Editing
     @State var isEditing = false
@@ -116,9 +122,11 @@ struct BookShelfView: View {
                         navigationPath.removeLast()
                     }
                 )
+                .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的backButton
             }
             .navigationDestination(for: SpaceBookGroup.self) { book in
                 SpaceBookDetailView(book: book, isSidebarVisible: .constant(true))
+                    .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的返回按钮
             }
             .navigationDestination(for: SpaceOutfit.self) { outfit in
                 SpatialCanvasEditorView(
@@ -141,6 +149,16 @@ struct BookShelfView: View {
             }
             .onAppear {
                 performMigration()
+                // 初始化时同步选中状态
+                isBookSelected = selectedBook != nil
+            }
+            .onChange(of: selectedBook) { _, newValue in
+                // 同步选中状态到外部
+                isBookSelected = newValue != nil
+            }
+            .onChange(of: isSpatialBookSelected) { _, newValue in
+                // 同步空间书选中状态到外部
+                isSpaceBookSelected = newValue
             }
             .alert("删除手帐", isPresented: $showingDeleteBookAlert) {
                 Button("取消", role: .cancel) { bookToDelete = nil }

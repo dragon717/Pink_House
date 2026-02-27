@@ -545,17 +545,27 @@ struct OOTDViewWithBackButton: View {
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
     
+    // 监听当前是否选中了书（书页列表模式下隐藏全局导航返回按钮）
+    @State private var isBookSelected: Bool = false
+    
+    // 监听当前是否选中了空间书（空间书页列表模式下隐藏全局导航返回按钮）
+    @State private var isSpaceBookSelected: Bool = false
+    
     var body: some View {
-        OOTDView(hideBackButton: true)
+        OOTDView(hideBackButton: true, isBookSelected: $isBookSelected, isSpaceBookSelected: $isSpaceBookSelected)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
+                // 只在书架列表模式下显示全局导航返回按钮
+                // 选中书时（平面或空间书页列表），使用自定义的返回按钮
+                if !isBookSelected && !isSpaceBookSelected {
+                    ToolbarItem(placement: .topBarLeading) {
+                        SmallWorldBackButton(
+                            selectedTab: $selectedTab,
+                            homeTab: $homeTab,
+                            onBackToMenu: {
+                                destination = .menu
+                            }
+                        )
+                    }
                 }
             }
     }

@@ -20,8 +20,6 @@ struct SpaceBookToolbar: ToolbarContent {
         // Leading: Back button and Sidebar toggle
         ToolbarItem(placement: .topBarLeading) {
             HStack(spacing: 8) {
-                
-
                 // Toggle Sidebar Button
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {

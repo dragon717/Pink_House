@@ -463,7 +463,7 @@ struct OOTDEditorView: View {
     private func mainContentArea(geometry: GeometryProxy) -> some View {
         let isLandscape = geometry.size.width > geometry.size.height
         let isIPad = UIDevice.current.userInterfaceIdiom == .pad
-        
+
         // 根据设备类型和屏幕尺寸计算贴纸库宽度
         let sidebarWidth: CGFloat = {
             if isIPad {
@@ -474,8 +474,12 @@ struct OOTDEditorView: View {
                 return isListExpanded ? min(320, geometry.size.width * 0.4) : 90
             }
         }()
-        
+
         ZStack {
+            // 背景
+            LiquidBackground()
+                .ignoresSafeArea()
+
             if isLandscape {
                 // Landscape Layout: HStack (Canvas + Sidebar)
                 HStack(spacing: 0) {
