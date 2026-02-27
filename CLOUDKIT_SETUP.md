@@ -103,11 +103,36 @@ Button {
 
 ### 5. 部署到 Production（发布前必须做）
 
-**注意**：Development 和 Production 是两个独立的环境
+**⚠️ 重要提示**：Development 和 Production 是两个完全独立的环境！
+
+- **Development**：Xcode 调试运行时使用
+- **Production**：TestFlight 和 App Store 版本使用
+
+**如果不部署到 Production，TestFlight 和 App Store 用户将看不到任何公告！**
+
+#### 部署步骤：
 
 1. 在 **Schema** 页面，点击右上角 **Deploy to Production...**
 2. 确认要部署的 Record Types 包含 `Notice`
 3. 点击 **Deploy**
+
+#### 部署后需要在 Production 环境重复配置：
+
+部署完成后，切换到 Production 环境，重复以下配置：
+
+1. 点击页面顶部的环境切换器，选择 **Production**
+2. 进入 **Schema** → **Record Types**
+3. 确认 `Notice` Record Type 已存在
+4. 进入 **Schema** → **Security Roles**，确认权限配置正确
+5. 如果需要在 Production 环境发布测试公告，需要先在 Production 环境发布一条公告
+
+#### 环境验证方法：
+
+在代码中添加了环境检测，查看控制台输出：
+```
+📢 当前运行环境: Development (调试版)  // Xcode 运行
+📢 当前运行环境: Production (发布版)   // TestFlight/App Store
+```
 
 ---
 

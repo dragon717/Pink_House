@@ -410,16 +410,48 @@ struct NoticeTestView: View {
     @State private var showResetAlert = false
     @StateObject private var service = NoticeService.shared
     @StateObject private var cloudKitService = NoticeCloudKitService.shared
+    @StateObject private var readStatusService = NoticeReadStatusService.shared
     @Environment(\.modelContext) private var modelContext
     @State private var showSyncAlert = false
     @State private var syncMessage = ""
+    @State private var showReadStatusAlert = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // 环境信息
+                VStack(spacing: 8) {
+                    Text("当前环境")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack {
+                        Image(systemName: "cloud.fill")
+                            .foregroundStyle(.blue)
+                        #if DEBUG
+                        Text("Development (调试版)")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                        #else
+                        Text("Production (发布版)")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        #endif
+                    }
+                    
+                    Text("📢 已读状态: \(readStatusService.isSyncing ? "同步中..." : "已同步")")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .padding(.horizontal)
+                .padding(.top, 20)
+
                 Text("公告管理功能测试")
                     .foregroundStyle(.secondary)
-                    .padding(.top, 20)
 
                 // 同步状态
                 if service.isSyncing || cloudKitService.isSyncing {
@@ -460,7 +492,7 @@ struct NoticeTestView: View {
                 }
                 .padding(.horizontal)
 
-                // 手动同步
+                // 手动同步公告
                 Button {
                     Task {
                         await service.manualSync()
@@ -476,6 +508,23 @@ struct NoticeTestView: View {
                     )
                 }
                 .disabled(service.isSyncing)
+                .padding(.horizontal)
+
+                // 同步已读状态
+                Button {
+                    Task {
+                        await readStatusService.syncFromCloud()
+                        showReadStatusAlert = true
+                    }
+                } label: {
+                    LabActionCard(
+                        icon: "checkmark.circle.icloud",
+                        title: "同步已读状态",
+                        subtitle: "从 iCloud 同步已读状态",
+                        color: .cyan
+                    )
+                }
+                .disabled(readStatusService.isSyncing)
                 .padding(.horizontal)
 
                 // 预览公告
@@ -527,6 +576,11 @@ struct NoticeTestView: View {
             Button("确定", role: .cancel) {}
         } message: {
             Text(syncMessage)
+        }
+        .alert("已读状态同步", isPresented: $showReadStatusAlert) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text("已读状态已从 iCloud 同步完成")
         }
         .alert("确认重置", isPresented: $showResetAlert) {
             Button("取消", role: .cancel) {}

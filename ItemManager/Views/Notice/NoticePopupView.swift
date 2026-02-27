@@ -13,25 +13,25 @@ struct NoticePopupView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // 灰色蒙版
-                Color.black
-                    .opacity(0.5)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        dismiss()
-                    }
-                
-                // 公告内容 - 根据屏幕尺寸自适应
-                NoticeCardView(notice: notice)
-                    .frame(width: cardWidth(for: geometry.size))
-                    .scaleEffect(isVisible ? 1.0 : 0.8)
-                    .opacity(isVisible ? 1.0 : 0.0)
-                    .onTapGesture {
-                        // 点击公告内容不关闭
-                    }
-            }
+        // 全局居中布局：公告内容在灰色蒙版中水平和垂直双轴居中
+        ZStack(alignment: .center) {
+            // 灰色蒙版
+            Color.black
+                .opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    dismiss()
+                }
+            
+            // 公告内容 - 全局居中：使用 ZStack alignment 实现水平和垂直双轴居中
+            NoticeCardView(notice: notice)
+                .frame(maxWidth: 320, maxHeight: 500)
+                .padding(.horizontal, 32)
+                .scaleEffect(isVisible ? 1.0 : 0.8)
+                .opacity(isVisible ? 1.0 : 0.0)
+                .onTapGesture {
+                    // 点击公告内容不关闭
+                }
         }
         .zIndex(999) // 置于最顶部
         .onAppear {
@@ -82,6 +82,7 @@ struct NoticeCardView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            // 全局居中布局：整个卡片在父容器中水平和垂直双轴居中
             ZStack {
                 // 第1层：背景色（圆角矩形）
                 RoundedRectangle(cornerRadius: NoticeConfig.cornerRadius)
@@ -307,55 +308,27 @@ class NoticePopupManager: ObservableObject {
     @Published var currentNotice: Notice?
     @Published var isShowing = false
 
-    private let shownNoticeIDsKey = "shownNoticeIDs"
-    private let lastResetTimeKey = "noticeLastResetTime"
+    private let readStatusService = NoticeReadStatusService.shared
     private let service = NoticeService.shared
 
     private init() {}
 
-    // 获取已展示过的公告ID列表
-    private var shownNoticeIDs: [String] {
-        get {
-            UserDefaults.standard.stringArray(forKey: shownNoticeIDsKey) ?? []
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: shownNoticeIDsKey)
-        }
-    }
-
-    // 获取上次重置时间
+    // 获取上次重置时间（从已读状态服务）
     var lastResetTime: Date? {
-        get {
-            UserDefaults.standard.object(forKey: lastResetTimeKey) as? Date
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: lastResetTimeKey)
-        }
+        return readStatusService.lastResetTime
     }
 
     // 检查公告是否已展示过
     func hasShownNotice(_ notice: Notice) -> Bool {
-        print("📢 hasShownNotice: notice.id=\(notice.id), createdAt=\(notice.createdAt), lastResetTime=\(String(describing: lastResetTime)), shownNoticeIDs=\(shownNoticeIDs)")
-        // 如果重置过，只检查重置时间之后的记录
-        if let resetTime = lastResetTime {
-            // 如果公告是在重置之后创建的，或者没有展示记录，则需要展示
-            if notice.createdAt > resetTime {
-                print("📢 公告在重置后创建，需要展示")
-                return false
-            }
-        }
-        let hasShown = shownNoticeIDs.contains(notice.id.uuidString)
+        print("📢 hasShownNotice: notice.id=\(notice.id), createdAt=\(notice.createdAt), lastResetTime=\(String(describing: lastResetTime))")
+        let hasShown = readStatusService.hasReadNotice(notice)
         print("📢 hasShown: \(hasShown)")
         return hasShown
     }
 
     // 标记公告为已展示
     func markNoticeAsShown(_ notice: Notice) {
-        var ids = shownNoticeIDs
-        if !ids.contains(notice.id.uuidString) {
-            ids.append(notice.id.uuidString)
-            shownNoticeIDs = ids
-        }
+        readStatusService.markAsRead(notice)
     }
 
     // 尝试展示公告（只展示未展示过的）
@@ -392,8 +365,7 @@ class NoticePopupManager: ObservableObject {
 
     // 重置所有展示记录（用于测试）
     func resetShownHistory() {
-        shownNoticeIDs = []
-        lastResetTime = Date()
+        readStatusService.resetReadHistory()
     }
 }
 
@@ -401,8 +373,22 @@ class NoticePopupManager: ObservableObject {
 struct NoticePopupModifier: ViewModifier {
     @StateObject private var manager = NoticePopupManager.shared
     @StateObject private var service = NoticeService.shared
+    @StateObject private var readStatusService = NoticeReadStatusService.shared
     @Environment(\.modelContext) private var modelContext
-    @State private var hasAttemptedShow = false
+    @State private var hasSyncedReadStatus = false
+    
+    // 使用 UserDefaults 持久化 hasAttemptedShow，避免应用重启后重复显示
+    private var hasAttemptedShow: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: "noticeHasAttemptedShow")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "noticeHasAttemptedShow")
+        }
+    }
+    
+    // 当前会话是否已经尝试过显示（用于防止同一会话内重复显示）
+    @State private var sessionAttempted = false
 
     func body(content: Content) -> some View {
         ZStack {
@@ -417,19 +403,45 @@ struct NoticePopupModifier: ViewModifier {
         .onAppear {
             print("📢 NoticePopupModifier onAppear")
             service.setup(with: modelContext)
+            // 启动时同步已读状态
+            syncReadStatus()
             // 每次视图出现时检查是否需要重置 hasAttemptedShow
             checkAndResetAttemptState()
         }
         .onChange(of: service.notices) { _, newNotices in
-            print("📢 service.notices changed: count=\(newNotices.count), hasAttemptedShow=\(hasAttemptedShow)")
-            // 等待公告数据加载完成后再尝试展示
-            if !hasAttemptedShow && !newNotices.isEmpty {
-                hasAttemptedShow = true
+            print("📢 service.notices changed: count=\(newNotices.count), hasAttemptedShow=\(hasAttemptedShow), sessionAttempted=\(sessionAttempted), hasSyncedReadStatus=\(hasSyncedReadStatus)")
+            // 等待公告数据加载完成且已读状态同步完成后再尝试展示
+            // 条件：未尝试过显示、未在同一会话中尝试过、有公告数据、已同步已读状态
+            if !hasAttemptedShow && !sessionAttempted && !newNotices.isEmpty && hasSyncedReadStatus {
+                sessionAttempted = true
                 // 记录本次尝试的时间戳
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastNoticeAttemptTime")
                 print("📢 准备显示公告，延迟 0.5 秒...")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     print("📢 调用 tryShowLatestNotice()")
+                    manager.tryShowLatestNotice()
+                }
+            }
+        }
+        .onChange(of: manager.isShowing) { _, isShowing in
+            // 当公告弹窗显示时，标记为已尝试过显示
+            if isShowing {
+                print("📢 公告弹窗已显示，设置 hasAttemptedShow = true")
+                UserDefaults.standard.set(true, forKey: "noticeHasAttemptedShow")
+            }
+        }
+    }
+    
+    // 同步已读状态
+    private func syncReadStatus() {
+        Task {
+            await readStatusService.syncFromCloud()
+            hasSyncedReadStatus = true
+            // 如果公告数据已经加载，尝试显示
+            if !service.notices.isEmpty && !hasAttemptedShow && !sessionAttempted {
+                sessionAttempted = true
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastNoticeAttemptTime")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     manager.tryShowLatestNotice()
                 }
             }
@@ -446,7 +458,7 @@ struct NoticePopupModifier: ViewModifier {
         // 如果重置时间晚于上次尝试时间，说明需要重新尝试显示
         if lastResetTime > lastAttemptTime {
             print("📢 检测到重置操作，重置 hasAttemptedShow")
-            hasAttemptedShow = false
+            UserDefaults.standard.set(false, forKey: "noticeHasAttemptedShow")
         }
     }
 }

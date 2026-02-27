@@ -24,6 +24,15 @@ struct MeView: View {
         GridItem(.flexible(), spacing: 16)
     ]
     
+    // 实验室入口是否显示（Debug 模式或通过兑换码开启）
+    private var shouldShowLabEntry: Bool {
+        #if DEBUG
+        return true
+        #else
+        return UserDefaults.standard.bool(forKey: "LabEntryEnabled")
+        #endif
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -120,18 +129,18 @@ struct MeView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         
-                        // 开发测试 (仅 Debug)
-                        #if DEBUG
-                        NavigationLink(destination: TestEffectsView()) {
-                            SettingsGridItem(
-                                title: "实验室",
-                                subtitle: "特效测试",
-                                icon: "flask.fill",
-                                iconColor: .green
-                            )
+                        // 开发测试 (仅 Debug 或通过兑换码开启)
+                        if shouldShowLabEntry {
+                            NavigationLink(destination: TestEffectsView()) {
+                                SettingsGridItem(
+                                    title: "实验室",
+                                    subtitle: "特效测试 · 公告管理",
+                                    icon: "flask.fill",
+                                    iconColor: .green
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        #endif
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 20)

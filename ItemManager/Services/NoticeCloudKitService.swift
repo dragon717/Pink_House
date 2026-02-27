@@ -63,9 +63,16 @@ class NoticeCloudKitService: ObservableObject {
             // 检查 iCloud 账户状态
             let accountStatus = try await container.accountStatus()
             guard accountStatus == .available else {
-                print("iCloud 账户不可用")
+                print("📢 iCloud 账户不可用，状态: \(accountStatus)")
                 return []
             }
+            
+            // 检测当前环境
+            #if DEBUG
+            print("📢 当前运行环境: Development (调试版)")
+            #else
+            print("📢 当前运行环境: Production (发布版)")
+            #endif
 
             // 只获取最近30天的活跃公告
             let cutoffDate = Date().addingTimeInterval(-NoticeConfig.maxNoticeAge)
@@ -89,7 +96,7 @@ class NoticeCloudKitService: ObservableObject {
                         notices.append(notice)
                     }
                 case .failure(let error):
-                    print("获取公告记录失败: \(error)")
+                    print("⚠️ 获取公告记录失败: \(error)")
                 }
             }
 
@@ -97,11 +104,60 @@ class NoticeCloudKitService: ObservableObject {
             print("✅ 成功拉取 \(notices.count) 条云端公告")
             return notices
 
+        } catch let error as CKError {
+            // 处理 CloudKit 特定错误
+            handleCloudKitError(error, operation: "拉取公告")
+            return []
         } catch {
             syncError = "同步失败: \(error.localizedDescription)"
             print("❌ 拉取云端公告失败: \(error)")
             return []
         }
+    }
+    
+    // MARK: - 处理 CloudKit 错误
+    private func handleCloudKitError(_ error: CKError, operation: String) {
+        switch error.code {
+        case .assetNotAvailable:
+            print("❌ \(operation) 失败: 资源不可用")
+        case .badContainer:
+            print("❌ \(operation) 失败: CloudKit 容器配置错误")
+        case .badDatabase:
+            print("❌ \(operation) 失败: 数据库访问错误")
+        case .invalidArguments:
+            print("❌ \(operation) 失败: 参数无效")
+        case .networkFailure:
+            print("❌ \(operation) 失败: 网络错误")
+        case .networkUnavailable:
+            print("❌ \(operation) 失败: 网络不可用")
+        case .notAuthenticated:
+            print("❌ \(operation) 失败: 用户未登录 iCloud")
+        case .permissionFailure:
+            print("❌ \(operation) 失败: 权限不足，请在 CloudKit Dashboard 中配置 Public Database 权限")
+        case .quotaExceeded:
+            print("❌ \(operation) 失败: 超出存储配额")
+        case .requestRateLimited:
+            print("❌ \(operation) 失败: 请求频率过高")
+        case .serverRecordChanged:
+            print("❌ \(operation) 失败: 服务器记录已更改")
+        case .serviceUnavailable:
+            print("❌ \(operation) 失败: CloudKit 服务不可用")
+        case .zoneBusy:
+            print("❌ \(operation) 失败: 区域繁忙")
+        case .zoneNotFound:
+            print("❌ \(operation) 失败: 区域未找到")
+        case .unknownItem:
+            print("❌ \(operation) 失败: 记录类型不存在，请在 CloudKit Dashboard 中创建 Notice Record Type")
+        default:
+            print("❌ \(operation) 失败: \(error.localizedDescription) (code: \(error.code.rawValue))")
+        }
+        
+        // 记录详细错误信息
+        if let retryAfter = error.userInfo[CKErrorRetryAfterKey] as? TimeInterval {
+            print("⏱️ 建议重试时间: \(retryAfter) 秒后")
+        }
+        
+        syncError = "\(operation)失败: \(error.localizedDescription)"
     }
 
     // MARK: - 发布公告到云端

@@ -240,6 +240,9 @@ struct VIPCenterView: View {
         showingPurchaseAlert = true
     }
     
+    // 实验室入口状态
+    @State private var showLabEntry = false
+    
     private func redeemVIPCode() {
         let code = vipCodeInput.trimmingCharacters(in: .whitespacesAndNewlines)
         if code == "太子爷" {
@@ -257,6 +260,11 @@ struct VIPCenterView: View {
                 redeemResultMessage = "兑换成功！\n获得 666 喵币\n88888 鱼币"
                 showingRedeemResultAlert = true
             }
+        } else if code == "adminmuniao" {
+            // 管理员兑换码：唤出实验室入口
+            UserDefaults.standard.set(true, forKey: "LabEntryEnabled")
+            redeemResultMessage = "实验室入口已开启！\n请前往「我的」页面查看"
+            showingRedeemResultAlert = true
         } else {
             redeemResultMessage = "兑换码无效"
             showingRedeemResultAlert = true

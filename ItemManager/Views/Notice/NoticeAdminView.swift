@@ -545,7 +545,8 @@ struct NoticePreviewOverlay: View {
     let notice: Notice
 
     var body: some View {
-        ZStack {
+        // 全局居中布局：公告内容在遮罩中水平和垂直双轴居中
+        ZStack(alignment: .center) {
             Color.black
                 .opacity(0.5)
                 .ignoresSafeArea()
@@ -553,8 +554,10 @@ struct NoticePreviewOverlay: View {
                     isPresented = false
                 }
 
+            // 公告卡片 - 全局居中：水平和垂直双轴居中
             NoticeCardView(notice: notice)
-                .frame(maxWidth: 340)
+                .frame(maxWidth: 340, maxHeight: 500)
+                .padding(.horizontal, 32)
                 .onTapGesture {
                     // 点击公告不关闭
                 }
