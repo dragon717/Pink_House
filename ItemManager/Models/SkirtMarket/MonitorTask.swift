@@ -370,6 +370,15 @@ final class MonitorNode {
     /// 节点评分（成功率）
     var successRate: Double
     
+    /// 该节点负责的平台列表
+    var platforms: [String]
+    
+    /// 当前已完成的任务数
+    var completedTasks: Int
+    
+    /// 最后在线时间（用于计算离线状态）
+    var lastSeenAt: Date?
+    
     init(nodeId: String, nodeName: String, deviceType: String) {
         self.nodeId = nodeId
         self.nodeName = nodeName
@@ -384,6 +393,9 @@ final class MonitorNode {
         self.currentTaskCount = 0
         self.weight = 1.0
         self.successRate = 1.0
+        self.platforms = []
+        self.completedTasks = 0
+        self.lastSeenAt = Date()
     }
     
     /// 更新活跃状态

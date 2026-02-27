@@ -211,7 +211,7 @@ struct DepositPlanView: View {
         self.filteredClothings = result
     }
     
-    // 计算所有代付尾款（不受年份筛选影响）
+    // 计算所有待付尾款（不受年份筛选影响）
     private var totalPendingBalanceAll: Decimal {
         depositClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
     }
@@ -219,7 +219,7 @@ struct DepositPlanView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // 总代付尾款统计（最顶部）
+                // 总待付尾款统计（最顶部）
                 TotalBalanceCard(
                     totalBalance: totalPendingBalanceAll,
                     isVisible: showStats,
@@ -371,7 +371,7 @@ struct DepositPlanView: View {
     }
 }
 
-// MARK: - 总代付尾款卡片
+// MARK: - 总待付尾款卡片
 struct TotalBalanceCard: View {
     let totalBalance: Decimal
     let isVisible: Bool
@@ -834,7 +834,7 @@ struct YearStatsCard: View {
                     Divider()
                         .frame(height: 30)
                     
-                    DepositStatItem(title: "代付尾款", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
+                    DepositStatItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 12)

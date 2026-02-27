@@ -570,6 +570,37 @@ final class TaskDispatcher: ObservableObject {
         }
     }
     
+    // MARK: - 公共API（供UI调用）
+    
+    /// 获取在线节点数
+    func getOnlineNodeCount() -> Int {
+        return onlineNodes.filter { $0.isOnline }.count
+    }
+    
+    /// 获取所有节点
+    func getAllNodes() -> [MonitorNode] {
+        return onlineNodes
+    }
+    
+    /// 获取待处理任务数
+    func getPendingTaskCount() -> Int {
+        guard let context = context else { return 0 }
+        let descriptor = FetchDescriptor<MonitorTask>(
+            predicate: MonitorTask.predicateForPending()
+        )
+        return (try? context.fetch(descriptor).count) ?? 0
+    }
+    
+    /// 获取今日采集数
+    func getTodayCollectedCount() -> Int {
+        return taskStats.totalItemsFound
+    }
+    
+    /// 获取成功率
+    func getSuccessRate() -> Int {
+        return Int(taskStats.successRate * 100)
+    }
+    
     // MARK: - 公共API
     
     /// 创建新任务

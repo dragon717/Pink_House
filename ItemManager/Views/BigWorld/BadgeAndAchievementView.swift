@@ -550,11 +550,11 @@ struct AchievementStatsCard: View {
     
     var body: some View {
         HStack(spacing: 20) {
-            StatItem(value: "\(unlockedCount)", label: "已解锁", color: .green)
+            BadgeStatItem(value: "\(unlockedCount)", label: "已解锁", color: .green)
             Divider().background(Color.white.opacity(0.2))
-            StatItem(value: "\(viewModel.achievements.count)", label: "总成就", color: .blue)
+            BadgeStatItem(value: "\(viewModel.achievements.count)", label: "总成就", color: .blue)
             Divider().background(Color.white.opacity(0.2))
-            StatItem(value: "\(Int(Double(unlockedCount) / Double(viewModel.achievements.count) * 100))%", label: "完成度", color: .orange)
+            BadgeStatItem(value: "\(Int(Double(unlockedCount) / Double(viewModel.achievements.count) * 100))%", label: "完成度", color: .orange)
         }
         .padding(20)
         .background(
@@ -574,7 +574,7 @@ struct AchievementStatsCard: View {
 }
 
 // MARK: - 统计项
-struct StatItem: View {
+struct BadgeStatItem: View {
     let value: String
     let label: String
     let color: Color
