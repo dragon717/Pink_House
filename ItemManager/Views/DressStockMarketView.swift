@@ -40,13 +40,6 @@ struct DressStockMarketView: View {
             }
             .navigationTitle("裙子股市")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
-                        dismiss()
-                    }
-                }
-            }
         }
     }
 }

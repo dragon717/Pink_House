@@ -424,7 +424,8 @@ struct TotalBalanceCard: View {
                 
                 // 裙子股市
                 Button {
-                    tabNavigationManager.navigate(to: .smallWorld(.bigWorld))
+                    // 跳转到House TabBar中的裙子股市子界面
+                    tabNavigationManager.navigate(to: .smallWorld(.dressStock))
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "chart.line.uptrend.xyaxis")
