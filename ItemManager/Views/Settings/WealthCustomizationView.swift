@@ -7,6 +7,7 @@ struct WealthCustomizationView: View {
     // Define available denominations
     let rmbDenominations = [100, 50, 20, 10, 5, 1]
     let jpyDenominations = [10000, 5000, 1000]
+    let usdDenominations = [100, 50, 20, 10, 5, 2, 1] // 根据联网信息，美元流通面额包括1、2、5、10、20、50、100
     
     var body: some View {
         AdaptiveSettingsView(title: "来财个性化") {
@@ -33,6 +34,13 @@ struct WealthCustomizationView: View {
                         .adaptiveRow(showDivider: value != jpyDenominations.last)
                 }
             }
+
+            AdaptiveSection(header: "美刀样式", footer: "自定义图片将应用到对应面额的纸币显示中。支持1、2、5、10、20、50、100美元面额。") {
+                ForEach(usdDenominations, id: \.self) { value in
+                    CustomizationRowView(currency: .usd, denomination: value, viewModel: viewModel)
+                        .adaptiveRow(showDivider: value != usdDenominations.last)
+                }
+            }
         }
     }
 }
@@ -41,7 +49,17 @@ struct CustomizationRowView: View {
     let currency: CurrencyType
     let denomination: Int
     var viewModel: WealthAppearanceManager
-    
+
+    // 根据货币类型返回单位文本
+    private var currencyUnitText: String {
+        switch currency {
+        case .rmb: return "元"
+        case .jpy: return "円"
+        case .usd: return "刀"
+        case .gold, .silver: return ""
+        }
+    }
+
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var showingCropView = false
@@ -50,7 +68,8 @@ struct CustomizationRowView: View {
         VStack(spacing: 12) {
             // Header
             HStack {
-                Text("\(denomination) \(currency == .rmb ? "元" : "円")")
+                let unitText = currencyUnitText
+                Text("\(denomination) \(unitText)")
                     .font(.headline)
                 Spacer()
             }
@@ -145,7 +164,8 @@ struct CustomizationRowView: View {
     
     private func getDefaultColor(currency: CurrencyType, value: Int) -> Color {
         // Simplified default colors matching WealthViewModel logic
-        if currency == .rmb {
+        switch currency {
+        case .rmb:
             switch value {
             case 100: return Color(red: 0.9, green: 0.3, blue: 0.3)
             case 50: return Color(red: 0.3, green: 0.7, blue: 0.5)
@@ -155,13 +175,27 @@ struct CustomizationRowView: View {
             case 1: return Color(red: 0.7, green: 0.7, blue: 0.3)
             default: return .gray
             }
-        } else {
+        case .jpy:
             switch value {
             case 10000: return Color(red: 0.5, green: 0.3, blue: 0.2)
             case 5000: return Color(red: 0.5, green: 0.2, blue: 0.6)
             case 1000: return Color(red: 0.2, green: 0.4, blue: 0.7)
             default: return .gray
             }
+        case .usd:
+            // 美元面额颜色，与 WealthViewModel 保持一致
+            switch value {
+            case 100: return Color(red: 0.1, green: 0.4, blue: 0.2)  // 墨绿色
+            case 50: return Color(red: 0.2, green: 0.3, blue: 0.5)   // 深蓝色
+            case 20: return Color(red: 0.4, green: 0.2, blue: 0.2)   // 深红色
+            case 10: return Color(red: 0.2, green: 0.3, blue: 0.2)   // 橄榄绿
+            case 5: return Color(red: 0.3, green: 0.2, blue: 0.4)    // 紫色
+            case 2: return Color(red: 0.3, green: 0.4, blue: 0.6)    // 蓝灰色（2美元）
+            case 1: return Color(red: 0.2, green: 0.5, blue: 0.3)    // 绿色
+            default: return .gray
+            }
+        case .gold, .silver:
+            return .gray
         }
     }
 }

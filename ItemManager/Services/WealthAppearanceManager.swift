@@ -104,19 +104,24 @@ class WealthAppearanceManager {
         // Or just load on demand?
         // For now, let's load all known possible denominations if we can, or just iterate file system?
         // Iterating file system might be safer to catch all.
-        
+
         // Known denominations
         let rmbDenominations = [100, 50, 20, 10, 5, 1]
         let jpyDenominations = [10000, 5000, 1000] // Common JPY notes
-        
+        let usdDenominations = [100, 50, 20, 10, 5, 2, 1] // USD notes (包括2美元)
+
         for val in rmbDenominations {
             loadSingleImage(currency: .rmb, val: val)
         }
-        
+
         for val in jpyDenominations {
             loadSingleImage(currency: .jpy, val: val)
         }
-        
+
+        for val in usdDenominations {
+            loadSingleImage(currency: .usd, val: val)
+        }
+
         // Load container background
         if let url = containerBackgroundImageURL,
            let data = try? Data(contentsOf: url),

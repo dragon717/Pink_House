@@ -438,6 +438,21 @@ struct ClothingPriceView: View {
 
 // MARK: - Purchase Info Section
 
+// 时间段选项（用于预计尾款时间计算）
+enum PaymentDurationOption: Int, CaseIterable {
+    case tenDays = 10
+    case thirtyDays = 30
+    case sixtyDays = 60
+    
+    var label: String {
+        switch self {
+        case .tenDays: return "10天"
+        case .thirtyDays: return "30天"
+        case .sixtyDays: return "60天"
+        }
+    }
+}
+
 struct ClothingPurchaseInfoView: View {
     @Binding var purchaseDate: Date
     @Binding var depositDate: Date
@@ -445,6 +460,15 @@ struct ClothingPurchaseInfoView: View {
     @Binding var finalPaymentDate: Date
     @Binding var finalPaymentEndDate: Date
     @Binding var note: String
+    
+    // 时间段滑块状态（0=10天, 1=30天, 2=60天）
+    @State private var durationSliderValue: Double = 1.0
+    
+    // 根据滑块值获取当前选中的时间段
+    private var selectedDuration: PaymentDurationOption {
+        let index = Int(round(durationSliderValue))
+        return PaymentDurationOption.allCases[min(max(index, 0), 2)]
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -469,19 +493,83 @@ struct ClothingPurchaseInfoView: View {
                     .foregroundStyle(.secondary)
                 
                 if isDepositPlan {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         DatePicker("定金日期", selection: $depositDate, displayedComponents: .date)
                             .environment(\.locale, Locale(identifier: "zh_CN"))
                         
-                        DatePicker("预估尾款时间 (开始)", selection: $finalPaymentDate, displayedComponents: .date)
-                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                        Divider()
                         
-                        DatePicker("预估尾款时间 (结束)", selection: $finalPaymentEndDate, displayedComponents: .date)
-                            .environment(\.locale, Locale(identifier: "zh_CN"))
-                        
-                        Text("设置预估尾款时间范围，方便在尾款天使中统计和提醒")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        // 预计尾款时间区域
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("预计尾款时间")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            
+                            // 开始时间选择
+                            DatePicker("开始", selection: $finalPaymentDate, displayedComponents: .date)
+                                .environment(\.locale, Locale(identifier: "zh_CN"))
+                                .onChange(of: finalPaymentDate) { _, _ in
+                                    // 开始时间变化时，根据时间段重新计算结束时间
+                                    updateFinalPaymentEndDate()
+                                }
+                            
+                            // 时间段滑块
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("时间段")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(selectedDuration.label)
+                                        .font(.subheadline.bold())
+                                        .foregroundStyle(.pink)
+                                }
+                                
+                                // 自定义滑块样式
+                                HStack(spacing: 8) {
+                                    ForEach(0..<PaymentDurationOption.allCases.count, id: \.self) { index in
+                                        Button {
+                                            withAnimation(.spring(response: 0.3)) {
+                                                durationSliderValue = Double(index)
+                                                updateFinalPaymentEndDate()
+                                            }
+                                        } label: {
+                                            Text(PaymentDurationOption.allCases[index].label)
+                                                .font(.caption)
+                                                .fontWeight(durationSliderValue == Double(index) ? .bold : .regular)
+                                                .foregroundStyle(durationSliderValue == Double(index) ? .white : .primary)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 16)
+                                                        .fill(durationSliderValue == Double(index) ? Color.pink : Color(uiColor: .tertiarySystemFill))
+                                                )
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                            
+                            // 结束时间（自动计算，只读显示）
+                            HStack {
+                                Text("结束")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(finalPaymentEndDate, style: .date)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(Color(uiColor: .tertiarySystemGroupedBackground))
+                            .cornerRadius(8)
+                            
+                            Text("设置预计尾款时间范围，方便在尾款天使中统计和提醒")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -500,5 +588,33 @@ struct ClothingPurchaseInfoView: View {
         .padding()
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(16)
+        .onAppear {
+            // 初始化时根据当前finalPaymentEndDate反推滑块值
+            initializeDurationSlider()
+        }
+    }
+    
+    // 根据开始时间和时间段计算结束时间
+    private func updateFinalPaymentEndDate() {
+        let calendar = Calendar.current
+        if let newEndDate = calendar.date(byAdding: .day, value: selectedDuration.rawValue, to: finalPaymentDate) {
+            finalPaymentEndDate = newEndDate
+        }
+    }
+    
+    // 初始化滑块值（根据当前结束时间和开始时间的差值）
+    private func initializeDurationSlider() {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.day], from: finalPaymentDate, to: finalPaymentEndDate)
+        if let days = components.day {
+            // 找到最接近的时间段
+            let closestOption = PaymentDurationOption.allCases.min { option1, option2 in
+                abs(option1.rawValue - days) < abs(option2.rawValue - days)
+            }
+            if let closest = closestOption,
+               let index = PaymentDurationOption.allCases.firstIndex(of: closest) {
+                durationSliderValue = Double(index)
+            }
+        }
     }
 }

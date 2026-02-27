@@ -626,6 +626,7 @@ struct MoneyCountingContainerView: View {
             Picker("货币", selection: $viewModel.selectedCurrency) {
                 Text("人民币").tag(CurrencyType.rmb)
                 Text("日元").tag(CurrencyType.jpy)
+                Text("美刀").tag(CurrencyType.usd)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -650,7 +651,21 @@ struct MoneyCountingContainerView: View {
 
 struct MoneyCountingHeaderView: View {
     @Bindable var viewModel: WealthViewModel
-    
+
+    // 计算当前货币对人民币的汇率（用于财富等级计算）
+    private var exchangeRateToCNY: Double {
+        switch viewModel.selectedCurrency {
+        case .rmb:
+            return 1.0
+        case .jpy:
+            return 1.0 / viewModel.exchangeRateJPY
+        case .usd:
+            return 1.0 / viewModel.exchangeRateUSD
+        case .gold, .silver:
+            return 1.0
+        }
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             HStack(alignment: .top, spacing: 8) {
@@ -661,7 +676,7 @@ struct MoneyCountingHeaderView: View {
                 
                 LiquidRollingNumber(
                     value: Double(viewModel.totalAmount),
-                    exchangeRateToCNY: viewModel.selectedCurrency == .rmb ? 1.0 : (1.0 / viewModel.exchangeRateJPY)
+                    exchangeRateToCNY: exchangeRateToCNY
                 )
                 .font(.system(size: 64, weight: .heavy, design: .rounded))
             }
@@ -680,11 +695,15 @@ struct MoneyCountingHeaderView: View {
                 Text("已购入小裙子总价 + 尾款天使已付总定金")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
-                if viewModel.selectedCurrency == .jpy {
+
+                // 日元或美元时显示汇率
+                if viewModel.selectedCurrency == .jpy || viewModel.selectedCurrency == .usd {
                     HStack(spacing: 4) {
-                        Text("汇率: 1 CNY ≈ \(String(format: "%.2f", viewModel.exchangeRateJPY)) JPY")
-                        
+                        let rateText = viewModel.selectedCurrency == .jpy
+                            ? "汇率: 1 CNY ≈ \(String(format: "%.2f", viewModel.exchangeRateJPY)) JPY"
+                            : "汇率: 1 CNY ≈ \(String(format: "%.4f", viewModel.exchangeRateUSD)) USD"
+                        Text(rateText)
+
                         if viewModel.isFetchingRate {
                             ProgressView()
                                 .controlSize(.mini)

@@ -5,15 +5,17 @@ import Observation
 enum CurrencyType: String, CaseIterable, Identifiable {
     case rmb = "人民币"
     case jpy = "日元"
+    case usd = "美刀"
     case gold = "黄金"
     case silver = "白银"
-    
+
     var id: String { rawValue }
-    
+
     var symbol: String {
         switch self {
         case .rmb: return "CN¥"
         case .jpy: return "JP¥"
+        case .usd: return "$"
         case .gold: return "Gold"
         case .silver: return "Silver"
         }
@@ -43,6 +45,7 @@ class WealthViewModel {
     
     // Exchange Rates
     var exchangeRateJPY: Double = 21.0 // CNY to JPY
+    var exchangeRateUSD: Double = 0.14 // CNY to USD (1 CNY ≈ 0.14 USD)
     var goldPriceCNYPerGram: Double = 600.0 // CNY per Gram
     var goldPriceSource: String = "模拟数据"
     
@@ -75,6 +78,9 @@ class WealthViewModel {
             return NSDecimalNumber(decimal: baseAmountCNY).intValue
         case .jpy:
             let converted = baseAmountCNY * Decimal(exchangeRateJPY)
+            return NSDecimalNumber(decimal: converted).intValue
+        case .usd:
+            let converted = baseAmountCNY * Decimal(exchangeRateUSD)
             return NSDecimalNumber(decimal: converted).intValue
         case .gold:
             // This is just a placeholder, we won't use this Int for Gold display likely
@@ -173,22 +179,34 @@ class WealthViewModel {
     
     private func fetchJPYRate() async {
         guard let url = URL(string: "https://api.exchangerate-api.com/v4/latest/CNY") else { return }
-        
+
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let rates = json["rates"] as? [String: Double],
-               let jpyRate = rates["JPY"] {
-                
+               let rates = json["rates"] as? [String: Double] {
+
+                // 获取日元汇率
+                if let jpyRate = rates["JPY"] {
+                    await MainActor.run {
+                        self.exchangeRateJPY = jpyRate
+                    }
+                }
+
+                // 获取美元汇率
+                if let usdRate = rates["USD"] {
+                    await MainActor.run {
+                        self.exchangeRateUSD = usdRate
+                    }
+                }
+
                 await MainActor.run {
-                    self.exchangeRateJPY = jpyRate
                     if let dateStr = json["date"] as? String {
                         self.lastUpdatedDate = dateStr
                     }
                 }
             }
         } catch {
-            print("Failed to fetch JPY rate: \(error)")
+            print("Failed to fetch exchange rates: \(error)")
         }
     }
     
@@ -264,6 +282,17 @@ class WealthViewModel {
         Denomination(value: 5000, color: Color(red: 0.5, green: 0.2, blue: 0.6), name: "5000"),  // Purple
         Denomination(value: 1000, color: Color(red: 0.2, green: 0.4, blue: 0.7), name: "1000")   // Blue
     ]
+
+    // 美元面额：100刀、50刀、20刀、10刀、5刀、2刀、1刀（根据联网信息，2美元也是流通面额）
+    let usdDenominations: [Denomination] = [
+        Denomination(value: 100, color: Color(red: 0.1, green: 0.4, blue: 0.2), name: "100"), // 墨绿色
+        Denomination(value: 50, color: Color(red: 0.2, green: 0.3, blue: 0.5), name: "50"),   // 深蓝色
+        Denomination(value: 20, color: Color(red: 0.4, green: 0.2, blue: 0.2), name: "20"),   // 深红色
+        Denomination(value: 10, color: Color(red: 0.2, green: 0.3, blue: 0.2), name: "10"),   // 橄榄绿
+        Denomination(value: 5, color: Color(red: 0.3, green: 0.2, blue: 0.4), name: "5"),     // 紫色
+        Denomination(value: 2, color: Color(red: 0.3, green: 0.4, blue: 0.6), name: "2"),     // 蓝灰色（2美元特殊颜色）
+        Denomination(value: 1, color: Color(red: 0.2, green: 0.5, blue: 0.3), name: "1")      // 绿色
+    ]
     
     // Gold Beans don't have "denominations" in the same way, but for the stack view fallback (if we used it)
     // we could define something. But we will use Physics View for Gold.
@@ -272,6 +301,7 @@ class WealthViewModel {
         switch selectedCurrency {
         case .rmb: return rmbDenominations
         case .jpy: return jpyDenominations
+        case .usd: return usdDenominations
         case .gold: return [] // Not used for Gold
         case .silver: return [] // Not used for Silver
         }
