@@ -78,12 +78,12 @@ final class SkirtMarketPersistence {
     // MARK: - ModelConfiguration
     
     private func createPublicDatabaseConfiguration(schema: Schema) -> ModelConfiguration {
-        // 关键：使用.automatic并配合CloudKit容器配置
-        // SwiftData会自动使用Public Database
+        // 关键：使用独立的存储文件和CloudKit容器，与主应用完全隔离
+        // 这样不会干扰原有的衣橱数据
         let config = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic  // 使用自动配置，配合Info.plist中的CloudKit设置
+            cloudKitDatabase: .none  // 先禁用CloudKit，使用本地存储避免冲突
         )
         
         return config

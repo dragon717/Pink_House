@@ -5,6 +5,11 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.yourapp.skirtmarket.fetch</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh_CN</string>

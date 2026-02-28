@@ -118,11 +118,10 @@ struct MainContentView: View {
                 // 0.6 Validate Model3D references integrity
                 await Model3DValidationService.shared.validateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
                 
-                // 0.7 初始化裙子股市（SwiftData + CloudKit Public DB）
-                await SkirtMarketPersistence.shared.configure()
-                await TaskDispatcher.shared.start()
-                
-                // 注意：不使用测试数据，使用真实从公共数据库获取的数据
+                // 0.7 裙子股市功能已暂时禁用，避免影响原有衣橱数据
+                // await SkirtMarketPersistence.shared.configure()
+                // await TaskDispatcher.shared.start()
+                print("⚠️ 裙子股市功能已禁用，保护原有衣橱数据")
                 
                 // 1. Minimum splash duration (aesthetic + buffer)
                 try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds

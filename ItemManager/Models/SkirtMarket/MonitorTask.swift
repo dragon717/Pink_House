@@ -11,20 +11,40 @@ import UIKit
 
 /// 任务状态
 enum TaskStatus: String, Codable, CaseIterable {
-    case pending = "待处理"        // 等待分配
-    case assigned = "已分配"       // 已分配给某个节点
-    case processing = "处理中"     // 正在抓取
-    case completed = "已完成"      // 抓取完成
-    case failed = "失败"           // 抓取失败
-    case expired = "已过期"        // 任务过期
+    case pending = "pending"        // 等待分配
+    case assigned = "assigned"       // 已分配给某个节点
+    case processing = "processing"     // 正在抓取
+    case completed = "completed"      // 抓取完成
+    case failed = "failed"           // 抓取失败
+    case expired = "expired"        // 任务过期
+    
+    var displayName: String {
+        switch self {
+        case .pending: return "待处理"
+        case .assigned: return "已分配"
+        case .processing: return "处理中"
+        case .completed: return "已完成"
+        case .failed: return "失败"
+        case .expired: return "已过期"
+        }
+    }
 }
 
 /// 任务类型
 enum TaskType: String, Codable, CaseIterable {
-    case search = "搜索"           // 关键词搜索
-    case detail = "详情"           // 商品详情
-    case userItems = "用户商品"     // 用户所有商品
-    case comment = "评论采集"       // 采集评论
+    case search = "search"           // 关键词搜索
+    case detail = "detail"           // 商品详情
+    case userItems = "userItems"     // 用户所有商品
+    case comment = "comment"       // 采集评论
+    
+    var displayName: String {
+        switch self {
+        case .search: return "搜索"
+        case .detail: return "详情"
+        case .userItems: return "用户商品"
+        case .comment: return "评论采集"
+        }
+    }
 }
 
 /// 监控任务 - 存储在CloudKit Public DB中实现分布式任务分发
@@ -33,7 +53,8 @@ final class MonitorTask {
     // MARK: - 唯一标识
     
     /// 任务唯一ID
-    @Attribute(.unique) var taskID: String = ""
+    /// 注意：CloudKit不支持unique约束
+    var taskID: String = ""
     
     /// 内部UUID
     var id: UUID = UUID()
@@ -285,39 +306,33 @@ final class MonitorTask {
 // MARK: - 任务查询扩展
 
 extension MonitorTask {
-    /// 查询待处理的任务（简化谓词，避免枚举比较）
-    static func predicateForPending() -> Predicate<MonitorTask> {
-        #Predicate { task in
-            task.status.rawValue == "pending"
-        }
-    }
-
     /// 查询分配给特定节点的任务
     static func predicateForNode(_ nodeId: String) -> Predicate<MonitorTask> {
         #Predicate { task in
             task.assignedNodeId == nodeId
         }
     }
-
-    /// 查询特定平台的任务
-    static func predicateForPlatform(_ platform: PlatformType) -> Predicate<MonitorTask> {
-        #Predicate { task in
-            task.platform.rawValue == platform.rawValue
-        }
+    
+    // 注意：所有涉及枚举的查询改为内存过滤，避免在#Predicate中使用枚举
+    
+    /// 查询待处理的任务（内存过滤）
+    static func filterPending(from tasks: [MonitorTask]) -> [MonitorTask] {
+        tasks.filter { $0.status == .pending }
     }
-
-    /// 查询过期的任务（简化谓词）
-    static func predicateForExpired() -> Predicate<MonitorTask> {
-        #Predicate { task in
-            task.status.rawValue != "completed" && task.status.rawValue != "failed"
-        }
+    
+    /// 查询过期的任务（内存过滤）
+    static func filterExpired(from tasks: [MonitorTask]) -> [MonitorTask] {
+        tasks.filter { $0.status != .completed && $0.status != .failed }
     }
-
-    /// 查询需要执行的任务（简化谓词）
-    static func predicateForExecutable() -> Predicate<MonitorTask> {
-        #Predicate { task in
-            task.status.rawValue == "pending" || task.status.rawValue == "assigned"
-        }
+    
+    /// 查询需要执行的任务（内存过滤）
+    static func filterExecutable(from tasks: [MonitorTask]) -> [MonitorTask] {
+        tasks.filter { $0.status == .pending || $0.status == .assigned }
+    }
+    
+    /// 查询特定平台的任务（内存过滤）
+    static func filterByPlatform(_ platform: PlatformType, from tasks: [MonitorTask]) -> [MonitorTask] {
+        tasks.filter { $0.platform == platform }
     }
 }
 
@@ -326,7 +341,8 @@ extension MonitorTask {
 /// 分布式节点状态 - 用于监控各节点健康状况
 @Model
 final class MonitorNode {
-    @Attribute(.unique) var nodeId: String = ""
+    /// 注意：CloudKit不支持unique约束
+    var nodeId: String = ""
     
     /// 节点名称
     var nodeName: String = ""

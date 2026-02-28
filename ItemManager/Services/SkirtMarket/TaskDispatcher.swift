@@ -238,17 +238,22 @@ final class TaskDispatcher: ObservableObject {
         // 0. 预刷新裙子索引缓存（用于高效去重）
         await SkirtIndexCache.shared.refreshCache()
         
-        // 1. 查询待处理的任务
+        // 1. 查询所有任务，然后在内存中过滤待处理的任务
         let descriptor = FetchDescriptor<MonitorTask>(
-            predicate: MonitorTask.predicateForPending(),
             sortBy: [
                 SortDescriptor(\.priority, order: .reverse),
                 SortDescriptor(\.createdAt)
             ]
         )
         
-        guard let pendingTasks = try? context.fetch(descriptor),
-              !pendingTasks.isEmpty else {
+        guard let allTasks = try? context.fetch(descriptor),
+              !allTasks.isEmpty else {
+            return
+        }
+        
+        // 内存中过滤待处理的任务
+        let pendingTasks = MonitorTask.filterPending(from: allTasks)
+        guard !pendingTasks.isEmpty else {
             return
         }
         
@@ -588,10 +593,9 @@ final class TaskDispatcher: ObservableObject {
     /// 获取待处理任务数
     func getPendingTaskCount() -> Int {
         guard let context = context else { return 0 }
-        let descriptor = FetchDescriptor<MonitorTask>(
-            predicate: MonitorTask.predicateForPending()
-        )
-        return (try? context.fetch(descriptor).count) ?? 0
+        let descriptor = FetchDescriptor<MonitorTask>()
+        let allTasks = (try? context.fetch(descriptor)) ?? []
+        return MonitorTask.filterPending(from: allTasks).count
     }
     
     /// 获取今日采集数

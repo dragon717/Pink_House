@@ -10,30 +10,61 @@ import SwiftData
 
 /// 电商平台类型
 enum PlatformType: String, Codable, CaseIterable {
-    case xianyu = "闲鱼"
-    case xiaohongshu = "小红书"
-    case taobao = "淘宝"
-    case weidian = "微店"
-    case other = "其他"
+    case xianyu = "xianyu"
+    case xiaohongshu = "xiaohongshu"
+    case taobao = "taobao"
+    case weidian = "weidian"
+    case other = "other"
+    
+    var displayName: String {
+        switch self {
+        case .xianyu: return "闲鱼"
+        case .xiaohongshu: return "小红书"
+        case .taobao: return "淘宝"
+        case .weidian: return "微店"
+        case .other: return "其他"
+        }
+    }
 }
 
 /// 商品状态
 enum ItemStatus: String, Codable, CaseIterable {
-    case onSale = "在售"           // 正在出售
-    case sold = "已售"             // 已售出
-    case reserved = "预订"         // 预订/意向金
-    case unknown = "未知"          // 状态未知
+    case onSale = "onSale"
+    case sold = "sold"
+    case reserved = "reserved"
+    case unknown = "unknown"
+    
+    var displayName: String {
+        switch self {
+        case .onSale: return "在售"
+        case .sold: return "已售"
+        case .reserved: return "预订"
+        case .unknown: return "未知"
+        }
+    }
 }
 
 /// 商品类型
 enum LolitaItemType: String, Codable, CaseIterable {
-    case jsk = "JSK"               // Jumper Skirt
-    case op = "OP"                 // One Piece
-    case sk = "SK"                 // Skirt
-    case accessory = "小物"         // 配饰
-    case bag = "包"                // 包袋
-    case shoes = "鞋"              // 鞋子
-    case other = "其他"
+    case jsk = "jsk"
+    case op = "op"
+    case sk = "sk"
+    case accessory = "accessory"
+    case bag = "bag"
+    case shoes = "shoes"
+    case other = "other"
+    
+    var displayName: String {
+        switch self {
+        case .jsk: return "JSK"
+        case .op: return "OP"
+        case .sk: return "SK"
+        case .accessory: return "小物"
+        case .bag: return "包"
+        case .shoes: return "鞋"
+        case .other: return "其他"
+        }
+    }
 }
 
 /// Lolita商品数据模型 - 存储在CloudKit Public DB中实现分布式共享
@@ -43,7 +74,8 @@ final class LolitaItem {
     
     /// 平台+商品ID组合的唯一标识，用于基础去重
     /// 格式: "platform_itemId" 例如: "xianyu_123456789"
-    @Attribute(.unique) var platformID: String = ""
+    /// 注意：CloudKit不支持unique约束，应用层通过SkirtIndexCache去重
+    var platformID: String = ""
     
     /// 内部UUID
     var id: UUID = UUID()
@@ -253,23 +285,25 @@ final class LolitaItem {
 
 // MARK: - 价格趋势枚举
 
-enum PriceTrend: String {
-    case bargain = "好价"      // 低于原价30%以上
-    case fair = "合理"         // 原价±30%以内
-    case premium = "溢价"      // 高于原价30%以上
-    case unknown = "未知"
+enum PriceTrend: String, Codable {
+    case bargain = "bargain"
+    case fair = "fair"
+    case premium = "premium"
+    case unknown = "unknown"
+    
+    var displayName: String {
+        switch self {
+        case .bargain: return "好价"
+        case .fair: return "合理"
+        case .premium: return "溢价"
+        case .unknown: return "未知"
+        }
+    }
 }
 
 // MARK: - 查询扩展
 
 extension LolitaItem {
-    /// 按平台查询的谓词
-    static func predicateForPlatform(_ platform: PlatformType) -> Predicate<LolitaItem> {
-        #Predicate { item in
-            item.platform == platform && item.isDeleted == false
-        }
-    }
-    
     /// 按品牌查询的谓词
     static func predicateForBrand(_ brand: String) -> Predicate<LolitaItem> {
         #Predicate { item in
@@ -282,6 +316,13 @@ extension LolitaItem {
         #Predicate { item in
             item.currentPrice >= min && item.currentPrice <= max && item.isDeleted == false
         }
+    }
+    
+    // 注意：涉及枚举的查询改为内存过滤
+    
+    /// 按平台过滤（内存过滤）
+    static func filterByPlatform(_ platform: PlatformType, from items: [LolitaItem]) -> [LolitaItem] {
+        items.filter { $0.platform == platform && !$0.isDeleted }
     }
     
     /// 按语义哈希去重查询的谓词

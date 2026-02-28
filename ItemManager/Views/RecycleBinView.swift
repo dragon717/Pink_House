@@ -494,9 +494,19 @@ struct RecycleBinView: View {
         withAnimation {
             clothing.isDeleted = false
             clothing.deletedAt = nil
+            // 关键：更新 lastModified，确保恢复后的状态不会被 iCloud 同步覆盖
+            clothing.lastModified = Date()
         }
         // 从 DeleteTracker 中移除删除记录，防止被再次删除
         DeleteTracker.shared.removeDeletedClothing(id: clothing.id)
+        
+        // 立即保存，确保恢复状态被持久化
+        do {
+            try modelContext.save()
+            print("RecycleBinView: 恢复裙子 '\(clothing.name)' 成功，lastModified 已更新")
+        } catch {
+            print("RecycleBinView: 恢复裙子保存失败: \(error)")
+        }
     }
     
     private func permanentlyDeleteClothing(_ clothing: Clothing) {
@@ -512,10 +522,12 @@ struct RecycleBinView: View {
         withAnimation {
             book.isDeleted = false
             book.deletedAt = nil
+            book.lastModified = Date()
             // Restore all pages in this book
             for page in book.pages ?? [] {
                 page.isDeleted = false
                 page.deletedAt = nil
+                page.lastModified = Date()
                 // 从 DeleteTracker 中移除书页的删除记录
                 DeleteTracker.shared.removeDeletedOutfit(id: page.id)
             }
@@ -544,6 +556,7 @@ struct RecycleBinView: View {
         withAnimation {
             outfit.isDeleted = false
             outfit.deletedAt = nil
+            outfit.lastModified = Date()
         }
         // 从 DeleteTracker 中移除删除记录，防止被再次删除
         DeleteTracker.shared.removeDeletedOutfit(id: outfit.id)
@@ -564,10 +577,12 @@ struct RecycleBinView: View {
         withAnimation {
             book.isDeleted = false
             book.deletedAt = nil
+            book.lastModified = Date()
             // Restore all pages in this book
             for page in book.pages ?? [] {
                 page.isDeleted = false
                 page.deletedAt = nil
+                page.lastModified = Date()
             }
         }
     }
@@ -590,6 +605,7 @@ struct RecycleBinView: View {
         withAnimation {
             outfit.isDeleted = false
             outfit.deletedAt = nil
+            outfit.lastModified = Date()
         }
     }
     

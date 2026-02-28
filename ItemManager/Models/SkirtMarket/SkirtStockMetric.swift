@@ -14,7 +14,8 @@ final class SkirtStockMetric {
     // MARK: - 标识
     
     /// 唯一标识：裙子名称+时间戳
-    @Attribute(.unique) var metricID: String = ""
+    /// 注意：CloudKit不支持unique约束
+    var metricID: String = ""
     
     /// 内部UUID
     var id: UUID = UUID()
@@ -237,13 +238,23 @@ final class SkirtStockMetric {
 
 // MARK: - 投资建议枚举
 
-enum InvestmentSuggestion: String {
-    case strongBuy = "强烈建议买入"
-    case buy = "建议买入"
-    case hold = "持有观望"
-    case avoid = "建议回避"
-    case sell = "建议卖出"
-    
+enum InvestmentSuggestion: String, Codable {
+    case strongBuy = "strongBuy"
+    case buy = "buy"
+    case hold = "hold"
+    case avoid = "avoid"
+    case sell = "sell"
+
+    var displayName: String {
+        switch self {
+        case .strongBuy: return "强烈建议买入"
+        case .buy: return "建议买入"
+        case .hold: return "持有观望"
+        case .avoid: return "建议回避"
+        case .sell: return "建议卖出"
+        }
+    }
+
     var icon: String {
         switch self {
         case .strongBuy: return "🔥"
@@ -270,7 +281,8 @@ enum InvestmentSuggestion: String {
 /// 萌款大盘指数 - 综合反映市场热度
 @Model
 final class LolitaMarketIndex {
-    @Attribute(.unique) var timestamp: Date = Date()
+    /// 注意：CloudKit不支持unique约束
+    var timestamp: Date = Date()
     
     /// 指数值（基准1000）
     var indexValue: Double = 1000.0
