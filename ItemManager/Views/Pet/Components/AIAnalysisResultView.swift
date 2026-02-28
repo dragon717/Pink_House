@@ -5,7 +5,7 @@ struct AIAnalysisResultView: View {
     let resultText: String
     let analyzedImage: UIImage?
     var userQuestion: String = "这是什么？" // 默认问题，如果未提供
-    var petName: String = "萌宠" // 动态名字
+    var petName: String = "小伙伴" // 动态名字，实际使用时应传入 status.displayName
     let onClose: () -> Void
     
     @State private var isChatMode = false

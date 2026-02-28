@@ -119,7 +119,7 @@ class PetViewModel: ObservableObject {
     }
     
     private func setupAIService() {
-        let petName = status.petName ?? currentPet.displayName
+        let petName = status.displayName
         
         // 读取用户设置的优先级 (默认为 DeepSeek > Minimax)
         let priorityString = UserDefaults.standard.string(forKey: "textModelPriority") ?? "DeepSeek,Minimax"
@@ -655,7 +655,7 @@ class PetViewModel: ObservableObject {
         // 0. 检查精力是否足够 (如果道具消耗精力)
         if let energyCost = item.energyCost, energyCost > 0 {
              if status.energy < Double(energyCost) {
-                 showFloatingText("\(status.petName ?? "萌宠")太累了，不想玩...", style: .warning)
+                 showFloatingText("\(status.displayName)太累了，不想玩...", style: .warning)
                  return
              }
         }
@@ -752,7 +752,7 @@ class PetViewModel: ObservableObject {
         // 检查精力是否足够 (如果道具消耗精力)
         if let energyCost = item.energyCost, energyCost > 0 {
              if status.energy < Double(energyCost) {
-                 showFloatingText("\(status.petName ?? "萌宠")太累了，不想玩...", style: .warning)
+                 showFloatingText("\(status.displayName)太累了，不想玩...", style: .warning)
                  return
              }
         }
@@ -931,8 +931,8 @@ class PetViewModel: ObservableObject {
         
         guard currentState == .idle || canInterruptSleep else {
             print("DEBUG: clean blocked, current state: \(currentState), energy: \(status.energy)")
-            
-            let petName = status.petName ?? "萌宠"
+
+            let petName = status.displayName
             let message: String
             switch currentState {
             case .sleeping:

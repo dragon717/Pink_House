@@ -442,7 +442,7 @@ struct InventoryView: View {
     }
     
     private func getUsageMessage(for item: PetItemDefinition) -> String {
-        let petName = viewModel.status.petName ?? "萌宠"
+        let petName = viewModel.status.displayName
         if item.isToy {
             return "确定要让\(petName)玩 \(item.name) 吗？\n将消耗 \(item.energyCost ?? 0) 点精力，增加心情。"
         } else if item.isDrink {

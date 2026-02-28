@@ -404,13 +404,23 @@ struct PetStatus: Codable {
     }
     
     // 供 UI 显示用的名字（经过清洗）
+    // 如果用户没有给宠物起名，则使用宠物类型名（如"奶茶"、"毛毛"）作为默认显示名
     var displayName: String {
-        guard let name = petName else { return "萌宠" }
+        guard let name = petName else {
+            // 没有自定义名字时，返回宠物类型名
+            guard let id = selectedPetId, let character = PetCharacter(rawValue: id) else { return "小伙伴" }
+            return character.displayName
+        }
         let clean = name.replacingOccurrences(of: "\"", with: "")
-                        .replacingOccurrences(of: "“", with: "")
-                        .replacingOccurrences(of: "”", with: "")
+                        .replacingOccurrences(of: "\"", with: "")
+                        .replacingOccurrences(of: "\"", with: "")
                         .trimmingCharacters(in: .whitespacesAndNewlines)
-        return clean.isEmpty ? "萌宠" : clean
+        // 如果用户起的名字为空，则使用宠物类型名
+        if clean.isEmpty {
+            guard let id = selectedPetId, let character = PetCharacter(rawValue: id) else { return "小伙伴" }
+            return character.displayName
+        }
+        return clean
     }
     
     var ownedPetIds: [String] = [] // 已拥有的宠物列表，默认为空，进入领养流程

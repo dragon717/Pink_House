@@ -5,7 +5,7 @@ import Vision
 struct PetOverlayView: View {
     // 点击动作
     var action: () -> Void
-    var petName: String = "萌宠" // Add petName property
+    var petName: String = "小伙伴" // 默认名字，实际使用时应传入 status.displayName
     
     // Managers
     @StateObject private var interactionManager = PetInteractionManager.shared
