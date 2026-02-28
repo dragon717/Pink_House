@@ -33,18 +33,18 @@ final class MonitorTask {
     // MARK: - 唯一标识
     
     /// 任务唯一ID
-    @Attribute(.unique) var taskID: String
+    @Attribute(.unique) var taskID: String = ""
     
     /// 内部UUID
-    var id: UUID
+    var id: UUID = UUID()
     
     // MARK: - 任务定义
     
     /// 任务类型
-    var taskType: TaskType
+    var taskType: TaskType = TaskType.search
     
     /// 目标平台
-    var platform: PlatformType
+    var platform: PlatformType = PlatformType.other
     
     /// 搜索关键词（如果是搜索任务）
     var keyword: String?
@@ -61,10 +61,10 @@ final class MonitorTask {
     // MARK: - 任务状态
     
     /// 当前状态
-    var status: TaskStatus
+    var status: TaskStatus = TaskStatus.pending
     
     /// 优先级（1-10，数字越大优先级越高）
-    var priority: Int
+    var priority: Int = 5
     
     /// 分配给的节点ID
     var assignedNodeId: String?
@@ -82,18 +82,18 @@ final class MonitorTask {
     var failureReason: String?
     
     /// 重试次数
-    var retryCount: Int
+    var retryCount: Int = 0
     
     /// 最大重试次数
-    var maxRetries: Int
+    var maxRetries: Int = 3
     
     // MARK: - 时间约束
     
     /// 任务创建时间
-    var createdAt: Date
+    var createdAt: Date = Date()
     
     /// 任务过期时间
-    var expiresAt: Date
+    var expiresAt: Date = Date()
     
     /// 下次执行时间（用于定时任务）
     var nextRunAt: Date?
@@ -118,13 +118,13 @@ final class MonitorTask {
     // MARK: - 分布式协调
     
     /// 创建该任务的节点ID
-    var creatorNodeId: String
+    var creatorNodeId: String = ""
     
     /// 最后心跳时间（用于检测节点是否存活）
     var lastHeartbeat: Date?
     
     /// 版本号（用于乐观锁）
-    var version: Int
+    var version: Int = 1
     
     // MARK: - 初始化
     
@@ -326,37 +326,37 @@ extension MonitorTask {
 /// 分布式节点状态 - 用于监控各节点健康状况
 @Model
 final class MonitorNode {
-    @Attribute(.unique) var nodeId: String
+    @Attribute(.unique) var nodeId: String = ""
     
     /// 节点名称
-    var nodeName: String
+    var nodeName: String = ""
     
     /// 节点类型（iPhone/iPad/Mac）
-    var deviceType: String
+    var deviceType: String = ""
     
     /// 系统版本
-    var osVersion: String
+    var osVersion: String = ""
     
     /// 应用版本
-    var appVersion: String
+    var appVersion: String = ""
     
     /// 节点状态
-    var isOnline: Bool
+    var isOnline: Bool = true
     
     /// 首次上线时间
-    var firstSeenAt: Date
+    var firstSeenAt: Date = Date()
     
     /// 最后活跃时间
-    var lastActiveAt: Date
+    var lastActiveAt: Date = Date()
     
     /// 累计处理任务数
-    var totalTasksProcessed: Int
+    var totalTasksProcessed: Int = 0
     
     /// 累计发现商品数
-    var totalItemsFound: Int
+    var totalItemsFound: Int = 0
     
     /// 当前正在处理的任务数
-    var currentTaskCount: Int
+    var currentTaskCount: Int = 0
     
     /// 节点地区（用于反爬分析）
     var region: String?
@@ -365,16 +365,16 @@ final class MonitorNode {
     var isp: String?
     
     /// 节点权重（性能好的节点权重高）
-    var weight: Double
+    var weight: Double = 1.0
     
     /// 节点评分（成功率）
-    var successRate: Double
+    var successRate: Double = 1.0
     
     /// 该节点负责的平台列表
-    var platforms: [String]
+    var platforms: [String] = []
     
     /// 当前已完成的任务数
-    var completedTasks: Int
+    var completedTasks: Int = 0
     
     /// 最后在线时间（用于计算离线状态）
     var lastSeenAt: Date?

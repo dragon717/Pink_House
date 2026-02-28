@@ -8,7 +8,7 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "C34ECE2F-08B1-411E-96D6-EFD8A2EF4AD1"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ItemManager/Views/WardrobeView.swift"
@@ -16,8 +16,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1005"
             endingLineNumber = "1005"
-            landmarkName = "dropUpdated(info:)"
-            landmarkType = "7">
+            landmarkName = "WardrobeStatsView"
+            landmarkType = "14">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -40,7 +40,7 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "43ED8AE2-7997-4B73-80C6-374C58E35EB2"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ItemManager/Views/BigWorld/BadgeAndAchievementView.swift"

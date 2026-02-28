@@ -35,9 +35,17 @@ final class AIDeduplicationService {
     // MARK: - 主入口
     
     /// 对新抓取的商品进行AI去重处理
-    /// 流程：1.文本清洗 -> 2.语义哈希生成 -> 3.相似度检查 -> 4.视觉验证（可选）
+    /// 流程：1.内存索引检查 -> 2.文本清洗 -> 3.语义哈希生成 -> 4.相似度检查 -> 5.视觉验证（可选）
     func processNewItem(_ item: LolitaItem) async -> DeduplicationResult {
         print("🤖 AI处理商品: \(item.rawTitle)")
+        
+        // 0. 首先检查内存索引（O(1)快速去重）
+        if let cachedDuplicate = await checkCacheForDuplicate(item) {
+            print("📦 内存索引命中重复: \(cachedDuplicate.platformID)")
+            // 更新现有记录的价格
+            await updateExistingItem(cachedDuplicate, with: item)
+            return .duplicate(existingItemID: cachedDuplicate.platformID)
+        }
         
         // 1. 使用MiniMax进行文本清洗和结构化
         let structuredData = await analyzeTextWithMiniMax(item)
@@ -54,11 +62,22 @@ final class AIDeduplicationService {
         let semanticHash = generateSemanticHash(from: structuredData)
         item.semanticHash = semanticHash
         
-        // 3. 检查是否已存在相似商品
+        // 3. 再次检查内存索引（使用生成的语义哈希）
+        let cacheDuplicates = SkirtIndexCache.shared.findBySemanticHash(semanticHash)
+            .filter { $0.platformID != item.platformID && !$0.isDeleted }
+        
+        if let cachedItem = cacheDuplicates.first {
+            print("📦 语义哈希命中重复: \(cachedItem.platformID)")
+            // 更新缓存和数据库
+            await updateCachedItem(cachedItem, with: item)
+            return .duplicate(existingItemID: cachedItem.platformID)
+        }
+        
+        // 4. 检查是否已存在相似商品（数据库查询作为fallback）
         let existingItems = await findSimilarItems(semanticHash: semanticHash, item: item)
         
         if let similarItem = existingItems.first {
-            // 4. 如果语义相似，进行视觉验证
+            // 5. 如果语义相似，进行视觉验证
             if let imageURL = item.mainImageURL {
                 let isVisualMatch = await verifyVisualSimilarity(
                     newImageURL: imageURL,
@@ -68,6 +87,8 @@ final class AIDeduplicationService {
                 if isVisualMatch {
                     // 确定是同一商品，合并信息
                     await mergeItem(item, into: similarItem)
+                    // 更新内存索引
+                    SkirtIndexCache.shared.updateCache(with: similarItem)
                     return .duplicate(existingItemID: similarItem.platformID)
                 }
             }
@@ -76,19 +97,119 @@ final class AIDeduplicationService {
             return .similarButDifferent(similarItemID: similarItem.platformID)
         }
         
-        // 新商品
+        // 新商品 - 添加到内存索引
+        SkirtIndexCache.shared.updateCache(with: item)
         return .newItem
     }
     
+    // MARK: - 内存索引快速去重
+    
+    /// 检查内存索引中是否存在重复 - O(1)复杂度
+    private func checkCacheForDuplicate(_ item: LolitaItem) async -> SkirtIndexEntry? {
+        // 1. 检查PlatformID（完全相同的商品）
+        if let existing = SkirtIndexCache.shared.findByPlatformID(item.platformID) {
+            return existing
+        }
+        
+        // 2. 如果已有语义哈希，检查语义哈希
+        if let semanticHash = item.semanticHash, !semanticHash.isEmpty {
+            let duplicates = SkirtIndexCache.shared.findBySemanticHash(semanticHash)
+                .filter { $0.platformID != item.platformID && !$0.isDeleted }
+            return duplicates.first
+        }
+        
+        return nil
+    }
+    
+    /// 更新内存索引中的现有商品
+    private func updateCachedItem(_ cachedItem: SkirtIndexEntry, with newItem: LolitaItem) async {
+        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        
+        // 查询数据库中的完整记录（使用字符串匹配避免谓词捕获问题）
+        let targetPlatformID = cachedItem.platformID
+        let descriptor = FetchDescriptor<LolitaItem>(
+            predicate: #Predicate { item in
+                item.platformID == targetPlatformID
+            }
+        )
+        
+        if let existingItem = try? context.fetch(descriptor).first {
+            // 保留更低的价格
+            if newItem.currentPrice < existingItem.currentPrice {
+                existingItem.currentPrice = newItem.currentPrice
+            }
+            existingItem.lastUpdated = Date()
+            try? context.save()
+            
+            // 更新内存索引
+            SkirtIndexCache.shared.updateCache(with: existingItem)
+        }
+    }
+    
+    /// 更新现有商品信息
+    private func updateExistingItem(_ cachedItem: SkirtIndexEntry, with newItem: LolitaItem) async {
+        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        
+        // 使用字符串匹配避免谓词捕获问题
+        let targetPlatformID = cachedItem.platformID
+        let descriptor = FetchDescriptor<LolitaItem>(
+            predicate: #Predicate { item in
+                item.platformID == targetPlatformID
+            }
+        )
+        
+        if let existingItem = try? context.fetch(descriptor).first {
+            // 更新价格（保留最低价格）
+            if newItem.currentPrice < existingItem.currentPrice {
+                existingItem.currentPrice = newItem.currentPrice
+            }
+            existingItem.lastUpdated = Date()
+            try? context.save()
+            
+            // 更新内存索引
+            SkirtIndexCache.shared.updateCache(with: existingItem)
+        }
+    }
+    
     /// 批量处理商品（用于后台任务）
+    /// 优化流程：先使用内存缓存快速去重，再对剩余商品调用AI分析
     func processItemsBatch(_ items: [LolitaItem]) async -> BatchDeduplicationResult {
+        print("🔄 开始批量处理 \(items.count) 个商品...")
+        
+        // 0. 确保索引缓存已刷新
+        await SkirtIndexCache.shared.refreshCache()
+        
         var results: [DeduplicationResult] = []
         var duplicates = 0
         var newItems = 0
+        var cacheHits = 0
+        var aiProcessed = 0
+        
+        // 第一阶段：使用内存缓存快速去重（O(1)复杂度）
+        var itemsNeedAIAnalysis: [LolitaItem] = []
         
         for item in items {
+            // 快速检查内存索引
+            if let cachedDuplicate = await checkCacheForDuplicate(item) {
+                // 缓存命中，直接标记为重复
+                await updateExistingItem(cachedDuplicate, with: item)
+                results.append(.duplicate(existingItemID: cachedDuplicate.platformID))
+                duplicates += 1
+                cacheHits += 1
+                continue
+            }
+            
+            // 未命中，需要AI分析
+            itemsNeedAIAnalysis.append(item)
+        }
+        
+        print("📊 快速去重完成: \(cacheHits) 个缓存命中, \(itemsNeedAIAnalysis.count) 个需要AI分析")
+        
+        // 第二阶段：对剩余商品调用AI分析
+        for item in itemsNeedAIAnalysis {
             let result = await processNewItem(item)
             results.append(result)
+            aiProcessed += 1
             
             switch result {
             case .duplicate:
@@ -103,10 +224,14 @@ final class AIDeduplicationService {
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
         }
         
+        print("✅ 批量处理完成: 总计\(items.count)个, 重复\(duplicates)个, 新增\(newItems)个, 缓存命中\(cacheHits)个")
+        
         return BatchDeduplicationResult(
             totalProcessed: items.count,
             duplicatesFound: duplicates,
             newItems: newItems,
+            cacheHits: cacheHits,
+            aiProcessed: aiProcessed,
             details: results
         )
     }
@@ -671,7 +796,21 @@ struct BatchDeduplicationResult {
     let totalProcessed: Int
     let duplicatesFound: Int
     let newItems: Int
+    let cacheHits: Int           // 缓存命中数（新增）
+    let aiProcessed: Int         // AI实际处理数（新增）
     let details: [DeduplicationResult]
+    
+    /// 缓存命中率
+    var cacheHitRate: Double {
+        guard totalProcessed > 0 else { return 0 }
+        return Double(cacheHits) / Double(totalProcessed)
+    }
+    
+    /// AI调用节省率
+    var aiSavingsRate: Double {
+        guard totalProcessed > 0 else { return 0 }
+        return Double(cacheHits) / Double(totalProcessed)
+    }
 }
 
 /// AI错误类型

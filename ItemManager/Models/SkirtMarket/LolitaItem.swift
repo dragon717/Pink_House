@@ -43,26 +43,26 @@ final class LolitaItem {
     
     /// 平台+商品ID组合的唯一标识，用于基础去重
     /// 格式: "platform_itemId" 例如: "xianyu_123456789"
-    @Attribute(.unique) var platformID: String
+    @Attribute(.unique) var platformID: String = ""
     
     /// 内部UUID
-    var id: UUID
+    var id: UUID = UUID()
     
     // MARK: - 平台信息
     
     /// 来源平台
-    var platform: PlatformType
+    var platform: PlatformType = PlatformType.other
     
     /// 平台原始链接
     var originalURL: String?
     
     /// 平台商品ID
-    var platformItemId: String
+    var platformItemId: String = ""
     
     // MARK: - 商品基本信息
     
     /// 商品标题（原始）
-    var rawTitle: String
+    var rawTitle: String = ""
     
     /// AI清洗后的商品名称
     var cleanedName: String?
@@ -82,21 +82,21 @@ final class LolitaItem {
     // MARK: - 价格信息
     
     /// 当前价格
-    var currentPrice: Double
+    var currentPrice: Double = 0.0
     
     /// 原价（如果有）
     var originalPrice: Double?
     
     /// 货币单位
-    var currency: String
+    var currency: String = "CNY"
     
     /// 是否包含运费
-    var includesShipping: Bool
+    var includesShipping: Bool = false
     
     // MARK: - 商品状态
     
     /// 商品状态
-    var status: ItemStatus
+    var status: ItemStatus = ItemStatus.unknown
     
     /// 成色描述（全新/九成新等）
     var condition: String?
@@ -130,7 +130,7 @@ final class LolitaItem {
     var aiConfidence: Double?
     
     /// 是否为Lolita相关商品（AI过滤）
-    var isLolitaRelated: Bool
+    var isLolitaRelated: Bool = true
     
     /// 情绪分析分数（-1到1，负值表示急出）
     var sentimentScore: Double?
@@ -152,10 +152,10 @@ final class LolitaItem {
     // MARK: - 时间戳
     
     /// 首次发现时间
-    var firstSeenAt: Date
+    var firstSeenAt: Date = Date()
     
     /// 最后更新时间
-    var lastUpdated: Date
+    var lastUpdated: Date = Date()
     
     /// 商品发布时间（平台原始时间）
     var platformPostedAt: Date?
@@ -177,7 +177,7 @@ final class LolitaItem {
     // MARK: - 软删除标记
     
     /// 是否已删除
-    var isDeleted: Bool
+    var isDeleted: Bool = false
     
     /// 删除时间
     var deletedAt: Date?

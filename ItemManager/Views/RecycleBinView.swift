@@ -504,6 +504,8 @@ struct RecycleBinView: View {
             NotificationManager.shared.cancelNotification(for: clothing)
             modelContext.delete(clothing)
         }
+        // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
+        DeleteTracker.shared.removeDeletedClothing(id: clothing.id)
     }
     
     private func restoreBook(_ book: BookGroup) {
@@ -529,9 +531,13 @@ struct RecycleBinView: View {
                 if let path = page.snapshotPath {
                     ImageManager.shared.deleteImage(fileName: path, context: modelContext)
                 }
+                // 从 DeleteTracker 中移除书页的删除记录
+                DeleteTracker.shared.removeDeletedOutfit(id: page.id)
             }
             modelContext.delete(book)
         }
+        // 从 DeleteTracker 中移除手帐本的删除记录
+        DeleteTracker.shared.removeDeletedBookGroup(id: book.id)
     }
     
     private func restoreOutfit(_ outfit: Outfit) {
@@ -550,6 +556,8 @@ struct RecycleBinView: View {
             }
             modelContext.delete(outfit)
         }
+        // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
+        DeleteTracker.shared.removeDeletedOutfit(id: outfit.id)
     }
     
     private func restoreSpaceBook(_ book: SpaceBookGroup) {
@@ -574,6 +582,8 @@ struct RecycleBinView: View {
             }
             modelContext.delete(book)
         }
+        // 注意：SpaceBookGroup 和 SpaceOutfit 目前没有在 DeleteTracker 中单独追踪
+        // 如果需要，可以在这里添加相应的清理逻辑
     }
     
     private func restoreSpaceOutfit(_ outfit: SpaceOutfit) {
@@ -590,6 +600,8 @@ struct RecycleBinView: View {
             }
             modelContext.delete(outfit)
         }
+        // 注意：SpaceOutfit 目前没有在 DeleteTracker 中单独追踪
+        // 如果需要，可以在这里添加相应的清理逻辑
     }
     
     private func restoreModel3D(_ model: Model3D) {
@@ -610,12 +622,14 @@ struct RecycleBinView: View {
                 let modelDir = documentsPath.appendingPathComponent("Models/\(model.id.uuidString)")
                 try? fileManager.removeItem(at: modelDir)
             }
-            
+
             // 删除数据库记录
             modelContext.delete(model)
-            
+
             print("[RecycleBin] 彻底删除 Model3D: \(model.name) (ID: \(model.id))")
         }
+        // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
+        DeleteTracker.shared.removeDeletedModel3D(id: model.id)
     }
     
     private func restorePerlerPattern(_ pattern: PerlerBeadPattern) {
@@ -635,12 +649,14 @@ struct RecycleBinView: View {
             if let thumbnailPath = pattern.thumbnailPath {
                 ImageManager.shared.deleteImage(fileName: thumbnailPath, context: modelContext)
             }
-            
+
             // 删除数据库记录
             modelContext.delete(pattern)
-            
+
             print("[RecycleBin] 彻底删除 PerlerPattern: \(pattern.name) (ID: \(pattern.id))")
         }
+        // 从 DeleteTracker 中移除删除记录，因为项目已被彻底删除
+        DeleteTracker.shared.removeDeletedPerlerPattern(id: pattern.id)
     }
     
     // MARK: - Batch Actions

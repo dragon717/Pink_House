@@ -4,6 +4,7 @@
 //
 //  裙子股市 - 主界面
 //  莫妮卡粉主题 + 金融级数据可视化
+//  数据驱动展示
 //
 
 import SwiftUI
@@ -12,32 +13,13 @@ import Charts
 
 // MARK: - 主视图
 struct DressStockMarketView: View {
-    @Environment(\.modelContext) private var modelContext
-    
-    // MARK: - 查询
-    @Query(sort: \LolitaMarketIndex.timestamp, order: .reverse) private var marketIndices: [LolitaMarketIndex]
-    @Query(sort: \SkirtStockMetric.timestamp, order: .reverse) private var stockMetrics: [SkirtStockMetric]
+    @StateObject private var viewModel = SkirtMarketViewModel()
     
     // MARK: - 状态
-    @State private var selectedTab: MarketTab = .overview
-    @State private var selectedSkirt: String?
-    @State private var showingNodePanel = false
-    @State private var onlineNodes: Int = 0
-    
-    // MARK: - 枚举
-    enum MarketTab: String, CaseIterable {
-        case overview = "大盘"
-        case skirts = "萌款"
-        case nodes = "节点"
-        
-        var icon: String {
-            switch self {
-            case .overview: return "chart.line.uptrend.xyaxis"
-            case .skirts: return "hanger"
-            case .nodes: return "network"
-            }
-        }
-    }
+    @State private var marketIndices: [LolitaMarketIndex] = []
+    @State private var stockMetrics: [SkirtStockMetric] = []
+    @State private var recentItems: [LolitaItem] = []
+    @State private var isLoading = true
     
     var body: some View {
         NavigationStack {
@@ -48,21 +30,28 @@ struct DressStockMarketView: View {
                 
                 VStack(spacing: 0) {
                     // 顶部导航
-                    headerView
+                    HeaderView(
+                        latestIndex: marketIndices.first,
+                        onlineNodes: viewModel.onlineNodes,
+                        dataCount: stockMetrics.count
+                    )
                     
                     // 标签页切换
-                    tabSwitcher
+                    TabSwitcher(selectedTab: $viewModel.selectedTab)
                     
                     // 内容区域
-                    TabView(selection: $selectedTab) {
+                    TabView(selection: $viewModel.selectedTab) {
                         MarketOverviewView(indices: marketIndices)
-                            .tag(MarketTab.overview)
+                            .tag(SkirtMarketViewModel.MarketTab.overview)
                         
-                        SkirtListView(metrics: stockMetrics, selectedSkirt: $selectedSkirt)
-                            .tag(MarketTab.skirts)
+                        SkirtListView(
+                            metrics: stockMetrics,
+                            selectedSkirt: $viewModel.selectedSkirt
+                        )
+                        .tag(SkirtMarketViewModel.MarketTab.skirts)
                         
                         NodeMonitorView()
-                            .tag(MarketTab.nodes)
+                            .tag(SkirtMarketViewModel.MarketTab.nodes)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
@@ -71,98 +60,194 @@ struct DressStockMarketView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(SkirtMarketTheme.riseGreen)
-                            .frame(width: 8, height: 8)
-                        Text("\(onlineNodes) 节点")
-                            .font(SkirtMarketTheme.captionFont)
-                            .foregroundStyle(.secondary)
-                    }
+                    NodeStatusView(onlineNodes: viewModel.onlineNodes)
                 }
+            }
+            .navigationDestination(for: String.self) { skirtName in
+                SkirtDetailView(skirtName: skirtName)
             }
         }
         .onAppear {
-            updateOnlineNodes()
+            Task {
+                await loadData()
+                viewModel.startAutoRefresh(interval: 30)
+            }
+        }
+        .onDisappear {
+            viewModel.stopAutoRefresh()
+        }
+        .refreshable {
+            await loadData()
+        }
+        .alert("错误", isPresented: $viewModel.showError) {
+            Button("确定") { viewModel.showError = false }
+        } message: {
+            Text(viewModel.errorMessage ?? "未知错误")
         }
     }
     
-    // MARK: - 顶部视图
-    private var headerView: some View {
+    // MARK: - 数据加载
+    
+    private func loadData() async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        guard let context = SkirtMarketPersistence.shared.mainContext else {
+            print("❌ 无法获取裙子股市上下文")
+            return
+        }
+        
+        // 加载大盘指数
+        let indexDescriptor = FetchDescriptor<LolitaMarketIndex>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        marketIndices = (try? context.fetch(indexDescriptor)) ?? []
+        
+        // 加载萌款指标
+        let metricDescriptor = FetchDescriptor<SkirtStockMetric>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        stockMetrics = (try? context.fetch(metricDescriptor)) ?? []
+        
+        // 加载最新商品
+        let itemDescriptor = FetchDescriptor<LolitaItem>(
+            predicate: #Predicate { $0.isDeleted == false },
+            sortBy: [SortDescriptor(\.lastUpdated, order: .reverse)]
+        )
+        recentItems = (try? context.fetch(itemDescriptor)) ?? []
+        
+        // 更新视图模型数据
+        await viewModel.loadAllData()
+        
+        print("✅ 裙子股市数据加载完成: \(marketIndices.count) 指数, \(stockMetrics.count) 指标, \(recentItems.count) 商品")
+    }
+}
+
+// MARK: - 顶部视图（数据驱动）
+struct HeaderView: View {
+    let latestIndex: LolitaMarketIndex?
+    let onlineNodes: Int
+    let dataCount: Int
+    
+    var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("LO-指数")
                     .font(SkirtMarketTheme.captionFont)
                     .foregroundStyle(.secondary)
                 
-                if let latestIndex = marketIndices.first {
-                    HStack(alignment: .lastTextBaseline, spacing: 8) {
-                        Text(String(format: "%.2f", latestIndex.indexValue))
-                            .font(SkirtMarketTheme.indexFont)
-                            .foregroundStyle(SkirtMarketTheme.primaryPink)
-                        
-                        HStack(spacing: 2) {
-                            Image(systemName: latestIndex.changePercent >= 0 ? "arrow.up" : "arrow.down")
-                            Text(String(format: "%.2f%%", abs(latestIndex.changePercent)))
-                        }
-                        .font(SkirtMarketTheme.subtitleFont)
-                        .foregroundStyle(latestIndex.changePercent >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            (latestIndex.changePercent >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
-                                .opacity(0.1)
-                        )
-                        .cornerRadius(6)
-                    }
+                if let index = latestIndex {
+                    IndexValueView(index: index)
                 } else {
-                    Text("1,250.00")
-                        .font(SkirtMarketTheme.indexFont)
-                        .foregroundStyle(SkirtMarketTheme.primaryPink)
+                    PlaceholderIndexView()
                 }
             }
             
             Spacer()
             
             // 实时状态指示器
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 6) {
-                    PulsingDot()
-                    Text("实时")
-                        .font(SkirtMarketTheme.captionFont)
-                        .foregroundStyle(SkirtMarketTheme.primaryPink)
-                }
-                
-                Text("\(stockMetrics.count) 条数据")
-                    .font(SkirtMarketTheme.captionFont)
-                    .foregroundStyle(.secondary)
-            }
+            LiveStatusView(dataCount: dataCount)
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
     }
+}
+
+// MARK: - 指数值视图
+struct IndexValueView: View {
+    let index: LolitaMarketIndex
     
-    // MARK: - 标签切换器
-    private var tabSwitcher: some View {
+    var body: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 8) {
+            Text(String(format: "%.2f", index.indexValue))
+                .font(SkirtMarketTheme.indexFont)
+                .foregroundStyle(SkirtMarketTheme.primaryPink)
+            
+            ChangeBadge(changePercent: index.changePercent)
+        }
+    }
+}
+
+// MARK: - 占位指数视图
+struct PlaceholderIndexView: View {
+    var body: some View {
+        Text("1,250.00")
+            .font(SkirtMarketTheme.indexFont)
+            .foregroundStyle(SkirtMarketTheme.primaryPink)
+    }
+}
+
+// MARK: - 涨跌幅徽章
+struct ChangeBadge: View {
+    let changePercent: Double
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: changePercent >= 0 ? "arrow.up" : "arrow.down")
+            Text(String(format: "%.2f%%", abs(changePercent)))
+        }
+        .font(SkirtMarketTheme.subtitleFont)
+        .foregroundStyle(changePercent >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            (changePercent >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
+                .opacity(0.1)
+        )
+        .cornerRadius(6)
+    }
+}
+
+// MARK: - 实时状态视图
+struct LiveStatusView: View {
+    let dataCount: Int
+    
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 6) {
+                PulsingDot()
+                Text("实时")
+                    .font(SkirtMarketTheme.captionFont)
+                    .foregroundStyle(SkirtMarketTheme.primaryPink)
+            }
+            
+            Text("\(dataCount) 条数据")
+                .font(SkirtMarketTheme.captionFont)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - 节点状态视图
+struct NodeStatusView: View {
+    let onlineNodes: Int
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(Color(hex: NodeCountFormatter.statusColor(onlineNodes)))
+                .frame(width: 8, height: 8)
+            Text("\(NodeCountFormatter.format(onlineNodes)) 节点")
+                .font(SkirtMarketTheme.captionFont)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - 标签切换器
+struct TabSwitcher: View {
+    @Binding var selectedTab: SkirtMarketViewModel.MarketTab
+    
+    var body: some View {
         HStack(spacing: 0) {
-            ForEach(MarketTab.allCases, id: \.self) { tab in
-                Button(action: { 
+            ForEach(SkirtMarketViewModel.MarketTab.allCases, id: \.self) { tab in
+                TabButton(
+                    tab: tab,
+                    isSelected: selectedTab == tab
+                ) {
                     withAnimation(.spring(response: 0.3)) {
                         selectedTab = tab
                     }
-                }) {
-                    VStack(spacing: 6) {
-                        Image(systemName: tab.icon)
-                            .font(.system(size: 18))
-                        Text(tab.rawValue)
-                            .font(SkirtMarketTheme.captionFont)
-                    }
-                    .foregroundStyle(selectedTab == tab ? SkirtMarketTheme.primaryPink : .secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(
-                        selectedTab == tab ? SkirtMarketTheme.ultraLightPink : Color.clear
-                    )
                 }
             }
         }
@@ -171,11 +256,29 @@ struct DressStockMarketView: View {
         .padding(.horizontal)
         .padding(.bottom, 8)
     }
+}
+
+// MARK: - 标签按钮
+struct TabButton: View {
+    let tab: SkirtMarketViewModel.MarketTab
+    let isSelected: Bool
+    let action: () -> Void
     
-    // MARK: - 更新在线节点数
-    private func updateOnlineNodes() {
-        // 从TaskDispatcher获取在线节点数
-        onlineNodes = TaskDispatcher.shared.getOnlineNodeCount()
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 18))
+                Text(tab.rawValue)
+                    .font(SkirtMarketTheme.captionFont)
+            }
+            .foregroundStyle(isSelected ? SkirtMarketTheme.primaryPink : .secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                isSelected ? SkirtMarketTheme.ultraLightPink : Color.clear
+            )
+        }
     }
 }
 
@@ -229,64 +332,89 @@ struct IndexChartCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("大盘走势")
-                    .font(SkirtMarketTheme.subtitleFont)
-                    .foregroundStyle(.primary)
-                
-                Spacer()
-                
-                Text("24H")
-                    .font(SkirtMarketTheme.captionFont)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(SkirtMarketTheme.ultraLightPink)
-                    .cornerRadius(4)
-            }
+            ChartHeader(title: "大盘走势", badge: "24H")
             
             if indices.count >= 2 {
-                Chart(indices.suffix(24)) { index in
-                    LineMark(
-                        x: .value("时间", index.timestamp),
-                        y: .value("指数", index.indexValue)
-                    )
-                    .foregroundStyle(SkirtMarketTheme.primaryPink)
-                    .interpolationMethod(.catmullRom)
-                    
-                    AreaMark(
-                        x: .value("时间", index.timestamp),
-                        y: .value("指数", index.indexValue)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [SkirtMarketTheme.primaryPink.opacity(0.3), .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .interpolationMethod(.catmullRom)
-                }
-                .frame(height: 180)
-                .chartYScale(domain: .automatic(includesZero: false))
+                IndexChart(indices: indices)
             } else {
-                // 占位图
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(SkirtMarketTheme.ultraLightPink)
-                    .frame(height: 180)
-                    .overlay(
-                        VStack(spacing: 8) {
-                            Image(systemName: "chart.line.uptrend.xyaxis")
-                                .font(.system(size: 40))
-                                .foregroundStyle(SkirtMarketTheme.primaryPink.opacity(0.5))
-                            Text("数据采集中...")
-                                .font(SkirtMarketTheme.captionFont)
-                                .foregroundStyle(.secondary)
-                        }
-                    )
+                ChartPlaceholder()
             }
         }
         .skirtMarketCardStyle()
+    }
+}
+
+// MARK: - 图表头部
+struct ChartHeader: View {
+    let title: String
+    let badge: String
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(SkirtMarketTheme.subtitleFont)
+                .foregroundStyle(.primary)
+            
+            Spacer()
+            
+            Text(badge)
+                .font(SkirtMarketTheme.captionFont)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(SkirtMarketTheme.ultraLightPink)
+                .cornerRadius(4)
+        }
+    }
+}
+
+// MARK: - 指数图表
+struct IndexChart: View {
+    let indices: [LolitaMarketIndex]
+    
+    var body: some View {
+        Chart(indices.suffix(24)) { index in
+            LineMark(
+                x: .value("时间", index.timestamp),
+                y: .value("指数", index.indexValue)
+            )
+            .foregroundStyle(SkirtMarketTheme.primaryPink)
+            .interpolationMethod(.catmullRom)
+            
+            AreaMark(
+                x: .value("时间", index.timestamp),
+                y: .value("指数", index.indexValue)
+            )
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [SkirtMarketTheme.primaryPink.opacity(0.3), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .interpolationMethod(.catmullRom)
+        }
+        .frame(height: 180)
+        .chartYScale(domain: .automatic(includesZero: false))
+    }
+}
+
+// MARK: - 图表占位
+struct ChartPlaceholder: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(SkirtMarketTheme.ultraLightPink)
+            .frame(height: 180)
+            .overlay(
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 40))
+                        .foregroundStyle(SkirtMarketTheme.primaryPink.opacity(0.5))
+                    Text("数据采集中...")
+                        .font(SkirtMarketTheme.captionFont)
+                        .foregroundStyle(.secondary)
+                }
+            )
     }
 }
 
@@ -401,20 +529,29 @@ struct SectorRow: View {
             
             Spacer()
             
-            HStack(spacing: 2) {
-                Image(systemName: change >= 0 ? "arrow.up" : "arrow.down")
-                Text(String(format: "%.1f%%", abs(change)))
-            }
-            .font(SkirtMarketTheme.captionFont)
-            .foregroundStyle(change >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                (change >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
-                    .opacity(0.1)
-            )
-            .cornerRadius(4)
+            ChangeLabel(change: change)
         }
+    }
+}
+
+// MARK: - 涨跌标签
+struct ChangeLabel: View {
+    let change: Double
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: change >= 0 ? "arrow.up" : "arrow.down")
+            Text(String(format: "%.1f%%", abs(change)))
+        }
+        .font(SkirtMarketTheme.captionFont)
+        .foregroundStyle(change >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            (change >= 0 ? SkirtMarketTheme.riseGreen : SkirtMarketTheme.fallRed)
+                .opacity(0.1)
+        )
+        .cornerRadius(4)
     }
 }
 
@@ -432,11 +569,14 @@ struct SkirtListView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(Array(groupedMetrics.values.sorted { $0.averagePrice > $1.averagePrice }), id: \.skirtName) { metric in
-                    SkirtRow(metric: metric)
-                        .onTapGesture {
-                            selectedSkirt = metric.skirtName
-                        }
+                ForEach(
+                    Array(groupedMetrics.values.sorted { $0.averagePrice > $1.averagePrice }),
+                    id: \.skirtName
+                ) { metric in
+                    NavigationLink(value: metric.skirtName) {
+                        SkirtRow(metric: metric)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal)
@@ -452,15 +592,7 @@ struct SkirtRow: View {
     var body: some View {
         HStack(spacing: 12) {
             // 图标
-            ZStack {
-                Circle()
-                    .fill(SkirtMarketTheme.ultraLightPink)
-                    .frame(width: 48, height: 48)
-                
-                Image(systemName: "hanger")
-                    .font(.system(size: 20))
-                    .foregroundStyle(SkirtMarketTheme.primaryPink)
-            }
+            SkirtIcon()
             
             // 信息
             VStack(alignment: .leading, spacing: 4) {
@@ -493,6 +625,21 @@ struct SkirtRow: View {
     }
 }
 
+// MARK: - 裙子图标
+struct SkirtIcon: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(SkirtMarketTheme.ultraLightPink)
+                .frame(width: 48, height: 48)
+            
+            Image(systemName: "hanger")
+                .font(.system(size: 20))
+                .foregroundStyle(SkirtMarketTheme.primaryPink)
+        }
+    }
+}
+
 // MARK: - 节点监控视图
 struct NodeMonitorView: View {
     @State private var nodes: [MonitorNode] = []
@@ -515,7 +662,6 @@ struct NodeMonitorView: View {
     }
     
     private func loadNodes() {
-        // 从TaskDispatcher获取节点信息
         nodes = TaskDispatcher.shared.getAllNodes()
     }
 }
@@ -573,21 +719,7 @@ struct NodeListCard: View {
                 .foregroundStyle(.primary)
             
             if nodes.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "network")
-                        .font(.system(size: 48))
-                        .foregroundStyle(SkirtMarketTheme.primaryPink.opacity(0.5))
-                    
-                    Text("暂无节点数据")
-                        .font(SkirtMarketTheme.bodyFont)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("启动分布式任务后节点将显示在这里")
-                        .font(SkirtMarketTheme.captionFont)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
+                EmptyNodeView()
             } else {
                 VStack(spacing: 10) {
                     ForEach(nodes.prefix(5)) { node in
@@ -597,6 +729,27 @@ struct NodeListCard: View {
             }
         }
         .skirtMarketCardStyle()
+    }
+}
+
+// MARK: - 空节点视图
+struct EmptyNodeView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "network")
+                .font(.system(size: 48))
+                .foregroundStyle(SkirtMarketTheme.primaryPink.opacity(0.5))
+            
+            Text("暂无节点数据")
+                .font(SkirtMarketTheme.bodyFont)
+                .foregroundStyle(.secondary)
+            
+            Text("启动分布式任务后节点将显示在这里")
+                .font(SkirtMarketTheme.captionFont)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
     }
 }
 
@@ -656,4 +809,5 @@ struct NodeRow: View {
 // MARK: - 预览
 #Preview {
     DressStockMarketView()
+        .modelContainer(for: [LolitaMarketIndex.self, SkirtStockMetric.self, LolitaItem.self], inMemory: true)
 }

@@ -14,15 +14,15 @@ final class SkirtStockMetric {
     // MARK: - 标识
     
     /// 唯一标识：裙子名称+时间戳
-    @Attribute(.unique) var metricID: String
+    @Attribute(.unique) var metricID: String = ""
     
     /// 内部UUID
-    var id: UUID
+    var id: UUID = UUID()
     
     // MARK: - 裙子标识
     
     /// 裙子名称（标准化后的名称）
-    var skirtName: String
+    var skirtName: String = ""
     
     /// 品牌
     var brand: String?
@@ -36,24 +36,24 @@ final class SkirtStockMetric {
     // MARK: - 时间信息
     
     /// 统计时间戳（精确到小时）
-    var timestamp: Date
+    var timestamp: Date = Date()
     
     /// 统计日期（用于按天分组）
-    var dateString: String  // 格式: "2024-01-15"
+    var dateString: String = ""  // 格式: "2024-01-15"
     
     /// 统计小时（0-23）
-    var hour: Int
+    var hour: Int = 0
     
     // MARK: - 价格指标（K线数据）
     
     /// 该时段最高价
-    var highPrice: Double
+    var highPrice: Double = 0.0
     
     /// 该时段最低价
-    var lowPrice: Double
+    var lowPrice: Double = 0.0
     
     /// 该时段平均价
-    var averagePrice: Double
+    var averagePrice: Double = 0.0
     
     /// 该时段中位数价格
     var medianPrice: Double?
@@ -67,10 +67,10 @@ final class SkirtStockMetric {
     // MARK: - 成交量指标
     
     /// 全网挂牌量（去重后）
-    var listingCount: Int
+    var listingCount: Int = 0
     
     /// 新增挂牌数
-    var newListings: Int
+    var newListings: Int = 0
     
     /// 成交数（如果可获取）
     var soldCount: Int?
@@ -81,23 +81,23 @@ final class SkirtStockMetric {
     // MARK: - 平台分布
     
     /// 闲鱼数量
-    var xianyuCount: Int
+    var xianyuCount: Int = 0
     
     /// 小红书数量
-    var xiaohongshuCount: Int
+    var xiaohongshuCount: Int = 0
     
     /// 淘宝数量
-    var taobaoCount: Int
+    var taobaoCount: Int = 0
     
     /// 微店数量
-    var weidianCount: Int
+    var weidianCount: Int = 0
     
     // MARK: - AI情绪指标
     
     /// 市场情绪分数（-1到1）
     /// 正值：积极（大家都在蹲）
     /// 负值：消极（大家都在出）
-    var sentimentScore: Double
+    var sentimentScore: Double = 0.0
     
     /// 急出商品比例（0-1）
     var urgentSaleRatio: Double?
@@ -111,7 +111,7 @@ final class SkirtStockMetric {
     // MARK: - 大盘指数贡献
     
     /// 该裙子对大盘指数的贡献权重
-    var indexWeight: Double
+    var indexWeight: Double = 1.0
     
     /// 价格变动率（相对于上一时段）
     var priceChangeRatio: Double?
@@ -125,15 +125,15 @@ final class SkirtStockMetric {
     var calculatorDeviceId: String?
     
     /// 数据来源节点数
-    var sourceNodeCount: Int
+    var sourceNodeCount: Int = 1
     
     // MARK: - 时间戳
     
     /// 记录创建时间
-    var createdAt: Date
+    var createdAt: Date = Date()
     
     /// 最后更新时间
-    var lastUpdated: Date
+    var lastUpdated: Date = Date()
     
     // MARK: - 初始化
     
@@ -270,25 +270,25 @@ enum InvestmentSuggestion: String {
 /// 萌款大盘指数 - 综合反映市场热度
 @Model
 final class LolitaMarketIndex {
-    @Attribute(.unique) var timestamp: Date
+    @Attribute(.unique) var timestamp: Date = Date()
     
     /// 指数值（基准1000）
-    var indexValue: Double
+    var indexValue: Double = 1000.0
     
     /// 涨跌幅
-    var changePercent: Double
+    var changePercent: Double = 0.0
     
     /// 参与计算的萌款数量
-    var componentCount: Int
+    var componentCount: Int = 0
     
     /// 总挂牌量
-    var totalListings: Int
+    var totalListings: Int = 0
     
     /// 市场平均情绪
-    var averageSentiment: Double
+    var averageSentiment: Double = 0.0
     
     /// 活跃节点数
-    var activeNodes: Int
+    var activeNodes: Int = 1
     
     init(timestamp: Date, indexValue: Double, totalListings: Int) {
         self.timestamp = timestamp

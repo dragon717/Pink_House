@@ -235,6 +235,9 @@ final class TaskDispatcher: ObservableObject {
             return
         }
         
+        // 0. 预刷新裙子索引缓存（用于高效去重）
+        await SkirtIndexCache.shared.refreshCache()
+        
         // 1. 查询待处理的任务
         let descriptor = FetchDescriptor<MonitorTask>(
             predicate: MonitorTask.predicateForPending(),
