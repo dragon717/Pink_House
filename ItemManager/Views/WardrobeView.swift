@@ -987,6 +987,7 @@ struct WardrobeStatsView: View {
                         isVisible.wrappedValue.toggle()
                     }
                 } label: {
+                    // 折叠价格时显示闭眼(eye.slash)，显示价格时显示睁眼(eye)
                     Image(systemName: isVisible.wrappedValue ? "eye" : "eye.slash")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)

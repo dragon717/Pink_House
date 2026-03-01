@@ -141,9 +141,8 @@ struct ModernTabView: View {
         // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
         .applyTabBarMinimizeBehavior()
         .applySearchToolbarBehavior()
-        .toolbarBackground(Color(red: 0.698, green: 0.133, blue: 0.133), for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-        .toolbarColorScheme(.dark, for: .tabBar)
+        .toolbarBackground(.clear, for: .tabBar)
+        .toolbarBackground(.hidden, for: .tabBar)
         .environment(\.isSimulationActive, isSimulationActive)
         .overlay {
             RewardBubbleView()
@@ -426,6 +425,588 @@ struct SmallWorldContainerView: View {
 }
 
 // MARK: - 主 Tab 视图
+// MARK: - iOS 18以下 自定义椭圆胶囊底部导航栏
+struct LegacyTabView: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTabSelection: HomeTab
+    @Binding var smallWorldDestination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
+    @ObservedObject private var petDataManager = PetDataManager.shared
+    @StateObject private var mediaStateManager = MediaStateManager.shared
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+
+    // B22222深红色
+    private let selectedColor = Color(red: 0.698, green: 0.133, blue: 0.133)
+
+    var body: some View {
+        ZStack {
+            // 内容区域
+            contentView
+
+            // 自定义底部导航栏
+            VStack {
+                Spacer()
+                customTabBar
+            }
+        }
+        .overlay {
+            RewardBubbleView()
+            PetOverlayView(action: {
+                smallWorldDestination = .pet
+            }, petName: petDataManager.status.displayName)
+            SmallWorldMenuOverlay(
+                selectedTab: $selectedTab,
+                smallWorldDestination: $smallWorldDestination,
+                homeTab: $homeTabSelection
+            )
+        }
+        .onReceive(tabNavigationManager.$navigateToTab) { tab in
+            if let tab = tab {
+                withAnimation {
+                    if tab == 1 && selectedTab != 1 {
+                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
+                    }
+                    selectedTab = tab
+                }
+            }
+        }
+        .onReceive(tabNavigationManager.$navigateToHomeTab) { homeTab in
+            if let homeTab = homeTab {
+                withAnimation {
+                    homeTabSelection = homeTab
+                }
+                tabNavigationManager.navigateToHomeTab = nil
+            }
+        }
+        .onReceive(tabNavigationManager.$navigateToSmallWorld) { destination in
+            if let destination = destination {
+                withAnimation {
+                    if !tabNavigationManager.isNavigatingInsideSmallWorld {
+                        tabNavigationManager.recordEnteringSmallWorldFromHomeTab(homeTabSelection)
+                    }
+                    smallWorldDestination = destination
+                }
+                tabNavigationManager.navigateToSmallWorld = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var contentView: some View {
+        switch selectedTab {
+        case 0:
+            NavigationStack {
+                HomeView(selectedTab: $homeTabSelection)
+                    .toolbarBackground(.hidden, for: .navigationBar)
+            }
+        case 1:
+            NavigationStack {
+                SmallWorldContainerViewLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTabSelection,
+                    destination: $smallWorldDestination,
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                )
+                .toolbarBackground(.hidden, for: .navigationBar)
+            }
+        case 2:
+            NavigationStack {
+                MeView()
+                    .toolbarBackground(.hidden, for: .navigationBar)
+            }
+        case 3:
+            GlobalSearchViewLegacy()
+        default:
+            NavigationStack {
+                HomeView(selectedTab: $homeTabSelection)
+                    .toolbarBackground(.hidden, for: .navigationBar)
+            }
+        }
+    }
+
+    private var customTabBar: some View {
+        GeometryReader { geometry in
+            let safeAreaBottom = geometry.safeAreaInsets.bottom
+
+            // 使用VStack将内容推到底部
+            VStack {
+                Spacer()
+                // 椭圆胶囊容器
+                HStack(spacing: -8) {
+                    // 衣橱 Tab
+                    tabButton(
+                        index: 0,
+                        title: "衣橱",
+                        icon: "cabinet.fill"
+                    )
+
+                    // House Tab
+                    tabButton(
+                        index: 1,
+                        title: smallWorldTabTitle,
+                        icon: smallWorldTabIcon
+                    )
+
+                    // 我 Tab
+                    tabButton(
+                        index: 2,
+                        title: "我",
+                        icon: "face.smiling"
+                    )
+
+                    // 搜索 Tab
+                    tabButton(
+                        index: 3,
+                        title: "搜索",
+                        icon: "magnifyingglass"
+                    )
+                }
+                .frame(height: 56)
+                // 白色背景，适配暗黑模式，椭圆胶囊形状
+                .background(
+                    Capsule()
+                        .fill(Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: -2)
+                )
+                .padding(.horizontal, 16)
+                // 往下挪，紧贴底部（减小安全区域间距）
+                .padding(.bottom, safeAreaBottom > 0 ? 2 : 4)
+            }
+        }
+    }
+
+    private func tabButton(index: Int, title: String, icon: String) -> some View {
+        let isSelected = selectedTab == index
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedTab = index
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
+                    // 未选中黑色（适配暗黑模式），选中B22222深红色
+                    .foregroundColor(isSelected ? selectedColor : .primary)
+
+                Text(title)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    // 未选中黑色（适配暗黑模式），选中B22222深红色
+                    .foregroundColor(isSelected ? selectedColor : .primary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var smallWorldTabTitle: String {
+        switch smallWorldDestination {
+        case .bigWorld: return "世界书"
+        case .calendar: return "梦裙日历"
+        case .wealth: return "来财"
+        case .pet: return petDataManager.status.displayName
+        case .ootd: return "穿搭手帐"
+        case .ootdDefaultBook: return "魔法贴纸"
+        case .menu: return "House"
+        case .perler: return "拼豆工坊"
+        case .wardrobe: return "衣橱"
+        case .depositPlan: return "尾款天使"
+        case .recycleBin: return "回收站"
+        case .dressStock: return "裙子股市"
+        }
+    }
+
+    private var smallWorldTabIcon: String {
+        switch smallWorldDestination {
+        case .bigWorld: return "globe.asia.australia"
+        case .calendar: return "calendar"
+        case .wealth: return "yensign.circle"
+        case .pet: return "pawprint"
+        case .ootd: return "book.pages"
+        case .ootdDefaultBook: return "book.pages"
+        case .menu: return "house.fill"
+        case .perler: return "circle.grid.2x2"
+        case .wardrobe: return "cabinet.fill"
+        case .depositPlan: return "tag.fill"
+        case .recycleBin: return "trash.fill"
+        case .dressStock: return "chart.line.uptrend.xyaxis"
+        }
+    }
+}
+
+// MARK: - iOS 18以下 SmallWorld容器视图
+struct SmallWorldContainerViewLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    @Binding var isPlayingOpeningAnimation: Bool
+
+    var body: some View {
+        switch destination {
+        case .menu:
+            SmallWorldView(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination,
+                isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+            )
+        case .ootd:
+            OOTDViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .ootdDefaultBook:
+            OOTDDefaultBookViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .pet:
+            PetHomeViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .wealth:
+            WealthViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .calendar:
+            DreamDressCalendarViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .bigWorld:
+            BigWorldViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .perler:
+            PerlerBeadPatternListViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .recycleBin:
+            RecycleBinViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .dressStock:
+            DressStockMarketViewWithBackButtonLegacy(
+                selectedTab: $selectedTab,
+                homeTab: $homeTab,
+                destination: $destination
+            )
+        case .wardrobe, .depositPlan:
+            EmptyView()
+        }
+    }
+}
+
+// MARK: - iOS 18以下 全局搜索视图
+struct GlobalSearchViewLegacy: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
+    @State private var searchText = ""
+
+    var filteredClothings: [Clothing] {
+        if searchText.isEmpty { return [] }
+        return clothings.filter { clothing in
+            let nameMatch = clothing.name.localizedCaseInsensitiveContains(searchText)
+            let brandMatch = clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false
+            let tagMatch = clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false
+            return nameMatch || brandMatch || tagMatch
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LiquidBackground()
+                    .ignoresSafeArea()
+
+                List {
+                    if searchText.isEmpty {
+                        Section("搜索建议") {
+                            Label("裙子/小物名称", systemImage: "tshirt")
+                            Label("品牌/标签tag", systemImage: "tag")
+                        }
+                    } else if filteredClothings.isEmpty {
+                        ContentUnavailableView {
+                            Label("未找到结果", systemImage: "magnifyingglass")
+                        } description: {
+                            Text("尝试其他关键词搜索")
+                        }
+                    } else {
+                        Section("找到 \(filteredClothings.count) 件衣物") {
+                            ForEach(filteredClothings) { clothing in
+                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                                    HStack {
+                                        clothingThumbnail(clothing)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(clothing.name)
+                                                .font(.headline)
+                                            if let brand = clothing.brand {
+                                                Text(brand.name)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("全局搜索")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "全局搜索裙子、品牌、标签..."
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func clothingThumbnail(_ clothing: Clothing) -> some View {
+        if let firstImagePath = clothing.imagePaths.first {
+            AsyncLocalImageView(
+                fileName: firstImagePath,
+                displaySize: CGSize(width: 50, height: 50),
+                contentMode: .fill,
+                cornerRadius: 8,
+                placeholderColor: Color.gray.opacity(0.2)
+            )
+            .overlay(
+                Image(systemName: "tshirt")
+                    .foregroundStyle(.secondary)
+                    .opacity(0.5)
+            )
+        } else {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Image(systemName: "tshirt")
+                        .foregroundStyle(.secondary)
+                )
+        }
+    }
+}
+
+// MARK: - iOS 18以下 返回按钮包装视图
+struct SmallWorldBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    var onBackToMenu: () -> Void
+    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
+
+    var body: some View {
+        Button {
+            withAnimation {
+                switch tabNavigationManager.currentSmallWorldSource {
+                case .wardrobe:
+                    homeTab = .wardrobe
+                    selectedTab = 0
+                case .depositPlan:
+                    homeTab = .depositPlan
+                    selectedTab = 0
+                case .smallWorld:
+                    onBackToMenu()
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+    }
+}
+
+struct OOTDViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    @State private var isBookSelected: Bool = false
+    @State private var isSpaceBookSelected: Bool = false
+
+    var body: some View {
+        OOTDView(hideBackButton: true, isBookSelected: $isBookSelected, isSpaceBookSelected: $isSpaceBookSelected)
+            .toolbar {
+                if !isBookSelected && !isSpaceBookSelected {
+                    ToolbarItem(placement: .topBarLeading) {
+                        SmallWorldBackButtonLegacy(
+                            selectedTab: $selectedTab,
+                            homeTab: $homeTab,
+                            onBackToMenu: { destination = .menu }
+                        )
+                    }
+                }
+            }
+    }
+}
+
+struct OOTDDefaultBookViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        OOTDDefaultBookView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+struct PetHomeViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        PetHomeView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+struct WealthViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        WealthView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+struct DreamDressCalendarViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        DreamDressCalendarView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+struct BigWorldViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        BigWorldView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+struct PerlerBeadPatternListViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        PerlerBeadPatternListView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+struct RecycleBinViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        RecycleBinView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+struct DressStockMarketViewWithBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+
+    var body: some View {
+        DressStockMarketView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
+    }
+}
+
+// MARK: - 主 Tab 视图
 struct MainTabView: View {
     @State private var selectedTab: Int = 0
     @State private var homeTabSelection: HomeTab = .wardrobe
@@ -433,10 +1014,11 @@ struct MainTabView: View {
     @State private var isPlayingOpeningAnimation = false
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
-    
+
     var body: some View {
         Group {
-            if #available(iOS 18.0, *) {
+            if #available(iOS 26.0, *) {
+                // iOS 26+ 使用系统原生TabBar
                 ModernTabView(
                     selectedTab: $selectedTab,
                     homeTabSelection: $homeTabSelection,
@@ -454,7 +1036,27 @@ struct MainTabView: View {
                         )
                     }
                 }
-                .noticePopup() // 添加公告弹窗
+                .noticePopup()
+            } else {
+                // iOS 18-25 使用自定义红色背景底部导航栏
+                LegacyTabView(
+                    selectedTab: $selectedTab,
+                    homeTabSelection: $homeTabSelection,
+                    smallWorldDestination: $smallWorldDestination,
+                    isPlayingOpeningAnimation: $isPlayingOpeningAnimation
+                )
+                .overlay {
+                    if isPlayingOpeningAnimation {
+                        OpeningVideoOverlay(
+                            isPlaying: $isPlayingOpeningAnimation,
+                            onComplete: {
+                                homeTabSelection = .wardrobe
+                                selectedTab = 0
+                            }
+                        )
+                    }
+                }
+                .noticePopup()
             }
         }
     }

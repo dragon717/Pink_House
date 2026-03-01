@@ -455,9 +455,9 @@ struct TotalBalanceCard: View {
                 
                 Spacer()
                 
-                // 小眼睛按钮
+                // 小眼睛按钮 - 折叠价格时显示闭眼(eye.slash)，显示价格时显示睁眼(eye)
                 Button(action: onToggleVisibility) {
-                    Image(systemName: isVisible ? "eye.slash" : "eye")
+                    Image(systemName: isVisible ? "eye" : "eye.slash")
                         .font(.system(size: 16))
                         .foregroundStyle(.pink)
                         .frame(width: 32, height: 32)
@@ -637,14 +637,14 @@ struct YearSelectorView: View {
             }
             .buttonStyle(.plain)
             
-            // 小眼睛按钮放在年份选择器右侧
+            // 小眼睛按钮放在年份选择器右侧 - 折叠价格时显示闭眼(eye.slash)，显示价格时显示睁眼(eye)
             if let onToggle = onToggleStats {
                 Divider()
                     .frame(height: 20)
                     .padding(.horizontal, 4)
-                
+
                 Button(action: onToggle) {
-                    Image(systemName: showStats ? "eye.slash" : "eye")
+                    Image(systemName: showStats ? "eye" : "eye.slash")
                         .font(.system(size: 14))
                         .foregroundStyle(.pink)
                         .frame(width: 28, height: 28)
@@ -722,7 +722,7 @@ struct MonthSelectorView: View {
                 }
             } label: {
                 HStack {
-                    Text("按月预估尾款")
+                    Text("年度预估尾款(点我隐藏)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                     Spacer()
