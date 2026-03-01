@@ -168,7 +168,9 @@ final class SyncEngine {
         
         do {
             // 1. 拉取 LolitaItem
-            let query = CKQuery(recordType: "LolitaItem", predicate: NSPredicate(value: true))
+            // 使用 platformID != "" 作为查询条件，避免查询 recordName
+            let predicate = NSPredicate(format: "platformID != %@", "")
+            let query = CKQuery(recordType: "LolitaItem", predicate: predicate)
             query.sortDescriptors = [NSSortDescriptor(key: "lastUpdated", ascending: false)]
             
             let (matchResults, _) = try await publicDatabase.records(matching: query)
