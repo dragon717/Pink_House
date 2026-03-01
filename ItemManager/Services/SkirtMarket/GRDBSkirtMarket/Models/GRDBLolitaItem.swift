@@ -58,6 +58,9 @@ struct GRDBLolitaItem: Codable, FetchableRecord, PersistableRecord, Identifiable
     /// 本地修改时间（用于冲突检测）
     var modifiedAt: Date
     
+    /// 价格趋势: bargain(好价), fair(合理), premium(溢价), unknown(未知)
+    var priceTrend: String
+    
     // MARK: - 表名
     
     static var databaseTableName: String {
@@ -81,7 +84,8 @@ struct GRDBLolitaItem: Codable, FetchableRecord, PersistableRecord, Identifiable
         firstSeenAt: Date = Date(),
         lastUpdated: Date = Date(),
         syncStatus: String = "pending",
-        modifiedAt: Date = Date()
+        modifiedAt: Date = Date(),
+        priceTrend: String = "unknown"
     ) {
         self.id = id
         self.cloudKitRecordID = cloudKitRecordID
@@ -98,6 +102,7 @@ struct GRDBLolitaItem: Codable, FetchableRecord, PersistableRecord, Identifiable
         self.lastUpdated = lastUpdated
         self.syncStatus = syncStatus
         self.modifiedAt = modifiedAt
+        self.priceTrend = priceTrend
     }
     
     // MARK: - 计算属性
@@ -135,6 +140,7 @@ extension GRDBLolitaItem {
         static let lastUpdated = Column("last_updated")
         static let syncStatus = Column("sync_status")
         static let modifiedAt = Column("modified_at")
+        static let priceTrend = Column("price_trend")
     }
 }
 

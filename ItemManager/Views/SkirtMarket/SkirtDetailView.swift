@@ -71,22 +71,22 @@ struct SkirtDetailView: View {
             ScrollView {
                 VStack(spacing: SkirtMarketTheme.standardSpacing) {
                     // 价格概览卡片
-                    PriceOverviewCard(metrics: metrics, skirtName: skirtName)
+                    DetailPriceOverviewCard(metrics: metrics, skirtName: skirtName)
                     
                     // K线图
-                    KLineChartCard(
+                    DetailKLineChartCard(
                         metrics: filteredMetrics,
                         timeRange: selectedTimeRange
                     )
                     
                     // 时间范围选择器
-                    TimeRangeSelector(selection: $selectedTimeRange)
+                    DetailTimeRangeSelector(selection: $selectedTimeRange)
                     
                     // 市场统计
                     MarketDetailStatsCard(metrics: latestMetric, items: items)
                     
                     // AI投资建议
-                    AIAnalysisCard(metric: latestMetric)
+                    DetailAIAnalysisCard(metric: latestMetric)
                     
                     // 在售商品列表
                     ActiveListingsCard(items: items)
@@ -128,7 +128,7 @@ struct SkirtDetailView: View {
 }
 
 // MARK: - 价格概览卡片
-struct PriceOverviewCard: View {
+struct DetailPriceOverviewCard: View {
     let metrics: [SkirtStockMetric]
     let skirtName: String
     
@@ -175,9 +175,9 @@ struct PriceOverviewCard: View {
                 
                 // 价格区间
                 HStack(spacing: 16) {
-                    PriceRangeItem(title: "最高", value: latest.highPrice, color: SkirtMarketTheme.riseGreen)
-                    PriceRangeItem(title: "最低", value: latest.lowPrice, color: SkirtMarketTheme.fallRed)
-                    PriceRangeItem(title: "中位数", value: latest.medianPrice ?? latest.averagePrice, color: SkirtMarketTheme.primaryPink)
+                    DetailPriceRangeItem(title: "最高", value: latest.highPrice, color: SkirtMarketTheme.riseGreen)
+                    DetailPriceRangeItem(title: "最低", value: latest.lowPrice, color: SkirtMarketTheme.fallRed)
+                    DetailPriceRangeItem(title: "中位数", value: latest.medianPrice ?? latest.averagePrice, color: SkirtMarketTheme.primaryPink)
                 }
             } else {
                 // 无数据占位
@@ -209,7 +209,7 @@ struct PriceOverviewCard: View {
 }
 
 // MARK: - 价格区间项
-struct PriceRangeItem: View {
+struct DetailPriceRangeItem: View {
     let title: String
     let value: Double
     let color: Color
@@ -229,7 +229,7 @@ struct PriceRangeItem: View {
 }
 
 // MARK: - K线图卡片
-struct KLineChartCard: View {
+struct DetailKLineChartCard: View {
     let metrics: [SkirtStockMetric]
     let timeRange: SkirtDetailView.TimeRange
     
@@ -286,7 +286,7 @@ struct KLineChartCard: View {
 }
 
 // MARK: - 时间范围选择器
-struct TimeRangeSelector: View {
+struct DetailTimeRangeSelector: View {
     @Binding var selection: SkirtDetailView.TimeRange
     
     var body: some View {
@@ -404,17 +404,17 @@ struct PlatformDistributionView: View {
                 .foregroundStyle(.secondary)
             
             HStack(spacing: 12) {
-                PlatformBadge(name: "闲鱼", count: metric.xianyuCount, color: .yellow)
-                PlatformBadge(name: "小红书", count: metric.xiaohongshuCount, color: .red)
-                PlatformBadge(name: "淘宝", count: metric.taobaoCount, color: .orange)
-                PlatformBadge(name: "微店", count: metric.weidianCount, color: .green)
+                DetailPlatformBadge(name: "闲鱼", count: metric.xianyuCount, color: .yellow)
+                DetailPlatformBadge(name: "小红书", count: metric.xiaohongshuCount, color: .red)
+                DetailPlatformBadge(name: "淘宝", count: metric.taobaoCount, color: .orange)
+                DetailPlatformBadge(name: "微店", count: metric.weidianCount, color: .green)
             }
         }
     }
 }
 
 // MARK: - 平台徽章
-struct PlatformBadge: View {
+struct DetailPlatformBadge: View {
     let name: String
     let count: Int
     let color: Color
@@ -437,7 +437,7 @@ struct PlatformBadge: View {
 }
 
 // MARK: - AI分析卡片
-struct AIAnalysisCard: View {
+struct DetailAIAnalysisCard: View {
     let metric: SkirtStockMetric?
     
     var body: some View {
@@ -466,19 +466,19 @@ struct AIAnalysisCard: View {
             // AI分析内容
             if let metric = metric {
                 VStack(alignment: .leading, spacing: 8) {
-                    AnalysisRow(
+                    DetailAnalysisRow(
                         title: "好价比例",
                         value: String(format: "%.0f%%", (metric.bargainRatio ?? 0) * 100),
                         progress: metric.bargainRatio ?? 0
                     )
                     
-                    AnalysisRow(
+                    DetailAnalysisRow(
                         title: "急出比例",
                         value: String(format: "%.0f%%", (metric.urgentSaleRatio ?? 0) * 100),
                         progress: metric.urgentSaleRatio ?? 0
                     )
                     
-                    AnalysisRow(
+                    DetailAnalysisRow(
                         title: "溢价比例",
                         value: String(format: "%.0f%%", (metric.premiumRatio ?? 0) * 100),
                         progress: metric.premiumRatio ?? 0
@@ -497,7 +497,7 @@ struct AIAnalysisCard: View {
 }
 
 // MARK: - 分析行
-struct AnalysisRow: View {
+struct DetailAnalysisRow: View {
     let title: String
     let value: String
     let progress: Double
@@ -574,7 +574,7 @@ struct ActiveListingsCard: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(items.prefix(5), id: \.platformID) { item in
-                        ListingRow(item: item)
+                        DetailListingRow(item: item)
                         
                         if item.platformID != items.prefix(5).last?.platformID {
                             Divider()
@@ -589,7 +589,7 @@ struct ActiveListingsCard: View {
 }
 
 // MARK: - 商品行
-struct ListingRow: View {
+struct DetailListingRow: View {
     let item: LolitaItem
     
     var body: some View {

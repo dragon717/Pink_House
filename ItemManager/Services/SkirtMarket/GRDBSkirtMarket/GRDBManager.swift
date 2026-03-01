@@ -101,6 +101,7 @@ final class GRDBManager {
                 t.column("first_seen_at", .datetime).notNull()
                 t.column("sync_status", .text).notNull().defaults(to: "pending") // pending, synced, conflict
                 t.column("modified_at", .datetime).notNull()
+                t.column("price_trend", .text).notNull().defaults(to: "unknown") // bargain, fair, premium, unknown
                 
                 // 索引
                 t.uniqueKey(["platform_id"])

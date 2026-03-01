@@ -23,17 +23,21 @@ enum PetTrailTheme: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .defaultPink:
             // 粉，莫妮卡粉(深粉)，米白
-            return [Color(hex: "FFC0CB"), Color(hex: "D87093"), Color(hex: "F5F5DC")]
+            let colors: [Color] = [Color(hex: "FFC0CB"), Color(hex: "D87093"), Color(hex: "F5F5DC")]
+            return colors
         case .ocean:
-            return [Color(hex: "006994"), Color(hex: "00CED1"), Color(hex: "F0F8FF")]
+            let colors: [Color] = [Color(hex: "006994"), Color(hex: "00CED1"), Color(hex: "F0F8FF")]
+            return colors
         case .sunset:
-            return [Color(hex: "FF4500"), Color(hex: "FF69B4"), Color(hex: "8A2BE2")]
+            let colors: [Color] = [Color(hex: "FF4500"), Color(hex: "FF69B4"), Color(hex: "8A2BE2")]
+            return colors
         case .forest:
-            return [Color(hex: "228B22"), Color(hex: "90EE90"), Color(hex: "FFFFF0")]
+            let colors: [Color] = [Color(hex: "228B22"), Color(hex: "90EE90"), Color(hex: "FFFFF0")]
+            return colors
         case .custom:
-            let c1 = Color(hex: custom1 ?? "808080")
-            let c2 = Color(hex: custom2 ?? "808080")
-            let c3 = Color(hex: custom3 ?? "808080")
+            let c1: Color = Color(hex: custom1 ?? "808080")
+            let c2: Color = Color(hex: custom2 ?? "808080")
+            let c3: Color = Color(hex: custom3 ?? "808080")
             return [c1, c2, c3]
         }
     }

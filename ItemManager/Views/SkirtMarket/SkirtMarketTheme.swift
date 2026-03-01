@@ -167,4 +167,26 @@ extension View {
     }
 }
 
+// MARK: - 共享组件
+
+/// 脉冲点（实时指示器）
+struct PulsingDot: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        Circle()
+            .fill(SkirtMarketTheme.primaryPink)
+            .frame(width: 6, height: 6)
+            .scaleEffect(isAnimating ? 1.5 : 1.0)
+            .opacity(isAnimating ? 0.5 : 1.0)
+            .animation(
+                .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
+                value: isAnimating
+            )
+            .onAppear {
+                isAnimating = true
+            }
+    }
+}
+
 
