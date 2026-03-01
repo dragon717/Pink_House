@@ -72,6 +72,9 @@ enum LolitaItemType: String, Codable, CaseIterable {
 final class LolitaItem {
     // MARK: - 唯一标识
     
+    /// CloudKit Record ID - 用于同步
+    var cloudKitRecordID: String?
+    
     /// 平台+商品ID组合的唯一标识，用于基础去重
     /// 格式: "platform_itemId" 例如: "xianyu_123456789"
     /// 注意：CloudKit不支持unique约束，应用层通过SkirtIndexCache去重

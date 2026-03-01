@@ -47,7 +47,7 @@ final class TaskDispatcher: ObservableObject {
     
     /// 当前上下文
     private var context: ModelContext? {
-        SkirtMarketPersistence.shared.mainContext
+        SkirtMarketPersistenceV2.shared.mainContext
     }
     
     // MARK: - 初始化
@@ -82,8 +82,8 @@ final class TaskDispatcher: ObservableObject {
         // 3. 启动任务检查
         startTaskChecking()
         
-        // 4. 注册后台任务
-        registerBackgroundTask()
+        // 4. 注册后台任务（现在在AppDelegate中注册）
+        print("✅ 后台任务将在AppDelegate中注册")
         
         isRunning = true
         print("✅ 任务分发器已启动")
@@ -227,8 +227,8 @@ final class TaskDispatcher: ObservableObject {
     
     // MARK: - 任务分配核心逻辑
     
-    /// 检查并领取任务
-    private func checkAndClaimTasks() async {
+    /// 检查并领取任务（内部方法，供后台任务调用）
+    internal func checkAndClaimTasks() async {
         guard let context = context else { return }
         guard currentTasks.count < TaskConfig.maxConcurrentTasksPerNode else {
             print("⏸️ 当前任务已满 (\(currentTasks.count)/\(TaskConfig.maxConcurrentTasksPerNode))")
@@ -692,7 +692,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         // 配置裙子股市
         Task {
-            await SkirtMarketPersistence.shared.configure()
+            await SkirtMarketPersistenceV2.shared.configure()
             await TaskDispatcher.shared.start()
             
             // 创建一些示例任务

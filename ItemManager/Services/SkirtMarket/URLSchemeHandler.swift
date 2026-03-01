@@ -257,7 +257,7 @@ final class URLSchemeHandler {
     
     /// 保存商品到数据库
     private func saveItem(_ item: LolitaItem) {
-        guard let context = SkirtMarketPersistence.shared.mainContext else {
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             print("❌ 无法获取数据库上下文")
             return
         }

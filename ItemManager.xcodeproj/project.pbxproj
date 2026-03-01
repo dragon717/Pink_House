@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		A226CD742F26A507004E4E41 /* 少女心愿logo.icon in Resources */ = {isa = PBXBuildFile; fileRef = A226CD732F26A507004E4E41 /* 少女心愿logo.icon */; };
+		A2379F992F5440D200E0F2DF /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A2379F982F5440D200E0F2DF /* GRDB */; };
+
 		A280DB932F443697002CBC10 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = A280DB922F443697002CBC10 /* GoogleGenerativeAI */; };
 		A2AE59C32F1EB85300B4B6EB /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2AE59C22F1EB85300B4B6EB /* WidgetKit.framework */; };
 		A2AE59C52F1EB85300B4B6EB /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2AE59C42F1EB85300B4B6EB /* SwiftUI.framework */; };
@@ -141,6 +143,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A280DB932F443697002CBC10 /* GoogleGenerativeAI in Frameworks */,
+				A2379F992F5440D200E0F2DF /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,6 +245,7 @@
 			name = ItemManager;
 			packageProductDependencies = (
 				A280DB922F443697002CBC10 /* GoogleGenerativeAI */,
+				A2379F982F5440D200E0F2DF /* GRDB */,
 			);
 			productName = ItemManager;
 			productReference = A2AE58732F19377500B4B6EB /* ItemManager.app */;
@@ -349,6 +353,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A280DB912F443697002CBC10 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
+				A2379F972F5440D200E0F2DF /* XCRemoteSwiftPackageReference "GRDB" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A2AE58742F19377500B4B6EB /* Products */;
@@ -909,6 +914,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A2379F972F5440D200E0F2DF /* XCRemoteSwiftPackageReference "GRDB" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
 		A280DB912F443697002CBC10 /* XCRemoteSwiftPackageReference "generative-ai-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/generative-ai-swift";
@@ -920,6 +933,12 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A2379F982F5440D200E0F2DF /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A2379F972F5440D200E0F2DF /* XCRemoteSwiftPackageReference "GRDB" */;
+			productName = GRDB;
+		};
+
 		A280DB922F443697002CBC10 /* GoogleGenerativeAI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A280DB912F443697002CBC10 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;

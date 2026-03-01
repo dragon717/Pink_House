@@ -21,7 +21,7 @@ final class SkirtMarketTestDataGenerator {
     func generateTestData() async {
         print("🧪 开始生成裙子股市测试数据...")
         
-        guard let context = SkirtMarketPersistence.shared.mainContext else {
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             print("❌ 无法获取上下文")
             return
         }
@@ -163,7 +163,7 @@ final class SkirtMarketTestDataGenerator {
     func clearTestData() async {
         print("🧹 清理测试数据...")
         
-        guard let context = SkirtMarketPersistence.shared.mainContext else {
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             return
         }
         

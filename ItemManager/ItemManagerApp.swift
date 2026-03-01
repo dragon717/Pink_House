@@ -7,6 +7,8 @@
 
 import SwiftUI
 import SwiftData
+import BackgroundTasks
+import CloudKit
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     static var orientationLock = UIInterfaceOrientationMask.all
@@ -32,7 +34,37 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
         
+        // 注册裙子股市后台任务
+        registerSkirtMarketBackgroundTask()
+        
         return true
+    }
+    
+    // MARK: - 后台任务注册
+    
+    private func registerSkirtMarketBackgroundTask() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: "com.yourapp.skirtmarket.fetch",
+            using: nil
+        ) { task in
+            self.handleSkirtMarketBackgroundTask(task as! BGAppRefreshTask)
+        }
+        print("✅ 后台任务已注册: com.yourapp.skirtmarket.fetch")
+    }
+    
+    private func handleSkirtMarketBackgroundTask(_ task: BGAppRefreshTask) {
+        task.expirationHandler = {
+            print("⏰ 后台任务即将过期")
+        }
+        
+        Task {
+            // 执行裙子股市的后台任务
+            await TaskDispatcher.shared.checkAndClaimTasks()
+            task.setTaskCompleted(success: true)
+            
+            // 调度下一次任务
+            TaskDispatcher.shared.scheduleBackgroundTask()
+        }
     }
 }
 
@@ -118,10 +150,14 @@ struct MainContentView: View {
                 // 0.6 Validate Model3D references integrity
                 await Model3DValidationService.shared.validateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
                 
-                // 0.7 裙子股市功能已暂时禁用，避免影响原有衣橱数据
-                // await SkirtMarketPersistence.shared.configure()
-                // await TaskDispatcher.shared.start()
-                print("⚠️ 裙子股市功能已禁用，保护原有衣橱数据")
+                // 0.7 裙子股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
+                do {
+                    try await GRDBManager.shared.initialize()
+                    await SyncEngine.shared.configure()
+                    print("✅ 裙子股市功能已启用（GRDB 版本）")
+                } catch {
+                    print("❌ 裙子股市初始化失败: \(error)")
+                }
                 
                 // 1. Minimum splash duration (aesthetic + buffer)
                 try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds

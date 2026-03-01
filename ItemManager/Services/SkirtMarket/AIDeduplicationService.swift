@@ -123,7 +123,7 @@ final class AIDeduplicationService {
     
     /// 更新内存索引中的现有商品
     private func updateCachedItem(_ cachedItem: SkirtIndexEntry, with newItem: LolitaItem) async {
-        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else { return }
         
         // 查询数据库中的完整记录（使用字符串匹配避免谓词捕获问题）
         let targetPlatformID = cachedItem.platformID
@@ -148,7 +148,7 @@ final class AIDeduplicationService {
     
     /// 更新现有商品信息
     private func updateExistingItem(_ cachedItem: SkirtIndexEntry, with newItem: LolitaItem) async {
-        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else { return }
         
         // 使用字符串匹配避免谓词捕获问题
         let targetPlatformID = cachedItem.platformID
@@ -509,7 +509,7 @@ final class AIDeduplicationService {
     
     /// 查找相似商品
     private func findSimilarItems(semanticHash: String, item: LolitaItem) async -> [LolitaItem] {
-        guard let context = SkirtMarketPersistence.shared.mainContext else { return [] }
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else { return [] }
         
         // 1. 精确匹配语义哈希（简化谓词，避免复杂表达式）
         let exactDescriptor = FetchDescriptor<LolitaItem>(
@@ -733,7 +733,7 @@ final class AIDeduplicationService {
         newItem.deleteReason = "重复商品，已合并到 \(existingItem.platformID)"
         
         // 保存
-        if let context = SkirtMarketPersistence.shared.mainContext {
+        if let context = SkirtMarketPersistenceV2.shared.mainContext {
             try? context.save()
         }
         

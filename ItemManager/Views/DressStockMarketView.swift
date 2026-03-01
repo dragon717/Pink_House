@@ -92,7 +92,7 @@ struct DressStockMarketView: View {
         isLoading = true
         defer { isLoading = false }
         
-        guard let context = SkirtMarketPersistence.shared.mainContext else {
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             print("❌ 无法获取裙子股市上下文")
             return
         }

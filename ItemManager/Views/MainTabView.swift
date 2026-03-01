@@ -740,7 +740,8 @@ struct DressStockMarketViewWithBackButton: View {
     @Binding var destination: SmallWorldDestination
     
     var body: some View {
-        DressStockMarketView()
+        // 使用 GRDB 版本的裙子股市（完全独立于 SwiftData）
+        GRDBDressStockMarketView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     SmallWorldBackButton(

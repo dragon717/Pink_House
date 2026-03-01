@@ -77,7 +77,7 @@ final class SkirtMarketViewModel: ObservableObject {
     // MARK: - 初始化
     
     init() {
-        self.context = SkirtMarketPersistence.shared.mainContext
+        self.context = SkirtMarketPersistenceV2.shared.mainContext
         setupBindings()
     }
     

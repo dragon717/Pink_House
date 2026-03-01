@@ -100,7 +100,7 @@ final class SkirtIndexCache {
         
         print("🔄 开始刷新裙子索引缓存...")
         
-        guard let context = SkirtMarketPersistence.shared.mainContext else {
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             print("❌ 无法获取上下文")
             return
         }
