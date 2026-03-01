@@ -183,7 +183,8 @@ struct HomeView: View {
                 }
             }
             .toolbarBackground(.visible, for: .navigationBar)
-            .searchable(
+            // 只在搜索激活时显示搜索栏，默认隐藏常驻搜索框
+            .applySearchableIfNeeded(
                 text: Binding(
                     get: { selectedTab == .wardrobe ? wardrobeSearchText : depositSearchText },
                     set: { newValue in
@@ -195,7 +196,6 @@ struct HomeView: View {
                     }
                 ),
                 isPresented: $isSearchActive,
-                placement: .toolbar,//.navigationBarDrawer(displayMode: .automatic),
                 prompt: "搜索名称、品牌、标签、类型、颜色、尺码、价格范围等..."
             )
             .onAppear {
@@ -820,5 +820,27 @@ extension HomeView {
         if let day = pickDay(in: currentInterval) { return .current(day) }
         if let day = pickDay(in: nextInterval) { return .next(day) }
         return nil
+    }
+}
+
+// MARK: - View 扩展：条件应用 searchable
+extension View {
+    /// 只在 isPresented 为 true 时应用 searchable，实现默认隐藏搜索栏的效果
+    @ViewBuilder
+    func applySearchableIfNeeded(
+        text: Binding<String>,
+        isPresented: Binding<Bool>,
+        prompt: String
+    ) -> some View {
+        if isPresented.wrappedValue {
+            self.searchable(
+                text: text,
+                isPresented: isPresented,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: prompt
+            )
+        } else {
+            self
+        }
     }
 }
