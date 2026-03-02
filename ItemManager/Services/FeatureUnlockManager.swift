@@ -267,6 +267,17 @@ final class FeatureUnlockManager: ObservableObject {
         setupDefaultConditions()
     }
     
+    // MARK: - 从磁盘重新加载（用于备份恢复后）
+    func reloadFromDisk() {
+        print("🔄 FeatureUnlockManager: Reloading from disk...")
+        loadData()
+        // 重新设置默认条件（如果有新功能）
+        setupDefaultConditions()
+        // 通知UI更新
+        objectWillChange.send()
+        print("✅ FeatureUnlockManager: Reload complete")
+    }
+    
     // MARK: - 数据持久化
     private func loadData() {
         // 加载状态

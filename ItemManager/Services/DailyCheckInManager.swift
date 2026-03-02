@@ -50,6 +50,24 @@ final class DailyCheckInManager: ObservableObject {
         }
     }
     
+    // MARK: - 从磁盘重新加载（用于备份恢复后）
+    func reloadFromDisk() {
+        print("🔄 DailyCheckInManager: Reloading from disk...")
+        loadCheckInData()
+        // 重新计算本周打卡状态
+        calculateWeekCheckIns()
+        // 如果今日已打卡，加载今日记录
+        if hasCheckedInToday {
+            let records = loadAllRecords()
+            todayCheckIn = records.first(where: { Calendar.current.isDateInToday($0.date) })
+        } else {
+            todayCheckIn = nil
+        }
+        // 通知UI更新
+        objectWillChange.send()
+        print("✅ DailyCheckInManager: Reload complete. Total days: \(totalDays), Consecutive: \(consecutiveDays)")
+    }
+    
     // MARK: - 检查今日是否已打卡
     var hasCheckedInToday: Bool {
         guard let lastDate = UserDefaults.standard.object(forKey: lastCheckInDateKey) as? Date else {

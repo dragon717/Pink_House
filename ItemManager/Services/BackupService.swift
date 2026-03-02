@@ -713,8 +713,70 @@ class BackupService {
                 }
             }
             
+            // v1.8: Magic Tasks (魔法任务解锁状态)
+            let featureStatusDTOs: [FeatureStatusDTO] = await MainActor.run {
+                let manager = FeatureUnlockManager.shared
+                return FeatureItem.allCases.map { feature in
+                    let status = manager.getStatus(for: feature)
+                    return FeatureStatusDTO(
+                        featureID: feature.rawValue,
+                        isUnlocked: status.isUnlocked,
+                        isVisible: status.isVisible,
+                        unlockedAt: status.unlockedAt,
+                        unlockedBy: status.unlockedBy
+                    )
+                }
+            }
+            
+            let unlockConditionDTOs: [UnlockConditionDTO] = await MainActor.run {
+                let manager = FeatureUnlockManager.shared
+                return FeatureItem.allCases.map { feature in
+                    let condition = manager.getCondition(for: feature)
+                    return UnlockConditionDTO(
+                        featureID: feature.rawValue,
+                        type: condition.type,
+                        requiredValue: condition.requiredValue,
+                        description: condition.description
+                    )
+                }
+            }
+            print("### Export: Added \(featureStatusDTOs.count) magic task statuses")
+            
+            // v1.8: CheckIn Records (签到打卡记录)
+            let checkInRecordsDTOs: [CheckInRecordDTO] = await MainActor.run {
+                let manager = DailyCheckInManager.shared
+                // 获取所有打卡记录
+                if let data = UserDefaults.standard.data(forKey: "dailyCheckIn.records"),
+                   let records = try? JSONDecoder().decode([CheckInRecord].self, from: data) {
+                    return records.map { record in
+                        CheckInRecordDTO(
+                            id: record.id,
+                            date: record.date,
+                            colors: record.colors,
+                            accessories: record.accessories,
+                            weather: record.weather,
+                            location: record.location,
+                            isAIGenerated: record.isAIGenerated
+                        )
+                    }
+                }
+                return []
+            }
+            
+            let checkInStatsDTO: CheckInStatsDTO = await MainActor.run {
+                let consecutiveDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.consecutiveDays")
+                let totalDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.totalDays")
+                let lastDate = UserDefaults.standard.object(forKey: "dailyCheckIn.lastDate") as? Date
+                return CheckInStatsDTO(
+                    consecutiveDays: consecutiveDays,
+                    totalDays: totalDays,
+                    lastCheckInDate: lastDate
+                )
+            }
+            print("### Export: Added \(checkInRecordsDTOs.count) check-in records")
+            
             let manifest = BackupManifest(
-                version: "1.7",
+                version: "1.8",
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -742,6 +804,10 @@ class BackupService {
                 userProfile: userProfileDTO,
                 userAvatarFile: userAvatarFileName,
                 perlerBeadPatterns: perlerBeadPatternDTOs,
+                featureStatuses: featureStatusDTOs,
+                unlockConditions: unlockConditionDTOs,
+                checkInRecords: checkInRecordsDTOs,
+                checkInStats: checkInStatsDTO,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: snapshotDTOs.count,
@@ -2349,10 +2415,16 @@ class BackupService {
         // 4. 恢复 User Profile (头像和昵称)
         restoreUserProfile(manifest: manifest, imageFiles: imageFiles, documentsDir: documentsDir, fileManager: fileManager)
         
-        // 5. 刷新主题和小组件
+        // 5. 恢复魔法任务 (v1.8+)
+        restoreMagicTasks(manifest: manifest)
+        
+        // 6. 恢复签到打卡 (v1.8+)
+        restoreCheckInRecords(manifest: manifest)
+        
+        // 7. 刷新主题和小组件
         refreshThemeAndWidget(documentsDir: documentsDir, fileManager: fileManager)
         
-        // 6. 版本检查与缓存清理
+        // 8. 版本检查与缓存清理
         performVersionCheckAndCacheClear(manifest: manifest)
     }
     
@@ -2521,6 +2593,104 @@ class BackupService {
                 print("Restore: App Version Mismatch (Backup: \(backupAppVersion), Current: \(currentAppVersion ?? "Unknown")). Clearing Spatial Cache...")
                 SpatialAssetManager.shared.clearAllCache()
             }
+        }
+    }
+    
+    // MARK: - 恢复魔法任务 (v1.8+)
+    
+    private func restoreMagicTasks(manifest: BackupManifest) {
+        // 恢复魔法任务解锁状态
+        if let featureStatusDTOs = manifest.featureStatuses {
+            print("Restore: Restoring \(featureStatusDTOs.count) magic task statuses...")
+            
+            var restoredStatuses: [String: FeatureStatus] = [:]
+            for dto in featureStatusDTOs {
+                let status = FeatureStatus(
+                    isUnlocked: dto.isUnlocked,
+                    isVisible: dto.isVisible,
+                    unlockedAt: dto.unlockedAt,
+                    unlockedBy: dto.unlockedBy
+                )
+                restoredStatuses[dto.featureID] = status
+            }
+            
+            // 保存到 UserDefaults
+            if let encoded = try? JSONEncoder().encode(restoredStatuses) {
+                UserDefaults.standard.set(encoded, forKey: "featureUnlock.statuses")
+                print("Restore: Magic task statuses saved to UserDefaults")
+            }
+        }
+        
+        // 恢复魔法任务解锁条件配置
+        if let unlockConditionDTOs = manifest.unlockConditions {
+            print("Restore: Restoring \(unlockConditionDTOs.count) unlock conditions...")
+            
+            var restoredConditions: [String: UnlockCondition] = [:]
+            for dto in unlockConditionDTOs {
+                let condition = UnlockCondition(
+                    type: dto.type,
+                    requiredValue: dto.requiredValue,
+                    description: dto.description
+                )
+                restoredConditions[dto.featureID] = condition
+            }
+            
+            // 保存到 UserDefaults
+            if let encoded = try? JSONEncoder().encode(restoredConditions) {
+                UserDefaults.standard.set(encoded, forKey: "featureUnlock.conditions")
+                print("Restore: Unlock conditions saved to UserDefaults")
+            }
+        }
+        
+        // 刷新 FeatureUnlockManager
+        DispatchQueue.main.async {
+            FeatureUnlockManager.shared.reloadFromDisk()
+            print("Restore: FeatureUnlockManager reloaded")
+        }
+    }
+    
+    // MARK: - 恢复签到打卡 (v1.8+)
+    
+    private func restoreCheckInRecords(manifest: BackupManifest) {
+        // 恢复打卡记录
+        if let checkInRecordDTOs = manifest.checkInRecords {
+            print("Restore: Restoring \(checkInRecordDTOs.count) check-in records...")
+            
+            let records = checkInRecordDTOs.map { dto in
+                CheckInRecord(
+                    id: dto.id,
+                    date: dto.date,
+                    colors: dto.colors,
+                    accessories: dto.accessories,
+                    weather: dto.weather,
+                    location: dto.location,
+                    isAIGenerated: dto.isAIGenerated
+                )
+            }
+            
+            // 保存到 UserDefaults
+            if let encoded = try? JSONEncoder().encode(records) {
+                UserDefaults.standard.set(encoded, forKey: "dailyCheckIn.records")
+                print("Restore: Check-in records saved to UserDefaults")
+            }
+        }
+        
+        // 恢复签到统计数据
+        if let stats = manifest.checkInStats {
+            print("Restore: Restoring check-in stats...")
+            UserDefaults.standard.set(stats.consecutiveDays, forKey: "dailyCheckIn.consecutiveDays")
+            UserDefaults.standard.set(stats.totalDays, forKey: "dailyCheckIn.totalDays")
+            if let lastDate = stats.lastCheckInDate {
+                UserDefaults.standard.set(lastDate, forKey: "dailyCheckIn.lastDate")
+            }
+            print("Restore: Check-in stats saved to UserDefaults")
+        }
+        
+        // 刷新 DailyCheckInManager
+        DispatchQueue.main.async {
+            // 通过重新初始化来加载新数据
+            DailyCheckInManager.shared.reloadFromDisk()
+            print("Restore: DailyCheckInManager reloaded")
         }
     }
 

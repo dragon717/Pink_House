@@ -59,6 +59,14 @@ struct BackupManifest: Codable {
     // Version 1.7: Perler Bead Patterns (拼豆/像素画)
     let perlerBeadPatterns: [PerlerBeadPatternDTO]?
     
+    // Version 1.8: Magic Tasks (魔法任务解锁状态)
+    let featureStatuses: [FeatureStatusDTO]? // v1.8+ 魔法任务解锁状态
+    let unlockConditions: [UnlockConditionDTO]? // v1.8+ 魔法任务解锁条件配置
+    
+    // Version 1.8: CheckIn Records (签到打卡记录)
+    let checkInRecords: [CheckInRecordDTO]? // v1.8+ 签到打卡记录
+    let checkInStats: CheckInStatsDTO? // v1.8+ 签到统计数据
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int
@@ -315,4 +323,41 @@ struct PerlerBeadPatternDTO: Codable {
     let updatedAt: Date
     let lastModified: Date?
     let sortIndex: Int
+}
+
+// MARK: - Magic Tasks DTO (v1.8)
+// 魔法任务解锁状态和条件配置的备份DTO
+
+struct FeatureStatusDTO: Codable {
+    let featureID: String // FeatureItem.rawValue
+    let isUnlocked: Bool
+    let isVisible: Bool
+    let unlockedAt: Date?
+    let unlockedBy: String?
+}
+
+struct UnlockConditionDTO: Codable {
+    let featureID: String // FeatureItem.rawValue
+    let type: String // UnlockConditionType.rawValue
+    let requiredValue: Int
+    let description: String
+}
+
+// MARK: - CheckIn DTO (v1.8)
+// 签到打卡记录的备份DTO
+
+struct CheckInRecordDTO: Codable {
+    let id: String
+    let date: Date
+    let colors: [String]
+    let accessories: String
+    let weather: String?
+    let location: String?
+    let isAIGenerated: Bool
+}
+
+struct CheckInStatsDTO: Codable {
+    let consecutiveDays: Int
+    let totalDays: Int
+    let lastCheckInDate: Date?
 }
