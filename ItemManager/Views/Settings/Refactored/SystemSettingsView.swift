@@ -31,8 +31,6 @@ struct SystemSettingsView: View {
             
             // MARK: - 通用设置
             AdaptiveSection(header: "通用设置") {
-                
-                
                 Picker("界面语言", selection: $languageManager.currentLanguage) {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.displayName).tag(language)

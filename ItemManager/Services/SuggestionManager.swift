@@ -17,7 +17,7 @@ class SuggestionManager {
     static let shared = SuggestionManager()
     
     private var tries: [SuggestionField: Trie] = [:]
-    private let cache = LRUCache<String, [String]>(capacity: 100)
+    private let cache = LRUCache(capacity: 100)
     private let queue = DispatchQueue(label: "com.pinkhouse.suggestion", qos: .userInitiated)
     
     private init() {
@@ -153,7 +153,7 @@ class SuggestionManager {
         return queue.sync {
             // 检查缓存
             let cacheKey = "\(field.rawValue):\(trimmedQuery)"
-            if let cached = cache.getValue(for: cacheKey) {
+            if let cached = cache.getValue(for: cacheKey) as? [String] {
                 return cached
             }
             

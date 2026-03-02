@@ -105,6 +105,7 @@ struct MainContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSplash = true
     @State private var showMigrationOverlay = false
+    @State private var showDailyCheckIn = false
     
     var body: some View {
         ZStack {
@@ -122,6 +123,13 @@ struct MainContentView: View {
                 MigrationProgressView()
                     .zIndex(2)
             }
+            
+            // 全局解锁通知覆盖层
+            GlobalUnlockNotificationOverlay()
+                .zIndex(3)
+        }
+        .sheet(isPresented: $showDailyCheckIn) {
+            DailyCheckInView()
         }
         .onAppear {
             if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
@@ -161,6 +169,11 @@ struct MainContentView: View {
                     print("❌ 裙子股市初始化失败: \(error)")
                 }
                 
+                // 0.8 刷新魔法任务进度（在开屏期间完成）
+                await MainActor.run {
+                    FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
+                }
+                
                 // 1. Minimum splash duration (aesthetic + buffer)
                 try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
                 
@@ -172,6 +185,12 @@ struct MainContentView: View {
                 withAnimation(.easeOut(duration: 0.5)) {
                     showSplash = false
                 }
+                
+                // 4. 检查是否需要显示每日打卡（开屏结束后）
+                try? await Task.sleep(nanoseconds: 300_000_000) // 等待0.3秒确保动画完成
+                await MainActor.run {
+                    checkAndShowDailyCheckIn()
+                }
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -181,6 +200,20 @@ struct MainContentView: View {
                     // 调度裙子股市后台任务
                     TaskDispatcher.shared.scheduleBackgroundTask()
                 }
+            } else if newPhase == .active {
+                // 从后台回到前台时检查是否需要打卡
+                checkAndShowDailyCheckIn()
+            }
+        }
+    }
+    
+    // MARK: - 检查并显示每日打卡
+    private func checkAndShowDailyCheckIn() {
+        // 检查今天是否已经打卡
+        if !DailyCheckInManager.shared.hasCheckedInToday {
+            // 延迟一点显示，让主界面先加载完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showDailyCheckIn = true
             }
         }
     }

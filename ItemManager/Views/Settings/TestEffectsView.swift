@@ -7,6 +7,7 @@ enum LabModule: String, CaseIterable, Identifiable {
     case vip = "VIP 测试"
     case favoriteMenu = "菜单设置"
     case notice = "公告管理"
+    case featureUnlock = "功能解锁"
     
     var id: String { rawValue }
     
@@ -16,6 +17,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .vip: return "crown.fill"
         case .favoriteMenu: return "star.fill"
         case .notice: return "megaphone.fill"
+        case .featureUnlock: return "lock.open.fill"
         }
     }
     
@@ -25,6 +27,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .vip: return .yellow
         case .favoriteMenu: return .orange
         case .notice: return .blue
+        case .featureUnlock: return .green
         }
     }
     
@@ -34,6 +37,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .vip: return "状态 · 重置"
         case .favoriteMenu: return "常用 · 清除"
         case .notice: return "管理 · 预览"
+        case .featureUnlock: return "解锁 · 显示"
         }
     }
 }
@@ -166,6 +170,8 @@ struct LabModuleDetailView: View {
                         FavoriteMenuTestView()
                     case .notice:
                         NoticeTestView()
+                    case .featureUnlock:
+                        FeatureUnlockSettingsView()
                     }
                 }
             }

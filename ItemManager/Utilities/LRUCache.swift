@@ -1,110 +1,81 @@
 
 import Foundation
 
-class LRUCache<Key: Hashable, Value> {
-    private struct CachePayload {
-        let key: Key
-        let value: Value
-    }
-    
+// 使用字典 + 数组实现 LRU 缓存
+// 注意：为了规避 Swift 6.2 编译器在 Release 模式下对泛型类 deinit 的崩溃问题，
+// 这个实现使用具体类型而非泛型
+protocol LRUCacheKey: Hashable {
+    var cacheKey: String { get }
+}
+
+protocol LRUCacheValue {
+    var cacheValue: Any { get }
+}
+
+// 具体类型的缓存实现，避免泛型导致的编译器崩溃
+final class LRUCache {
+    private var storage: [String: Any] = [:]
+    private var accessOrder: [String] = []
     private let capacity: Int
-    private let list = DoublyLinkedList<CachePayload>()
-    private var nodes = [Key: DoublyLinkedList<CachePayload>.Node]()
+    private let lock = NSLock()
     
     init(capacity: Int) {
         self.capacity = max(1, capacity)
     }
     
-    func setValue(_ value: Value, for key: Key) {
-        let payload = CachePayload(key: key, value: value)
+    func setValue(_ value: Any, for key: String) {
+        lock.lock()
+        defer { lock.unlock() }
         
-        if let node = nodes[key] {
-            node.payload = payload
-            list.moveToHead(node)
-        } else {
-            let node = list.addHead(payload)
-            nodes[key] = node
+        // 如果 key 已存在，更新值并移动到队尾（最近使用）
+        if storage[key] != nil {
+            storage[key] = value
+            moveToEnd(key: key)
+            return
         }
         
-        if list.count > capacity {
-            if let node = list.removeLast() {
-                nodes[node.payload.key] = nil
-            }
+        // 如果容量已满，移除最久未使用的（队首）
+        if accessOrder.count >= capacity {
+            let oldestKey = accessOrder.removeFirst()
+            storage.removeValue(forKey: oldestKey)
         }
+        
+        // 添加新值到队尾
+        storage[key] = value
+        accessOrder.append(key)
     }
     
-    func getValue(for key: Key) -> Value? {
-        guard let node = nodes[key] else { return nil }
-        list.moveToHead(node)
-        return node.payload.value
-    }
-}
-
-// 简单的双向链表实现
-private class DoublyLinkedList<T> {
-    class Node {
-        var payload: T
-        var previous: Node?
-        var next: Node?
+    func getValue(for key: String) -> Any? {
+        lock.lock()
+        defer { lock.unlock() }
         
-        init(payload: T) {
-            self.payload = payload
-        }
+        guard let value = storage[key] else { return nil }
+        
+        // 移动到队尾表示最近使用
+        moveToEnd(key: key)
+        return value
     }
     
-    private(set) var count: Int = 0
-    private var head: Node?
-    private var tail: Node?
-    
-    func addHead(_ payload: T) -> Node {
-        let node = Node(payload: payload)
-        if let head = head {
-            node.next = head
-            head.previous = node
-            self.head = node
-        } else {
-            head = node
-            tail = node
-        }
-        count += 1
-        return node
+    func removeValue(for key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        storage.removeValue(forKey: key)
+        accessOrder.removeAll { $0 == key }
     }
     
-    func moveToHead(_ node: Node) {
-        guard node !== head else { return }
+    func removeAll() {
+        lock.lock()
+        defer { lock.unlock() }
         
-        let previous = node.previous
-        let next = node.next
-        
-        previous?.next = next
-        next?.previous = previous
-        
-        node.next = head
-        node.previous = nil
-        
-        if node === tail {
-            tail = previous
-        }
-        
-        if let head = head {
-            head.previous = node
-        }
-        
-        head = node
+        storage.removeAll()
+        accessOrder.removeAll()
     }
     
-    func removeLast() -> Node? {
-        guard let tail = tail else { return nil }
-        
-        let previous = tail.previous
-        previous?.next = nil
-        self.tail = previous
-        
-        if count == 1 {
-            head = nil
-        }
-        
-        count -= 1
-        return tail
+    // MARK: - Private
+    
+    private func moveToEnd(key: String) {
+        accessOrder.removeAll { $0 == key }
+        accessOrder.append(key)
     }
 }

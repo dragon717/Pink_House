@@ -1014,6 +1014,7 @@ struct MainTabView: View {
     @State private var isPlayingOpeningAnimation = false
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
 
     var body: some View {
         Group {
@@ -1058,6 +1059,22 @@ struct MainTabView: View {
                 }
                 .noticePopup()
             }
+        }
+        // 监听解锁后的跳转通知
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSmallWorldDestination)) { notification in
+            if let destination = notification.userInfo?["destination"] as? SmallWorldDestination {
+                withAnimation {
+                    smallWorldDestination = destination
+                    selectedTab = 1 // 切换到 House Tab
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSettings)) { notification in
+            // 跳转到设置页面
+            withAnimation {
+                selectedTab = 2 // 切换到"我"Tab
+            }
+            // 这里可以进一步细化跳转到具体设置项
         }
     }
 }

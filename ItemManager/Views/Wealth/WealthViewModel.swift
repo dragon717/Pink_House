@@ -321,6 +321,8 @@ class WealthViewModel {
         var remaining = totalAmount
         var result: [MoneyPile] = []
         
+        print("💰 calculateStacks: selectedCurrency=\(selectedCurrency), baseAmountCNY=\(baseAmountCNY), totalAmount=\(totalAmount), remaining=\(remaining)")
+        
         for denom in currentDenominations {
             let totalCountForDenom = remaining / denom.value
             
@@ -342,6 +344,7 @@ class WealthViewModel {
                 remaining %= denom.value
             }
         }
+        print("💰 calculateStacks: result.count=\(result.count)")
         return result
     }
 }

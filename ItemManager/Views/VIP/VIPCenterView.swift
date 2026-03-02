@@ -245,6 +245,16 @@ struct VIPCenterView: View {
     
     private func redeemVIPCode() {
         let code = vipCodeInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. 先检查是否是功能解锁兑换码
+        let featureResult = FeatureUnlockManager.shared.redeemCode(code)
+        if featureResult.success {
+            redeemResultMessage = featureResult.message
+            showingRedeemResultAlert = true
+            return
+        }
+        
+        // 2. 检查是否是VIP兑换码
         if code == "太子爷" {
             let key = "HasRedeemedVIP_Prince"
             if UserDefaults.standard.bool(forKey: key) {
@@ -260,15 +270,26 @@ struct VIPCenterView: View {
                 redeemResultMessage = "兑换成功！\n获得 666 喵币\n88888 鱼币"
                 showingRedeemResultAlert = true
             }
-        } else if code == "adminmuniao" {
+            return
+        }
+        
+        // 3. 检查是否是管理员兑换码
+        if code == "adminmuniao" {
             // 管理员兑换码：唤出实验室入口
             UserDefaults.standard.set(true, forKey: "LabEntryEnabled")
             redeemResultMessage = "实验室入口已开启！\n请前往「我的」页面查看"
             showingRedeemResultAlert = true
+            return
+        }
+        
+        // 4. 都不是，显示功能解锁的失败消息或其他提示
+        if let feature = featureResult.feature {
+            // 是功能兑换码但已经解锁过了
+            redeemResultMessage = featureResult.message
         } else {
             redeemResultMessage = "兑换码无效"
-            showingRedeemResultAlert = true
         }
+        showingRedeemResultAlert = true
     }
 }
 

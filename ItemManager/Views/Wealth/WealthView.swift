@@ -246,6 +246,7 @@ struct WealthView: View {
     
     private func updateAmount() {
         let total = calculatedTotalAmount
+        print("💰 updateAmount: allClothings.count=\(allClothings.count), total=\(total)")
         viewModel.baseAmountCNY = total
     }
     
@@ -988,7 +989,7 @@ struct SilverStorageView: View {
 // MARK: - 货币可视化视图
 
 struct MoneyVisualizationView: View {
-    var viewModel: WealthViewModel
+    @Bindable var viewModel: WealthViewModel
     var onPileTap: ((WealthViewModel.MoneyPile) -> Void)? = nil
     
     var body: some View {

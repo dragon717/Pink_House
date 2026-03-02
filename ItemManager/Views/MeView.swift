@@ -41,7 +41,42 @@ struct MeView: View {
                     vipSection
                         .padding(.horizontal)
                     
-                    // 2. 设置网格 (豆腐块)
+                    // 2. 魔法任务入口
+                    NavigationLink(destination: MagicTasksView()) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "sparkles")
+                                .font(.title2)
+                                .foregroundColor(.pink)
+                                .frame(width: 44, height: 44)
+                                .background(Color.pink.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("魔法任务")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Text("完成任务解锁更多功能")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.ultraThinMaterial)
+                                .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal)
+                    
+                    // 3. 设置网格 (豆腐块)
                     LazyVGrid(columns: columns, spacing: 16) {
                         // 账户与云端 (1x1) - 聚合了登录和 iCloud
                         AccountCard(
