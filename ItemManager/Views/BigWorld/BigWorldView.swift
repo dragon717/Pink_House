@@ -537,9 +537,9 @@ struct EnhancedCheckInView: View {
                     Spacer().frame(height: tabBarOffset)
                 }
                 
-                // 加载遮罩
+                // 猫爪加载遮罩（统一使用 ShareCardManager 的加载动画）
                 if isGeneratingShareImage {
-                    CheckInShareLoadingOverlay()
+                    ShareLoadingOverlay(message: "正在生成分享卡片...")
                 }
             }
         }
@@ -869,101 +869,6 @@ struct ConfettiView: View {
                     rotation: Double.random(in: 0...360),
                     delay: Double.random(in: 0...2)
                 )
-            }
-        }
-    }
-}
-
-// MARK: - 打卡分享加载遮罩
-struct CheckInShareLoadingOverlay: View {
-    @State private var rotation: Double = 0
-    @State private var scale: CGFloat = 1.0
-    @State private var opacity: Double = 1.0
-    @State private var breatheScale: CGFloat = 1.0
-    @State private var glowOpacity: Double = 0.5
-    
-    var body: some View {
-        ZStack {
-            // 半透明背景
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-            
-            // 加载内容
-            VStack(spacing: 24) {
-                // 猫爪旋转动画
-                ZStack {
-                    // 外发光圈
-                    Circle()
-                        .fill(Color(red: 1.0, green: 0.84, blue: 0.0).opacity(glowOpacity * 0.3))
-                        .frame(width: 120, height: 120)
-                        .scaleEffect(breatheScale)
-                    
-                    // 外圈装饰
-                    Circle()
-                        .stroke(Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.4), lineWidth: 2)
-                        .frame(width: 100, height: 100)
-                        .scaleEffect(scale)
-                    
-                    // 内圈装饰
-                    Circle()
-                        .stroke(Color(red: 1.0, green: 0.6, blue: 0.4).opacity(0.6), lineWidth: 1)
-                        .frame(width: 80, height: 80)
-                        .scaleEffect(scale * 0.9)
-                    
-                    // 猫爪图标
-                    Image(systemName: "pawprint.fill")
-                        .font(.system(size: 50, weight: .bold))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 1.0, green: 0.84, blue: 0.0), Color(red: 1.0, green: 0.6, blue: 0.4)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .rotationEffect(.degrees(rotation))
-                        .shadow(color: Color(red: 1.0, green: 0.84, blue: 0.0).opacity(glowOpacity), radius: 15, x: 0, y: 5)
-                        .scaleEffect(breatheScale)
-                }
-                
-                // 加载文字
-                Text("正在生成分享卡片...")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
-                    .opacity(opacity)
-                    .scaleEffect(breatheScale)
-            }
-            .padding(40)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
-            )
-        }
-        .transition(.opacity)
-        .onAppear {
-            // 旋转动画 - 持续旋转
-            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
-            
-            // 脉冲缩放动画 - 快速的脉冲
-            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                scale = 1.15
-            }
-            
-            // 文字闪烁动画
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                opacity = 0.5
-            }
-            
-            // 呼吸动画 - 明显的呼吸效果
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                breatheScale = 1.15
-            }
-            
-            // 发光呼吸动画 - 强烈的发光变化
-            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                glowOpacity = 1.0
             }
         }
     }

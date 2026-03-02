@@ -884,6 +884,7 @@ struct WardrobeStatsView: View {
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
     
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    @State private var showDailyCheckIn = false
     
     var styleCount: Int {
         clothings.count
@@ -942,35 +943,66 @@ struct WardrobeStatsView: View {
                     statItem(title: "总价值", value: "¥\(NSDecimalNumber(decimal: totalValue).stringValue)", isVisible: $showTotalValue)
                 }
                 
-                // Bottom Actions
-                HStack(spacing: 12) {
+                // Bottom Actions - 三个功能入口
+                HStack(spacing: 8) {
+                    // 今日穿搭色按钮
+                    Button {
+                        showDailyCheckIn = true
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 20))
+                            Text("今日穿搭色")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundStyle(Color.pink)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    
+                    // 穿搭手帐按钮
                     Button {
                         tabNavigationManager.navigate(to: .smallWorld(.ootd))
                     } label: {
-                        HStack {
+                        VStack(spacing: 4) {
                             Image(systemName: "book.closed.fill")
+                                .font(.system(size: 20))
                             Text("穿搭手帐")
+                                .font(.system(size: 11, weight: .medium))
                         }
-                        .padding()
+                        .padding(.vertical, 10)
                         .frame(maxWidth: .infinity)
                         .background(Color.pink.opacity(0.1))
                         .foregroundStyle(Color.pink)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     
-                    // Statistics Button
+                    // 详细统计按钮
                     NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
-                        HStack {
+                        VStack(spacing: 4) {
                             Image(systemName: "chart.bar.fill")
+                                .font(.system(size: 20))
                             Text("详细统计")
+                                .font(.system(size: 11, weight: .medium))
                         }
-                        .padding()
+                        .padding(.vertical, 10)
                         .frame(maxWidth: .infinity)
                         .background(Color.brown.opacity(0.1))
                         .foregroundStyle(Color.brown)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
+            }
+            .sheet(isPresented: $showDailyCheckIn) {
+                DailyCheckInView()
             }
         }
     }

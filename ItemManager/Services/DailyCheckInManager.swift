@@ -42,6 +42,12 @@ final class DailyCheckInManager: ObservableObject {
     
     private init() {
         loadCheckInData()
+        // 如果今日已打卡，加载今日穿搭色
+        if hasCheckedInToday {
+            Task {
+                await loadTodayOutfitColor()
+            }
+        }
     }
     
     // MARK: - 检查今日是否已打卡
@@ -187,6 +193,28 @@ final class DailyCheckInManager: ObservableObject {
             return []
         }
         return records
+    }
+    
+    // MARK: - 加载今日穿搭色（用于已打卡状态）
+    func loadTodayOutfitColor() async {
+        // 先从本地记录中查找今日记录
+        let records = loadAllRecords()
+        if let todayRecord = records.first(where: { Calendar.current.isDateInToday($0.date) }) {
+            await MainActor.run {
+                todayOutfitColor = TodayOutfitColor(
+                    colors: todayRecord.colors,
+                    accessories: todayRecord.accessories,
+                    description: "",
+                    source: todayRecord.isAIGenerated ? "ai" : "cloudkit"
+                )
+            }
+        } else {
+            // 如果没有本地记录，尝试获取
+            let outfit = await fetchTodayOutfitColor()
+            await MainActor.run {
+                todayOutfitColor = outfit
+            }
+        }
     }
     
     // MARK: - 获取今日穿搭色

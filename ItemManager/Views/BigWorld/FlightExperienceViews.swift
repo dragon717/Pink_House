@@ -840,6 +840,8 @@ struct ShareCardView: View {
     let boardingPass: BoardingPass
     @Environment(\.dismiss) private var dismiss
     
+    @State private var isSharing = false // 分享加载状态
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -855,7 +857,9 @@ struct ShareCardView: View {
                     
                     // 分享按钮
                     Button {
-                        shareBoardingPass()
+                        Task {
+                            await shareBoardingPassAsync()
+                        }
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "square.and.arrow.up")
@@ -876,6 +880,12 @@ struct ShareCardView: View {
                     }
                     .padding(.horizontal, 30)
                     .padding(.bottom, 30)
+                    .disabled(isSharing)
+                }
+                
+                // 猫爪加载遮罩（统一使用 ShareCardManager 的加载动画）
+                if isSharing {
+                    ShareLoadingOverlay(message: "正在准备分享...")
                 }
             }
             .navigationTitle("分享登机牌")
@@ -891,12 +901,22 @@ struct ShareCardView: View {
         }
     }
     
-    private func shareBoardingPass() {
-        // 实现分享功能
-        let renderer = ImageRenderer(content: ShareableBoardingPassCard(boardingPass: boardingPass))
-        renderer.scale = UIScreen.main.scale
+    // MARK: - 异步分享（带猫爪加载动画）
+    private func shareBoardingPassAsync() async {
+        await MainActor.run { isSharing = true }
         
-        if let image = renderer.uiImage {
+        // 在后台线程生成图片
+        let image = await Task.detached(priority: .userInitiated) {
+            let renderer = ImageRenderer(content: ShareableBoardingPassCard(boardingPass: self.boardingPass))
+            renderer.scale = UIScreen.main.scale
+            return renderer.uiImage
+        }.value
+        
+        await MainActor.run { isSharing = false }
+        
+        guard let image = image else { return }
+        
+        await MainActor.run {
             let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
             
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,

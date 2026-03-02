@@ -9,6 +9,7 @@ struct DailyCheckInView: View {
     @State private var showShareSheet = false
     @State private var shareImage: UIImage?
     @State private var showCelebration = false
+    @State private var isSharing = false // 分享加载状态
     
     // 星期名称
     private let weekDays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
@@ -58,6 +59,12 @@ struct DailyCheckInView: View {
                     }
                     .transition(.opacity)
                 }
+                
+                // 猫爪加载遮罩（分享时显示）
+                if isSharing {
+                    ShareLoadingOverlay(message: "正在准备分享...")
+                        .transition(.opacity)
+                }
             }
             .navigationTitle("每日打卡")
             .navigationBarTitleDisplayMode(.inline)
@@ -72,6 +79,12 @@ struct DailyCheckInView: View {
         .sheet(isPresented: $showShareSheet) {
             if let image = shareImage {
                 ShareSheet(items: [image])
+            }
+        }
+        .task {
+            // 如果已打卡但穿搭色为空，加载今日穿搭色
+            if checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
+                await checkInManager.loadTodayOutfitColor()
             }
         }
     }
@@ -277,7 +290,9 @@ struct DailyCheckInView: View {
     // MARK: - 分享按钮
     private var shareButton: some View {
         Button {
-            generateShareImage()
+            Task {
+                await generateShareImageAsync()
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "square.and.arrow.up")
@@ -292,6 +307,7 @@ struct DailyCheckInView: View {
                     .stroke(Color.pink, lineWidth: 2)
             )
         }
+        .disabled(isSharing)
     }
     
     // MARK: - 执行打卡
@@ -307,16 +323,26 @@ struct DailyCheckInView: View {
         }
     }
     
-    // MARK: - 生成分享图片
-    private func generateShareImage() {
-        let renderer = ImageRenderer(content: CheckInShareCardView(
-            outfit: checkInManager.todayOutfitColor,
-            consecutiveDays: checkInManager.consecutiveDays
-        ))
-        renderer.scale = UIScreen.main.scale
+    // MARK: - 异步生成分享图片（带猫爪加载动画）
+    private func generateShareImageAsync() async {
+        await MainActor.run { isSharing = true }
         
-        if let uiImage = renderer.uiImage {
-            shareImage = uiImage
+        // 在后台线程生成图片
+        let image = await Task.detached(priority: .userInitiated) {
+            let renderer = ImageRenderer(content: CheckInShareCardView(
+                outfit: DailyCheckInManager.shared.todayOutfitColor,
+                consecutiveDays: DailyCheckInManager.shared.consecutiveDays
+            ))
+            renderer.scale = UIScreen.main.scale
+            return renderer.uiImage
+        }.value
+        
+        await MainActor.run { isSharing = false }
+        
+        guard let image = image else { return }
+        
+        await MainActor.run {
+            shareImage = image
             showShareSheet = true
         }
     }
