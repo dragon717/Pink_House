@@ -17,6 +17,7 @@ struct MeView: View {
     @State private var showingImportAlert = false
     @State private var importMessage = ""
     @State private var showingCloudSyncSheet = false
+    @State private var showMagicTasks = false
     
     // Grid Layout
     private let columns = [
@@ -42,7 +43,7 @@ struct MeView: View {
                         .padding(.horizontal)
                     
                     // 2. 魔法任务入口
-                    NavigationLink(destination: MagicTasksView()) {
+                    NavigationLink(destination: MagicTasksView(), isActive: $showMagicTasks) {
                         HStack(spacing: 16) {
                             Image(systemName: "sparkles")
                                 .font(.title2)
@@ -50,7 +51,7 @@ struct MeView: View {
                                 .frame(width: 44, height: 44)
                                 .background(Color.pink.opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                            
+
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("魔法任务")
                                     .font(.headline)
@@ -59,9 +60,9 @@ struct MeView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            
+
                             Spacer()
-                            
+
                             Image(systemName: "chevron.right")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -102,22 +103,24 @@ struct MeView: View {
                             SettingsGridItem(
                                 title: "House",
                                 subtitle: "风格 · 场景 · 3D",
-                                icon: "globe.asia.australia.fill",
+                                icon: "house.fill",
                                 iconColor: .indigo
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
                         
-                        // 智能萌宠
-                        NavigationLink(destination: PetAISettingsView()) {
-                            SettingsGridItem(
-                                title: "智能萌宠",
-                                subtitle: "AI · 语音 · 形象",
-                                icon: "pawprint.fill",
-                                iconColor: .orange
-                            )
+                        // 智能萌宠（萌宠功能已解锁时才显示）
+                        if FeatureUnlockManager.shared.isUnlocked(.pet) {
+                            NavigationLink(destination: PetAISettingsView()) {
+                                SettingsGridItem(
+                                    title: "智能萌宠",
+                                    subtitle: "AI · 语音 · 形象",
+                                    icon: "pawprint.fill",
+                                    iconColor: .orange
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
                         
                         // 彩蛋设置
                         EasterEggSettingsCard()
@@ -211,6 +214,9 @@ struct MeView: View {
                 if authManager.isAuthenticated {
                     cloudManager.fetchLatestBackupMetadata()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showMagicTasks)) { _ in
+                showMagicTasks = true
             }
         }
     }

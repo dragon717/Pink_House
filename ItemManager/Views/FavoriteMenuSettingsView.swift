@@ -18,9 +18,9 @@ struct FavoriteMenuSettingsView: View {
                     .ignoresSafeArea()
 
                 List {
-                    // 已选中的常用功能（可排序）
+                    // 已选中的常用功能（可排序），只显示已解锁的
                     Section {
-                        ForEach(settingsManager.selectedItems) { item in
+                        ForEach(selectedAndUnlockedItems) { item in
                             SelectedItemRow(item: item, isEditing: isEditing)
                         }
                         .onMove { from, to in
@@ -28,7 +28,7 @@ struct FavoriteMenuSettingsView: View {
                         }
                         .onDelete { indexSet in
                             for index in indexSet {
-                                let item = settingsManager.selectedItems[index]
+                                let item = selectedAndUnlockedItems[index]
                                 settingsManager.removeItem(item)
                             }
                         }
@@ -44,9 +44,9 @@ struct FavoriteMenuSettingsView: View {
                             AvailableItemRow(
                                 item: item,
                                 isSelected: false,
-                                isDisabled: settingsManager.selectedItems.count >= maxItems
+                                isDisabled: selectedAndUnlockedItems.count >= maxItems
                             ) {
-                                if settingsManager.selectedItems.count >= maxItems {
+                                if selectedAndUnlockedItems.count >= maxItems {
                                     showMaxItemsAlert = true
                                 } else {
                                     settingsManager.addItem(item)
@@ -80,10 +80,15 @@ struct FavoriteMenuSettingsView: View {
         }
     }
     
-    // 计算还未选中的功能
+    // 计算已选中且已解锁的功能（用于显示）
+    private var selectedAndUnlockedItems: [FavoriteMenuItem] {
+        settingsManager.selectedItems.filter { $0.isUnlocked }
+    }
+    
+    // 计算还未选中且已解锁的功能
     private var availableItems: [FavoriteMenuItem] {
         allItems.filter { item in
-            !settingsManager.selectedItems.contains(item)
+            !settingsManager.selectedItems.contains(item) && item.isUnlocked
         }
     }
 }

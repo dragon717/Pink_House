@@ -18,6 +18,13 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case bigWorld = "世界书"
     case recycleBin = "回收站"
     
+    // MARK: - 默认常用菜单配置
+    // 实验室-菜单设置中"清除常用菜单历史，恢复到默认"使用的配置
+    // 当前默认：萌宠、拼豆工坊、世界书、穿搭手帐、来财
+    static var defaultFavoriteItems: [FavoriteMenuItem] {
+        [.ootd, .perler, .bigWorld, .fashionJournal, .wealth]
+    }
+    
     var id: String { rawValue }
     
     var icon: String {
@@ -76,6 +83,43 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     var isSmallWorldFeature: Bool {
         destination != nil
     }
+    
+    // 检查功能是否已解锁
+    var isUnlocked: Bool {
+        // 获取对应的功能项
+        let featureItem: FeatureItem?
+        switch self {
+        case .wardrobe:
+            featureItem = .wardrobe
+        case .finalPayment:
+            featureItem = .finalPayment
+        case .pet:
+            featureItem = .pet
+        case .ootd:
+            featureItem = .ootdDefaultBook
+        case .fashionJournal:
+            featureItem = .ootd
+        case .smallWorld:
+            // House 菜单始终可用
+            return true
+        case .wealth:
+            featureItem = .wealth
+        case .dressStock:
+            featureItem = .dressStock
+        case .perler:
+            featureItem = .perler
+        case .calendar:
+            featureItem = .calendar
+        case .bigWorld:
+            featureItem = .bigWorld
+        case .recycleBin:
+            featureItem = .recycleBin
+        }
+        
+        // 检查功能是否已解锁
+        guard let feature = featureItem else { return true }
+        return FeatureUnlockManager.shared.isUnlocked(feature)
+    }
 }
 
 // MARK: - 常用菜单设置（SwiftData）
@@ -85,8 +129,9 @@ class FavoriteMenuSettings {
     var selectedItemIDs: [String]
     var lastUpdated: Date
     
-    init(selectedItemIDs: [String] = ["萌宠", "拼豆工坊", "世界书", "穿搭手帐","来财"]) {
-        self.selectedItemIDs = selectedItemIDs
+    // 使用 FavoriteMenuItem.defaultFavoriteItems 作为默认配置
+    init(selectedItemIDs: [String]? = nil) {
+        self.selectedItemIDs = selectedItemIDs ?? FavoriteMenuItem.defaultFavoriteItems.map { $0.rawValue }
         self.lastUpdated = Date()
     }
     
@@ -95,9 +140,10 @@ class FavoriteMenuSettings {
         FavoriteMenuItem.allCases
     }
     
-    // 默认选中的功能
+    // 默认选中的功能（用于初始化时无保存数据的情况）
+    // 注意：这里只保留House菜单作为最低保底，实际默认配置请使用 FavoriteMenuItem.defaultFavoriteItems
     static var defaultItems: [FavoriteMenuItem] {
-        [.pet, .ootd, .smallWorld]
+        [.smallWorld]
     }
 }
 
@@ -105,23 +151,25 @@ class FavoriteMenuSettings {
 final class FavoriteMenuSettingsManager: ObservableObject {
     static let shared = FavoriteMenuSettingsManager()
     
-    @Published var selectedItems: [FavoriteMenuItem] = [.pet, .ootd, .smallWorld]
+    // 初始默认值，实际会从 UserDefaults 加载或使用 FavoriteMenuItem.defaultFavoriteItems
+    @Published var selectedItems: [FavoriteMenuItem] = FavoriteMenuItem.defaultFavoriteItems
     
     private let userDefaultsKey = "favoriteMenuSelectedItems"
     
     private init() {
         loadSettings()
     }
-    
+
     func loadSettings() {
         if let savedIDs = UserDefaults.standard.stringArray(forKey: userDefaultsKey) {
             selectedItems = savedIDs.compactMap { FavoriteMenuItem(rawValue: $0) }
+                .filter { $0.isUnlocked } // 过滤掉未解锁的功能
             // 确保至少有一个选中项
             if selectedItems.isEmpty {
-                selectedItems = FavoriteMenuSettings.defaultItems
+                selectedItems = FavoriteMenuSettings.defaultItems.filter { $0.isUnlocked }
             }
         } else {
-            selectedItems = FavoriteMenuSettings.defaultItems
+            selectedItems = FavoriteMenuSettings.defaultItems.filter { $0.isUnlocked }
         }
     }
     
@@ -131,6 +179,8 @@ final class FavoriteMenuSettingsManager: ObservableObject {
     }
     
     func addItem(_ item: FavoriteMenuItem) {
+        // 未解锁的功能不能加入常用菜单
+        guard item.isUnlocked else { return }
         if !selectedItems.contains(item) && selectedItems.count < 5 {
             selectedItems.append(item)
             saveSettings()

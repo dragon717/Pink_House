@@ -18,6 +18,11 @@ struct FrenchRetroSmallWorldView: View {
     @Binding var isPlayingOpeningAnimation: Bool
     
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    @StateObject private var featureManager = FeatureUnlockManager.shared
+    
+    // 未解锁功能提示
+    @State private var showUnlockAlert = false
+    @State private var lockedDestination: SmallWorldDestination? = nil
     
     // 图片原始尺寸 1919x1079
     @State private var imageSize = CGSize(width: 1919, height: 1079)
@@ -145,39 +150,84 @@ struct FrenchRetroSmallWorldView: View {
                 isPlayingOpeningAnimation = false
             }
         }
+        .alert("功能未解锁", isPresented: $showUnlockAlert) {
+            if let dest = lockedDestination,
+               let feature = dest.featureItem {
+                let condition = featureManager.getCondition(for: feature)
+                // 兑换码解锁的功能只显示"我知道啦～"按钮
+                if condition.type == UnlockConditionType.redeemCode.rawValue {
+                    Button("我知道啦～", role: .cancel) { }
+                } else {
+                    Button("取消", role: .cancel) { }
+                    Button("去解锁") {
+                        NotificationCenter.default.post(
+                            name: .navigateToMagicTasks,
+                            object: nil
+                        )
+                    }
+                }
+            } else {
+                Button("取消", role: .cancel) { }
+                Button("去解锁") {
+                    NotificationCenter.default.post(
+                        name: .navigateToMagicTasks,
+                        object: nil
+                    )
+                }
+            }
+        } message: {
+            if let dest = lockedDestination,
+               let feature = dest.featureItem {
+                let condition = featureManager.getCondition(for: feature)
+                Text("\(feature.displayName) 尚未解锁\n\(condition.description)")
+            } else {
+                Text("该功能尚未解锁，请先完成对应任务")
+            }
+        }
         }
     }
-    
+
+    // MARK: - 导航方法
+    private func navigate(to destination: SmallWorldDestination) {
+        // 检查功能是否已解锁
+        if destination.canAccess {
+            // 已解锁，正常导航
+            tabNavigationManager.markNavigatingInsideSmallWorld()
+            self.destination = destination
+        } else {
+            // 未解锁，显示提示
+            lockedDestination = destination
+            showUnlockAlert = true
+        }
+    }
+
     @ViewBuilder
     private func hotspotContent(geometry: GeometryProxy) -> some View {
         ZStack(alignment: .topLeading) {
             // 1. OOTD (穿搭手帐) - 最左侧
             InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange, label: "穿搭手帐", labelStyle: .horizontal(angle: -28), labelPosition: CGPoint(x: 0.17, y: 0.86)) {
-                tabNavigationManager.markNavigatingInsideSmallWorld()
-                destination = .ootd
+                navigate(to: .ootd)
             }
-            
+
             // 2. 衣橱 (少女衣橱)
             InteractionHotspot(rect: CGRect(x: 0.41, y: 0.06, width: 0.155, height: 0.7), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "少女衣橱", labelPosition: CGPoint(x: 0.4, y: 0.38)) {
                 withAnimation(.easeIn(duration: 0.5)) {
                     isPlayingOpeningAnimation = true
                 }
             }
-            
+
             // 3. 猪 (来财)
             InteractionHotspot(rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "马上来财", labelPosition: CGPoint(x: 0.85, y: 0.72)) {
-                tabNavigationManager.markNavigatingInsideSmallWorld()
-                destination = .wealth
+                navigate(to: .wealth)
             }
-            
+
             // 4. 墙上的日历 (梦裙日历)
             if shouldShowCalendar {
                 CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "梦裙日历", labelPosition: CGPoint(x: 0.77, y: 0.27)) {
-                    tabNavigationManager.markNavigatingInsideSmallWorld()
-                    destination = .calendar
+                    navigate(to: .calendar)
                 }
             }
-            
+
             // 5. 尾款天使 (衣橱右边)
             InteractionHotspot(rect: CGRect(x: 0.6, y: 0.42, width: 0.07, height: 0.12), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .purple, label: "尾款天使", labelStyle: .horizontal(angle: 0), labelPosition: CGPoint(x: 0.635, y: 0.56)) {
                 selectedTab = 0
@@ -186,8 +236,7 @@ struct FrenchRetroSmallWorldView: View {
 
             // 6. 拼豆工坊
             InteractionHotspot(rect: CGRect(x: 0.85, y: 0.15, width: 0.1, height: 0.15), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .pink, label: "拼豆工坊", labelStyle: .horizontal(angle: -15), labelPosition: CGPoint(x: 0.92, y: 0.32)) {
-                tabNavigationManager.markNavigatingInsideSmallWorld()
-                destination = .perler
+                navigate(to: .perler)
             }
 
             // 中心锚点，用于初始定位

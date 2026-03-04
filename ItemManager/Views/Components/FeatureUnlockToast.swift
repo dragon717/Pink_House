@@ -566,6 +566,8 @@ extension Notification.Name {
     static let navigateToSmallWorldDestination = Notification.Name("navigateToSmallWorldDestination")
     static let navigateToSettings = Notification.Name("navigateToSettings")
     static let navigateToHomeTab = Notification.Name("navigateToHomeTab")
+    static let navigateToMagicTasks = Notification.Name("navigateToMagicTasks")
+    static let showMagicTasks = Notification.Name("showMagicTasks")
 }
 
 // MARK: - View 扩展

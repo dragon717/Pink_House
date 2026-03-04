@@ -160,7 +160,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return .free()
         case .pet:
             // 萌宠：在VIP界面兑换码输入 "vip萌宠" 解锁
-            return .redeemCode("vip萌宠", description: "在VIP界面输入兑换码「vip萌宠」解锁")
+            return .redeemCode("vip萌宠", description: "仍在认真开发和内测中，敬请期待～")
         case .ootd:
             return .clothingCount(5)
         case .ootdDefaultBook:
@@ -171,13 +171,13 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return .clothingCount(10)
         case .bigWorld:
             // 世界书：在VIP界面兑换码输入 "vip世界书" 解锁
-            return .redeemCode("vip世界书", description: "在VIP界面输入兑换码「vip世界书」解锁")
+            return .redeemCode("vip世界书", description: "仍在认真开发和内测中，敬请期待～")
         case .perler:
             // 拼豆工坊：在VIP界面兑换码输入 "vip拼豆工坊" 解锁
-            return .redeemCode("vip拼豆工坊", description: "在VIP界面输入兑换码「vip拼豆工坊」解锁")
+            return .redeemCode("vip拼豆工坊", description: "仍在认真开发和内测中，敬请期待～")
         case .dressStock:
             // 裙子股市：在VIP界面兑换码输入 "vip裙子股市" 解锁
-            return .redeemCode("vip裙子股市", description: "在VIP界面输入兑换码「vip裙子股市」解锁")
+            return .redeemCode("vip裙子股市", description: "仍在认真开发和内测中，敬请期待～")
         case .dataBackup, .cloudSync:
             return .free()
         case .batchImport:
@@ -309,8 +309,12 @@ final class FeatureUnlockManager: ObservableObject {
     private func setupDefaultConditions() {
         for feature in FeatureItem.allCases {
             // 设置默认解锁条件
+            let defaultCondition = feature.defaultCondition
             if unlockConditions[feature.rawValue] == nil {
-                unlockConditions[feature.rawValue] = feature.defaultCondition
+                unlockConditions[feature.rawValue] = defaultCondition
+            } else if defaultCondition.type == UnlockConditionType.redeemCode.rawValue {
+                // 对于兑换码解锁的功能，强制更新描述文字（用于文案调整）
+                unlockConditions[feature.rawValue] = defaultCondition
             }
             
             // 设置默认显示状态（首次安装时）
@@ -323,7 +327,7 @@ final class FeatureUnlockManager: ObservableObject {
                 )
                 
                 // 免费功能默认解锁
-                let condition = unlockConditions[feature.rawValue] ?? feature.defaultCondition
+                let condition = unlockConditions[feature.rawValue] ?? defaultCondition
                 if condition.type == UnlockConditionType.free.rawValue {
                     status.isUnlocked = true
                 }
@@ -708,6 +712,45 @@ struct FeatureUnlockAlert: Identifiable {
     let condition: UnlockCondition
     let canUnlock: Bool
     let message: String?
+}
+
+// MARK: - SmallWorldDestination 扩展
+extension SmallWorldDestination {
+    /// 映射到对应的功能项
+    var featureItem: FeatureItem? {
+        switch self {
+        case .wardrobe: return .wardrobe
+        case .depositPlan: return .finalPayment
+        case .pet: return .pet
+        case .ootd: return .ootd
+        case .ootdDefaultBook: return .ootdDefaultBook
+        case .wealth: return .wealth
+        case .calendar: return .calendar
+        case .bigWorld: return .bigWorld
+        case .perler: return .perler
+        case .recycleBin: return .recycleBin
+        case .dressStock: return .dressStock
+        case .menu: return nil
+        }
+    }
+    
+    /// 检查该目的地是否已解锁
+    var isUnlocked: Bool {
+        guard let feature = featureItem else { return true }
+        return FeatureUnlockManager.shared.isUnlocked(feature)
+    }
+    
+    /// 检查该目的地是否可见
+    var isVisible: Bool {
+        guard let feature = featureItem else { return true }
+        return FeatureUnlockManager.shared.isVisible(feature)
+    }
+    
+    /// 检查该目的地是否可以访问
+    var canAccess: Bool {
+        guard let feature = featureItem else { return true }
+        return FeatureUnlockManager.shared.canAccess(feature)
+    }
 }
 
 // MARK: - View 扩展

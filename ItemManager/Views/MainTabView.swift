@@ -146,9 +146,12 @@ struct ModernTabView: View {
         .environment(\.isSimulationActive, isSimulationActive)
         .overlay {
             RewardBubbleView()
-            PetOverlayView(action: {
-                smallWorldDestination = .pet
-            }, petName: petDataManager.status.displayName)
+            // 只有萌宠功能已解锁时才显示悬浮宠物
+            if FeatureUnlockManager.shared.isUnlocked(.pet) {
+                PetOverlayView(action: {
+                    smallWorldDestination = .pet
+                }, petName: petDataManager.status.displayName)
+            }
             // 修复：使用正确的 Binding 传递 selectedTab
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
@@ -451,9 +454,12 @@ struct LegacyTabView: View {
         }
         .overlay {
             RewardBubbleView()
-            PetOverlayView(action: {
-                smallWorldDestination = .pet
-            }, petName: petDataManager.status.displayName)
+            // 只有萌宠功能已解锁时才显示悬浮宠物
+            if FeatureUnlockManager.shared.isUnlocked(.pet) {
+                PetOverlayView(action: {
+                    smallWorldDestination = .pet
+                }, petName: petDataManager.status.displayName)
+            }
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
                 smallWorldDestination: $smallWorldDestination,
@@ -1065,9 +1071,18 @@ struct MainTabView: View {
         // 监听解锁后的跳转通知
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSmallWorldDestination)) { notification in
             if let destination = notification.userInfo?["destination"] as? SmallWorldDestination {
-                withAnimation {
-                    smallWorldDestination = destination
-                    selectedTab = 1 // 切换到 House Tab
+                // 检查功能是否已解锁
+                if destination.canAccess {
+                    withAnimation {
+                        smallWorldDestination = destination
+                        selectedTab = 1 // 切换到 House Tab
+                    }
+                } else {
+                    // 未解锁，显示提示
+                    NotificationCenter.default.post(
+                        name: .navigateToMagicTasks,
+                        object: nil
+                    )
                 }
             }
         }
@@ -1089,6 +1104,19 @@ struct MainTabView: View {
                     }
                     selectedTab = 0 // 切换到衣橱 Tab
                 }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToMagicTasks)) { _ in
+            // 跳转到"我"Tab，然后显示魔法任务
+            withAnimation {
+                selectedTab = 2 // 切换到"我"Tab
+            }
+            // 延迟后发送通知显示魔法任务
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(
+                    name: .showMagicTasks,
+                    object: nil
+                )
             }
         }
     }

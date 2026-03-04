@@ -412,7 +412,8 @@ struct FavoriteMenuTestView: View {
         .alert("确认清除", isPresented: $showAlert) {
             Button("取消", role: .cancel) {}
             Button("清除", role: .destructive) {
-                favoriteMenuManager.selectedItems = [.pet, .perler, .bigWorld, .smallWorld, .wealth]
+                // 恢复到默认常用菜单配置（定义在 FavoriteMenuItem.defaultFavoriteItems）
+                favoriteMenuManager.selectedItems = FavoriteMenuItem.defaultFavoriteItems
                 favoriteMenuManager.saveSettings()
             }
         } message: {
