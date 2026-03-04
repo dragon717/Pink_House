@@ -330,7 +330,7 @@ struct MagicTaskDetailView: View {
                         }
                     }
                     
-                    // 已解锁信息显示
+                    // 已解锁信息显示和操作
                     if manager.isUnlocked(feature) {
                         Section("解锁信息") {
                             if let unlockedAt = manager.getStatus(for: feature).unlockedAt {
@@ -349,6 +349,69 @@ struct MagicTaskDetailView: View {
                                     Text(unlockedBy)
                                         .foregroundColor(.secondary)
                                 }
+                            }
+                        }
+                        
+                        // 进入功能按钮（如果该功能有对应页面）
+                        if let destination = feature.destination {
+                            Section {
+                                Button {
+                                    // 关闭详情页
+                                    dismiss()
+                                    // 延迟后跳转到对应功能
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        NotificationCenter.default.post(
+                                            name: .navigateToSmallWorldDestination,
+                                            object: nil,
+                                            userInfo: ["destination": destination]
+                                        )
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "arrow.right.circle.fill")
+                                        Text("进入 \(feature.displayName)")
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                    }
+                                }
+                                .tint(.pink)
+                            }
+                        } else if feature.isSettingsFeature {
+                            // 设置功能跳转
+                            Section {
+                                Button {
+                                    dismiss()
+                                    // 批量导入在衣橱界面，其他设置在"我"页面
+                                    if feature == .batchImport {
+                                        // 跳转到衣橱页面
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToHomeTab,
+                                                object: nil,
+                                                userInfo: ["homeTab": "wardrobe"]
+                                            )
+                                        }
+                                    } else {
+                                        // 其他设置功能跳转到"我"页面
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToSettings,
+                                                object: nil,
+                                                userInfo: ["feature": feature.rawValue]
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "arrow.right.circle.fill")
+                                        Text("进入 \(feature.displayName)")
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                    }
+                                }
+                                .tint(.blue)
                             }
                         }
                     }

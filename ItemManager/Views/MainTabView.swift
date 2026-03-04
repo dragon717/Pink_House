@@ -1038,6 +1038,7 @@ struct MainTabView: View {
                     }
                 }
                 .noticePopup()
+                .withMagicTaskCompletions()
             } else {
                 // iOS 18-25 使用自定义红色背景底部导航栏
                 LegacyTabView(
@@ -1058,6 +1059,7 @@ struct MainTabView: View {
                     }
                 }
                 .noticePopup()
+                .withMagicTaskCompletions()
             }
         }
         // 监听解锁后的跳转通知
@@ -1075,6 +1077,19 @@ struct MainTabView: View {
                 selectedTab = 2 // 切换到"我"Tab
             }
             // 这里可以进一步细化跳转到具体设置项
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToHomeTab)) { notification in
+            // 跳转到衣橱页面（用于批量导入等功能）
+            if let homeTabString = notification.userInfo?["homeTab"] as? String {
+                withAnimation {
+                    if homeTabString == "wardrobe" {
+                        homeTabSelection = .wardrobe
+                    } else if homeTabString == "depositPlan" {
+                        homeTabSelection = .depositPlan
+                    }
+                    selectedTab = 0 // 切换到衣橱 Tab
+                }
+            }
         }
     }
 }

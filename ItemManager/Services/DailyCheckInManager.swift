@@ -63,6 +63,9 @@ final class DailyCheckInManager: ObservableObject {
         } else {
             todayCheckIn = nil
         }
+        // 同步更新魔法任务的登录天数进度
+        FeatureUnlockManager.shared.updateLoginDays(totalDays)
+        print("🔄 DailyCheckInManager: Synced loginDays to FeatureUnlockManager: \(totalDays)")
         // 通知UI更新
         objectWillChange.send()
         print("✅ DailyCheckInManager: Reload complete. Total days: \(totalDays), Consecutive: \(consecutiveDays)")
@@ -106,13 +109,15 @@ final class DailyCheckInManager: ObservableObject {
     
     // MARK: - 检查某天是否打卡
     private func hasCheckIn(on date: Date) -> Bool {
-        // 这里简化处理，实际应该查询历史记录
-        // 如果日期是今天且已打卡
+        // 如果日期是今天，使用hasCheckedInToday快速判断
         if Calendar.current.isDateInToday(date) {
             return hasCheckedInToday
         }
-        // 其他日期需要查询历史记录
-        return false
+        // 其他日期查询历史记录
+        let records = loadAllRecords()
+        return records.contains { record in
+            Calendar.current.isDate(record.date, inSameDayAs: date)
+        }
     }
     
     // MARK: - 执行打卡

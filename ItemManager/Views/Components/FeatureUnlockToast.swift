@@ -498,10 +498,7 @@ struct Particle: Identifiable {
 // MARK: - 全局解锁通知覆盖层
 struct GlobalUnlockNotificationOverlay: View {
     @StateObject private var notificationManager = FeatureUnlockNotificationManager.shared
-    @State private var showDetailView = false
     @State private var selectedFeature: FeatureItem?
-    @State private var navigateToFeature = false
-    @State private var targetDestination: SmallWorldDestination? = nil
     
     var body: some View {
         ZStack {
@@ -522,7 +519,6 @@ struct GlobalUnlockNotificationOverlay: View {
                     onTap: {
                         // 跳转到庆祝动画页面
                         selectedFeature = notification.feature
-                        showDetailView = true
                         notificationManager.dismiss()
                     },
                     onDismiss: {
@@ -538,8 +534,8 @@ struct GlobalUnlockNotificationOverlay: View {
         .sheet(item: $selectedFeature) { feature in
             NavigationStack {
                 FeatureUnlockCelebrationView(feature: feature) {
-                    // 动画完成后，跳转到对应功能
-                    showDetailView = false
+                    // 动画完成后，关闭sheet并跳转到对应功能
+                    selectedFeature = nil
                     
                     // 延迟一点后跳转，让sheet先关闭
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -569,6 +565,7 @@ struct GlobalUnlockNotificationOverlay: View {
 extension Notification.Name {
     static let navigateToSmallWorldDestination = Notification.Name("navigateToSmallWorldDestination")
     static let navigateToSettings = Notification.Name("navigateToSettings")
+    static let navigateToHomeTab = Notification.Name("navigateToHomeTab")
 }
 
 // MARK: - View 扩展

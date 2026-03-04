@@ -513,9 +513,10 @@ final class FeatureUnlockManager: ObservableObject {
             userInfo: ["feature": feature.rawValue]
         )
         
-        // 显示解锁完成弹窗（在主线程）
+        // 添加到常驻任务完成提示（在主线程）
+        // 使用卡片堆叠方式显示，不再显示大卡片弹窗
         DispatchQueue.main.async {
-            FeatureUnlockNotificationManager.shared.showUnlockNotification(feature: feature, autoDismiss: false)
+            MagicTaskCompletionManager.shared.addCompletion(feature: feature)
         }
     }
     
@@ -572,7 +573,10 @@ final class FeatureUnlockManager: ObservableObject {
     func getLockableFeatures() -> [FeatureItem] {
         return FeatureItem.allCases.filter {
             let condition = getCondition(for: $0)
-            return condition.type != UnlockConditionType.free.rawValue
+            // 免费功能和兑换码功能不在魔法任务界面显示
+            // 兑换码功能需要在VIP界面输入兑换码解锁
+            return condition.type != UnlockConditionType.free.rawValue &&
+                   condition.type != UnlockConditionType.redeemCode.rawValue
         }
     }
     

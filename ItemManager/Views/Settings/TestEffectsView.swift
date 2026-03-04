@@ -8,6 +8,8 @@ enum LabModule: String, CaseIterable, Identifiable {
     case favoriteMenu = "菜单设置"
     case notice = "公告管理"
     case featureUnlock = "功能解锁"
+    case magicTasks = "魔法任务"
+    case checkIn = "签到打卡"
     
     var id: String { rawValue }
     
@@ -18,6 +20,8 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .favoriteMenu: return "star.fill"
         case .notice: return "megaphone.fill"
         case .featureUnlock: return "lock.open.fill"
+        case .magicTasks: return "wand.and.stars"
+        case .checkIn: return "checkmark.seal.fill"
         }
     }
     
@@ -28,6 +32,8 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .favoriteMenu: return .orange
         case .notice: return .blue
         case .featureUnlock: return .green
+        case .magicTasks: return .purple
+        case .checkIn: return .red
         }
     }
     
@@ -38,6 +44,8 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .favoriteMenu: return "常用 · 清除"
         case .notice: return "管理 · 预览"
         case .featureUnlock: return "解锁 · 显示"
+        case .magicTasks: return "状态 · 重置"
+        case .checkIn: return "记录 · 重置"
         }
     }
 }
@@ -172,6 +180,10 @@ struct LabModuleDetailView: View {
                         NoticeTestView()
                     case .featureUnlock:
                         FeatureUnlockSettingsView()
+                    case .magicTasks:
+                        MagicTasksTestView()
+                    case .checkIn:
+                        CheckInTestView()
                     }
                 }
             }
@@ -639,6 +651,901 @@ struct LabActionCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .fill(.ultraThinMaterial)
         )
+    }
+}
+
+// MARK: - 魔法任务测试子视图
+struct MagicTasksTestView: View {
+    @ObservedObject private var manager = FeatureUnlockManager.shared
+    @State private var showResetAlert = false
+    @State private var showResetAllAlert = false
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // 统计信息卡片
+                VStack(spacing: 12) {
+                    HStack {
+                        VStack(spacing: 4) {
+                            Text("\(manager.getUnlockedFeatures().count)")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundStyle(.purple)
+                            Text("已解锁")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        
+                        Divider()
+                        
+                        VStack(spacing: 4) {
+                            Text("\(manager.getLockableFeatures().count)")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundStyle(.orange)
+                            Text("待解锁")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        
+                        Divider()
+                        
+                        VStack(spacing: 4) {
+                            Text("\(manager.getVisibleFeatures().count)")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundStyle(.green)
+                            Text("可见")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                )
+                .padding(.horizontal)
+                .padding(.top, 20)
+                
+                // 功能列表
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("功能状态")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal)
+                    
+                    LazyVStack(spacing: 8) {
+                        ForEach(FeatureItem.allCases) { feature in
+                            LabMagicTaskRow(feature: feature)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                
+                // 操作按钮
+                VStack(spacing: 12) {
+                    Button {
+                        showResetAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("重置所有魔法任务")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+                    
+                    Text("将所有功能重置为初始状态（仅免费功能保持解锁）")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal)
+                .padding(.top, 20)
+                
+                Spacer(minLength: 100)
+            }
+        }
+        .alert("确认重置", isPresented: $showResetAlert) {
+            Button("取消", role: .cancel) {}
+            Button("重置", role: .destructive) {
+                resetAllMagicTasks()
+            }
+        } message: {
+            Text("这将重置所有魔法任务状态，已解锁的功能将重新锁定（免费功能除外）。确定要继续吗？")
+        }
+    }
+    
+    private func resetAllMagicTasks() {
+        // 重置所有功能状态
+        for feature in FeatureItem.allCases {
+            let condition = feature.defaultCondition
+            // 免费功能保持解锁，其他重置
+            if condition.type == UnlockConditionType.free.rawValue {
+                manager.unlock(feature, force: true)
+            } else {
+                manager.lock(feature)
+                // 重置显示状态
+                manager.setVisible(feature, visible: !feature.isHiddenByDefault)
+            }
+        }
+        // 重置衣物数量和登录天数缓存
+        UserDefaults.standard.set(0, forKey: "clothingCount_cache")
+        UserDefaults.standard.set(0, forKey: "loginDays")
+    }
+}
+
+// MARK: - 实验室魔法任务行
+struct LabMagicTaskRow: View {
+    let feature: FeatureItem
+    @ObservedObject private var manager = FeatureUnlockManager.shared
+    
+    var body: some View {
+        HStack {
+            Image(systemName: feature.icon)
+                .font(.title3)
+                .foregroundStyle(iconColor)
+                .frame(width: 40, height: 40)
+                .background(iconColor.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(feature.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+                
+                Text(statusText)
+                    .font(.caption)
+                    .foregroundStyle(statusColor)
+            }
+            
+            Spacer()
+            
+            // 状态指示器
+            HStack(spacing: 8) {
+                if manager.isUnlocked(feature) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.orange)
+                }
+                
+                if !manager.isVisible(feature) {
+                    Image(systemName: "eye.slash.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+        )
+    }
+    
+    private var iconColor: Color {
+        if manager.canAccess(feature) {
+            return .purple
+        } else if manager.isUnlocked(feature) {
+            return .gray
+        } else {
+            return .orange
+        }
+    }
+    
+    private var statusText: String {
+        let condition = manager.getCondition(for: feature)
+        if manager.isUnlocked(feature) {
+            return manager.isVisible(feature) ? "已解锁" : "已解锁(隐藏)"
+        } else {
+            return condition.description
+        }
+    }
+    
+    private var statusColor: Color {
+        if manager.isUnlocked(feature) {
+            return manager.isVisible(feature) ? .green : .secondary
+        } else {
+            return .orange
+        }
+    }
+}
+
+// MARK: - 签到打卡测试子视图
+struct CheckInTestView: View {
+    @ObservedObject private var manager = DailyCheckInManager.shared
+    @State private var showResetAlert = false
+    @State private var showAddRecordAlert = false
+    @State private var showClearAllAlert = false
+    @State private var selectedMakeupDate = Date()
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // 统计信息卡片
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(.red)
+                    
+                    HStack(spacing: 30) {
+                        VStack(spacing: 4) {
+                            Text("\(manager.totalDays)")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundStyle(.primary)
+                            Text("累计打卡")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        VStack(spacing: 4) {
+                            Text("\(manager.consecutiveDays)")
+                                .font(.system(size: 36, weight: .bold))
+                                .foregroundStyle(.red)
+                            Text("连续打卡")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    if manager.hasCheckedInToday {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("今日已打卡")
+                                .font(.subheadline)
+                                .foregroundStyle(.green)
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "circle")
+                                .foregroundStyle(.secondary)
+                            Text("今日未打卡")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(30)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial)
+                )
+                .padding(.horizontal)
+                .padding(.top, 20)
+                
+                // 本周打卡状态
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("本周打卡")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal)
+                    
+                    HStack(spacing: 8) {
+                        ForEach(0..<7) { index in
+                            let dayNames = ["一", "二", "三", "四", "五", "六", "日"]
+                            VStack(spacing: 6) {
+                                Text(dayNames[index])
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                
+                                if index < manager.weekCheckIns.count {
+                                    Image(systemName: manager.weekCheckIns[index] ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(manager.weekCheckIns[index] ? .green : .secondary.opacity(0.3))
+                                        .font(.title3)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.ultraThinMaterial)
+                    )
+                    .padding(.horizontal)
+                }
+                
+                // 操作按钮
+                VStack(spacing: 12) {
+                    Button {
+                        showResetAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("重置今日打卡")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+                    
+                    Button {
+                        showAddRecordAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle")
+                            Text("补卡")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+                    
+                    Button {
+                        fillThisWeekCheckIns()
+                    } label: {
+                        HStack {
+                            Image(systemName: "calendar.badge.checkmark")
+                            Text("补打本周未打卡")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.green)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+                    
+                    Button {
+                        showClearAllAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash")
+                            Text("清空所有打卡记录")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 10)
+                
+                Spacer(minLength: 100)
+            }
+        }
+        .alert("确认重置", isPresented: $showResetAlert) {
+            Button("取消", role: .cancel) {}
+            Button("重置", role: .destructive) {
+                resetTodayCheckIn()
+            }
+        } message: {
+            Text("这将重置今日打卡状态，允许重新打卡。确定要继续吗？")
+        }
+        .sheet(isPresented: $showAddRecordAlert) {
+            MakeupCheckInSheet(
+                selectedDate: $selectedMakeupDate,
+                checkedInDates: loadCheckedInDates(),
+                onConfirm: { date in
+                    addMakeupCheckInRecord(for: date)
+                },
+                onCancel: {
+                    showAddRecordAlert = false
+                }
+            )
+        }
+        .alert("确认清空", isPresented: $showClearAllAlert) {
+            Button("取消", role: .cancel) {}
+            Button("清空", role: .destructive) {
+                clearAllCheckInRecords()
+            }
+        } message: {
+            Text("这将清空所有打卡记录和统计数据，此操作不可恢复。确定要继续吗？")
+        }
+    }
+    
+    private func resetTodayCheckIn() {
+        // 清除今日打卡状态
+        let lastDate = UserDefaults.standard.object(forKey: "dailyCheckIn.lastDate") as? Date
+        if let lastDate = lastDate, Calendar.current.isDateInToday(lastDate) {
+            UserDefaults.standard.removeObject(forKey: "dailyCheckIn.lastDate")
+            // 减少总天数
+            let totalDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.totalDays")
+            if totalDays > 0 {
+                UserDefaults.standard.set(totalDays - 1, forKey: "dailyCheckIn.totalDays")
+            }
+            // 重新计算连续天数
+            let consecutiveDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.consecutiveDays")
+            if consecutiveDays > 0 {
+                UserDefaults.standard.set(consecutiveDays - 1, forKey: "dailyCheckIn.consecutiveDays")
+            }
+            // 从记录中移除今日记录
+            if let data = UserDefaults.standard.data(forKey: "dailyCheckIn.records"),
+               var records = try? JSONDecoder().decode([CheckInRecord].self, from: data) {
+                records.removeAll { Calendar.current.isDateInToday($0.date) }
+                if let encoded = try? JSONEncoder().encode(records) {
+                    UserDefaults.standard.set(encoded, forKey: "dailyCheckIn.records")
+                }
+            }
+            // 刷新管理器
+            manager.reloadFromDisk()
+        }
+    }
+    
+    private func addMakeupCheckInRecord(for date: Date) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let makeupDate = calendar.startOfDay(for: date)
+
+        // 只能补今天之前的日期
+        guard makeupDate < today else {
+            print("只能补今天之前的日期")
+            return
+        }
+
+        // 添加单条记录
+        addCheckInRecord(for: makeupDate)
+
+        // 更新最后打卡日期为补卡日期（如果比当前记录的更晚）
+        if let lastDate = UserDefaults.standard.object(forKey: "dailyCheckIn.lastDate") as? Date {
+            let lastDay = calendar.startOfDay(for: lastDate)
+            if makeupDate > lastDay {
+                UserDefaults.standard.set(makeupDate, forKey: "dailyCheckIn.lastDate")
+            }
+        } else {
+            UserDefaults.standard.set(makeupDate, forKey: "dailyCheckIn.lastDate")
+        }
+
+        // 重新计算累计天数和连续天数
+        recalculateStats()
+
+        // 刷新管理器
+        manager.reloadFromDisk()
+    }
+    
+    // 为指定日期添加打卡记录
+    private func addCheckInRecord(for date: Date) {
+        let calendar = Calendar.current
+        let colors = [
+            ["樱花粉", "奶油白"],
+            ["薰衣草紫", "珍珠白"],
+            ["薄荷绿", "浅灰蓝"],
+            ["玫瑰红", "香槟金"]
+        ]
+        let accessories = [
+            "搭配粉色蝴蝶结发饰",
+            "搭配珍珠项链和蕾丝手套",
+            "搭配同色系包包和鞋子",
+            "搭配复古发带和耳环"
+        ]
+        
+        let testRecord = CheckInRecord(
+            id: UUID().uuidString,
+            date: date,
+            colors: colors.randomElement()!,
+            accessories: accessories.randomElement()!,
+            weather: nil,
+            location: nil,
+            isAIGenerated: true
+        )
+        
+        // 加载现有记录
+        var records: [CheckInRecord] = []
+        if let data = UserDefaults.standard.data(forKey: "dailyCheckIn.records"),
+           let existingRecords = try? JSONDecoder().decode([CheckInRecord].self, from: data) {
+            records = existingRecords
+        }
+        
+        // 检查是否已有该日期的记录
+        let hasRecord = records.contains { calendar.isDate($0.date, inSameDayAs: date) }
+        if !hasRecord {
+            records.append(testRecord)
+            if let encoded = try? JSONEncoder().encode(records) {
+                UserDefaults.standard.set(encoded, forKey: "dailyCheckIn.records")
+            }
+            // 更新统计
+            let totalDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.totalDays")
+            UserDefaults.standard.set(totalDays + 1, forKey: "dailyCheckIn.totalDays")
+        }
+    }
+    
+    // 补打本周未打卡的天数
+    private func fillThisWeekCheckIns() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekday = calendar.component(.weekday, from: today)
+        // 调整为周一为第一天 (1=周日, 2=周一... 7=周六)
+        let mondayOffset = (weekday + 5) % 7
+        guard let monday = calendar.date(byAdding: .day, value: -mondayOffset, to: today) else { return }
+
+        // 从周一到今天，补打未打卡的天数
+        var addedCount = 0
+        for i in 0...mondayOffset {
+            if let date = calendar.date(byAdding: .day, value: i, to: monday) {
+                // 检查是否已有记录
+                let hasRecord = hasCheckInRecord(for: date)
+                if !hasRecord {
+                    addCheckInRecord(for: date)
+                    addedCount += 1
+                }
+            }
+        }
+
+        // 更新最后打卡日期为今天
+        UserDefaults.standard.set(Date(), forKey: "dailyCheckIn.lastDate")
+
+        // 重新计算累计天数和连续天数
+        recalculateStats()
+
+        // 刷新管理器
+        manager.reloadFromDisk()
+
+        print("补打本周打卡完成，新增 \(addedCount) 条记录")
+    }
+    
+
+    // 检查某天是否已有打卡记录
+    private func hasCheckInRecord(for date: Date) -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: "dailyCheckIn.records"),
+              let records = try? JSONDecoder().decode([CheckInRecord].self, from: data) else {
+            return false
+        }
+        return records.contains { Calendar.current.isDate($0.date, inSameDayAs: date) }
+    }
+
+    // 加载所有已打卡的日期
+    private func loadCheckedInDates() -> Set<Date> {
+        let calendar = Calendar.current
+        guard let data = UserDefaults.standard.data(forKey: "dailyCheckIn.records"),
+              let records = try? JSONDecoder().decode([CheckInRecord].self, from: data) else {
+            return []
+        }
+        return Set(records.map { calendar.startOfDay(for: $0.date) })
+    }
+
+    // MARK: - 重新计算统计信息
+    private func recalculateStats() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // 加载所有记录
+        guard let data = UserDefaults.standard.data(forKey: "dailyCheckIn.records"),
+              let records = try? JSONDecoder().decode([CheckInRecord].self, from: data) else {
+            // 没有记录，重置统计
+            UserDefaults.standard.set(0, forKey: "dailyCheckIn.totalDays")
+            UserDefaults.standard.set(0, forKey: "dailyCheckIn.consecutiveDays")
+            return
+        }
+
+        // 计算累计天数（去重日期）
+        let uniqueDates = Set(records.map { calendar.startOfDay(for: $0.date) })
+        let totalDays = uniqueDates.count
+        UserDefaults.standard.set(totalDays, forKey: "dailyCheckIn.totalDays")
+
+        // 计算连续天数（从今天往前数）
+        var consecutiveDays = 0
+        var checkDate = today
+
+        // 如果今天没有打卡，从昨天开始算
+        if !uniqueDates.contains(today) {
+            if let yesterday = calendar.date(byAdding: .day, value: -1, to: today) {
+                checkDate = yesterday
+            }
+        }
+
+        // 往前数连续打卡天数
+        while uniqueDates.contains(checkDate) {
+            consecutiveDays += 1
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) else {
+                break
+            }
+            checkDate = previousDay
+        }
+
+        UserDefaults.standard.set(consecutiveDays, forKey: "dailyCheckIn.consecutiveDays")
+
+        print("📊 重新计算统计：累计打卡 \(totalDays) 天，连续打卡 \(consecutiveDays) 天")
+    }
+
+    private func clearAllCheckInRecords() {
+        // 清除所有打卡数据
+        UserDefaults.standard.removeObject(forKey: "dailyCheckIn.records")
+        UserDefaults.standard.removeObject(forKey: "dailyCheckIn.lastDate")
+        UserDefaults.standard.removeObject(forKey: "dailyCheckIn.consecutiveDays")
+        UserDefaults.standard.removeObject(forKey: "dailyCheckIn.totalDays")
+        // 刷新管理器
+        manager.reloadFromDisk()
+    }
+}
+
+// MARK: - 补卡选择日期 Sheet
+struct MakeupCheckInSheet: View {
+    @Binding var selectedDate: Date
+    let checkedInDates: Set<Date>
+    let onConfirm: (Date) -> Void
+    let onCancel: () -> Void
+
+    @State private var currentMonth: Date = Date()
+
+    private let calendar = Calendar.current
+    private let weekDays = ["日", "一", "二", "三", "四", "五", "六"]
+
+    // 限制日期范围
+    private var minDate: Date {
+        guard let date = calendar.date(byAdding: .day, value: -30, to: calendar.startOfDay(for: Date())) else {
+            return Date.distantPast
+        }
+        return date
+    }
+
+    private var maxDate: Date {
+        // 今天之前的日期
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date())) else {
+            return Date.distantPast
+        }
+        return yesterday
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("选择要补卡的日期")
+                    .font(.headline)
+                    .padding(.top, 20)
+
+                // 月份导航
+                HStack {
+                    Button {
+                        withAnimation {
+                            currentMonth = previousMonth
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .foregroundStyle(.primary)
+                    }
+
+                    Spacer()
+
+                    Text(monthYearString)
+                        .font(.system(size: 17, weight: .semibold))
+
+                    Spacer()
+
+                    Button {
+                        withAnimation {
+                            currentMonth = nextMonth
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.primary)
+                    }
+                    .disabled(isNextMonthDisabled)
+                }
+                .padding(.horizontal)
+
+                // 星期标题
+                HStack {
+                    ForEach(weekDays, id: \.self) { day in
+                        Text(day)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.horizontal)
+
+                // 日期网格
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+                    ForEach(Array(daysInMonth.enumerated()), id: \.offset) { index, date in
+                        if let date = date {
+                            MakeupDayCell(
+                                date: date,
+                                isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
+                                isCheckedIn: isDateCheckedIn(date),
+                                isEnabled: isDateEnabled(date)
+                            )
+                            .onTapGesture {
+                                if isDateEnabled(date) {
+                                    selectedDate = date
+                                }
+                            }
+                        } else {
+                            // 空占位
+                            Color.clear
+                                .frame(height: 40)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                // 图例说明
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                        Text("已打卡")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 8, height: 8)
+                        Text("选中")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                        Text("不可选")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.top, 8)
+
+                // 检查选中的日期是否已打卡
+                if isSelectedDateCheckedIn {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("该日期已打卡，无需补卡")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                    .padding(.top, 8)
+                }
+
+                Spacer()
+            }
+            .navigationTitle("补卡")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") {
+                        onCancel()
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("确认") {
+                        onConfirm(selectedDate)
+                        onCancel()
+                    }
+                    .disabled(isSelectedDateCheckedIn)
+                }
+            }
+        }
+    }
+
+    // MARK: - 辅助计算属性
+
+    private var monthYearString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年M月"
+        return formatter.string(from: currentMonth)
+    }
+
+    private var previousMonth: Date {
+        guard let date = calendar.date(byAdding: .month, value: -1, to: currentMonth) else {
+            return currentMonth
+        }
+        return date
+    }
+
+    private var nextMonth: Date {
+        guard let date = calendar.date(byAdding: .month, value: 1, to: currentMonth) else {
+            return currentMonth
+        }
+        return date
+    }
+
+    private var isNextMonthDisabled: Bool {
+        let nextMonthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: nextMonth))!
+        return nextMonthStart > maxDate
+    }
+
+    private var daysInMonth: [Date?] {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
+              let firstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start) else {
+            return []
+        }
+
+        var dates: [Date?] = []
+        var current = firstWeek.start
+
+        // 生成6周的日期（确保覆盖整个月）
+        for _ in 0..<42 {
+            if calendar.isDate(current, equalTo: monthInterval.start, toGranularity: .month) {
+                dates.append(current)
+            } else {
+                dates.append(nil) // 非本月日期显示为空
+            }
+
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: current) else { break }
+            current = nextDay
+        }
+
+        return dates
+    }
+
+    // MARK: - 辅助方法
+
+    private func isDateCheckedIn(_ date: Date) -> Bool {
+        let day = calendar.startOfDay(for: date)
+        return checkedInDates.contains(day)
+    }
+
+    private func isDateEnabled(_ date: Date) -> Bool {
+        let day = calendar.startOfDay(for: date)
+        return day >= minDate && day <= maxDate
+    }
+
+    private var isSelectedDateCheckedIn: Bool {
+        isDateCheckedIn(selectedDate)
+    }
+}
+
+// MARK: - 补卡日期格子
+private struct MakeupDayCell: View {
+    let date: Date
+    let isSelected: Bool
+    let isCheckedIn: Bool
+    let isEnabled: Bool
+
+    private let calendar = Calendar.current
+
+    var body: some View {
+        ZStack {
+            // 背景
+            if isSelected {
+                Circle()
+                    .fill(Color.blue)
+            } else if isCheckedIn {
+                Circle()
+                    .fill(Color.green.opacity(0.2))
+            }
+
+            // 日期数字
+            Text("\(calendar.component(.day, from: date))")
+                .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(textColor)
+
+            // 已打卡标记
+            if isCheckedIn && !isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.green)
+                    .offset(x: 8, y: -8)
+            }
+        }
+        .frame(height: 40)
+        .opacity(isEnabled ? 1.0 : 0.3)
+    }
+
+    private var textColor: Color {
+        if isSelected {
+            return .white
+        } else if isCheckedIn {
+            return .green
+        } else {
+            return .primary
+        }
     }
 }
 

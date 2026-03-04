@@ -2683,13 +2683,17 @@ class BackupService {
             if let lastDate = stats.lastCheckInDate {
                 UserDefaults.standard.set(lastDate, forKey: "dailyCheckIn.lastDate")
             }
-            print("Restore: Check-in stats saved to UserDefaults")
+            // 同时恢复魔法任务需要的登录天数进度
+            UserDefaults.standard.set(stats.totalDays, forKey: "loginDays")
+            print("Restore: Check-in stats saved to UserDefaults (totalDays: \(stats.totalDays))")
         }
-        
+
         // 刷新 DailyCheckInManager
         DispatchQueue.main.async {
             // 通过重新初始化来加载新数据
             DailyCheckInManager.shared.reloadFromDisk()
+            // 同时刷新 FeatureUnlockManager 的登录天数缓存
+            FeatureUnlockManager.shared.updateLoginDays(manifest.checkInStats?.totalDays ?? 0)
             print("Restore: DailyCheckInManager reloaded")
         }
     }
