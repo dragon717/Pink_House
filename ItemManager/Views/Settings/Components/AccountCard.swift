@@ -2,6 +2,7 @@ import SwiftUI
 import AuthenticationServices
 
 struct AccountCard: View {
+    @Environment(ThemeManager.self) private var themeManager
     @ObservedObject var authManager: AuthenticationManager
     @ObservedObject var cloudManager: CloudSyncManager
     let action: () -> Void
@@ -24,7 +25,7 @@ struct AccountCard: View {
                             // 未登录：显示占位图标
                             Image(systemName: "person.crop.circle.badge.plus")
                                 .font(.title2)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(themeManager.primaryTextColor)
                                 .frame(width: 40, height: 40)
                                 .background(Color.gray.opacity(0.1))
                                 .clipShape(Circle())
@@ -43,7 +44,7 @@ struct AccountCard: View {
                                 .foregroundStyle(.red)
                         } else {
                             Image(systemName: "icloud.fill")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(themeManager.accentTextColor)
                         }
                     }
                 }
@@ -52,23 +53,23 @@ struct AccountCard: View {
                     if authManager.isAuthenticated {
                         Text(authManager.displayName)
                             .font(.headline)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(themeManager.primaryTextColor)
                             .lineLimit(1)
                         
                         Text(icloudStatusText)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                     } else {
                         Text("Apple 登录")
                             .font(.headline)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(themeManager.primaryTextColor)
                             .lineLimit(1)
                         
                         Text("点击登录以同步数据")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                     }

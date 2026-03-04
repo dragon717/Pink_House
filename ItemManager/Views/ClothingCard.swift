@@ -35,6 +35,7 @@ struct ClothingCard: View, Equatable {
     
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.containerPalette) private var palette
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
@@ -151,7 +152,7 @@ struct ClothingCard: View, Equatable {
                 Text(clothing.name)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1) // 限制单行，保持整齐
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(palette.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 Spacer(minLength: 4) // 将价格信息推到底部，保持视觉对齐
@@ -161,7 +162,7 @@ struct ClothingCard: View, Equatable {
                         Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.system(size: 10))
                             .strikethrough()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                     }
                     
                     if showPrice {
@@ -174,14 +175,14 @@ struct ClothingCard: View, Equatable {
                                 Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                             }
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.pink)
+                            .foregroundStyle(palette.accent)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                         } else {
                             let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
                             Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
                                 .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color(hex: "8D6E63")) // Brownish
+                                .foregroundStyle(palette.primary)
                         }
                     }
                 }
@@ -194,6 +195,8 @@ struct ClothingCard: View, Equatable {
             CardBackgroundView(cornerRadius: 16)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        // 应用容器就近配色
+        .containerAdaptiveColors(background: .ultraThinMaterial)
         // 卡片整体阴影和悬浮动画 - 针对低端设备优化阴影
         .shadow(
             color: .black.opacity(isHovering ? 0.12 : 0.06),
@@ -283,6 +286,8 @@ struct ClothingRow: View {
     // 直接使用 AppStorage
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
     
     var body: some View {
@@ -335,18 +340,18 @@ struct ClothingRow: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(clothing.name)
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(palette.primary)
                     
                     // Attribute Display: Type, Color, Size
                     HStack(spacing: 6) {
                         if !clothing.types.isEmpty {
-                            AttributePill(text: clothing.types, icon: "tshirt", color: .pink)
+                            AttributePill(text: clothing.types, icon: "tshirt", color: palette.accent)
                         }
                         if !clothing.colors.isEmpty {
-                            AttributePill(text: clothing.colors, icon: "paintpalette", color: .blue)
+                            AttributePill(text: clothing.colors, icon: "paintpalette", color: palette.secondary)
                         }
                         if !clothing.sizes.isEmpty {
-                            AttributePill(text: clothing.sizes, icon: "ruler", color: .green)
+                            AttributePill(text: clothing.sizes, icon: "ruler", color: palette.tertiary)
                         }
                     }
                     
@@ -355,12 +360,12 @@ struct ClothingRow: View {
                             ForEach(tags.prefix(3)) { tag in
                                 Text("#\(tag.name)")
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(palette.tertiary)
                             }
                             if tags.count > 3 {
                                 Text("...")
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(palette.tertiary)
                             }
                         }
                     }
@@ -372,7 +377,7 @@ struct ClothingRow: View {
                     if showOriginalPrice && clothing.originalPrice > 0 {
                         Text("原价: ¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.secondary)
                     }
                     
                     if showPrice {
@@ -382,29 +387,30 @@ struct ClothingRow: View {
                             
                             Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
-                                .foregroundStyle(.pink)
+                                .foregroundStyle(palette.accent)
                             Text("尾款: ¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
                                 .bold()
-                                .foregroundStyle(.pink)
+                                .foregroundStyle(palette.accent)
                         } else {
                             let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
                             
                             Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundStyle(Color(hex: "8D6E63"))
+                                .foregroundStyle(palette.primary)
                         }
                     }
                     
                     if clothing.stock > 1 {
                         Text("库存: \(clothing.stock)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.tertiary)
                     }
                 }
             }
         }
+        .containerAdaptiveColors(background: .ultraThinMaterial)
         .padding(.vertical, 4)
     }
 }
@@ -414,6 +420,8 @@ struct ClothingRowBrief: View {
     // 直接使用 AppStorage
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
     
     var body: some View {
@@ -453,23 +461,24 @@ struct ClothingRowBrief: View {
                 
                 Text(clothing.name)
                     .font(.body)
+                    .foregroundStyle(palette.primary)
                     .lineLimit(1)
-                
+
                 Spacer()
-                
+
                 if let brand = clothing.brand {
                     Text(brand.name)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondary)
                         .lineLimit(1)
                 }
-                
+
                 if showOriginalPrice && clothing.originalPrice > 0 {
                     Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondary)
                 }
-                
+
                 if showPrice {
                     if clothing.isDepositPlan {
                         let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
@@ -477,16 +486,18 @@ struct ClothingRowBrief: View {
                         Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                             .font(.caption)
                             .bold()
-                            .foregroundStyle(.pink)
+                            .foregroundStyle(palette.accent)
                     } else {
                         let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
                         Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
                             .font(.subheadline)
                             .bold()
+                            .foregroundStyle(palette.primary)
                     }
                 }
             }
         }
+        .containerAdaptiveColors(background: .ultraThinMaterial)
         .padding(.vertical, 2)
     }
 }

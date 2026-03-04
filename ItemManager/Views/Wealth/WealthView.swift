@@ -23,6 +23,7 @@ struct WealthView: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var soundManager = SoundManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
+    @Environment(ThemeManager.self) private var themeManager
     
     // 主页面签选择
     @State private var selectedMainTab: WealthMainTab = .divination
@@ -169,9 +170,10 @@ struct WealthView: View {
             Menu {
                 Text("马上来财")
                     .font(.headline)
+                    .foregroundStyle(themeManager.primaryTextColor)
                 Text("财运亨通，日进斗金")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
             } label: {
                 Text("🐎")
                     .font(.caption)

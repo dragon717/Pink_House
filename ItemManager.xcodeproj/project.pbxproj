@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A226CD742F26A507004E4E41 /* 少女心愿logo.icon in Resources */ = {isa = PBXBuildFile; fileRef = A226CD732F26A507004E4E41 /* 少女心愿logo.icon */; };
 		A2379F992F5440D200E0F2DF /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A2379F982F5440D200E0F2DF /* GRDB */; };
 		A280DB932F443697002CBC10 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = A280DB922F443697002CBC10 /* GoogleGenerativeAI */; };
 		A2AE59C32F1EB85300B4B6EB /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2AE59C22F1EB85300B4B6EB /* WidgetKit.framework */; };
@@ -60,7 +59,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		A226CD732F26A507004E4E41 /* 少女心愿logo.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "少女心愿logo.icon"; sourceTree = "<group>"; };
 		A2AE58732F19377500B4B6EB /* ItemManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ItemManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2AE58842F19377600B4B6EB /* ItemManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ItemManagerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2AE588E2F19377600B4B6EB /* ItemManagerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ItemManagerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -180,7 +178,6 @@
 				A2AE58912F19377600B4B6EB /* ItemManagerUITests */,
 				A2AE59C12F1EB85300B4B6EB /* Frameworks */,
 				A2AE58742F19377500B4B6EB /* Products */,
-				A226CD732F26A507004E4E41 /* 少女心愿logo.icon */,
 				A2F14A312F44792000BA78C6 /* 少女心愿衣橱 */,
 				BC5D82BE6AA6114C408C7257 /* asserts */,
 			);
@@ -372,7 +369,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A226CD742F26A507004E4E41 /* 少女心愿logo.icon in Resources */,
 				FACC6A312B163829E15C2439 /* asserts in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -480,12 +476,12 @@
 		A2AE58982F19377600B4B6EB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "少女心愿logo";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = ItemManager/ItemManager.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -494,6 +490,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ItemManager/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙子图片";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -529,12 +526,12 @@
 		A2AE58992F19377600B4B6EB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "少女心愿logo";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = ItemManager/ItemManager.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -543,6 +540,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ItemManager/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙子图片";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;

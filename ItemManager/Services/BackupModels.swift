@@ -67,6 +67,9 @@ struct BackupManifest: Codable {
     let checkInRecords: [CheckInRecordDTO]? // v1.8+ 签到打卡记录
     let checkInStats: CheckInStatsDTO? // v1.8+ 签到统计数据
     
+    // Version 1.9: Theme Color Config (魔法配色/客制化配色配置)
+    let themeColorConfig: ThemeColorConfig? // v1.9+ 主题配色配置
+    
     // Summary
     let clothingCount: Int
     let imageCount: Int

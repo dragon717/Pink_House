@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SettingsGridItem: View {
+    @Environment(ThemeManager.self) private var themeManager
+    
     let title: String
     let subtitle: String
     let icon: String
@@ -30,12 +32,12 @@ struct SettingsGridItem: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(themeManager.primaryTextColor)
                     .lineLimit(1)
                 
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }

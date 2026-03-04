@@ -10,6 +10,7 @@ import SwiftData
 
 struct DepositItemRow: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     let clothing: Clothing
     @State private var isExpanded: Bool = false
     @State private var showEditNoteAlert: Bool = false
@@ -56,7 +57,7 @@ struct DepositItemRow: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(clothing.name)
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(themeManager.primaryTextColor)
                         
                         if let brand = clothing.brand {
                             HStack(spacing: 4) {
@@ -65,13 +66,13 @@ struct DepositItemRow: View {
                                 Text(brand.name)
                                     .font(.caption)
                             }
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         
                         if clothing.stock > 1 {
                             Text("库存: \(clothing.stock)")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
                         }
                         
                         // Tags
@@ -99,22 +100,22 @@ struct DepositItemRow: View {
                             Text("定金¥\(totalDeposit.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(themeManager.accentTextColor)
                             Text("尾款¥\(totalBalance.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
-                                .foregroundStyle(.pink)
+                                .foregroundStyle(themeManager.accentTextColor)
                         }
                     } else {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(themeManager.accentTextColor)
                             Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                                 .font(.caption)
                                 .bold()
-                                .foregroundStyle(.pink)
+                                .foregroundStyle(themeManager.accentTextColor)
                         }
                     }
                 }
@@ -158,7 +159,7 @@ struct DepositItemRow: View {
                 if !clothing.note.isEmpty {
                     Text("备注: \(clothing.note)")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                         .padding(8)
                         .background(Color.secondary.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -235,6 +236,7 @@ struct DepositItemRow: View {
 
 struct SimpleDepositItemRow: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     let clothing: Clothing
     @State private var thumbnailImage: UIImage?
     @State private var showEditNoteAlert: Bool = false
@@ -279,27 +281,27 @@ struct SimpleDepositItemRow: View {
                     Text(clothing.name)
                         .font(.system(size: 14, weight: .medium))
                         .lineLimit(1)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(themeManager.primaryTextColor)
                     
                     HStack(spacing: 6) {
                         if let date = clothing.finalPaymentDate {
                             Text("尾款: \(Self.monthFormatter.string(from: date))")
                                 .font(.caption2)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(themeManager.accentTextColor)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.1))
+                                .background(themeManager.accentTextColor.opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                         } else {
                             Text("尾款待定")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
                         }
                         
                         if let brand = clothing.brand {
                             Text(brand.name)
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                     }
                 }
@@ -310,11 +312,11 @@ struct SimpleDepositItemRow: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(themeManager.accentTextColor)
                     Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                         .font(.caption)
                         .bold()
-                        .foregroundStyle(.pink)
+                        .foregroundStyle(themeManager.accentTextColor)
                 }
                 
                 // 4. Note Icon

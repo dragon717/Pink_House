@@ -53,11 +53,11 @@ struct PerlerBeadsView: View {
                         // 标题
                         Text("拼豆工坊")
                             .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(Color(red: 0.3, green: 0.2, blue: 0.25))
+                            .foregroundStyle(themeManager.primaryTextColor)
 
                         Text("把照片变成拼豆图案")
                             .font(.system(size: 16))
-                            .foregroundColor(Color(red: 0.5, green: 0.4, blue: 0.45))
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
                     .padding(.top, 40)
 
@@ -96,7 +96,7 @@ struct PerlerBeadsView: View {
                     // 底部提示
                     Text("选择一种方式开始创作吧")
                         .font(.system(size: 14))
-                        .foregroundColor(Color(red: 0.6, green: 0.5, blue: 0.55))
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                         .padding(.bottom, 40)
                 }
             }
@@ -182,6 +182,8 @@ struct PerlerBeadsView: View {
 
 // MARK: - 功能卡片
 struct FeatureCard: View {
+    @Environment(ThemeManager.self) private var themeManager
+    
     let icon: String
     let title: String
     let subtitle: String
@@ -213,15 +215,15 @@ struct FeatureCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.primary)
+                        .foregroundStyle(themeManager.primaryTextColor)
 
                     Text(subtitle)
                         .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
 
                     Text(description)
                         .font(.system(size: 12))
-                        .foregroundColor(Color.gray)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                 }
 
                 Spacer()
@@ -229,7 +231,7 @@ struct FeatureCard: View {
                 // 箭头
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.gray)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
             }
             .padding(20)
             .background(

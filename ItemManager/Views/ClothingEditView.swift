@@ -175,7 +175,8 @@ final class ClothingEditDraftManager {
 struct ClothingEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<Clothing> { $0.isDeleted == false }) private var allClothings: [Clothing]
+    // 统一使用 deletedAt == nil 作为未删除的判断条件，与其他视图保持一致
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @State private var draftManager = ClothingEditDraftManager.shared
     

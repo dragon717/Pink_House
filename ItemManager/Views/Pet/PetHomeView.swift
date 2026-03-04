@@ -5,6 +5,7 @@ import Combine
 struct PetHomeView: View {
     @StateObject private var viewModel = PetViewModel()
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var clothings: [Clothing]
     
     @StateObject private var audioManager = AudioManager.shared
@@ -116,10 +117,10 @@ struct PetHomeView: View {
                                                     Text("对话")
                                                     .font(.system(size: 16, weight: .bold))
                                             }
-                                            .foregroundColor(.white)
+                                            .foregroundColor(themeManager.primaryTextColor)
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 12)
-                                            .background(Color(red: 0.80, green: 0.65, blue: 0.80)) // 莫妮卡紫
+                                            .background(themeManager.accentTextColor.opacity(0.3))
                                             .clipShape(Capsule())
                                             .shadow(radius: 4, x: 0, y: 2)
                                         }
@@ -139,10 +140,10 @@ struct PetHomeView: View {
                                                 Text("背包")
                                                     .font(.system(size: 16, weight: .bold))
                                             }
-                                            .foregroundColor(.white)
+                                            .foregroundColor(themeManager.primaryTextColor)
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 12)
-                                            .background(Color(red: 0.62, green: 0.74, blue: 0.82)) // 莫妮卡蓝
+                                            .background(themeManager.secondaryTextColor.opacity(0.3))
                                             .clipShape(Capsule())
                                             .shadow(radius: 4, x: 0, y: 2)
                                             }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PetStatusHeaderView: View {
     @ObservedObject var viewModel: PetViewModel
+    @Environment(ThemeManager.self) private var themeManager
     let isLandscape: Bool
     
     @State private var showExchangeSheet = false
@@ -113,6 +114,7 @@ struct PetStatusHeaderView: View {
 
 struct MoreCurrenciesView: View {
     let currencies: [(type: PetCurrency, amount: Int, action: () -> Void)]
+    @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -136,6 +138,7 @@ struct MoreCurrenciesView: View {
                     Button("关闭") {
                         dismiss()
                     }
+                    .foregroundStyle(themeManager.primaryTextColor)
                 }
             }
         }
@@ -144,6 +147,7 @@ struct MoreCurrenciesView: View {
 
 struct ExchangeView: View {
     @ObservedObject var viewModel: PetViewModel
+    @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) var dismiss
     
     @State private var exchangeAmount: Double = 100
@@ -158,10 +162,11 @@ struct ExchangeView: View {
                     Text("货币兑换")
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundStyle(themeManager.primaryTextColor)
                     
                     Text("汇率 1:1")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                 }
                 .padding(.top, 20)
                 
@@ -173,11 +178,12 @@ struct ExchangeView: View {
                             .foregroundColor(.orange)
                         Text("鱼币")
                             .font(.caption)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
                     
                     Image(systemName: "arrow.left.arrow.right")
                         .font(.title2)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                     
                     VStack {
                         // 骨头币图标
@@ -190,6 +196,7 @@ struct ExchangeView: View {
                         }
                         Text("骨头币")
                             .font(.caption)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
                 }
                 
@@ -203,7 +210,7 @@ struct ExchangeView: View {
                     } label: {
                         Text("兑换数量: \(Int(exchangeAmount))")
                             .font(.headline)
-                            .foregroundColor(.primary)
+                            .foregroundStyle(themeManager.primaryTextColor)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(Color.secondary.opacity(0.1))
@@ -211,7 +218,7 @@ struct ExchangeView: View {
                     }
                     
                     Slider(value: $exchangeAmount, in: 1000...100000, step: 1000)
-                        .tint(.blue)
+                        .tint(themeManager.accentTextColor)
                     
                     HStack {
                         Text("1000")
@@ -219,7 +226,7 @@ struct ExchangeView: View {
                         Text("100000")
                     }
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
                 }
                 .padding(.horizontal, 30)
                 

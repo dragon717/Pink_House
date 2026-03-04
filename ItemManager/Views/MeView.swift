@@ -131,6 +131,17 @@ struct MeView: View {
                         // 梦裙日历
                         CalendarSettingsCard()
                         
+                        // 魔法配色
+                        NavigationLink(destination: MagicColorSettingsView()) {
+                            SettingsGridItem(
+                                title: "魔法配色",
+                                subtitle: "智能配色 · 客制化配色",
+                                icon: "wand.and.stars",
+                                iconColor: .purple
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
                         // 常用菜单设置
                         NavigationLink(destination: FavoriteMenuSettingsView()) {
                             SettingsGridItem(

@@ -11,6 +11,7 @@ import UIKit
 
 struct BigWorldView: View {
     @StateObject private var viewModel = BigWorldViewModel()
+    @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTab: BigWorldTab = .explore
     
@@ -94,7 +95,7 @@ struct BigWorldView: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 17, weight: .medium))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(themeManager.primaryTextColor)
                                 .frame(width: 32, height: 32)
                                 .background(Color.clear)
                         }
@@ -108,7 +109,7 @@ struct BigWorldView: View {
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 17, weight: .medium))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(themeManager.primaryTextColor)
                                 .frame(width: 32, height: 32)
                                 .background(Color.clear)
                         }
@@ -129,6 +130,8 @@ struct BigWorldView: View {
 
 // MARK: - 梦幻页面占位
 struct DreamPlaceholderView: View {
+    @Environment(ThemeManager.self) private var themeManager
+    
     var body: some View {
         ZStack {
             Color.black.opacity(0.3).ignoresSafeArea()
@@ -136,15 +139,15 @@ struct DreamPlaceholderView: View {
             VStack(spacing: 20) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 60))
-                    .foregroundStyle(Color(red: 1.0, green: 0.84, blue: 0.0).opacity(0.5))
+                    .foregroundStyle(themeManager.accentTextColor.opacity(0.5))
                 
                 Text("梦幻世界")
                     .font(.system(size: 24, weight: .bold, design: .serif))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(themeManager.primaryTextColor)
                 
                 Text("即将开启，敬请期待...")
                     .font(.subheadline)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(themeManager.secondaryTextColor)
             }
         }
     }

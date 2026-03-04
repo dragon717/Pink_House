@@ -55,6 +55,28 @@ enum SkirtFillMode: String, CaseIterable, Identifiable {
 class ThemeManager {
     static let shared = ThemeManager()
     
+    // MARK: - V2 Color System (New)
+    /// 主题配色配置（支持备份恢复）
+    var themeColorConfig: ThemeColorConfig = .default {
+        didSet {
+            // 加载配置时不重复保存
+            if !isLoadingConfig {
+                saveThemeColorConfig()
+            }
+            updateAdaptivePalette()
+        }
+    }
+    
+    /// 当前配色模式
+    var colorSchemeMode: ColorSchemeMode {
+        get { themeColorConfig.colorSchemeMode }
+        set {
+            var newConfig = themeColorConfig
+            newConfig.colorSchemeMode = newValue
+            themeColorConfig = newConfig
+        }
+    }
+    
     // MARK: - Card Settings
     var cardStyle: CardStyle = .solid {
         didSet {
@@ -112,6 +134,7 @@ class ThemeManager {
     var backgroundColorHex: String = "#F2F2F7" { // Default system grouped background
         didSet {
             UserDefaults.standard.set(backgroundColorHex, forKey: "theme_background_color")
+            updateAdaptivePalette()
         }
     }
     
@@ -119,6 +142,7 @@ class ThemeManager {
     var backgroundStyle: BackgroundStyle = .color {
         didSet {
             UserDefaults.standard.set(backgroundStyle.rawValue, forKey: "theme_background_style")
+            updateAdaptivePalette()
         }
     }
     
@@ -128,7 +152,11 @@ class ThemeManager {
         }
     }
     
-    var backgroundImage: UIImage? = nil
+    var backgroundImage: UIImage? = nil {
+        didSet {
+            updateAdaptivePalette()
+        }
+    }
     var originalImage: UIImage? = nil // Cache for original image
     
     // MARK: - Common Settings
@@ -138,8 +166,62 @@ class ThemeManager {
         }
     }
     
-    // 预留
-    var textColorHex: String = "#000000"
+    // MARK: - Smart Text Color Settings
+    /// 是否启用智能字体配色
+    var isSmartTextColorEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isSmartTextColorEnabled, forKey: "theme_smart_text_color_enabled")
+            updateAdaptivePalette()
+        }
+    }
+    
+    /// 手动字体颜色 (当智能配色关闭时使用)
+    var manualTextColorHex: String = "#000000" {
+        didSet {
+            UserDefaults.standard.set(manualTextColorHex, forKey: "theme_manual_text_color")
+            updateAdaptivePalette()
+        }
+    }
+    
+    /// 当前自适应调色板 (根据背景自动计算)
+    private(set) var adaptivePalette: AdaptivePalette = .lightBackground
+    
+    /// 主文本色 (便捷访问)
+    var primaryTextColor: Color { adaptivePalette.primary }
+    /// 副文本色 (便捷访问)
+    var secondaryTextColor: Color { adaptivePalette.secondary }
+    /// 辅助文本色 (便捷访问)
+    var tertiaryTextColor: Color { adaptivePalette.tertiary }
+    /// 强调色 (便捷访问)
+    var accentTextColor: Color { adaptivePalette.accent }
+    
+    /// 更新自适应调色板
+    func updateAdaptivePalette() {
+        if !isSmartTextColorEnabled {
+            // 手动模式: 根据手动设置的颜色生成调色板
+            let manualColor = Color(hex: manualTextColorHex)
+            adaptivePalette = AdaptivePalette.generate(
+                from: manualColor.isDark ? Color.white : Color.black,
+                accentColor: cardTintColor
+            )
+            return
+        }
+        
+        // 智能模式: 根据背景自动判断
+        switch backgroundStyle {
+        case .color:
+            adaptivePalette = AdaptivePalette.generate(from: backgroundColor, accentColor: cardTintColor)
+        case .image:
+            // 图片背景: 尝试提取图片主色调,否则使用暗色预设
+            if let image = backgroundImage,
+               let avgColor = image.averageColor {
+                adaptivePalette = AdaptivePalette.generate(from: Color(uiColor: avgColor), accentColor: cardTintColor)
+            } else {
+                adaptivePalette = .darkBackground
+            }
+        }
+    }
+    
     var selectionColorHex: String = "#A52A2A" // Brown
     
     // MARK: - Debug Parameters (Liquid Glass)
@@ -199,6 +281,14 @@ class ThemeManager {
         
         self.isBlurEnabled = UserDefaults.standard.bool(forKey: "theme_is_blur_enabled")
         
+        // Load Smart Text Color Settings
+        self.isSmartTextColorEnabled = UserDefaults.standard.object(forKey: "theme_smart_text_color_enabled") != nil
+            ? UserDefaults.standard.bool(forKey: "theme_smart_text_color_enabled")
+            : true // 默认开启
+        if let savedManualTextColor = UserDefaults.standard.string(forKey: "theme_manual_text_color") {
+            self.manualTextColorHex = savedManualTextColor
+        }
+        
         // Load Debug Parameters
         #if DEBUG
         if UserDefaults.standard.object(forKey: "dbg_glass_fallback_light") != nil { self.dbg_glass_fallback_light = UserDefaults.standard.double(forKey: "dbg_glass_fallback_light") }
@@ -217,6 +307,12 @@ class ThemeManager {
         
         // Load image
         loadBackgroundImage()
+        
+        // Load V2 Color System Config
+        loadThemeColorConfig()
+        
+        // 初始化自适应调色板
+        updateAdaptivePalette()
     }
     
     var backgroundColor: Color {
@@ -322,6 +418,14 @@ class ThemeManager {
         
         self.isBlurEnabled = UserDefaults.standard.bool(forKey: "theme_is_blur_enabled")
         
+        // Reload Smart Text Color Settings
+        self.isSmartTextColorEnabled = UserDefaults.standard.object(forKey: "theme_smart_text_color_enabled") != nil
+            ? UserDefaults.standard.bool(forKey: "theme_smart_text_color_enabled")
+            : true
+        if let savedManualTextColor = UserDefaults.standard.string(forKey: "theme_manual_text_color") {
+            self.manualTextColorHex = savedManualTextColor
+        }
+        
         // Load Debug Parameters
         #if DEBUG
         if UserDefaults.standard.object(forKey: "dbg_glass_fallback_light") != nil { self.dbg_glass_fallback_light = UserDefaults.standard.double(forKey: "dbg_glass_fallback_light") }
@@ -341,5 +445,118 @@ class ThemeManager {
     
     private func loadBackgroundImage() {
         reloadBackgroundImage()
+    }
+    
+    // MARK: - V2 Color System Methods
+    
+    /// 保存主题配色配置
+    func saveThemeColorConfig() {
+        if let encoded = try? JSONEncoder().encode(themeColorConfig) {
+            UserDefaults.standard.set(encoded, forKey: "theme_color_config_v2")
+        }
+    }
+    
+    /// 加载主题配色配置
+    private var isLoadingConfig = false
+    
+    func loadThemeColorConfig() {
+        isLoadingConfig = true
+        defer { isLoadingConfig = false }
+        
+        if let data = UserDefaults.standard.data(forKey: "theme_color_config_v2"),
+           let config = try? JSONDecoder().decode(ThemeColorConfig.self, from: data) {
+            self.themeColorConfig = config
+        }
+    }
+    
+    /// 获取容器就近调色板
+    func getPaletteForContainer(
+        containerBackground: ContainerBackgroundType,
+        colorScheme: ColorScheme,
+        overrideAccent: Color? = nil
+    ) -> AdaptivePaletteV2 {
+        let accent = overrideAccent ?? cardTintColor
+        
+        // 判断当前是亮色还是暗色模式
+        let isDarkMode: Bool
+        if themeColorConfig.followSystemDarkMode {
+            isDarkMode = colorScheme == .dark
+        } else {
+            // 如果不跟随系统，根据容器背景判断
+            isDarkMode = containerBackground.isDark
+        }
+        
+        switch colorSchemeMode {
+        case .magic:
+            // 魔法配色：根据容器背景生成
+            return AdaptivePaletteV2.generate(
+                from: backgroundColor,
+                isDark: isDarkMode,
+                accentColor: accent,
+                containerBackground: containerBackground
+            )
+            
+        case .custom:
+            // 客制化配色：根据当前模式选择颜色
+            let primaryRGBA = isDarkMode ? themeColorConfig.darkPrimaryRGBA : themeColorConfig.customPrimaryRGBA
+            let secondaryRGBA = isDarkMode ? themeColorConfig.darkSecondaryRGBA : themeColorConfig.customSecondaryRGBA
+            let tertiaryRGBA = isDarkMode ? themeColorConfig.darkTertiaryRGBA : themeColorConfig.customTertiaryRGBA
+            let accentRGBA = isDarkMode ? themeColorConfig.darkAccentRGBA : themeColorConfig.customAccentRGBA
+            
+            print("🎨 getPaletteForContainer (custom): Primary RGB = \(primaryRGBA.r), \(primaryRGBA.g), \(primaryRGBA.b)")
+            
+            return AdaptivePaletteV2.fromRGBA(
+                primary: primaryRGBA,
+                secondary: secondaryRGBA,
+                tertiary: tertiaryRGBA,
+                accent: accentRGBA
+            )
+        }
+    }
+    
+    /// 更新客制化颜色（当前模式）
+    func updateCustomColors(
+        primary: Color,
+        secondary: Color,
+        tertiary: Color,
+        accent: Color,
+        forDarkMode: Bool? = nil
+    ) {
+        let isDark = forDarkMode ?? (UITraitCollection.current.userInterfaceStyle == .dark)
+
+        if let primaryRGBA = primary.rgba,
+           let secondaryRGBA = secondary.rgba,
+           let tertiaryRGBA = tertiary.rgba,
+           let accentRGBA = accent.rgba {
+
+            // 创建新的配置副本，修改后重新赋值以触发 didSet
+            var newConfig = themeColorConfig
+
+            if isDark {
+                newConfig.darkPrimaryRGBA = primaryRGBA
+                newConfig.darkSecondaryRGBA = secondaryRGBA
+                newConfig.darkTertiaryRGBA = tertiaryRGBA
+                newConfig.darkAccentRGBA = accentRGBA
+            } else {
+                newConfig.customPrimaryRGBA = primaryRGBA
+                newConfig.customSecondaryRGBA = secondaryRGBA
+                newConfig.customTertiaryRGBA = tertiaryRGBA
+                newConfig.customAccentRGBA = accentRGBA
+            }
+
+            // 重新赋值以触发 didSet 和视图更新
+            themeColorConfig = newConfig
+            
+            print("✅ ThemeManager: Custom colors updated - Primary: \(primaryRGBA.r), \(primaryRGBA.g), \(primaryRGBA.b)")
+        } else {
+            print("❌ ThemeManager: Failed to convert colors to RGBA")
+        }
+    }
+    
+    /// 切换配色模式
+    func switchColorSchemeMode(to mode: ColorSchemeMode) {
+        var newConfig = themeColorConfig
+        newConfig.colorSchemeMode = mode
+        themeColorConfig = newConfig  // 重新赋值触发 didSet
     }
 }

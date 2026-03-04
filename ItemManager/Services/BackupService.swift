@@ -775,8 +775,11 @@ class BackupService {
             }
             print("### Export: Added \(checkInRecordsDTOs.count) check-in records")
             
+            // 获取主题配色配置
+            let themeColorConfig = ThemeManager.shared.themeColorConfig
+            
             let manifest = BackupManifest(
-                version: "1.8",
+                version: "1.9",
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -808,6 +811,7 @@ class BackupService {
                 unlockConditions: unlockConditionDTOs,
                 checkInRecords: checkInRecordsDTOs,
                 checkInStats: checkInStatsDTO,
+                themeColorConfig: themeColorConfig,
                 clothingCount: clothingDTOs.count,
                 imageCount: storedImageDTOs.count,
                 outfitCount: snapshotDTOs.count,
@@ -2421,7 +2425,10 @@ class BackupService {
         // 6. 恢复签到打卡 (v1.8+)
         restoreCheckInRecords(manifest: manifest)
         
-        // 7. 刷新主题和小组件
+        // 7. 恢复主题配色配置 (v1.9+)
+        restoreThemeColorConfig(manifest: manifest)
+        
+        // 8. 刷新主题和小组件
         refreshThemeAndWidget(documentsDir: documentsDir, fileManager: fileManager)
         
         // 8. 版本检查与缓存清理
@@ -2695,6 +2702,18 @@ class BackupService {
             // 同时刷新 FeatureUnlockManager 的登录天数缓存
             FeatureUnlockManager.shared.updateLoginDays(manifest.checkInStats?.totalDays ?? 0)
             print("Restore: DailyCheckInManager reloaded")
+        }
+    }
+
+    // MARK: - 恢复主题配色配置 (v1.9+)
+
+    private func restoreThemeColorConfig(manifest: BackupManifest) {
+        if let config = manifest.themeColorConfig {
+            print("Restore: Restoring theme color config...")
+            ThemeManager.shared.themeColorConfig = config
+            print("Restore: Theme color config restored successfully")
+        } else {
+            print("Restore: No theme color config found in backup (backward compatibility)")
         }
     }
 

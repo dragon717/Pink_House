@@ -52,11 +52,9 @@
     {
       "layers" : [
         {
-          "blend-mode" : "multiply",
-          "fill" : {
-            "automatic-gradient" : "display-p3:0.94650,0.65069,0.96921,1.00000"
-          },
-          "glass" : false,
+          "blend-mode" : "normal",
+          "fill" : "none",
+          "glass" : true,
           "hidden" : false,
           "image-name" : "text.png",
           "name" : "text",
@@ -70,7 +68,7 @@
           }
         },
         {
-          "glass" : false,
+          "glass" : true,
           "image-name" : "dress_front.png",
           "name" : "dress_front",
           "position" : {
@@ -82,7 +80,7 @@
           }
         },
         {
-          "glass" : false,
+          "glass" : true,
           "image-name" : "dress.png",
           "name" : "dress",
           "opacity" : 1,

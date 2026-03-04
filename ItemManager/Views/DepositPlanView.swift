@@ -29,6 +29,7 @@ enum DepositDisplayMode: String, CaseIterable, Identifiable {
 struct DepositPlanView: View {
     @Binding var searchText: String
     @Binding var displayMode: DepositDisplayMode
+    @Environment(ThemeManager.self) private var themeManager
     @Query private var depositClothings: [Clothing]
     
     @State private var viewMode: DepositViewMode = .monthly
@@ -80,7 +81,9 @@ struct DepositPlanView: View {
          selectedAccessories: Set<String>) {
         _searchText = searchText
         _displayMode = displayMode
-        let filter = #Predicate<Clothing> { $0.isDepositPlan == true && $0.isDeleted == false }
+        // 统一使用 deletedAt == nil 作为未删除的判断条件，与衣橱列表保持一致
+        // 避免 isDeleted 和 deletedAt 不一致导致的数据问题
+        let filter = #Predicate<Clothing> { $0.isDepositPlan == true && $0.deletedAt == nil }
         // Use default sort since we'll apply sorting manually in updateBaseClothings
         _depositClothings = Query(filter: filter, sort: \Clothing.createdAt, order: .reverse)
         
@@ -241,8 +244,12 @@ struct DepositPlanView: View {
                 
                 // View Mode Switcher
                 Picker("视图模式", selection: $viewMode) {
-                    Text("按月视图").tag(DepositViewMode.monthly)
-                    Text("按系列视图").tag(DepositViewMode.series)
+                    Text("按月视图")
+                        .tag(DepositViewMode.monthly)
+                        .foregroundStyle(themeManager.primaryTextColor)
+                    Text("按系列视图")
+                        .tag(DepositViewMode.series)
+                        .foregroundStyle(themeManager.primaryTextColor)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -378,7 +385,13 @@ struct TotalBalanceCard: View {
     let onToggleVisibility: () -> Void
     let onCountMoney: () -> Void
     
+    @Environment(ThemeManager.self) private var themeManager
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    @StateObject private var featureManager = FeatureUnlockManager.shared
+    
+    // 未解锁功能提示弹窗
+    @State private var showUnlockAlert = false
+    @State private var lockedFeature: FeatureItem? = nil
     
     var body: some View {
         VStack(spacing: 0) {
@@ -386,7 +399,7 @@ struct TotalBalanceCard: View {
             HStack(spacing: 0) {
                 // 梦裙日历
                 Button {
-                    tabNavigationManager.navigate(to: .smallWorld(.calendar))
+                    handleQuickAccess(.calendar)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "calendar")
@@ -405,7 +418,7 @@ struct TotalBalanceCard: View {
                 
                 // 马上来财
                 Button {
-                    tabNavigationManager.navigate(to: .smallWorld(.wealth))
+                    handleQuickAccess(.wealth)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "dollarsign.circle")
@@ -424,8 +437,7 @@ struct TotalBalanceCard: View {
                 
                 // 裙子股市
                 Button {
-                    // 跳转到House TabBar中的裙子股市子界面
-                    tabNavigationManager.navigate(to: .smallWorld(.dressStock))
+                    handleQuickAccess(.dressStock)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "chart.line.uptrend.xyaxis")
@@ -441,6 +453,32 @@ struct TotalBalanceCard: View {
             }
             .padding(.horizontal, 8)
             .padding(.top, 12)
+            .alert("功能未解锁", isPresented: $showUnlockAlert) {
+                if let feature = lockedFeature {
+                    let condition = featureManager.getCondition(for: feature)
+                    // 兑换码解锁的功能只显示"我知道啦～"按钮
+                    if condition.type == UnlockConditionType.redeemCode.rawValue {
+                        Button("我知道啦～", role: .cancel) { }
+                    } else {
+                        Button("取消", role: .cancel) { }
+                        Button("去解锁") {
+                            NotificationCenter.default.post(
+                                name: .navigateToMagicTasks,
+                                object: nil
+                            )
+                        }
+                    }
+                } else {
+                    Button("取消", role: .cancel) { }
+                }
+            } message: {
+                if let feature = lockedFeature {
+                    let condition = featureManager.getCondition(for: feature)
+                    Text("\(feature.displayName) 尚未解锁\n\(condition.description)")
+                } else {
+                    Text("该功能尚未解锁，请先完成对应任务")
+                }
+            }
             
             // 分割线
             Divider()
@@ -451,7 +489,7 @@ struct TotalBalanceCard: View {
             HStack {
                 Text("总待付尾款")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
                 
                 Spacer()
                 
@@ -504,6 +542,24 @@ struct TotalBalanceCard: View {
         .background(CardBackgroundView(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    // MARK: - 处理快捷入口点击
+    private func handleQuickAccess(_ destination: SmallWorldDestination) {
+        // 检查功能是否已解锁
+        if let feature = destination.featureItem {
+            if featureManager.canAccess(feature) {
+                // 已解锁，正常跳转
+                tabNavigationManager.navigate(to: .smallWorld(destination))
+            } else {
+                // 未解锁，显示提示
+                lockedFeature = feature
+                showUnlockAlert = true
+            }
+        } else {
+            // 没有对应功能项，直接跳转
+            tabNavigationManager.navigate(to: .smallWorld(destination))
+        }
     }
 }
 
