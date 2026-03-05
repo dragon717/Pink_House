@@ -186,14 +186,55 @@ class ThemeManager {
     /// 当前自适应调色板 (根据背景自动计算)
     private(set) var adaptivePalette: AdaptivePalette = .lightBackground
     
-    /// 主文本色 (便捷访问)
-    var primaryTextColor: Color { adaptivePalette.primary }
-    /// 副文本色 (便捷访问)
-    var secondaryTextColor: Color { adaptivePalette.secondary }
-    /// 辅助文本色 (便捷访问)
-    var tertiaryTextColor: Color { adaptivePalette.tertiary }
-    /// 强调色 (便捷访问)
-    var accentTextColor: Color { adaptivePalette.accent }
+    /// 主文本色 (便捷访问) - 支持客制化配色
+    var primaryTextColor: Color {
+        if colorSchemeMode == .custom {
+            // 根据当前暗夜/亮色模式返回对应颜色
+            let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+            if isDark {
+                return themeColorConfig.darkPrimaryRGBA.color
+            } else {
+                return themeColorConfig.customPrimaryRGBA.color
+            }
+        }
+        return adaptivePalette.primary
+    }
+    /// 副文本色 (便捷访问) - 支持客制化配色
+    var secondaryTextColor: Color {
+        if colorSchemeMode == .custom {
+            let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+            if isDark {
+                return themeColorConfig.darkSecondaryRGBA.color
+            } else {
+                return themeColorConfig.customSecondaryRGBA.color
+            }
+        }
+        return adaptivePalette.secondary
+    }
+    /// 辅助文本色 (便捷访问) - 支持客制化配色
+    var tertiaryTextColor: Color {
+        if colorSchemeMode == .custom {
+            let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+            if isDark {
+                return themeColorConfig.darkTertiaryRGBA.color
+            } else {
+                return themeColorConfig.customTertiaryRGBA.color
+            }
+        }
+        return adaptivePalette.tertiary
+    }
+    /// 强调色 (便捷访问) - 支持客制化配色
+    var accentTextColor: Color {
+        if colorSchemeMode == .custom {
+            let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+            if isDark {
+                return themeColorConfig.darkAccentRGBA.color
+            } else {
+                return themeColorConfig.customAccentRGBA.color
+            }
+        }
+        return adaptivePalette.accent
+    }
     
     /// 更新自适应调色板
     func updateAdaptivePalette() {
@@ -274,9 +315,11 @@ class ThemeManager {
             self.cardTintColorHex = savedCardTint
         }
         
-        // Load opacity, default to 1.0 if not set (register defaults would be better, but this works)
+        // 图片不透明度：强制默认100%，如果未设置则使用默认值1.0
         if UserDefaults.standard.object(forKey: "theme_background_opacity") != nil {
             self.backgroundOpacity = UserDefaults.standard.double(forKey: "theme_background_opacity")
+        } else {
+            self.backgroundOpacity = 1.0
         }
         
         self.isBlurEnabled = UserDefaults.standard.bool(forKey: "theme_is_blur_enabled")
@@ -409,10 +452,10 @@ class ThemeManager {
             self.cardTintColorHex = savedCardTint
         }
         
-        self.backgroundOpacity = UserDefaults.standard.double(forKey: "theme_background_opacity")
-        // Handle case where opacity might be 0.0 if key missing, but default logic in init handled it. 
-        // Here we just trust UserDefaults which was just restored.
-        if self.backgroundOpacity == 0.0 && UserDefaults.standard.object(forKey: "theme_background_opacity") == nil {
+        // 图片不透明度：强制默认100%，如果未设置则使用默认值1.0
+        if UserDefaults.standard.object(forKey: "theme_background_opacity") != nil {
+            self.backgroundOpacity = UserDefaults.standard.double(forKey: "theme_background_opacity")
+        } else {
             self.backgroundOpacity = 1.0
         }
         

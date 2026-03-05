@@ -923,16 +923,16 @@ struct DreamDressCalendarViewWithBackButtonLegacy: View {
     @Binding var destination: SmallWorldDestination
 
     var body: some View {
-        DreamDressCalendarView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: { destination = .menu }
-                    )
-                }
-            }
+        // 将返回按钮传入DreamDressCalendarView内部显示，解决导航栏嵌套问题
+        DreamDressCalendarView(
+            backButton: AnyView(
+                SmallWorldBackButtonLegacy(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    onBackToMenu: { destination = .menu }
+                )
+            )
+        )
     }
 }
 
@@ -1308,20 +1308,18 @@ struct DreamDressCalendarViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
-    
+
     var body: some View {
-        DreamDressCalendarView()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
-                        selectedTab: $selectedTab,
-                        homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
-                    )
-                }
-            }
+        // 将返回按钮传入DreamDressCalendarView内部显示，解决导航栏嵌套问题
+        DreamDressCalendarView(
+            backButton: AnyView(
+                SmallWorldBackButton(
+                    selectedTab: $selectedTab,
+                    homeTab: $homeTab,
+                    onBackToMenu: { destination = .menu }
+                )
+            )
+        )
     }
 }
 

@@ -14,20 +14,27 @@ struct DreamDressCalendarView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(CalendarThemeManager.self) private var themeManager
     @Environment(ThemeManager.self) private var appThemeManager
-    
+
     // Data Query
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
-    
+
     // AppStorage for persisting filter preference
     // 首次使用默认为 true，之后完全记录用户的选择习惯
     @AppStorage("calendarShowDepositPlanOnly") private var showDepositPlanOnly: Bool = true
-    
+
     // State
     @State private var viewMode: CalendarViewMode = .monthly
     @State private var currentDate = Date() // Anchor date for Month/Year view
     @State private var showingDayPopup: Date? // Date for the popup
     @State private var showingMonthPreview: Date? // Month for the large preview popup
     @State private var viewModel = CalendarViewModel()
+
+    // 用于从外部传入返回按钮，解决iOS 18-25下导航栏嵌套问题
+    var backButton: AnyView?
+
+    init(backButton: AnyView? = nil) {
+        self.backButton = backButton
+    }
 
     var body: some View {
         NavigationStack {
@@ -89,7 +96,7 @@ struct DreamDressCalendarView: View {
                     .zIndex(110)
                 }
             }
-            .applyNavigationConfig(viewMode: $viewMode, showFilter: $showDepositPlanOnly, themeManager: themeManager)
+            .applyNavigationConfig(viewMode: $viewMode, showFilter: $showDepositPlanOnly, themeManager: themeManager, backButton: backButton)
             .task {
                 await updateData()
             }
@@ -109,52 +116,34 @@ struct DreamDressCalendarView: View {
     }
     
     // MARK: - Legacy Header for < iOS 26
+    // 在iOS 18-25下，导航栏显示返回按钮和筛选按钮，这里只显示模式选择器
     private var headerView: some View {
-        ZStack {
-            // Center: Picker
-            HStack {
-                Spacer()
-                
-                // Custom Segmented Control for older versions
-                HStack(spacing: 0) {
-                    ForEach(CalendarViewMode.allCases) { mode in
-                        Text(mode.rawValue)
-                            .font(.custom(themeManager.currentTheme.fontName, size: 14))
-                            .fontWeight(viewMode == mode ? .bold : .regular)
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 16)
-                            .background(viewMode == mode ? Color(uiColor: themeManager.currentTheme.accentColor) : Color.clear)
-                            .foregroundStyle(viewMode == mode ? .white : Color(uiColor: themeManager.currentTheme.accentColor))
-                            .clipShape(Capsule())
-                            .onTapGesture {
-                                withAnimation {
-                                    viewMode = mode
-                                }
+        HStack {
+            Spacer()
+
+            // Custom Segmented Control for older versions
+            HStack(spacing: 0) {
+                ForEach(CalendarViewMode.allCases) { mode in
+                    Text(mode.rawValue)
+                        .font(.custom(themeManager.currentTheme.fontName, size: 14))
+                        .fontWeight(viewMode == mode ? .bold : .regular)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 16)
+                        .background(viewMode == mode ? Color(uiColor: themeManager.currentTheme.accentColor) : Color.clear)
+                        .foregroundStyle(viewMode == mode ? .white : Color(uiColor: themeManager.currentTheme.accentColor))
+                        .clipShape(Capsule())
+                        .onTapGesture {
+                            withAnimation {
+                                viewMode = mode
                             }
-                    }
-                }
-                .padding(4)
-                .background(Color(uiColor: themeManager.currentTheme.accentColor).opacity(0.1))
-                .clipShape(Capsule())
-                
-                Spacer()
-            }
-            
-            // Right: Filter Button
-            HStack {
-                Spacer()
-                
-                Button {
-                    withAnimation {
-                        showDepositPlanOnly.toggle()
-                    }
-                } label: {
-                    Image(systemName: showDepositPlanOnly ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        .font(.title2)
-                        .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
-                        .padding(.trailing, 8)
+                        }
                 }
             }
+            .padding(4)
+            .background(Color(uiColor: themeManager.currentTheme.accentColor).opacity(0.1))
+            .clipShape(Capsule())
+
+            Spacer()
         }
         .padding()
     }
@@ -163,7 +152,12 @@ struct DreamDressCalendarView: View {
 // MARK: - Navigation Config Helper
 extension View {
     @ViewBuilder
-    func applyNavigationConfig(viewMode: Binding<CalendarViewMode>, showFilter: Binding<Bool>, themeManager: CalendarThemeManager) -> some View {
+    func applyNavigationConfig(
+        viewMode: Binding<CalendarViewMode>,
+        showFilter: Binding<Bool>,
+        themeManager: CalendarThemeManager,
+        backButton: AnyView? = nil
+    ) -> some View {
         if #available(iOS 26.0, *) {
             self
                 .navigationBarHidden(false)
@@ -178,7 +172,7 @@ extension View {
                         .pickerStyle(.segmented)
                         .frame(width: 240)
                     }
-                    
+
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Toggle(isOn: Binding(
@@ -198,7 +192,37 @@ extension View {
                     }
                 }
         } else {
-            self.navigationBarHidden(true)
+            // iOS 18-25: 显示导航栏，添加返回按钮和筛选按钮
+            self
+                .navigationBarHidden(false)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    // 返回按钮（如果有）
+                    if let backButton = backButton {
+                        ToolbarItem(placement: .topBarLeading) {
+                            backButton
+                        }
+                    }
+
+                    // 筛选按钮
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Toggle(isOn: Binding(
+                                get: { showFilter.wrappedValue },
+                                set: { newValue in
+                                    withAnimation {
+                                        showFilter.wrappedValue = newValue
+                                    }
+                                }
+                            )) {
+                                Label("只看尾款天使", systemImage: "star")
+                            }
+                        } label: {
+                            Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                        }
+                    }
+                }
         }
     }
 }

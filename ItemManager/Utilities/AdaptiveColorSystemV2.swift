@@ -41,9 +41,9 @@ struct ThemeColorConfig: Codable {
     // 是否跟随系统暗夜模式
     var followSystemDarkMode: Bool
     
-    // 默认配置
+    // 默认配置 - 客制化配色作为默认模式
     static let `default` = ThemeColorConfig(
-        colorSchemeMode: .magic,
+        colorSchemeMode: .custom,
         customPrimaryRGBA: ColorRGBA.black,
         customSecondaryRGBA: ColorRGBA.gray,
         customTertiaryRGBA: ColorRGBA.lightGray,

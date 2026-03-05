@@ -22,7 +22,6 @@ struct WardrobeSettingsView: View {
         AdaptiveSettingsView(title: "梦幻衣橱") {
             // MARK: - 外观个性化
             appAppearanceSection(theme: theme)
-            skirtCardAppearanceSection(theme: theme)
             
             // MARK: - 隐私显示
             AdaptiveSection(header: "隐私显示", footer: "关闭后，衣柜列表将不再显示对应的价格信息。") {
@@ -75,19 +74,6 @@ struct WardrobeSettingsView: View {
     
     // MARK: - Subviews & Actions
     
-    private func skirtFillColor(theme: ThemeManager) -> Color {
-        switch theme.skirtFillMode {
-        case .transparent:
-            return colorScheme == .dark ? Color.black.opacity(0.2) : Color.white.opacity(0.4)
-        case .fullyTransparent:
-            return Color.clear
-        case .tinted:
-            return colorScheme == .dark ? theme.cardTintColor.opacity(0.15) : theme.cardTintColor.opacity(0.3)
-        case .solid:
-            return colorScheme == .dark ? Color.black.opacity(0.6) : Color.white.opacity(0.8)
-        }
-    }
-    
     @ViewBuilder
     private func appAppearanceSection(theme: ThemeManager) -> some View {
         @Bindable var theme = theme
@@ -120,94 +106,16 @@ struct WardrobeSettingsView: View {
             
             Toggle("启用高斯模糊", isOn: $theme.isBlurEnabled)
                 .adaptiveRow(showDivider: false)
+            
+            // 跳转到魔法配色设置
+            NavigationLink(destination: MagicColorSettingsView()) {
+                Label("字体配色与卡片样式", systemImage: "paintpalette")
+            }
+            .adaptiveRow(showDivider: false)
         }
     }
 
-    @ViewBuilder
-    private func skirtCardAppearanceSection(theme: ThemeManager) -> some View {
-        @Bindable var theme = theme
-        
-        // 实时预览区域
-        HStack {
-            Spacer()
-            VStack(spacing: 8) {
-                ZStack {
-                    VStack(alignment: .leading, spacing: 8) {
-                        // 模拟图片区域，应用填充模式
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(skirtFillColor(theme: theme))
-                            
-                            Image(systemName: "tshirt")
-                                .font(.system(size: 30))
-                                .foregroundStyle(.gray.opacity(0.5))
-                        }
-                        .frame(height: 80)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 80, height: 12)
-                            
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.pink.opacity(0.3))
-                                .frame(width: 60, height: 12)
-                        }
-                    }
-                    .padding(10)
-                    .background(CardBackgroundView())
-                    .frame(width: 140, height: 150)
-                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
-                }
-                .padding()
-                .background(
-                    ZStack {
-                        if theme.backgroundStyle == .image, let image = theme.backgroundImage {
-                                Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                        } else {
-                            theme.backgroundColor
-                        }
-                    }
-                    .frame(width: 180, height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
-                )
-                
-                Text("实时预览")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.vertical) // Instead of listRowBackground
-        
-        AdaptiveSection(header: "裙子卡片外观") {
-            Picker("卡片样式", selection: $theme.cardStyle) {
-                ForEach(CardStyle.allCases) { style in
-                    Text(style.displayName).tag(style)
-                }
-            }
-            .pickerStyle(.segmented)
-            .adaptiveRow()
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("裙子卡片填充方式")
-                    .font(.caption).foregroundStyle(.secondary)
-                Picker("", selection: $theme.skirtFillMode) {
-                    ForEach(SkirtFillMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-            .adaptiveRow(showDivider: theme.cardStyle != .solid && theme.cardStyle != .fullyTransparent)
-            
-            // 高级卡片样式调整
-            advancedCardSettings(theme: theme)
-        }
-    }
+
     
     @ViewBuilder
     private func imageSelectionRow(theme: ThemeManager) -> some View {
@@ -254,36 +162,6 @@ struct WardrobeSettingsView: View {
             .frame(maxWidth: .infinity)
         }
         .disabled(isLoadingImage)
-    }
-    
-    @ViewBuilder
-    private func advancedCardSettings(theme: ThemeManager) -> some View {
-        @Bindable var theme = theme
-        if theme.cardStyle != .solid && theme.cardStyle != .fullyTransparent {
-            if theme.cardStyle == .transparent {
-                VStack(alignment: .leading) {
-                    Text("卡片不透明度: \(Int(theme.transparentOpacity * 100))%")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Slider(value: $theme.transparentOpacity, in: 0...1.0)
-                }
-                .adaptiveRow(showDivider: theme.cardStyle == .tinted)
-            } else {
-                VStack(alignment: .leading) {
-                    Text("卡片色调浓度: \(Int(theme.tintOpacity * 100))%")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Slider(value: $theme.tintOpacity, in: 0.1...0.8)
-                }
-                .adaptiveRow(showDivider: theme.cardStyle == .tinted)
-            }
-            
-            if theme.cardStyle == .tinted {
-                ColorPicker("色调颜色", selection: Binding(
-                    get: { theme.cardTintColor },
-                    set: { theme.cardTintColorHex = $0.toHex() }
-                ))
-                .adaptiveRow(showDivider: false)
-            }
-        }
     }
     
     private func handleImageSelection(_ newItem: PhotosPickerItem?) {

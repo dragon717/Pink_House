@@ -380,9 +380,32 @@ struct BatchImportView: View {
             }
             
             await MainActor.run {
+                // 保存所有更改
+                do {
+                    try modelContext.save()
+                    
+                    // 更新衣物数量缓存，用于魔法任务进度实时显示
+                    updateClothingCountCache()
+                } catch {
+                    print("BatchImportView: Failed to save context: \(error)")
+                }
+                
                 isProcessing = false
                 dismiss()
             }
+        }
+    }
+    
+    /// 更新衣物数量缓存，用于魔法任务进度实时显示
+    private func updateClothingCountCache() {
+        do {
+            // 只统计未删除的衣物，与魔法任务进度检查保持一致
+            let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.isDeleted == false })
+            let count = try modelContext.fetchCount(descriptor)
+            FeatureUnlockManager.shared.updateClothingCount(count)
+            print("👗 批量导入后衣物数量缓存已更新: \(count)")
+        } catch {
+            print("❌ 批量导入后更新衣物数量缓存失败: \(error)")
         }
     }
 }

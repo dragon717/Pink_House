@@ -510,10 +510,10 @@ struct WardrobeView: View {
                             .frame(maxWidth: .infinity)
                         }
                         .disabled(selectedItemIDs.isEmpty)
-                        
+
                         Divider()
                             .frame(height: 20)
-                        
+
                         // Add Tags
                         Button {
                             tempSelectedTags = []
@@ -527,10 +527,10 @@ struct WardrobeView: View {
                             .frame(maxWidth: .infinity)
                         }
                         .disabled(selectedItemIDs.isEmpty)
-                        
+
                         Divider()
                             .frame(height: 20)
-                        
+
                         // Group to Brand
                         Button {
                             tempSelectedBrand = nil
@@ -544,10 +544,10 @@ struct WardrobeView: View {
                             .frame(maxWidth: .infinity)
                         }
                         .disabled(selectedItemIDs.isEmpty)
-                        
+
                         Divider()
                             .frame(height: 20)
-                        
+
                         // Select All
                         Button {
                             toggleSelectAll()
@@ -562,6 +562,12 @@ struct WardrobeView: View {
                         .disabled(filteredClothings.isEmpty)
                     }
                     .padding()
+                    // iOS 18 及以下需要额外底部padding避开TabBar，iOS 19+ 不需要
+                    .padding(.bottom, {
+                        let version = UIDevice.current.systemVersion
+                        let majorVersion = Int(version.split(separator: ".").first ?? "0") ?? 0
+                        return majorVersion <= 18 ? 60 : 0
+                    }())
                     .background(.regularMaterial)
                 }
             }
@@ -709,6 +715,9 @@ struct WardrobeView: View {
 
             // 记录删除到 DeleteTracker，防止iCloud同步覆盖
             DeleteTracker.shared.recordDeletedClothing(id: item.id)
+            
+            // 更新衣物数量缓存，用于魔法任务进度实时显示
+            updateClothingCountCache()
         } catch {
             print("WardrobeView: Failed to save deletion: \(error)")
         }
@@ -762,7 +771,13 @@ struct WardrobeView: View {
         newItem.imagePaths = newImagePaths
         
         modelContext.insert(newItem)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            // 更新衣物数量缓存，用于魔法任务进度实时显示
+            updateClothingCountCache()
+        } catch {
+            print("WardrobeView: Failed to save copied item: \(error)")
+        }
         itemToCopy = nil
     }
     
@@ -799,6 +814,18 @@ struct WardrobeView: View {
             clothing.sortIndex = index
         }
         try? modelContext.save()
+    }
+    
+    /// 更新衣物数量缓存，用于魔法任务进度实时显示
+    private func updateClothingCountCache() {
+        do {
+            let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.isDeleted == false })
+            let count = try modelContext.fetchCount(descriptor)
+            FeatureUnlockManager.shared.updateClothingCount(count)
+            print("👗 衣物数量缓存已更新: \(count)")
+        } catch {
+            print("❌ 更新衣物数量缓存失败: \(error)")
+        }
     }
     
     // MARK: - Auto Scroll Logic

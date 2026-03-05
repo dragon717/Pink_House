@@ -12,6 +12,8 @@ import Foundation
 struct ClothingListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     // Filter out deleted items at the query level
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }, sort: \Clothing.createdAt, order: .reverse) private var clothings: [Clothing]
@@ -171,7 +173,14 @@ struct ClothingListView: View {
         }
     }
     
-    @ViewBuilder
+    // 获取容器配色
+    private var containerPalette: AdaptivePaletteV2 {
+        themeManager.getPaletteForContainer(
+            containerBackground: .ultraThinMaterial,
+            colorScheme: colorScheme
+        )
+    }
+    
     private var content: some View {
         ZStack {
             LiquidBackground()
@@ -179,211 +188,50 @@ struct ClothingListView: View {
             Group {
                 switch viewLayout {
                 case .listBrief:
-                    List {
-                        ForEach(filteredClothings) { clothing in
-                            NavigationLink {
-                                ClothingDetailView(clothing: clothing)
-                            } label: {
-                                ClothingRowBrief(clothing: clothing)
-                                    .padding(.vertical, 4)
-                            }
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    itemToDelete = clothing
-                                    showingDeleteAlert = true
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                                
-                                Button {
-                                    duplicateItem(clothing)
-                                } label: {
-                                    Label("复制", systemImage: "doc.on.doc")
-                                }
-                                .tint(.blue)
-                            }
-                            .contextMenu {
-                                Button {
-                                    duplicateItem(clothing)
-                                } label: {
-                                    Label("复制", systemImage: "doc.on.doc")
-                                }
-                                
-                                Button(role: .destructive) {
-                                    itemToDelete = clothing
-                                    showingDeleteAlert = true
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                    .listStyle(.insetGrouped)
-                    
+                    contentList
                 case .listDetailed:
-                    List {
-                        ForEach(filteredClothings) { clothing in
-                            Group {
-                                ClothingRow(clothing: clothing)
-                            }
-                            .background(
-                                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                    EmptyView()
-                                }
-                                .opacity(0)
-                            )
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    itemToDelete = clothing
-                                    showingDeleteAlert = true
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                                
-                                Button {
-                                    duplicateItem(clothing)
-                                } label: {
-                                    Label("复制", systemImage: "doc.on.doc")
-                                }
-                                .tint(.blue)
-                            }
-                            .contextMenu {
-                                Button {
-                                    duplicateItem(clothing)
-                                } label: {
-                                    Label("复制", systemImage: "doc.on.doc")
-                                }
-                                
-                                Button(role: .destructive) {
-                                    itemToDelete = clothing
-                                    showingDeleteAlert = true
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
-                    
-                case .grid2, .grid3:
-                    ScrollView {
-                        LazyVGrid(columns: gridColumns, spacing: 16) {
-                            ForEach(filteredClothings) { clothing in
-                                NavigationLink {
-                                    ClothingDetailView(clothing: clothing)
-                                } label: {
-                                    ClothingCard(clothing: clothing)
-                                        .contextMenu {
-                                            Button {
-                                                duplicateItem(clothing)
-                                            } label: {
-                                                Label("复制", systemImage: "doc.on.doc")
-                                            }
-                                            
-                                            Button(role: .destructive) {
-                                                itemToDelete = clothing
-                                                showingDeleteAlert = true
-                                            } label: {
-                                                Label("删除", systemImage: "trash")
-                                            }
-                                        }
-                                }
-                            }
-                        }
-                        .padding()
-                    }
-                    
-                case .grid6:
-                    ScrollView {
-                        LazyVGrid(columns: gridColumns, spacing: 2) {
-                            ForEach(filteredClothings) { clothing in
-                                NavigationLink {
-                                    ClothingDetailView(clothing: clothing)
-                                } label: {
-                                    ClothingThumbnail(clothing: clothing)
-                                        .contextMenu {
-                                            Button {
-                                                duplicateItem(clothing)
-                                            } label: {
-                                                Label("复制", systemImage: "doc.on.doc")
-                                            }
-                                            
-                                            Button(role: .destructive) {
-                                                itemToDelete = clothing
-                                                showingDeleteAlert = true
-                                            } label: {
-                                                Label("删除", systemImage: "trash")
-                                            }
-                                        }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 2)
-                    }
-            }
-            }
-            .scrollContentBackground(.hidden)
-            .searchable(text: $searchText, prompt: "衣橱里搜索名称、品牌、标签、属性...")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 12) {
-                        // 3D模型筛选按钮
-                        Button {
-                            showOnly3DModels.toggle()
-                        } label: {
-                            Label("3D模型", systemImage: "cube.box")
-                                .symbolVariant(showOnly3DModels ? .fill : .none)
-                        }
-                        .foregroundStyle(showOnly3DModels ? .purple : .primary)
-                        
-                        Menu {
-                            Picker("布局", selection: $viewLayout) {
-                                ForEach(ViewLayout.allCases) { layout in
-                                    Label(layout.rawValue, systemImage: layout.icon)
-                                        .tag(layout)
-                                }
-                            }
-                        } label: {
-                            Label("布局", systemImage: viewLayout.icon)
-                        }
-                        
-                        ClothingFilterMenu(
-                            clothings: clothings,
-                            tags: tags,
-                            brands: brands,
-                            selectedTagIDs: $selectedTagIDs,
-                            selectedBrandIDs: $selectedBrandIDs,
-                            selectedTypes: $selectedTypes,
-                            selectedColors: $selectedColors,
-                            selectedSizes: $selectedSizes,
-                            selectedLengths: $selectedLengths,
-                            selectedConditions: $selectedConditions,
-                            selectedAccessories: $selectedAccessories
-                        )
-                        
-                        Menu {
-                            Button {
-                                showingAddSheet = true
-                            } label: {
-                                Label("手动添加", systemImage: "plus")
-                            }
-                            
-                            Button {
-                                showingBatchImportSheet = true
-                            } label: {
-                                Label("批量导入", systemImage: "square.and.arrow.down.on.square")
-                            }
-                        } label: {
-                            Label("新增", systemImage: "plus")
-                        }
-                    }
+                    contentList
+                case .grid2, .grid3, .grid6:
+                    gridContent
                 }
             }
         }
+    }
+    
+    // 列表内容 - 应用容器配色
+    private var contentList: some View {
+        List {
+            ForEach(filteredClothings) { clothing in
+                NavigationLink {
+                    ClothingDetailView(clothing: clothing)
+                } label: {
+                    ClothingRowBrief(clothing: clothing)
+                        .padding(.vertical, 4)
+                }
+                .listRowBackground(Color.clear)
+            }
+            .onDelete(perform: deleteClothings)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.containerPalette, containerPalette)
+    }
+    
+    // 网格内容 - 应用容器配色
+    private var gridContent: some View {
+        ScrollView {
+            LazyVGrid(columns: gridColumns, spacing: 16) {
+                ForEach(filteredClothings) { clothing in
+                    NavigationLink {
+                        ClothingDetailView(clothing: clothing)
+                    } label: {
+                        ClothingCard(clothing: clothing)
+                    }
+                }
+            }
+            .padding()
+        }
+        .environment(\.containerPalette, containerPalette)
     }
     
     private func duplicateItem(_ item: Clothing) {
@@ -433,5 +281,49 @@ struct ClothingListView: View {
         
         // Sync widget
         Task { await SharedPersistence.shared.syncWidgetData() }
+        
+        // 更新衣物数量缓存，用于魔法任务进度实时显示
+        updateClothingCountCache()
+    }
+    
+    /// 处理列表滑动删除
+    private func deleteClothings(at offsets: IndexSet) {
+        let itemsToDelete = offsets.map { filteredClothings[$0] }
+        
+        for item in itemsToDelete {
+            NotificationManager.shared.cancelNotification(for: item)
+            
+            // 软删除
+            item.isDeleted = true
+            item.deletedAt = Date()
+            item.lastModified = Date()
+            
+            // 记录删除到 DeleteTracker，防止iCloud同步覆盖
+            DeleteTracker.shared.recordDeletedClothing(id: item.id)
+        }
+        
+        do {
+            try modelContext.save()
+            
+            // Sync widget
+            Task { await SharedPersistence.shared.syncWidgetData() }
+            
+            // 更新衣物数量缓存，用于魔法任务进度实时显示
+            updateClothingCountCache()
+        } catch {
+            print("ClothingListView: Failed to save deletion: \(error)")
+        }
+    }
+    
+    /// 更新衣物数量缓存，用于魔法任务进度实时显示
+    private func updateClothingCountCache() {
+        do {
+            let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.isDeleted == false })
+            let count = try modelContext.fetchCount(descriptor)
+            FeatureUnlockManager.shared.updateClothingCount(count)
+            print("👗 衣物数量缓存已更新: \(count)")
+        } catch {
+            print("❌ 更新衣物数量缓存失败: \(error)")
+        }
     }
 }

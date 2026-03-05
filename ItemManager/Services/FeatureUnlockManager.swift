@@ -125,7 +125,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .dataBackup: return "数据备份"
         case .cloudSync: return "iCloud同步"
         case .batchImport: return "批量导入"
-        case .themeCustomize: return "主题定制"
+        case .themeCustomize: return "魔法配色"
         case .widgetCustomize: return "小组件定制"
         case .aiAnalysis: return "AI智能分析"
         }
@@ -670,10 +670,11 @@ final class FeatureUnlockManager: ObservableObject {
         print("✅ 魔法任务进度刷新完成")
     }
     
-    /// 从数据库获取衣物数量
+    /// 从数据库获取衣物数量（排除已删除的）
     private func fetchClothingCount(from context: ModelContext) -> Int {
         do {
-            let descriptor = FetchDescriptor<Clothing>()
+            // 只统计未删除的衣物
+            let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.isDeleted == false })
             let count = try context.fetchCount(descriptor)
             return count
         } catch {
