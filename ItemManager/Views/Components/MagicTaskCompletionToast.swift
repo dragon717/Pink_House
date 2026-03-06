@@ -7,6 +7,7 @@ struct MagicTaskCompletion: Identifiable, Equatable {
     let feature: FeatureItem
     let timestamp: Date
     var isRead: Bool = false
+    var isUnlockable: Bool = false // 是否为"可解锁"状态（未达到解锁，只是满足条件）
     
     static func == (lhs: MagicTaskCompletion, rhs: MagicTaskCompletion) -> Bool {
         lhs.id == rhs.id
@@ -37,11 +38,14 @@ final class MagicTaskCompletionManager: ObservableObject {
     /// 添加一个新的任务完成提示
     /// 新的任务添加到列表末尾（显示在最上面）
     func addCompletion(feature: FeatureItem) {
-        // 检查是否已存在相同的未读任务
-        let exists = completions.contains { $0.feature == feature && !$0.isRead }
+        // 检查是否已存在相同的未读任务（包括可解锁状态）
+        let exists = completions.contains { $0.feature == feature && !$0.isRead && !$0.isUnlockable }
         guard !exists else { return }
         
-        let completion = MagicTaskCompletion(feature: feature, timestamp: Date())
+        // 如果存在可解锁状态的提示，移除它（因为现在已经解锁了）
+        completions.removeAll { $0.feature == feature && $0.isUnlockable }
+        
+        let completion = MagicTaskCompletion(feature: feature, timestamp: Date(), isUnlockable: false)
         
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             // 添加到列表末尾（新的在后面，显示时在最上面）
@@ -55,6 +59,34 @@ final class MagicTaskCompletionManager: ObservableObject {
         
         // 播放提示音效和震动
         HapticEngineManager.shared.playFireworksHaptic()
+    }
+    
+    // MARK: - 添加可解锁提示
+    /// 添加一个"可解锁"状态提示（当进度达到但未解锁时）
+    func addUnlockable(feature: FeatureItem) {
+        // 检查是否已存在相同的未读可解锁任务
+        let exists = completions.contains { $0.feature == feature && !$0.isRead && $0.isUnlockable }
+        guard !exists else { return }
+        
+        // 检查是否已存在解锁完成的提示
+        let unlockedExists = completions.contains { $0.feature == feature && !$0.isRead && !$0.isUnlockable }
+        guard !unlockedExists else { return }
+        
+        let completion = MagicTaskCompletion(feature: feature, timestamp: Date(), isUnlockable: true)
+        
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            // 添加到列表末尾（新的在后面，显示时在最上面）
+            completions.append(completion)
+            
+            // 限制存储数量
+            if completions.count > maxStoredCount {
+                completions.removeFirst(completions.count - maxStoredCount)
+            }
+        }
+        
+        // 播放轻微的提示音效和震动
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
     }
     
     // MARK: - 移除任务完成
@@ -192,8 +224,8 @@ struct MagicTaskCompletionCard: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color.pink.opacity(0.4),
-                                    Color.pink.opacity(0.0)
+                                    (completion.isUnlockable ? Color.orange : Color.pink).opacity(0.4),
+                                    (completion.isUnlockable ? Color.orange : Color.pink).opacity(0.0)
                                 ],
                                 center: .center,
                                 startRadius: 5,
@@ -207,7 +239,10 @@ struct MagicTaskCompletionCard: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [
+                                colors: completion.isUnlockable ? [
+                                    Color.orange.opacity(0.3),
+                                    Color.yellow.opacity(0.2)
+                                ] : [
                                     Color.pink.opacity(0.3),
                                     Color.purple.opacity(0.2)
                                 ],
@@ -222,7 +257,7 @@ struct MagicTaskCompletionCard: View {
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.pink, .purple],
+                                colors: completion.isUnlockable ? [.orange, .yellow] : [.pink, .purple],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -232,9 +267,9 @@ struct MagicTaskCompletionCard: View {
                 
                 // 文字内容
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("✨ 任务完成！")
+                    Text(completion.isUnlockable ? "🔓 可解锁" : "✨ 任务完成！")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.pink)
+                        .foregroundColor(completion.isUnlockable ? .orange : .pink)
                     
                     Text(completion.feature.displayName)
                         .font(.system(size: 15, weight: .semibold))
@@ -272,7 +307,10 @@ struct MagicTaskCompletionCard: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
-                            colors: [
+                            colors: completion.isUnlockable ? [
+                                Color.orange.opacity(0.3 - Double(index) * 0.05),
+                                Color.yellow.opacity(0.2 - Double(index) * 0.03)
+                            ] : [
                                 Color.pink.opacity(0.3 - Double(index) * 0.05),
                                 Color.purple.opacity(0.2 - Double(index) * 0.03)
                             ],

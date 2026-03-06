@@ -45,11 +45,7 @@ struct DreamDressCalendarView: View {
                 
                 VStack(spacing: 0) {
                     // 1. Header with Mode Switcher
-                    if #available(iOS 26.0, *) {
-                        // Native Navigation Bar handles this
-                    } else {
-                        headerView
-                    }
+                    // iOS 18+: 页签选择器都在导航栏的 principal 位置显示
                     
                     // 2. Main Content
                     TabView(selection: $viewMode) {
@@ -145,7 +141,9 @@ struct DreamDressCalendarView: View {
 
             Spacer()
         }
-        .padding()
+        // 减少顶部padding，让页签更靠近导航栏
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
 }
 
@@ -192,7 +190,7 @@ extension View {
                     }
                 }
         } else {
-            // iOS 18-25: 显示导航栏，添加返回按钮和筛选按钮
+            // iOS 18-25: 显示导航栏，添加返回按钮、页签选择器和筛选按钮
             self
                 .navigationBarHidden(false)
                 .navigationBarTitleDisplayMode(.inline)
@@ -202,6 +200,17 @@ extension View {
                         ToolbarItem(placement: .topBarLeading) {
                             backButton
                         }
+                    }
+
+                    // 页签选择器（中间）
+                    ToolbarItem(placement: .principal) {
+                        Picker("视图模式", selection: viewMode) {
+                            ForEach(CalendarViewMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 240)
                     }
 
                     // 筛选按钮

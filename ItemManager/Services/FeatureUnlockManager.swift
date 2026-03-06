@@ -599,7 +599,31 @@ final class FeatureUnlockManager: ObservableObject {
     
     /// 更新衣物数量缓存
     func updateClothingCount(_ count: Int) {
+        // 检查更新前是否有满足条件的任务
+        let previouslyUnlockableFeatures = getUnlockableFeatures()
+        
         UserDefaults.standard.set(count, forKey: "clothingCount_cache")
+        
+        // 更新后再次检查，找出新达到可解锁状态的任务
+        let currentlyUnlockableFeatures = getUnlockableFeatures()
+        let newlyUnlockableFeatures = currentlyUnlockableFeatures.filter { !previouslyUnlockableFeatures.contains($0) }
+        
+        // 显示可解锁提示
+        for feature in newlyUnlockableFeatures {
+            print("🔓 新达到可解锁状态: \(feature.displayName)")
+            DispatchQueue.main.async {
+                MagicTaskCompletionManager.shared.addUnlockable(feature: feature)
+            }
+        }
+    }
+    
+    /// 获取当前可解锁的功能列表（满足条件但未解锁）
+    func getUnlockableFeatures() -> [FeatureItem] {
+        return getLockableFeatures().filter { feature in
+            guard !isUnlocked(feature) else { return false }
+            let check = checkUnlockCondition(feature)
+            return check.met
+        }
     }
     
     /// 更新登录天数
