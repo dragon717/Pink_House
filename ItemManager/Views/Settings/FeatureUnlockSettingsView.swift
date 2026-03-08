@@ -4,17 +4,25 @@ import SwiftData
 // MARK: - 功能解锁管理设置页面
 struct FeatureUnlockSettingsView: View {
     @StateObject private var manager = FeatureUnlockManager.shared
+    @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var showUnlockConfirmation = false
     @State private var showLockConfirmation = false
     @State private var selectedFeature: FeatureItem?
     @State private var showUnlockAlert = false
     @State private var unlockMessage = ""
-    
+
     var body: some View {
         NavigationStack {
-            featureManagementView
+            ZStack {
+                // 背景
+                LiquidBackground()
+                    .ignoresSafeArea()
+
+                // 内容
+                featureManagementView
+            }
             .navigationTitle("功能管理")
             .navigationBarTitleDisplayMode(.inline)
             .alert("解锁确认", isPresented: $showUnlockConfirmation) {
@@ -58,7 +66,7 @@ struct FeatureUnlockSettingsView: View {
                 let accessibleFeatures = manager.getAccessibleFeatures()
                 if accessibleFeatures.isEmpty {
                     Text("暂无已解锁的功能")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                         .font(.caption)
                 } else {
                     ForEach(accessibleFeatures) { feature in
@@ -75,19 +83,20 @@ struct FeatureUnlockSettingsView: View {
             } header: {
                 HStack {
                     Text("已解锁且显示")
+                        .foregroundColor(themeManager.primaryTextColor)
                     Spacer()
                     Text("\(manager.getAccessibleFeatures().count) 个")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                 }
             }
-            
+
             // 已解锁但不显示的功能
             Section {
                 let unlockedHiddenFeatures = manager.getUnlockedFeatures().filter { !manager.isVisible($0) }
                 if unlockedHiddenFeatures.isEmpty {
                     Text("暂无隐藏的功能")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                         .font(.caption)
                 } else {
                     ForEach(unlockedHiddenFeatures) { feature in
@@ -104,19 +113,20 @@ struct FeatureUnlockSettingsView: View {
             } header: {
                 HStack {
                     Text("已解锁但隐藏")
+                        .foregroundColor(themeManager.primaryTextColor)
                     Spacer()
                     Text("\(manager.getUnlockedFeatures().filter { !manager.isVisible($0) }.count) 个")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                 }
             }
-            
+
             // 未解锁的功能
             Section {
                 let lockedFeatures = FeatureItem.allCases.filter { !manager.isUnlocked($0) }
                 if lockedFeatures.isEmpty {
                     Text("所有功能已解锁")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                         .font(.caption)
                 } else {
                     ForEach(lockedFeatures) { feature in
@@ -132,13 +142,15 @@ struct FeatureUnlockSettingsView: View {
             } header: {
                 HStack {
                     Text("未解锁")
+                        .foregroundColor(themeManager.primaryTextColor)
                     Spacer()
                     Text("\(FeatureItem.allCases.filter { !manager.isUnlocked($0) }.count) 个")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
     }
     
     private func unlockFeature(_ feature: FeatureItem) {
@@ -164,31 +176,33 @@ struct AccessibleFeatureRow: View {
     let feature: FeatureItem
     let onHide: () -> Void
     let onLock: () -> Void
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         HStack {
             Image(systemName: feature.icon)
                 .frame(width: 24)
-                .foregroundColor(.pink)
-            
+                .foregroundColor(themeManager.accentTextColor)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(feature.displayName)
                     .font(.system(size: 16))
-                
+                    .foregroundColor(themeManager.primaryTextColor)
+
                 Text("已解锁 · 显示中")
                     .font(.caption)
-                    .foregroundColor(.green)
+                    .foregroundColor(themeManager.accentTextColor)
             }
-            
+
             Spacer()
-            
+
             Menu {
                 Button {
                     onHide()
                 } label: {
                     Label("隐藏", systemImage: "eye.slash")
                 }
-                
+
                 Button(role: .destructive) {
                     onLock()
                 } label: {
@@ -196,7 +210,7 @@ struct AccessibleFeatureRow: View {
                 }
             } label: {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+                    .foregroundColor(themeManager.accentTextColor)
                     .font(.title3)
             }
         }
@@ -209,32 +223,33 @@ struct HiddenFeatureRow: View {
     let feature: FeatureItem
     let onShow: () -> Void
     let onLock: () -> Void
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         HStack {
             Image(systemName: feature.icon)
                 .frame(width: 24)
-                .foregroundColor(.gray)
-            
+                .foregroundColor(themeManager.secondaryTextColor)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(feature.displayName)
                     .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-                
+                    .foregroundColor(themeManager.secondaryTextColor)
+
                 Text("已解锁 · 已隐藏")
                     .font(.caption)
-                    .foregroundColor(.orange)
+                    .foregroundColor(themeManager.tertiaryTextColor)
             }
-            
+
             Spacer()
-            
+
             Menu {
                 Button {
                     onShow()
                 } label: {
                     Label("显示", systemImage: "eye")
                 }
-                
+
                 Button(role: .destructive) {
                     onLock()
                 } label: {
@@ -242,7 +257,7 @@ struct HiddenFeatureRow: View {
                 }
             } label: {
                 Image(systemName: "eye.slash.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(themeManager.tertiaryTextColor)
                     .font(.title3)
             }
         }
@@ -254,30 +269,31 @@ struct HiddenFeatureRow: View {
 struct LockedFeatureRow: View {
     let feature: FeatureItem
     let onUnlock: () -> Void
-    
+
     @StateObject private var manager = FeatureUnlockManager.shared
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         HStack {
             Image(systemName: feature.icon)
                 .frame(width: 24)
-                .foregroundColor(.gray)
-            
+                .foregroundColor(themeManager.secondaryTextColor)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(feature.displayName)
                     .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-                
+                    .foregroundColor(themeManager.secondaryTextColor)
+
                 let condition = manager.getCondition(for: feature)
                 Text(condition.description)
                     .font(.caption)
-                    .foregroundColor(.orange)
+                    .foregroundColor(themeManager.tertiaryTextColor)
             }
-            
+
             Spacer()
-            
+
             let check = manager.checkUnlockCondition(feature)
-            
+
             if check.met {
                 Button {
                     onUnlock()
@@ -288,12 +304,12 @@ struct LockedFeatureRow: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.pink)
+                        .background(themeManager.accentTextColor)
                         .cornerRadius(12)
                 }
             } else {
                 Image(systemName: "lock.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(themeManager.tertiaryTextColor)
                     .font(.title3)
             }
         }
@@ -304,13 +320,14 @@ struct LockedFeatureRow: View {
 // MARK: - 状态徽章
 struct StatusBadge: View {
     let feature: FeatureItem
-    
+
     @StateObject private var manager = FeatureUnlockManager.shared
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         let isUnlocked = manager.isUnlocked(feature)
         let isVisible = manager.isVisible(feature)
-        
+
         HStack(spacing: 6) {
             if isUnlocked && isVisible {
                 Image(systemName: "checkmark.circle.fill")
@@ -325,11 +342,11 @@ struct StatusBadge: View {
         }
         .font(.caption)
         .fontWeight(.medium)
-        .foregroundColor(isUnlocked ? (isVisible ? .green : .orange) : .gray)
+        .foregroundColor(isUnlocked ? (isVisible ? themeManager.accentTextColor : themeManager.tertiaryTextColor) : themeManager.secondaryTextColor)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(
-            (isUnlocked ? (isVisible ? Color.green : Color.orange) : Color.gray)
+            (isUnlocked ? (isVisible ? themeManager.accentTextColor : themeManager.tertiaryTextColor) : themeManager.secondaryTextColor)
                 .opacity(0.15)
         )
         .cornerRadius(12)

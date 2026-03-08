@@ -12,6 +12,8 @@ struct ClothingDetailView: View {
     @Bindable var clothing: Clothing
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showingEditSheet = false
     @State private var showingImageViewer = false
     @State private var showingDeleteAlert = false
@@ -19,10 +21,18 @@ struct ClothingDetailView: View {
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
     @State private var showingShareSheet = false
-    
+
     @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = false
-    
+
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+    @ObservedObject private var networkManager = NetworkSettingsManager.shared
+    
+    private var containerPalette: AdaptivePaletteV2 {
+        themeManager.getPaletteForContainer(
+            containerBackground: .ultraThinMaterial,
+            colorScheme: colorScheme
+        )
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -30,6 +40,7 @@ struct ClothingDetailView: View {
                 // Background
                 LiquidBackground()
                     .ignoresSafeArea()
+                    .environment(\.containerPalette, containerPalette)
                 
                 ScrollView {
                     VStack(spacing: 16) {
@@ -94,27 +105,29 @@ struct ClothingDetailView: View {
                 }
                 .ignoresSafeArea(edges: .top)
                 
-                // MARK: - FAB
-                VStack {
-                    Spacer()
-                    HStack {
+                // MARK: - FAB (社区按钮：跟随联网设置显示/隐藏)
+                if networkManager.canShowNetworkUI() {
+                    VStack {
                         Spacer()
-                        Button {
-                            // Action for Community/Square
-                        } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "bubble.left.and.bubble.right")
-                                    .font(.title2)
-                                Text("社区")
-                                    .font(.caption2)
+                        HStack {
+                            Spacer()
+                            Button {
+                                // Action for Community/Square
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "bubble.left.and.bubble.right")
+                                        .font(.title2)
+                                    Text("社区")
+                                        .font(.caption2)
+                                }
+                                .foregroundStyle(.white)
+                                .frame(width: 60, height: 60)
+                                .background(Circle().fill(Color.black.opacity(0.6)))
+                                .shadow(radius: 4)
                             }
-                            .foregroundStyle(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Circle().fill(Color.black.opacity(0.6)))
-                            .shadow(radius: 4)
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 20)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20)
                     }
                 }
                 
@@ -382,22 +395,37 @@ struct ClothingDetailView: View {
     
     // customNavBar removed
     
+    /// 主信息卡片 - 使用统一配色
     private var mainInfoCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(clothing.name)
-                    .font(.title2)
-                    .bold()
+                // 裙子名称支持长按拷贝
+                CopyableText(
+                    text: clothing.name,
+                    font: .title2,
+                    foregroundStyle: themeManager.primaryTextColor,
+                    alignment: .leading
+                )
+                .bold()
                 Spacer()
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.right.circle.fill")
-                    Text("追根溯源") // This could be dynamic based on status
+
+                // 追根溯源按钮：跟随联网设置显示/隐藏
+                if networkManager.canShowNetworkUI() {
+                    Button {
+                        // 追根溯源操作
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.right.circle.fill")
+                            Text("追根溯源")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.brown))
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .font(.caption)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.brown))
             }
             
             if let tags = clothing.tags, !tags.isEmpty {
@@ -410,6 +438,7 @@ struct ClothingDetailView: View {
                                     .frame(width: 6, height: 6)
                                 Text(tag.name)
                                     .font(.caption)
+                                    .unifiedSecondary()
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -421,6 +450,7 @@ struct ClothingDetailView: View {
             }
             
             Divider()
+                .background(themeManager.tertiaryTextColor.opacity(0.3))
             
             HStack {
                 if let brand = clothing.brand {
@@ -441,12 +471,17 @@ struct ClothingDetailView: View {
                                     .foregroundStyle(.white)
                             )
                     }
-                    Text(brand.name)
-                        .font(.subheadline)
+                    // 品牌名称支持长按拷贝
+                    CopyableText(
+                        text: brand.name,
+                        font: .subheadline,
+                        foregroundStyle: themeManager.secondaryTextColor,
+                        alignment: .leading
+                    )
                 } else {
                     Text("暂无品牌信息")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .unifiedTertiary()
                 }
                 
                 if clothing.isDepositPlan {
@@ -457,10 +492,10 @@ struct ClothingDetailView: View {
                             .font(.caption)
                             .bold()
                     }
-                    .foregroundStyle(.pink)
+                    .unifiedAccent()
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.pink.opacity(0.1))
+                    .background(themeManager.accentTextColor.opacity(0.1))
                     .cornerRadius(12)
                 }
                 
@@ -468,16 +503,16 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
+        .unifiedShadow(.card)
     }
     
+    /// 详细信息卡片 - 使用统一配色
     private var detailInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("裙子信息", systemImage: "info.circle.fill")
                 .font(.headline)
-                .foregroundStyle(.brown)
+                .unifiedPrimary()
             
             ForEach(visibilityManager.fieldOrder, id: \.self) { field in
                 if visibilityManager.isVisible(field) {
@@ -486,9 +521,8 @@ struct ClothingDetailView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
+        .unifiedShadow(.card)
     }
     
     @ViewBuilder
@@ -509,11 +543,12 @@ struct ClothingDetailView: View {
         }
     }
     
+    /// 价格信息卡片 - 使用统一配色
     private var priceInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("价格信息", systemImage: "yensign.circle.fill")
                 .font(.headline)
-                .foregroundStyle(.brown)
+                .unifiedPrimary()
             
             if clothing.isDepositPlan {
                 // Show total deposit/balance including accessories
@@ -521,6 +556,7 @@ struct ClothingDetailView: View {
                 InfoRow(label: "总尾款", value: "¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                 
                 Divider()
+                    .background(themeManager.tertiaryTextColor.opacity(0.3))
                 
                 // Show Breakdown for Dress
                 InfoRow(label: "裙子定金", value: "¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0))))")
@@ -540,21 +576,25 @@ struct ClothingDetailView: View {
             
             if let items = clothing.accessoryItems, !items.isEmpty {
                 Divider()
+                    .background(themeManager.tertiaryTextColor.opacity(0.3))
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("小物明细")
+                            .unifiedPrimary()
                         Spacer()
                         Text("小物总价: ¥\(items.reduce(Decimal(0)) { $0 + $1.price }.formatted(.number.precision(.fractionLength(0...2))))")
+                            .unifiedSecondary()
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
                     
                     ForEach(items.sorted(by: { $0.sortIndex < $1.sortIndex })) { item in
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
                                 Text(item.name.isEmpty ? "未命名小物" : item.name)
+                                    .unifiedPrimary()
                                 Spacer()
                                 Text("¥\(NSDecimalNumber(decimal: item.price).doubleValue.formatted(.number.precision(.fractionLength(0...2))))")
+                                    .unifiedSecondary()
                             }
                             
                             // Show deposit/balance for accessory if it exists
@@ -562,14 +602,15 @@ struct ClothingDetailView: View {
                                 HStack {
                                     if item.deposit > 0 {
                                         Text("定金: ¥\(item.deposit.formatted(.number.precision(.fractionLength(0...2))))")
+                                            .unifiedTertiary()
                                     }
                                     if item.balance > 0 {
                                         Text("尾款: ¥\(item.balance.formatted(.number.precision(.fractionLength(0...2))))")
+                                            .unifiedTertiary()
                                     }
                                     Spacer()
                                 }
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
                             }
                         }
                         .font(.subheadline)
@@ -580,7 +621,7 @@ struct ClothingDetailView: View {
             HStack {
                 Label("合计金额", systemImage: "star.circle.fill")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .unifiedSecondary()
                 Spacer()
                 
                 let totalUnit = clothing.price + clothing.accessoriesPrice
@@ -589,30 +630,30 @@ struct ClothingDetailView: View {
                 Text("¥\(totalAll.formatted(.number.precision(.fractionLength(0))))")
                     .font(.title3)
                     .bold()
-                    .foregroundStyle(.brown)
+                    .unifiedAccent()
             }
             .padding(12)
-            .background(Color(uiColor: .secondarySystemBackground))
+            .background(themeManager.secondaryTextColor.opacity(0.1))
             .cornerRadius(12)
             
             if clothing.stock > 1 {
                 Text("包含 \(clothing.stock) 件库存，单套价值 ¥\((clothing.price + clothing.accessoriesPrice).formatted(.number.precision(.fractionLength(0))))")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .unifiedTertiary()
                     .padding(.horizontal, 4)
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
+        .unifiedShadow(.card)
     }
     
+    /// 购买信息卡片 - 使用统一配色
     private var purchaseInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("购买信息", systemImage: "bag.fill")
                 .font(.headline)
-                .foregroundStyle(.brown)
+                .unifiedPrimary()
             
             InfoRow(label: "购买日期", value: clothing.purchaseDate.formatted(.dateTime.year().month().day().locale(Locale(identifier: "zh_CN"))))
             
@@ -642,16 +683,20 @@ struct ClothingDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("备注")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(clothing.note)
-                        .font(.body)
+                        .unifiedSecondary()
+                    // 备注也支持长按拷贝
+                    CopyableText(
+                        text: clothing.note,
+                        font: .body,
+                        foregroundStyle: themeManager.primaryTextColor,
+                        alignment: .leading
+                    )
                 }
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
+        .unifiedShadow(.card)
     }
     
     private func formatFinalPaymentDate(start: Date, end: Date?) -> String {
@@ -670,7 +715,9 @@ struct ClothingDetailView: View {
     }
 }
 
+/// 信息行组件 - 使用统一配色
 struct InfoRow: View {
+    @Environment(ThemeManager.self) private var themeManager
     let label: String
     let value: String
     
@@ -678,19 +725,24 @@ struct InfoRow: View {
         HStack {
             Image(systemName: iconForLabel(label))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(themeManager.tertiaryTextColor)
                 .frame(width: 20)
             
             Text(label)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(themeManager.secondaryTextColor)
             
             Spacer()
             
-            Text(value)
-                .font(.subheadline)
-                .foregroundStyle(.primary)
+            // 使用 CopyableText 支持长按拷贝字段值
+            CopyableText(
+                text: value,
+                font: .subheadline,
+                foregroundStyle: themeManager.primaryTextColor,
+                alignment: .trailing
+            )
         }
+        .contentShape(Rectangle())
     }
     
     private func iconForLabel(_ label: String) -> String {

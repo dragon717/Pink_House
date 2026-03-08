@@ -275,9 +275,16 @@ struct RococoSmallWorldView: View {
     private func navigate(to destination: SmallWorldDestination) {
         // 检查功能是否已解锁
         if destination.canAccess {
-            // 已解锁，正常导航
-            tabNavigationManager.markNavigatingInsideSmallWorld()
-            self.destination = destination
+            // 特殊处理：尾款天使和衣橱需要跳转到 Tab 0 (衣橱Tab)
+            if destination == .depositPlan {
+                tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
+            } else if destination == .wardrobe {
+                tabNavigationManager.navigate(to: .wardrobe(.wardrobe))
+            } else {
+                // 已解锁，正常导航到House内部页面
+                tabNavigationManager.markNavigatingInsideSmallWorld()
+                self.destination = destination
+            }
         } else {
             // 未解锁，显示提示
             lockedDestination = destination

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct iCloudStatusCard: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var cloudManager: CloudSyncManager
     @ObservedObject var authManager: AuthenticationManager
     let action: () -> Void
@@ -38,11 +40,11 @@ struct iCloudStatusCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("iCloud 同步")
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(themeManager.primaryTextColor)
                     
                     Text(statusText)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
@@ -50,17 +52,50 @@ struct iCloudStatusCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .aspectRatio(1.0, contentMode: .fill)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-            )
+            .background(cardBackground)
+            .overlay(cardOverlay)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    // MARK: - 卡片背景（适配主题色）
+    private var cardBackground: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return Group {
+            switch themeManager.cardStyle {
+            case .solid:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardColors.backgroundRGBA.color)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .transparent:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardColors.backgroundRGBA.color.opacity(themeManager.transparentOpacity))
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .fullyTransparent:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardColors.backgroundRGBA.color.opacity(0.3))
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .tinted:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+                    )
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            }
+        }
+    }
+    
+    // MARK: - 卡片边框（适配主题色）
+    private var cardOverlay: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return RoundedRectangle(cornerRadius: 20)
+            .stroke(cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2), lineWidth: 1)
     }
     
     private var iconColor: Color {

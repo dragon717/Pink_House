@@ -402,21 +402,25 @@ struct PetHomeView: View {
                 print("🐱 PetHomeView.onAppear: 已切换到萌宠页面")
             
             // 监听媒体停止通知（当切换到其他页面时）
+            // 注意：背景音乐的状态保存和停止已经在 MediaStateManager.stopAllMedia() 中处理
+            // 这里使用不保存的方法停止，避免覆盖用户的持久化设置
             NotificationCenter.default.publisher(for: .petMediaShouldStop)
                 .sink { [weak audioManager, weak hapticManager] _ in
-                    audioManager?.isBackgroundMusicEnabled = false
+                    audioManager?.stopBackgroundMusicWithoutSaving()
                     audioManager?.isInteractionEnabled = false
                     hapticManager?.stopHaptics()
                 }
                 .store(in: &cancellables)
             
             // 监听媒体启动通知（当切换回萌宠页面时）
-                NotificationCenter.default.publisher(for: .petMediaShouldStart)
-                    .sink { [weak audioManager] _ in
-                        audioManager?.isBackgroundMusicEnabled = true
-                        // 注意：萌宠页面的震动由具体交互触发，这里不需要自动启动
-                    }
-                    .store(in: &cancellables)
+            // 注意：背景音乐的状态恢复已经在 MediaStateManager.startPetMedia() 中处理
+            // 这里不需要再设置，避免覆盖用户的持久化设置
+            NotificationCenter.default.publisher(for: .petMediaShouldStart)
+                .sink { _ in
+                    // 背景音乐状态已由 MediaStateManager 恢复，这里仅处理其他媒体启动逻辑
+                    // 注意：萌宠页面的震动由具体交互触发，这里不需要自动启动
+                }
+                .store(in: &cancellables)
         }
         .onDisappear {
             viewModel.onViewDisappear()

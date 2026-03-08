@@ -34,6 +34,46 @@ struct MeView: View {
         #endif
     }
     
+    // MARK: - 魔法任务卡片背景（适配主题色）
+    private var magicTaskCardBackground: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return Group {
+            switch themeManager.cardStyle {
+            case .solid:
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(cardColors.backgroundRGBA.color)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .transparent:
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(cardColors.backgroundRGBA.color.opacity(themeManager.transparentOpacity))
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .fullyTransparent:
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(cardColors.backgroundRGBA.color.opacity(0.3))
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .tinted:
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+                    )
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            }
+        }
+    }
+    
+    // MARK: - 魔法任务卡片边框（适配主题色）
+    private var magicTaskCardOverlay: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return RoundedRectangle(cornerRadius: 16)
+            .stroke(cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2), lineWidth: 1)
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -55,24 +95,21 @@ struct MeView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("魔法任务")
                                     .font(.headline)
-                                    .foregroundColor(.primary)
+                                    .foregroundStyle(themeManager.primaryTextColor)
                                 Text("完成任务解锁更多功能")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(themeManager.secondaryTextColor)
                             }
 
                             Spacer()
 
                             Image(systemName: "chevron.right")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-                        )
+                        .background(magicTaskCardBackground)
+                        .overlay(magicTaskCardOverlay)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.horizontal)
@@ -121,16 +158,24 @@ struct MeView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
-                        
+
+                        // 联网设置
+                        NavigationLink(destination: NetworkSettingsView()) {
+                            SettingsGridItem(
+                                title: "联网设置",
+                                subtitle: "社区 · 分享 · 追根溯源",
+                                icon: "network",
+                                iconColor: .cyan
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
                         // 彩蛋设置
                         EasterEggSettingsCard()
-                        
+
                         // 马上来财设置
                         WealthHapticsSettingsCard()
-                        
-                        // 梦裙日历
-                        CalendarSettingsCard()
-                        
+
                         // 魔法配色
                         NavigationLink(destination: MagicColorSettingsView()) {
                             SettingsGridItem(

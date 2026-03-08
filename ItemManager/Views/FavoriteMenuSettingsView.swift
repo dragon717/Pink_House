@@ -2,6 +2,8 @@ import SwiftUI
 
 struct FavoriteMenuSettingsView: View {
     @StateObject private var settingsManager = FavoriteMenuSettingsManager.shared
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
     @State private var showMaxItemsAlert = false
@@ -9,7 +11,7 @@ struct FavoriteMenuSettingsView: View {
     // 所有可选功能
     private let allItems = FavoriteMenuItem.allCases
     private let maxItems = 5
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -22,6 +24,15 @@ struct FavoriteMenuSettingsView: View {
                     Section {
                         ForEach(selectedAndUnlockedItems) { item in
                             SelectedItemRow(item: item, isEditing: isEditing)
+                                .listRowBackground(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
+                                        )
+                                        .padding(.vertical, 4)
+                                )
                         }
                         .onMove { from, to in
                             settingsManager.reorderItems(from: from, to: to)
@@ -34,8 +45,10 @@ struct FavoriteMenuSettingsView: View {
                         }
                     } header: {
                         Text("已选中的常用功能（左滑删除，最多 \(maxItems) 个）")
+                            .foregroundColor(themeManager.secondaryTextColor)
                     } footer: {
                         Text("长按House Tab 按钮，常用分类将显示这些功能")
+                            .foregroundColor(themeManager.secondaryTextColor)
                     }
 
                     // 可选功能列表
@@ -52,11 +65,22 @@ struct FavoriteMenuSettingsView: View {
                                     settingsManager.addItem(item)
                                 }
                             }
+                            .listRowBackground(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
+                                    )
+                                    .padding(.vertical, 4)
+                            )
                         }
                     } header: {
                         Text("可选功能")
+                            .foregroundColor(themeManager.secondaryTextColor)
                     } footer: {
                         Text("最多可选择 \(maxItems) 个常用功能")
+                            .foregroundColor(themeManager.secondaryTextColor)
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -69,6 +93,7 @@ struct FavoriteMenuSettingsView: View {
                                 isEditing.toggle()
                             }
                         }
+                        .foregroundColor(themeManager.accentTextColor)
                     }
                 }
                 .alert("常用菜单已满", isPresented: $showMaxItemsAlert) {
@@ -97,7 +122,8 @@ struct FavoriteMenuSettingsView: View {
 private struct SelectedItemRow: View {
     let item: FavoriteMenuItem
     let isEditing: Bool
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         HStack {
             Image(systemName: item.icon)
@@ -106,19 +132,21 @@ private struct SelectedItemRow: View {
                 .frame(width: 36, height: 36)
                 .background(Color(hex: item.color).opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-            
+
             Text(item.rawValue)
                 .font(.body)
-            
+                .foregroundColor(themeManager.primaryTextColor)
+
             Spacer()
-            
+
             // 只在编辑模式下显示汉堡键
             if isEditing {
                 Image(systemName: "line.3.horizontal")
-                    .foregroundColor(.gray)
+                    .foregroundColor(themeManager.secondaryTextColor)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
     }
 }
 
@@ -128,28 +156,30 @@ private struct AvailableItemRow: View {
     let isSelected: Bool
     let isDisabled: Bool
     let action: () -> Void
+    @Environment(ThemeManager.self) private var themeManager
 
     var body: some View {
         Button(action: action) {
             HStack {
                 Image(systemName: item.icon)
                     .font(.title3)
-                    .foregroundColor(isDisabled ? .gray : Color(hex: item.color))
+                    .foregroundColor(isDisabled ? themeManager.secondaryTextColor : Color(hex: item.color))
                     .frame(width: 36, height: 36)
-                    .background((isDisabled ? Color.gray : Color(hex: item.color)).opacity(0.15))
+                    .background((isDisabled ? themeManager.secondaryTextColor : Color(hex: item.color)).opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 Text(item.rawValue)
                     .font(.body)
-                    .foregroundColor(isDisabled ? .gray : .primary)
+                    .foregroundColor(isDisabled ? themeManager.secondaryTextColor : themeManager.primaryTextColor)
 
                 Spacer()
 
                 Image(systemName: isDisabled ? "plus.circle" : "plus.circle.fill")
                     .font(.title3)
-                    .foregroundColor(isDisabled ? .gray : .pink)
+                    .foregroundColor(isDisabled ? themeManager.secondaryTextColor : themeManager.accentTextColor)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
         }
         .buttonStyle(PlainButtonStyle())
     }

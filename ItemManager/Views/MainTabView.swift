@@ -149,7 +149,11 @@ struct ModernTabView: View {
             // 只有萌宠功能已解锁时才显示悬浮宠物
             if FeatureUnlockManager.shared.isUnlocked(.pet) {
                 PetOverlayView(action: {
-                    smallWorldDestination = .pet
+                    // 修复：点击悬浮小猫时同时切换到 House Tab 并设置目的地为萌宠
+                    withAnimation {
+                        selectedTab = 1
+                        smallWorldDestination = .pet
+                    }
                 }, petName: petDataManager.status.displayName)
             }
             // 修复：使用正确的 Binding 传递 selectedTab
@@ -457,7 +461,11 @@ struct LegacyTabView: View {
             // 只有萌宠功能已解锁时才显示悬浮宠物
             if FeatureUnlockManager.shared.isUnlocked(.pet) {
                 PetOverlayView(action: {
-                    smallWorldDestination = .pet
+                    // 修复：点击悬浮小猫时同时切换到 House Tab 并设置目的地为萌宠
+                    withAnimation {
+                        selectedTab = 1
+                        smallWorldDestination = .pet
+                    }
                 }, petName: petDataManager.status.displayName)
             }
             SmallWorldMenuOverlay(
@@ -586,7 +594,12 @@ struct LegacyTabView: View {
 
         return Button {
             withAnimation(.easeInOut(duration: 0.2)) {
-                selectedTab = index
+                // 修复：如果已经在 House Tab (index=1) 且当前不在 menu 页面，则返回到 menu
+                if index == 1 && selectedTab == 1 && smallWorldDestination != .menu {
+                    smallWorldDestination = .menu
+                } else {
+                    selectedTab = index
+                }
             }
         } label: {
             VStack(spacing: 4) {
@@ -923,16 +936,17 @@ struct DreamDressCalendarViewWithBackButtonLegacy: View {
     @Binding var destination: SmallWorldDestination
 
     var body: some View {
-        // 将返回按钮传入DreamDressCalendarView内部显示，解决导航栏嵌套问题
-        DreamDressCalendarView(
-            backButton: AnyView(
-                SmallWorldBackButtonLegacy(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    onBackToMenu: { destination = .menu }
-                )
-            )
-        )
+        // 使用toolbar添加返回按钮，与其他视图保持一致
+        DreamDressCalendarView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButtonLegacy(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
     }
 }
 
@@ -1310,16 +1324,17 @@ struct DreamDressCalendarViewWithBackButton: View {
     @Binding var destination: SmallWorldDestination
 
     var body: some View {
-        // 将返回按钮传入DreamDressCalendarView内部显示，解决导航栏嵌套问题
-        DreamDressCalendarView(
-            backButton: AnyView(
-                SmallWorldBackButton(
-                    selectedTab: $selectedTab,
-                    homeTab: $homeTab,
-                    onBackToMenu: { destination = .menu }
-                )
-            )
-        )
+        // 使用toolbar添加返回按钮，与其他视图保持一致
+        DreamDressCalendarView()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    SmallWorldBackButton(
+                        selectedTab: $selectedTab,
+                        homeTab: $homeTab,
+                        onBackToMenu: { destination = .menu }
+                    )
+                }
+            }
     }
 }
 

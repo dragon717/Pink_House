@@ -17,6 +17,8 @@ struct BookOpeningAnimationView: View {
     
     // 书页图片缓存
     @State private var pageImages: [UIImage?] = Array(repeating: nil, count: 6)
+    // 封面图片缓存 - 确保使用最新数据
+    @State private var coverImage: UIImage? = nil
     
     // 配置参数
     private let bookWidth: CGFloat = 200
@@ -35,7 +37,7 @@ struct BookOpeningAnimationView: View {
             // 3D 书本容器
             ZStack {
                 // 1. 封底 (固定不动，或者稍微调整角度)
-                BookCover(book: book, width: bookWidth, height: bookHeight, color: coverColor)
+                BookCover(book: book, width: bookWidth, height: bookHeight, color: coverColor, image: coverImage)
                 
                 // 2. 书页 (多层)
                 ForEach(0..<6) { index in
@@ -52,7 +54,7 @@ struct BookOpeningAnimationView: View {
                 }
                 
                 // 3. 封面
-                BookCover(book: book, width: bookWidth, height: bookHeight, color: coverColor, isFront: true)
+                BookCover(book: book, width: bookWidth, height: bookHeight, color: coverColor, isFront: true, image: coverImage)
                     .rotation3DEffect(
                         .degrees(isOpening ? -180 : 0),
                         axis: (x: 0.0, y: 1.0, z: 0.0),
@@ -87,6 +89,16 @@ struct BookOpeningAnimationView: View {
         )
         
         let validPages = (try? modelContext.fetch(descriptor)) ?? []
+        
+        // 加载封面图片 - 优先使用用户设置的封面，否则使用第一页的快照
+        if let coverPath = book.coverImage,
+           let image = ImageManager.shared.loadImage(fileName: coverPath) {
+            coverImage = image
+        } else if let firstPage = validPages.first,
+                  let snapshotPath = firstPage.snapshotPath,
+                  let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
+            coverImage = image
+        }
         
         // 如果没有书页，直接返回
         if validPages.isEmpty { return }
@@ -143,12 +155,12 @@ struct BookCover: View {
     let height: CGFloat
     let color: Color
     var isFront: Bool = false
+    var image: UIImage? = nil
     
     var body: some View {
         ZStack {
-            // Base Cover
-            if let coverPath = book.coverImage,
-               let image = ImageManager.shared.loadImage(fileName: coverPath) {
+            // Base Cover - 优先使用传入的图片，确保实时更新
+            if let image = image {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()

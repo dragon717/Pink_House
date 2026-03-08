@@ -80,21 +80,20 @@ final class MediaStateManager: ObservableObject {
     /// 停止所有媒体
     private func stopAllMedia() {
         print("🛑 MediaStateManager: 停止所有媒体")
-        
-        // 停止萌宠媒体
-        let bgmWasEnabled = AudioManager.shared.isBackgroundMusicEnabled
-        AudioManager.shared.isBackgroundMusicEnabled = false
+
+        // 停止萌宠媒体（使用不保存的方法，避免覆盖用户的持久化设置）
+        AudioManager.shared.stopBackgroundMusicWithoutSaving()
         AudioManager.shared.isInteractionEnabled = false
-        print("🎵 萌宠背景音乐已停止 (之前状态: \(bgmWasEnabled))")
-        
+        print("🎵 萌宠背景音乐已停止（不覆盖持久化设置）")
+
         // 停止财富媒体
         SoundManager.shared.stopAllSounds()
         print("🔔 财富音效已停止")
-        
+
         // 停止震动
         HapticEngineManager.shared.stopHaptics()
         print("📳 震动已停止")
-        
+
         // 暂停视频和物理
         isVideoPaused = true
         isPhysicsPaused = true
@@ -143,15 +142,24 @@ final class MediaStateManager: ObservableObject {
             print("⚠️ 萌宠页面不支持视频媒体")
             return
         }
-        
+
         // 恢复视频播放
         isVideoPaused = false
         print("▶️ 视频播放已恢复")
-        
-        // 启动背景音乐
-        AudioManager.shared.isBackgroundMusicEnabled = true
-        print("🎵 萌宠背景音乐已启动: \(AudioManager.shared.isBackgroundMusicEnabled)")
-        
+
+        // 根据用户历史习惯决定是否启动背景音乐
+        // 如果用户曾经手动设置过，则恢复之前的设置；否则默认关闭
+        let audioManager = AudioManager.shared
+        if audioManager.hasUserManuallySetBackgroundMusic {
+            // 用户有历史设置，恢复之前的习惯（使用内部方法避免重复持久化）
+            audioManager.restoreBackgroundMusicFromSavedState()
+            print("🎵 萌宠背景音乐已恢复历史状态")
+        } else {
+            // 首次使用，默认关闭背景音乐
+            audioManager.isBackgroundMusicEnabled = false
+            print("🎵 萌宠背景音乐默认关闭（首次使用）")
+        }
+
         NotificationCenter.default.post(name: .petMediaShouldStart, object: nil)
         print("📢 发送萌宠媒体启动通知")
     }
@@ -160,14 +168,14 @@ final class MediaStateManager: ObservableObject {
     func stopPetMedia() {
         // 暂停视频播放
         isVideoPaused = true
-        
-        // 停止背景音乐
-        AudioManager.shared.isBackgroundMusicEnabled = false
+
+        // 停止背景音乐（使用不保存的方法，避免覆盖用户的持久化设置）
+        AudioManager.shared.stopBackgroundMusicWithoutSaving()
         AudioManager.shared.isInteractionEnabled = false
-        
+
         // 停止震动
         HapticEngineManager.shared.stopHaptics()
-        
+
         NotificationCenter.default.post(name: .petMediaShouldStop, object: nil)
     }
     

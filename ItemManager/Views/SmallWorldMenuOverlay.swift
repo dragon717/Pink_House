@@ -523,13 +523,11 @@ struct SmallWorldMenuOverlay: View {
             withTransaction(transaction) {
                 switch dest {
                 case .wardrobe:
-                    // 跳转到衣橱 Tab
-                    selectedTab = 0
-                    homeTab = .wardrobe
+                    // 使用 TabNavigationManager 跳转到衣橱 Tab
+                    tabNavigationManager.navigate(to: .wardrobe(.wardrobe))
                 case .depositPlan:
-                    // 跳转到尾款天使 Tab
-                    selectedTab = 0
-                    homeTab = .depositPlan
+                    // 使用 TabNavigationManager 跳转到尾款天使 Tab
+                    tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
                 default:
                     // 其他功能在House Tab 内跳转
                     selectedTab = 1

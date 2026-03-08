@@ -110,51 +110,86 @@ struct TestEffectsView: View {
 
 // MARK: - 实验室豆腐块
 struct LabGridItem: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     let module: LabModule
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: module.icon)
                         .font(.title2)
-                        .foregroundStyle(module.iconColor)
+                        .foregroundStyle(themeManager.accentTextColor)
                         .frame(width: 40, height: 40)
-                        .background(module.iconColor.opacity(0.1))
+                        .background(themeManager.accentTextColor.opacity(0.1))
                         .clipShape(Circle())
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(module.rawValue)
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(themeManager.primaryTextColor)
                         .lineLimit(1)
-                    
+
                     Text(module.subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                         .lineLimit(1)
                 }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .aspectRatio(1.0, contentMode: .fill)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-            )
+            .background(cardBackground)
+            .overlay(cardOverlay)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    // MARK: - 卡片背景（适配主题色）
+    private var cardBackground: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return Group {
+            switch themeManager.cardStyle {
+            case .solid:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardColors.backgroundRGBA.color)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .transparent:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardColors.backgroundRGBA.color.opacity(themeManager.transparentOpacity))
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .fullyTransparent:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardColors.backgroundRGBA.color.opacity(0.3))
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            case .tinted:
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+                    )
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+            }
+        }
+    }
+    
+    // MARK: - 卡片边框（适配主题色）
+    private var cardOverlay: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return RoundedRectangle(cornerRadius: 20)
+            .stroke(cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2), lineWidth: 1)
     }
 }
 
@@ -205,20 +240,21 @@ struct EffectsTestView: View {
     @State private var showCelebration = false
     @State private var selectedOption: EffectOption = .random
     @State private var currentEffectToPlay: CelebrationEffect?
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 Text("选择特效类型并预览")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
                     .padding(.top, 20)
-                
+
                 // 特效选择器卡片
                 VStack(alignment: .leading, spacing: 12) {
                     Text("特效类型")
                         .font(.headline)
-                        .foregroundStyle(.primary)
-                    
+                        .foregroundStyle(themeManager.primaryTextColor)
+
                     Picker("特效类型", selection: $selectedOption) {
                         ForEach(EffectOption.allCases) { option in
                             Text(option.rawValue).tag(option)
@@ -230,10 +266,14 @@ struct EffectsTestView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal)
-                
+
                 // 播放按钮
                 Button {
                     if selectedOption == .random {
@@ -251,12 +291,12 @@ struct EffectsTestView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.pink)
+                    .background(themeManager.accentTextColor)
                     .cornerRadius(16)
                 }
                 .padding(.horizontal)
-                .shadow(color: .pink.opacity(0.3), radius: 8, x: 0, y: 4)
-                
+                .shadow(color: themeManager.accentTextColor.opacity(0.3), radius: 8, x: 0, y: 4)
+
                 Spacer(minLength: 100)
             }
         }
@@ -273,8 +313,9 @@ struct EffectsTestView: View {
 // MARK: - VIP 测试子视图
 struct VIPTestView: View {
     @ObservedObject private var vipManager = VIPManager.shared
+    @Environment(ThemeManager.self) private var themeManager
     @State private var showAlert = false
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -282,27 +323,32 @@ struct VIPTestView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 60))
-                        .foregroundStyle(.yellow)
-                    
+                        .foregroundStyle(themeManager.accentTextColor)
+
                     Text(vipManager.isVIP ? "VIP 会员" : "普通用户")
                         .font(.title2)
                         .fontWeight(.bold)
-                    
+                        .foregroundColor(themeManager.primaryTextColor)
+
                     if let expireDate = PetDataManager.shared.status.vipStatus.expireDate {
                         Text("到期时间: \(expireDate.formatted(date: .long, time: .shortened))")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
                 }
                 .padding(30)
                 .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal)
                 .padding(.top, 20)
-                
+
                 // 操作按钮
                 VStack(spacing: 12) {
                     Button {
@@ -313,20 +359,20 @@ struct VIPTestView: View {
                             Text("清除 VIP 时间")
                         }
                         .font(.headline)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.red.opacity(0.1))
+                        .background(themeManager.tertiaryTextColor.opacity(0.1))
                         .cornerRadius(16)
                     }
-                    
+
                     Text("重置为非会员状态，用于测试非 VIP 功能")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal)
-                
+
                 Spacer(minLength: 100)
             }
         }
@@ -348,8 +394,9 @@ struct VIPTestView: View {
 // MARK: - 常用菜单测试子视图
 struct FavoriteMenuTestView: View {
     @ObservedObject private var favoriteMenuManager = FavoriteMenuSettingsManager.shared
+    @Environment(ThemeManager.self) private var themeManager
     @State private var showAlert = false
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -357,8 +404,8 @@ struct FavoriteMenuTestView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("当前常用菜单")
                         .font(.headline)
-                        .foregroundStyle(.primary)
-                    
+                        .foregroundStyle(themeManager.primaryTextColor)
+
                     FlowLayout(spacing: 8) {
                         ForEach(Array(favoriteMenuManager.selectedItems.enumerated()), id: \.offset) { index, item in
                             HStack(spacing: 4) {
@@ -368,8 +415,8 @@ struct FavoriteMenuTestView: View {
                             .font(.caption)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.orange.opacity(0.1))
-                            .foregroundStyle(.orange)
+                            .background(themeManager.accentTextColor.opacity(0.1))
+                            .foregroundStyle(themeManager.accentTextColor)
                             .cornerRadius(12)
                         }
                     }
@@ -377,11 +424,15 @@ struct FavoriteMenuTestView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal)
                 .padding(.top, 20)
-                
+
                 // 操作按钮
                 VStack(spacing: 12) {
                     Button {
@@ -392,20 +443,20 @@ struct FavoriteMenuTestView: View {
                             Text("清除常用菜单历史")
                         }
                         .font(.headline)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.red.opacity(0.1))
+                        .background(themeManager.tertiaryTextColor.opacity(0.1))
                         .cornerRadius(16)
                     }
-                    
+
                     Text("恢复为默认的常用菜单设置")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal)
-                
+
                 Spacer(minLength: 100)
             }
         }
@@ -431,6 +482,7 @@ struct NoticeTestView: View {
     @StateObject private var cloudKitService = NoticeCloudKitService.shared
     @StateObject private var readStatusService = NoticeReadStatusService.shared
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     @State private var showSyncAlert = false
     @State private var syncMessage = ""
     @State private var showReadStatusAlert = false
@@ -442,35 +494,39 @@ struct NoticeTestView: View {
                 VStack(spacing: 8) {
                     Text("当前环境")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
+                        .foregroundStyle(themeManager.secondaryTextColor)
+
                     HStack {
                         Image(systemName: "cloud.fill")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(themeManager.accentTextColor)
                         #if DEBUG
                         Text("Development (调试版)")
                             .font(.caption)
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(themeManager.accentTextColor)
                         #else
                         Text("Production (发布版)")
                             .font(.caption)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(themeManager.accentTextColor)
                         #endif
                     }
-                    
+
                     Text("📢 已读状态: \(readStatusService.isSyncing ? "同步中..." : "已同步")")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                 }
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
-                .background(.ultraThinMaterial)
+                .background(themeManager.cardBackgroundColor.opacity(0.5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+                )
                 .cornerRadius(12)
                 .padding(.horizontal)
                 .padding(.top, 20)
 
                 Text("公告管理功能测试")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
 
                 // 同步状态
                 if service.isSyncing || cloudKitService.isSyncing {
@@ -478,7 +534,7 @@ struct NoticeTestView: View {
                         ProgressView()
                             .padding(.trailing, 8)
                         Text("同步中...")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
                     .padding(.horizontal)
                 }
@@ -493,7 +549,7 @@ struct NoticeTestView: View {
                         icon: "person.badge.key",
                         title: "获取我的 iCloud ID",
                         subtitle: "配置管理员权限时使用",
-                        color: .orange
+                        color: themeManager.accentTextColor
                     )
                 }
                 .padding(.horizontal)
@@ -506,7 +562,7 @@ struct NoticeTestView: View {
                         icon: "gear",
                         title: "管理公告",
                         subtitle: "添加、编辑、删除公告（需管理员权限）",
-                        color: .blue
+                        color: themeManager.accentTextColor
                     )
                 }
                 .padding(.horizontal)
@@ -523,7 +579,7 @@ struct NoticeTestView: View {
                         icon: "arrow.clockwise.icloud",
                         title: "手动同步公告",
                         subtitle: "从云端拉取最新公告",
-                        color: .purple
+                        color: themeManager.accentTextColor
                     )
                 }
                 .disabled(service.isSyncing)
@@ -540,7 +596,7 @@ struct NoticeTestView: View {
                         icon: "arrow.down.icloud",
                         title: "同步已读状态",
                         subtitle: "从 iCloud 同步已读状态",
-                        color: .cyan
+                        color: themeManager.accentTextColor
                     )
                 }
                 .disabled(readStatusService.isSyncing)
@@ -554,7 +610,7 @@ struct NoticeTestView: View {
                         icon: "eye",
                         title: "预览公告弹窗",
                         subtitle: "查看公告展示效果",
-                        color: .green
+                        color: themeManager.accentTextColor
                     )
                 }
                 .padding(.horizontal)
@@ -567,7 +623,7 @@ struct NoticeTestView: View {
                         icon: "arrow.counterclockwise",
                         title: "重置公告展示记录",
                         subtitle: "清除已展示过的记录",
-                        color: .red
+                        color: themeManager.tertiaryTextColor
                     )
                 }
                 .padding(.horizontal)
@@ -576,7 +632,7 @@ struct NoticeTestView: View {
                 if !service.notices.isEmpty {
                     Text("当前有 \(service.notices.count) 条公告")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                         .padding(.top, 8)
                 }
 
@@ -621,36 +677,41 @@ struct LabActionCard: View {
     let title: String
     let subtitle: String
     let color: Color
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(color)
+                .foregroundStyle(themeManager.accentTextColor)
                 .frame(width: 50, height: 50)
-                .background(color.opacity(0.1))
+                .background(themeManager.accentTextColor.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(.primary)
-                
+                    .foregroundStyle(themeManager.primaryTextColor)
+
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
             }
-            
+
             Spacer()
-            
+
             Image(systemName: "chevron.right")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(themeManager.secondaryTextColor)
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+                .fill(themeManager.cardBackgroundColor.opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
         )
     }
 }
@@ -658,9 +719,10 @@ struct LabActionCard: View {
 // MARK: - 魔法任务测试子视图
 struct MagicTasksTestView: View {
     @ObservedObject private var manager = FeatureUnlockManager.shared
+    @Environment(ThemeManager.self) private var themeManager
     @State private var showResetAlert = false
     @State private var showResetAllAlert = false
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -670,34 +732,34 @@ struct MagicTasksTestView: View {
                         VStack(spacing: 4) {
                             Text("\(manager.getUnlockedFeatures().count)")
                                 .font(.system(size: 36, weight: .bold))
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(themeManager.accentTextColor)
                             Text("已解锁")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         .frame(maxWidth: .infinity)
-                        
+
                         Divider()
-                        
+
                         VStack(spacing: 4) {
                             Text("\(manager.getLockableFeatures().count)")
                                 .font(.system(size: 36, weight: .bold))
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
                             Text("待解锁")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         .frame(maxWidth: .infinity)
-                        
+
                         Divider()
-                        
+
                         VStack(spacing: 4) {
                             Text("\(manager.getVisibleFeatures().count)")
                                 .font(.system(size: 36, weight: .bold))
-                                .foregroundStyle(.green)
+                                .foregroundStyle(themeManager.accentTextColor)
                             Text("可见")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -705,18 +767,22 @@ struct MagicTasksTestView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal)
                 .padding(.top, 20)
-                
+
                 // 功能列表
                 VStack(alignment: .leading, spacing: 12) {
                     Text("功能状态")
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(themeManager.primaryTextColor)
                         .padding(.horizontal)
-                    
+
                     LazyVStack(spacing: 8) {
                         ForEach(FeatureItem.allCases) { feature in
                             LabMagicTaskRow(feature: feature)
@@ -724,7 +790,7 @@ struct MagicTasksTestView: View {
                     }
                     .padding(.horizontal)
                 }
-                
+
                 // 操作按钮
                 VStack(spacing: 12) {
                     Button {
@@ -735,21 +801,21 @@ struct MagicTasksTestView: View {
                             Text("重置所有魔法任务")
                         }
                         .font(.headline)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.red.opacity(0.1))
+                        .background(themeManager.tertiaryTextColor.opacity(0.1))
                         .cornerRadius(16)
                     }
-                    
+
                     Text("将所有功能重置为初始状态（仅免费功能保持解锁）")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal)
                 .padding(.top, 20)
-                
+
                 Spacer(minLength: 100)
             }
         }
@@ -786,7 +852,8 @@ struct MagicTasksTestView: View {
 struct LabMagicTaskRow: View {
     let feature: FeatureItem
     @ObservedObject private var manager = FeatureUnlockManager.shared
-    
+    @Environment(ThemeManager.self) private var themeManager
+
     var body: some View {
         HStack {
             Image(systemName: feature.icon)
@@ -795,33 +862,33 @@ struct LabMagicTaskRow: View {
                 .frame(width: 40, height: 40)
                 .background(iconColor.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(feature.displayName)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(.primary)
-                
+                    .foregroundStyle(themeManager.primaryTextColor)
+
                 Text(statusText)
                     .font(.caption)
                     .foregroundStyle(statusColor)
             }
-            
+
             Spacer()
-            
+
             // 状态指示器
             HStack(spacing: 8) {
                 if manager.isUnlocked(feature) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(themeManager.accentTextColor)
                 } else {
                     Image(systemName: "lock.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                 }
-                
+
                 if !manager.isVisible(feature) {
                     Image(systemName: "eye.slash.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(themeManager.secondaryTextColor)
                         .font(.caption)
                 }
             }
@@ -829,20 +896,24 @@ struct LabMagicTaskRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(themeManager.cardBackgroundColor.opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
         )
     }
-    
+
     private var iconColor: Color {
         if manager.canAccess(feature) {
-            return .purple
+            return themeManager.accentTextColor
         } else if manager.isUnlocked(feature) {
-            return .gray
+            return themeManager.secondaryTextColor
         } else {
-            return .orange
+            return themeManager.tertiaryTextColor
         }
     }
-    
+
     private var statusText: String {
         let condition = manager.getCondition(for: feature)
         if manager.isUnlocked(feature) {
@@ -851,12 +922,12 @@ struct LabMagicTaskRow: View {
             return condition.description
         }
     }
-    
+
     private var statusColor: Color {
         if manager.isUnlocked(feature) {
-            return manager.isVisible(feature) ? .green : .secondary
+            return manager.isVisible(feature) ? themeManager.accentTextColor : themeManager.secondaryTextColor
         } else {
-            return .orange
+            return themeManager.tertiaryTextColor
         }
     }
 }
@@ -864,11 +935,12 @@ struct LabMagicTaskRow: View {
 // MARK: - 签到打卡测试子视图
 struct CheckInTestView: View {
     @ObservedObject private var manager = DailyCheckInManager.shared
+    @Environment(ThemeManager.self) private var themeManager
     @State private var showResetAlert = false
     @State private var showAddRecordAlert = false
     @State private var showClearAllAlert = false
     @State private var selectedMakeupDate = Date()
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -876,72 +948,76 @@ struct CheckInTestView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 50))
-                        .foregroundStyle(.red)
-                    
+                        .foregroundStyle(themeManager.accentTextColor)
+
                     HStack(spacing: 30) {
                         VStack(spacing: 4) {
                             Text("\(manager.totalDays)")
                                 .font(.system(size: 36, weight: .bold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(themeManager.primaryTextColor)
                             Text("累计打卡")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
-                        
+
                         VStack(spacing: 4) {
                             Text("\(manager.consecutiveDays)")
                                 .font(.system(size: 36, weight: .bold))
-                                .foregroundStyle(.red)
+                                .foregroundStyle(themeManager.accentTextColor)
                             Text("连续打卡")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                     }
-                    
+
                     if manager.hasCheckedInToday {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
+                                .foregroundStyle(themeManager.accentTextColor)
                             Text("今日已打卡")
                                 .font(.subheadline)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(themeManager.accentTextColor)
                         }
                     } else {
                         HStack {
                             Image(systemName: "circle")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                             Text("今日未打卡")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                     }
                 }
                 .padding(30)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal)
                 .padding(.top, 20)
-                
+
                 // 本周打卡状态
                 VStack(alignment: .leading, spacing: 12) {
                     Text("本周打卡")
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(themeManager.primaryTextColor)
                         .padding(.horizontal)
-                    
+
                     HStack(spacing: 8) {
                         ForEach(0..<7) { index in
                             let dayNames = ["一", "二", "三", "四", "五", "六", "日"]
                             VStack(spacing: 6) {
                                 Text(dayNames[index])
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                
+                                    .foregroundStyle(themeManager.secondaryTextColor)
+
                                 if index < manager.weekCheckIns.count {
                                     Image(systemName: manager.weekCheckIns[index] ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(manager.weekCheckIns[index] ? .green : .secondary.opacity(0.3))
+                                        .foregroundStyle(manager.weekCheckIns[index] ? themeManager.accentTextColor : themeManager.secondaryTextColor.opacity(0.3))
                                         .font(.title3)
                                 }
                             }
@@ -951,11 +1027,15 @@ struct CheckInTestView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(.ultraThinMaterial)
+                            .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
                     )
                     .padding(.horizontal)
                 }
-                
+
                 // 操作按钮
                 VStack(spacing: 12) {
                     Button {
@@ -966,13 +1046,13 @@ struct CheckInTestView: View {
                             Text("重置今日打卡")
                         }
                         .font(.headline)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.orange.opacity(0.1))
+                        .background(themeManager.tertiaryTextColor.opacity(0.1))
                         .cornerRadius(16)
                     }
-                    
+
                     Button {
                         showAddRecordAlert = true
                     } label: {
@@ -981,13 +1061,13 @@ struct CheckInTestView: View {
                             Text("补卡")
                         }
                         .font(.headline)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(themeManager.accentTextColor)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue.opacity(0.1))
+                        .background(themeManager.accentTextColor.opacity(0.1))
                         .cornerRadius(16)
                     }
-                    
+
                     Button {
                         fillThisWeekCheckIns()
                     } label: {
@@ -996,13 +1076,13 @@ struct CheckInTestView: View {
                             Text("补打本周未打卡")
                         }
                         .font(.headline)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(themeManager.accentTextColor)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.green.opacity(0.1))
+                        .background(themeManager.accentTextColor.opacity(0.1))
                         .cornerRadius(16)
                     }
-                    
+
                     Button {
                         showClearAllAlert = true
                     } label: {
@@ -1011,16 +1091,16 @@ struct CheckInTestView: View {
                             Text("清空所有打卡记录")
                         }
                         .font(.headline)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.red.opacity(0.1))
+                        .background(themeManager.tertiaryTextColor.opacity(0.1))
                         .cornerRadius(16)
                     }
                 }
                 .padding(.horizontal)
                 .padding(.top, 10)
-                
+
                 Spacer(minLength: 100)
             }
         }
@@ -1136,7 +1216,10 @@ struct CheckInTestView: View {
             accessories: accessories.randomElement()!,
             weather: nil,
             location: nil,
-            isAIGenerated: true
+            temperature: nil,
+            season: nil,
+            isAIGenerated: true,
+            petName: nil
         )
         
         // 加载现有记录
@@ -1274,6 +1357,7 @@ struct MakeupCheckInSheet: View {
     let checkedInDates: Set<Date>
     let onConfirm: (Date) -> Void
     let onCancel: () -> Void
+    @Environment(ThemeManager.self) private var themeManager
 
     @State private var currentMonth: Date = Date()
 
@@ -1301,6 +1385,7 @@ struct MakeupCheckInSheet: View {
             VStack(spacing: 20) {
                 Text("选择要补卡的日期")
                     .font(.headline)
+                    .foregroundColor(themeManager.primaryTextColor)
                     .padding(.top, 20)
 
                 // 月份导航
@@ -1311,13 +1396,14 @@ struct MakeupCheckInSheet: View {
                         }
                     } label: {
                         Image(systemName: "chevron.left")
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(themeManager.primaryTextColor)
                     }
 
                     Spacer()
 
                     Text(monthYearString)
                         .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(themeManager.primaryTextColor)
 
                     Spacer()
 
@@ -1327,7 +1413,7 @@ struct MakeupCheckInSheet: View {
                         }
                     } label: {
                         Image(systemName: "chevron.right")
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(themeManager.primaryTextColor)
                     }
                     .disabled(isNextMonthDisabled)
                 }
@@ -1339,7 +1425,7 @@ struct MakeupCheckInSheet: View {
                         Text(day)
                             .font(.caption)
                             .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                             .frame(maxWidth: .infinity)
                     }
                 }
@@ -1373,29 +1459,29 @@ struct MakeupCheckInSheet: View {
                 HStack(spacing: 16) {
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(Color.green)
+                            .fill(themeManager.accentTextColor)
                             .frame(width: 8, height: 8)
                         Text("已打卡")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
 
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(Color.blue)
+                            .fill(themeManager.accentTextColor)
                             .frame(width: 8, height: 8)
                         Text("选中")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
 
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(Color.gray.opacity(0.3))
+                            .fill(themeManager.tertiaryTextColor.opacity(0.3))
                             .frame(width: 8, height: 8)
                         Text("不可选")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
                 }
                 .padding(.top, 8)
@@ -1404,10 +1490,10 @@ struct MakeupCheckInSheet: View {
                 if isSelectedDateCheckedIn {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(themeManager.accentTextColor)
                         Text("该日期已打卡，无需补卡")
                             .font(.caption)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(themeManager.accentTextColor)
                     }
                     .padding(.top, 8)
                 }
@@ -1508,6 +1594,7 @@ private struct MakeupDayCell: View {
     let isSelected: Bool
     let isCheckedIn: Bool
     let isEnabled: Bool
+    @Environment(ThemeManager.self) private var themeManager
 
     private let calendar = Calendar.current
 
@@ -1516,10 +1603,10 @@ private struct MakeupDayCell: View {
             // 背景
             if isSelected {
                 Circle()
-                    .fill(Color.blue)
+                    .fill(themeManager.accentTextColor)
             } else if isCheckedIn {
                 Circle()
-                    .fill(Color.green.opacity(0.2))
+                    .fill(themeManager.accentTextColor.opacity(0.2))
             }
 
             // 日期数字
@@ -1531,7 +1618,7 @@ private struct MakeupDayCell: View {
             if isCheckedIn && !isSelected {
                 Image(systemName: "checkmark")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(themeManager.accentTextColor)
                     .offset(x: 8, y: -8)
             }
         }
@@ -1543,9 +1630,9 @@ private struct MakeupDayCell: View {
         if isSelected {
             return .white
         } else if isCheckedIn {
-            return .green
+            return themeManager.accentTextColor
         } else {
-            return .primary
+            return themeManager.primaryTextColor
         }
     }
 }

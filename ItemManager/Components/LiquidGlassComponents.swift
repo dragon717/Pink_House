@@ -82,18 +82,48 @@ struct LiquidBackground: View {
 }
 
 // MARK: - Glass Card
+/// 统一配色的玻璃卡片组件，支持魔法配色和客制化配色
 struct GlassCard<Content: View>: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
     var cornerRadius: CGFloat = 24
+    var padding: CGFloat = 16
     var content: Content
-    
-    init(cornerRadius: CGFloat = 24, @ViewBuilder content: () -> Content) {
+
+    init(cornerRadius: CGFloat = 24, padding: CGFloat = 16, @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
+        self.padding = padding
         self.content = content()
     }
-    
+
+    /// 当前卡片样式（根据 ThemeManager 配置）
+    private var cardStyle: UnifiedColorConfig.CardStyle {
+        UnifiedColorConfig.CardStyle.current(from: themeManager)
+    }
+
     var body: some View {
         ZStack {
-            // Optimization: Use simple color opacity for very low memory devices to save GPU
+            // 根据配置选择背景样式
+            cardBackground
+
+            // 边框（仅非全透明模式下显示）
+            if !isFullyTransparent {
+                cardBorder
+            }
+
+            content
+                .padding(padding)
+        }
+        .unifiedShadow(.card)
+    }
+    
+    /// 卡片背景
+    @ViewBuilder
+    private var cardBackground: some View {
+        switch cardStyle {
+        case .ultraThinMaterial:
+            // 优化：低内存设备使用简单颜色
             if ProcessInfo.processInfo.physicalMemory <= 2 * 1024 * 1024 * 1024 {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(Color(uiColor: .secondarySystemBackground).opacity(0.8))
@@ -102,21 +132,40 @@ struct GlassCard<Content: View>: View {
                     .fill(.ultraThinMaterial)
                     .opacity(0.9)
             }
-            
+        default:
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.6), .white.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-            
-            content
-                .padding()
+                .fill(cardStyle.backgroundColor(colorScheme: colorScheme))
         }
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2) // Reduced shadow radius from 10 to 5
+    }
+    
+    /// 卡片边框
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .stroke(
+                LinearGradient(
+                    colors: borderColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+    }
+    
+    /// 边框颜色（根据配色模式调整）
+    private var borderColors: [Color] {
+        let isDark = colorScheme == .dark
+        return [
+            isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.6),
+            isDark ? Color.white.opacity(0.05) : Color.white.opacity(0.1)
+        ]
+    }
+    
+    /// 是否为全透明模式
+    private var isFullyTransparent: Bool {
+        if case .fullyTransparent = cardStyle {
+            return true
+        }
+        return false
     }
 }
 

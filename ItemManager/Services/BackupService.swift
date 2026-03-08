@@ -59,9 +59,12 @@ class BackupService {
         "theme_background_opacity",
         "theme_is_blur_enabled",
         "theme_card_style",
+        "theme_skirt_fill_mode",
         "theme_transparent_opacity",
         "theme_tint_opacity",
         "theme_card_tint_color",
+        "theme_image_fill_tint_color",      // v1.9+: 图片填充色调颜色
+        "theme_image_fill_tint_opacity",    // v1.9+: 图片填充色调透明度
         "isDepositNotificationEnabled",
         "depositNotificationDaysBefore",
         "depositNotificationDaysList",
@@ -756,7 +759,10 @@ class BackupService {
                             accessories: record.accessories,
                             weather: record.weather,
                             location: record.location,
-                            isAIGenerated: record.isAIGenerated
+                            isAIGenerated: record.isAIGenerated,
+                            temperature: record.temperature,
+                            season: record.season,
+                            petName: record.petName
                         )
                     }
                 }
@@ -779,7 +785,7 @@ class BackupService {
             let themeColorConfig = ThemeManager.shared.themeColorConfig
             
             let manifest = BackupManifest(
-                version: "1.9",
+                formatVersion: BackupFormatVersion.current.rawValue,
                 timestamp: Date(),
                 deviceName: deviceName,
                 brands: brandDTOs,
@@ -2671,7 +2677,10 @@ class BackupService {
                     accessories: dto.accessories,
                     weather: dto.weather,
                     location: dto.location,
-                    isAIGenerated: dto.isAIGenerated
+                    temperature: dto.temperature,
+                    season: dto.season,
+                    isAIGenerated: dto.isAIGenerated,
+                    petName: dto.petName
                 )
             }
             
@@ -2752,7 +2761,7 @@ class BackupService {
         let manifest: BackupManifest
         do {
             manifest = try jsonDecoder.decode(BackupManifest.self, from: manifestData)
-            print("### Import: Manifest decoded successfully. Version: \(manifest.version), Backup Date: \(manifest.timestamp)")
+            print("### Import: Manifest decoded successfully. Format Version: \(manifest.backupVersion.versionString) (raw: \(manifest.formatVersion)), Backup Date: \(manifest.timestamp)")
         } catch let decodingError as DecodingError {
             print("### Import: FAILED to decode manifest - \(decodingError)")
             // 详细的解码错误信息

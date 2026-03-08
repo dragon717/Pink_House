@@ -40,6 +40,8 @@ struct DepositPlanView: View {
     @State private var isAnalyzing: Bool = false
     @State private var showStats = false // 默认隐藏总待付尾款统计
     @State private var showYearStats = false // 默认隐藏年份统计（独立控制）
+    @State private var isMonthSelectorExpanded: Bool = true // 月份选择器展开状态
+    @State private var isSeriesSelectorExpanded: Bool = true // 系列选择器展开状态
     
     @State private var filteredClothings: [Clothing] = []
     @State private var baseClothings: [Clothing] = []
@@ -189,20 +191,29 @@ struct DepositPlanView: View {
     private func updateFilteredClothings() {
         let result = baseClothings.filter { clothing in
             if viewMode == .monthly {
+                // 月份视图
+                if !isMonthSelectorExpanded {
+                    // 面板隐藏时，显示当前月
+                    return isClothingInCurrentMonth(clothing)
+                }
                 if selectedMonths.isEmpty {
+                    // 面板展开且未选中月份：显示全年
                     return true
                 } else {
-                    if let date = clothing.finalPaymentDate {
-                        let month = Calendar.current.component(.month, from: date)
-                        return selectedMonths.contains(month)
-                    }
-                    return false
+                    // 有选中月份时，只显示选中的月份
+                    return isClothingInSelectedMonths(clothing)
                 }
             } else {
                 // Series Mode
+                if !isSeriesSelectorExpanded {
+                    // 面板隐藏时，显示最近添加（一个月内）
+                    return isClothingRecentlyAdded(clothing)
+                }
                 if selectedSeries.isEmpty {
+                    // 面板展开且未选中系列：显示全部系列
                     return true
                 } else {
+                    // 有选中系列时，只显示选中的系列
                     return selectedSeries.contains { seriesPrefix in
                         let sanitizedName = SeriesAnalyzer.shared.sanitize(clothing.name).lowercased()
                         let prefix = seriesPrefix.lowercased()
@@ -214,11 +225,106 @@ struct DepositPlanView: View {
         self.filteredClothings = result
     }
     
+    // 检查商品是否在当前月份
+    private func isClothingInCurrentMonth(_ clothing: Clothing) -> Bool {
+        let calendar = Calendar.current
+        let currentMonthValue = currentMonth
+        
+        if let start = clothing.finalPaymentDate {
+            let month = calendar.component(.month, from: start)
+            if month == currentMonthValue { return true }
+        }
+        if let end = clothing.finalPaymentEndDate {
+            let month = calendar.component(.month, from: end)
+            if month == currentMonthValue { return true }
+        }
+        return false
+    }
+    
+    // 检查商品是否在选中的月份
+    private func isClothingInSelectedMonths(_ clothing: Clothing) -> Bool {
+        if let start = clothing.finalPaymentDate {
+            let month = Calendar.current.component(.month, from: start)
+            if selectedMonths.contains(month) { return true }
+        }
+        if let end = clothing.finalPaymentEndDate {
+            let month = Calendar.current.component(.month, from: end)
+            if selectedMonths.contains(month) { return true }
+        }
+        return false
+    }
+
+    // 检查商品是否是最近添加（一个月内）
+    private func isClothingRecentlyAdded(_ clothing: Clothing) -> Bool {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let oneMonthAgo = calendar.date(byAdding: .month, value: -1, to: now) else {
+            return false
+        }
+        return clothing.createdAt >= oneMonthAgo
+    }
+    
     // 计算所有待付尾款（不受年份筛选影响）
     private var totalPendingBalanceAll: Decimal {
         depositClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
     }
     
+    // 计算当前月
+    private var currentMonth: Int {
+        Calendar.current.component(.month, from: Date())
+    }
+
+    // 视图模式选择器
+    private var viewModePicker: some View {
+        Picker("视图模式", selection: $viewMode) {
+            Text("按月视图")
+                .tag(DepositViewMode.monthly)
+                .foregroundStyle(themeManager.primaryTextColor)
+            Text("按系列视图")
+                .tag(DepositViewMode.series)
+                .foregroundStyle(themeManager.primaryTextColor)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .onChange(of: viewMode) { oldValue, newValue in
+            updateFilteredClothings()
+            if newValue == .series && seriesList.isEmpty {
+                analyzeSeries()
+            }
+        }
+    }
+
+    // 选择器区域
+    private var selectorArea: some View {
+        Group {
+            if viewMode == .monthly {
+                MonthSelectorView(
+                    selectedMonths: $selectedMonths,
+                    year: $selectedYear,
+                    clothings: baseClothings,
+                    showYearStats: $showYearStats,
+                    isExpanded: $isMonthSelectorExpanded
+                )
+                .padding(.horizontal)
+            } else {
+                SeriesSelectorView(
+                    selectedSeries: $selectedSeries,
+                    year: $selectedYear,
+                    seriesList: seriesList,
+                    isAnalyzing: isAnalyzing,
+                    showYearStats: $showYearStats,
+                    clothings: baseClothings,
+                    isExpanded: $isSeriesSelectorExpanded
+                )
+                .padding(.horizontal)
+            }
+        }
+        .onChange(of: selectedMonths) { updateFilteredClothings() }
+        .onChange(of: selectedSeries) { updateFilteredClothings() }
+        .onChange(of: isMonthSelectorExpanded) { updateFilteredClothings() }
+        .onChange(of: isSeriesSelectorExpanded) { updateFilteredClothings() }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -243,80 +349,11 @@ struct DepositPlanView: View {
                 .padding(.horizontal)
                 
                 // View Mode Switcher
-                Picker("视图模式", selection: $viewMode) {
-                    Text("按月视图")
-                        .tag(DepositViewMode.monthly)
-                        .foregroundStyle(themeManager.primaryTextColor)
-                    Text("按系列视图")
-                        .tag(DepositViewMode.series)
-                        .foregroundStyle(themeManager.primaryTextColor)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .onChange(of: viewMode) { oldValue, newValue in
-                    updateFilteredClothings()
-                    if newValue == .series && seriesList.isEmpty {
-                        analyzeSeries()
-                    }
-                }
-                .task {
-                    // Initial load
-                    updateBaseClothings()
-                    if viewMode == .series && seriesList.isEmpty {
-                        analyzeSeries()
-                    }
-                }
-                .onChange(of: depositClothings) { oldValue, newValue in
-                    updateBaseClothings()
-                    if viewMode == .series {
-                        analyzeSeries()
-                    }
-                }
-                // Re-analyze series if year changes
-                .onChange(of: selectedYear) { oldValue, newValue in
-                    updateBaseClothings()
-                    if viewMode == .series {
-                        analyzeSeries()
-                    }
-                    // Clear selections when year changes to avoid confusion
-                    selectedMonths.removeAll()
-                    selectedSeries.removeAll()
-                }
-                // Filter triggers
-                .onChange(of: searchText) { updateBaseClothings() }
-                .onChange(of: selectedTagIDs) { updateBaseClothings() }
-                .onChange(of: selectedBrandIDs) { updateBaseClothings() }
-                .onChange(of: selectedTypes) { updateBaseClothings() }
-                .onChange(of: selectedColors) { updateBaseClothings() }
-                .onChange(of: selectedSizes) { updateBaseClothings() }
-                .onChange(of: selectedLengths) { updateBaseClothings() }
-                .onChange(of: selectedConditions) { updateBaseClothings() }
-                .onChange(of: selectedAccessories) { updateBaseClothings() }
-                .onChange(of: selectedMonths) { updateFilteredClothings() }
-                .onChange(of: selectedSeries) { updateFilteredClothings() }
-                
+                viewModePicker
+
                 // Selector Area
-                if viewMode == .monthly {
-                    // Pass filtered clothings (base) so it knows what months have data?
-                    // Or pass baseClothings to calculate stats for each month
-                    MonthSelectorView(
-                        selectedMonths: $selectedMonths,
-                        year: $selectedYear,
-                        clothings: baseClothings,
-                        showYearStats: $showYearStats
-                    )
-                    .padding(.horizontal)
-                } else {
-                    SeriesSelectorView(
-                        selectedSeries: $selectedSeries,
-                        year: $selectedYear,
-                        seriesList: seriesList,
-                        isAnalyzing: isAnalyzing,
-                        showYearStats: $showYearStats
-                    )
-                    .padding(.horizontal)
-                }
-                
+                selectorArea
+
                 // List
                 LazyVStack(spacing: 16) {
                     ForEach(filteredClothings) { clothing in
@@ -361,8 +398,39 @@ struct DepositPlanView: View {
         } message: {
             Text("⚠️ 前方尾款大军已集结！\n温馨提示：看完请抱紧你的钱包，深呼吸是没用的，不如默念“美貌无价”！\n(｡•́ω•̀｡)")
         }
+        .task {
+            // Initial load
+            updateBaseClothings()
+            if viewMode == .series && seriesList.isEmpty {
+                analyzeSeries()
+            }
+        }
+        .onChange(of: depositClothings) { oldValue, newValue in
+            updateBaseClothings()
+            if viewMode == .series {
+                analyzeSeries()
+            }
+        }
+        .onChange(of: selectedYear) { oldValue, newValue in
+            updateBaseClothings()
+            if viewMode == .series {
+                analyzeSeries()
+            }
+            // Clear selections when year changes to avoid confusion
+            selectedMonths.removeAll()
+            selectedSeries.removeAll()
+        }
+        .onChange(of: searchText) { updateBaseClothings() }
+        .onChange(of: selectedTagIDs) { updateBaseClothings() }
+        .onChange(of: selectedBrandIDs) { updateBaseClothings() }
+        .onChange(of: selectedTypes) { updateBaseClothings() }
+        .onChange(of: selectedColors) { updateBaseClothings() }
+        .onChange(of: selectedSizes) { updateBaseClothings() }
+        .onChange(of: selectedLengths) { updateBaseClothings() }
+        .onChange(of: selectedConditions) { updateBaseClothings() }
+        .onChange(of: selectedAccessories) { updateBaseClothings() }
     }
-    
+
     private func analyzeSeries() {
         isAnalyzing = true
         // Analyze based on the YEAR filtered clothings
@@ -493,7 +561,7 @@ struct TotalBalanceCard: View {
                 
                 Spacer()
                 
-                // 小眼睛按钮 - 折叠价格时显示闭眼(eye.slash)，显示价格时显示睁眼(eye)
+                // 小眼睛按钮 - 闭眼(eye.slash)表示当前隐藏，点击显示；睁眼(eye)表示当前显示，点击隐藏
                 Button(action: onToggleVisibility) {
                     Image(systemName: isVisible ? "eye" : "eye.slash")
                         .font(.system(size: 16))
@@ -724,7 +792,7 @@ struct MonthSelectorView: View {
     @Binding var year: Int
     let clothings: [Clothing] // Pass in all deposit clothings to calculate monthly stats
     @Binding var showYearStats: Bool
-    @State private var expanded: Bool = true
+    @Binding var isExpanded: Bool
     
     let months = Array(1...12)
     let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
@@ -769,26 +837,54 @@ struct MonthSelectorView: View {
         return (totalCount, styleCount, paidDeposit, pendingBalance)
     }
     
+    // 计算当前月的统计
+    private var currentMonthStats: (month: Int, count: Int, amount: Decimal, hasData: Bool) {
+        let calendar = Calendar.current
+        let currentMonth = calendar.component(.month, from: Date())
+        
+        // 统计当前月的所有商品（只要开始时间或结束时间在当前月份都算）
+        let monthClothings = clothings.filter { clothing in
+            // 检查开始时间是否在当前月份
+            if let start = clothing.finalPaymentDate {
+                let m = calendar.component(.month, from: start)
+                if m == currentMonth { return true }
+            }
+            
+            // 检查结束时间是否在当前月份
+            if let end = clothing.finalPaymentEndDate {
+                let m = calendar.component(.month, from: end)
+                if m == currentMonth { return true }
+            }
+            
+            return false
+        }
+        
+        let count = monthClothings.reduce(0) { $0 + $1.stock }
+        let amount = monthClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        
+        return (currentMonth, count, amount, count > 0)
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             // Header
             Button {
                 withAnimation {
-                    expanded.toggle()
+                    isExpanded.toggle()
                 }
             } label: {
                 HStack {
-                    Text("年度预估尾款(点我隐藏)")
+                    Text("年度预估尾款(点我隐藏并显示当前月)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                     Spacer()
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            
-            if expanded {
+
+            if isExpanded {
                 // Year Selector（带小眼睛按钮）
                 YearSelectorView(
                     year: $year,
@@ -864,8 +960,131 @@ struct MonthSelectorView: View {
                         }
                     }
                 }
+            } else {
+                // 隐藏时显示当前月统计
+                RecentMonthCard(stats: currentMonthStats)
             }
         }
+    }
+}
+
+// MARK: - 最近月统计卡片
+struct RecentMonthCard: View {
+    let stats: (month: Int, count: Int, amount: Decimal, hasData: Bool)
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundStyle(.brown)
+                Text("最近月统计")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if stats.hasData {
+                    Text("\(stats.month)月")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.brown)
+                        .clipShape(Capsule())
+                }
+            }
+
+            if stats.hasData {
+                HStack(spacing: 0) {
+                    DepositStatItem(
+                        title: "待付件数",
+                        value: "\(stats.count)",
+                        valueColor: .primary
+                    )
+
+                    Divider()
+                        .frame(height: 30)
+
+                    DepositStatItem(
+                        title: "待付尾款",
+                        value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
+                        valueColor: Color(hex: "C94C72")
+                    )
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+            } else {
+                Text("暂无尾款数据")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 12)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(CardBackgroundView(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
+    }
+}
+
+// MARK: - 最近添加统计卡片
+struct RecentAddedCard: View {
+    let stats: (title: String, count: Int, amount: Decimal, hasData: Bool)
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(.brown)
+                Text(stats.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if stats.hasData {
+                    Text("一个月内")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.brown)
+                        .clipShape(Capsule())
+                }
+            }
+
+            if stats.hasData {
+                HStack(spacing: 0) {
+                    DepositStatItem(
+                        title: "待付件数",
+                        value: "\(stats.count)",
+                        valueColor: .primary
+                    )
+
+                    Divider()
+                        .frame(height: 30)
+
+                    DepositStatItem(
+                        title: "待付尾款",
+                        value: "¥\(NSDecimalNumber(decimal: stats.amount).stringValue)",
+                        valueColor: Color(hex: "C94C72")
+                    )
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+            } else {
+                Text("暂无最近添加")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 12)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(CardBackgroundView(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
     }
 }
 
@@ -929,12 +1148,13 @@ struct SeriesSelectorView: View {
     let seriesList: [SeriesInfo]
     let isAnalyzing: Bool
     @Binding var showYearStats: Bool
-    @State private var expanded: Bool = true
+    let clothings: [Clothing] // 用于计算当前月统计（不区分系列）
+    @Binding var isExpanded: Bool
     @State private var showTips: Bool = false
-    
+
     // Adaptive grid columns
     let columns = [GridItem(.adaptive(minimum: 100), spacing: 10)]
-    
+
     // 计算系列视图的年份统计
     private var yearStats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal) {
         // 从seriesList计算总计
@@ -942,8 +1162,28 @@ struct SeriesSelectorView: View {
         let styleCount = seriesList.count
         let paidDeposit = seriesList.reduce(0) { $0 + $1.totalDeposit }
         let pendingBalance = seriesList.reduce(0) { $0 + $1.totalBalance }
-        
+
         return (totalCount, styleCount, paidDeposit, pendingBalance)
+    }
+
+    // 计算最近添加的统计（一个月内添加的商品，不区分系列）
+    private var recentAddedStats: (title: String, count: Int, amount: Decimal, hasData: Bool) {
+        let calendar = Calendar.current
+        let now = Date()
+        // 获取一个月前的日期
+        guard let oneMonthAgo = calendar.date(byAdding: .month, value: -1, to: now) else {
+            return ("最近添加", 0, 0, false)
+        }
+
+        // 统计最近一个月内添加的商品（按 createdAt 字段）
+        let recentClothings = clothings.filter { clothing in
+            clothing.createdAt >= oneMonthAgo
+        }
+
+        let count = recentClothings.reduce(0) { $0 + $1.stock }
+        let amount = recentClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+
+        return ("最近添加", count, amount, count > 0)
     }
     
     var body: some View {
@@ -951,11 +1191,11 @@ struct SeriesSelectorView: View {
             // Header
             Button {
                 withAnimation {
-                    expanded.toggle()
+                    isExpanded.toggle()
                 }
             } label: {
                 HStack {
-                    Text("按系列预估尾款")
+                    Text("按系列预估尾款(点我隐藏并显示最近添加)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                     
@@ -981,13 +1221,13 @@ struct SeriesSelectorView: View {
                     }
                     
                     Spacer()
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             
-            if expanded {
+            if isExpanded {
                 // Year Selector（带小眼睛按钮）
                 YearSelectorView(
                     year: $year,
@@ -1068,6 +1308,9 @@ struct SeriesSelectorView: View {
                     }
                     .frame(maxHeight: 300) // Limit height to avoid taking too much space
                 }
+            } else {
+                // 隐藏时显示最近添加统计（一个月内）
+                RecentAddedCard(stats: recentAddedStats)
             }
         }
     }

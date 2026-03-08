@@ -4,12 +4,14 @@ struct CardBackgroundView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat = 16
-    
+
     var body: some View {
         Group {
             switch themeManager.cardStyle {
             case .solid:
-                Color(uiColor: .secondarySystemGroupedBackground)
+                // 实色模式：使用主题色系统中的卡片背景颜色
+                // 根据当前配色模式动态计算卡片背景色
+                magicCardBackgroundColor
             case .fullyTransparent:
                 Color.clear
             case .transparent:
@@ -35,18 +37,20 @@ struct CardBackgroundView: View {
                             lineWidth: 1
                         )
                 )
-                
+
             case .tinted:
-                // Acrylic/Mica: Regular Material + Tint Overlay
+                // Acrylic/Mica: 使用主题卡片背景色 + 色调叠加
                 ZStack {
+                    // 基础层：主题卡片背景色
+                    magicCardBackgroundColor
+
+                    // 材质层
                     if themeManager.isBlurEnabled {
                         Rectangle()
                             .fill(.regularMaterial)
-                    } else {
-                        // Fallback
-                        Color(uiColor: .systemBackground).opacity(0.5)
                     }
-                    
+
+                    // 色调层：主题强调色
                     themeManager.cardTintColor
                         .opacity(themeManager.tintOpacity)
                 }
@@ -64,6 +68,32 @@ struct CardBackgroundView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+    }
+    
+    /// 魔法配色下的卡片背景色 - 基于用户设置的背景色动态计算
+    private var magicCardBackgroundColor: Color {
+        // 客制化配色模式：使用预设主题的卡片背景色
+        if themeManager.colorSchemeMode == .custom {
+            let isDark = colorScheme == .dark
+            let cardColors = themeManager.themeColorConfig.customColorConfig.currentCustom.cardColors(forDarkMode: isDark)
+            return cardColors.backgroundRGBA.color
+        }
+        
+        // 魔法配色模式：基于用户设置的背景色生成卡片背景色
+        let isDark = colorScheme == .dark
+        let bgColor = themeManager.backgroundColor
+        
+        if isDark {
+            // 暗夜模式：比背景色稍亮一点，增加层次感
+            return bgColor.opacity(0.9)
+        } else {
+            // 亮色模式：使用半透明白色，与背景色融合
+            if bgColor.isDark {
+                return Color.white.opacity(0.95)
+            } else {
+                return Color.white.opacity(0.85)
+            }
+        }
     }
     
     private var glassFallbackColor: Color {

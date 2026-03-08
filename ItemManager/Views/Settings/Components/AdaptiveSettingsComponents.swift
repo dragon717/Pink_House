@@ -33,6 +33,8 @@ struct AdaptiveSettingsView<Content: View>: View {
 
 // MARK: - 自适应分组 (替代 Section)
 struct AdaptiveSection<Content: View>: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     let header: String?
     let footer: String?
     @ViewBuilder let content: Content
@@ -57,7 +59,7 @@ struct AdaptiveSection<Content: View>: View {
             if let header {
                 Text(header.uppercased())
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
                     .padding(.leading, 8)
             }
             
@@ -65,23 +67,49 @@ struct AdaptiveSection<Content: View>: View {
                 content
             }
             .frame(maxWidth: .infinity) // 确保卡片撑满宽度
-            .background(Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8))
+            .background(sectionBackground)
             .cornerRadius(12)
             // 添加边框或阴影以增强豆腐块质感
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-            )
+            .overlay(sectionOverlay)
             .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
             
             if let footer {
                 Text(footer)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
                     .padding(.leading, 8)
                     .fixedSize(horizontal: false, vertical: true) // 允许换行
             }
         }
+    }
+    
+    // MARK: - 分组背景（适配主题色）
+    private var sectionBackground: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return Group {
+            switch themeManager.cardStyle {
+            case .solid:
+                cardColors.backgroundRGBA.color
+            case .transparent:
+                cardColors.backgroundRGBA.color.opacity(themeManager.transparentOpacity)
+            case .fullyTransparent:
+                cardColors.backgroundRGBA.color.opacity(0.3)
+            case .tinted:
+                Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
+                    .overlay(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+            }
+        }
+    }
+    
+    // MARK: - 分组边框（适配主题色）
+    private var sectionOverlay: some View {
+        let isDark = colorScheme == .dark
+        let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
+        
+        return RoundedRectangle(cornerRadius: 12)
+            .stroke(cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2), lineWidth: 1)
     }
 }
 

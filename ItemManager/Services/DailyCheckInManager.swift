@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Combine
 import CloudKit
+import CoreLocation
 
 // MARK: - 打卡记录
 struct CheckInRecord: Codable, Identifiable {
@@ -11,7 +12,10 @@ struct CheckInRecord: Codable, Identifiable {
     let accessories: String // 小物搭配建议
     let weather: String? // 天气信息
     let location: String? // 位置信息
+    let temperature: Double? // 温度
+    let season: String? // 季节
     let isAIGenerated: Bool // 是否AI生成
+    let petName: String? // 萌宠名字（推荐者）
 }
 
 // MARK: - 今日穿搭色数据
@@ -19,10 +23,16 @@ struct TodayOutfitColor: Codable {
     let colors: [String] // 颜色数组，如 ["樱花粉", "奶油白"]
     let accessories: String // 小物搭配建议
     let description: String // 描述
-    let source: String // 来源：cloudkit/ai
+    let source: String // 来源：cloudkit/pet/local
+    let weather: String? // 天气信息
+    let location: String? // 位置信息
+    let temperature: Double? // 温度
+    let season: String? // 季节
+    let petName: String? // 萌宠推荐者名字
 }
 
 // MARK: - 每日打卡管理器
+@MainActor
 final class DailyCheckInManager: ObservableObject {
     static let shared = DailyCheckInManager()
     
@@ -33,12 +43,23 @@ final class DailyCheckInManager: ObservableObject {
     @Published var todayOutfitColor: TodayOutfitColor?
     @Published var isLoading = false
     
+    // 位置天气信息
+    @Published var currentWeather: WeatherData?
+    @Published var currentLocation: String = ""
+    
     private let checkInKey = "dailyCheckIn.records"
     private let lastCheckInDateKey = "dailyCheckIn.lastDate"
     private let consecutiveDaysKey = "dailyCheckIn.consecutiveDays"
     private let totalDaysKey = "dailyCheckIn.totalDays"
     
     private let container = CKContainer(identifier: "iCloud.bugod2.SkirtMarket")
+    
+    // 2025年Lolita流行色
+    private let trendyColors2025 = [
+        "莫兰迪粉", "雾霾蓝", "奶油白", "薄荷绿", "浅鹅黄",
+        "薰衣草紫", "珊瑚粉", "香槟金", "珍珠白", "樱花粉",
+        "焦糖棕", "奶茶色", "枫叶红", "酒红色", "墨绿色"
+    ]
     
     private init() {
         loadCheckInData()
@@ -126,50 +147,76 @@ final class DailyCheckInManager: ObservableObject {
             return nil
         }
         
-        await MainActor.run { isLoading = true }
+        isLoading = true
         
-        // 1. 获取今日穿搭色
+        // 1. 获取位置和天气信息
+        await fetchLocationAndWeather()
+        
+        // 2. 获取今日穿搭色
         let outfitColor = await fetchTodayOutfitColor()
         
-        // 2. 创建打卡记录
+        // 3. 获取萌宠名字
+        let petName = PetDataManager.shared.status.displayName
+        
+        // 4. 创建打卡记录
         let record = CheckInRecord(
             id: UUID().uuidString,
             date: Date(),
             colors: outfitColor.colors,
             accessories: outfitColor.accessories,
-            weather: nil, // 可以接入天气API
-            location: nil, // 可以获取位置
-            isAIGenerated: outfitColor.source == "ai"
+            weather: currentWeather?.condition.rawValue,
+            location: currentLocation,
+            temperature: currentWeather?.temperature,
+            season: LocationService.shared.getCurrentSeason().displayName,
+            isAIGenerated: outfitColor.source == "ai",
+            petName: petName
         )
         
-        // 3. 更新数据
-        await MainActor.run {
-            todayCheckIn = record
-            todayOutfitColor = outfitColor
-            
-            // 更新连续天数
-            updateConsecutiveDays()
-            
-            // 更新总天数
-            totalDays += 1
-            UserDefaults.standard.set(totalDays, forKey: totalDaysKey)
-            
-            // 更新魔法任务进度
-            FeatureUnlockManager.shared.updateLoginDays(totalDays)
-            
-            // 保存最后打卡日期
-            UserDefaults.standard.set(Date(), forKey: lastCheckInDateKey)
-            
-            // 重新计算本周打卡状态
-            calculateWeekCheckIns()
-            
-            isLoading = false
-        }
+        // 5. 更新数据
+        todayCheckIn = record
+        todayOutfitColor = outfitColor
         
-        // 4. 保存记录
+        // 更新连续天数
+        updateConsecutiveDays()
+        
+        // 更新总天数
+        totalDays += 1
+        UserDefaults.standard.set(totalDays, forKey: totalDaysKey)
+        
+        // 更新魔法任务进度
+        FeatureUnlockManager.shared.updateLoginDays(totalDays)
+        
+        // 保存最后打卡日期
+        UserDefaults.standard.set(Date(), forKey: lastCheckInDateKey)
+        
+        // 重新计算本周打卡状态
+        calculateWeekCheckIns()
+        
+        isLoading = false
+        
+        // 6. 保存记录
         saveCheckInRecord(record)
         
         return record
+    }
+    
+    // MARK: - 获取位置和天气
+    private func fetchLocationAndWeather() async {
+        // 获取位置
+        let locationService = LocationService.shared
+        if let location = await locationService.getCurrentLocation() {
+            currentLocation = locationService.currentCity
+            
+            // 获取天气
+            let weather = await WeatherService.shared.fetchWeather(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                city: locationService.currentCity
+            )
+            currentWeather = weather
+        } else {
+            currentLocation = locationService.currentCity
+        }
     }
     
     // MARK: - 更新连续天数
@@ -223,20 +270,22 @@ final class DailyCheckInManager: ObservableObject {
         // 先从本地记录中查找今日记录
         let records = loadAllRecords()
         if let todayRecord = records.first(where: { Calendar.current.isDateInToday($0.date) }) {
-            await MainActor.run {
-                todayOutfitColor = TodayOutfitColor(
-                    colors: todayRecord.colors,
-                    accessories: todayRecord.accessories,
-                    description: "",
-                    source: todayRecord.isAIGenerated ? "ai" : "cloudkit"
-                )
-            }
+            todayOutfitColor = TodayOutfitColor(
+                colors: todayRecord.colors,
+                accessories: todayRecord.accessories,
+                description: "",
+                source: todayRecord.isAIGenerated ? "ai" : "local",
+                weather: todayRecord.weather,
+                location: todayRecord.location,
+                temperature: todayRecord.temperature,
+                season: todayRecord.season,
+                petName: todayRecord.petName
+            )
+            currentLocation = todayRecord.location ?? ""
         } else {
             // 如果没有本地记录，尝试获取
             let outfit = await fetchTodayOutfitColor()
-            await MainActor.run {
-                todayOutfitColor = outfit
-            }
+            todayOutfitColor = outfit
         }
     }
     
@@ -247,8 +296,8 @@ final class DailyCheckInManager: ObservableObject {
             return cloudKitColor
         }
         
-        // 2. 如果CloudKit没有，使用AI生成
-        return await generateFromAI()
+        // 2. 如果CloudKit没有，使用本地智能算法生成（基于位置、天气、季节、流行色）
+        return await generateLocally()
     }
     
     // MARK: - 从CloudKit获取
@@ -258,8 +307,8 @@ final class DailyCheckInManager: ObservableObject {
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let dateString = dateFormatter.string(from: today)
         
-        // 获取当前省份（简化处理，实际应该根据用户位置）
-        let province = await getCurrentProvince()
+        // 获取当前省份
+        let province = LocationService.shared.currentProvince
         
         let recordID = CKRecord.ID(recordName: "outfit_\(province)_\(dateString)")
         let database = container.publicCloudDatabase
@@ -276,7 +325,12 @@ final class DailyCheckInManager: ObservableObject {
                 colors: colors,
                 accessories: accessories,
                 description: record["description"] as? String ?? "",
-                source: "cloudkit"
+                source: "cloudkit",
+                weather: currentWeather?.condition.rawValue,
+                location: currentLocation,
+                temperature: currentWeather?.temperature,
+                season: LocationService.shared.getCurrentSeason().displayName,
+                petName: PetDataManager.shared.status.displayName
             )
         } catch {
             print("CloudKit获取失败: \(error)")
@@ -284,92 +338,122 @@ final class DailyCheckInManager: ObservableObject {
         }
     }
     
-    // MARK: - 获取当前省份
-    private func getCurrentProvince() async -> String {
-        // 简化处理，返回默认省份
-        // 实际应该根据用户位置或设置获取
-        return "default"
-    }
-    
-    // MARK: - AI生成穿搭色
-    private func generateFromAI() async -> TodayOutfitColor {
-        // 获取当前日期信息
-        let calendar = Calendar.current
-        let month = calendar.component(.month, from: Date())
-        let day = calendar.component(.day, from: Date())
+    // MARK: - 本地智能生成穿搭色
+    private func generateLocally() async -> TodayOutfitColor {
+        let season = LocationService.shared.getCurrentSeason()
+        let weather = currentWeather
+        let petName = PetDataManager.shared.status.displayName
         
-        // 获取节气/节日信息（简化版）
-        let festival = getFestivalOrSolarTerm(month: month, day: day)
+        // 根据多种因素选择颜色
+        var selectedColors: [String] = []
         
-        // 构建AI提示词
-        let prompt = """
-        作为Lolita时尚搭配专家，请根据以下信息推荐今日穿搭配色：
-        
-        日期：\(month)月\(day)日
-        \(festival.isEmpty ? "" : "特殊日期：\(festival)")
-        
-        请推荐：
-        1. 1-3种Lolita风格的主色调（使用中文颜色名称，如：樱花粉、奶油白、薰衣草紫）
-        2. 适合的小物搭配建议（如：发饰、包包、鞋子等）
-        3. 简短的风格描述
-        
-        请以JSON格式返回：
-        {
-            "colors": ["颜色1", "颜色2"],
-            "accessories": "小物搭配建议",
-            "description": "风格描述"
+        // 1. 首先考虑天气
+        if let weather = weather {
+            let weatherColors = weather.condition.recommendedColors
+            selectedColors.append(weatherColors.randomElement()!)
+            
+            // 温度也影响颜色选择
+            let tempColors = weather.temperatureColors
+            selectedColors.append(tempColors.randomElement()!)
         }
-        """
         
-        // 调用AI服务（使用项目中已有的AI规范）
-        do {
-            let response = try await PetAIService.shared.generateOutfitColors(prompt: prompt)
-            return TodayOutfitColor(
-                colors: response.colors,
-                accessories: response.accessories,
-                description: response.description,
-                source: "ai"
-            )
-        } catch {
-            print("AI生成失败: \(error)")
-            // 返回默认推荐
-            return getDefaultOutfitColor()
-        }
-    }
-    
-    // MARK: - 获取节日/节气
-    private func getFestivalOrSolarTerm(month: Int, day: Int) -> String {
-        // 简化版节日/节气判断
-        let festivals: [String: String] = [
-            "2-14": "情人节",
-            "3-8": "妇女节",
-            "5-1": "劳动节",
-            "6-1": "儿童节",
-            "10-1": "国庆节",
-            "12-25": "圣诞节"
-        ]
+        // 2. 考虑季节
+        let seasonColors = season.recommendedColors
+        selectedColors.append(seasonColors.randomElement()!)
         
-        let key = "\(month)-\(day)"
-        return festivals[key] ?? ""
-    }
-    
-    // MARK: - 默认穿搭色
-    private func getDefaultOutfitColor() -> TodayOutfitColor {
-        let defaultColors = [
-            ["樱花粉", "奶油白"],
-            ["薰衣草紫", "珍珠白"],
-            ["薄荷绿", "浅灰蓝"],
-            ["玫瑰红", "香槟金"]
-        ]
+        // 3. 加入2025流行色
+        selectedColors.append(trendyColors2025.randomElement()!)
         
-        let randomColors = defaultColors.randomElement()!
+        // 去重并限制数量
+        selectedColors = Array(Set(selectedColors)).prefix(3).map { $0 }
+        
+        // 生成搭配建议
+        let accessories = generateAccessoriesAdvice(season: season, weather: weather)
+        
+        // 生成描述
+        let description = generateDescription(season: season, weather: weather, colors: selectedColors)
         
         return TodayOutfitColor(
-            colors: randomColors,
-            accessories: "搭配同色系发饰和蕾丝手套，选择珍珠项链增添优雅气质",
-            description: "经典优雅的Lolita配色",
-            source: "default"
+            colors: selectedColors,
+            accessories: accessories,
+            description: description,
+            source: "pet",
+            weather: weather?.condition.rawValue,
+            location: currentLocation.isEmpty ? nil : currentLocation,
+            temperature: weather?.temperature,
+            season: season.displayName,
+            petName: petName
         )
+    }
+    
+    // MARK: - 生成小物搭配建议
+    private func generateAccessoriesAdvice(season: Season, weather: WeatherData?) -> String {
+        var advice: [String] = []
+        
+        // 根据季节
+        switch season {
+        case .spring:
+            advice.append("搭配花朵发饰和蕾丝手套")
+        case .summer:
+            advice.append("选择草编包和遮阳帽")
+        case .autumn:
+            advice.append("搭配贝雷帽和围巾")
+        case .winter:
+            advice.append("选择毛绒耳罩和保暖手套")
+        }
+        
+        // 根据天气
+        if let weather = weather {
+            switch weather.condition {
+            case .sunny:
+                advice.append("佩戴太阳镜和防晒伞")
+            case .lightRain, .moderateRain, .heavyRain, .thunderstorm:
+                advice.append("准备可爱的雨靴和透明雨伞")
+            case .snow:
+                advice.append("选择保暖的毛绒包包")
+            default:
+                break
+            }
+        }
+        
+        // 通用建议
+        let generalAdvice = [
+            "珍珠项链增添优雅气质",
+            "蝴蝶结发夹点缀发型",
+            "蕾丝袜搭配小皮鞋",
+            "精致的手提包提升整体感"
+        ]
+        advice.append(generalAdvice.randomElement()!)
+        
+        return advice.joined(separator: "，")
+    }
+    
+    // MARK: - 生成描述
+    private func generateDescription(season: Season, weather: WeatherData?, colors: [String]) -> String {
+        var parts: [String] = []
+        
+        // 季节描述
+        switch season {
+        case .spring:
+            parts.append("春日")
+        case .summer:
+            parts.append("夏日")
+        case .autumn:
+            parts.append("秋日")
+        case .winter:
+            parts.append("冬日")
+        }
+        
+        // 天气描述
+        if let weather = weather {
+            parts.append(weather.condition.rawValue)
+        }
+        
+        // 风格描述
+        let styles = ["甜美", "优雅", "复古", "清新", "浪漫"]
+        parts.append(styles.randomElement()!)
+        
+        return parts.joined(separator: "") + "的Lolita配色"
     }
 }
 

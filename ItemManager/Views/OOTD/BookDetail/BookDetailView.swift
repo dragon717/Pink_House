@@ -321,6 +321,8 @@ struct BookDetailView: View {
             
             await MainActor.run {
                 try? modelContext.save()
+                // 批量添加完成后重新加载书页数据，确保视图即时刷新
+                loadPages()
                 refreshTrigger.toggle()
                 isBatchProcessing = false
             }

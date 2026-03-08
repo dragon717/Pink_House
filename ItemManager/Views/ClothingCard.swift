@@ -36,6 +36,12 @@ struct ClothingCard: View, Equatable {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.containerPalette) private var palette
+    
+    // 调试：打印容器配色
+    private var debugPalette: String {
+        print("📦 ClothingCard palette: primary=\(palette.primary)")
+        return ""
+    }
     @AppStorage("privacyShowPrice") private var showPrice = true
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
@@ -81,7 +87,8 @@ struct ClothingCard: View, Equatable {
                         )
                         .clipped()
                 } else {
-                    CutePlaceholderView()
+                    // 使用支持主题配色的占位图
+                    ThemedPlaceholderView()
                         .aspectRatio(1, contentMode: .fit)
                 }
                 
@@ -219,6 +226,8 @@ struct ClothingThumbnail: View, Equatable {
     }
     
     let clothing: Clothing
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
     
     var body: some View {
@@ -233,7 +242,8 @@ struct ClothingThumbnail: View, Equatable {
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
-                CutePlaceholderView(iconSize: 14)
+                // 使用主题色的占位图，保持配色统一
+                ThemedPlaceholderView(iconSize: 14)
                     .aspectRatio(1, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
@@ -258,6 +268,61 @@ struct ClothingThumbnail: View, Equatable {
     }
 }
 
+/// 支持主题配色的占位图视图
+struct ThemedPlaceholderView: View {
+    var iconSize: CGFloat = 30
+    
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.containerPalette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
+    
+    var body: some View {
+        ZStack {
+            // 背景根据当前配色模式调整
+            Group {
+                switch themeManager.skirtFillMode {
+                case .transparent:
+                    if colorScheme == .dark {
+                        Color.black.opacity(0.2)
+                    } else {
+                        Color.white.opacity(0.4)
+                    }
+                case .fullyTransparent:
+                    Color.clear
+                case .tinted:
+                    if colorScheme == .dark {
+                        themeManager.cardTintColor.opacity(0.15)
+                    } else {
+                        themeManager.cardTintColor.opacity(0.3)
+                    }
+                case .solid:
+                    if colorScheme == .dark {
+                        Color.black.opacity(0.6)
+                    } else {
+                        Color.white.opacity(0.8)
+                    }
+                }
+            }
+            
+            // 使用主题强调色的渐变
+            LinearGradient(
+                colors: [
+                    palette.accent.opacity(0.15),
+                    palette.accent.opacity(0.05)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            // 使用主题强调色的图标
+            Image(systemName: "heart.fill")
+                .font(.system(size: iconSize))
+                .foregroundStyle(palette.accent.opacity(0.4))
+        }
+    }
+}
+
+/// 保持向后兼容的原始占位图（在不需要主题配色的场景使用）
 struct CutePlaceholderView: View {
     var iconSize: CGFloat = 30
     
@@ -302,7 +367,8 @@ struct ClothingRow: View {
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     } else {
-                        CutePlaceholderView(iconSize: 24)
+                        // 使用支持主题配色的占位图
+                        ThemedPlaceholderView(iconSize: 24)
                             .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -326,7 +392,7 @@ struct ClothingRow: View {
                 }
                 .overlay(alignment: .topTrailing) {
                     if clothing.isDepositPlan {
-                        Text("定尾")
+                        Text("尾款")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 4)
@@ -436,7 +502,8 @@ struct ClothingRowBrief: View {
                             .frame(width: 40, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
-                        CutePlaceholderView(iconSize: 16)
+                        // 使用支持主题配色的占位图
+                        ThemedPlaceholderView(iconSize: 16)
                             .frame(width: 40, height: 40)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }

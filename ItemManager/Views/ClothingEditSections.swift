@@ -32,6 +32,7 @@ struct ClothingBasicInfoView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var brands: [Brand]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+    @ObservedObject private var networkManager = NetworkSettingsManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -84,11 +85,22 @@ struct ClothingBasicInfoView: View {
                 }
             }
             
-            Toggle("同步到裙子社区", isOn: $isShared)
+            // 联网选项：只有在联网功能解锁并开启时才显示
+            if networkManager.canShowNetworkUI() {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("加入联网社区", isOn: $isShared)
+                        .tint(.pink)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                        Text("开启后，其他用户可以在社区中看到这条裙子")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                }
                 .padding(.top, 8)
-            Text("分享你的裙子给其他用户参考")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            }
         }
         .padding()
         .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -519,10 +531,15 @@ struct ClothingPurchaseInfoView: View {
                             // 开始时间选择
                             DatePicker("开始", selection: $finalPaymentDate, displayedComponents: .date)
                                 .environment(\.locale, Locale(identifier: "zh_CN"))
-                                .onChange(of: finalPaymentDate) { _, _ in
+                                .onChange(of: finalPaymentDate) { _, newValue in
                                     // 开始时间变化时，如果不是自定义模式，根据时间段重新计算结束时间
                                     if !isCustomMode {
                                         updateFinalPaymentEndDate()
+                                    } else {
+                                        // 自定义模式下，如果结束时间早于新的开始时间，强制设置结束时间为开始时间
+                                        if finalPaymentEndDate < newValue {
+                                            finalPaymentEndDate = newValue
+                                        }
                                     }
                                 }
                             
@@ -572,6 +589,12 @@ struct ClothingPurchaseInfoView: View {
                                 // 自定义模式：显示日期选择器
                                 DatePicker("结束", selection: $finalPaymentEndDate, in: finalPaymentDate..., displayedComponents: .date)
                                     .environment(\.locale, Locale(identifier: "zh_CN"))
+                                    .onChange(of: finalPaymentEndDate) { _, newValue in
+                                        // 如果结束时间早于开始时间，强制设置为开始时间
+                                        if newValue < finalPaymentDate {
+                                            finalPaymentEndDate = finalPaymentDate
+                                        }
+                                    }
                             } else {
                                 // 预设模式：只读显示自动计算的结束时间
                                 HStack {

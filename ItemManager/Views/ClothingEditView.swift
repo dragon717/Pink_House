@@ -175,6 +175,8 @@ final class ClothingEditDraftManager {
 struct ClothingEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     // 统一使用 deletedAt == nil 作为未删除的判断条件，与其他视图保持一致
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
@@ -246,11 +248,19 @@ struct ClothingEditView: View {
     
     var isEditing: Bool { clothing != nil }
     
+    private var containerPalette: AdaptivePaletteV2 {
+        themeManager.getPaletteForContainer(
+            containerBackground: .ultraThinMaterial,
+            colorScheme: colorScheme
+        )
+    }
+    
     var body: some View {
         ZStack {
             // Background
             LiquidBackground()
                 .ignoresSafeArea()
+                .environment(\.containerPalette, containerPalette)
             
             ScrollView {
                 VStack(spacing: 24) {

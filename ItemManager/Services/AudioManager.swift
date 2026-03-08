@@ -104,15 +104,54 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
     }
     
-    /// 背景音乐开关
+    /// 背景音乐开关（当前会话状态）
+    /// 注意：直接设置此属性会触发持久化，页面切换时请使用 `stopBackgroundMusicWithoutSaving()`
     @Published var isBackgroundMusicEnabled: Bool = false {
         didSet {
+            // 如果是内部状态更新（跳过保存标记为true），则不持久化
+            if isInternalStateUpdate {
+                return
+            }
             if isBackgroundMusicEnabled {
                 playBackgroundMusic()
             } else {
                 stopBackgroundMusic()
             }
+            // 持久化用户手动设置的背景音乐状态
+            UserDefaults.standard.set(isBackgroundMusicEnabled, forKey: "petBackgroundMusicEnabled")
+            print("🎵 AudioManager: 用户手动设置背景音乐为 \(isBackgroundMusicEnabled)，已持久化")
         }
+    }
+    
+    /// 用于标记是否是内部状态更新（页面切换等），避免重复持久化
+    private var isInternalStateUpdate: Bool = false
+    
+    /// 用户是否手动开启过背景音乐（用于判断是否是首次使用）
+    var hasUserManuallySetBackgroundMusic: Bool {
+        return UserDefaults.standard.object(forKey: "petBackgroundMusicEnabled") != nil
+    }
+    
+    /// 获取持久化的背景音乐设置
+    var savedBackgroundMusicState: Bool {
+        return UserDefaults.standard.bool(forKey: "petBackgroundMusicEnabled")
+    }
+    
+    /// 内部方法：停止背景音乐但不持久化（用于页面切换时）
+    func stopBackgroundMusicWithoutSaving() {
+        print("🎵 AudioManager: 内部停止背景音乐（不持久化）")
+        isInternalStateUpdate = true
+        stopBackgroundMusic()
+        isBackgroundMusicEnabled = false
+        isInternalStateUpdate = false
+    }
+    
+    /// 内部方法：恢复背景音乐到持久化的状态（用于页面切换回来）
+    func restoreBackgroundMusicFromSavedState() {
+        let savedState = savedBackgroundMusicState
+        print("🎵 AudioManager: 恢复背景音乐到持久化状态: \(savedState)")
+        isInternalStateUpdate = true
+        isBackgroundMusicEnabled = savedState
+        isInternalStateUpdate = false
     }
     
     /// 互动模式开关（原变音开关）

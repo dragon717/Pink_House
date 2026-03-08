@@ -86,6 +86,9 @@ struct DailyCheckInView: View {
             if checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
                 await checkInManager.loadTodayOutfitColor()
             }
+            
+            // 请求位置权限
+            LocationService.shared.requestAuthorization()
         }
     }
     
@@ -191,7 +194,7 @@ struct DailyCheckInView: View {
     // MARK: - 今日穿搭色区域
     private func outfitColorSection(outfit: TodayOutfitColor) -> some View {
         VStack(spacing: 16) {
-            // 标题
+            // 标题和推荐来源
             HStack {
                 Text("今日穿搭色")
                     .font(.system(size: 18, weight: .semibold))
@@ -199,20 +202,67 @@ struct DailyCheckInView: View {
                 
                 Spacer()
                 
-                // 来源标签
+                // 萌宠推荐标签
                 HStack(spacing: 4) {
-                    Image(systemName: outfit.source == "ai" ? "sparkles" : "cloud.fill")
+                    Image(systemName: "pawprint.fill")
                         .font(.caption)
-                    Text(outfit.source == "ai" ? "AI推荐" : "云端推荐")
+                    Text("\(outfit.petName ?? "萌宠")推荐")
                         .font(.caption)
                 }
-                .foregroundColor(outfit.source == "ai" ? .purple : .blue)
+                .foregroundColor(.orange)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
                     Capsule()
-                        .fill(outfit.source == "ai" ? Color.purple.opacity(0.1) : Color.blue.opacity(0.1))
+                        .fill(Color.orange.opacity(0.1))
                 )
+            }
+            
+            // 天气位置信息
+            HStack(spacing: 12) {
+                // 位置
+                if let location = outfit.location, !location.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "location.fill")
+                            .font(.caption)
+                        Text(location)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
+                
+                // 天气
+                if let weather = outfit.weather {
+                    HStack(spacing: 4) {
+                        Image(systemName: weatherIcon(for: weather))
+                            .font(.caption)
+                        Text(weather)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
+                
+                // 温度
+                if let temp = outfit.temperature {
+                    HStack(spacing: 4) {
+                        Image(systemName: "thermometer")
+                            .font(.caption)
+                        Text("\(Int(temp))°C")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
+                
+                // 季节
+                if let season = outfit.season {
+                    HStack(spacing: 4) {
+                        Image(systemName: "leaf.fill")
+                            .font(.caption)
+                        Text(season)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
             }
             
             // 颜色展示
@@ -250,6 +300,21 @@ struct DailyCheckInView: View {
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
         )
+    }
+    
+    // MARK: - 天气图标映射
+    private func weatherIcon(for weather: String) -> String {
+        switch weather {
+        case "晴": return "sun.max.fill"
+        case "多云": return "cloud.sun.fill"
+        case "阴": return "cloud.fill"
+        case "小雨", "中雨": return "cloud.rain.fill"
+        case "大雨": return "cloud.heavyrain.fill"
+        case "雷雨": return "cloud.bolt.rain.fill"
+        case "雪": return "snowflake"
+        case "雾": return "cloud.fog.fill"
+        default: return "cloud.fill"
+        }
     }
     
     // MARK: - 打卡按钮
@@ -419,9 +484,10 @@ struct DayCell: View {
 struct ColorCard: View {
     let colorName: String
     
-    // 颜色映射
+    // 颜色映射 - 扩展更多颜色支持2025流行色
     private var color: Color {
         let colorMap: [String: Color] = [
+            // 基础色
             "樱花粉": Color(red: 1.0, green: 0.71, blue: 0.76),
             "奶油白": Color(red: 1.0, green: 0.98, blue: 0.94),
             "薰衣草紫": Color(red: 0.9, green: 0.8, blue: 1.0),
@@ -430,7 +496,39 @@ struct ColorCard: View {
             "浅灰蓝": Color(red: 0.75, green: 0.85, blue: 0.95),
             "玫瑰红": Color(red: 1.0, green: 0.4, blue: 0.5),
             "香槟金": Color(red: 0.95, green: 0.9, blue: 0.7),
-            "浅金色": Color(red: 0.95, green: 0.9, blue: 0.75)
+            "浅金色": Color(red: 0.95, green: 0.9, blue: 0.75),
+            // 2025流行色
+            "莫兰迪粉": Color(red: 0.92, green: 0.78, blue: 0.82),
+            "雾霾蓝": Color(red: 0.65, green: 0.75, blue: 0.85),
+            "浅鹅黄": Color(red: 1.0, green: 0.95, blue: 0.75),
+            "珊瑚粉": Color(red: 1.0, green: 0.65, blue: 0.6),
+            "焦糖棕": Color(red: 0.8, green: 0.6, blue: 0.45),
+            "奶茶色": Color(red: 0.85, green: 0.78, blue: 0.7),
+            "枫叶红": Color(red: 0.9, green: 0.4, blue: 0.35),
+            "酒红色": Color(red: 0.65, green: 0.15, blue: 0.25),
+            "墨绿色": Color(red: 0.2, green: 0.35, blue: 0.25),
+            // 天气相关色
+            "明亮黄": Color(red: 1.0, green: 0.9, blue: 0.3),
+            "天空蓝": Color(red: 0.5, green: 0.75, blue: 1.0),
+            "海洋蓝": Color(red: 0.2, green: 0.5, blue: 0.8),
+            "冰蓝": Color(red: 0.75, green: 0.9, blue: 1.0),
+            "银白": Color(red: 0.9, green: 0.9, blue: 0.95),
+            "雪白": Color.white,
+            "深红": Color(red: 0.7, green: 0.1, blue: 0.15),
+            "藏青": Color(red: 0.15, green: 0.25, blue: 0.45),
+            "深灰": Color(red: 0.35, green: 0.35, blue: 0.4),
+            "深紫": Color(red: 0.4, green: 0.2, blue: 0.5),
+            "墨蓝": Color(red: 0.1, green: 0.2, blue: 0.4),
+            "黑色": Color.black,
+            "驼色": Color(red: 0.75, green: 0.6, blue: 0.45),
+            "橄榄绿": Color(red: 0.5, green: 0.55, blue: 0.35),
+            "米色": Color(red: 0.95, green: 0.92, blue: 0.85),
+            "淡粉": Color(red: 1.0, green: 0.85, blue: 0.9),
+            "浅紫": Color(red: 0.85, green: 0.75, blue: 0.95),
+            "天蓝": Color(red: 0.6, green: 0.85, blue: 1.0),
+            "深蓝": Color(red: 0.1, green: 0.3, blue: 0.6),
+            "墨绿": Color(red: 0.1, green: 0.35, blue: 0.25),
+            "白色": Color.white
         ]
         return colorMap[colorName] ?? .pink
     }
@@ -557,6 +655,21 @@ struct CheckInShareCardView: View {
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.primary)
                         
+                        // 萌宠推荐标签
+                        HStack(spacing: 4) {
+                            Image(systemName: "pawprint.fill")
+                                .font(.caption)
+                            Text("\(outfit.petName ?? "萌宠")推荐")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.orange.opacity(0.1))
+                        )
+                        
                         HStack(spacing: 16) {
                             ForEach(outfit.colors, id: \.self) { color in
                                 VStack(spacing: 8) {
@@ -605,7 +718,7 @@ struct CheckInShareCardView: View {
             }
             .padding(30)
         }
-        .frame(width: 320, height: 480)
+        .frame(width: 320, height: 520)
     }
     
     private var todayDateString: String {
@@ -625,7 +738,16 @@ struct CheckInShareCardView: View {
             "浅灰蓝": Color(red: 0.75, green: 0.85, blue: 0.95),
             "玫瑰红": Color(red: 1.0, green: 0.4, blue: 0.5),
             "香槟金": Color(red: 0.95, green: 0.9, blue: 0.7),
-            "浅金色": Color(red: 0.95, green: 0.9, blue: 0.75)
+            "浅金色": Color(red: 0.95, green: 0.9, blue: 0.75),
+            "莫兰迪粉": Color(red: 0.92, green: 0.78, blue: 0.82),
+            "雾霾蓝": Color(red: 0.65, green: 0.75, blue: 0.85),
+            "浅鹅黄": Color(red: 1.0, green: 0.95, blue: 0.75),
+            "珊瑚粉": Color(red: 1.0, green: 0.65, blue: 0.6),
+            "焦糖棕": Color(red: 0.8, green: 0.6, blue: 0.45),
+            "奶茶色": Color(red: 0.85, green: 0.78, blue: 0.7),
+            "枫叶红": Color(red: 0.9, green: 0.4, blue: 0.35),
+            "酒红色": Color(red: 0.65, green: 0.15, blue: 0.25),
+            "墨绿色": Color(red: 0.2, green: 0.35, blue: 0.25)
         ]
         return colorMap[name] ?? .pink
     }

@@ -424,15 +424,6 @@ struct GeneralSettingsView: View {
         }
 
 
-        NavigationLink(destination: CalendarSettingsView()) {
-            HStack {
-                Text("梦裙日历个性化")
-                Spacer()
-                Text(CalendarThemeManager.shared.currentTheme.displayName)
-                    .foregroundStyle(.secondary)
-            }
-        }
-
         // House风格更换
         HStack {
             Image(systemName: "paintpalette.fill")

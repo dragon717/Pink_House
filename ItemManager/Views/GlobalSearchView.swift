@@ -13,6 +13,7 @@ import SwiftData
 struct GlobalSearchView: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
     
     @StateObject private var searchManager = GlobalSearchManager.shared
@@ -163,8 +164,8 @@ struct GlobalSearchView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("可搜索内容")
                 .font(.headline)
-                .foregroundStyle(.primary)
-            
+                .foregroundStyle(themeManager.primaryTextColor)
+
             LazyVGrid(columns: [
                 GridItem(.flexible()),
                 GridItem(.flexible())
@@ -173,25 +174,25 @@ struct GlobalSearchView: View {
                     icon: "tshirt",
                     title: "裙子",
                     description: "名称、类型、颜色、尺码",
-                    color: .pink
+                    color: themeManager.accentTextColor
                 )
                 capabilityCard(
                     icon: "bag",
                     title: "品牌",
                     description: "品牌名称",
-                    color: .brown
+                    color: themeManager.secondaryTextColor
                 )
                 capabilityCard(
                     icon: "tag",
                     title: "标签",
                     description: "自定义标签",
-                    color: .blue
+                    color: themeManager.primaryTextColor
                 )
                 capabilityCard(
                     icon: "yensign.circle",
                     title: "价格",
                     description: "价格范围搜索",
-                    color: .green
+                    color: themeManager.tertiaryTextColor
                 )
             }
         }
@@ -199,20 +200,21 @@ struct GlobalSearchView: View {
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
-    
+
     private func capabilityCard(icon: String, title: String, description: String, color: Color) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundStyle(color)
-            
+
             Text(title)
                 .font(.subheadline)
                 .fontWeight(.medium)
-            
+                .foregroundStyle(themeManager.primaryTextColor)
+
             Text(description)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(themeManager.secondaryTextColor)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

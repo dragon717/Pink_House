@@ -170,24 +170,23 @@ struct PetOverlayView: View {
     }
     
     private func handleDragEnded(_ value: DragGesture.Value, in geometry: GeometryProxy) {
+        // 先检查是否是点击（按压状态且移动距离很小）
+        if case .pressing = gestureHandler.state {
+            // 这是一个点击事件
+            handleTap(at: value.location)
+            gestureHandler.reset()
+            return
+        }
+        
+        // 处理拖拽结束
         gestureHandler.handleDragEnded(value, in: geometry.size)
         
-        // 处理手势事件
-        if case .dragEnd(let location, let isCircleTriggered, let bbox) = getGestureEvent(from: value, in: geometry) {
-            if isCircleTriggered, let boundingBox = bbox {
-                handleCircleTriggered(at: boundingBox, in: geometry)
-            } else {
-                handleDragEnded(at: location, in: geometry)
-            }
-        } else if case .tap(let location) = getGestureEvent(from: value, in: geometry) {
-            handleTap(at: location)
+        // 检查是否有圆圈触发
+        if gestureHandler.isCircleTriggered, let boundingBox = gestureHandler.circleBoundingBox {
+            handleCircleTriggered(at: boundingBox, in: geometry)
+        } else {
+            handleDragEnded(at: value.location, in: geometry)
         }
-    }
-    
-    private func getGestureEvent(from value: DragGesture.Value, in geometry: GeometryProxy) -> PetGestureEvent? {
-        // 根据手势处理器的状态返回对应的事件
-        // 实际实现中，手势处理器会通过回调通知事件
-        return nil
     }
     
     // MARK: - 事件处理

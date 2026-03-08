@@ -30,21 +30,6 @@ struct WealthHapticsSettingsCard: View {
     }
 }
 
-// MARK: - 梦裙日历主题卡片
-struct CalendarSettingsCard: View {
-    var body: some View {
-        NavigationLink(destination: CalendarSettingsView()) {
-            SettingsGridItem(
-                title: "梦裙日历",
-                subtitle: "主题 · 样式 · 个性化",
-                icon: "calendar",
-                iconColor: .red
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
 // MARK: - 小组件设置卡片
 struct WidgetSettingsCard: View {
     var body: some View {

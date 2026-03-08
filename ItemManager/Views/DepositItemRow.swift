@@ -344,20 +344,25 @@ struct SimpleDepositItemRow: View {
     }
 }
 
+/// 统一配色的标签视图
 struct TagView: View {
+    @Environment(ThemeManager.self) private var themeManager
     let text: String
     
     var body: some View {
         Text(text)
             .font(.caption2)
+            .foregroundStyle(themeManager.secondaryTextColor)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
-            .background(Color.secondary.opacity(0.1))
+            .background(themeManager.secondaryTextColor.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
 
+/// 统一配色的时间轴行视图
 struct TimelineRow: View {
+    @Environment(ThemeManager.self) private var themeManager
     let title: String
     let date: Date?
     var trailing: String? = nil
@@ -373,16 +378,17 @@ struct TimelineRow: View {
             Text(title)
                 .font(.caption)
                 .fontWeight(.medium)
+                .foregroundStyle(themeManager.primaryTextColor)
                 .frame(width: 40, alignment: .leading)
             
             if let date = date {
                 Text(formatDate(date))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
             } else {
                 Text("待定")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
             }
             
             Spacer()
@@ -390,9 +396,10 @@ struct TimelineRow: View {
             if let trailing = trailing {
                 Text(trailing)
                     .font(.caption2)
+                    .foregroundStyle(themeManager.secondaryTextColor)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.1))
+                    .background(themeManager.secondaryTextColor.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }

@@ -8,6 +8,7 @@
 import SwiftUI
 import UIKit
 
+// MARK: - 日历主题协议
 protocol CalendarTheme {
     var id: String { get }
     var displayName: String { get }
@@ -18,71 +19,76 @@ protocol CalendarTheme {
     var fontName: String { get }
 }
 
-struct MonicaTheme: CalendarTheme {
-    let id = "monica"
-    let displayName = "莫妮卡 (默认)"
-    let backgroundColor = UIColor(red: 1.0, green: 0.94, blue: 0.96, alpha: 1.0) // Lavender Blush
-    let accentColor = UIColor(red: 0.85, green: 0.75, blue: 0.85, alpha: 1.0) // Thistle
-    let depositColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0) // Gold
-    let finalPaymentColor = UIColor(red: 1.0, green: 0.41, blue: 0.71, alpha: 1.0) // Hot Pink
+// MARK: - 基于新主题系统的日历主题适配器
+struct AdaptiveCalendarTheme: CalendarTheme {
+    let id: String
+    let displayName: String
+    let backgroundColor: UIColor
+    let accentColor: UIColor
+    let depositColor: UIColor
+    let finalPaymentColor: UIColor
     let fontName = "PingFangSC-Regular"
+
+    /// 从 ThemePreset 创建日历主题
+    static func fromThemePreset(_ preset: ThemePreset, colorScheme: ColorScheme) -> AdaptiveCalendarTheme {
+        let isDark = colorScheme == .dark
+        let cardColors = preset.cardColors(forDarkMode: isDark)
+        let textColors = preset.textColors(forDarkMode: isDark)
+
+        return AdaptiveCalendarTheme(
+            id: preset.id,
+            displayName: preset.name,
+            backgroundColor: UIColor(cardColors.backgroundRGBA.color),
+            accentColor: UIColor(cardColors.accentRGBA.color),
+            depositColor: UIColor(cardColors.depositRGBA.color),
+            finalPaymentColor: UIColor(cardColors.finalPaymentRGBA.color)
+        )
+    }
+
+    /// 从 ThemeManager 获取当前主题
+    static func current(from themeManager: ThemeManager, colorScheme: ColorScheme) -> AdaptiveCalendarTheme {
+        let config = themeManager.themeColorConfig
+        let preset = config.currentTheme(forDarkMode: colorScheme == .dark)
+        return fromThemePreset(preset, colorScheme: colorScheme)
+    }
 }
 
-struct CinderellaTheme: CalendarTheme {
-    let id = "cinderella"
-    let displayName = "灰姑娘"
-    let backgroundColor = UIColor(red: 0.94, green: 0.97, blue: 1.0, alpha: 1.0) // Alice Blue
-    let accentColor = UIColor(red: 0.53, green: 0.81, blue: 0.92, alpha: 1.0) // Sky Blue
-    let depositColor = UIColor(red: 1.0, green: 0.65, blue: 0.0, alpha: 1.0) // Orange
-    let finalPaymentColor = UIColor(red: 0.25, green: 0.41, blue: 0.88, alpha: 1.0) // Royal Blue
-    let fontName = "PingFangSC-Regular"
-}
-
-struct MatchaTheme: CalendarTheme {
-    let id = "matcha"
-    let displayName = "抹茶拿铁"
-    let backgroundColor = UIColor(red: 0.94, green: 1.0, blue: 0.94, alpha: 1.0) // Honeydew
-    let accentColor = UIColor(red: 0.60, green: 0.98, blue: 0.60, alpha: 1.0) // Pale Green
-    let depositColor = UIColor(red: 0.85, green: 0.65, blue: 0.13, alpha: 1.0) // Goldenrod
-    let finalPaymentColor = UIColor(red: 0.13, green: 0.55, blue: 0.13, alpha: 1.0) // Forest Green
-    let fontName = "PingFangSC-Regular"
-}
-
-struct GothicTheme: CalendarTheme {
-    let id = "gothic"
-    let displayName = "哥特人偶"
-    let backgroundColor = UIColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0) // Dark Gray
-    let accentColor = UIColor(red: 0.5, green: 0.0, blue: 0.0, alpha: 1.0) // Dark Red
-    let depositColor = UIColor(red: 0.8, green: 0.8, blue: 0.8, alpha: 1.0) // Light Gray
-    let finalPaymentColor = UIColor(red: 0.8, green: 0.0, blue: 0.0, alpha: 1.0) // Red
-    let fontName = "PingFangSC-Regular"
-}
-
+// MARK: - 主题管理器
 @Observable
 class CalendarThemeManager {
     static let shared = CalendarThemeManager()
-    
+
     var currentTheme: CalendarTheme
-    
-    let availableThemes: [CalendarTheme] = [
-        MonicaTheme(),
-        CinderellaTheme(),
-        MatchaTheme(),
-        GothicTheme()
-    ]
-    
-    private init() {
-        let savedThemeId = UserDefaults.standard.string(forKey: "calendar_theme_id") ?? "monica"
-        let themes: [CalendarTheme] = [MonicaTheme(), CinderellaTheme(), MatchaTheme(), GothicTheme()]
-        if let theme = themes.first(where: { $0.id == savedThemeId }) {
-            self.currentTheme = theme
-        } else {
-            self.currentTheme = MonicaTheme()
+
+    // 是否使用客制化配色（从 ThemeManager 获取）
+    var useCustomColorScheme: Bool = false {
+        didSet {
+            UserDefaults.standard.set(useCustomColorScheme, forKey: "calendar_use_custom_color_scheme")
         }
     }
-    
-    func setTheme(_ theme: CalendarTheme) {
-        currentTheme = theme
-        UserDefaults.standard.set(theme.id, forKey: "calendar_theme_id")
+
+    private init() {
+        // 加载是否使用客制化配色的设置
+        self.useCustomColorScheme = UserDefaults.standard.bool(forKey: "calendar_use_custom_color_scheme")
+
+        // 默认使用莫妮卡粉主题
+        self.currentTheme = AdaptiveCalendarTheme.fromThemePreset(CustomColorPresets.monicaPink, colorScheme: .light)
+    }
+
+    /// 刷新主题（根据 ThemeManager 的当前配置）
+    func refreshTheme(from themeManager: ThemeManager, colorScheme: ColorScheme) {
+        currentTheme = AdaptiveCalendarTheme.current(from: themeManager, colorScheme: colorScheme)
+    }
+
+    /// 设置使用客制化配色
+    func setCustomTheme(from themeManager: ThemeManager, colorScheme: ColorScheme) {
+        refreshTheme(from: themeManager, colorScheme: colorScheme)
+        useCustomColorScheme = true
+    }
+
+    /// 设置使用预设主题
+    func setPresetTheme(_ preset: ThemePreset, colorScheme: ColorScheme) {
+        currentTheme = AdaptiveCalendarTheme.fromThemePreset(preset, colorScheme: colorScheme)
+        useCustomColorScheme = false
     }
 }

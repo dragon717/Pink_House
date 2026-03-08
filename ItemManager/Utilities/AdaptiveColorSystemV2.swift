@@ -12,7 +12,7 @@ import UIKit
 enum ColorSchemeMode: String, Codable, CaseIterable {
     case magic = "magic"           // 魔法配色（智能）
     case custom = "custom"         // 客制化配色
-    
+
     var displayName: String {
         switch self {
         case .magic: return "魔法配色"
@@ -21,39 +21,402 @@ enum ColorSchemeMode: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - 卡片配色配置
+struct CardColorConfig: Codable {
+    // 卡片背景色
+    var backgroundRGBA: ColorRGBA
+    // 卡片强调色（用于标签、按钮等）
+    var accentRGBA: ColorRGBA
+    // 卡片次要色
+    var secondaryRGBA: ColorRGBA
+    // 定金标记色
+    var depositRGBA: ColorRGBA
+    // 尾款标记色
+    var finalPaymentRGBA: ColorRGBA
+
+    // 默认配置
+    static let `default` = CardColorConfig(
+        backgroundRGBA: ColorRGBA(r: 1.0, g: 0.94, b: 0.96), // 薰衣草淡粉
+        accentRGBA: ColorRGBA(r: 0.85, g: 0.75, b: 0.85),    // 蓟色
+        secondaryRGBA: ColorRGBA(r: 0.9, g: 0.9, b: 0.9),    // 浅灰
+        depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0),     // 金色
+        finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71) // 热粉
+    )
+
+    // 莫妮卡主题
+    static let monica = CardColorConfig(
+        backgroundRGBA: ColorRGBA(r: 1.0, g: 0.94, b: 0.96),
+        accentRGBA: ColorRGBA(r: 0.85, g: 0.75, b: 0.85),
+        secondaryRGBA: ColorRGBA(r: 0.96, g: 0.9, b: 0.94),
+        depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0),
+        finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71)
+    )
+
+    // 灰姑娘主题
+    static let cinderella = CardColorConfig(
+        backgroundRGBA: ColorRGBA(r: 0.94, g: 0.97, b: 1.0),
+        accentRGBA: ColorRGBA(r: 0.53, g: 0.81, b: 0.92),
+        secondaryRGBA: ColorRGBA(r: 0.9, g: 0.94, b: 0.98),
+        depositRGBA: ColorRGBA(r: 1.0, g: 0.65, b: 0.0),
+        finalPaymentRGBA: ColorRGBA(r: 0.25, g: 0.41, b: 0.88)
+    )
+
+    // 抹茶拿铁主题
+    static let matcha = CardColorConfig(
+        backgroundRGBA: ColorRGBA(r: 0.94, g: 1.0, b: 0.94),
+        accentRGBA: ColorRGBA(r: 0.6, g: 0.98, b: 0.6),
+        secondaryRGBA: ColorRGBA(r: 0.9, g: 0.96, b: 0.9),
+        depositRGBA: ColorRGBA(r: 0.85, g: 0.65, b: 0.13),
+        finalPaymentRGBA: ColorRGBA(r: 0.13, g: 0.55, b: 0.13)
+    )
+
+    // 哥特人偶主题
+    static let gothic = CardColorConfig(
+        backgroundRGBA: ColorRGBA(r: 0.15, g: 0.15, b: 0.15),
+        accentRGBA: ColorRGBA(r: 0.5, g: 0.0, b: 0.0),
+        secondaryRGBA: ColorRGBA(r: 0.25, g: 0.25, b: 0.25),
+        depositRGBA: ColorRGBA(r: 0.8, g: 0.8, b: 0.8),
+        finalPaymentRGBA: ColorRGBA(r: 0.8, g: 0.0, b: 0.0)
+    )
+}
+
+// MARK: - 完整主题方案
+struct ThemePreset: Codable, Identifiable {
+    let id: String
+    let name: String
+    // 字体配色
+    var textPrimaryRGBA: ColorRGBA
+    var textSecondaryRGBA: ColorRGBA
+    var textTertiaryRGBA: ColorRGBA
+    var textAccentRGBA: ColorRGBA
+    // 卡片配色
+    var cardConfig: CardColorConfig
+    // 是否支持暗夜模式变体
+    var supportsDarkMode: Bool
+
+    // 暗夜模式配色（可选）
+    var darkTextPrimaryRGBA: ColorRGBA?
+    var darkTextSecondaryRGBA: ColorRGBA?
+    var darkTextTertiaryRGBA: ColorRGBA?
+    var darkTextAccentRGBA: ColorRGBA?
+    var darkCardConfig: CardColorConfig?
+
+    // 获取指定模式下的字体配色
+    func textColors(forDarkMode isDark: Bool) -> (primary: ColorRGBA, secondary: ColorRGBA, tertiary: ColorRGBA, accent: ColorRGBA) {
+        if isDark && supportsDarkMode {
+            return (
+                darkTextPrimaryRGBA ?? textPrimaryRGBA,
+                darkTextSecondaryRGBA ?? textSecondaryRGBA,
+                darkTextTertiaryRGBA ?? textTertiaryRGBA,
+                darkTextAccentRGBA ?? textAccentRGBA
+            )
+        }
+        return (textPrimaryRGBA, textSecondaryRGBA, textTertiaryRGBA, textAccentRGBA)
+    }
+
+    // 获取指定模式下的卡片配色
+    func cardColors(forDarkMode isDark: Bool) -> CardColorConfig {
+        if isDark && supportsDarkMode {
+            return darkCardConfig ?? cardConfig
+        }
+        return cardConfig
+    }
+}
+
+// MARK: - 用户自定义配色方案
+struct UserCustomTheme: Codable, Identifiable {
+    let id: String
+    var name: String
+    // 亮色模式配色
+    var textPrimaryRGBA: ColorRGBA
+    var textSecondaryRGBA: ColorRGBA
+    var textTertiaryRGBA: ColorRGBA
+    var textAccentRGBA: ColorRGBA
+    var cardConfig: CardColorConfig
+    // 暗夜模式配色
+    var darkTextPrimaryRGBA: ColorRGBA
+    var darkTextSecondaryRGBA: ColorRGBA
+    var darkTextTertiaryRGBA: ColorRGBA
+    var darkTextAccentRGBA: ColorRGBA
+    var darkCardConfig: CardColorConfig
+    // 创建时间
+    let createdAt: Date
+    var updatedAt: Date
+
+    /// 获取指定模式下的字体配色
+    func textColors(forDarkMode isDark: Bool) -> (primary: ColorRGBA, secondary: ColorRGBA, tertiary: ColorRGBA, accent: ColorRGBA) {
+        if isDark {
+            return (darkTextPrimaryRGBA, darkTextSecondaryRGBA, darkTextTertiaryRGBA, darkTextAccentRGBA)
+        }
+        return (textPrimaryRGBA, textSecondaryRGBA, textTertiaryRGBA, textAccentRGBA)
+    }
+
+    /// 获取指定模式下的卡片配色
+    func cardColors(forDarkMode isDark: Bool) -> CardColorConfig {
+        if isDark {
+            return darkCardConfig
+        }
+        return cardConfig
+    }
+
+    /// 转换为ThemePreset
+    func toThemePreset() -> ThemePreset {
+        ThemePreset(
+            id: id,
+            name: name,
+            textPrimaryRGBA: textPrimaryRGBA,
+            textSecondaryRGBA: textSecondaryRGBA,
+            textTertiaryRGBA: textTertiaryRGBA,
+            textAccentRGBA: textAccentRGBA,
+            cardConfig: cardConfig,
+            supportsDarkMode: true,
+            darkTextPrimaryRGBA: darkTextPrimaryRGBA,
+            darkTextSecondaryRGBA: darkTextSecondaryRGBA,
+            darkTextTertiaryRGBA: darkTextTertiaryRGBA,
+            darkTextAccentRGBA: darkTextAccentRGBA,
+            darkCardConfig: darkCardConfig
+        )
+    }
+}
+
+// MARK: - 客制化配色配置
+struct CustomColorConfig: Codable {
+    // 当前选中的预设方案ID（4个预设之一或nil表示使用自定义）
+    var selectedPresetId: String?
+    // 用户保存的自定义方案列表
+    var userCustomThemes: [UserCustomTheme]
+    // 当前正在使用的自定义配色（当selectedPresetId为nil时使用）
+    var currentCustom: UserCustomTheme
+
+    // 默认配置（莫妮卡粉作为App默认主题）
+    static let `default` = CustomColorConfig(
+        selectedPresetId: "monica_pink", // 默认选中莫妮卡粉
+        userCustomThemes: [],
+        currentCustom: UserCustomTheme(
+            id: "custom_current",
+            name: "自定义",
+            textPrimaryRGBA: ColorRGBA(r: 0.55, g: 0.35, b: 0.45),
+            textSecondaryRGBA: ColorRGBA(r: 0.70, g: 0.50, b: 0.60),
+            textTertiaryRGBA: ColorRGBA(r: 0.80, g: 0.65, b: 0.72),
+            textAccentRGBA: ColorRGBA(r: 0.95, g: 0.45, b: 0.65),
+            cardConfig: CardColorConfig(
+                backgroundRGBA: ColorRGBA(r: 1.0, g: 0.90, b: 0.94),
+                accentRGBA: ColorRGBA(r: 1.0, g: 0.65, b: 0.75),
+                secondaryRGBA: ColorRGBA(r: 1.0, g: 0.85, b: 0.90),
+                depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0),
+                finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71)
+            ),
+            darkTextPrimaryRGBA: ColorRGBA(r: 0.95, g: 0.85, b: 0.90),
+            darkTextSecondaryRGBA: ColorRGBA(r: 0.80, g: 0.70, b: 0.75),
+            darkTextTertiaryRGBA: ColorRGBA(r: 0.65, g: 0.55, b: 0.60),
+            darkTextAccentRGBA: ColorRGBA(r: 1.0, g: 0.60, b: 0.75),
+            darkCardConfig: CardColorConfig(
+                backgroundRGBA: ColorRGBA(r: 0.35, g: 0.20, b: 0.28),
+                accentRGBA: ColorRGBA(r: 0.90, g: 0.50, b: 0.65),
+                secondaryRGBA: ColorRGBA(r: 0.45, g: 0.30, b: 0.38),
+                depositRGBA: ColorRGBA(r: 0.9, g: 0.75, b: 0.2),
+                finalPaymentRGBA: ColorRGBA(r: 0.95, g: 0.5, b: 0.75)
+            ),
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    )
+
+    /// 获取当前主题
+    func currentTheme(forDarkMode isDark: Bool) -> ThemePreset {
+        // 如果有选中的预设，返回预设
+        if let presetId = selectedPresetId,
+           let preset = CustomColorPresets.all.first(where: { $0.id == presetId }) {
+            return preset
+        }
+        // 否则返回当前自定义配置
+        return currentCustom.toThemePreset()
+    }
+
+    /// 保存当前配置为新方案
+    mutating func saveAsNewTheme(name: String) -> UserCustomTheme {
+        let newTheme = UserCustomTheme(
+            id: UUID().uuidString,
+            name: name,
+            textPrimaryRGBA: currentCustom.textPrimaryRGBA,
+            textSecondaryRGBA: currentCustom.textSecondaryRGBA,
+            textTertiaryRGBA: currentCustom.textTertiaryRGBA,
+            textAccentRGBA: currentCustom.textAccentRGBA,
+            cardConfig: currentCustom.cardConfig,
+            darkTextPrimaryRGBA: currentCustom.darkTextPrimaryRGBA,
+            darkTextSecondaryRGBA: currentCustom.darkTextSecondaryRGBA,
+            darkTextTertiaryRGBA: currentCustom.darkTextTertiaryRGBA,
+            darkTextAccentRGBA: currentCustom.darkTextAccentRGBA,
+            darkCardConfig: currentCustom.darkCardConfig,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        userCustomThemes.append(newTheme)
+        return newTheme
+    }
+
+    /// 删除自定义方案
+    mutating func deleteCustomTheme(id: String) {
+        userCustomThemes.removeAll { $0.id == id }
+    }
+
+    /// 更新当前自定义配色
+    mutating func updateCurrentCustom(_ theme: UserCustomTheme) {
+        currentCustom = theme
+        selectedPresetId = nil // 切换到自定义模式
+    }
+}
+
+// MARK: - 客制化配色预设方案（5个梦群日历主题）
+enum CustomColorPresets {
+    // 莫妮卡粉主题（App默认）- 柔和的粉红色调
+    static let monicaPink = ThemePreset(
+        id: "monica_pink",
+        name: "莫妮卡粉",
+        textPrimaryRGBA: ColorRGBA(r: 0.55, g: 0.35, b: 0.45),
+        textSecondaryRGBA: ColorRGBA(r: 0.70, g: 0.50, b: 0.60),
+        textTertiaryRGBA: ColorRGBA(r: 0.80, g: 0.65, b: 0.72),
+        textAccentRGBA: ColorRGBA(r: 0.95, g: 0.45, b: 0.65),
+        cardConfig: CardColorConfig(
+            backgroundRGBA: ColorRGBA(r: 1.0, g: 0.90, b: 0.94),
+            accentRGBA: ColorRGBA(r: 1.0, g: 0.65, b: 0.75),
+            secondaryRGBA: ColorRGBA(r: 1.0, g: 0.85, b: 0.90),
+            depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0),
+            finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71)
+        ),
+        supportsDarkMode: true,
+        darkTextPrimaryRGBA: ColorRGBA(r: 0.95, g: 0.85, b: 0.90),
+        darkTextSecondaryRGBA: ColorRGBA(r: 0.80, g: 0.70, b: 0.75),
+        darkTextTertiaryRGBA: ColorRGBA(r: 0.65, g: 0.55, b: 0.60),
+        darkTextAccentRGBA: ColorRGBA(r: 1.0, g: 0.60, b: 0.75),
+        darkCardConfig: CardColorConfig(
+            backgroundRGBA: ColorRGBA(r: 0.35, g: 0.20, b: 0.28),
+            accentRGBA: ColorRGBA(r: 0.90, g: 0.50, b: 0.65),
+            secondaryRGBA: ColorRGBA(r: 0.45, g: 0.30, b: 0.38),
+            depositRGBA: ColorRGBA(r: 0.9, g: 0.75, b: 0.2),
+            finalPaymentRGBA: ColorRGBA(r: 0.95, g: 0.5, b: 0.75)
+        )
+    )
+
+    // 莫妮卡紫主题（原莫妮卡）- 薰衣草紫色调
+    static let monicaPurple = ThemePreset(
+        id: "monica_purple",
+        name: "莫妮卡紫",
+        textPrimaryRGBA: ColorRGBA(r: 0.42, g: 0.36, b: 0.45),
+        textSecondaryRGBA: ColorRGBA(r: 0.61, g: 0.54, b: 0.65),
+        textTertiaryRGBA: ColorRGBA(r: 0.77, g: 0.71, b: 0.80),
+        textAccentRGBA: ColorRGBA(r: 0.85, g: 0.65, b: 0.78),
+        cardConfig: CardColorConfig.monica,
+        supportsDarkMode: true,
+        darkTextPrimaryRGBA: ColorRGBA(r: 0.88, g: 0.84, b: 0.90),
+        darkTextSecondaryRGBA: ColorRGBA(r: 0.70, g: 0.65, b: 0.75),
+        darkTextTertiaryRGBA: ColorRGBA(r: 0.55, g: 0.50, b: 0.60),
+        darkTextAccentRGBA: ColorRGBA(r: 0.90, g: 0.70, b: 0.85),
+        darkCardConfig: CardColorConfig(
+            backgroundRGBA: ColorRGBA(r: 0.25, g: 0.20, b: 0.28),
+            accentRGBA: ColorRGBA(r: 0.70, g: 0.60, b: 0.75),
+            secondaryRGBA: ColorRGBA(r: 0.35, g: 0.30, b: 0.38),
+            depositRGBA: ColorRGBA(r: 0.9, g: 0.75, b: 0.2),
+            finalPaymentRGBA: ColorRGBA(r: 0.95, g: 0.5, b: 0.75)
+        )
+    )
+
+    // 灰姑娘主题（水蓝色调）
+    static let cinderella = ThemePreset(
+        id: "cinderella",
+        name: "灰姑娘",
+        textPrimaryRGBA: ColorRGBA(r: 0.17, g: 0.37, b: 0.49),
+        textSecondaryRGBA: ColorRGBA(r: 0.36, g: 0.62, b: 0.71),
+        textTertiaryRGBA: ColorRGBA(r: 0.56, g: 0.77, b: 0.85),
+        textAccentRGBA: ColorRGBA(r: 0.53, g: 0.81, b: 0.92),
+        cardConfig: CardColorConfig.cinderella,
+        supportsDarkMode: true,
+        darkTextPrimaryRGBA: ColorRGBA(r: 0.80, g: 0.90, b: 0.95),
+        darkTextSecondaryRGBA: ColorRGBA(r: 0.60, g: 0.75, b: 0.85),
+        darkTextTertiaryRGBA: ColorRGBA(r: 0.45, g: 0.60, b: 0.70),
+        darkTextAccentRGBA: ColorRGBA(r: 0.65, g: 0.85, b: 0.95),
+        darkCardConfig: CardColorConfig(
+            backgroundRGBA: ColorRGBA(r: 0.15, g: 0.25, b: 0.35),
+            accentRGBA: ColorRGBA(r: 0.45, g: 0.70, b: 0.85),
+            secondaryRGBA: ColorRGBA(r: 0.25, g: 0.35, b: 0.45),
+            depositRGBA: ColorRGBA(r: 0.9, g: 0.6, b: 0.1),
+            finalPaymentRGBA: ColorRGBA(r: 0.4, g: 0.6, b: 0.95)
+        )
+    )
+
+    // 抹茶拿铁主题（绿色调）
+    static let matcha = ThemePreset(
+        id: "matcha",
+        name: "抹茶拿铁",
+        textPrimaryRGBA: ColorRGBA(r: 0.24, g: 0.36, b: 0.24),
+        textSecondaryRGBA: ColorRGBA(r: 0.42, g: 0.56, b: 0.42),
+        textTertiaryRGBA: ColorRGBA(r: 0.61, g: 0.75, b: 0.61),
+        textAccentRGBA: ColorRGBA(r: 0.24, g: 0.71, b: 0.54),
+        cardConfig: CardColorConfig.matcha,
+        supportsDarkMode: true,
+        darkTextPrimaryRGBA: ColorRGBA(r: 0.85, g: 0.92, b: 0.85),
+        darkTextSecondaryRGBA: ColorRGBA(r: 0.65, g: 0.78, b: 0.65),
+        darkTextTertiaryRGBA: ColorRGBA(r: 0.50, g: 0.63, b: 0.50),
+        darkTextAccentRGBA: ColorRGBA(r: 0.55, g: 0.85, b: 0.70),
+        darkCardConfig: CardColorConfig(
+            backgroundRGBA: ColorRGBA(r: 0.18, g: 0.28, b: 0.18),
+            accentRGBA: ColorRGBA(r: 0.55, g: 0.85, b: 0.55),
+            secondaryRGBA: ColorRGBA(r: 0.28, g: 0.38, b: 0.28),
+            depositRGBA: ColorRGBA(r: 0.85, g: 0.70, b: 0.25),
+            finalPaymentRGBA: ColorRGBA(r: 0.35, g: 0.75, b: 0.35)
+        )
+    )
+
+    // 哥特人偶主题（暗红黑色调）
+    static let gothic = ThemePreset(
+        id: "gothic",
+        name: "哥特人偶",
+        textPrimaryRGBA: ColorRGBA(r: 0.88, g: 0.88, b: 0.88),
+        textSecondaryRGBA: ColorRGBA(r: 0.63, g: 0.63, b: 0.63),
+        textTertiaryRGBA: ColorRGBA(r: 0.44, g: 0.44, b: 0.44),
+        textAccentRGBA: ColorRGBA(r: 0.80, g: 0.0, b: 0.0),
+        cardConfig: CardColorConfig.gothic,
+        supportsDarkMode: true,
+        darkTextPrimaryRGBA: ColorRGBA(r: 0.90, g: 0.90, b: 0.90),
+        darkTextSecondaryRGBA: ColorRGBA(r: 0.70, g: 0.70, b: 0.70),
+        darkTextTertiaryRGBA: ColorRGBA(r: 0.50, g: 0.50, b: 0.50),
+        darkTextAccentRGBA: ColorRGBA(r: 0.90, g: 0.20, b: 0.20),
+        darkCardConfig: CardColorConfig.gothic
+    )
+
+    // 所有预设（莫妮卡粉作为默认排在第一位）
+    static let all: [ThemePreset] = [monicaPink, monicaPurple, cinderella, matcha, gothic]
+}
+
 // MARK: - 主题配色配置（持久化）
 struct ThemeColorConfig: Codable {
     // 配色模式
     var colorSchemeMode: ColorSchemeMode
-    
-    // 客制化颜色（RGBA存储，兼容备份）
-    var customPrimaryRGBA: ColorRGBA
-    var customSecondaryRGBA: ColorRGBA
-    var customTertiaryRGBA: ColorRGBA
-    var customAccentRGBA: ColorRGBA
-    
-    // 暗夜模式下的客制化颜色
-    var darkPrimaryRGBA: ColorRGBA
-    var darkSecondaryRGBA: ColorRGBA
-    var darkTertiaryRGBA: ColorRGBA
-    var darkAccentRGBA: ColorRGBA
-    
+
+    // 客制化配色配置（新增）
+    var customColorConfig: CustomColorConfig
+
     // 是否跟随系统暗夜模式
     var followSystemDarkMode: Bool
-    
-    // 默认配置 - 客制化配色作为默认模式
+
+    // 默认配置
     static let `default` = ThemeColorConfig(
         colorSchemeMode: .custom,
-        customPrimaryRGBA: ColorRGBA.black,
-        customSecondaryRGBA: ColorRGBA.gray,
-        customTertiaryRGBA: ColorRGBA.lightGray,
-        customAccentRGBA: ColorRGBA.pink,
-        darkPrimaryRGBA: ColorRGBA.white,
-        darkSecondaryRGBA: ColorRGBA.lightGray,
-        darkTertiaryRGBA: ColorRGBA.gray,
-        darkAccentRGBA: ColorRGBA.pink,
+        customColorConfig: CustomColorConfig.default,
         followSystemDarkMode: true
     )
+
+    // 获取当前主题
+    func currentTheme(forDarkMode isDark: Bool) -> ThemePreset {
+        customColorConfig.currentTheme(forDarkMode: isDark)
+    }
+
+    // 获取所有可选主题（4个预设 + 用户自定义方案）
+    func allAvailableThemes() -> [ThemePreset] {
+        var themes = CustomColorPresets.all
+        themes.append(contentsOf: customColorConfig.userCustomThemes.map { $0.toThemePreset() })
+        return themes
+    }
 }
 
 // MARK: - RGBA颜色结构（备份兼容）

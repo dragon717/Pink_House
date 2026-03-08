@@ -209,130 +209,15 @@ struct WardrobeView: View {
         Group {
             switch viewLayout {
             case .listBrief, .listDetailed:
-                List {
-                    Section {
-                        statsSection
-                            .padding(.top, 10)
-                            .padding(.bottom, 8)
-                    }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    
-                    ForEach(isEditing ? editableClothings : filteredClothings) { clothing in
-                        ZStack {
-                            if isEditing {
-                                VStack(spacing: 0) {
-                                    clothingRowView(clothing: clothing)
-                                    
-                                    Divider()
-                                        .padding(.leading)
-                                }
-                            } else if isSelectionMode {
-                                HStack(spacing: 12) {
-                                    Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
-                                        .font(.title3)
-                                        .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
-                                    
-                                    VStack(spacing: 0) {
-                                        clothingRowView(clothing: clothing)
-                                        
-                                        Divider()
-                                            .padding(.leading)
-                                    }
-                                }
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    toggleSelection(clothing.id)
-                                }
-                            } else {
-                                // 正常模式
-                                ZStack {
-                                    VStack(spacing: 0) {
-                                        clothingRowView(clothing: clothing)
-                                        
-                                        Divider()
-                                            .padding(.leading)
-                                    }
-                                    
-                                    // 隐藏的 NavigationLink，确保点击整行可跳转
-                                    NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                        EmptyView()
-                                    }
-                                    .opacity(0)
-                                }
-                                .contextMenu {
-                                    Button {
-                                        isSelectionMode = true
-                                        selectedItemIDs.insert(clothing.id)
-                                    } label: {
-                                        Label("选择", systemImage: "checkmark.circle")
-                                    }
-                                    
-                                    NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                        Label("查看详情", systemImage: "info.circle")
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    Button {
-                                        itemToCopy = clothing
-                                        showingCopyAlert = true
-                                    } label: {
-                                        Label("复制", systemImage: "doc.on.doc")
-                                    }
-                                    
-                                    Button(role: .destructive) {
-                                        itemToDelete = clothing
-                                        showingDeleteSingleAlert = true
-                                    } label: {
-                                        Label("删除", systemImage: "trash")
-                                    }
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        itemToDelete = clothing
-                                        showingDeleteSingleAlert = true
-                                    } label: {
-                                        Label("删除", systemImage: "trash")
-                                    }
-                                    
-                                    Button {
-                                        itemToCopy = clothing
-                                        showingCopyAlert = true
-                                    } label: {
-                                        Label("复制", systemImage: "doc.on.doc")
-                                    }
-                                    .tint(.blue)
-                                }
-                            }
-                        }
-                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                    }
-                    .onMove { from, to in
-                        if isEditing {
-                            editableClothings.move(fromOffsets: from, toOffset: to)
-                        }
-                    }
-                    
-                    // Bottom padding
-                    Color.clear.frame(height: 100)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+                listView
 
             case .grid2, .grid3, .grid6:
                 ScrollViewReader { proxy in
                     ZStack {
                         ScrollView {
-                            VStack(spacing: 20) {
+                            VStack(spacing: 8) {
                                 statsSection
+                                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
                                 
                                 LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
                                 ForEach((isEditing || (isSelectionMode && sortOption == .custom)) ? editableClothings : filteredClothings) { clothing in
@@ -454,6 +339,8 @@ struct WardrobeView: View {
         }
         .toolbar {
         }
+        // 应用容器就近配色，支持魔法配色和客制化配色
+        .containerAdaptiveColors(background: .ultraThinMaterial)
         .onChange(of: isEditing) { oldValue, newValue in
             if newValue {
                 // Start editing
@@ -869,7 +756,7 @@ struct WardrobeView: View {
     }
     
     private var statsSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             HStack {
                 Spacer()
                 Button {
@@ -885,15 +772,151 @@ struct WardrobeView: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal)
-            
+
             if showStats {
                 WardrobeStatsView(clothings: filteredClothings,
                                   filterDescription: filterDescription,
                                   onClearFilter: onClearFilter)
-                    .padding(.horizontal)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
+        }
+    }
+
+    private var listView: some View {
+        List {
+            Section {
+                listContent
+            } header: {
+                statsSection
+                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+                    .padding(.vertical, 8)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+    }
+
+    private var listContent: some View {
+        ForEach(isEditing ? editableClothings : filteredClothings) { clothing in
+            listRow(for: clothing)
+        }
+        .onMove { from, to in
+            if isEditing {
+                editableClothings.move(fromOffsets: from, toOffset: to)
+            }
+        }
+    }
+
+    private func listRow(for clothing: Clothing) -> some View {
+        ZStack {
+            if isEditing {
+                editingRow(for: clothing)
+            } else if isSelectionMode {
+                selectionRow(for: clothing)
+            } else {
+                normalRow(for: clothing)
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+
+    private func editingRow(for clothing: Clothing) -> some View {
+        VStack(spacing: 0) {
+            clothingRowView(clothing: clothing)
+            Divider()
+                .padding(.leading)
+        }
+    }
+
+    private func selectionRow(for clothing: Clothing) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+
+            VStack(spacing: 0) {
+                clothingRowView(clothing: clothing)
+                Divider()
+                    .padding(.leading)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            toggleSelection(clothing.id)
+        }
+    }
+
+    private func normalRow(for clothing: Clothing) -> some View {
+        ZStack {
+            VStack(spacing: 0) {
+                clothingRowView(clothing: clothing)
+                Divider()
+                    .padding(.leading)
+            }
+
+            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                EmptyView()
+            }
+            .opacity(0)
+        }
+        .contextMenu {
+            contextMenuItems(for: clothing)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            swipeActions(for: clothing)
+        }
+    }
+
+    private func contextMenuItems(for clothing: Clothing) -> some View {
+        Group {
+            Button {
+                isSelectionMode = true
+                selectedItemIDs.insert(clothing.id)
+            } label: {
+                Label("选择", systemImage: "checkmark.circle")
+            }
+
+            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                Label("查看详情", systemImage: "info.circle")
+            }
+
+            Divider()
+
+            Button {
+                itemToCopy = clothing
+                showingCopyAlert = true
+            } label: {
+                Label("复制", systemImage: "doc.on.doc")
+            }
+
+            Button(role: .destructive) {
+                itemToDelete = clothing
+                showingDeleteSingleAlert = true
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
+    }
+
+    private func swipeActions(for clothing: Clothing) -> some View {
+        Group {
+            Button(role: .destructive) {
+                itemToDelete = clothing
+                showingDeleteSingleAlert = true
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+
+            Button {
+                itemToCopy = clothing
+                showingCopyAlert = true
+            } label: {
+                Label("复制", systemImage: "doc.on.doc")
+            }
+            .tint(.blue)
         }
     }
 }
@@ -909,6 +932,9 @@ struct WardrobeStatsView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }, sort: \BookGroup.sortIndex, order: .forward) private var books: [BookGroup]
+    
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.containerPalette) private var palette
     
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @State private var showDailyCheckIn = false
@@ -953,94 +979,95 @@ struct WardrobeStatsView: View {
     }
     
     var body: some View {
-        GlassCard {
-            VStack(spacing: 16) {
-                // Main Stats
-                HStack(spacing: 0) {
-                    statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
-                    
-                    Divider()
-                        .frame(height: 30)
-                    
-                    statItem(title: "裙子价值", value: "¥\(NSDecimalNumber(decimal: dressValue).stringValue)", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
-                    
-                    Divider()
-                        .frame(height: 30)
-                    
-                    statItem(title: "总价值", value: "¥\(NSDecimalNumber(decimal: totalValue).stringValue)", isVisible: $showTotalValue)
-                }
-                
-                // Bottom Actions - 三个功能入口
-                HStack(spacing: 8) {
-                    // 今日穿搭色按钮
-                    Button {
-                        showDailyCheckIn = true
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 20))
-                            Text("今日穿搭色")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            LinearGradient(
-                                colors: [Color.pink.opacity(0.15), Color.purple.opacity(0.1)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .foregroundStyle(Color.pink)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    
-                    // 穿搭手帐按钮
-                    Button {
-                        tabNavigationManager.navigate(to: .smallWorld(.ootd))
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: "book.closed.fill")
-                                .font(.system(size: 20))
-                            Text("穿搭手帐")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.pink.opacity(0.1))
-                        .foregroundStyle(Color.pink)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    
-                    // 详细统计按钮
-                    NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
-                        VStack(spacing: 4) {
-                            Image(systemName: "chart.bar.fill")
-                                .font(.system(size: 20))
-                            Text("详细统计")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.brown.opacity(0.1))
-                        .foregroundStyle(Color.brown)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                }
+        VStack(spacing: 12) {
+            // Main Stats
+            HStack(spacing: 0) {
+                statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
+
+                Divider()
+
+                statItem(title: "裙子价值", value: "¥\(NSDecimalNumber(decimal: dressValue).stringValue)", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
+
+                Divider()
+
+                statItem(title: "总价值", value: "¥\(NSDecimalNumber(decimal: totalValue).stringValue)", isVisible: $showTotalValue)
             }
-            .sheet(isPresented: $showDailyCheckIn) {
-                DailyCheckInView()
+
+            // Bottom Actions - 三个功能入口
+            HStack(spacing: 8) {
+                // 今日穿搭色按钮 - 使用主题强调色
+                Button {
+                    showDailyCheckIn = true
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20))
+                        Text("今日穿搭色")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        LinearGradient(
+                            colors: [palette.accent.opacity(0.15), palette.accent.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .foregroundStyle(palette.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+
+                // 穿搭手帐按钮 - 使用主题强调色
+                Button {
+                    tabNavigationManager.navigate(to: .smallWorld(.ootd))
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "book.closed.fill")
+                            .font(.system(size: 20))
+                        Text("穿搭手帐")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(palette.accent.opacity(0.1))
+                    .foregroundStyle(palette.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+
+                // 详细统计按钮 - 使用主题次要色
+                NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(size: 20))
+                        Text("详细统计")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(palette.secondary.opacity(0.1))
+                    .foregroundStyle(palette.secondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .sheet(isPresented: $showDailyCheckIn) {
+            DailyCheckInView()
+        }
     }
-    
-    private func statItem(title: String, value: String, isVisible: Binding<Bool>, valueColor: Color = .primary) -> some View {
-        VStack(spacing: 8) {
+
+    private func statItem(title: String, value: String, isVisible: Binding<Bool>, valueColor: Color? = nil) -> some View {
+        VStack(spacing: 4) {
             HStack(spacing: 4) {
                 Text(title)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                
+                    .foregroundStyle(palette.secondary)
+
                 Button {
                     withAnimation {
                         isVisible.wrappedValue.toggle()
@@ -1049,15 +1076,15 @@ struct WardrobeStatsView: View {
                     // 折叠价格时显示闭眼(eye.slash)，显示价格时显示睁眼(eye)
                     Image(systemName: isVisible.wrappedValue ? "eye" : "eye.slash")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(palette.tertiary)
                         .contentShape(Rectangle()) // Make it easier to tap
                 }
             }
-            
+
             Text(isVisible.wrappedValue ? value : "****")
                 .font(.title3)
                 .fontWeight(.semibold)
-                .foregroundStyle(valueColor)
+                .foregroundStyle(valueColor ?? palette.primary)
                 .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity)

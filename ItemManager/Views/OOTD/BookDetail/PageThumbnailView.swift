@@ -40,8 +40,10 @@ struct PageThumbnailView: View {
                     placeholderView
                 }
             }
-            .aspectRatio(0.75, contentMode: .fit)
+            // 保持3:4比例（宽3高4），使用fill模式确保填充整个区域
+            .aspectRatio(0.75, contentMode: .fill)
             .frame(maxWidth: .infinity)
+            .clipped()
             .background(Color.white)
             .cornerRadius(8)
             .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)

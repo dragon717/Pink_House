@@ -107,6 +107,9 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     case widgetCustomize = "widgetCustomize"
     case aiAnalysis = "aiAnalysis"
     
+    // 联网功能
+    case networkCommunity = "networkCommunity"
+    
     var id: String { rawValue }
     
     var displayName: String {
@@ -127,7 +130,10 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .batchImport: return "批量导入"
         case .themeCustomize: return "魔法配色"
         case .widgetCustomize: return "小组件定制"
-        case .aiAnalysis: return "AI智能分析"
+        case .aiAnalysis:
+            return "AI智能分析"
+        case .networkCommunity:
+            return "联网社区"
         }
     }
     
@@ -150,6 +156,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .themeCustomize: return "paintpalette.fill"
         case .widgetCustomize: return "rectangle.grid.2x2.fill"
         case .aiAnalysis: return "brain.fill"
+        case .networkCommunity: return "network"
         }
     }
     
@@ -188,14 +195,17 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return .loginDays(7)
         case .aiAnalysis:
             return .vip()
+        case .networkCommunity:
+            // 联网功能默认隐藏，需要答题解锁
+            return .manual(description: "完成答题挑战解锁联网功能")
         }
     }
     
     // 是否默认隐藏
     var isHiddenByDefault: Bool {
         switch self {
-        case .pet, .bigWorld, .perler, .dressStock:
-            return true // 萌宠、世界书、拼豆工坊、裙子股市默认隐藏
+        case .pet, .bigWorld, .perler, .dressStock, .networkCommunity:
+            return true // 萌宠、世界书、拼豆工坊、裙子股市、联网社区默认隐藏
         default:
             return false
         }

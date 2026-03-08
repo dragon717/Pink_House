@@ -210,27 +210,46 @@ class WealthViewModel {
         }
     }
     
-    private func fetchGoldPrice() async {
-        // Using goldprice.org API
-        // Returns price per Ounce in CNY
-        guard let url = URL(string: "https://data-asg.goldprice.org/dbXRates/CNY") else { return }
+    /// 获取USD到CNY的汇率，用于黄金/白银价格转换
+    /// 返回 1 USD = ? CNY
+    private func fetchUSDTocnyRate() async -> Double {
+        guard let url = URL(string: "https://api.exchangerate-api.com/v4/latest/USD") else {
+            return 7.0 // 默认汇率
+        }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            // Expected JSON: {"items":[{"curr":"CNY","xauPrice":20000.0,...}]}
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let items = json["items"] as? [[String: Any]],
-               let firstItem = items.first {
+               let rates = json["rates"] as? [String: Double],
+               let cnyRate = rates["CNY"] {
+                return cnyRate
+            }
+        } catch {
+            print("Failed to fetch USD to CNY rate: \(error)")
+        }
+        return 7.0 // 默认汇率
+    }
+    
+    private func fetchGoldPrice() async {
+        // 使用 gold-api.com 获取黄金价格（美元/盎司），然后转换为人民币/克
+        guard let url = URL(string: "https://api.gold-api.com/price/XAU") else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            // Expected JSON: {"name":"Gold","price":5086.9,"symbol":"XAU","updatedAt":"..."}
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let priceUSDPerOunce = json["price"] as? Double {
                 
-                // Gold
-                if let xauPriceOunce = firstItem["xauPrice"] as? Double {
-                    // Convert Ounce to Gram (1 Troy Ounce = 31.1034768 Grams)
-                    let pricePerGram = xauPriceOunce / 31.1034768
-                    
-                    await MainActor.run {
-                        self.goldPriceCNYPerGram = pricePerGram
-                        self.goldPriceSource = "数据来源: GoldPrice.org"
-                    }
+                // 获取USD到CNY的汇率
+                let usdToCNY = await fetchUSDTocnyRate()
+                
+                // 转换为人民币/盎司，然后转换为人民币/克
+                let priceCNYPerOunce = priceUSDPerOunce * usdToCNY
+                let pricePerGram = priceCNYPerOunce / 31.1034768 // 1 Troy Ounce = 31.1034768 Grams
+                
+                await MainActor.run {
+                    self.goldPriceCNYPerGram = pricePerGram
+                    self.goldPriceSource = "数据来源: Gold-API.com"
                 }
             }
         } catch {
@@ -242,21 +261,25 @@ class WealthViewModel {
     }
     
     private func fetchSilverPrice() async {
-        guard let url = URL(string: "https://data-asg.goldprice.org/dbXRates/CNY") else { return }
+        // 使用 gold-api.com 获取白银价格（美元/盎司），然后转换为人民币/克
+        guard let url = URL(string: "https://api.gold-api.com/price/XAG") else { return }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
+            // Expected JSON: {"name":"Silver","price":82.85,"symbol":"XAG","updatedAt":"..."}
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let items = json["items"] as? [[String: Any]],
-               let firstItem = items.first,
-               let xagPriceOunce = firstItem["xagPrice"] as? Double { // XAG is Silver
+               let priceUSDPerOunce = json["price"] as? Double {
                 
-                // Convert Ounce to Gram
-                let pricePerGram = xagPriceOunce / 31.1034768
+                // 获取USD到CNY的汇率
+                let usdToCNY = await fetchUSDTocnyRate()
+                
+                // 转换为人民币/盎司，然后转换为人民币/克
+                let priceCNYPerOunce = priceUSDPerOunce * usdToCNY
+                let pricePerGram = priceCNYPerOunce / 31.1034768 // 1 Troy Ounce = 31.1034768 Grams
                 
                 await MainActor.run {
                     self.silverPriceCNYPerGram = pricePerGram
-                    self.silverPriceSource = "数据来源: GoldPrice.org"
+                    self.silverPriceSource = "数据来源: Gold-API.com"
                 }
             }
         } catch {

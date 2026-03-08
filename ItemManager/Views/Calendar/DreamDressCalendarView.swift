@@ -28,13 +28,7 @@ struct DreamDressCalendarView: View {
     @State private var showingDayPopup: Date? // Date for the popup
     @State private var showingMonthPreview: Date? // Month for the large preview popup
     @State private var viewModel = CalendarViewModel()
-
-    // 用于从外部传入返回按钮，解决iOS 18-25下导航栏嵌套问题
-    var backButton: AnyView?
-
-    init(backButton: AnyView? = nil) {
-        self.backButton = backButton
-    }
+    @State private var showingThemeSelector = false // 主题选择器
 
     var body: some View {
         NavigationStack {
@@ -42,19 +36,19 @@ struct DreamDressCalendarView: View {
                 // Background
                 LiquidBackground()
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // 1. Header with Mode Switcher
                     // iOS 18+: 页签选择器都在导航栏的 principal 位置显示
-                    
+
                     // 2. Main Content
                     TabView(selection: $viewMode) {
                         RecentTimelineView(viewModel: viewModel, onDayTap: { date in showingDayPopup = date })
                             .tag(CalendarViewMode.recent)
-                        
+
                         DualMonthScrollView(anchorDate: $currentDate, viewModel: viewModel, onDayTap: { date in showingDayPopup = date })
                             .tag(CalendarViewMode.monthly)
-                        
+
                         YearlyHeatmapView(
                             currentDate: $currentDate,
                             viewModel: viewModel,
@@ -65,7 +59,7 @@ struct DreamDressCalendarView: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .animation(.easeInOut, value: viewMode)
                 }
-                
+
                 // 3. Popup Overlay (Day & Month)
                 if let date = showingDayPopup {
                     UnifiedEventsPopup(
@@ -77,30 +71,46 @@ struct DreamDressCalendarView: View {
                     .transition(.opacity)
                     .zIndex(100)
                 }
-                
+
                 if let monthDate = showingMonthPreview {
                     UnifiedEventsPopup(
                         title: CalendarHelper.shared.monthYearString(monthDate),
                         clothings: viewModel.clothings(forMonth: monthDate),
                         onClose: { showingMonthPreview = nil },
-                        onDayTap: { date in 
+                        onDayTap: { date in
                             showingMonthPreview = nil
-                            showingDayPopup = date 
+                            showingDayPopup = date
                         }
                     )
                     .transition(.opacity)
                     .zIndex(110)
                 }
             }
-            .applyNavigationConfig(viewMode: $viewMode, showFilter: $showDepositPlanOnly, themeManager: themeManager, backButton: backButton)
+            .applyNavigationConfig(
+                viewMode: $viewMode,
+                showFilter: $showDepositPlanOnly,
+                themeManager: themeManager,
+                onThemeTap: { showingThemeSelector = true }
+            )
             .task {
                 await updateData()
+                // 初始化时检查是否需要应用客制化配色
+                if themeManager.useCustomColorScheme {
+                    themeManager.setCustomTheme(from: appThemeManager, colorScheme: colorScheme)
+                }
             }
             .onChange(of: allClothings) { _, _ in
                 Task { await updateData() }
             }
             .onChange(of: showDepositPlanOnly) { _, _ in
                 Task { await updateData() }
+            }
+            .onChange(of: colorScheme) { _, _ in
+                // 当系统颜色模式改变时，刷新主题
+                themeManager.refreshTheme(from: appThemeManager, colorScheme: colorScheme)
+            }
+            .sheet(isPresented: $showingThemeSelector) {
+                CalendarThemeSelectorView()
             }
         }
     }
@@ -148,13 +158,14 @@ struct DreamDressCalendarView: View {
 }
 
 // MARK: - Navigation Config Helper
+// 返回按钮现在由外部包装视图通过 .toolbar 添加，不再通过参数传入
 extension View {
     @ViewBuilder
     func applyNavigationConfig(
         viewMode: Binding<CalendarViewMode>,
         showFilter: Binding<Bool>,
         themeManager: CalendarThemeManager,
-        backButton: AnyView? = nil
+        onThemeTap: (() -> Void)? = nil
     ) -> some View {
         if #available(iOS 26.0, *) {
             self
@@ -172,36 +183,41 @@ extension View {
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Toggle(isOn: Binding(
-                                get: { showFilter.wrappedValue },
-                                set: { newValue in
-                                    withAnimation {
-                                        showFilter.wrappedValue = newValue
-                                    }
-                                }
-                            )) {
-                                Label("只看尾款天使", systemImage: "star")
+                        HStack(spacing: 12) {
+                            // 主题切换按钮
+                            Button {
+                                onThemeTap?()
+                            } label: {
+                                Image(systemName: "paintpalette")
+                                    .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
                             }
-                        } label: {
-                            Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                                .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+
+                            // 筛选按钮
+                            Menu {
+                                Toggle(isOn: Binding(
+                                    get: { showFilter.wrappedValue },
+                                    set: { newValue in
+                                        withAnimation {
+                                            showFilter.wrappedValue = newValue
+                                        }
+                                    }
+                                )) {
+                                    Label("只看尾款天使", systemImage: "star")
+                                }
+                            } label: {
+                                Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                    .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                            }
                         }
                     }
                 }
         } else {
-            // iOS 18-25: 显示导航栏，添加返回按钮、页签选择器和筛选按钮
+            // iOS 18-25: 显示导航栏，添加页签选择器和筛选按钮
+            // 返回按钮由外部包装视图通过 .toolbar 添加
             self
                 .navigationBarHidden(false)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // 返回按钮（如果有）
-                    if let backButton = backButton {
-                        ToolbarItem(placement: .topBarLeading) {
-                            backButton
-                        }
-                    }
-
                     // 页签选择器（中间）
                     ToolbarItem(placement: .principal) {
                         Picker("视图模式", selection: viewMode) {
@@ -213,22 +229,33 @@ extension View {
                         .frame(width: 240)
                     }
 
-                    // 筛选按钮
+                    // 筛选按钮和主题按钮
                     ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Toggle(isOn: Binding(
-                                get: { showFilter.wrappedValue },
-                                set: { newValue in
-                                    withAnimation {
-                                        showFilter.wrappedValue = newValue
-                                    }
-                                }
-                            )) {
-                                Label("只看尾款天使", systemImage: "star")
+                        HStack(spacing: 12) {
+                            // 主题切换按钮
+                            Button {
+                                onThemeTap?()
+                            } label: {
+                                Image(systemName: "paintpalette")
+                                    .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
                             }
-                        } label: {
-                            Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                                .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+
+                            // 筛选按钮
+                            Menu {
+                                Toggle(isOn: Binding(
+                                    get: { showFilter.wrappedValue },
+                                    set: { newValue in
+                                        withAnimation {
+                                            showFilter.wrappedValue = newValue
+                                        }
+                                    }
+                                )) {
+                                    Label("只看尾款天使", systemImage: "star")
+                                }
+                            } label: {
+                                Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                    .foregroundStyle(Color(uiColor: themeManager.currentTheme.accentColor))
+                            }
                         }
                     }
                 }
@@ -623,11 +650,266 @@ struct MiniMonthGrid: View {
     }
     
     private func intensityColor(_ intensity: Double) -> Color {
-        if intensity == 0 { 
-            return colorScheme == .dark ? Color.white.opacity(0.1) : Color.gray.opacity(0.1) 
+        if intensity == 0 {
+            return colorScheme == .dark ? Color.white.opacity(0.1) : Color.gray.opacity(0.1)
         }
         let baseColor = Color(uiColor: theme.accentColor)
         // 在黑暗模式下，让颜色更亮一点
         return baseColor.opacity(colorScheme == .dark ? (0.3 + intensity * 0.7) : (0.2 + intensity * 0.8))
+    }
+}
+
+// MARK: - 日历主题选择器
+struct CalendarThemeSelectorView: View {
+    @Environment(CalendarThemeManager.self) private var themeManager
+    @Environment(ThemeManager.self) private var appThemeManager
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // 预设主题区域（4个梦群日历主题）
+                    presetThemesSection
+
+                    // 客制化配色区域（第5个选项 + 用户自定义方案）
+                    customColorSection
+                }
+                .padding()
+            }
+            .background(LiquidBackground())
+            .navigationTitle("选择主题")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+    }
+
+    // MARK: - 预设主题区域
+    private var presetThemesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("预设主题")
+                .font(.headline)
+                .padding(.horizontal, 4)
+
+            // 4个梦群日历主题
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                ForEach(CustomColorPresets.all) { preset in
+                    CalendarThemeButton(
+                        preset: preset,
+                        isSelected: themeManager.currentTheme.id == preset.id && !themeManager.useCustomColorScheme
+                    ) {
+                        themeManager.setPresetTheme(preset, colorScheme: colorScheme)
+                        // 同步更新 ThemeManager 的选中预设
+                        var newConfig = appThemeManager.themeColorConfig
+                        newConfig.customColorConfig.selectedPresetId = preset.id
+                        appThemeManager.themeColorConfig = newConfig
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - 客制化配色区域
+    private var customColorSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("客制化配色")
+                .font(.headline)
+                .padding(.horizontal, 4)
+
+            // 当前自定义配置
+            Button {
+                themeManager.setCustomTheme(from: appThemeManager, colorScheme: colorScheme)
+            } label: {
+                HStack(spacing: 16) {
+                    // 预览色块 - 显示当前客制化配色
+                    HStack(spacing: 4) {
+                        let isDark = colorScheme == .dark
+                        let customTheme = appThemeManager.themeColorConfig.customColorConfig.currentCustom
+                        let textColors = [
+                            isDark ? customTheme.darkTextPrimaryRGBA.color : customTheme.textPrimaryRGBA.color,
+                            isDark ? customTheme.darkTextSecondaryRGBA.color : customTheme.textSecondaryRGBA.color,
+                            isDark ? customTheme.darkTextAccentRGBA.color : customTheme.textAccentRGBA.color
+                        ]
+                        let cardColors = isDark ? customTheme.darkCardConfig : customTheme.cardConfig
+
+                        // 字体配色
+                        ForEach(textColors, id: \.self) { color in
+                            Circle()
+                                .fill(color)
+                                .frame(width: 20, height: 20)
+                        }
+
+                        // 卡片背景
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(cardColors.backgroundRGBA.color)
+                            .frame(width: 20, height: 20)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("自定义")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        Text("自定义字体和卡片配色")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if themeManager.useCustomColorScheme && appThemeManager.themeColorConfig.customColorConfig.selectedPresetId == nil {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.pink)
+                    }
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(themeManager.useCustomColorScheme && appThemeManager.themeColorConfig.customColorConfig.selectedPresetId == nil ? Color.pink : Color.clear, lineWidth: 2)
+                )
+            }
+            .buttonStyle(.plain)
+
+            // 用户保存的自定义方案
+            if !appThemeManager.themeColorConfig.customColorConfig.userCustomThemes.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("我的方案")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+
+                    ForEach(appThemeManager.themeColorConfig.customColorConfig.userCustomThemes) { theme in
+                        let preset = theme.toThemePreset()
+                        Button {
+                            themeManager.setPresetTheme(preset, colorScheme: colorScheme)
+                            var newConfig = appThemeManager.themeColorConfig
+                            newConfig.customColorConfig.selectedPresetId = nil
+                            newConfig.customColorConfig.currentCustom = theme
+                            appThemeManager.themeColorConfig = newConfig
+                        } label: {
+                            HStack(spacing: 12) {
+                                // 预览色块
+                                HStack(spacing: 4) {
+                                    let isDark = colorScheme == .dark
+                                    let textColors = [
+                                        isDark ? theme.darkTextPrimaryRGBA.color : theme.textPrimaryRGBA.color,
+                                        isDark ? theme.darkTextAccentRGBA.color : theme.textAccentRGBA.color
+                                    ]
+                                    let cardColors = isDark ? theme.darkCardConfig : theme.cardConfig
+
+                                    ForEach(textColors, id: \.self) { color in
+                                        Circle()
+                                            .fill(color)
+                                            .frame(width: 16, height: 16)
+                                    }
+
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(cardColors.backgroundRGBA.color)
+                                        .frame(width: 16, height: 16)
+                                }
+
+                                Text(theme.name)
+                                    .font(.subheadline)
+
+                                Spacer()
+
+                                if themeManager.currentTheme.id == theme.id {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption)
+                                        .foregroundStyle(.pink)
+                                }
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(.ultraThinMaterial)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            // 跳转到配色设置页面的链接
+            NavigationLink {
+                MagicColorSettingsView()
+            } label: {
+                HStack {
+                    Image(systemName: "slider.horizontal.3")
+                    Text("调整配色方案")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .font(.subheadline)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                )
+            }
+        }
+    }
+}
+
+// MARK: - 日历主题按钮
+struct CalendarThemeButton: View {
+    let preset: ThemePreset
+    let isSelected: Bool
+    let action: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                // 预览卡片 - 显示完整的主题色（字体+卡片）
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(preset.cardColors(forDarkMode: colorScheme == .dark).backgroundRGBA.color)
+                    .frame(height: 60)
+                    .overlay(
+                        HStack(spacing: 4) {
+                            let textColors = preset.textColors(forDarkMode: colorScheme == .dark)
+                            // 字体配色预览
+                            Circle().fill(textColors.primary.color).frame(width: 8, height: 8)
+                            Circle().fill(textColors.secondary.color).frame(width: 8, height: 8)
+                            Circle().fill(textColors.accent.color).frame(width: 8, height: 8)
+                            Spacer()
+                            // 定金/尾款色预览
+                            Circle()
+                                .fill(preset.cardColors(forDarkMode: colorScheme == .dark).depositRGBA.color)
+                                .frame(width: 6, height: 6)
+                            Circle()
+                                .fill(preset.cardColors(forDarkMode: colorScheme == .dark).finalPaymentRGBA.color)
+                                .frame(width: 6, height: 6)
+                        }
+                        .padding(8)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 2)
+                    )
+
+                Text(preset.name)
+                    .font(.caption)
+                    .fontWeight(isSelected ? .bold : .regular)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }

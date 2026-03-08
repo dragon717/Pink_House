@@ -230,8 +230,8 @@ struct FrenchRetroSmallWorldView: View {
 
             // 5. 尾款天使 (衣橱右边)
             InteractionHotspot(rect: CGRect(x: 0.6, y: 0.42, width: 0.07, height: 0.12), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .purple, label: "尾款天使", labelStyle: .horizontal(angle: 0), labelPosition: CGPoint(x: 0.635, y: 0.56)) {
-                selectedTab = 0
-                homeTab = .depositPlan
+                // 使用 TabNavigationManager 正确导航到衣橱Tab的尾款天使
+                tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
             }
 
             // 6. 拼豆工坊

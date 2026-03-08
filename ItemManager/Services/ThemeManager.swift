@@ -78,28 +78,47 @@ class ThemeManager {
     }
     
     // MARK: - Card Settings
-    var cardStyle: CardStyle = .solid {
+    var cardStyle: CardStyle = .transparent {
         didSet {
             UserDefaults.standard.set(cardStyle.rawValue, forKey: "theme_card_style")
         }
     }
-    
+
     var skirtFillMode: SkirtFillMode = .transparent {
         didSet {
             UserDefaults.standard.set(skirtFillMode.rawValue, forKey: "theme_skirt_fill_mode")
         }
     }
-    
+
+    // 半透明模式默认100%透明度（完全不透明，即实色效果）
     var transparentOpacity: Double = 1.0 {
         didSet {
             UserDefaults.standard.set(transparentOpacity, forKey: "theme_transparent_opacity")
         }
     }
-    
+
     var tintOpacity: Double = 0.2 {
         didSet {
             UserDefaults.standard.set(tintOpacity, forKey: "theme_tint_opacity")
         }
+    }
+
+    // 图片填充色调配置
+    var imageFillTintColorHex: String = "#FFB6C1" {
+        didSet {
+            UserDefaults.standard.set(imageFillTintColorHex, forKey: "theme_image_fill_tint_color")
+        }
+    }
+
+    var imageFillTintOpacity: Double = 0.3 {
+        didSet {
+            UserDefaults.standard.set(imageFillTintOpacity, forKey: "theme_image_fill_tint_opacity")
+        }
+    }
+
+    /// 图片填充色调颜色
+    var imageFillTintColor: Color {
+        Color(hex: imageFillTintColorHex)
     }
     
     // Legacy property for compatibility or if needed
@@ -125,13 +144,48 @@ class ThemeManager {
             UserDefaults.standard.set(cardTintColorHex, forKey: "theme_card_tint_color")
         }
     }
-    
+
+    /// 卡片色调颜色 - 根据当前配色模式返回主题强调色或自定义色调色
     var cardTintColor: Color {
-        Color(hex: cardTintColorHex)
+        if colorSchemeMode == .custom {
+            // 客制化配色：使用当前主题的强调色
+            let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+            let colors = themeColorConfig.customColorConfig.currentCustom.textColors(forDarkMode: isDark)
+            return colors.accent.color
+        }
+        // 魔法配色：使用自定义色调色
+        return Color(hex: cardTintColorHex)
     }
-    
+
+    /// 卡片背景颜色 - 根据当前配色模式返回主题卡片背景色
+    var cardBackgroundColor: Color {
+        let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+        
+        if colorSchemeMode == .custom {
+            // 客制化配色：使用当前主题的卡片背景色
+            let cardColors = themeColorConfig.customColorConfig.currentCustom.cardColors(forDarkMode: isDark)
+            return cardColors.backgroundRGBA.color
+        }
+        
+        // 魔法配色：基于用户设置的背景色生成卡片背景色
+        // 根据当前是亮色还是暗夜模式，生成适合的卡片背景色
+        if isDark {
+            // 暗夜模式：比背景色稍亮一点，增加层次感
+            // 使用白色叠加来提亮背景色
+            return backgroundColor.opacity(0.9)
+        } else {
+            // 亮色模式：使用半透明白色，与背景色融合
+            // 如果背景色是浅色，使用白色半透明；如果是深色，使用更亮的颜色
+            if backgroundColor.isDark {
+                return Color.white.opacity(0.95)
+            } else {
+                return Color.white.opacity(0.85)
+            }
+        }
+    }
+
     // MARK: - Color Settings
-    var backgroundColorHex: String = "#F2F2F7" { // Default system grouped background
+    var backgroundColorHex: String = "#FFE6EF" { // 默认莫妮卡粉背景色
         didSet {
             UserDefaults.standard.set(backgroundColorHex, forKey: "theme_background_color")
             updateAdaptivePalette()
@@ -191,11 +245,8 @@ class ThemeManager {
         if colorSchemeMode == .custom {
             // 根据当前暗夜/亮色模式返回对应颜色
             let isDark = UITraitCollection.current.userInterfaceStyle == .dark
-            if isDark {
-                return themeColorConfig.darkPrimaryRGBA.color
-            } else {
-                return themeColorConfig.customPrimaryRGBA.color
-            }
+            let colors = themeColorConfig.customColorConfig.currentCustom.textColors(forDarkMode: isDark)
+            return colors.primary.color
         }
         return adaptivePalette.primary
     }
@@ -203,11 +254,8 @@ class ThemeManager {
     var secondaryTextColor: Color {
         if colorSchemeMode == .custom {
             let isDark = UITraitCollection.current.userInterfaceStyle == .dark
-            if isDark {
-                return themeColorConfig.darkSecondaryRGBA.color
-            } else {
-                return themeColorConfig.customSecondaryRGBA.color
-            }
+            let colors = themeColorConfig.customColorConfig.currentCustom.textColors(forDarkMode: isDark)
+            return colors.secondary.color
         }
         return adaptivePalette.secondary
     }
@@ -215,11 +263,8 @@ class ThemeManager {
     var tertiaryTextColor: Color {
         if colorSchemeMode == .custom {
             let isDark = UITraitCollection.current.userInterfaceStyle == .dark
-            if isDark {
-                return themeColorConfig.darkTertiaryRGBA.color
-            } else {
-                return themeColorConfig.customTertiaryRGBA.color
-            }
+            let colors = themeColorConfig.customColorConfig.currentCustom.textColors(forDarkMode: isDark)
+            return colors.tertiary.color
         }
         return adaptivePalette.tertiary
     }
@@ -227,11 +272,8 @@ class ThemeManager {
     var accentTextColor: Color {
         if colorSchemeMode == .custom {
             let isDark = UITraitCollection.current.userInterfaceStyle == .dark
-            if isDark {
-                return themeColorConfig.darkAccentRGBA.color
-            } else {
-                return themeColorConfig.customAccentRGBA.color
-            }
+            let colors = themeColorConfig.customColorConfig.currentCustom.textColors(forDarkMode: isDark)
+            return colors.accent.color
         }
         return adaptivePalette.accent
     }
@@ -297,22 +339,33 @@ class ThemeManager {
            let style = CardStyle(rawValue: savedCardStyle) {
             self.cardStyle = style
         }
-        
+
         if let savedSkirtFillMode = UserDefaults.standard.string(forKey: "theme_skirt_fill_mode"),
            let mode = SkirtFillMode(rawValue: savedSkirtFillMode) {
             self.skirtFillMode = mode
         }
-        
+
+        // 半透明模式默认100%透明度（如果未设置则使用默认值1.0）
         if UserDefaults.standard.object(forKey: "theme_transparent_opacity") != nil {
             self.transparentOpacity = UserDefaults.standard.double(forKey: "theme_transparent_opacity")
+        } else {
+            self.transparentOpacity = 1.0
         }
-        
+
         if UserDefaults.standard.object(forKey: "theme_tint_opacity") != nil {
             self.tintOpacity = UserDefaults.standard.double(forKey: "theme_tint_opacity")
         }
-        
+
         if let savedCardTint = UserDefaults.standard.string(forKey: "theme_card_tint_color") {
             self.cardTintColorHex = savedCardTint
+        }
+
+        // 加载图片填充色调配置
+        if let savedImageFillTint = UserDefaults.standard.string(forKey: "theme_image_fill_tint_color") {
+            self.imageFillTintColorHex = savedImageFillTint
+        }
+        if UserDefaults.standard.object(forKey: "theme_image_fill_tint_opacity") != nil {
+            self.imageFillTintOpacity = UserDefaults.standard.double(forKey: "theme_image_fill_tint_opacity")
         }
         
         // 图片不透明度：强制默认100%，如果未设置则使用默认值1.0
@@ -353,9 +406,76 @@ class ThemeManager {
         
         // Load V2 Color System Config
         loadThemeColorConfig()
-        
+
+        // 根据版本号强制设置默认预设方案（新版本时重置为莫妮卡主题）
+        checkAndApplyVersionBasedDefaultTheme()
+
         // 初始化自适应调色板
         updateAdaptivePalette()
+    }
+
+    // MARK: - 版本控制默认主题
+
+    /// 当前应用版本号（用于强制重置默认主题）
+    private static let appVersionKey = "app_theme_version"
+    private static let targetVersion = "1.0.0" // 目标版本号，当版本变化时触发重置
+
+    /// 检查并根据版本号应用默认主题
+    private func checkAndApplyVersionBasedDefaultTheme() {
+        let savedVersion = UserDefaults.standard.string(forKey: Self.appVersionKey)
+        let currentVersion = Self.targetVersion
+
+        // 如果版本号不同，强制设置默认预设方案
+        if savedVersion != currentVersion {
+            print("🎨 [ThemeManager] 版本变化 detected: \(savedVersion ?? "nil") -> \(currentVersion)，强制设置莫妮卡主题为默认")
+
+            // 强制设置为莫妮卡主题
+            forceApplyMonicaTheme()
+
+            // 保存新版本号
+            UserDefaults.standard.set(currentVersion, forKey: Self.appVersionKey)
+        }
+    }
+
+    /// 强制应用莫妮卡粉主题（作为App默认方案）
+    private func forceApplyMonicaTheme() {
+        // 重置背景色为莫妮卡粉
+        self.backgroundColorHex = "#FFE6EF"
+        self.backgroundStyle = .color
+
+        // 重置为客制化配色模式
+        var newConfig = themeColorConfig
+        newConfig.colorSchemeMode = .custom
+        newConfig.customColorConfig.selectedPresetId = "monica_pink" // 莫妮卡粉主题ID
+
+        // 同步莫妮卡粉预设的颜色到 currentCustom
+        let monicaPinkPreset = CustomColorPresets.monicaPink
+        newConfig.customColorConfig.currentCustom.textPrimaryRGBA = monicaPinkPreset.textPrimaryRGBA
+        newConfig.customColorConfig.currentCustom.textSecondaryRGBA = monicaPinkPreset.textSecondaryRGBA
+        newConfig.customColorConfig.currentCustom.textTertiaryRGBA = monicaPinkPreset.textTertiaryRGBA
+        newConfig.customColorConfig.currentCustom.textAccentRGBA = monicaPinkPreset.textAccentRGBA
+        newConfig.customColorConfig.currentCustom.cardConfig = monicaPinkPreset.cardConfig
+
+        // 同步暗夜模式配色
+        if monicaPinkPreset.supportsDarkMode {
+            newConfig.customColorConfig.currentCustom.darkTextPrimaryRGBA = monicaPinkPreset.darkTextPrimaryRGBA ?? monicaPinkPreset.textPrimaryRGBA
+            newConfig.customColorConfig.currentCustom.darkTextSecondaryRGBA = monicaPinkPreset.darkTextSecondaryRGBA ?? monicaPinkPreset.textSecondaryRGBA
+            newConfig.customColorConfig.currentCustom.darkTextTertiaryRGBA = monicaPinkPreset.darkTextTertiaryRGBA ?? monicaPinkPreset.textTertiaryRGBA
+            newConfig.customColorConfig.currentCustom.darkTextAccentRGBA = monicaPinkPreset.darkTextAccentRGBA ?? monicaPinkPreset.textAccentRGBA
+            newConfig.customColorConfig.currentCustom.darkCardConfig = monicaPinkPreset.darkCardConfig ?? monicaPinkPreset.cardConfig
+        }
+
+        newConfig.customColorConfig.currentCustom.updatedAt = Date()
+
+        // 应用新配置（不触发保存，避免循环）
+        isLoadingConfig = true
+        themeColorConfig = newConfig
+        isLoadingConfig = false
+
+        // 保存配置
+        saveThemeColorConfig()
+
+        print("✅ [ThemeManager] 莫妮卡粉主题已强制设置为默认方案")
     }
     
     var backgroundColor: Color {
@@ -439,17 +559,28 @@ class ThemeManager {
            let style = CardStyle(rawValue: savedCardStyle) {
             self.cardStyle = style
         }
-        
+
+        // 半透明模式默认100%透明度
         if UserDefaults.standard.object(forKey: "theme_transparent_opacity") != nil {
             self.transparentOpacity = UserDefaults.standard.double(forKey: "theme_transparent_opacity")
+        } else {
+            self.transparentOpacity = 1.0
         }
-        
+
         if UserDefaults.standard.object(forKey: "theme_tint_opacity") != nil {
             self.tintOpacity = UserDefaults.standard.double(forKey: "theme_tint_opacity")
         }
-        
+
         if let savedCardTint = UserDefaults.standard.string(forKey: "theme_card_tint_color") {
             self.cardTintColorHex = savedCardTint
+        }
+
+        // 重新加载图片填充色调配置
+        if let savedImageFillTint = UserDefaults.standard.string(forKey: "theme_image_fill_tint_color") {
+            self.imageFillTintColorHex = savedImageFillTint
+        }
+        if UserDefaults.standard.object(forKey: "theme_image_fill_tint_opacity") != nil {
+            self.imageFillTintOpacity = UserDefaults.standard.double(forKey: "theme_image_fill_tint_opacity")
         }
         
         // 图片不透明度：强制默认100%，如果未设置则使用默认值1.0
@@ -541,18 +672,13 @@ class ThemeManager {
             
         case .custom:
             // 客制化配色：根据当前模式选择颜色
-            let primaryRGBA = isDarkMode ? themeColorConfig.darkPrimaryRGBA : themeColorConfig.customPrimaryRGBA
-            let secondaryRGBA = isDarkMode ? themeColorConfig.darkSecondaryRGBA : themeColorConfig.customSecondaryRGBA
-            let tertiaryRGBA = isDarkMode ? themeColorConfig.darkTertiaryRGBA : themeColorConfig.customTertiaryRGBA
-            let accentRGBA = isDarkMode ? themeColorConfig.darkAccentRGBA : themeColorConfig.customAccentRGBA
-            
-            print("🎨 getPaletteForContainer (custom): Primary RGB = \(primaryRGBA.r), \(primaryRGBA.g), \(primaryRGBA.b)")
+            let textColors = themeColorConfig.customColorConfig.currentCustom.textColors(forDarkMode: isDarkMode)
             
             return AdaptivePaletteV2.fromRGBA(
-                primary: primaryRGBA,
-                secondary: secondaryRGBA,
-                tertiary: tertiaryRGBA,
-                accent: accentRGBA
+                primary: textColors.primary,
+                secondary: textColors.secondary,
+                tertiary: textColors.tertiary,
+                accent: textColors.accent
             )
         }
     }
@@ -576,16 +702,19 @@ class ThemeManager {
             var newConfig = themeColorConfig
 
             if isDark {
-                newConfig.darkPrimaryRGBA = primaryRGBA
-                newConfig.darkSecondaryRGBA = secondaryRGBA
-                newConfig.darkTertiaryRGBA = tertiaryRGBA
-                newConfig.darkAccentRGBA = accentRGBA
+                newConfig.customColorConfig.currentCustom.darkTextPrimaryRGBA = primaryRGBA
+                newConfig.customColorConfig.currentCustom.darkTextSecondaryRGBA = secondaryRGBA
+                newConfig.customColorConfig.currentCustom.darkTextTertiaryRGBA = tertiaryRGBA
+                newConfig.customColorConfig.currentCustom.darkTextAccentRGBA = accentRGBA
             } else {
-                newConfig.customPrimaryRGBA = primaryRGBA
-                newConfig.customSecondaryRGBA = secondaryRGBA
-                newConfig.customTertiaryRGBA = tertiaryRGBA
-                newConfig.customAccentRGBA = accentRGBA
+                newConfig.customColorConfig.currentCustom.textPrimaryRGBA = primaryRGBA
+                newConfig.customColorConfig.currentCustom.textSecondaryRGBA = secondaryRGBA
+                newConfig.customColorConfig.currentCustom.textTertiaryRGBA = tertiaryRGBA
+                newConfig.customColorConfig.currentCustom.textAccentRGBA = accentRGBA
             }
+            // 切换到自定义模式并更新时间
+            newConfig.customColorConfig.selectedPresetId = nil
+            newConfig.customColorConfig.currentCustom.updatedAt = Date()
 
             // 重新赋值以触发 didSet 和视图更新
             themeColorConfig = newConfig

@@ -7,10 +7,38 @@
 
 import Foundation
 
+// MARK: - 备份版本控制
+/// 强制版本控制 - 使用单一版本号管理所有备份格式变更
+enum BackupFormatVersion: Int, Codable {
+    case v1_0 = 1  // 初始版本
+    case v1_9 = 2  // v1.9+ 新增主题配色配置、魔法任务、签到打卡等
+    
+    /// 当前最新版本
+    static let current: BackupFormatVersion = .v1_9
+    
+    /// 版本号字符串（用于 manifest）
+    var versionString: String {
+        switch self {
+        case .v1_0: return "1.0"
+        case .v1_9: return "1.9"
+        }
+    }
+}
+
 // MARK: - Data Transfer Objects
 
 struct BackupManifest: Codable {
-    let version: String
+    // MARK: - 强制版本控制（单一版本字段）
+    /// 备份格式版本号 - 用于控制所有字段的兼容性
+    /// 所有新增字段都通过版本号判断是否存在，不再使用多个可选字段注释
+    let formatVersion: Int
+    
+    /// 便捷访问：获取版本枚举
+    var backupVersion: BackupFormatVersion {
+        BackupFormatVersion(rawValue: formatVersion) ?? .v1_0
+    }
+    
+    // MARK: - 基础字段（所有版本都有）
     let timestamp: Date
     let deviceName: String
     
@@ -79,6 +107,252 @@ struct BackupManifest: Codable {
     let spaceOutfitCount: Int?
     let model3DCount: Int?
     let perlerBeadPatternCount: Int?
+    
+    // MARK: - 编码/解码处理
+    
+    enum CodingKeys: String, CodingKey {
+        case formatVersion
+        // 兼容旧版本：旧备份使用 "version" 字段
+        case legacyVersion = "version"
+        case timestamp
+        case deviceName
+        case brands
+        case tags
+        case clothings
+        case storedImages
+        case cutouts
+        case outfits
+        case snapshots
+        case appSettings
+        case themeFiles
+        case wealthFiles
+        case hasWidgetBackground
+        case hasSmallWidgetBackground
+        case hasMediumWidgetBackground
+        case hasLargeWidgetBackground
+        case externalFileHashes
+        case petStatusData
+        case chatHistoryData
+        case appVersion
+        case bookGroups
+        case spaceBookGroups
+        case spaceOutfits
+        case model3Ds
+        case userProfile
+        case userAvatarFile
+        case perlerBeadPatterns
+        case featureStatuses
+        case unlockConditions
+        case checkInRecords
+        case checkInStats
+        case themeColorConfig
+        case clothingCount
+        case imageCount
+        case outfitCount
+        case bookGroupCount
+        case spaceBookGroupCount
+        case spaceOutfitCount
+        case model3DCount
+        case perlerBeadPatternCount
+    }
+    
+    init(
+        formatVersion: Int = BackupFormatVersion.current.rawValue,
+        timestamp: Date,
+        deviceName: String,
+        brands: [BrandDTO],
+        tags: [TagDTO],
+        clothings: [ClothingDTO],
+        storedImages: [StoredImageDTO],
+        cutouts: [CutoutItemDTO],
+        outfits: [OutfitDTO]?,
+        snapshots: [OOTDSnapshotDTO]?,
+        appSettings: [String: String]?,
+        themeFiles: [String]?,
+        wealthFiles: [String]?,
+        hasWidgetBackground: Bool?,
+        hasSmallWidgetBackground: Bool?,
+        hasMediumWidgetBackground: Bool?,
+        hasLargeWidgetBackground: Bool?,
+        externalFileHashes: [String: String]?,
+        petStatusData: Data?,
+        chatHistoryData: Data?,
+        appVersion: String?,
+        bookGroups: [BookGroupDTO]?,
+        spaceBookGroups: [SpaceBookGroupDTO]?,
+        spaceOutfits: [SpaceOutfitDTO]?,
+        model3Ds: [Model3DDTO]?,
+        userProfile: UserProfileDTO?,
+        userAvatarFile: String?,
+        perlerBeadPatterns: [PerlerBeadPatternDTO]?,
+        featureStatuses: [FeatureStatusDTO]?,
+        unlockConditions: [UnlockConditionDTO]?,
+        checkInRecords: [CheckInRecordDTO]?,
+        checkInStats: CheckInStatsDTO?,
+        themeColorConfig: ThemeColorConfig?,
+        clothingCount: Int,
+        imageCount: Int,
+        outfitCount: Int,
+        bookGroupCount: Int?,
+        spaceBookGroupCount: Int?,
+        spaceOutfitCount: Int?,
+        model3DCount: Int?,
+        perlerBeadPatternCount: Int?
+    ) {
+        self.formatVersion = formatVersion
+        self.timestamp = timestamp
+        self.deviceName = deviceName
+        self.brands = brands
+        self.tags = tags
+        self.clothings = clothings
+        self.storedImages = storedImages
+        self.cutouts = cutouts
+        self.outfits = outfits
+        self.snapshots = snapshots
+        self.appSettings = appSettings
+        self.themeFiles = themeFiles
+        self.wealthFiles = wealthFiles
+        self.hasWidgetBackground = hasWidgetBackground
+        self.hasSmallWidgetBackground = hasSmallWidgetBackground
+        self.hasMediumWidgetBackground = hasMediumWidgetBackground
+        self.hasLargeWidgetBackground = hasLargeWidgetBackground
+        self.externalFileHashes = externalFileHashes
+        self.petStatusData = petStatusData
+        self.chatHistoryData = chatHistoryData
+        self.appVersion = appVersion
+        self.bookGroups = bookGroups
+        self.spaceBookGroups = spaceBookGroups
+        self.spaceOutfits = spaceOutfits
+        self.model3Ds = model3Ds
+        self.userProfile = userProfile
+        self.userAvatarFile = userAvatarFile
+        self.perlerBeadPatterns = perlerBeadPatterns
+        self.featureStatuses = featureStatuses
+        self.unlockConditions = unlockConditions
+        self.checkInRecords = checkInRecords
+        self.checkInStats = checkInStats
+        self.themeColorConfig = themeColorConfig
+        self.clothingCount = clothingCount
+        self.imageCount = imageCount
+        self.outfitCount = outfitCount
+        self.bookGroupCount = bookGroupCount
+        self.spaceBookGroupCount = spaceBookGroupCount
+        self.spaceOutfitCount = spaceOutfitCount
+        self.model3DCount = model3DCount
+        self.perlerBeadPatternCount = perlerBeadPatternCount
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // 优先读取新的 formatVersion，如果不存在则读取旧的 version 字段
+        if let version = try? container.decode(Int.self, forKey: .formatVersion) {
+            self.formatVersion = version
+        } else if let legacyVersion = try? container.decode(String.self, forKey: .legacyVersion) {
+            // 兼容旧版本：从字符串版本号转换
+            self.formatVersion = BackupManifest.convertLegacyVersion(legacyVersion)
+        } else {
+            self.formatVersion = BackupFormatVersion.v1_0.rawValue
+        }
+        
+        self.timestamp = try container.decode(Date.self, forKey: .timestamp)
+        self.deviceName = try container.decode(String.self, forKey: .deviceName)
+        self.brands = try container.decode([BrandDTO].self, forKey: .brands)
+        self.tags = try container.decode([TagDTO].self, forKey: .tags)
+        self.clothings = try container.decode([ClothingDTO].self, forKey: .clothings)
+        self.storedImages = try container.decode([StoredImageDTO].self, forKey: .storedImages)
+        self.cutouts = try container.decode([CutoutItemDTO].self, forKey: .cutouts)
+        self.outfits = try container.decodeIfPresent([OutfitDTO].self, forKey: .outfits)
+        self.snapshots = try container.decodeIfPresent([OOTDSnapshotDTO].self, forKey: .snapshots)
+        self.appSettings = try container.decodeIfPresent([String: String].self, forKey: .appSettings)
+        self.themeFiles = try container.decodeIfPresent([String].self, forKey: .themeFiles)
+        self.wealthFiles = try container.decodeIfPresent([String].self, forKey: .wealthFiles)
+        self.hasWidgetBackground = try container.decodeIfPresent(Bool.self, forKey: .hasWidgetBackground)
+        self.hasSmallWidgetBackground = try container.decodeIfPresent(Bool.self, forKey: .hasSmallWidgetBackground)
+        self.hasMediumWidgetBackground = try container.decodeIfPresent(Bool.self, forKey: .hasMediumWidgetBackground)
+        self.hasLargeWidgetBackground = try container.decodeIfPresent(Bool.self, forKey: .hasLargeWidgetBackground)
+        self.externalFileHashes = try container.decodeIfPresent([String: String].self, forKey: .externalFileHashes)
+        self.petStatusData = try container.decodeIfPresent(Data.self, forKey: .petStatusData)
+        self.chatHistoryData = try container.decodeIfPresent(Data.self, forKey: .chatHistoryData)
+        self.appVersion = try container.decodeIfPresent(String.self, forKey: .appVersion)
+        self.bookGroups = try container.decodeIfPresent([BookGroupDTO].self, forKey: .bookGroups)
+        self.spaceBookGroups = try container.decodeIfPresent([SpaceBookGroupDTO].self, forKey: .spaceBookGroups)
+        self.spaceOutfits = try container.decodeIfPresent([SpaceOutfitDTO].self, forKey: .spaceOutfits)
+        self.model3Ds = try container.decodeIfPresent([Model3DDTO].self, forKey: .model3Ds)
+        self.userProfile = try container.decodeIfPresent(UserProfileDTO.self, forKey: .userProfile)
+        self.userAvatarFile = try container.decodeIfPresent(String.self, forKey: .userAvatarFile)
+        self.perlerBeadPatterns = try container.decodeIfPresent([PerlerBeadPatternDTO].self, forKey: .perlerBeadPatterns)
+        self.featureStatuses = try container.decodeIfPresent([FeatureStatusDTO].self, forKey: .featureStatuses)
+        self.unlockConditions = try container.decodeIfPresent([UnlockConditionDTO].self, forKey: .unlockConditions)
+        self.checkInRecords = try container.decodeIfPresent([CheckInRecordDTO].self, forKey: .checkInRecords)
+        self.checkInStats = try container.decodeIfPresent(CheckInStatsDTO.self, forKey: .checkInStats)
+        self.themeColorConfig = try container.decodeIfPresent(ThemeColorConfig.self, forKey: .themeColorConfig)
+        self.clothingCount = try container.decode(Int.self, forKey: .clothingCount)
+        self.imageCount = try container.decode(Int.self, forKey: .imageCount)
+        self.outfitCount = try container.decode(Int.self, forKey: .outfitCount)
+        self.bookGroupCount = try container.decodeIfPresent(Int.self, forKey: .bookGroupCount)
+        self.spaceBookGroupCount = try container.decodeIfPresent(Int.self, forKey: .spaceBookGroupCount)
+        self.spaceOutfitCount = try container.decodeIfPresent(Int.self, forKey: .spaceOutfitCount)
+        self.model3DCount = try container.decodeIfPresent(Int.self, forKey: .model3DCount)
+        self.perlerBeadPatternCount = try container.decodeIfPresent(Int.self, forKey: .perlerBeadPatternCount)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(formatVersion, forKey: .formatVersion)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(deviceName, forKey: .deviceName)
+        try container.encode(brands, forKey: .brands)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(clothings, forKey: .clothings)
+        try container.encode(storedImages, forKey: .storedImages)
+        try container.encode(cutouts, forKey: .cutouts)
+        try container.encodeIfPresent(outfits, forKey: .outfits)
+        try container.encodeIfPresent(snapshots, forKey: .snapshots)
+        try container.encodeIfPresent(appSettings, forKey: .appSettings)
+        try container.encodeIfPresent(themeFiles, forKey: .themeFiles)
+        try container.encodeIfPresent(wealthFiles, forKey: .wealthFiles)
+        try container.encodeIfPresent(hasWidgetBackground, forKey: .hasWidgetBackground)
+        try container.encodeIfPresent(hasSmallWidgetBackground, forKey: .hasSmallWidgetBackground)
+        try container.encodeIfPresent(hasMediumWidgetBackground, forKey: .hasMediumWidgetBackground)
+        try container.encodeIfPresent(hasLargeWidgetBackground, forKey: .hasLargeWidgetBackground)
+        try container.encodeIfPresent(externalFileHashes, forKey: .externalFileHashes)
+        try container.encodeIfPresent(petStatusData, forKey: .petStatusData)
+        try container.encodeIfPresent(chatHistoryData, forKey: .chatHistoryData)
+        try container.encodeIfPresent(appVersion, forKey: .appVersion)
+        try container.encodeIfPresent(bookGroups, forKey: .bookGroups)
+        try container.encodeIfPresent(spaceBookGroups, forKey: .spaceBookGroups)
+        try container.encodeIfPresent(spaceOutfits, forKey: .spaceOutfits)
+        try container.encodeIfPresent(model3Ds, forKey: .model3Ds)
+        try container.encodeIfPresent(userProfile, forKey: .userProfile)
+        try container.encodeIfPresent(userAvatarFile, forKey: .userAvatarFile)
+        try container.encodeIfPresent(perlerBeadPatterns, forKey: .perlerBeadPatterns)
+        try container.encodeIfPresent(featureStatuses, forKey: .featureStatuses)
+        try container.encodeIfPresent(unlockConditions, forKey: .unlockConditions)
+        try container.encodeIfPresent(checkInRecords, forKey: .checkInRecords)
+        try container.encodeIfPresent(checkInStats, forKey: .checkInStats)
+        try container.encodeIfPresent(themeColorConfig, forKey: .themeColorConfig)
+        try container.encode(clothingCount, forKey: .clothingCount)
+        try container.encode(imageCount, forKey: .imageCount)
+        try container.encode(outfitCount, forKey: .outfitCount)
+        try container.encodeIfPresent(bookGroupCount, forKey: .bookGroupCount)
+        try container.encodeIfPresent(spaceBookGroupCount, forKey: .spaceBookGroupCount)
+        try container.encodeIfPresent(spaceOutfitCount, forKey: .spaceOutfitCount)
+        try container.encodeIfPresent(model3DCount, forKey: .model3DCount)
+        try container.encodeIfPresent(perlerBeadPatternCount, forKey: .perlerBeadPatternCount)
+    }
+    
+    /// 转换旧版本字符串版本号为整数版本
+    private static func convertLegacyVersion(_ version: String) -> Int {
+        switch version {
+        case "1.9": return BackupFormatVersion.v1_9.rawValue
+        case "1.8", "1.7", "1.6", "1.5", "1.4", "1.3", "1.2", "1.1":
+            // 这些版本都映射到 v1_0，因为它们没有 formatVersion 字段
+            return BackupFormatVersion.v1_0.rawValue
+        default:
+            return BackupFormatVersion.v1_0.rawValue
+        }
+    }
 }
 
 // MARK: - User Profile DTO (v1.6)
@@ -357,6 +631,11 @@ struct CheckInRecordDTO: Codable {
     let weather: String?
     let location: String?
     let isAIGenerated: Bool
+    
+    // v1.9+ 新增字段 - 今日穿搭色增强
+    let temperature: Double?  // 温度
+    let season: String?       // 季节
+    let petName: String?      // 萌宠推荐者名字
 }
 
 struct CheckInStatsDTO: Codable {

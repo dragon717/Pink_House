@@ -130,11 +130,13 @@ struct ClothingListView: View {
                 NavigationStack {
                     content
                         .navigationTitle("少女衣柜")
+                        .environment(\.containerPalette, containerPalette)
                 }
             } else {
                 NavigationSplitView {
                     content
                         .navigationTitle("少女衣柜")
+                        .environment(\.containerPalette, containerPalette)
                 } detail: {
                     ZStack {
                         LiquidBackground()
