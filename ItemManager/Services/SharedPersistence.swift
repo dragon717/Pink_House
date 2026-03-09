@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 import WidgetKit
 import SwiftUI
+import CoreData
 
 @MainActor
 class SharedContainer {
@@ -134,6 +135,46 @@ class SharedContainer {
         print("⚠️ recreateModelContainer 需要重新设计以支持 let container")
         #endif
     }
+    
+    #if !WIDGET_EXTENSION
+    /// 设置 iCloud 同步完成后的删除追踪器
+    /// 在 iCloud 同步完成后应用删除，避免访问失效对象导致崩溃
+    private func setupDeleteTrackerAfterSync(context: ModelContext) {
+        // 监听 iCloud 同步完成事件
+        NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self else { return }
+            
+            print("☁️ iCloud 同步完成通知收到，准备应用删除...")
+            
+            // 延迟一小段时间确保同步完全完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                print("DeleteTracker: iCloud 同步后应用删除...")
+                DeleteTracker.shared.applyAllDeletes(context: context)
+            }
+        }
+        
+        // 同时监听导入完成事件（从 iCloud 恢复数据时）
+        NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreDidImportUbiquitousContentChanges,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self else { return }
+            
+            print("☁️ iCloud 内容导入完成，准备应用删除...")
+            
+            // 延迟一小段时间确保导入完全完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                print("DeleteTracker: iCloud 导入后应用删除...")
+                DeleteTracker.shared.applyAllDeletes(context: context)
+            }
+        }
+    }
+    #endif
     
     // 同步数据给小组件
     // 这个方法应该在数据发生变化时调用（如添加、修改、删除衣物后）

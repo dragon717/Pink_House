@@ -127,6 +127,10 @@ struct MainContentView: View {
             // 全局解锁通知覆盖层
             GlobalUnlockNotificationOverlay()
                 .zIndex(3)
+            
+            // 全局拷贝提示覆盖层
+            GlobalCopyToast()
+                .zIndex(4)
         }
         .sheet(isPresented: $showDailyCheckIn) {
             DailyCheckInView()

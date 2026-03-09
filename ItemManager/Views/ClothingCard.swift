@@ -490,6 +490,16 @@ struct ClothingRowBrief: View {
     @Environment(\.containerPalette) private var palette
     @State private var image: UIImage?
     
+    /// 安全获取 Clothing 的属性，处理 iCloud 同步期间对象可能失效的情况
+    private func safeGetProperty<T>(_ getter: () throws -> T) -> T? {
+        do {
+            return try getter()
+        } catch {
+            print("ClothingRowBrief: 访问 Clothing 属性失败 - \(error)")
+            return nil
+        }
+    }
+    
     var body: some View {
         GlassCard {
             HStack(spacing: 12) {
@@ -509,57 +519,74 @@ struct ClothingRowBrief: View {
                     }
                 }
                 .task {
-                    if let firstPath = clothing.imagePaths.first {
-                        // List Brief: 文档建议 50x50
-                        // 之前是 80x80
-                        let size = CGSize(width: 50, height: 50)
-                        if let cached = ImageManager.shared.cachedImage(fileName: firstPath, targetSize: size) {
-                            self.image = cached
-                            return
-                        }
-                        try? await Task.sleep(nanoseconds: 50_000_000)
-                        if Task.isCancelled { return }
-                        self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
-                    } else {
-                        // 当图片被全部删除时，清空 image 以显示占位图
+                    // 安全访问 imagePaths，防止 iCloud 同步期间对象失效导致崩溃
+                    guard let firstPath = safeGetProperty({ clothing.imagePaths.first })?.flatMap({ $0 }) else {
                         self.image = nil
+                        return
                     }
+
+                    // List Brief: 文档建议 50x50
+                    // 之前是 80x80
+                    let size = CGSize(width: 50, height: 50)
+                    if let cached = ImageManager.shared.cachedImage(fileName: firstPath, targetSize: size) {
+                        self.image = cached
+                        return
+                    }
+                    try? await Task.sleep(nanoseconds: 50_000_000)
+                    if Task.isCancelled { return }
+                    self.image = await ImageManager.shared.loadImageAsync(fileName: firstPath, targetSize: size)
                 }
                 
-                Text(clothing.name)
-                    .font(.body)
-                    .foregroundStyle(palette.primary)
-                    .lineLimit(1)
+                // 安全显示名称
+                if let name = safeGetProperty({ clothing.name }) {
+                    Text(name)
+                        .font(.body)
+                        .foregroundStyle(palette.primary)
+                        .lineLimit(1)
+                }
 
                 Spacer()
 
-                if let brand = clothing.brand {
-                    Text(brand.name)
+                // 安全访问 brand
+                if let brand = safeGetProperty({ clothing.brand })?.flatMap({ $0 }),
+                   let brandName = safeGetProperty({ brand.name }) {
+                    Text(brandName)
                         .font(.caption)
                         .foregroundStyle(palette.secondary)
                         .lineLimit(1)
                 }
 
-                if showOriginalPrice && clothing.originalPrice > 0 {
-                    Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
-                        .font(.caption)
-                        .foregroundStyle(palette.secondary)
+                // 安全访问价格信息
+                if showOriginalPrice {
+                    if let originalPrice = safeGetProperty({ clothing.originalPrice }), originalPrice > 0 {
+                        Text("原价¥\(originalPrice, format: .number.precision(.fractionLength(0)))")
+                            .font(.caption)
+                            .foregroundStyle(palette.secondary)
+                    }
                 }
 
                 if showPrice {
-                    if clothing.isDepositPlan {
-                        let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
-                        let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
-                        Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
-                            .font(.caption)
-                            .bold()
-                            .foregroundStyle(palette.accent)
+                    if let isDepositPlan = safeGetProperty({ clothing.isDepositPlan }), isDepositPlan {
+                        if let totalDeposit = safeGetProperty({ clothing.totalDeposit }),
+                           let totalBalance = safeGetProperty({ clothing.totalBalance }),
+                           let stock = safeGetProperty({ clothing.stock }) {
+                            let depositValue = totalDeposit * Decimal(stock)
+                            let balanceValue = totalBalance * Decimal(stock)
+                            Text("定金¥\(depositValue, format: .number.precision(.fractionLength(0)))+尾款¥\(balanceValue, format: .number.precision(.fractionLength(0)))")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(palette.accent)
+                        }
                     } else {
-                        let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
-                        Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundStyle(palette.primary)
+                        if let price = safeGetProperty({ clothing.price }),
+                           let accessoriesPrice = safeGetProperty({ clothing.accessoriesPrice }),
+                           let stock = safeGetProperty({ clothing.stock }) {
+                            let totalWithAccessories = (price + accessoriesPrice) * Decimal(stock)
+                            Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundStyle(palette.primary)
+                        }
                     }
                 }
             }

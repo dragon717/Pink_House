@@ -23,6 +23,9 @@ struct MagicColorSettingsView: View {
     @State private var showingColorPicker = false
     @State private var colorPickerType: ColorPickerType = .primary
 
+    // 未解锁提示弹窗
+    @State private var showUnlockAlert = false
+
     // 卡片样式设置
     @State private var cardStyle: CardStyle = .solid
     @State private var skirtFillMode: SkirtFillMode = .transparent
@@ -56,8 +59,10 @@ struct MagicColorSettingsView: View {
                 .padding()
                 .onChange(of: selectedTab) { _, newValue in
                     if newValue == .magic && !unlockManager.isUnlocked(.themeCustomize) {
+                        // 未解锁时弹窗提示，并切回客制化页签
                         selectedTab = .custom
                         themeManager.switchColorSchemeMode(to: .custom)
+                        showUnlockAlert = true
                     } else {
                         themeManager.switchColorSchemeMode(to: newValue)
                     }
@@ -108,6 +113,12 @@ struct MagicColorSettingsView: View {
                     selectedColor: bindingForColorPickerType(),
                     onReset: { resetColorToDefault() }
                 )
+            }
+            .alert("魔法配色未解锁", isPresented: $showUnlockAlert) {
+                Button("知道了", role: .cancel) { }
+            } message: {
+                let condition = unlockManager.getCondition(for: .themeCustomize)
+                Text(condition.description)
             }
             .onAppear {
                 let savedMode = themeManager.colorSchemeMode

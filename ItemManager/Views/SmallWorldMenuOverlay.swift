@@ -133,96 +133,90 @@ struct SmallWorldMenuOverlay: View {
             let smallWorldTabCenterX = geometry.size.width * 0.375
             let smallWorldTabCenterY = isIPad ? triggerHeight / 2 : geometry.size.height - triggerHeight / 2
 
-            ZStack(alignment: .bottom) {
+            // 只在菜单显示时才使用全屏遮罩，否则只显示触发区域
+            if showMenu {
                 // 背景遮罩
-                if showMenu {
-                    Color.black.opacity(0.25)
-                        .ignoresSafeArea()
-                        .onTapGesture { closeMenu() }
-                        .transition(.opacity)
-                }
-
-                // 轮盘菜单（单层结构）
-                ZStack {
-                    // 单层菜单
-                    WheelMenuView(
-                        items: menuItems,
-                        radius: getMenuRadius(geometry: geometry),
-                        isLowMemoryDevice: isLowMemoryDevice,
-                        monicaPink: monicaPink,
-                        onItemSelected: { item in
-                            selectItem(item.destination)
-                        }
-                    )
-                    .position(x: menuOrigin.x, y: menuOrigin.y)
-                    .opacity(showMenu ? 1 : 0)
-                    .scaleEffect(showMenu ? 1 : 0.1)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showMenu)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(showMenu)
-
-                // 长按进度指示器
-                if isPressing && !showMenu {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white.opacity(0.3), lineWidth: 4)
-                            .frame(width: 60, height: 60)
-
-                        Circle()
-                            .trim(from: 0, to: pressProgress)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        monicaPink,
-                                        Color(red: 0.85, green: 0.75, blue: 0.85)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: 60, height: 60)
-                            .shadow(color: monicaPink.opacity(0.5), radius: 5)
-                    }
-                    .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
-                }
-
-                // 触发区域
-                Color.black.opacity(0.001)
-                    .contentShape(Rectangle())
-                    .frame(width: triggerAreaWidth, height: triggerHeight)
-                    .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
-                    .onLongPressGesture(
-                        minimumDuration: longPressDuration,
-                        maximumDistance: 20,
-                        pressing: { isPressing in
-                            if isPressing {
-                                self.isPressing = true
-                                self.startLocation = CGPoint(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
-                                #if canImport(UIKit)
-                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                generator.impactOccurred()
-                                #endif
-                                startLongPressTimer()
-                            } else {
-                                handlePressEnded()
-                            }
-                        },
-                        perform: {
-                            triggerMenu(smallWorldTabCenterX: smallWorldTabCenterX, smallWorldTabCenterY: smallWorldTabCenterY)
-                        }
-                    )
-                    .onTapGesture {
-                        if showMenu {
-                            closeMenu()
-                        } else {
-                            handleTapAction()
-                        }
-                    }
+                Color.black.opacity(0.25)
+                    .ignoresSafeArea()
+                    .onTapGesture { closeMenu() }
+                    .transition(.opacity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // 轮盘菜单（单层结构）- 只在显示时允许点击
+            if showMenu {
+                WheelMenuView(
+                    items: menuItems,
+                    radius: getMenuRadius(geometry: geometry),
+                    isLowMemoryDevice: isLowMemoryDevice,
+                    monicaPink: monicaPink,
+                    onItemSelected: { item in
+                        selectItem(item.destination)
+                    }
+                )
+                .position(x: menuOrigin.x, y: menuOrigin.y)
+                .transition(.scale.combined(with: .opacity))
+                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showMenu)
+            }
+
+            // 长按进度指示器
+            if isPressing && !showMenu {
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.3), lineWidth: 4)
+                        .frame(width: 60, height: 60)
+
+                    Circle()
+                        .trim(from: 0, to: pressProgress)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    monicaPink,
+                                    Color(red: 0.85, green: 0.75, blue: 0.85)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 60, height: 60)
+                        .shadow(color: monicaPink.opacity(0.5), radius: 5)
+                }
+                .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
+            }
+
+            // 触发区域 - 只在TabBar位置显示，不覆盖整个屏幕
+            Color.clear
+                .contentShape(Rectangle())
+                .frame(width: triggerAreaWidth, height: triggerHeight)
+                .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
+                .onLongPressGesture(
+                    minimumDuration: longPressDuration,
+                    maximumDistance: 20,
+                    pressing: { isPressing in
+                        if isPressing {
+                            self.isPressing = true
+                            self.startLocation = CGPoint(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
+                            #if canImport(UIKit)
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                            #endif
+                            startLongPressTimer()
+                        } else {
+                            handlePressEnded()
+                        }
+                    },
+                    perform: {
+                        triggerMenu(smallWorldTabCenterX: smallWorldTabCenterX, smallWorldTabCenterY: smallWorldTabCenterY)
+                    }
+                )
+                .onTapGesture {
+                    if showMenu {
+                        closeMenu()
+                    } else {
+                        handleTapAction()
+                    }
+                }
         }
         .ignoresSafeArea()
         .onChange(of: scenePhase) { newPhase in

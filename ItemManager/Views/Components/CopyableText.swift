@@ -8,8 +8,6 @@ struct CopyableText: View {
     var foregroundStyle: Color = .primary
     var alignment: TextAlignment = .trailing
     
-    @State private var showCopyFeedback = false
-    
     var body: some View {
         Text(text)
             .font(font)
@@ -23,12 +21,6 @@ struct CopyableText: View {
                         copyToClipboard()
                     }
             )
-            .overlay {
-                if showCopyFeedback {
-                    CopyFeedbackView(text: text)
-                        .transition(.scale.combined(with: .opacity))
-                }
-            }
     }
     
     private func copyToClipboard() {
@@ -38,66 +30,8 @@ struct CopyableText: View {
         let impact = UIImpactFeedbackGenerator(style: .light)
         impact.impactOccurred()
         
-        // 显示拷贝成功反馈
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            showCopyFeedback = true
-        }
-        
-        // 1.5秒后隐藏反馈
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showCopyFeedback = false
-            }
-        }
-    }
-}
-
-/// 拷贝成功弹窗视图 - 现代化设计
-private struct CopyFeedbackView: View {
-    let text: String
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            // 成功图标
-            ZStack {
-                Circle()
-                    .fill(Color.green.opacity(0.15))
-                    .frame(width: 70, height: 70)
-                
-                Circle()
-                    .fill(Color.green.opacity(0.25))
-                    .frame(width: 55, height: 55)
-                
-                Image(systemName: "doc.on.doc.fill")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.green)
-            }
-            
-            // 标题
-            Text("已拷贝到剪贴板")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.primary)
-            
-            // 拷贝的内容预览
-            Text(text)
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(Color(.systemBackground).opacity(0.95))
-                )
-        )
-        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        .frame(maxWidth: 280)
+        // 使用全局提示管理器显示提示
+        CopyToastManager.shared.show(text: text)
     }
 }
 

@@ -228,12 +228,15 @@ struct ClothingEditView: View {
     
     // 标记是否是通过"保存"按钮离开的
     @State private var isSaving = false
-    
+
     // 标记是否从草稿继续（false表示新建，清除草稿）
     private var continueFromDraft: Bool
-    
+
     // 标记是否已经处理过草稿逻辑（防止onAppear多次执行）
     @State private var hasProcessedDraft = false
+
+    // 标记是否已经进入后台（避免onDisappear重复保存草稿）
+    @State private var didEnterBackground = false
     
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
@@ -316,10 +319,15 @@ struct ClothingEditView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") {
-                    // 清除草稿
-                    draftManager.clearDraft()
-                    // 如果是新建状态且用户取消，需要清理已上传的图片
-                    if !isEditing {
+                    // 取消时如果有有效信息则保存草稿，方便用户下次恢复
+                    // 注意：保存草稿后不能删除图片文件，否则恢复草稿时图片会丢失
+                    if !isEditing && hasMeaningfulData() {
+                        print("ClothingEditView: Cancel with meaningful data, saving draft")
+                        saveCurrentStateAsDraft()
+                        // 草稿已保存，图片文件需要保留以便恢复时使用
+                    } else if !isEditing {
+                        // 只有在没有保存草稿的情况下，才清理已上传的图片
+                        print("ClothingEditView: Cancel without saving draft, deleting images")
                         for path in imagePaths {
                             ImageManager.shared.deleteImage(fileName: path, context: modelContext)
                         }
@@ -469,14 +477,20 @@ struct ClothingEditView: View {
         .onChange(of: length) { _, _ in updateCurrentDraft() }
         .onChange(of: condition) { _, _ in updateCurrentDraft() }
         .onChange(of: accessories) { _, _ in updateCurrentDraft() }
+        // 监听应用进入后台通知，设置标记避免重复保存
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            print("ClothingEditView: App did enter background")
+            didEnterBackground = true
+        }
         .onDisappear {
-            print("ClothingEditView: onDisappear, isSaving: \(isSaving), isEditing: \(isEditing)")
-            // 如果不是保存操作且不是编辑模式，保存草稿（作为后备方案）
-            if !isSaving && !isEditing {
+            print("ClothingEditView: onDisappear, isSaving: \(isSaving), isEditing: \(isEditing), didEnterBackground: \(didEnterBackground)")
+            // 如果不是保存操作且不是编辑模式且没有进入过后台，保存草稿
+            // 如果已经进入过后台，DraftManager会在后台通知中保存草稿，这里不需要重复保存
+            if !isSaving && !isEditing && !didEnterBackground {
                 print("ClothingEditView: Saving draft on disappear")
                 saveCurrentStateAsDraft()
             } else {
-                print("ClothingEditView: Not saving draft on disappear (isSaving: \(isSaving), isEditing: \(isEditing))")
+                print("ClothingEditView: Not saving draft on disappear (isSaving: \(isSaving), isEditing: \(isEditing), didEnterBackground: \(didEnterBackground))")
             }
         }
         .onChange(of: deposit) { oldValue, newValue in
@@ -623,6 +637,25 @@ struct ClothingEditView: View {
         selectedTags = []
         draftID = UUID()
         print("ClothingEditView: All states reset, new draftID: \(draftID)")
+    }
+    
+    // 检查是否有有效信息（用于判断是否需要保存草稿）
+    private func hasMeaningfulData() -> Bool {
+        // 如果有名称、图片、品牌、类型、颜色、尺码等任何有效信息，则认为有草稿价值
+        let hasName = !name.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasImages = !imagePaths.isEmpty
+        let hasBrand = !brandName.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasTypes = !types.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasColors = !colors.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasSizes = !sizes.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasPrice = priceTotal > 0 || deposit > 0 || balance > 0
+        let hasNote = !note.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasAccessories = !accessoryList.isEmpty
+        let hasTags = !selectedTags.isEmpty
+        
+        let result = hasName || hasImages || hasBrand || hasTypes || hasColors || hasSizes || hasPrice || hasNote || hasAccessories || hasTags
+        print("ClothingEditView: hasMeaningfulData = \(result) (name: \(hasName), images: \(hasImages), brand: \(hasBrand), types: \(hasTypes), colors: \(hasColors), sizes: \(hasSizes), price: \(hasPrice), note: \(hasNote), accessories: \(hasAccessories), tags: \(hasTags))")
+        return result
     }
     
     private func normalizeTags(_ input: String) -> String {

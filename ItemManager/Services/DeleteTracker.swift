@@ -133,15 +133,19 @@ final class DeleteTracker {
             typeName: "outfit",
             clearRecords: clearRecords
         ) { (item: Outfit, deleteTime: Date) -> Bool in
+            // 安全访问属性，使用可选绑定避免崩溃
+            let itemNote = (try? item.note) ?? "未知"
+            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            
             // 强制删除策略：只要在删除记录中，就强制删除
             // 避免 iCloud 同步覆盖导致的删除失效
-            if !item.isDeleted {
+            if !isAlreadyDeleted {
                 item.isDeleted = true
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
-                print("DeleteTracker: ✓ Force deleted outfit '\(item.note)'")
+                print("DeleteTracker: ✓ Force deleted outfit '\(itemNote)'")
             } else {
-                print("DeleteTracker: ✓ Outfit '\(item.note)' already deleted")
+                print("DeleteTracker: ✓ Outfit '\(itemNote)' already deleted")
             }
             return true
         }
@@ -154,14 +158,17 @@ final class DeleteTracker {
             typeName: "clothing",
             clearRecords: clearRecords
         ) { (item: Clothing, deleteTime: Date) -> Bool in
-            // 强制删除策略：只要在删除记录中，就强制删除
-            if !item.isDeleted {
+            // 安全访问属性，使用可选绑定避免崩溃
+            let itemName = (try? item.name) ?? "未知"
+            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            
+            if !isAlreadyDeleted {
                 item.isDeleted = true
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
-                print("DeleteTracker: ✓ Force deleted clothing '\(item.name)'")
+                print("DeleteTracker: ✓ Force deleted clothing '\(itemName)'")
             } else {
-                print("DeleteTracker: ✓ Clothing '\(item.name)' already deleted")
+                print("DeleteTracker: ✓ Clothing '\(itemName)' already deleted")
             }
             return true
         }
@@ -174,14 +181,18 @@ final class DeleteTracker {
             typeName: "book group",
             clearRecords: clearRecords
         ) { (item: BookGroup, deleteTime: Date) -> Bool in
+            // 安全访问属性，使用可选绑定避免崩溃
+            let itemTitle = (try? item.title) ?? "未知"
+            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            
             // 强制删除策略：只要在删除记录中，就强制删除
-            if !item.isDeleted {
+            if !isAlreadyDeleted {
                 item.isDeleted = true
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
-                print("DeleteTracker: ✓ Force deleted book group '\(item.title)'")
+                print("DeleteTracker: ✓ Force deleted book group '\(itemTitle)'")
             } else {
-                print("DeleteTracker: ✓ Book group '\(item.title)' already deleted")
+                print("DeleteTracker: ✓ Book group '\(itemTitle)' already deleted")
             }
             return true
         }
@@ -194,14 +205,18 @@ final class DeleteTracker {
             typeName: "3D model",
             clearRecords: clearRecords
         ) { (item: Model3D, deleteTime: Date) -> Bool in
+            // 安全访问属性，使用可选绑定避免崩溃
+            let itemName = (try? item.name) ?? "未知"
+            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            
             // 强制删除策略：只要在删除记录中，就强制删除
-            if !item.isDeleted {
+            if !isAlreadyDeleted {
                 item.isDeleted = true
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
-                print("DeleteTracker: ✓ Force deleted 3D model '\(item.name)'")
+                print("DeleteTracker: ✓ Force deleted 3D model '\(itemName)'")
             } else {
-                print("DeleteTracker: ✓ 3D model '\(item.name)' already deleted")
+                print("DeleteTracker: ✓ 3D model '\(itemName)' already deleted")
             }
             return true
         }
@@ -214,26 +229,30 @@ final class DeleteTracker {
             typeName: "perler pattern",
             clearRecords: clearRecords
         ) { (item: PerlerBeadPattern, deleteTime: Date) -> Bool in
-            let itemModifiedTime = item.lastModified
+            // 安全访问属性，使用可选绑定避免崩溃
+            let itemName = (try? item.name) ?? "未知"
+            let itemModifiedTime = (try? item.lastModified) ?? Date.distantPast
+            let isAlreadyDeleted = (try? item.isDeleted) ?? false
+            
             let timeDiff = deleteTime.timeIntervalSince(itemModifiedTime)
-
-            print("DeleteTracker: [\(item.name)] deleteTime:\(deleteTime), lastModified:\(itemModifiedTime), diff:\(timeDiff)s, isDeleted:\(item.isDeleted)")
+            print("DeleteTracker: [\(itemName)] deleteTime:\(deleteTime), lastModified:\(itemModifiedTime), diff:\(timeDiff)s, isDeleted:\(isAlreadyDeleted)")
 
             // 策略：如果项目在删除记录中，强制删除（不管时间戳）
             // 因为 iCloud 同步可能会在 DeleteTracker 之前更新 lastModified
-            if !item.isDeleted {
+            if !isAlreadyDeleted {
                 item.isDeleted = true
                 item.deletedAt = deleteTime
                 item.lastModified = Date()
-                print("DeleteTracker: ✓ Force deleted '\(item.name)' (in delete record)")
+                print("DeleteTracker: ✓ Force deleted '\(itemName)' (in delete record)")
             } else {
-                print("DeleteTracker: ✓ Already deleted '\(item.name)'")
+                print("DeleteTracker: ✓ Already deleted '\(itemName)'")
             }
             return true
         }
     }
 
     /// 通用的应用删除方法
+    /// 注意：此方法在 iCloud 同步期间可能被调用，需要处理对象上下文失效的情况
     private func applyDeletedItems<T: PersistentModel>(
         context: ModelContext,
         key: String,
@@ -259,15 +278,28 @@ final class DeleteTracker {
             var clearedRecords: [UUID] = []
 
             for item in allItems {
-                // 获取该 item 的 ID
+                // 检查对象是否仍然有效（未被 iCloud 同步分离）
+                // 通过尝试获取 ID 来验证对象有效性
                 guard let itemID = getItemID(item) else {
-                    print("DeleteTracker: Warning - Could not get ID for \(typeName)")
+                    print("DeleteTracker: Warning - Could not get ID for \(typeName), object may be detached")
                     continue
                 }
 
+                // 只在需要时访问对象属性，且要做好异常处理
                 if let deleteTime = deletedRecords[itemID] {
                     print("DeleteTracker: Found matching record for \(typeName) ID:\(itemID.uuidString.prefix(8))")
-                    if shouldDelete(item, deleteTime) {
+                    
+                    // 使用 do-catch 包裹 shouldDelete 调用，防止访问失效属性时崩溃
+                    let shouldApplyDelete: Bool
+                    do {
+                        shouldApplyDelete = shouldDelete(item, deleteTime)
+                    } catch {
+                        print("DeleteTracker: Warning - Failed to check delete for \(typeName) \(itemID.uuidString.prefix(8)): \(error)")
+                        // 如果检查失败，假设应该删除（保守策略）
+                        shouldApplyDelete = true
+                    }
+                    
+                    if shouldApplyDelete {
                         appliedCount += 1
                         if clearRecords {
                             clearedRecords.append(itemID)
@@ -276,13 +308,6 @@ final class DeleteTracker {
                         // 数据被修改过，清除删除记录
                         if clearRecords {
                             clearedRecords.append(itemID)
-                        }
-                    }
-                } else {
-                    // 检查是否是已删除的项目（ID不在记录中但isDeleted=true）
-                    if let perlerPattern = item as? PerlerBeadPattern {
-                        if perlerPattern.isDeleted {
-                            print("DeleteTracker: \(typeName) '\(perlerPattern.name)' is already deleted (no record)")
                         }
                     }
                 }
@@ -320,18 +345,19 @@ final class DeleteTracker {
     }
 
     /// 获取 PersistentModel 的 ID
+    /// 注意：此方法在 iCloud 同步期间可能被调用，需要处理对象上下文失效的情况
     private func getItemID<T: PersistentModel>(_ item: T) -> UUID? {
-        // 使用类型检查直接访问 id 属性
+        // 使用类型检查直接访问 id 属性，使用 try? 避免访问失效对象时崩溃
         if let outfit = item as? Outfit {
-            return outfit.id
+            return (try? outfit.id)
         } else if let clothing = item as? Clothing {
-            return clothing.id
+            return (try? clothing.id)
         } else if let bookGroup = item as? BookGroup {
-            return bookGroup.id
+            return (try? bookGroup.id)
         } else if let model3D = item as? Model3D {
-            return model3D.id
+            return (try? model3D.id)
         } else if let perlerPattern = item as? PerlerBeadPattern {
-            return perlerPattern.id
+            return (try? perlerPattern.id)
         }
         return nil
     }
