@@ -221,6 +221,71 @@ class AuthenticationManager: NSObject, ObservableObject {
         errorMessage = nil
     }
     
+    // MARK: - 账号删除功能 (App Store 审核要求)
+    
+    /// 删除用户账号及所有相关数据
+    func deleteAccount() async throws {
+        guard !userIdentifier.isEmpty else {
+            throw AuthError.notAuthenticated
+        }
+        
+        let userIdToDelete = userIdentifier
+        
+        // 1. 删除用户头像文件
+        if !customAvatarPath.isEmpty {
+            let fileURL = avatarFileURL
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+        
+        // 2. 从用户资料列表中删除该用户
+        var profiles: [String: UserProfile] = [:]
+        if let data = userProfilesData.data(using: .utf8),
+           let existing = try? JSONDecoder().decode([String: UserProfile].self, from: data) {
+            profiles = existing
+        }
+        profiles.removeValue(forKey: userIdToDelete)
+        
+        if let data = try? JSONEncoder().encode(profiles),
+           let json = String(data: data, encoding: .utf8) {
+            userProfilesData = json
+        }
+        
+        // 3. 清除所有用户数据
+        await MainActor.run {
+            userIdentifier = ""
+            givenName = ""
+            familyName = ""
+            email = ""
+            customNickname = ""
+            customAvatarPath = ""
+            cachedUserIdentifier = ""
+            cachedGivenName = ""
+            cachedFamilyName = ""
+            cachedEmail = ""
+            isAuthenticated = false
+        }
+        
+        // 4. 清除应用相关数据 (可选：根据隐私政策)
+        // 注意：这里不清除用户的衣橱数据，因为那是用户的个人内容
+        // 如果需要完全清除所有数据，可以在这里添加
+        
+        AppLogger.info("用户账号已删除: \(userIdToDelete)")
+    }
+    
+    enum AuthError: Error, LocalizedError {
+        case notAuthenticated
+        case deletionFailed(String)
+        
+        var errorDescription: String? {
+            switch self {
+            case .notAuthenticated:
+                return "用户未登录"
+            case .deletionFailed(let message):
+                return "删除失败: \(message)"
+            }
+        }
+    }
+    
     // MARK: - 登录流程
     
     func handleSignIn(result: Result<ASAuthorization, Error>) {

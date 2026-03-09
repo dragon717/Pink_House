@@ -14,6 +14,12 @@ struct UserProfileEditView: View {
     @State private var showActionSheet = false
     @State private var showClearAvatarConfirm = false
     
+    // 账号删除相关状态
+    @State private var showingDeleteAccountConfirm = false
+    @State private var showingDeleteAccountFinalConfirm = false
+    @State private var isDeletingAccount = false
+    @State private var deleteError: String?
+    
     // 裁剪相关状态
     @State private var cropRequest: CropRequest?
     @State private var pendingCameraImage: UIImage? // 临时存储相机图片
@@ -37,6 +43,11 @@ struct UserProfileEditView: View {
                         
                         // 昵称输入区域
                         nicknameSection
+                        
+                        // 账号删除区域 (仅在已登录时显示)
+                        if authManager.isAuthenticated {
+                            deleteAccountSection
+                        }
                         
                         Spacer()
                     }
@@ -125,6 +136,102 @@ struct UserProfileEditView: View {
                         cropRequest = nil
                     }
                 )
+            }
+            // 账号删除确认弹窗 (第一步)
+            .alert("删除账号", isPresented: $showingDeleteAccountConfirm) {
+                Button("取消", role: .cancel) {}
+                Button("继续", role: .destructive) {
+                    showingDeleteAccountFinalConfirm = true
+                }
+            } message: {
+                Text("删除账号将清除您的登录信息和个性化设置。\n\n您的衣橱数据将保留在设备本地，但 iCloud 同步功能将停止。\n\n此操作无法撤销。")
+            }
+            // 账号删除最终确认弹窗 (第二步)
+            .alert("最终确认", isPresented: $showingDeleteAccountFinalConfirm) {
+                Button("取消", role: .cancel) {}
+                Button("确认删除", role: .destructive) {
+                    performDeleteAccount()
+                }
+            } message: {
+                Text("您确定要删除账号吗？此操作将立即生效且无法恢复。")
+            }
+            // 删除中状态
+            .overlay {
+                if isDeletingAccount {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                        
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("正在删除账号...")
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - 账号删除区域
+    private var deleteAccountSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("账号管理")
+                .font(.headline)
+                .foregroundStyle(.primary)
+            
+            Button(action: {
+                showingDeleteAccountConfirm = true
+            }) {
+                HStack {
+                    Image(systemName: "person.crop.circle.badge.xmark")
+                        .foregroundStyle(.red)
+                    
+                    Text("删除账号")
+                        .foregroundStyle(.red)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.red.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.red.opacity(0.2), lineWidth: 1)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Text("删除账号将移除您的 Apple ID 关联信息，但保留本地数据。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+        }
+    }
+    
+    // MARK: - 执行账号删除
+    private func performDeleteAccount() {
+        isDeletingAccount = true
+        
+        Task {
+            do {
+                try await authManager.deleteAccount()
+                await MainActor.run {
+                    isDeletingAccount = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isDeletingAccount = false
+                    deleteError = error.localizedDescription
+                }
             }
         }
     }

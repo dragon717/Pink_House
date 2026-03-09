@@ -72,6 +72,12 @@ class PetAIService: ObservableObject {
     // Maintain simple history for API context
     private var history: [DSMessage] = []
     
+    // 用于取消 AI 请求的任务
+    private var currentTask: Task<Void, Never>?
+    
+    // 停止生成标志
+    private var shouldStopGeneration = false
+    
     private init() {
         // Initialize with placeholder history
         self.history = [
@@ -305,8 +311,19 @@ class PetAIService: ObservableObject {
         return await sendMessage(messageWithContext, userImagePath: imagePath, displayText: text)
     }
 
+    // MARK: - 停止生成
+    func stopGeneration() {
+        shouldStopGeneration = true
+        currentTask?.cancel()
+        isProcessing = false
+        print("🛑 [PetAIService] 用户停止生成")
+    }
+    
     func sendMessage(_ text: String, userImagePath: String? = nil, displayText: String? = nil) async -> ChatMessage {
         print("🐾 [Debug] 准备发送消息给奶茶猫 (DeepSeek): \(text)")
+        
+        // 重置停止标志
+        shouldStopGeneration = false
         
         // 1. 记录用户消息 (Use displayText if available, otherwise raw text)
         let userMsg = ChatMessage(text: displayText ?? text, imagePath: userImagePath, isUser: true)
@@ -315,7 +332,11 @@ class PetAIService: ObservableObject {
         self.saveMessages()
         
         self.isProcessing = true
-        defer { self.isProcessing = false }
+        defer { 
+            if !shouldStopGeneration {
+                self.isProcessing = false 
+            }
+        }
         
         // 捕获必要的上下文以传递给后台任务
         let currentHistory = self.history

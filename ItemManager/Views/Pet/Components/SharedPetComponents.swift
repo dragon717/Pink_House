@@ -75,7 +75,11 @@ struct StampView: View {
 // MARK: - Message Bubble
 struct MessageBubble: View {
     let message: ChatMessage
+    var isAI: Bool = false
     var onImageTap: ((UIImage) -> Void)? = nil
+    var onReport: (() -> Void)? = nil
+    
+    @State private var showingReportButton = false
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -143,6 +147,18 @@ struct MessageBubble: View {
             } else {
                 // AI 回复
                 VStack(alignment: .leading, spacing: 4) {
+                    // AI 生成标识
+                    if isAI {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.caption2)
+                            Text("AI 生成")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.pink.opacity(0.8))
+                        .padding(.leading, 4)
+                    }
+                    
                     VStack(alignment: .leading, spacing: 8) {
                         // 1. 图片内容 (如果有)
                         if let imageName = message.imageName {
@@ -197,12 +213,36 @@ struct MessageBubble: View {
                             .corners([.topLeft, .topRight, .bottomRight], radius: 20)
                             .corners([.bottomLeft], radius: 4)
                             .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                            .onLongPressGesture {
+                                if isAI {
+                                    showingReportButton = true
+                                }
+                            }
                     }
                     
-                    Text(formatTimestamp(message.timestamp))
-                        .font(.caption2)
-                        .foregroundStyle(.gray.opacity(0.8))
-                        .padding(.leading, 4)
+                    HStack(spacing: 12) {
+                        Text(formatTimestamp(message.timestamp))
+                            .font(.caption2)
+                            .foregroundStyle(.gray.opacity(0.8))
+                        
+                        // 举报按钮 (长按后显示)
+                        if isAI && showingReportButton {
+                            Button(action: {
+                                onReport?()
+                                showingReportButton = false
+                            }) {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "exclamationmark.bubble")
+                                        .font(.caption2)
+                                    Text("举报")
+                                        .font(.caption2)
+                                }
+                                .foregroundStyle(.pink)
+                            }
+                            .transition(.opacity.combined(with: .scale))
+                        }
+                    }
+                    .padding(.leading, 4)
                 }
                 
                 Spacer()
