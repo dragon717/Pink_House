@@ -87,21 +87,24 @@ struct AdaptiveSection<Content: View>: View {
     private var sectionBackground: some View {
         let isDark = colorScheme == .dark
         let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
-        
+
         return Group {
             switch themeManager.cardStyle {
             case .solid:
                 cardColors.backgroundRGBA.color
             case .transparent:
                 // 使用高斯模糊材质，类似 VIP 卡片样式
-                .ultraThinMaterial
+                Rectangle()
+                    .fill(.ultraThinMaterial)
                     .overlay(cardColors.backgroundRGBA.color.opacity(themeManager.transparentOpacity * 0.5))
             case .fullyTransparent:
                 // 完全透明时使用高斯模糊
-                .ultraThinMaterial
+                Rectangle()
+                    .fill(.ultraThinMaterial)
             case .tinted:
                 // 色调模式：使用高斯模糊材质叠加主题色调
-                .ultraThinMaterial
+                Rectangle()
+                    .fill(.ultraThinMaterial)
                     .overlay(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
             }
         }

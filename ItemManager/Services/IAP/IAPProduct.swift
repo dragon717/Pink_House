@@ -186,39 +186,51 @@ struct MeowCoinAccount: Codable {
     var totalPurchased: Int = 0             // 累计购买
     var totalSpent: Int = 0                 // 累计消费
     var lastUpdated: Date = Date()
-    var firstPurchaseCompleted: Bool = false // 是否已完成首次购买（用于双倍活动）
+    // 每个商品档位的首充完成状态，key为productID
+    var firstPurchaseCompletedByProduct: [String: Bool] = [:]
 
     static let storageKey = "MeowCoinAccount"
 }
 
 // MARK: - 首次双倍活动管理
+// 每个商品档位独立计算首充双倍
 struct FirstDoubleBonusManager {
     static let shared = FirstDoubleBonusManager()
 
-    // 检查是否还有首次双倍资格
-    func hasFirstDoubleBonus() -> Bool {
+    // 检查指定商品是否还有首次双倍资格
+    func hasFirstDoubleBonus(for productID: String) -> Bool {
         let account = StoreManager.loadMeowCoinAccount()
-        return !account.firstPurchaseCompleted
+        return !(account.firstPurchaseCompletedByProduct[productID] ?? false)
     }
 
-    // 标记首次购买已完成
-    func markFirstPurchaseCompleted() {
+    // 检查是否还有任何商品档位有首充双倍资格（用于显示全局横幅）
+    func hasAnyFirstDoubleBonus() -> Bool {
+        let account = StoreManager.loadMeowCoinAccount()
+        for productID in IAPProductType.coinProductIDs {
+            if !(account.firstPurchaseCompletedByProduct[productID] ?? false) {
+                return true
+            }
+        }
+        return false
+    }
+
+    // 标记指定商品的首次购买已完成
+    func markFirstPurchaseCompleted(for productID: String) {
         var account = StoreManager.loadMeowCoinAccount()
-        account.firstPurchaseCompleted = true
+        account.firstPurchaseCompletedByProduct[productID] = true
         StoreManager.saveMeowCoinAccount(account)
     }
 
     // 计算实际获得的喵币（包含首次双倍）
     func calculateActualCoins(baseAmount: Int, bonusAmount: Int, productID: String) -> (total: Int, isFirstDouble: Bool) {
-        let isFirstDouble = hasFirstDoubleBonus()
+        let isFirstDouble = hasFirstDoubleBonus(for: productID)
 
         if isFirstDouble {
-            // 首次购买：基础数量双倍，赠送数量不变
-            let doubledBase = baseAmount * 2
-            let total = doubledBase + bonusAmount
+            // 首次购买该档位：基础数量双倍（不包含赠送）
+            let total = baseAmount * 2
             return (total, true)
         } else {
-            // 非首次：正常计算
+            // 非首次购买该档位：基础金额 + 赠送
             let total = baseAmount + bonusAmount
             return (total, false)
         }

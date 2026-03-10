@@ -596,6 +596,8 @@ struct LabActionCard: View {
     let title: String
     let subtitle: String
     let color: Color
+    var tag: String? = nil
+    var tagColor: Color = .red
     @Environment(ThemeManager.self) private var themeManager
 
     var body: some View {
@@ -618,6 +620,15 @@ struct LabActionCard: View {
             }
 
             Spacer()
+
+            if let tag = tag {
+                Text(tag)
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(tagColor))
+            }
 
             Image(systemName: "chevron.right")
                 .font(.caption)
@@ -1617,10 +1628,10 @@ struct IAPTestView: View {
                     }
 
                     HStack {
-                        Text("首次购买")
+                        Text("首充状态")
                         Spacer()
-                        Text(testManager.hasFirstDoubleBonus() ? "✅ 可享受双倍" : "已完成")
-                            .foregroundStyle(testManager.hasFirstDoubleBonus() ? .green : themeManager.secondaryTextColor)
+                        Text(FirstDoubleBonusManager.shared.hasAnyFirstDoubleBonus() ? "✅ 有档位可享受双倍" : "所有档位已完成")
+                            .foregroundStyle(FirstDoubleBonusManager.shared.hasAnyFirstDoubleBonus() ? .green : themeManager.secondaryTextColor)
                     }
                 }
                 .padding()
@@ -1640,71 +1651,68 @@ struct IAPTestView: View {
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
 
-                    // 首充档位
+                    // 60喵币档位
+                    let hasFirstDouble60 = testManager.hasFirstDoubleBonus(for: "com.pinkhouse.app.meowcoin_60")
                     Button {
-                        testManager.addMeowCoins(60, isFirstDouble: true)
+                        testManager.addMeowCoins(60, productID: "com.pinkhouse.app.meowcoin_60", isFirstDouble: true)
                         viewModel.loadUserData()
                     } label: {
                         LabActionCard(
                             icon: "pawprint.fill",
                             title: "首充档位 (60喵币)",
-                            subtitle: "获得120喵币（首充双倍）",
-                            color: themeManager.accentTextColor
+                            subtitle: hasFirstDouble60 ? "获得120喵币（首充双倍）" : "获得66喵币（+10%赠送）",
+                            color: themeManager.accentTextColor,
+                            tag: hasFirstDouble60 ? "首充双倍" : "+10%",
+                            tagColor: hasFirstDouble60 ? .red : .orange
                         )
                     }
 
+                    // 300喵币档位
+                    let hasFirstDouble300 = testManager.hasFirstDoubleBonus(for: "com.pinkhouse.app.meowcoin_300")
                     Button {
-                        testManager.addMeowCoins(300, isFirstDouble: true)
+                        testManager.addMeowCoins(300, productID: "com.pinkhouse.app.meowcoin_300", isFirstDouble: true)
                         viewModel.loadUserData()
                     } label: {
                         LabActionCard(
                             icon: "pawprint.fill",
                             title: "中充档位 (300喵币)",
-                            subtitle: "获得600喵币（首充双倍）",
-                            color: themeManager.accentTextColor
+                            subtitle: hasFirstDouble300 ? "获得600喵币（首充双倍）" : "获得330喵币（+10%赠送）",
+                            color: themeManager.accentTextColor,
+                            tag: hasFirstDouble300 ? "首充双倍" : "+10%",
+                            tagColor: hasFirstDouble300 ? .red : .orange
                         )
                     }
 
+                    // 500喵币档位
+                    let hasFirstDouble500 = testManager.hasFirstDoubleBonus(for: "com.pinkhouse.app.meowcoin_500")
                     Button {
-                        testManager.addMeowCoins(3280, isFirstDouble: true)
-                        viewModel.loadUserData()
-                    } label: {
-                        LabActionCard(
-                            icon: "pawprint.fill",
-                            title: "土豪档位 (3280喵币)",
-                            subtitle: "获得6560喵币（首充双倍）",
-                            color: themeManager.accentTextColor
-                        )
-                    }
-
-                    // 非首充档位
-                    Button {
-                        testManager.addMeowCoins(500, isFirstDouble: false)
+                        testManager.addMeowCoins(500, productID: "com.pinkhouse.app.meowcoin_500", isFirstDouble: true)
                         viewModel.loadUserData()
                     } label: {
                         LabActionCard(
                             icon: "pawprint",
                             title: "普通档位 (500喵币)",
-                            subtitle: "获得575喵币（+15%赠送）",
-                            color: themeManager.secondaryTextColor
+                            subtitle: hasFirstDouble500 ? "获得1000喵币（首充双倍）" : "获得575喵币（+15%赠送）",
+                            color: themeManager.secondaryTextColor,
+                            tag: hasFirstDouble500 ? "首充双倍" : "+15%",
+                            tagColor: hasFirstDouble500 ? .red : .green
                         )
                     }
 
-                    // 自定义数量
-                    HStack {
-                        TextField("自定义数量", text: $customAmount)
-                            .keyboardType(.numberPad)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-
-                        Button("添加") {
-                            if let amount = Int(customAmount) {
-                                testManager.addMeowCoins(amount)
-                                viewModel.loadUserData()
-                                customAmount = ""
-                            }
-                        }
-                        .disabled(customAmount.isEmpty)
-                        .buttonStyle(.borderedProminent)
+                    // 3280喵币档位
+                    let hasFirstDouble3280 = testManager.hasFirstDoubleBonus(for: "com.pinkhouse.app.meowcoin_3280")
+                    Button {
+                        testManager.addMeowCoins(3280, productID: "com.pinkhouse.app.meowcoin_3280", isFirstDouble: true)
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "pawprint.fill",
+                            title: "土豪档位 (3280喵币)",
+                            subtitle: hasFirstDouble3280 ? "获得6560喵币（首充双倍）" : "获得4428喵币（+35%赠送）",
+                            color: themeManager.accentTextColor,
+                            tag: hasFirstDouble3280 ? "首充双倍" : "+35%",
+                            tagColor: hasFirstDouble3280 ? .red : .purple
+                        )
                     }
                 }
                 .padding(.horizontal)
@@ -1755,13 +1763,13 @@ struct IAPTestView: View {
                         )
 
                     Button {
-                        testManager.resetFirstPurchase()
+                        testManager.resetAllFirstPurchases()
                         viewModel.loadUserData()
                     } label: {
                         LabActionCard(
                             icon: "arrow.counterclockwise",
-                            title: "重置首次购买状态",
-                            subtitle: "清除后可重新测试首充双倍",
+                            title: "重置所有首充状态",
+                            subtitle: "清除后可重新测试各档位首充双倍",
                             color: .green
                         )
                     }

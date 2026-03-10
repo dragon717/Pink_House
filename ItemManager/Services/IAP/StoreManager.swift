@@ -299,9 +299,9 @@ class StoreManager: ObservableObject {
             productID: transaction.productID
         )
 
-        // 如果是首次购买，标记为已完成
+        // 如果是首次购买该档位，标记为已完成
         if isFirstDouble {
-            FirstDoubleBonusManager.shared.markFirstPurchaseCompleted()
+            FirstDoubleBonusManager.shared.markFirstPurchaseCompleted(for: transaction.productID)
         }
 
         // 更新用户喵币余额

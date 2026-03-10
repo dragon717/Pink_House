@@ -29,7 +29,8 @@ class IAPTestManager: ObservableObject {
     // MARK: - 模拟服务器数据（仅在测试模式使用）
     @Published var mockBalance: Int = 0
     @Published var mockIsVIP: Bool = false
-    @Published var mockFirstPurchaseCompleted: Bool = false
+    // 每个商品档位的首充完成状态，key为productID
+    @Published var mockFirstPurchaseCompletedByProduct: [String: Bool] = [:]
 
     // MARK: - 测试配置
     struct TestConfig {
@@ -57,9 +58,9 @@ class IAPTestManager: ObservableObject {
 
     /// 清除所有购买记录（用于测试首次购买体验）
     func clearAllPurchaseRecords() {
-        // 1. 清除本地首次购买标记
-        mockFirstPurchaseCompleted = false
-        UserDefaults.standard.set(false, forKey: "iap_first_purchase_completed")
+        // 1. 清除本地首次购买标记（按商品档位）
+        mockFirstPurchaseCompletedByProduct.removeAll()
+        UserDefaults.standard.removeObject(forKey: "iap_first_purchase_completed_by_product")
 
         // 2. 清除已处理的交易ID
         UserDefaults.standard.removeObject(forKey: "ProcessedTransactionIDs")
@@ -81,16 +82,37 @@ class IAPTestManager: ObservableObject {
 
     /// 快速添加喵币（测试用）
     /// - Parameters:
-    ///   - amount: 数量
-    ///   - isFirstDouble: 是否应用首充双倍
-    func addMeowCoins(_ amount: Int, isFirstDouble: Bool = false) {
-        let finalAmount = isFirstDouble ? amount * 2 : amount
+    ///   - amount: 数量（仅用于自定义数量，档位购买请使用productID）
+    ///   - productID: 商品ID（用于计算正确的首充双倍或赠送金额）
+    ///   - isFirstDouble: 是否尝试应用首充双倍（会根据实际首充状态校验）
+    func addMeowCoins(_ amount: Int, productID: String? = nil, isFirstDouble: Bool = false) {
+        let finalAmount: Int
+        let shouldApplyFirstDouble: Bool
+
+        if let pid = productID, let type = IAPProductType(rawValue: pid) {
+            // 有productID时，使用正确的档位计算逻辑
+            let (baseAmount, bonus) = getMockCoinAmount(for: type)
+            let hasBonus = hasFirstDoubleBonus(for: pid)
+            shouldApplyFirstDouble = isFirstDouble && hasBonus && testConfig.enableFirstDouble
+
+            if shouldApplyFirstDouble {
+                // 首充双倍：基础金额翻倍（不包含赠送）
+                finalAmount = baseAmount * 2
+            } else {
+                // 非首充：基础金额 + 赠送
+                finalAmount = baseAmount + bonus
+            }
+        } else {
+            // 没有productID时（自定义数量），按原来的逻辑
+            shouldApplyFirstDouble = isFirstDouble && testConfig.enableFirstDouble
+            finalAmount = shouldApplyFirstDouble ? amount * 2 : amount
+        }
 
         if isTestMode {
             mockBalance += finalAmount
-            // 如果是首充双倍，标记首次购买已完成
-            if isFirstDouble {
-                markFirstPurchaseCompleted()
+            // 如果实际应用了首充双倍，标记该商品首次购买已完成
+            if shouldApplyFirstDouble, let pid = productID {
+                markFirstPurchaseCompleted(for: pid)
             }
             saveMockData()
         }
@@ -100,9 +122,9 @@ class IAPTestManager: ObservableObject {
         account.balance += finalAmount
         account.totalPurchased += finalAmount
         account.lastUpdated = Date()
-        // 如果是首充双倍，标记首次购买已完成
-        if isFirstDouble {
-            account.firstPurchaseCompleted = true
+        // 如果实际应用了首充双倍，标记该商品首次购买已完成
+        if shouldApplyFirstDouble, let pid = productID {
+            account.firstPurchaseCompletedByProduct[pid] = true
         }
         StoreManager.saveMeowCoinAccount(account)
 
@@ -111,7 +133,14 @@ class IAPTestManager: ObservableObject {
         status.meowCoin = account.balance
         PetDataManager.shared.saveStatus(status)
 
-        print("[IAPTestManager] ✅ 已添加 \(finalAmount) 喵币")
+        if shouldApplyFirstDouble {
+            print("[IAPTestManager] ✅ 已添加 \(finalAmount) 喵币（首充双倍）")
+        } else if let pid = productID {
+            let (_, bonus) = getMockCoinAmount(for: IAPProductType(rawValue: pid)!)
+            print("[IAPTestManager] ✅ 已添加 \(finalAmount) 喵币（含赠送 \(bonus)）")
+        } else {
+            print("[IAPTestManager] ✅ 已添加 \(finalAmount) 喵币")
+        }
     }
 
     /// 设置喵币余额（直接设置，非累加）
@@ -178,37 +207,49 @@ class IAPTestManager: ObservableObject {
 
     // MARK: - 首次购买测试
 
-    /// 标记首次购买已完成
-    func markFirstPurchaseCompleted() {
-        mockFirstPurchaseCompleted = true
-        UserDefaults.standard.set(true, forKey: "iap_first_purchase_completed")
+    /// 标记指定商品的首次购买已完成
+    func markFirstPurchaseCompleted(for productID: String) {
+        mockFirstPurchaseCompletedByProduct[productID] = true
+        saveFirstPurchaseStatus()
 
         // 同时更新 MeowCoinAccount 中的首次购买标记，确保 FirstDoubleBonusManager 能正确读取
         var account = StoreManager.loadMeowCoinAccount()
-        account.firstPurchaseCompleted = true
+        account.firstPurchaseCompletedByProduct[productID] = true
         StoreManager.saveMeowCoinAccount(account)
 
-        print("[IAPTestManager] ✅ 已标记首次购买完成")
+        print("[IAPTestManager] ✅ 已标记商品 \(productID) 首次购买完成")
     }
 
-    /// 重置首次购买状态
-    func resetFirstPurchase() {
-        mockFirstPurchaseCompleted = false
-        UserDefaults.standard.set(false, forKey: "iap_first_purchase_completed")
+    /// 重置指定商品的首次购买状态
+    func resetFirstPurchase(for productID: String) {
+        mockFirstPurchaseCompletedByProduct.removeValue(forKey: productID)
+        saveFirstPurchaseStatus()
 
         var account = StoreManager.loadMeowCoinAccount()
-        account.firstPurchaseCompleted = false
+        account.firstPurchaseCompletedByProduct.removeValue(forKey: productID)
         StoreManager.saveMeowCoinAccount(account)
 
-        print("[IAPTestManager] ✅ 首次购买状态已重置")
+        print("[IAPTestManager] ✅ 商品 \(productID) 首次购买状态已重置")
     }
 
-    /// 检查是否还有首次双倍资格
-    func hasFirstDoubleBonus() -> Bool {
+    /// 重置所有商品的首次购买状态
+    func resetAllFirstPurchases() {
+        mockFirstPurchaseCompletedByProduct.removeAll()
+        saveFirstPurchaseStatus()
+
+        var account = StoreManager.loadMeowCoinAccount()
+        account.firstPurchaseCompletedByProduct.removeAll()
+        StoreManager.saveMeowCoinAccount(account)
+
+        print("[IAPTestManager] ✅ 所有商品首次购买状态已重置")
+    }
+
+    /// 检查指定商品是否还有首次双倍资格
+    func hasFirstDoubleBonus(for productID: String) -> Bool {
         if isTestMode {
-            return !mockFirstPurchaseCompleted
+            return !(mockFirstPurchaseCompletedByProduct[productID] ?? false)
         }
-        return !UserDefaults.standard.bool(forKey: "iap_first_purchase_completed")
+        return !(StoreManager.loadMeowCoinAccount().firstPurchaseCompletedByProduct[productID] ?? false)
     }
 
     // MARK: - 模拟服务器响应
@@ -230,14 +271,16 @@ class IAPTestManager: ObservableObject {
 
         let (baseAmount, bonus) = getMockCoinAmount(for: type)
 
-        // 应用首充双倍
-        let isFirstDouble = hasFirstDoubleBonus() && testConfig.enableFirstDouble
-        let finalAmount = isFirstDouble ? (baseAmount * 2 + bonus) : (baseAmount + bonus)
+        // 应用首充双倍（按商品档位独立计算）
+        // 首充时：基础金额翻倍（不包含赠送）
+        // 非首充时：基础金额 + 赠送
+        let isFirstDouble = hasFirstDoubleBonus(for: productID) && testConfig.enableFirstDouble
+        let finalAmount = isFirstDouble ? (baseAmount * 2) : (baseAmount + bonus)
 
         // 更新模拟数据
         mockBalance += finalAmount
         if isFirstDouble {
-            markFirstPurchaseCompleted()
+            markFirstPurchaseCompleted(for: productID)
         }
         saveMockData()
 
@@ -276,13 +319,26 @@ class IAPTestManager: ObservableObject {
     private func loadMockData() {
         mockBalance = UserDefaults.standard.integer(forKey: "iap_mock_balance")
         mockIsVIP = UserDefaults.standard.bool(forKey: "iap_mock_vip")
-        mockFirstPurchaseCompleted = UserDefaults.standard.bool(forKey: "iap_first_purchase_completed")
+        // 加载各商品档位的首充状态
+        if let data = UserDefaults.standard.data(forKey: "iap_first_purchase_completed_by_product"),
+           let dict = try? JSONDecoder().decode([String: Bool].self, from: data) {
+            mockFirstPurchaseCompletedByProduct = dict
+        }
     }
 
     private func saveMockData() {
         UserDefaults.standard.set(mockBalance, forKey: "iap_mock_balance")
         UserDefaults.standard.set(mockIsVIP, forKey: "iap_mock_vip")
-        UserDefaults.standard.set(mockFirstPurchaseCompleted, forKey: "iap_first_purchase_completed")
+        // 保存各商品档位的首充状态
+        if let data = try? JSONEncoder().encode(mockFirstPurchaseCompletedByProduct) {
+            UserDefaults.standard.set(data, forKey: "iap_first_purchase_completed_by_product")
+        }
+    }
+
+    private func saveFirstPurchaseStatus() {
+        if let data = try? JSONEncoder().encode(mockFirstPurchaseCompletedByProduct) {
+            UserDefaults.standard.set(data, forKey: "iap_first_purchase_completed_by_product")
+        }
     }
 }
 
@@ -331,38 +387,38 @@ struct IAPTestPanel: View {
                     }
 
                     HStack {
-                        Text("首次购买")
+                        Text("首充状态")
                         Spacer()
-                        Text(testManager.hasFirstDoubleBonus() ? "✅ 可享受双倍" : "已完成")
-                            .foregroundStyle(testManager.hasFirstDoubleBonus() ? .green : .secondary)
+                        Text("各档位独立计算")
+                            .foregroundStyle(.secondary)
                     }
                 }
 
                 // 快速添加喵币（豆腐块）
                 Section("快速添加喵币") {
-                    // 首充档位
+                    // 首充档位 - 每个档位独立计算首充
                     Button("💰 添加首充档位 (60喵币)") {
-                        testManager.addMeowCoins(60, isFirstDouble: true)
+                        testManager.addMeowCoins(60, productID: "com.pinkhouse.app.meowcoin_60", isFirstDouble: true)
                     }
                     .foregroundStyle(.blue)
 
                     Button("💰 添加中充档位 (300喵币)") {
-                        testManager.addMeowCoins(300, isFirstDouble: true)
+                        testManager.addMeowCoins(300, productID: "com.pinkhouse.app.meowcoin_300", isFirstDouble: true)
                     }
                     .foregroundStyle(.blue)
 
                     Button("💰 添加土豪档位 (3280喵币)") {
-                        testManager.addMeowCoins(3280, isFirstDouble: true)
+                        testManager.addMeowCoins(3280, productID: "com.pinkhouse.app.meowcoin_3280", isFirstDouble: true)
                     }
                     .foregroundStyle(.blue)
 
                     // 非首充档位
                     Button("🪙 添加60喵币（无双倍）") {
-                        testManager.addMeowCoins(60, isFirstDouble: false)
+                        testManager.addMeowCoins(60, productID: "com.pinkhouse.app.meowcoin_60", isFirstDouble: false)
                     }
 
                     Button("🪙 添加500喵币（无双倍）") {
-                        testManager.addMeowCoins(500, isFirstDouble: false)
+                        testManager.addMeowCoins(500, productID: "com.pinkhouse.app.meowcoin_500", isFirstDouble: false)
                     }
 
                     // 自定义数量
@@ -406,14 +462,10 @@ struct IAPTestPanel: View {
 
                 // 首次购买测试
                 Section("首次购买测试") {
-                    Button("🔄 重置首次购买状态") {
-                        testManager.resetFirstPurchase()
+                    Button("🔄 重置所有首充状态") {
+                        testManager.resetAllFirstPurchases()
                     }
                     .foregroundStyle(.green)
-
-                    Button("✅ 标记首次购买完成") {
-                        testManager.markFirstPurchaseCompleted()
-                    }
 
                     Toggle("启用首充双倍", isOn: $testManager.testConfig.enableFirstDouble)
                 }

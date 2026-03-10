@@ -263,7 +263,7 @@ struct MeowCoinStoreView: View {
 
 // MARK: - 首次双倍活动横幅
 struct FirstDoubleBanner: View {
-    @State private var hasFirstDouble = FirstDoubleBonusManager.shared.hasFirstDoubleBonus()
+    @State private var hasFirstDouble = FirstDoubleBonusManager.shared.hasAnyFirstDoubleBonus()
 
     var body: some View {
         if hasFirstDouble {
@@ -307,7 +307,11 @@ struct FirstDoubleBanner: View {
 struct CoinProductCard: View {
     let product: MeowCoinProductDisplay
     let onPurchase: () -> Void
-    @State private var hasFirstDouble = FirstDoubleBonusManager.shared.hasFirstDoubleBonus()
+    @State private var hasFirstDouble: Bool = false
+
+    private func updateFirstDoubleStatus() {
+        hasFirstDouble = FirstDoubleBonusManager.shared.hasFirstDoubleBonus(for: product.id)
+    }
 
     var body: some View {
         Button(action: onPurchase) {
@@ -414,6 +418,9 @@ struct CoinProductCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            updateFirstDoubleStatus()
+        }
     }
 }
 
