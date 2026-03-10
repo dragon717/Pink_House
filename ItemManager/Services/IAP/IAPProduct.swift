@@ -1,0 +1,226 @@
+import Foundation
+import StoreKit
+
+// MARK: - IAP 商品定义
+// 定义所有内购商品，包括喵币充值和VIP订阅
+
+enum IAPProductType: String, CaseIterable {
+    // 喵币 - 消耗型项目
+    // 汇率 10:1（1元 = 10喵币）
+    case meowCoin60 = "com.pinkhouse.app.meowcoin_60"      // 6元 = 60喵币
+    case meowCoin120 = "com.pinkhouse.app.meowcoin_120"    // 12元 = 120喵币
+    case meowCoin300 = "com.pinkhouse.app.meowcoin_300"    // 30元 = 300喵币
+    case meowCoin500 = "com.pinkhouse.app.meowcoin_500"    // 50元 = 500喵币（热门）
+    case meowCoin1280 = "com.pinkhouse.app.meowcoin_1280"  // 128元 = 1280喵币（最划算）
+    case meowCoin3280 = "com.pinkhouse.app.meowcoin_3280"  // 328元 = 3280喵币
+
+    // VIP 订阅 - 自动续订订阅
+    case vipMonthly = "com.pinkhouse.app.vip_monthly"
+    case vipYearly = "com.pinkhouse.app.vip_yearly"
+
+    // 商品ID列表，用于请求商品信息
+    static var allProductIDs: [String] {
+        return Self.allCases.map { $0.rawValue }
+    }
+
+    // 喵币商品ID列表
+    // 汇率 10:1（1元 = 10喵币）
+    static var coinProductIDs: [String] {
+        return [
+            meowCoin60.rawValue,    // 6元
+            meowCoin120.rawValue,   // 12元
+            meowCoin300.rawValue,   // 30元
+            meowCoin500.rawValue,   // 50元
+            meowCoin1280.rawValue,  // 128元
+            meowCoin3280.rawValue   // 328元
+        ]
+    }
+
+    // VIP订阅ID列表
+    static var subscriptionProductIDs: [String] {
+        return [
+            vipMonthly.rawValue,
+            vipYearly.rawValue
+        ]
+    }
+}
+
+// MARK: - 喵币商品信息
+struct MeowCoinProduct: Identifiable, Equatable {
+    let id: String
+    let coinAmount: Int      // 获得的喵币数量
+    let bonusAmount: Int     // 赠送的喵币数量
+    let price: Decimal       // 价格
+    let displayPrice: String // 显示价格
+    let isPopular: Bool      // 是否热门推荐
+    let isBestValue: Bool    // 是否最划算
+
+    var totalCoins: Int {
+        coinAmount + bonusAmount
+    }
+
+    // 根据ID创建商品信息
+    static func from(storeProduct: Product) -> MeowCoinProduct? {
+        guard let type = IAPProductType(rawValue: storeProduct.id),
+              case .meowCoin60 = type else { return nil }
+
+        let (amount, bonus, popular, bestValue) = Self.getProductDetails(for: type)
+
+        return MeowCoinProduct(
+            id: storeProduct.id,
+            coinAmount: amount,
+            bonusAmount: bonus,
+            price: storeProduct.price,
+            displayPrice: storeProduct.displayPrice,
+            isPopular: popular,
+            isBestValue: bestValue
+        )
+    }
+
+    private static func getProductDetails(for type: IAPProductType) -> (amount: Int, bonus: Int, popular: Bool, bestValue: Bool) {
+        // 汇率 10:1（1元 = 10喵币）
+        // 策略：首次购买双倍，之后按档位 +10%、+25%、+35% 赠送
+        switch type {
+        case .meowCoin60:
+            // 6元档：首次120喵币，之后60+6(10%)
+            return (60, 6, false, false)
+        case .meowCoin120:
+            // 12元档：首次240喵币，之后120+12(10%)
+            return (120, 12, false, false)
+        case .meowCoin300:
+            // 30元档：首次600喵币，之后300+30(10%)
+            return (300, 30, false, false)
+        case .meowCoin500:
+            // 50元档：首次1000喵币，之后500+75(15%)
+            return (500, 75, true, false)
+        case .meowCoin1280:
+            // 128元档：首次2560喵币，之后1280+320(25%)，最划算
+            return (1280, 320, false, true)
+        case .meowCoin3280:
+            // 328元档：首次6560喵币，之后3280+1148(35%)
+            return (3280, 1148, false, false)
+        default:
+            return (0, 0, false, false)
+        }
+    }
+}
+
+// MARK: - VIP订阅商品信息
+struct VIPSubscriptionProduct: Identifiable, Equatable {
+    let id: String
+    let period: SubscriptionPeriod
+    let price: Decimal
+    let displayPrice: String
+    let displayName: String
+    let description: String
+    let isRecommended: Bool
+
+    enum SubscriptionPeriod {
+        case monthly
+        case yearly
+
+        var displayText: String {
+            switch self {
+            case .monthly:
+                return "每月"
+            case .yearly:
+                return "每年"
+            }
+        }
+
+        var months: Int {
+            switch self {
+            case .monthly:
+                return 1
+            case .yearly:
+                return 12
+            }
+        }
+    }
+
+    static func from(storeProduct: Product) -> VIPSubscriptionProduct? {
+        guard let type = IAPProductType(rawValue: storeProduct.id) else { return nil }
+
+        let (period, name, desc, recommended) = Self.getProductDetails(for: type)
+
+        return VIPSubscriptionProduct(
+            id: storeProduct.id,
+            period: period,
+            price: storeProduct.price,
+            displayPrice: storeProduct.displayPrice,
+            displayName: name,
+            description: desc,
+            isRecommended: recommended
+        )
+    }
+
+    private static func getProductDetails(for type: IAPProductType) -> (period: SubscriptionPeriod, name: String, desc: String, recommended: Bool) {
+        switch type {
+        case .vipMonthly:
+            return (.monthly, "月度会员", "解锁所有VIP专属功能", false)
+        case .vipYearly:
+            return (.yearly, "年度会员", "立省40%，享受全年VIP特权", true)
+        default:
+            return (.monthly, "", "", false)
+        }
+    }
+}
+
+// MARK: - 购买记录
+struct IAPPurchaseRecord: Codable, Identifiable {
+    let id: String                    // 交易ID
+    let productID: String             // 商品ID
+    let purchaseDate: Date            // 购买时间
+    let coinAmount: Int?              // 获得的喵币数量（如果是喵币商品）
+    let subscriptionMonths: Int?      // 订阅月数（如果是VIP商品）
+    let isVerified: Bool              // 是否已通过服务器验证
+    let verificationDate: Date?       // 验证时间
+
+    // 用于本地存储的键
+    static let storageKey = "IAPPurchaseRecords"
+}
+
+// MARK: - 用户喵币账户
+struct MeowCoinAccount: Codable {
+    var balance: Int = 0                    // 当前余额
+    var totalPurchased: Int = 0             // 累计购买
+    var totalSpent: Int = 0                 // 累计消费
+    var lastUpdated: Date = Date()
+    var firstPurchaseCompleted: Bool = false // 是否已完成首次购买（用于双倍活动）
+
+    static let storageKey = "MeowCoinAccount"
+}
+
+// MARK: - 首次双倍活动管理
+struct FirstDoubleBonusManager {
+    static let shared = FirstDoubleBonusManager()
+
+    // 检查是否还有首次双倍资格
+    func hasFirstDoubleBonus() -> Bool {
+        let account = StoreManager.loadMeowCoinAccount()
+        return !account.firstPurchaseCompleted
+    }
+
+    // 标记首次购买已完成
+    func markFirstPurchaseCompleted() {
+        var account = StoreManager.loadMeowCoinAccount()
+        account.firstPurchaseCompleted = true
+        StoreManager.saveMeowCoinAccount(account)
+    }
+
+    // 计算实际获得的喵币（包含首次双倍）
+    func calculateActualCoins(baseAmount: Int, bonusAmount: Int, productID: String) -> (total: Int, isFirstDouble: Bool) {
+        let isFirstDouble = hasFirstDoubleBonus()
+
+        if isFirstDouble {
+            // 首次购买：基础数量双倍，赠送数量不变
+            let doubledBase = baseAmount * 2
+            let total = doubledBase + bonusAmount
+            return (total, true)
+        } else {
+            // 非首次：正常计算
+            let total = baseAmount + bonusAmount
+            return (total, false)
+        }
+    }
+}

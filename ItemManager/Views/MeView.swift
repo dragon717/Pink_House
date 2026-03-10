@@ -159,16 +159,18 @@ struct MeView: View {
                             .buttonStyle(PlainButtonStyle())
                         }
 
-                        // 联网设置
-                        NavigationLink(destination: NetworkSettingsView()) {
-                            SettingsGridItem(
-                                title: "联网设置",
-                                subtitle: "社区 · 分享 · 追根溯源",
-                                icon: "network",
-                                iconColor: .cyan
-                            )
+                        // 联网设置（已解锁时才显示）
+                        if FeatureUnlockManager.shared.isUnlocked(.networkCommunity) {
+                            NavigationLink(destination: NetworkSettingsView()) {
+                                SettingsGridItem(
+                                    title: "联网设置",
+                                    subtitle: "社区 · 分享 · 追根溯源",
+                                    icon: "network",
+                                    iconColor: .cyan
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
 
                         // 彩蛋设置
                         EasterEggSettingsCard()

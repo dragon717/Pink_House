@@ -13,8 +13,21 @@ struct MagicTasksView: View {
             UnlockConditionType(rawValue: manager.getCondition(for: feature).type) ?? .manual
         }
 
-        return grouped.sorted { $0.key.displayName < $1.key.displayName }
-            .map { (type: $0.key, features: $0.value) }
+        // 自定义排序：VIP专属 > 签到解锁 > 萌宠等级 > 收集解锁 > 喵币解锁 > 活动解锁
+        let sortOrder: [UnlockConditionType] = [
+            .vip,           // VIP专属
+            .loginDays,     // 签到解锁
+            .petLevel,      // 萌宠等级
+            .clothingCount, // 收集解锁
+            .meowCoin,      // 喵币解锁
+            .manual          // 活动解锁
+        ]
+
+        return grouped.sorted {
+            let index0 = sortOrder.firstIndex(of: $0.key) ?? Int.max
+            let index1 = sortOrder.firstIndex(of: $1.key) ?? Int.max
+            return index0 < index1
+        }.map { (type: $0.key, features: $0.value) }
     }
 
     @Environment(\.colorScheme) private var colorScheme

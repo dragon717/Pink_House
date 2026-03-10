@@ -121,6 +121,55 @@ struct ThemePreset: Codable, Identifiable {
         }
         return cardConfig
     }
+
+    /// 从自适应调色板创建主题预设（用于魔法配色预览）
+    static func fromAdaptivePalette(_ palette: AdaptivePalette, cardBackground: Color, isDarkMode: Bool) -> ThemePreset {
+        // 将 Color 转换为 ColorRGBA
+        let primaryRGBA = palette.primary.rgba ?? ColorRGBA(r: 0, g: 0, b: 0)
+        let secondaryRGBA = palette.secondary.rgba ?? ColorRGBA(r: 0.3, g: 0.3, b: 0.3)
+        let tertiaryRGBA = palette.tertiary.rgba ?? ColorRGBA(r: 0.5, g: 0.5, b: 0.5)
+        let accentRGBA = palette.accent.rgba ?? ColorRGBA(r: 1, g: 0.4, b: 0.7)
+        let cardBgRGBA = cardBackground.rgba ?? ColorRGBA(r: 1, g: 1, b: 1)
+
+        let cardConfig = CardColorConfig(
+            backgroundRGBA: cardBgRGBA,
+            accentRGBA: accentRGBA,
+            secondaryRGBA: secondaryRGBA,
+            depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0), // 金色
+            finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71) // 热粉
+        )
+
+        // 暗夜模式颜色
+        let darkPrimaryRGBA = isDarkMode ? primaryRGBA : ColorRGBA(r: 1, g: 1, b: 1)
+        let darkSecondaryRGBA = isDarkMode ? secondaryRGBA : ColorRGBA(r: 0.85, g: 0.85, b: 0.85)
+        let darkTertiaryRGBA = isDarkMode ? tertiaryRGBA : ColorRGBA(r: 0.6, g: 0.6, b: 0.6)
+        let darkAccentRGBA = isDarkMode ? accentRGBA : ColorRGBA(r: 0.9, g: 0.7, b: 0.85)
+        let darkCardBgRGBA = isDarkMode ? cardBgRGBA : ColorRGBA(r: 0.25, g: 0.2, b: 0.28)
+
+        let darkCardConfig = CardColorConfig(
+            backgroundRGBA: darkCardBgRGBA,
+            accentRGBA: darkAccentRGBA,
+            secondaryRGBA: darkSecondaryRGBA,
+            depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0),
+            finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71)
+        )
+
+        return ThemePreset(
+            id: "magic_adaptive",
+            name: "魔法配色",
+            textPrimaryRGBA: primaryRGBA,
+            textSecondaryRGBA: secondaryRGBA,
+            textTertiaryRGBA: tertiaryRGBA,
+            textAccentRGBA: accentRGBA,
+            cardConfig: cardConfig,
+            supportsDarkMode: true,
+            darkTextPrimaryRGBA: darkPrimaryRGBA,
+            darkTextSecondaryRGBA: darkSecondaryRGBA,
+            darkTextTertiaryRGBA: darkTertiaryRGBA,
+            darkTextAccentRGBA: darkAccentRGBA,
+            darkCardConfig: darkCardConfig
+        )
+    }
 }
 
 // MARK: - 用户自定义配色方案

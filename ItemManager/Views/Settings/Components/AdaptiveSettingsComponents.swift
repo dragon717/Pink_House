@@ -93,23 +93,38 @@ struct AdaptiveSection<Content: View>: View {
             case .solid:
                 cardColors.backgroundRGBA.color
             case .transparent:
-                cardColors.backgroundRGBA.color.opacity(themeManager.transparentOpacity)
+                // 使用高斯模糊材质，类似 VIP 卡片样式
+                .ultraThinMaterial
+                    .overlay(cardColors.backgroundRGBA.color.opacity(themeManager.transparentOpacity * 0.5))
             case .fullyTransparent:
-                cardColors.backgroundRGBA.color.opacity(0.3)
+                // 完全透明时使用高斯模糊
+                .ultraThinMaterial
             case .tinted:
-                Color(uiColor: .secondarySystemGroupedBackground).opacity(0.8)
+                // 色调模式：使用高斯模糊材质叠加主题色调
+                .ultraThinMaterial
                     .overlay(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
             }
         }
     }
     
-    // MARK: - 分组边框（适配主题色）
+    // MARK: - 分组边框（适配主题色，类似 VIP 卡片样式）
     private var sectionOverlay: some View {
         let isDark = colorScheme == .dark
         let cardColors = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark).cardColors(forDarkMode: isDark)
         
+        // 根据卡片样式调整边框透明度
+        let strokeOpacity: Double = {
+            switch themeManager.cardStyle {
+            case .solid:
+                return isDark ? 0.3 : 0.2
+            case .transparent, .fullyTransparent, .tinted:
+                // 高斯模糊模式下使用更明显的边框，类似 VIP 卡片
+                return isDark ? 0.4 : 0.3
+            }
+        }()
+        
         return RoundedRectangle(cornerRadius: 12)
-            .stroke(cardColors.accentRGBA.color.opacity(isDark ? 0.3 : 0.2), lineWidth: 1)
+            .stroke(cardColors.accentRGBA.color.opacity(strokeOpacity), lineWidth: 1)
     }
 }
 

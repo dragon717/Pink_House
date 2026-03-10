@@ -52,6 +52,10 @@ struct UnlockCondition: Codable, Equatable {
     static func free() -> UnlockCondition {
         UnlockCondition(type: "free", requiredValue: 0, description: "免费使用")
     }
+
+    static func loginDays(_ days: Int) -> UnlockCondition {
+        UnlockCondition(type: "loginDays", requiredValue: days, description: "累计登录 \(days) 天解锁")
+    }
     
     static func vip() -> UnlockCondition {
         UnlockCondition(type: "vip", requiredValue: 0, description: "开通VIP即可解锁")
@@ -64,10 +68,7 @@ struct UnlockCondition: Codable, Equatable {
     static func clothingCount(_ count: Int) -> UnlockCondition {
         UnlockCondition(type: "clothingCount", requiredValue: count, description: "收集 \(count) 件衣物解锁")
     }
-    
-    static func loginDays(_ days: Int) -> UnlockCondition {
-        UnlockCondition(type: "loginDays", requiredValue: days, description: "累计登录 \(days) 天解锁")
-    }
+ 
     
     static func petLevel(_ level: Int) -> UnlockCondition {
         UnlockCondition(type: "petLevel", requiredValue: level, description: "萌宠达到 \(level) 级解锁")
@@ -110,6 +111,9 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     // 联网功能
     case networkCommunity = "networkCommunity"
     
+    // 魔法任务
+    case magicTasks = "magicTasks"
+    
     var id: String { rawValue }
     
     var displayName: String {
@@ -134,6 +138,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return "AI智能分析"
         case .networkCommunity:
             return "联网社区"
+        case .magicTasks:
+            return "魔法任务"
         }
     }
     
@@ -155,8 +161,12 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .batchImport: return "square.and.arrow.down.on.square.fill"
         case .themeCustomize: return "paintpalette.fill"
         case .widgetCustomize: return "rectangle.grid.2x2.fill"
-        case .aiAnalysis: return "brain.fill"
-        case .networkCommunity: return "network"
+        case .aiAnalysis:
+            return "brain.fill"
+        case .networkCommunity:
+            return "network"
+        case .magicTasks:
+            return "sparkles"
         }
     }
     
@@ -196,16 +206,19 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .aiAnalysis:
             return .vip()
         case .networkCommunity:
-            // 联网功能默认隐藏，需要答题解锁
-            return .manual(description: "完成答题挑战解锁联网功能")
+            // 联网设置：在VIP界面兑换码输入 "vip联网" 解锁
+            return .redeemCode("vip联网", description: "仍在认真开发和内测中，敬请期待～")
+        case .magicTasks:
+            // 魔法任务：在VIP界面兑换码输入 "vip魔法任务" 解锁
+            return .redeemCode("vip魔法任务", description: "仍在认真开发和内测中，敬请期待～")
         }
     }
     
     // 是否默认隐藏
     var isHiddenByDefault: Bool {
         switch self {
-        case .pet, .bigWorld, .perler, .dressStock, .networkCommunity:
-            return true // 萌宠、世界书、拼豆工坊、裙子股市、联网社区默认隐藏
+        case .pet, .bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks:
+            return true // 萌宠、世界书、拼豆工坊、裙子股市、联网社区、魔法任务默认隐藏
         default:
             return false
         }
@@ -648,37 +661,39 @@ final class FeatureUnlockManager: ObservableObject {
     /// - Returns: (是否成功, 解锁的功能, 提示信息)
     func redeemCode(_ code: String) -> (success: Bool, feature: FeatureItem?, message: String) {
         let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        
+
         // 定义兑换码与功能的映射
         let codeMapping: [String: FeatureItem] = [
             "vip萌宠": .pet,
             "vip世界书": .bigWorld,
             "vip拼豆工坊": .perler,
-            "vip裙子股市": .dressStock
+            "vip裙子股市": .dressStock,
+            "vip联网": .networkCommunity,
+            "vip魔法任务": .magicTasks
         ]
-        
+
         // 查找对应的功能
         guard let feature = codeMapping[trimmedCode] else {
             return (false, nil, "兑换码无效，请检查后重试")
         }
-        
+
         // 检查是否已解锁
         if isUnlocked(feature) {
             return (false, feature, "\(feature.displayName) 已经解锁了")
         }
-        
+
         // 执行解锁
         performUnlock(feature, by: "redeemCode:\(trimmedCode)")
-        
+
         // 解锁后自动显示
         setVisible(feature, visible: true)
-        
+
         return (true, feature, "\(feature.displayName) 解锁成功！")
     }
-    
+
     /// 获取所有兑换码解锁的功能列表
     func getRedeemCodeFeatures() -> [FeatureItem] {
-        return [.pet, .bigWorld, .perler, .dressStock]
+        return [.pet, .bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks]
     }
     
     // MARK: - 启动时刷新进度

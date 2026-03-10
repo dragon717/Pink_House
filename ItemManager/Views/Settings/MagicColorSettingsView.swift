@@ -37,16 +37,11 @@ struct MagicColorSettingsView: View {
         case cardBackground, cardAccent, deposit, finalPayment
     }
 
-    // 计算当前主题
-    private var currentTheme: ThemePreset {
-        themeManager.themeColorConfig.currentTheme(forDarkMode: colorScheme == .dark)
-    }
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // 预览区域 - 主题色卡片示例
-                ThemePreviewSection(theme: currentTheme)
+                ThemePreviewSection()
                     .frame(height: 260)
 
                 // 系统原生页签切换
@@ -326,17 +321,63 @@ struct MagicColorSettingsView: View {
 
 // MARK: - 主题预览区域
 struct ThemePreviewSection: View {
-    let theme: ThemePreset
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
 
+    // 计算当前主题 - 根据配色模式返回不同的主题
+    private var currentTheme: ThemePreset {
+        let isDark = colorScheme == .dark
+        switch themeManager.colorSchemeMode {
+        case .magic:
+            // 魔法配色：使用自适应调色板生成主题
+            return ThemePreset.fromAdaptivePalette(
+                themeManager.adaptivePalette,
+                cardBackground: themeManager.cardBackgroundColor,
+                isDarkMode: isDark
+            )
+        case .custom:
+            // 客制化配色：使用当前自定义主题
+            return themeManager.themeColorConfig.currentTheme(forDarkMode: isDark)
+        }
+    }
+
     private var textColors: (primary: Color, secondary: Color, tertiary: Color, accent: Color) {
-        let colors = theme.textColors(forDarkMode: colorScheme == .dark)
+        let colors = currentTheme.textColors(forDarkMode: colorScheme == .dark)
         return (colors.primary.color, colors.secondary.color, colors.tertiary.color, colors.accent.color)
     }
 
     private var cardColors: CardColorConfig {
-        theme.cardColors(forDarkMode: colorScheme == .dark)
+        currentTheme.cardColors(forDarkMode: colorScheme == .dark)
+    }
+
+    // 根据卡片样式计算预览卡片背景
+    private var previewCardBackground: some View {
+        let baseColor = cardColors.backgroundRGBA.color
+        switch themeManager.cardStyle {
+        case .solid:
+            return AnyView(baseColor)
+        case .transparent:
+            return AnyView(baseColor.opacity(themeManager.transparentOpacity))
+        case .fullyTransparent:
+            return AnyView(Color.clear)
+        case .tinted:
+            // 色调强度越高，背景色越明显（越接近实色）
+            return AnyView(baseColor.opacity(themeManager.tintOpacity))
+        }
+    }
+
+    // 根据裙子填充模式计算图片区域背景
+    private func skirtImageBackground(baseColor: Color) -> Color {
+        switch themeManager.skirtFillMode {
+        case .solid:
+            return baseColor
+        case .transparent:
+            return baseColor.opacity(0.5)
+        case .fullyTransparent:
+            return Color.clear
+        case .tinted:
+            return baseColor.opacity(0.3)
+        }
     }
 
     var body: some View {
@@ -356,12 +397,12 @@ struct ThemePreviewSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
 
-                // 主题色卡片示例
+                // 主题色卡片示例 - 应用卡片样式设置
                 HStack(spacing: 12) {
-                    // 图片占位（模拟裙子图片区域）
+                    // 图片占位（模拟裙子图片区域）- 应用裙子填充模式
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(cardColors.secondaryRGBA.color)
+                            .fill(skirtImageBackground(baseColor: cardColors.secondaryRGBA.color))
                             .frame(width: 80, height: 80)
 
                         Image(systemName: "tshirt.fill")
@@ -416,7 +457,7 @@ struct ThemePreviewSection: View {
                     Spacer()
                 }
                 .padding()
-                .background(cardColors.backgroundRGBA.color)
+                .background(previewCardBackground)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
@@ -545,7 +586,7 @@ struct CardStyleSection: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $transparentOpacity, in: 0.1...1.0, step: 0.1)
+                        Slider(value: $transparentOpacity, in: 0.1...0.5, step: 0.05)
                             .onChange(of: transparentOpacity) { _, newValue in
                                 ThemeManager.shared.transparentOpacity = newValue
                             }

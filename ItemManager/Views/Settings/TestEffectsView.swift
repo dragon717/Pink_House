@@ -4,19 +4,19 @@ import SwiftUI
 // MARK: - 实验室功能模块枚举
 enum LabModule: String, CaseIterable, Identifiable {
     case effects = "特效测试"
-    case vip = "VIP 测试"
+    case iap = "支付测试"
     case favoriteMenu = "菜单设置"
     case notice = "公告管理"
     case featureUnlock = "功能解锁"
     case magicTasks = "魔法任务"
     case checkIn = "签到打卡"
-    
+
     var id: String { rawValue }
-    
+
     var icon: String {
         switch self {
         case .effects: return "sparkles"
-        case .vip: return "crown.fill"
+        case .iap: return "cart.fill"
         case .favoriteMenu: return "star.fill"
         case .notice: return "megaphone.fill"
         case .featureUnlock: return "lock.open.fill"
@@ -24,11 +24,11 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .checkIn: return "checkmark.seal.fill"
         }
     }
-    
+
     var iconColor: Color {
         switch self {
         case .effects: return .pink
-        case .vip: return .yellow
+        case .iap: return .green
         case .favoriteMenu: return .orange
         case .notice: return .blue
         case .featureUnlock: return .green
@@ -36,11 +36,11 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .checkIn: return .red
         }
     }
-    
+
     var subtitle: String {
         switch self {
         case .effects: return "礼花 · 蝴蝶"
-        case .vip: return "状态 · 重置"
+        case .iap: return "喵币 · 首充 · VIP"
         case .favoriteMenu: return "常用 · 清除"
         case .notice: return "管理 · 预览"
         case .featureUnlock: return "解锁 · 显示"
@@ -207,8 +207,8 @@ struct LabModuleDetailView: View {
                     switch module {
                     case .effects:
                         EffectsTestView()
-                    case .vip:
-                        VIPTestView()
+                    case .iap:
+                        IAPTestView()
                     case .favoriteMenu:
                         FavoriteMenuTestView()
                     case .notice:
@@ -306,87 +306,6 @@ struct EffectsTestView: View {
                     .ignoresSafeArea()
                     .zIndex(100)
             }
-        }
-    }
-}
-
-// MARK: - VIP 测试子视图
-struct VIPTestView: View {
-    @ObservedObject private var vipManager = VIPManager.shared
-    @Environment(ThemeManager.self) private var themeManager
-    @State private var showAlert = false
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // VIP 状态卡片
-                VStack(spacing: 16) {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(themeManager.accentTextColor)
-
-                    Text(vipManager.isVIP ? "VIP 会员" : "普通用户")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(themeManager.primaryTextColor)
-
-                    if let expireDate = PetDataManager.shared.status.vipStatus.expireDate {
-                        Text("到期时间: \(expireDate.formatted(date: .long, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(themeManager.secondaryTextColor)
-                    }
-                }
-                .padding(30)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
-                )
-                .padding(.horizontal)
-                .padding(.top, 20)
-
-                // 操作按钮
-                VStack(spacing: 12) {
-                    Button {
-                        showAlert = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("清除 VIP 时间")
-                        }
-                        .font(.headline)
-                        .foregroundStyle(themeManager.tertiaryTextColor)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(themeManager.tertiaryTextColor.opacity(0.1))
-                        .cornerRadius(16)
-                    }
-
-                    Text("重置为非会员状态，用于测试非 VIP 功能")
-                        .font(.caption)
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.horizontal)
-
-                Spacer(minLength: 100)
-            }
-        }
-        .alert("确认清除", isPresented: $showAlert) {
-            Button("取消", role: .cancel) {}
-            Button("清除", role: .destructive) {
-                var status = PetDataManager.shared.status
-                status.vipStatus.isActive = false
-                status.vipStatus.expireDate = nil
-                PetDataManager.shared.saveStatus(status)
-                vipManager.reloadStatus()
-            }
-        } message: {
-            Text("这将清除 VIP 状态，重置为非会员。确定要继续吗？")
         }
     }
 }
@@ -1633,6 +1552,244 @@ private struct MakeupDayCell: View {
             return themeManager.accentTextColor
         } else {
             return themeManager.primaryTextColor
+        }
+    }
+}
+
+// MARK: - 支付测试子视图
+struct IAPTestView: View {
+    @ObservedObject private var testManager = IAPTestManager.shared
+    @ObservedObject private var viewModel = IAPViewModel.shared
+    @Environment(ThemeManager.self) private var themeManager
+    @State private var customAmount: String = ""
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // 测试模式开关
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("测试模式")
+                            .font(.headline)
+                            .foregroundStyle(themeManager.primaryTextColor)
+                        Spacer()
+                        Toggle("", isOn: $testManager.isTestMode)
+                            .labelsHidden()
+                    }
+
+                    if testManager.isTestMode {
+                        Text("当前处于测试模式，支付将使用模拟数据")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal)
+                .padding(.top, 20)
+
+                // 当前状态
+                VStack(spacing: 12) {
+                    Text("当前状态")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+
+                    HStack {
+                        Text("喵币余额")
+                        Spacer()
+                        Text("\(viewModel.currentBalance)")
+                            .foregroundStyle(themeManager.accentTextColor)
+                            .fontWeight(.bold)
+                    }
+
+                    HStack {
+                        Text("VIP状态")
+                        Spacer()
+                        Text(viewModel.isVIP ? "已开通" : "未开通")
+                            .foregroundStyle(viewModel.isVIP ? themeManager.accentTextColor : themeManager.secondaryTextColor)
+                    }
+
+                    HStack {
+                        Text("首次购买")
+                        Spacer()
+                        Text(testManager.hasFirstDoubleBonus() ? "✅ 可享受双倍" : "已完成")
+                            .foregroundStyle(testManager.hasFirstDoubleBonus() ? .green : themeManager.secondaryTextColor)
+                    }
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal)
+
+                // 快速添加喵币
+                VStack(spacing: 12) {
+                    Text("快速添加喵币")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+
+                    // 首充档位
+                    Button {
+                        testManager.addMeowCoins(60, isFirstDouble: true)
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "pawprint.fill",
+                            title: "首充档位 (60喵币)",
+                            subtitle: "获得120喵币（首充双倍）",
+                            color: themeManager.accentTextColor
+                        )
+                    }
+
+                    Button {
+                        testManager.addMeowCoins(300, isFirstDouble: true)
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "pawprint.fill",
+                            title: "中充档位 (300喵币)",
+                            subtitle: "获得600喵币（首充双倍）",
+                            color: themeManager.accentTextColor
+                        )
+                    }
+
+                    Button {
+                        testManager.addMeowCoins(3280, isFirstDouble: true)
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "pawprint.fill",
+                            title: "土豪档位 (3280喵币)",
+                            subtitle: "获得6560喵币（首充双倍）",
+                            color: themeManager.accentTextColor
+                        )
+                    }
+
+                    // 非首充档位
+                    Button {
+                        testManager.addMeowCoins(500, isFirstDouble: false)
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "pawprint",
+                            title: "普通档位 (500喵币)",
+                            subtitle: "获得575喵币（+15%赠送）",
+                            color: themeManager.secondaryTextColor
+                        )
+                    }
+
+                    // 自定义数量
+                    HStack {
+                        TextField("自定义数量", text: $customAmount)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                        Button("添加") {
+                            if let amount = Int(customAmount) {
+                                testManager.addMeowCoins(amount)
+                                viewModel.loadUserData()
+                                customAmount = ""
+                            }
+                        }
+                        .disabled(customAmount.isEmpty)
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(.horizontal)
+
+                // VIP 测试
+                VStack(spacing: 12) {
+                    Text("VIP测试")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+
+                    Button {
+                        testManager.activateVIP(months: 1)
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "crown.fill",
+                            title: "开通月度VIP",
+                            subtitle: "开通1个月VIP会员",
+                            color: .orange
+                        )
+                    }
+
+                    Button {
+                        testManager.deactivateVIP()
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "crown",
+                            title: "取消VIP",
+                            subtitle: "取消VIP会员状态",
+                            color: themeManager.tertiaryTextColor
+                        )
+                    }
+                }
+                .padding(.horizontal)
+
+                // 首次购买测试
+                VStack(spacing: 12) {
+                    Text("首次购买测试")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+
+                    Toggle("启用首充双倍", isOn: $testManager.testConfig.enableFirstDouble)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(themeManager.cardBackgroundColor.opacity(0.3))
+                        )
+
+                    Button {
+                        testManager.resetFirstPurchase()
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "arrow.counterclockwise",
+                            title: "重置首次购买状态",
+                            subtitle: "清除后可重新测试首充双倍",
+                            color: .green
+                        )
+                    }
+                }
+                .padding(.horizontal)
+
+                // 清除数据
+                VStack(spacing: 12) {
+                    Text("危险操作")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
+
+                    Button {
+                        testManager.clearAllPurchaseRecords()
+                        viewModel.loadUserData()
+                    } label: {
+                        LabActionCard(
+                            icon: "trash.fill",
+                            title: "清除所有购买记录",
+                            subtitle: "清除后可重新测试首次购买流程",
+                            color: themeManager.tertiaryTextColor
+                        )
+                    }
+                }
+                .padding(.horizontal)
+
+                Spacer(minLength: 100)
+            }
         }
     }
 }
