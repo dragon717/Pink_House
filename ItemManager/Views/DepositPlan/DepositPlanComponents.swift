@@ -1,0 +1,405 @@
+//
+//  DepositPlanComponents.swift
+//  ItemManager
+//
+//  Created by 少女心愿 Dev on 1/16/26.
+//
+
+import SwiftUI
+
+// MARK: - 总待付尾款卡片
+struct TotalBalanceCard: View {
+    let totalBalance: Decimal
+    let isVisible: Bool
+    let onToggleVisibility: () -> Void
+    let onCountMoney: () -> Void
+    
+    @Environment(ThemeManager.self) private var themeManager
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    @StateObject private var featureManager = FeatureUnlockManager.shared
+    
+    // 未解锁功能提示弹窗
+    @State private var showUnlockAlert = false
+    @State private var lockedFeature: FeatureItem? = nil
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 三个功能入口（放在最上方）
+            HStack(spacing: 0) {
+                // 梦裙日历
+                Button {
+                    handleQuickAccess(.calendar)
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 16))
+                        Text("梦裙日历")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.pink)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // 马上来财
+                Button {
+                    handleQuickAccess(.wealth)
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "dollarsign.circle")
+                            .font(.system(size: 16))
+                        Text("马上来财")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // 裙子股市
+                Button {
+                    handleQuickAccess(.dressStock)
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 16))
+                        Text("裙子股市")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 12)
+            .alert("功能未解锁", isPresented: $showUnlockAlert) {
+                if let feature = lockedFeature {
+                    let condition = featureManager.getCondition(for: feature)
+                    // 兑换码解锁的功能只显示"我知道啦～"按钮
+                    if condition.type == UnlockConditionType.redeemCode.rawValue {
+                        Button("我知道啦～", role: .cancel) { }
+                    } else {
+                        Button("取消", role: .cancel) { }
+                        Button("去解锁") {
+                            NotificationCenter.default.post(
+                                name: .navigateToMagicTasks,
+                                object: nil
+                            )
+                        }
+                    }
+                } else {
+                    Button("取消", role: .cancel) { }
+                }
+            } message: {
+                if let feature = lockedFeature {
+                    let condition = featureManager.getCondition(for: feature)
+                    Text("\(feature.displayName) 尚未解锁\n\(condition.description)")
+                } else {
+                    Text("该功能尚未解锁，请先完成对应任务")
+                }
+            }
+            
+            // 分割线
+            Divider()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            
+            // 标题和按钮（始终显示）
+            HStack {
+                Text("总待付尾款")
+                    .font(.subheadline)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                
+                Spacer()
+                
+                // 小眼睛按钮 - 闭眼 (eye.slash) 表示当前隐藏，点击显示；睁眼 (eye) 表示当前显示，点击隐藏
+                Button(action: onToggleVisibility) {
+                    Image(systemName: isVisible ? "eye" : "eye.slash")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.pink)
+                        .frame(width: 32, height: 32)
+                        .background(Color.pink.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                
+                // 数钱按钮（仅显示时）
+                if isVisible {
+                    Button(action: onCountMoney) {
+                        Image(systemName: "banknote")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.green)
+                            .frame(width: 32, height: 32)
+                            .background(Color.green.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+            
+            // 金额显示（仅显示时）
+            if isVisible {
+                Button(action: onCountMoney) {
+                    Text("¥\(NSDecimalNumber(decimal: totalBalance).stringValue)")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(Color(hex: "C94C72"))
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
+                .padding(.bottom, 12)
+            } else {
+                // 隐藏状态只保留底部间距
+                Spacer()
+                    .frame(height: 8)
+            }
+
+        }
+        .background(CardBackgroundView(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    // MARK: - 处理快捷入口点击
+    private func handleQuickAccess(_ destination: SmallWorldDestination) {
+        // 检查功能是否已解锁
+        if let feature = destination.featureItem {
+            if featureManager.canAccess(feature) {
+                // 已解锁，正常跳转
+                tabNavigationManager.navigate(to: .smallWorld(destination))
+            } else {
+                // 未解锁，显示提示
+                lockedFeature = feature
+                showUnlockAlert = true
+            }
+        } else {
+            // 没有对应功能项，直接跳转
+            tabNavigationManager.navigate(to: .smallWorld(destination))
+        }
+    }
+}
+
+// MARK: - 统计视图
+struct DepositStatsView: View {
+    let clothings: [Clothing]
+    var onCountMoney: ((Decimal) -> Void)? = nil
+    
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    
+    // Deduplicated clothings based on name, deposit, balance for Style Count
+    // We ignore stock for style counting
+    private var uniqueStyles: [Clothing] {
+        var seenKeys: Set<String> = []
+        var result: [Clothing] = []
+        
+        for clothing in clothings {
+            // Style defined by Name + Price info
+            let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
+            if !seenKeys.contains(key) {
+                seenKeys.insert(key)
+                result.append(clothing)
+            }
+        }
+        return result
+    }
+    
+    var styleCount: Int {
+        uniqueStyles.count
+    }
+    
+    var totalCount: Int {
+        // Sum of stock of ALL clothings (Inventory Count)
+        clothings.reduce(0) { $0 + $1.stock }
+    }
+    
+    var paidDeposit: Decimal {
+        // Sum of deposit * stock for ALL clothings (Include accessories)
+        clothings.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
+    }
+    
+    var pendingBalance: Decimal {
+        // Sum of balance * stock for ALL clothings (Include accessories)
+        clothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)")
+                
+                Divider()
+                    .frame(height: 30)
+                
+                statItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
+                
+                Divider()
+                    .frame(height: 30)
+                
+                Button {
+                    onCountMoney?(pendingBalance)
+                } label: {
+                    statItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: pendingBalance).stringValue)", showIcon: true)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+        }
+        .background(CardBackgroundView(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+    
+    private func statItem(title: String, value: String, valueColor: Color = .primary, showIcon: Bool = false) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                if showIcon {
+                    Image(systemName: "banknote")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+            Text(value)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundStyle(valueColor)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - 年份选择器
+struct YearSelectorView: View {
+    @Binding var year: Int
+    var showStats: Bool = true
+    var onToggleStats: (() -> Void)? = nil
+    
+    var body: some View {
+        HStack {
+            Button {
+                withAnimation {
+                    year -= 1
+                }
+            } label: {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            
+            Spacer()
+            
+            Text("\(String(year))年")
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+            
+            Spacer()
+            
+            Button {
+                withAnimation {
+                    year += 1
+                }
+            } label: {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            
+            // 小眼睛按钮放在年份选择器右侧 - 折叠价格时显示闭眼 (eye.slash)，显示价格时显示睁眼 (eye)
+            if let onToggle = onToggleStats {
+                Divider()
+                    .frame(height: 20)
+                    .padding(.horizontal, 4)
+
+                Button(action: onToggle) {
+                    Image(systemName: showStats ? "eye" : "eye.slash")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.pink)
+                        .frame(width: 28, height: 28)
+                        .background(Color.pink.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .background(
+            CardBackgroundView(cornerRadius: 16)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
+
+// MARK: - 年份统计卡片
+struct YearStatsCard: View {
+    let stats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal)
+    let year: Int
+    var isVisible: Bool = true
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 统计内容（可折叠）
+            if isVisible {
+                HStack(spacing: 0) {
+                    DepositStatItem(title: "总件数/款", value: "\(stats.totalCount)/\(stats.styleCount)")
+                    
+                    Divider()
+                        .frame(height: 30)
+                    
+                    DepositStatItem(title: "已付定金", value: "¥\(NSDecimalNumber(decimal: stats.paidDeposit).stringValue)", valueColor: Color(hex: "FF9800"))
+                    
+                    Divider()
+                        .frame(height: 30)
+                    
+                    DepositStatItem(title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: stats.pendingBalance).stringValue)", valueColor: Color(hex: "C94C72"))
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 12)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .background(CardBackgroundView(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
+    }
+}
+
+struct DepositStatItem: View {
+    let title: String
+    let value: String
+    var valueColor: Color = .primary
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(valueColor)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
