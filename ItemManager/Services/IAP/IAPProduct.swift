@@ -11,8 +11,8 @@ enum IAPProductType: String, CaseIterable {
     case meowCoin120 = "com.pinkhouse.app.meowcoin_120"    // 12元 = 120喵币
     case meowCoin300 = "com.pinkhouse.app.meowcoin_300"    // 30元 = 300喵币
     case meowCoin500 = "com.pinkhouse.app.meowcoin_500"    // 50元 = 500喵币（热门）
-    case meowCoin1280 = "com.pinkhouse.app.meowcoin_1280"  // 128元 = 1280喵币（最划算）
-    case meowCoin3280 = "com.pinkhouse.app.meowcoin_3280"  // 328元 = 3280喵币
+    case meowCoin1280 = "com.pinkhouse.app.mcoin_1280"  // 128元 = 1280喵币（最划算）
+    case meowCoin3280 = "com.pinkhouse.app.mcoin_3280"  // 328元 = 3280喵币
 
     // VIP 订阅 - 自动续订订阅
     case vipMonthly = "com.pinkhouse.app.vip_monthly"

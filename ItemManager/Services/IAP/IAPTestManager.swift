@@ -408,7 +408,7 @@ struct IAPTestPanel: View {
                     .foregroundStyle(.blue)
 
                     Button("💰 添加土豪档位 (3280喵币)") {
-                        testManager.addMeowCoins(3280, productID: "com.pinkhouse.app.meowcoin_3280", isFirstDouble: true)
+                        testManager.addMeowCoins(3280, productID: "com.pinkhouse.app.mcoin_3280", isFirstDouble: true)
                     }
                     .foregroundStyle(.blue)
 

@@ -1700,9 +1700,9 @@ struct IAPTestView: View {
                     }
 
                     // 3280喵币档位
-                    let hasFirstDouble3280 = testManager.hasFirstDoubleBonus(for: "com.pinkhouse.app.meowcoin_3280")
+                    let hasFirstDouble3280 = testManager.hasFirstDoubleBonus(for: "com.pinkhouse.app.mcoin_3280")
                     Button {
-                        testManager.addMeowCoins(3280, productID: "com.pinkhouse.app.meowcoin_3280", isFirstDouble: true)
+                        testManager.addMeowCoins(3280, productID: "com.pinkhouse.app.mcoin_3280", isFirstDouble: true)
                         viewModel.loadUserData()
                     } label: {
                         LabActionCard(

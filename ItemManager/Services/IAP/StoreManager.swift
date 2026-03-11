@@ -155,11 +155,12 @@ class StoreManager: ObservableObject {
     // MARK: - 生产模式购买
     private func purchaseInProductionMode(product: Product) async -> IAPPurchaseResult {
         do {
-            // 准备购买选项（传入appAccountToken用于服务器关联）
+            // 准备购买选项
             var options: Set<Product.PurchaseOption> = []
-            if let userUUID = IAPServerManager.shared.getUserUUID() {
-                options.insert(.appAccountToken(userUUID))
-            }
+            // 可选：传入appAccountToken用于关联用户（当前使用本地验证，不需要）
+            // if let userUUID = getCurrentUserUUID() {
+            //     options.insert(.appAccountToken(userUUID))
+            // }
 
             // 发起购买请求
             let result = try await product.purchase(options: options)
