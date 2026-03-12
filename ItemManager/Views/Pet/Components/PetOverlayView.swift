@@ -163,8 +163,13 @@ struct PetOverlayView: View {
     private func handleDragChanged(_ value: DragGesture.Value, in geometry: GeometryProxy) {
         gestureHandler.handleDragChanged(value, in: geometry.size)
         
-        // Vision线检测
+        // 检查是否需要开始拖拽（从按压状态转为拖拽状态）
         if case .dragging = gestureHandler.state {
+            // 如果 interactionManager 还没有进入拖拽状态，则开始拖拽
+            if interactionManager.state != .dragging {
+                interactionManager.startDragging(at: value.location)
+            }
+            // Vision线检测
             performVisionCheck(at: value.location, in: geometry)
         }
     }
