@@ -6,11 +6,54 @@ extension BookDetailView {
 
     @ViewBuilder
     func pageCell(for page: Outfit) -> some View {
-        if isEditing {
+        if isBatchEditing {
+            batchEditingPageCell(for: page)
+        } else if isEditing {
             editingPageCell(for: page)
         } else {
             normalPageCell(for: page)
         }
+    }
+
+    @ViewBuilder
+    private func batchEditingPageCell(for page: Outfit) -> some View {
+        let isSelected = selectedPages.contains(page.id)
+        PageThumbnailView(page: page, gridMode: gridMode)
+            .overlay(alignment: .topLeading) {
+                selectionIndicator(isSelected: isSelected)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 3)
+            )
+            .onTapGesture {
+                withAnimation(.spring(response: 0.2)) {
+                    if isSelected {
+                        selectedPages.remove(page.id)
+                    } else {
+                        selectedPages.insert(page.id)
+                    }
+                }
+            }
+    }
+
+    private func selectionIndicator(isSelected: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(isSelected ? Color.pink : Color.white.opacity(0.8))
+                .frame(width: 24, height: 24)
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            } else {
+                Circle()
+                    .stroke(Color.gray.opacity(0.5), lineWidth: 2)
+                    .frame(width: 24, height: 24)
+            }
+        }
+        .padding(8)
     }
 
     @ViewBuilder

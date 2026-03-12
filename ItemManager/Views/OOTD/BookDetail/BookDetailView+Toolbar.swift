@@ -96,26 +96,36 @@ extension BookDetailView {
 
             Divider()
 
+            // 批量编辑入口
+            Button {
+                isBatchEditing = true
+                selectedPages.removeAll()
+            } label: {
+                Label("批量编辑", systemImage: "checkmark.circle")
+            }
+
+            Divider()
+
             Button {
                 showingTrash = true
             } label: {
                 Label("垃圾篓", systemImage: "trash")
             }
-            
+
             Divider()
-            
+
             Button {
                 showingBatchConfirmation = true
             } label: {
                 Label("批量处理小裙子", systemImage: "wand.and.stars")
             }
-            
+
             Button {
                 showingRepairConfirmation = true
             } label: {
                 Label("修复数据", systemImage: "hammer")
             }
-            
+
             Button {
                 showingBatchReplaceSheet = true
             } label: {

@@ -11,6 +11,8 @@ struct SpaceBookToolbar: ToolbarContent {
     @Binding var isSidebarVisible: Bool
     @Binding var gridModeValue: Int
     @Binding var isEditing: Bool
+    @Binding var isBatchEditing: Bool
+    @Binding var selectedPages: Set<UUID>
     @Binding var showingNewPageAlert: Bool
     @Binding var showingCoverPicker: Bool
     var dismissAction: () -> Void
@@ -78,11 +80,21 @@ struct SpaceBookToolbar: ToolbarContent {
                     } label: {
                         Label("修改手帐封面", systemImage: "photo")
                     }
-                    
+
                     Button {
                         onRenameBook()
                     } label: {
                         Label("重命名手帐", systemImage: "pencil")
+                    }
+
+                    Divider()
+
+                    // 批量编辑入口
+                    Button {
+                        isBatchEditing = true
+                        selectedPages.removeAll()
+                    } label: {
+                        Label("批量编辑", systemImage: "checkmark.circle")
                     }
 
                     Divider()

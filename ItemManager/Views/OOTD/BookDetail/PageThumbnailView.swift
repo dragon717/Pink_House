@@ -16,38 +16,48 @@ struct PageThumbnailView: View {
             return CGSize(width: 300, height: 400)
         }
     }
+
+    // 书页封面比例 4:3（竖4，横3）-> 宽:高 = 3:4
+    private var aspectRatio: CGFloat {
+        3.0 / 4.0
+    }
     
     var body: some View {
-        VStack {
-            Group {
-                if let path = page.snapshotPath {
-                    AsyncDownsampledImage(
-                        fileName: path,
-                        targetSize: targetSize,
-                        content: { uiImage in
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                        },
-                        placeholder: {
-                            placeholderView
-                                .overlay {
-                                    ProgressView()
-                                }
+        VStack(spacing: 8) {
+            // 使用 Color.clear + overlay 技巧来强制 4:3 比例
+            Color.clear
+                .aspectRatio(aspectRatio, contentMode: .fit)
+                .overlay {
+                    GeometryReader { geometry in
+                        Group {
+                            if let path = page.snapshotPath {
+                                AsyncDownsampledImage(
+                                    fileName: path,
+                                    targetSize: targetSize,
+                                    content: { uiImage in
+                                        Image(uiImage: uiImage)
+                                            .resizable()
+                                            .scaledToFill()  // 使用 fill 模式裁剪填充
+                                    },
+                                    placeholder: {
+                                        placeholderView
+                                            .overlay {
+                                                ProgressView()
+                                            }
+                                    }
+                                )
+                            } else {
+                                placeholderView
+                            }
                         }
-                    )
-                } else {
-                    placeholderView
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()  // 裁剪超出部分
+                    }
                 }
-            }
-            // 保持3:4比例（宽3高4），使用fill模式确保填充整个区域
-            .aspectRatio(0.75, contentMode: .fill)
-            .frame(maxWidth: .infinity)
-            .clipped()
-            .background(Color.white)
-            .cornerRadius(8)
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-            
+                .background(Color.white)
+                .cornerRadius(8)
+                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+
             Text(page.note)
                 .font(.caption)
                 .lineLimit(1)

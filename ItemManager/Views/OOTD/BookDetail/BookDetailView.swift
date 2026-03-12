@@ -81,6 +81,12 @@ struct BookDetailView: View {
     @State var isProcessing = false
     @State var processingMessage = ""
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothing: [Clothing]
+    
+    // 批量编辑相关状态
+    @State var isBatchEditing = false
+    @State var selectedPages = Set<UUID>()
+    @State var showingBatchDeleteConfirmation = false
+    @State var showingBatchCopyConfirmation = false
 
     @AppStorage("bookDetailGridMode") var gridModeValue = 2
 
@@ -98,7 +104,7 @@ struct BookDetailView: View {
     var body: some View {
         contentView
     }
-    
+
     @ViewBuilder
     private var contentView: some View {
         let mainView = Group {
@@ -118,16 +124,20 @@ struct BookDetailView: View {
         }
         .id(refreshTrigger)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        
+
         let withNav = mainView
-            .navigationTitle(book.title)
+            .navigationTitle(isBatchEditing ? "已选择 \(selectedPages.count) 项" : book.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 if showLeadingToolbar {
                     leadingToolbarContent
                 }
-                trailingToolbarContent
+                if isBatchEditing {
+                    batchEditingToolbarContent
+                } else {
+                    trailingToolbarContent
+                }
             }
         
         let withSheets = withNav
@@ -158,6 +168,22 @@ struct BookDetailView: View {
             }, message: {
                 Text(deleteConfirmationMessage)
             })
+            .alert("确认批量删除", isPresented: $showingBatchDeleteConfirmation) {
+                Button("取消", role: .cancel) {}
+                Button("删除", role: .destructive) {
+                    confirmBatchDelete()
+                }
+            } message: {
+                Text("确定要删除选中的 \(selectedPages.count) 个书页吗？删除后可在回收站中恢复。")
+            }
+            .alert("确认批量复制", isPresented: $showingBatchCopyConfirmation) {
+                Button("取消", role: .cancel) {}
+                Button("复制") {
+                    confirmBatchCopy()
+                }
+            } message: {
+                Text("确定要复制选中的 \(selectedPages.count) 个书页吗？")
+            }
             .fullScreenCover(isPresented: $showingShareCard) {
                 if let page = pageToShare {
                     ShareCardSheet(
@@ -620,6 +646,130 @@ struct BookDetailView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - 批量编辑工具栏
+
+    var batchEditingToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 16) {
+                // 全选/取消全选
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    Text(selectedPages.count == sortedPages.count ? "取消全选" : "全选")
+                        .font(.system(size: 16, weight: .medium))
+                }
+
+                // 复制按钮
+                Button {
+                    if !selectedPages.isEmpty {
+                        showingBatchCopyConfirmation = true
+                    }
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .disabled(selectedPages.isEmpty)
+
+                // 删除按钮
+                Button {
+                    if !selectedPages.isEmpty {
+                        showingBatchDeleteConfirmation = true
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+                .disabled(selectedPages.isEmpty)
+
+                // 完成按钮
+                Button {
+                    isBatchEditing = false
+                    selectedPages.removeAll()
+                } label: {
+                    Text("完成")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.pink)
+                }
+            }
+        }
+    }
+
+    // MARK: - 批量编辑操作
+
+    private func toggleSelectAll() {
+        if selectedPages.count == sortedPages.count {
+            selectedPages.removeAll()
+        } else {
+            selectedPages = Set(sortedPages.map { $0.id })
+        }
+    }
+
+    private func confirmBatchDelete() {
+        withAnimation {
+            let pagesToDelete = sortedPages.filter { selectedPages.contains($0.id) }
+            for page in pagesToDelete {
+                page.isDeleted = true
+                page.deletedAt = Date()
+                page.lastModified = Date()
+                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
+            }
+            try? modelContext.save()
+            loadPages()
+            selectedPages.removeAll()
+            isBatchEditing = false
+        }
+    }
+
+    private func confirmBatchCopy() {
+        withAnimation {
+            let pagesToCopy = sortedPages.filter { selectedPages.contains($0.id) }
+            var currentMaxSortIndex = sortedPages.last?.sortIndex ?? 0
+
+            for page in pagesToCopy {
+                currentMaxSortIndex += 1
+                let newPage = Outfit(
+                    note: page.note + " 副本",
+                    canvasType: page.canvasType,
+                    backgroundImagePath: page.backgroundImagePath,
+                    book: book
+                )
+                newPage.sortIndex = currentMaxSortIndex
+                modelContext.insert(newPage)
+
+                // 复制书页中的物品
+                if let items = page.items {
+                    for item in items {
+                        let newItem = OutfitItem(
+                            cutout: item.cutout,
+                            x: item.x,
+                            y: item.y,
+                            rotation: item.rotation,
+                            scale: item.scale,
+                            zIndex: item.zIndex
+                        )
+                        if newPage.items == nil {
+                            newPage.items = []
+                        }
+                        newPage.items?.append(newItem)
+                    }
+                }
+
+                // 复制缩略图
+                if let path = page.snapshotPath,
+                   let image = ImageManager.shared.loadImage(fileName: path),
+                   let newPath = ImageManager.shared.saveImage(image, context: modelContext) {
+                    newPage.snapshotPath = newPath
+                }
+            }
+
+            try? modelContext.save()
+            loadPages()
+            selectedPages.removeAll()
+            isBatchEditing = false
+        }
     }
 }
 

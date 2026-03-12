@@ -100,20 +100,32 @@ struct SpaceBookDetailView: View {
     // 用于强制刷新视图的触发器
     @State private var refreshTrigger = false
 
+    // 批量编辑相关状态
+    @State private var isBatchEditing = false
+    @State private var selectedPages = Set<UUID>()
+    @State private var showingBatchDeleteConfirmation = false
+    @State private var showingBatchCopyConfirmation = false
+
     var body: some View {
         mainContent
             .id(refreshTrigger)
-            .navigationTitle(book.title)
+            .navigationTitle(isBatchEditing ? "已选择 \(selectedPages.count) 项" : book.title)
             .toolbar {
-                SpaceBookToolbar(
-                    isSidebarVisible: $isSidebarVisible,
-                    gridModeValue: $gridModeValue,
-                    isEditing: $isEditing,
-                    showingNewPageAlert: $showingNewPageAlert,
-                    showingCoverPicker: $showingCoverPicker,
-                    dismissAction: { dismiss() },
-                    onRenameBook: { showingRenameBookAlert = true }
-                )
+                if isBatchEditing {
+                    batchEditingToolbarContent
+                } else {
+                    SpaceBookToolbar(
+                        isSidebarVisible: $isSidebarVisible,
+                        gridModeValue: $gridModeValue,
+                        isEditing: $isEditing,
+                        isBatchEditing: $isBatchEditing,
+                        selectedPages: $selectedPages,
+                        showingNewPageAlert: $showingNewPageAlert,
+                        showingCoverPicker: $showingCoverPicker,
+                        dismissAction: { dismiss() },
+                        onRenameBook: { showingRenameBookAlert = true }
+                    )
+                }
             }
             .alert("新建空间书页", isPresented: $showingNewPageAlert) {
                 TextField("备注", text: $newPageNote)
@@ -176,6 +188,122 @@ struct SpaceBookDetailView: View {
                     try? modelContext.save()
                 }
             }
+            .alert("确认批量删除", isPresented: $showingBatchDeleteConfirmation) {
+                Button("取消", role: .cancel) {}
+                Button("删除", role: .destructive) {
+                    confirmBatchDelete()
+                }
+            } message: {
+                Text("确定要删除选中的 \(selectedPages.count) 个书页吗？删除后可在回收站中恢复。")
+            }
+            .alert("确认批量复制", isPresented: $showingBatchCopyConfirmation) {
+                Button("取消", role: .cancel) {}
+                Button("复制") {
+                    confirmBatchCopy()
+                }
+            } message: {
+                Text("确定要复制选中的 \(selectedPages.count) 个书页吗？")
+            }
+    }
+
+    // MARK: - 批量编辑工具栏
+
+    private var batchEditingToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 16) {
+                // 全选/取消全选
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    Text(selectedPages.count == sortedPages.count ? "取消全选" : "全选")
+                        .font(.system(size: 16, weight: .medium))
+                }
+
+                // 复制按钮
+                Button {
+                    if !selectedPages.isEmpty {
+                        showingBatchCopyConfirmation = true
+                    }
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .disabled(selectedPages.isEmpty)
+
+                // 删除按钮
+                Button {
+                    if !selectedPages.isEmpty {
+                        showingBatchDeleteConfirmation = true
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+                .disabled(selectedPages.isEmpty)
+
+                // 完成按钮
+                Button {
+                    isBatchEditing = false
+                    selectedPages.removeAll()
+                } label: {
+                    Text("完成")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.pink)
+                }
+            }
+        }
+    }
+
+    // MARK: - 批量编辑操作
+
+    private func toggleSelectAll() {
+        if selectedPages.count == sortedPages.count {
+            selectedPages.removeAll()
+        } else {
+            selectedPages = Set(sortedPages.map { $0.id })
+        }
+    }
+
+    private func confirmBatchDelete() {
+        withAnimation {
+            let pagesToDelete = sortedPages.filter { selectedPages.contains($0.id) }
+            for page in pagesToDelete {
+                page.isDeleted = true
+                page.deletedAt = Date()
+                page.lastModified = Date()
+                DeleteTracker.shared.recordDeletedOutfit(id: page.id)
+            }
+            try? modelContext.save()
+            refreshTrigger.toggle()
+            selectedPages.removeAll()
+            isBatchEditing = false
+        }
+    }
+
+    private func confirmBatchCopy() {
+        withAnimation {
+            let pagesToCopy = sortedPages.filter { selectedPages.contains($0.id) }
+            var currentMaxSortIndex = sortedPages.last?.sortIndex ?? 0
+
+            for page in pagesToCopy {
+                currentMaxSortIndex += 1
+                let newPage = SpaceOutfit(note: page.note + " 副本", book: book)
+                newPage.sortIndex = currentMaxSortIndex
+                newPage.snapshotPath = page.snapshotPath
+                newPage.modelPath = page.modelPath
+                newPage.camPosX = page.camPosX
+                newPage.camPosY = page.camPosY
+                newPage.camPosZ = page.camPosZ
+                newPage.lightingIntensity = page.lightingIntensity
+                modelContext.insert(newPage)
+            }
+
+            try? modelContext.save()
+            refreshTrigger.toggle()
+            selectedPages.removeAll()
+            isBatchEditing = false
+        }
     }
 
     // MARK: - Main Content
@@ -210,6 +338,7 @@ struct SpaceBookDetailView: View {
             let columnCount = gridMode.rawValue
             let totalSpacing: CGFloat = CGFloat(columnCount - 1) * 16
             let itemWidth = (containerWidth - totalSpacing) / CGFloat(columnCount)
+            // 书页封面比例 4:3（竖4，横3）-> 高:宽 = 4:3
             let itemHeight = itemWidth * 4 / 3
 
             LazyVGrid(columns: gridMode.columns, spacing: 16) {
@@ -224,11 +353,54 @@ struct SpaceBookDetailView: View {
 
     @ViewBuilder
     private func pageCell(for page: SpaceOutfit, itemWidth: CGFloat, itemHeight: CGFloat) -> some View {
-        if isEditing {
+        if isBatchEditing {
+            batchEditingPageCell(for: page, itemWidth: itemWidth, itemHeight: itemHeight)
+        } else if isEditing {
             editingPageCell(for: page, itemWidth: itemWidth, itemHeight: itemHeight)
         } else {
             normalPageCell(for: page, itemWidth: itemWidth, itemHeight: itemHeight)
         }
+    }
+
+    @ViewBuilder
+    private func batchEditingPageCell(for page: SpaceOutfit, itemWidth: CGFloat, itemHeight: CGFloat) -> some View {
+        let isSelected = selectedPages.contains(page.id)
+        SpaceOutfitCard(page: page, width: itemWidth, height: itemHeight)
+            .overlay(alignment: .topLeading) {
+                selectionIndicator(isSelected: isSelected)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.pink : Color.clear, lineWidth: 3)
+            )
+            .onTapGesture {
+                withAnimation(.spring(response: 0.2)) {
+                    if isSelected {
+                        selectedPages.remove(page.id)
+                    } else {
+                        selectedPages.insert(page.id)
+                    }
+                }
+            }
+    }
+
+    private func selectionIndicator(isSelected: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(isSelected ? Color.pink : Color.white.opacity(0.8))
+                .frame(width: 24, height: 24)
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+            } else {
+                Circle()
+                    .stroke(Color.gray.opacity(0.5), lineWidth: 2)
+                    .frame(width: 24, height: 24)
+            }
+        }
+        .padding(8)
     }
 
     private func editingPageCell(for page: SpaceOutfit, itemWidth: CGFloat, itemHeight: CGFloat) -> some View {
