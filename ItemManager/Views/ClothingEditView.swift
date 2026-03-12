@@ -238,6 +238,32 @@ struct ClothingEditView: View {
     // 标记是否已经进入后台（避免onDisappear重复保存草稿）
     @State private var didEnterBackground = false
     
+    // Toast 提示状态
+    @State private var showToast = false
+    @State private var toastMessage = ""
+    @State private var toastType: ToastType = .error
+    
+    // Toast 类型
+    enum ToastType {
+        case success, error, warning
+        
+        var icon: String {
+            switch self {
+            case .success: return "checkmark.circle.fill"
+            case .error: return "exclamationmark.triangle.fill"
+            case .warning: return "info.circle.fill"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .success: return .green
+            case .error: return .red
+            case .warning: return .orange
+            }
+        }
+    }
+    
     private var initialBrandID: UUID?
     private var initialTypes: Set<String>?
     
@@ -258,6 +284,70 @@ struct ClothingEditView: View {
         )
     }
     
+    // 提取基础信息视图，避免 body 中表达式过于复杂
+    private var basicInfoSection: some View {
+        ClothingBasicInfoView(
+            imagePaths: $imagePaths,
+            name: $name,
+            brandName: $brandName,
+            isShared: $isShared,
+            types: $types,
+            colors: $colors,
+            sizes: $sizes,
+            length: $length,
+            condition: $condition,
+            accessories: $accessories,
+            showingBrandSelection: $showingBrandSelection,
+            showingGenericSelection: $showingGenericSelection,
+            activeSelectionField: $activeSelectionField
+        )
+    }
+    
+    // 提取标签视图
+    private var tagsSection: some View {
+        ClothingTagsView(
+            selectedTags: $selectedTags,
+            showingAddTagSheet: $showingAddTagSheet
+        )
+    }
+    
+    // 提取价格视图
+    private var priceSection: some View {
+        ClothingPriceView(
+            originalPrice: $originalPrice,
+            priceTotal: $priceTotal,
+            deposit: $deposit,
+            balance: $balance,
+            accessoriesPrice: $accessoriesPrice,
+            stock: $stock,
+            accessoryList: $accessoryList,
+            onShowToast: handleShowToast
+        )
+    }
+    
+    // 提取购买信息视图
+    private var purchaseInfoSection: some View {
+        ClothingPurchaseInfoView(
+            purchaseDate: $purchaseDate,
+            depositDate: $depositDate,
+            isDepositPlan: $isDepositPlan,
+            finalPaymentDate: $finalPaymentDate,
+            finalPaymentEndDate: $finalPaymentEndDate,
+            note: $note
+        )
+    }
+    
+    // 处理 Toast 显示的回调
+    private func handleShowToast(message: String, type: ClothingPriceView.ToastType) {
+        let toastType: ToastType
+        switch type {
+        case .success: toastType = .success
+        case .error: toastType = .error
+        case .warning: toastType = .warning
+        }
+        showToastMessage(message, type: toastType)
+    }
+    
     var body: some View {
         ZStack {
             // Background
@@ -268,51 +358,22 @@ struct ClothingEditView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // MARK: - 裙子信息
-                    ClothingBasicInfoView(
-                    imagePaths: $imagePaths,
-                    name: $name,
-                    brandName: $brandName,
-                    isShared: $isShared,
-                    types: $types,
-                    colors: $colors,
-                    sizes: $sizes,
-                    length: $length,
-                    condition: $condition,
-                    accessories: $accessories,
-                    showingBrandSelection: $showingBrandSelection,
-                    showingGenericSelection: $showingGenericSelection,
-                    activeSelectionField: $activeSelectionField
-                )
-                
-                // MARK: - 标签分类
-                ClothingTagsView(
-                    selectedTags: $selectedTags,
-                    showingAddTagSheet: $showingAddTagSheet
-                )
-                
-                // MARK: - 价格信息
-                ClothingPriceView(
-                    originalPrice: $originalPrice,
-                    priceTotal: $priceTotal,
-                    deposit: $deposit,
-                    balance: $balance,
-                    accessoriesPrice: $accessoriesPrice,
-                    stock: $stock,
-                    accessoryList: $accessoryList
-                )
-                
-                // MARK: - 购买信息
-                ClothingPurchaseInfoView(
-                    purchaseDate: $purchaseDate,
-                    depositDate: $depositDate,
-                    isDepositPlan: $isDepositPlan,
-                    finalPaymentDate: $finalPaymentDate,
-                    finalPaymentEndDate: $finalPaymentEndDate,
-                    note: $note
-                )
+                    basicInfoSection
+                    
+                    // MARK: - 标签分类
+                    tagsSection
+                    
+                    // MARK: - 价格信息
+                    priceSection
+                    
+                    // MARK: - 购买信息
+                    purchaseInfoSection
                 }
                 .padding()
             }
+            
+            // Toast 提示层
+            toastOverlay
         }
         .navigationTitle(isEditing ? "编辑" : "手动创建")
         .navigationBarTitleDisplayMode(.inline)
@@ -693,9 +754,58 @@ struct ClothingEditView: View {
     }
     
     private func updateTotalPrice() {
-        // 若定金和尾款都存在，则自动校正总价
+        // 保存前校验：若定金和尾款都存在，则校正总价
         if deposit > 0 && balance > 0 {
             priceTotal = deposit + balance
+        }
+    }
+    
+    // MARK: - Toast 提示
+    
+    /// 显示提示信息
+    private func showToastMessage(_ message: String, type: ToastType) {
+        toastMessage = message
+        toastType = type
+        withAnimation(.spring(response: 0.3)) {
+            showToast = true
+        }
+        // 2.5秒后自动隐藏
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                showToast = false
+            }
+        }
+    }
+    
+    /// Toast 提示视图
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if showToast {
+            VStack {
+                Spacer()
+                HStack(spacing: 12) {
+                    Image(systemName: toastType.icon)
+                        .font(.title3)
+                        .foregroundStyle(toastType.color)
+                    
+                    Text(toastMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                    
+                    Spacer()
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+            }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .zIndex(100)
         }
     }
     

@@ -224,6 +224,30 @@ struct ClothingPriceView: View {
     @Binding var stock: Int
     @Binding var accessoryList: [AccessoryItemData]
     
+    // 回调闭包用于显示 Toast
+    var onShowToast: ((String, ToastType) -> Void)?
+    
+    // 提示类型
+    enum ToastType {
+        case success, error, warning
+        
+        var icon: String {
+            switch self {
+            case .success: return "checkmark.circle.fill"
+            case .error: return "exclamationmark.triangle.fill"
+            case .warning: return "info.circle.fill"
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .success: return .green
+            case .error: return .red
+            case .warning: return .orange
+            }
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             Text("价格信息")
@@ -233,7 +257,7 @@ struct ClothingPriceView: View {
             VStack(spacing: 12) {
                 PriceRow(title: "原价", value: $originalPrice)
                 Divider()
-                PriceRow(title: "裙子总价合计", subtitle: "(自动计算=定金+尾款)", value: $priceTotal)
+                PriceRow(title: "裙子总价合计", value: $priceTotal)
             }
             
             // 定金和尾款
@@ -242,6 +266,25 @@ struct ClothingPriceView: View {
                 Divider()
                 PriceRow(title: "尾款", value: $balance)
             }
+            
+            // 自动计算按钮
+            Button(action: autoCalculateWithFeedback) {
+                HStack {
+                    Image(systemName: "wand.and.stars")
+                    Text("自动计算")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(canAutoCalculate ? Color.pink : Color.gray)
+                )
+            }
+            .disabled(!canAutoCalculate)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 8)
             
             // 汇总信息 (New Feature: Total Deposit & Balance)
             let totalDeposit = deposit + accessoryList.reduce(0) { $0 + $1.deposit }
@@ -445,6 +488,70 @@ struct ClothingPriceView: View {
     private func calculateAccessoriesTotal() {
         let total = accessoryList.reduce(0) { $0 + $1.price }
         accessoriesPrice = total
+    }
+    
+    // MARK: - 价格自动计算逻辑
+    
+    /// 判断是否满足自动计算条件（三个价格中至少输入了两个）
+    private var canAutoCalculate: Bool {
+        let hasTotal = priceTotal > 0
+        let hasDeposit = deposit > 0
+        let hasBalance = balance > 0
+        
+        // 至少有两个值已输入，且第三个值为0或可以计算
+        let filledCount = (hasTotal ? 1 : 0) + (hasDeposit ? 1 : 0) + (hasBalance ? 1 : 0)
+        return filledCount >= 2
+    }
+    
+    /// 自动计算价格（手动触发，带反馈）
+    private func autoCalculateWithFeedback() {
+        let result = performAutoCalculate()
+        showToastMessage(result.message, type: result.success ? .success : .error)
+    }
+    
+    /// 执行自动计算，返回结果和提示信息
+    private func performAutoCalculate() -> (success: Bool, message: String) {
+        // 情况1: 定金 + 尾款 → 计算总价
+        if deposit > 0 && balance > 0 && priceTotal == 0 {
+            priceTotal = deposit + balance
+            return (true, "已自动计算总价：¥\(String(format: "%.2f", priceTotal))")
+        }
+        // 情况2: 总价 + 定金 → 计算尾款
+        else if priceTotal > 0 && deposit > 0 && balance == 0 {
+            let newBalance = priceTotal - deposit
+            if newBalance >= 0 {
+                balance = newBalance
+                return (true, "已自动计算尾款：¥\(String(format: "%.2f", balance))")
+            } else {
+                return (false, "计算失败：定金不能大于总价")
+            }
+        }
+        // 情况3: 总价 + 尾款 → 计算定金
+        else if priceTotal > 0 && balance > 0 && deposit == 0 {
+            let newDeposit = priceTotal - balance
+            if newDeposit >= 0 {
+                deposit = newDeposit
+                return (true, "已自动计算定金：¥\(String(format: "%.2f", deposit))")
+            } else {
+                return (false, "计算失败：尾款不能大于总价")
+            }
+        }
+        // 情况4: 三个值都已输入，校验并校正（以定金+尾款为准重新计算总价）
+        else if priceTotal > 0 && deposit > 0 && balance > 0 {
+            let calculatedTotal = deposit + balance
+            if calculatedTotal != priceTotal {
+                priceTotal = calculatedTotal
+                return (true, "总价已校正为：¥\(String(format: "%.2f", priceTotal))")
+            } else {
+                return (true, "价格计算正确，无需调整")
+            }
+        }
+        return (false, "无法计算，请至少输入两个价格值")
+    }
+    
+    /// 显示提示信息
+    private func showToastMessage(_ message: String, type: ToastType) {
+        onShowToast?(message, type)
     }
 }
 
