@@ -11,6 +11,14 @@ struct DailyCheckInView: View {
     @State private var showCelebration = false
     @State private var isSharing = false // 分享加载状态
     
+    // 选中的日期（用于查看往日穿搭色）
+    @State private var selectedDate: Date = Date()
+    @State private var selectedDateOutfit: TodayOutfitColor?
+    @State private var isLoadingSelectedDate = false
+    
+    // 本周签到展开状态
+    @State private var isWeekCheckInExpanded = false
+    
     // 星期名称
     private let weekDays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
     
@@ -29,10 +37,8 @@ struct DailyCheckInView: View {
                         // 七日签到卡片
                         weekCheckInCard
                         
-                        // 今日穿搭色推荐
-                        if let outfit = checkInManager.todayOutfitColor {
-                            outfitColorSection(outfit: outfit)
-                        }
+                        // 穿搭色区域（今日或选中的往日）
+                        outfitColorSection
                         
                         // 打卡按钮
                         checkInButton
@@ -44,7 +50,7 @@ struct DailyCheckInView: View {
                             shareButton
                                 .padding(.horizontal, 40)
                         }
-                        
+
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 20)
@@ -86,7 +92,12 @@ struct DailyCheckInView: View {
             if checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
                 await checkInManager.loadTodayOutfitColor()
             }
-            
+
+            // 如果未打卡且穿搭色为空，从 CloudKit 获取今日穿搭色
+            if !checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
+                await checkInManager.fetchTodayOutfitColorFromCloudKit()
+            }
+
             // 请求位置权限
             LocationService.shared.requestAuthorization()
         }
@@ -145,30 +156,93 @@ struct DailyCheckInView: View {
         }
     }
     
-    // MARK: - 七日签到卡片
+    // MARK: - 七日签到卡片（可点击查看往日穿搭色，可展开为日历）
     private var weekCheckInCard: some View {
         VStack(spacing: 16) {
-            // 标题
-            HStack {
-                Text("本周签到")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                Text("累计 \(checkInManager.totalDays) 天")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
+            // 标题栏（带展开按钮）
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isWeekCheckInExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("本周签到")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Text("累计 \(checkInManager.totalDays) 天")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+
+                    // 展开/折叠图标
+                    Image(systemName: isWeekCheckInExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 4)
+                }
             }
-            
-            // 七日格子
-            HStack(spacing: 8) {
-                ForEach(0..<7) { index in
-                    DayCell(
-                        day: weekDays[index],
-                        isCheckedIn: checkInManager.weekCheckIns[index],
-                        isToday: isToday(weekday: index)
-                    )
+
+            if isWeekCheckInExpanded {
+                // 展开状态：显示原生日历组件
+                DatePicker(
+                    "选择日期",
+                    selection: $selectedDate,
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .accentColor(.pink)
+                .onChange(of: selectedDate) { _ in
+                    loadOutfitForSelectedDate()
+                }
+            } else {
+                // 折叠状态：显示本周七日格子
+                HStack(spacing: 8) {
+                    ForEach(0..<7) { index in
+                        let date = getDateForWeekday(index)
+                        let isSelected = Calendar.current.isDate(selectedDate, inSameDayAs: date)
+                        let isToday = isToday(weekday: index)
+                        let isCheckedIn = checkInManager.weekCheckIns[index]
+
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedDate = date
+                                loadOutfitForSelectedDate()
+                            }
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text(weekDays[index])
+                                    .font(.system(size: 12))
+                                    .foregroundColor(isToday ? .pink : .secondary)
+
+                                ZStack {
+                                    Circle()
+                                        .fill(isCheckedIn ? Color.pink.opacity(0.2) : Color.clear)
+                                        .frame(width: 36, height: 36)
+
+                                    if isCheckedIn {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.pink)
+                                    } else {
+                                        Text("\(Calendar.current.component(.day, from: date))")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    // 选中边框
+                                    if isSelected {
+                                        Circle()
+                                            .stroke(Color.pink, lineWidth: 2)
+                                            .frame(width: 36, height: 36)
+                                    }
+                                }
+                            }
+                        }
+                        .disabled(date > Date()) // 禁用未来日期
+                    }
                 }
             }
         }
@@ -190,109 +264,186 @@ struct DailyCheckInView: View {
                 )
         )
     }
+
+    // MARK: - 根据星期索引获取日期
+    private func getDateForWeekday(_ index: Int) -> Date {
+        let calendar = Calendar.current
+        let today = Date()
+        let weekday = calendar.component(.weekday, from: today)
+        // 转换为周一=0, 周日=6
+        let todayIndex = (weekday + 5) % 7
+        let daysOffset = index - todayIndex
+        return calendar.date(byAdding: .day, value: daysOffset, to: today) ?? today
+    }
     
-    // MARK: - 今日穿搭色区域
-    private func outfitColorSection(outfit: TodayOutfitColor) -> some View {
-        VStack(spacing: 16) {
-            // 标题和推荐来源
+    // MARK: - 穿搭色区域（今日或选中的往日）
+    private var outfitColorSection: some View {
+        VStack(spacing: 20) {
+            // 标题行
             HStack {
-                Text("今日穿搭色")
-                    .font(.system(size: 18, weight: .semibold))
+                let isToday = Calendar.current.isDateInToday(selectedDate)
+                Text(isToday ? "今日穿搭色" : "\(formatDate(selectedDate))穿搭色")
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.primary)
-                
+
                 Spacer()
-                
-                // 萌宠推荐标签
-                HStack(spacing: 4) {
-                    Image(systemName: "pawprint.fill")
-                        .font(.caption)
-                    Text("\(outfit.petName ?? "萌宠")推荐")
-                        .font(.caption)
-                }
-                .foregroundColor(.orange)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(Color.orange.opacity(0.1))
-                )
-            }
-            
-            // 天气位置信息
-            HStack(spacing: 12) {
-                // 位置
-                if let location = outfit.location, !location.isEmpty {
+
+                // 推荐者标签
+                let outfit = isToday ? checkInManager.todayOutfitColor : selectedDateOutfit
+                if let outfit = outfit {
                     HStack(spacing: 4) {
-                        Image(systemName: "location.fill")
+                        Image(systemName: outfit.source == "ai" ? "sparkles" : "pawprint.fill")
                             .font(.caption)
-                        Text(location)
+                        Text("\(outfit.petName ?? "萌宠")推荐")
                             .font(.caption)
                     }
-                    .foregroundColor(.secondary)
-                }
-                
-                // 天气
-                if let weather = outfit.weather {
-                    HStack(spacing: 4) {
-                        Image(systemName: weatherIcon(for: weather))
-                            .font(.caption)
-                        Text(weather)
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
-                }
-                
-                // 温度
-                if let temp = outfit.temperature {
-                    HStack(spacing: 4) {
-                        Image(systemName: "thermometer")
-                            .font(.caption)
-                        Text("\(Int(temp))°C")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
-                }
-                
-                // 季节
-                if let season = outfit.season {
-                    HStack(spacing: 4) {
-                        Image(systemName: "leaf.fill")
-                            .font(.caption)
-                        Text(season)
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
+                    .foregroundColor(outfit.source == "ai" ? .purple : .orange)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(outfit.source == "ai" ? Color.purple.opacity(0.1) : Color.orange.opacity(0.1))
+                    )
                 }
             }
-            
-            // 颜色展示
-            HStack(spacing: 12) {
-                ForEach(outfit.colors, id: \.self) { color in
-                    ColorCard(colorName: color)
-                }
-            }
-            
-            // 小物搭配建议
-            VStack(alignment: .leading, spacing: 8) {
+
+            // 加载状态
+            if isLoadingSelectedDate {
                 HStack {
-                    Image(systemName: "sparkle")
-                        .foregroundColor(.pink)
-                    Text("小物搭配")
-                        .font(.system(size: 14, weight: .medium))
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("加载中...")
+                        .font(.system(size: 14))
                         .foregroundColor(.secondary)
+                    Spacer()
                 }
-                
-                Text(outfit.accessories)
-                    .font(.system(size: 15))
-                    .foregroundColor(.primary)
-                    .lineSpacing(4)
+                .padding(.vertical, 40)
+            } else if let outfit = Calendar.current.isDateInToday(selectedDate) ? checkInManager.todayOutfitColor : selectedDateOutfit {
+                // 天气位置信息
+                HStack(spacing: 12) {
+                    // 位置
+                    if let location = outfit.location, !location.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "location.fill")
+                                .font(.caption)
+                            Text(location)
+                                .font(.caption)
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                    
+                    // 天气
+                    if let weather = outfit.weather {
+                        HStack(spacing: 4) {
+                            Image(systemName: weatherIcon(for: weather))
+                                .font(.caption)
+                            Text(weather)
+                                .font(.caption)
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                    
+                    // 温度
+                    if let temp = outfit.temperature {
+                        HStack(spacing: 4) {
+                            Image(systemName: "thermometer")
+                                .font(.caption)
+                            Text("\(Int(temp))°C")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                    
+                    // 季节
+                    if let season = outfit.season {
+                        HStack(spacing: 4) {
+                            Image(systemName: "leaf.fill")
+                                .font(.caption)
+                            Text(season)
+                                .font(.caption)
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                }
+
+                // 颜色展示
+                HStack(spacing: 12) {
+                    ForEach(outfit.colors, id: \.self) { colorInfo in
+                        if let hex = colorInfo.hex {
+                            ColorCard(colorName: colorInfo.name, hexColor: hex)
+                        } else {
+                            ColorCard(colorName: colorInfo.name)
+                        }
+                    }
+                }
+
+                // 小物搭配建议
+                if !outfit.accessories.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "sparkle")
+                                .foregroundColor(.pink)
+                            Text("小物搭配")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Text(outfit.accessories)
+                            .font(.system(size: 15))
+                            .foregroundColor(.primary)
+                            .lineSpacing(4)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.pink.opacity(0.05))
+                    )
+                }
+            } else if Calendar.current.isDateInToday(selectedDate) {
+                // 今日加载中
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("正在为你推荐今日穿搭色...")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.vertical, 40)
+            } else {
+                // 往日无数据
+                VStack(spacing: 16) {
+                    Image(systemName: "tshirt")
+                        .font(.system(size: 50))
+                        .foregroundColor(.secondary.opacity(0.5))
+
+                    Text("该日期暂无穿搭色记录")
+                        .font(.system(size: 15))
+                        .foregroundColor(.secondary)
+
+                    // AI 生成按钮
+                    Button {
+                        generateOutfitForSelectedDate()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                            Text("AI生成穿搭色")
+                        }
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(Color.pink)
+                        )
+                    }
+                }
+                .padding(.vertical, 30)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.pink.opacity(0.05))
-            )
         }
         .padding(20)
         .background(
@@ -300,6 +451,70 @@ struct DailyCheckInView: View {
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
         )
+    }
+
+    // MARK: - 格式化日期（MM月dd日）
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "MM月dd日"
+        return formatter.string(from: date)
+    }
+
+    // MARK: - 加载选中日期的穿搭色
+    private func loadOutfitForSelectedDate() {
+        Task {
+            isLoadingSelectedDate = true
+            selectedDateOutfit = nil
+
+            let isToday = Calendar.current.isDateInToday(selectedDate)
+
+            if isToday {
+                // 今日穿搭色由 manager 管理
+                selectedDateOutfit = nil
+            } else {
+                // 往日穿搭色：先查本地，再查 CloudKit
+                if let localRecord = checkInManager.getRecord(for: selectedDate) {
+                    // 本地有记录
+                    let colorInfos = zip(localRecord.colors, localRecord.colorHexes).map { name, hex in
+                        if let hex = hex {
+                            return ColorInfo(name: name, hex: hex)
+                        } else {
+                            return ColorInfo(name: name)
+                        }
+                    }
+                    selectedDateOutfit = TodayOutfitColor(
+                        colors: colorInfos,
+                        accessories: localRecord.accessories,
+                        description: "",
+                        source: localRecord.isAIGenerated ? "ai" : "local",
+                        weather: localRecord.weather,
+                        location: localRecord.location,
+                        temperature: localRecord.temperature,
+                        season: localRecord.season,
+                        petName: localRecord.petName
+                    )
+                } else {
+                    // 本地没有，查 CloudKit
+                    if let cloudOutfit = await checkInManager.fetchOutfitColor(for: selectedDate) {
+                        selectedDateOutfit = cloudOutfit
+                    }
+                }
+            }
+
+            isLoadingSelectedDate = false
+        }
+    }
+
+    // MARK: - 为选中日期生成穿搭色
+    private func generateOutfitForSelectedDate() {
+        Task {
+            isLoadingSelectedDate = true
+            if let outfit = await checkInManager.generateAndUploadOutfitForDate(selectedDate) {
+                selectedDateOutfit = outfit
+            }
+            isLoadingSelectedDate = false
+        }
     }
     
     // MARK: - 天气图标映射
@@ -374,6 +589,8 @@ struct DailyCheckInView: View {
         }
         .disabled(isSharing)
     }
+
+
     
     // MARK: - 执行打卡
     private func performCheckIn() {
@@ -435,116 +652,6 @@ struct DailyCheckInView: View {
         // 转换为周一为0的索引
         let todayIndex = (today + 5) % 7
         return weekday == todayIndex
-    }
-}
-
-// MARK: - 日期格子
-struct DayCell: View {
-    let day: String
-    let isCheckedIn: Bool
-    let isToday: Bool
-    
-    var body: some View {
-        VStack(spacing: 6) {
-            Text(day)
-                .font(.system(size: 12))
-                .foregroundColor(isToday ? .pink : .secondary)
-            
-            ZStack {
-                Circle()
-                    .fill(backgroundColor)
-                    .frame(width: 36, height: 36)
-                
-                if isCheckedIn {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                } else if isToday {
-                    Circle()
-                        .stroke(Color.pink, lineWidth: 2)
-                        .frame(width: 36, height: 36)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-    
-    private var backgroundColor: Color {
-        if isCheckedIn {
-            return .pink
-        } else if isToday {
-            return .pink.opacity(0.1)
-        } else {
-            return .gray.opacity(0.1)
-        }
-    }
-}
-
-// MARK: - 颜色卡片
-struct ColorCard: View {
-    let colorName: String
-    
-    // 颜色映射 - 扩展更多颜色支持2025流行色
-    private var color: Color {
-        let colorMap: [String: Color] = [
-            // 基础色
-            "樱花粉": Color(red: 1.0, green: 0.71, blue: 0.76),
-            "奶油白": Color(red: 1.0, green: 0.98, blue: 0.94),
-            "薰衣草紫": Color(red: 0.9, green: 0.8, blue: 1.0),
-            "珍珠白": Color(red: 0.98, green: 0.97, blue: 0.95),
-            "薄荷绿": Color(red: 0.7, green: 0.95, blue: 0.85),
-            "浅灰蓝": Color(red: 0.75, green: 0.85, blue: 0.95),
-            "玫瑰红": Color(red: 1.0, green: 0.4, blue: 0.5),
-            "香槟金": Color(red: 0.95, green: 0.9, blue: 0.7),
-            "浅金色": Color(red: 0.95, green: 0.9, blue: 0.75),
-            // 2025流行色
-            "莫兰迪粉": Color(red: 0.92, green: 0.78, blue: 0.82),
-            "雾霾蓝": Color(red: 0.65, green: 0.75, blue: 0.85),
-            "浅鹅黄": Color(red: 1.0, green: 0.95, blue: 0.75),
-            "珊瑚粉": Color(red: 1.0, green: 0.65, blue: 0.6),
-            "焦糖棕": Color(red: 0.8, green: 0.6, blue: 0.45),
-            "奶茶色": Color(red: 0.85, green: 0.78, blue: 0.7),
-            "枫叶红": Color(red: 0.9, green: 0.4, blue: 0.35),
-            "酒红色": Color(red: 0.65, green: 0.15, blue: 0.25),
-            "墨绿色": Color(red: 0.2, green: 0.35, blue: 0.25),
-            // 天气相关色
-            "明亮黄": Color(red: 1.0, green: 0.9, blue: 0.3),
-            "天空蓝": Color(red: 0.5, green: 0.75, blue: 1.0),
-            "海洋蓝": Color(red: 0.2, green: 0.5, blue: 0.8),
-            "冰蓝": Color(red: 0.75, green: 0.9, blue: 1.0),
-            "银白": Color(red: 0.9, green: 0.9, blue: 0.95),
-            "雪白": Color.white,
-            "深红": Color(red: 0.7, green: 0.1, blue: 0.15),
-            "藏青": Color(red: 0.15, green: 0.25, blue: 0.45),
-            "深灰": Color(red: 0.35, green: 0.35, blue: 0.4),
-            "深紫": Color(red: 0.4, green: 0.2, blue: 0.5),
-            "墨蓝": Color(red: 0.1, green: 0.2, blue: 0.4),
-            "黑色": Color.black,
-            "驼色": Color(red: 0.75, green: 0.6, blue: 0.45),
-            "橄榄绿": Color(red: 0.5, green: 0.55, blue: 0.35),
-            "米色": Color(red: 0.95, green: 0.92, blue: 0.85),
-            "淡粉": Color(red: 1.0, green: 0.85, blue: 0.9),
-            "浅紫": Color(red: 0.85, green: 0.75, blue: 0.95),
-            "天蓝": Color(red: 0.6, green: 0.85, blue: 1.0),
-            "深蓝": Color(red: 0.1, green: 0.3, blue: 0.6),
-            "墨绿": Color(red: 0.1, green: 0.35, blue: 0.25),
-            "白色": Color.white
-        ]
-        return colorMap[colorName] ?? .pink
-    }
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Circle()
-                .fill(color)
-                .frame(width: 50, height: 50)
-                .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
-            
-            Text(colorName)
-                .font(.system(size: 13))
-                .foregroundColor(.primary)
-        }
-        .frame(maxWidth: .infinity)
     }
 }
 
@@ -671,14 +778,15 @@ struct CheckInShareCardView: View {
                         )
                         
                         HStack(spacing: 16) {
-                            ForEach(outfit.colors, id: \.self) { color in
+                            ForEach(outfit.colors, id: \.self) { colorInfo in
+                                let color = colorInfo.color
                                 VStack(spacing: 8) {
                                     Circle()
-                                        .fill(colorFromName(color))
+                                        .fill(color)
                                         .frame(width: 60, height: 60)
-                                        .shadow(color: colorFromName(color).opacity(0.4), radius: 8, x: 0, y: 4)
+                                        .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
                                     
-                                    Text(color)
+                                    Text(colorInfo.name)
                                         .font(.system(size: 14))
                                         .foregroundColor(.primary)
                                 }
@@ -728,28 +836,13 @@ struct CheckInShareCardView: View {
         return formatter.string(from: Date())
     }
     
-    private func colorFromName(_ name: String) -> Color {
-        let colorMap: [String: Color] = [
-            "樱花粉": Color(red: 1.0, green: 0.71, blue: 0.76),
-            "奶油白": Color(red: 1.0, green: 0.98, blue: 0.94),
-            "薰衣草紫": Color(red: 0.9, green: 0.8, blue: 1.0),
-            "珍珠白": Color(red: 0.98, green: 0.97, blue: 0.95),
-            "薄荷绿": Color(red: 0.7, green: 0.95, blue: 0.85),
-            "浅灰蓝": Color(red: 0.75, green: 0.85, blue: 0.95),
-            "玫瑰红": Color(red: 1.0, green: 0.4, blue: 0.5),
-            "香槟金": Color(red: 0.95, green: 0.9, blue: 0.7),
-            "浅金色": Color(red: 0.95, green: 0.9, blue: 0.75),
-            "莫兰迪粉": Color(red: 0.92, green: 0.78, blue: 0.82),
-            "雾霾蓝": Color(red: 0.65, green: 0.75, blue: 0.85),
-            "浅鹅黄": Color(red: 1.0, green: 0.95, blue: 0.75),
-            "珊瑚粉": Color(red: 1.0, green: 0.65, blue: 0.6),
-            "焦糖棕": Color(red: 0.8, green: 0.6, blue: 0.45),
-            "奶茶色": Color(red: 0.85, green: 0.78, blue: 0.7),
-            "枫叶红": Color(red: 0.9, green: 0.4, blue: 0.35),
-            "酒红色": Color(red: 0.65, green: 0.15, blue: 0.25),
-            "墨绿色": Color(red: 0.2, green: 0.35, blue: 0.25)
-        ]
-        return colorMap[name] ?? .pink
+}
+
+// MARK: - Date 扩展
+extension Date {
+    /// 获取当天的开始时间（00:00:00）
+    var startOfDay: Date {
+        return Calendar.current.startOfDay(for: self)
     }
 }
 

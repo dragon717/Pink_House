@@ -69,6 +69,11 @@ class PetAIService: ObservableObject {
     private var apiKey: String = ""
     private var provider: AIProvider = .deepSeek
     
+    // 公共属性：检查 API Key 是否可用
+    var isAPIKeyAvailable: Bool {
+        return !apiKey.isEmpty
+    }
+    
     // Maintain simple history for API context
     private var history: [DSMessage] = []
     
@@ -319,7 +324,7 @@ class PetAIService: ObservableObject {
         print("🛑 [PetAIService] 用户停止生成")
     }
     
-    func sendMessage(_ text: String, userImagePath: String? = nil, displayText: String? = nil) async -> ChatMessage {
+    func sendMessage(_ text: String, userImagePath: String? = nil, displayText: String? = nil, enableVoice: Bool = true) async -> ChatMessage {
         print("🐾 [Debug] 准备发送消息给奶茶猫 (DeepSeek): \(text)")
         
         // 重置停止标志
@@ -471,10 +476,12 @@ class PetAIService: ObservableObject {
             self.history.append(DSMessage(role: "assistant", content: replyContent))
             
             let (cleanText, imageName) = parseResponse(replyContent)
-            
-            // 触发语音朗读 (TTS)
-            PetVoiceManager.shared.speak(cleanText, for: self.role)
-            
+
+            // 触发语音朗读 (TTS) - 仅在启用语音时播放
+            if enableVoice {
+                PetVoiceManager.shared.speak(cleanText, for: self.role)
+            }
+
             let aiMsg = ChatMessage(text: cleanText, imageName: imageName, isUser: false)
             self.allMessages.append(aiMsg)
             self.uiMessages.append(aiMsg)

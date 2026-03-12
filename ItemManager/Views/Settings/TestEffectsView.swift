@@ -1123,52 +1123,74 @@ struct CheckInTestView: View {
         manager.reloadFromDisk()
     }
     
-    // 为指定日期添加打卡记录
+    // 为指定日期添加打卡记录（从CloudKit获取或AI生成）
     private func addCheckInRecord(for date: Date) {
         let calendar = Calendar.current
-        let colors = [
-            ["樱花粉", "奶油白"],
-            ["薰衣草紫", "珍珠白"],
-            ["薄荷绿", "浅灰蓝"],
-            ["玫瑰红", "香槟金"]
-        ]
-        let accessories = [
-            "搭配粉色蝴蝶结发饰",
-            "搭配珍珠项链和蕾丝手套",
-            "搭配同色系包包和鞋子",
-            "搭配复古发带和耳环"
-        ]
-        
-        let testRecord = CheckInRecord(
-            id: UUID().uuidString,
-            date: date,
-            colors: colors.randomElement()!,
-            accessories: accessories.randomElement()!,
-            weather: nil,
-            location: nil,
-            temperature: nil,
-            season: nil,
-            isAIGenerated: true,
-            petName: nil
-        )
-        
+
         // 加载现有记录
         var records: [CheckInRecord] = []
         if let data = UserDefaults.standard.data(forKey: "dailyCheckIn.records"),
            let existingRecords = try? JSONDecoder().decode([CheckInRecord].self, from: data) {
             records = existingRecords
         }
-        
+
         // 检查是否已有该日期的记录
         let hasRecord = records.contains { calendar.isDate($0.date, inSameDayAs: date) }
-        if !hasRecord {
-            records.append(testRecord)
-            if let encoded = try? JSONEncoder().encode(records) {
-                UserDefaults.standard.set(encoded, forKey: "dailyCheckIn.records")
+        guard !hasRecord else { return }
+
+        // 从 CloudKit 获取或 AI 生成穿搭色
+        Task {
+            if let outfit = await manager.generateAndUploadOutfitForDate(date) {
+                // 创建打卡记录
+                let testRecord = CheckInRecord(
+                    id: UUID().uuidString,
+                    date: date,
+                    colors: outfit.colorNames,
+                    colorHexes: outfit.colors.map { $0.hex },
+                    accessories: outfit.accessories,
+                    weather: outfit.weather,
+                    location: outfit.location,
+                    temperature: outfit.temperature,
+                    season: outfit.season,
+                    isAIGenerated: outfit.source == "ai",
+                    petName: outfit.petName
+                )
+
+                // 保存记录
+                await MainActor.run {
+                    records.append(testRecord)
+                    if let encoded = try? JSONEncoder().encode(records) {
+                        UserDefaults.standard.set(encoded, forKey: "dailyCheckIn.records")
+                    }
+                    // 更新统计
+                    let totalDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.totalDays")
+                    UserDefaults.standard.set(totalDays + 1, forKey: "dailyCheckIn.totalDays")
+                }
+            } else {
+                // AI 生成失败，使用默认数据
+                await MainActor.run {
+                    let defaultColors = ["樱花粉", "奶油白"]
+                    let defaultRecord = CheckInRecord(
+                        id: UUID().uuidString,
+                        date: date,
+                        colors: defaultColors,
+                        colorHexes: Array(repeating: nil, count: defaultColors.count),
+                        accessories: "搭配粉色蝴蝶结发饰",
+                        weather: nil,
+                        location: nil,
+                        temperature: nil,
+                        season: nil,
+                        isAIGenerated: false,
+                        petName: nil
+                    )
+                    records.append(defaultRecord)
+                    if let encoded = try? JSONEncoder().encode(records) {
+                        UserDefaults.standard.set(encoded, forKey: "dailyCheckIn.records")
+                    }
+                    let totalDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.totalDays")
+                    UserDefaults.standard.set(totalDays + 1, forKey: "dailyCheckIn.totalDays")
+                }
             }
-            // 更新统计
-            let totalDays = UserDefaults.standard.integer(forKey: "dailyCheckIn.totalDays")
-            UserDefaults.standard.set(totalDays + 1, forKey: "dailyCheckIn.totalDays")
         }
     }
     

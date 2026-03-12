@@ -631,11 +631,69 @@ struct CheckInRecordDTO: Codable {
     let weather: String?
     let location: String?
     let isAIGenerated: Bool
-    
+
     // v1.9+ 新增字段 - 今日穿搭色增强
     let temperature: Double?  // 温度
     let season: String?       // 季节
     let petName: String?      // 萌宠推荐者名字
+
+    // v1.10+ 新增字段 - AI 生成的颜色 hex 值
+    let colorHexes: [String?]? // 颜色 hex 值数组（AI生成时会有）
+
+    // 自定义解码以兼容旧备份（没有 colorHexes 字段）
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        date = try container.decode(Date.self, forKey: .date)
+        colors = try container.decode([String].self, forKey: .colors)
+        accessories = try container.decode(String.self, forKey: .accessories)
+        weather = try container.decodeIfPresent(String.self, forKey: .weather)
+        location = try container.decodeIfPresent(String.self, forKey: .location)
+        isAIGenerated = try container.decode(Bool.self, forKey: .isAIGenerated)
+        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
+        season = try container.decodeIfPresent(String.self, forKey: .season)
+        petName = try container.decodeIfPresent(String.self, forKey: .petName)
+        colorHexes = try container.decodeIfPresent([String?].self, forKey: .colorHexes)
+    }
+
+    // 自定义编码
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(date, forKey: .date)
+        try container.encode(colors, forKey: .colors)
+        try container.encode(accessories, forKey: .accessories)
+        try container.encode(weather, forKey: .weather)
+        try container.encode(location, forKey: .location)
+        try container.encode(isAIGenerated, forKey: .isAIGenerated)
+        try container.encode(temperature, forKey: .temperature)
+        try container.encode(season, forKey: .season)
+        try container.encode(petName, forKey: .petName)
+        try container.encode(colorHexes, forKey: .colorHexes)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, date, colors, accessories, weather, location, isAIGenerated
+        case temperature, season, petName, colorHexes
+    }
+
+    // 初始化方法 - 用于创建新记录
+    init(id: String, date: Date, colors: [String], colorHexes: [String?]? = nil,
+         accessories: String, weather: String?, location: String?,
+         isAIGenerated: Bool, temperature: Double? = nil,
+         season: String? = nil, petName: String? = nil) {
+        self.id = id
+        self.date = date
+        self.colors = colors
+        self.colorHexes = colorHexes
+        self.accessories = accessories
+        self.weather = weather
+        self.location = location
+        self.isAIGenerated = isAIGenerated
+        self.temperature = temperature
+        self.season = season
+        self.petName = petName
+    }
 }
 
 struct CheckInStatsDTO: Codable {
