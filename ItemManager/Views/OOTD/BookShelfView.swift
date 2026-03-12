@@ -57,7 +57,10 @@ struct BookShelfView: View {
     
     // 用于外部监听当前是否选中了空间书（空间书页列表模式下隐藏全局导航返回按钮）
     @Binding var isSpaceBookSelected: Bool
-    
+
+    // 从魔法贴纸加入手帐后需要自动导航到的书
+    @Binding var navigateToBookID: UUID?
+
     // Custom Sort Editing
     @State var isEditing = false
     @State var editableBooks: [BookGroup] = []
@@ -159,6 +162,20 @@ struct BookShelfView: View {
             .onChange(of: isSpatialBookSelected) { _, newValue in
                 // 同步空间书选中状态到外部
                 isSpaceBookSelected = newValue
+            }
+            .onChange(of: navigateToBookID) { _, newBookID in
+                // 监听从魔法贴纸加入手帐后的导航
+                if let bookID = newBookID {
+                    // 找到对应的手帐并导航到书页列表
+                    if let targetBook = books.first(where: { $0.id == bookID }) {
+                        withAnimation {
+                            // 导航到书页列表
+                            navigationPath.append(targetBook)
+                        }
+                        // 清空，避免重复导航
+                        navigateToBookID = nil
+                    }
+                }
             }
             .alert("删除手帐", isPresented: $showingDeleteBookAlert) {
                 Button("取消", role: .cancel) { bookToDelete = nil }

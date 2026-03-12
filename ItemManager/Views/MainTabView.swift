@@ -877,18 +877,165 @@ struct OOTDDefaultBookViewWithBackButtonLegacy: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         OOTDDefaultBookView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButtonLegacy(
+                    MagicStickerBackButtonLegacy(
                         selectedTab: $selectedTab,
                         homeTab: $homeTab,
-                        onBackToMenu: { destination = .menu }
+                        destination: $destination
                     )
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToBook)) { _ in
+                // 导航到 OOTD 手帐列表
+                withAnimation {
+                    destination = .ootd
+                }
+            }
+    }
+}
+
+// MARK: - 魔法贴纸返回按钮（带菜单）- iOS 18以下
+struct MagicStickerBackButtonLegacy: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil && $0.title != "默认手帐" }, sort: \BookGroup.sortIndex) private var otherBooks: [BookGroup]
+
+    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
+    @State private var showingMoveOptions = false
+    @State private var showingBookPicker = false
+
+    var body: some View {
+        Button {
+            showingMoveOptions = true
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+        .confirmationDialog("书页管理", isPresented: $showingMoveOptions, titleVisibility: .visible) {
+            Button("保持在默认手帐") {
+                goBack()
+            }
+
+            if !otherBooks.isEmpty {
+                Button("加入其他手帐") {
+                    showingBookPicker = true
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("当前书页在'默认手帐'中，您可以选择保持现状或移动到其他手帐")
+        }
+        .sheet(isPresented: $showingBookPicker) {
+            BookPickerSheetLegacy(
+                books: otherBooks,
+                onSelect: { selectedBook in
+                    moveCurrentPage(to: selectedBook)
+                },
+                onCancel: {
+                    showingBookPicker = false
+                }
+            )
+        }
+    }
+
+    private func goBack() {
+        withAnimation {
+            switch tabNavigationManager.currentSmallWorldSource {
+            case .wardrobe:
+                homeTab = .wardrobe
+                selectedTab = 0
+            case .depositPlan:
+                homeTab = .depositPlan
+                selectedTab = 0
+            case .smallWorld:
+                destination = .menu
+            }
+        }
+    }
+
+    private func moveCurrentPage(to book: BookGroup) {
+        // 获取当前默认手帐
+        let bookDescriptor = FetchDescriptor<BookGroup>(
+            predicate: #Predicate<BookGroup> { $0.title == "默认手帐" && $0.deletedAt == nil }
+        )
+        guard let defaultBook = try? modelContext.fetch(bookDescriptor).first else { return }
+
+        // 获取默认手帐的第一页 - 使用bookID避免在Predicate中捕获外部变量
+        let defaultBookID = defaultBook.id
+        let outfitDescriptor = FetchDescriptor<Outfit>(
+            predicate: #Predicate<Outfit> { outfit in
+                outfit.isDeleted == false
+            },
+            sortBy: [SortDescriptor(\.sortIndex)]
+        )
+        let allOutfits = (try? modelContext.fetch(outfitDescriptor)) ?? []
+        guard let firstOutfit = allOutfits.first(where: { $0.book?.id == defaultBookID }) else { return }
+
+        // 移动书页到选中的手帐
+        firstOutfit.book = book
+        firstOutfit.lastModified = Date()
+
+        // 重新计算sortIndex - 使用bookID避免在Predicate中捕获外部变量
+        let targetBookID = book.id
+        let existingPages = allOutfits.filter { $0.book?.id == targetBookID && $0.isDeleted == false }
+            .sorted { $0.sortIndex > $1.sortIndex }
+        firstOutfit.sortIndex = (existingPages.first?.sortIndex ?? 0) + 1
+
+        try? modelContext.save()
+
+        showingBookPicker = false
+
+        // 发送通知让 OOTDDefaultBookView 显示 Toast 并导航
+        NotificationCenter.default.post(
+            name: .magicStickerPageMoved,
+            object: nil,
+            userInfo: ["bookTitle": book.title, "bookID": book.id]
+        )
+    }
+}
+
+// MARK: - 手帐选择Sheet - iOS 18以下
+struct BookPickerSheetLegacy: View {
+    let books: [BookGroup]
+    let onSelect: (BookGroup) -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            List(books) { book in
+                Button {
+                    onSelect(book)
+                } label: {
+                    HStack {
+                        Image(systemName: "book.closed")
+                            .foregroundStyle(.pink)
+                        Text(book.title)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("选择目标手帐")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") {
+                        onCancel()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1253,20 +1400,169 @@ struct OOTDDefaultBookViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
-    
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
         OOTDDefaultBookView()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    SmallWorldBackButton(
+                    MagicStickerBackButton(
                         selectedTab: $selectedTab,
                         homeTab: $homeTab,
-                        onBackToMenu: {
-                            destination = .menu
-                        }
+                        destination: $destination
                     )
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToBook)) { _ in
+                // 导航到 OOTD 手帐列表
+                withAnimation {
+                    destination = .ootd
+                }
+            }
+    }
+}
+
+// MARK: - 魔法贴纸返回按钮（带菜单）
+@available(iOS 18.0, *)
+struct MagicStickerBackButton: View {
+    @Binding var selectedTab: Int
+    @Binding var homeTab: HomeTab
+    @Binding var destination: SmallWorldDestination
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil && $0.title != "默认手帐" }, sort: \BookGroup.sortIndex) private var otherBooks: [BookGroup]
+
+    @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
+    @State private var showingMoveOptions = false
+    @State private var showingBookPicker = false
+
+    var body: some View {
+        Button {
+            showingMoveOptions = true
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+        .confirmationDialog("书页管理", isPresented: $showingMoveOptions, titleVisibility: .visible) {
+            Button("保持在默认手帐") {
+                // 直接返回，不做任何操作
+                goBack()
+            }
+
+            if !otherBooks.isEmpty {
+                Button("加入其他手帐") {
+                    showingBookPicker = true
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("当前书页在'默认手帐'中，您可以选择保持现状或移动到其他手帐")
+        }
+        .sheet(isPresented: $showingBookPicker) {
+            BookPickerSheet(
+                books: otherBooks,
+                onSelect: { selectedBook in
+                    moveCurrentPage(to: selectedBook)
+                },
+                onCancel: {
+                    showingBookPicker = false
+                }
+            )
+        }
+    }
+
+    private func goBack() {
+        withAnimation {
+            switch tabNavigationManager.currentSmallWorldSource {
+            case .wardrobe:
+                homeTab = .wardrobe
+                selectedTab = 0
+            case .depositPlan:
+                homeTab = .depositPlan
+                selectedTab = 0
+            case .smallWorld:
+                destination = .menu
+            }
+        }
+    }
+
+    private func moveCurrentPage(to book: BookGroup) {
+        // 获取当前默认手帐
+        let bookDescriptor = FetchDescriptor<BookGroup>(
+            predicate: #Predicate<BookGroup> { $0.title == "默认手帐" && $0.deletedAt == nil }
+        )
+        guard let defaultBook = try? modelContext.fetch(bookDescriptor).first else { return }
+
+        // 获取默认手帐的第一页 - 使用bookID避免在Predicate中捕获外部变量
+        let defaultBookID = defaultBook.id
+        let outfitDescriptor = FetchDescriptor<Outfit>(
+            predicate: #Predicate<Outfit> { outfit in
+                outfit.isDeleted == false
+            },
+            sortBy: [SortDescriptor(\.sortIndex)]
+        )
+        let allOutfits = (try? modelContext.fetch(outfitDescriptor)) ?? []
+        guard let firstOutfit = allOutfits.first(where: { $0.book?.id == defaultBookID }) else { return }
+
+        // 移动书页到选中的手帐
+        firstOutfit.book = book
+        firstOutfit.lastModified = Date()
+
+        // 重新计算sortIndex - 使用bookID避免在Predicate中捕获外部变量
+        let targetBookID = book.id
+        let existingPages = allOutfits.filter { $0.book?.id == targetBookID && $0.isDeleted == false }
+            .sorted { $0.sortIndex > $1.sortIndex }
+        firstOutfit.sortIndex = (existingPages.first?.sortIndex ?? 0) + 1
+
+        try? modelContext.save()
+
+        showingBookPicker = false
+
+        // 发送通知让 OOTDDefaultBookView 显示 Toast 并导航
+        NotificationCenter.default.post(
+            name: .magicStickerPageMoved,
+            object: nil,
+            userInfo: ["bookTitle": book.title, "bookID": book.id]
+        )
+    }
+}
+
+// MARK: - 手帐选择Sheet
+@available(iOS 18.0, *)
+struct BookPickerSheet: View {
+    let books: [BookGroup]
+    let onSelect: (BookGroup) -> Void
+    let onCancel: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    
+    var body: some View {
+        NavigationStack {
+            List(books) { book in
+                Button {
+                    onSelect(book)
+                } label: {
+                    HStack {
+                        Image(systemName: "book.closed")
+                            .foregroundStyle(.pink)
+                        Text(book.title)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("选择目标手帐")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") {
+                        onCancel()
+                    }
+                }
+            }
+        }
     }
 }
 
