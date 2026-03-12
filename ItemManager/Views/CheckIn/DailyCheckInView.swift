@@ -567,7 +567,7 @@ struct DailyCheckInView: View {
         .disabled(checkInManager.hasCheckedInToday || checkInManager.isLoading)
     }
     
-    // MARK: - 分享按钮
+    // MARK: - 分享按钮（支持今日或往日穿搭）
     private var shareButton: some View {
         Button {
             Task {
@@ -576,7 +576,8 @@ struct DailyCheckInView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "square.and.arrow.up")
-                Text("分享今日穿搭")
+                let isToday = Calendar.current.isDateInToday(selectedDate)
+                Text(isToday ? "分享今日穿搭" : "分享穿搭色")
                     .font(.system(size: 16, weight: .medium))
             }
             .foregroundColor(.pink)
@@ -605,24 +606,31 @@ struct DailyCheckInView: View {
         }
     }
     
-    // MARK: - 异步生成分享图片（带猫爪加载动画）
+    // MARK: - 异步生成分享图片（支持今日或往日穿搭）
     private func generateShareImageAsync() async {
         await MainActor.run { isSharing = true }
-        
+
+        // 确定要分享的穿搭色和日期
+        let isToday = Calendar.current.isDateInToday(selectedDate)
+        let outfitToShare = isToday ? checkInManager.todayOutfitColor : selectedDateOutfit
+        let dateToShare = selectedDate
+        let consecutiveDaysToShare = isToday ? checkInManager.consecutiveDays : nil
+
         // 在后台线程生成图片
         let image = await Task.detached(priority: .userInitiated) {
             let renderer = ImageRenderer(content: CheckInShareCardView(
-                outfit: DailyCheckInManager.shared.todayOutfitColor,
-                consecutiveDays: DailyCheckInManager.shared.consecutiveDays
+                outfit: outfitToShare,
+                date: dateToShare,
+                consecutiveDays: consecutiveDaysToShare
             ))
             renderer.scale = UIScreen.main.scale
             return renderer.uiImage
         }.value
-        
+
         await MainActor.run { isSharing = false }
-        
+
         guard let image = image else { return }
-        
+
         await MainActor.run {
             shareImage = image
             showShareSheet = true
@@ -723,11 +731,12 @@ struct CheckInCelebrationView: View {
     }
 }
 
-// MARK: - 打卡分享卡片
+// MARK: - 打卡分享卡片（支持今日或往日穿搭）
 struct CheckInShareCardView: View {
     let outfit: TodayOutfitColor?
-    let consecutiveDays: Int
-    
+    let date: Date
+    let consecutiveDays: Int?
+
     var body: some View {
         ZStack {
             // 背景
@@ -739,7 +748,7 @@ struct CheckInShareCardView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            
+
             VStack(spacing: 20) {
                 // 顶部标题
                 HStack {
@@ -749,34 +758,35 @@ struct CheckInShareCardView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.pink)
                 }
-                
+
                 // 日期
-                Text(todayDateString)
+                Text(shareDateString)
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
-                
+
                 // 穿搭色展示
                 if let outfit = outfit {
                     VStack(spacing: 16) {
-                        Text("今日穿搭色")
+                        // 标题根据是否是今日动态变化
+                        Text(isToday ? "今日穿搭色" : "穿搭色推荐")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.primary)
-                        
+
                         // 萌宠推荐标签
                         HStack(spacing: 4) {
-                            Image(systemName: "pawprint.fill")
+                            Image(systemName: outfit.source == "ai" ? "sparkles" : "pawprint.fill")
                                 .font(.caption)
                             Text("\(outfit.petName ?? "萌宠")推荐")
                                 .font(.caption)
                         }
-                        .foregroundColor(.orange)
+                        .foregroundColor(outfit.source == "ai" ? .purple : .orange)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(Color.orange.opacity(0.1))
+                                .fill(outfit.source == "ai" ? Color.purple.opacity(0.1) : Color.orange.opacity(0.1))
                         )
-                        
+
                         HStack(spacing: 16) {
                             ForEach(outfit.colors, id: \.self) { colorInfo in
                                 let color = colorInfo.color
@@ -785,20 +795,20 @@ struct CheckInShareCardView: View {
                                         .fill(color)
                                         .frame(width: 60, height: 60)
                                         .shadow(color: color.opacity(0.4), radius: 8, x: 0, y: 4)
-                                    
+
                                     Text(colorInfo.name)
                                         .font(.system(size: 14))
                                         .foregroundColor(.primary)
                                 }
                             }
                         }
-                        
+
                         // 小物搭配
                         VStack(alignment: .leading, spacing: 8) {
                             Text("小物搭配")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.secondary)
-                            
+
                             Text(outfit.accessories)
                                 .font(.system(size: 13))
                                 .foregroundColor(.primary)
@@ -807,17 +817,19 @@ struct CheckInShareCardView: View {
                         .padding(.horizontal, 20)
                     }
                 }
-                
-                // 连续打卡
-                HStack(spacing: 8) {
-                    Image(systemName: "flame.fill")
-                        .foregroundColor(.orange)
-                    Text("连续打卡 \(consecutiveDays) 天")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+
+                // 连续打卡（仅今日显示）
+                if let consecutiveDays = consecutiveDays {
+                    HStack(spacing: 8) {
+                        Image(systemName: "flame.fill")
+                            .foregroundColor(.orange)
+                        Text("连续打卡 \(consecutiveDays) 天")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
-                
+
                 // 底部标语
                 Text("记录每一天的美好")
                     .font(.system(size: 12))
@@ -828,14 +840,22 @@ struct CheckInShareCardView: View {
         }
         .frame(width: 320, height: 520)
     }
-    
-    private var todayDateString: String {
+
+    private var isToday: Bool {
+        Calendar.current.isDateInToday(date)
+    }
+
+    private var shareDateString: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "yyyy年MM月dd日"
-        return formatter.string(from: Date())
+        if isToday {
+            formatter.dateFormat = "yyyy年MM月dd日"
+        } else {
+            formatter.dateFormat = "yyyy年MM月dd日 EEEE"
+        }
+        return formatter.string(from: date)
     }
-    
+
 }
 
 // MARK: - Date 扩展
