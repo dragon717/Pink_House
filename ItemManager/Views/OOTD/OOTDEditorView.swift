@@ -14,6 +14,10 @@ struct OOTDEditorView: View {
     // 页面切换回调
     var onPageChange: ((Outfit) -> Void)?
     
+    // 初始状态配置（用于魔法贴纸模式）
+    var initialToolbarVisible: Bool = true
+    var initialStickerLibraryVisible: Bool = false
+    
     // States copied from OOTDView
     @State private var isListExpanded = false
     @State private var isProcessing = false
@@ -46,11 +50,18 @@ struct OOTDEditorView: View {
     @State private var showingBackgroundCropper = false
     
     // 工具栏和贴纸库显示状态
-    @State private var isToolbarVisible = true
-    @State private var isStickerLibraryVisible = false {
-        didSet {
-            print("[OOTD Editor] isStickerLibraryVisible 变化: \(oldValue) -> \(isStickerLibraryVisible)")
-        }
+    @State private var isToolbarVisible: Bool
+    @State private var isStickerLibraryVisible: Bool
+    
+    // 初始化时设置默认值
+    init(outfit: Outfit, onPageChange: ((Outfit) -> Void)? = nil, initialToolbarVisible: Bool = true, initialStickerLibraryVisible: Bool = false) {
+        self.outfit = outfit
+        self.onPageChange = onPageChange
+        self.initialToolbarVisible = initialToolbarVisible
+        self.initialStickerLibraryVisible = initialStickerLibraryVisible
+        // 初始化 State 值
+        _isToolbarVisible = State(initialValue: initialToolbarVisible)
+        _isStickerLibraryVisible = State(initialValue: initialStickerLibraryVisible)
     }
     
     // 当前书页索引

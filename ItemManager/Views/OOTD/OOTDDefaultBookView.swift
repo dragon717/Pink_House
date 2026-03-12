@@ -15,9 +15,9 @@ struct OOTDDefaultBookView: View {
     
     @State private var navigationPath = NavigationPath()
     
-    // 获取默认手帐
+    // 获取默认手帐（魔法贴纸使用"默认手帐"作为默认名，不借用其他手帐）
     private var defaultBook: BookGroup? {
-        books.first { $0.title == "默认手帐" } ?? books.first
+        books.first { $0.title == "默认手帐" }
     }
     
     // 获取默认手帐的第一页
@@ -39,65 +39,77 @@ struct OOTDDefaultBookView: View {
                 Group {
                     if let book = defaultBook {
                         if let page = firstPage {
-                            // 直接显示编辑界面
+                            // 直接显示编辑界面（魔法贴纸模式：隐藏工具栏，显示贴纸库）
                             OOTDEditorView(
                                 outfit: page,
                                 onPageChange: { newOutfit in
                                     // 页面切换时更新导航路径
                                     navigationPath.append(newOutfit)
-                                }
+                                },
+                                initialToolbarVisible: false,
+                                initialStickerLibraryVisible: true
                             )
                         } else {
                             // 手帐存在但没有书页，显示空状态并允许创建新书页
                             EmptyPageView(book: book)
                         }
                     } else {
-                        // 如果没有手帐，显示创建提示
-                        NoBookView(onCreate: createDefaultBook)
+                        // 如果没有手帐，自动创建"默认手帐"
+                        AutoCreateBookView(onAutoCreate: createDefaultBook)
                     }
                 }
             }
-            .navigationTitle("OOTD")
+            .navigationTitle("魔法贴纸")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
         }
     }
     
     private func createDefaultBook() {
+        // 创建手帐
         let book = BookGroup(title: "默认手帐")
         modelContext.insert(book)
+        
+        // 同时创建第一页（空白画布），让用户可以直接进入编辑器
+        let firstPage = Outfit(
+            note: "OOTD",
+            canvasType: "blank",
+            book: book
+        )
+        firstPage.sortIndex = 0
+        modelContext.insert(firstPage)
+        
         try? modelContext.save()
     }
 }
 
-// MARK: - 无手帐视图
-private struct NoBookView: View {
-    let onCreate: () -> Void
+// MARK: - 自动创建手帐视图（魔法贴纸无需手动创建）
+private struct AutoCreateBookView: View {
+    let onAutoCreate: () -> Void
     
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
             
-            Image(systemName: "book.pages")
+            Image(systemName: "sparkles")
                 .font(.system(size: 60))
                 .foregroundColor(.pink.opacity(0.6))
             
-            Text("还没有手帐")
+            Text("正在准备魔法贴纸...")
                 .font(.title2)
                 .foregroundColor(.primary)
             
-            Text("请先创建一本手帐")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Button("创建默认手帐") {
-                onCreate()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.pink)
-            .padding(.top)
+            ProgressView()
+                .scaleEffect(1.2)
+                .padding(.top)
             
             Spacer()
+        }
+        .onAppear {
+            // 自动创建默认手帐，无需用户手动操作
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                onAutoCreate()
+            }
         }
     }
 }
