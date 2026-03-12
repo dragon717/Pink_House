@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 每日打卡视图
 struct DailyCheckInView: View {
@@ -185,18 +186,14 @@ struct DailyCheckInView: View {
             }
 
             if isWeekCheckInExpanded {
-                // 展开状态：显示原生日历组件
-                DatePicker(
-                    "选择日期",
-                    selection: $selectedDate,
-                    in: ...Date(),
-                    displayedComponents: .date
+                // 展开状态：显示自定义日历组件，支持打勾标记
+                CustomCalendarView(
+                    selectedDate: $selectedDate,
+                    checkInManager: checkInManager,
+                    onDateSelected: { date in
+                        loadOutfitForSelectedDate()
+                    }
                 )
-                .datePickerStyle(.graphical)
-                .accentColor(.pink)
-                .onChange(of: selectedDate) { _ in
-                    loadOutfitForSelectedDate()
-                }
             } else {
                 // 折叠状态：显示本周七日格子
                 HStack(spacing: 8) {
@@ -856,6 +853,280 @@ struct CheckInShareCardView: View {
         return formatter.string(from: date)
     }
 
+}
+
+// MARK: - 日历日期项（用于ForEach）
+struct CalendarDayItem: Identifiable {
+    let id = UUID()
+    let date: Date?
+    let index: Int
+}
+
+// MARK: - 自定义日历视图（支持打勾标记）
+struct CustomCalendarView: View {
+    @Binding var selectedDate: Date
+    @ObservedObject var checkInManager: DailyCheckInManager
+    let onDateSelected: (Date) -> Void
+    
+    @State private var currentMonth: Date
+    
+    private let calendar = Calendar.current
+    private let weekDays = ["日", "一", "二", "三", "四", "五", "六"]
+    
+    init(selectedDate: Binding<Date>, checkInManager: DailyCheckInManager, onDateSelected: @escaping (Date) -> Void) {
+        self._selectedDate = selectedDate
+        self.checkInManager = checkInManager
+        self.onDateSelected = onDateSelected
+        
+        // 获取选中日期所在月份的第一天
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month], from: selectedDate.wrappedValue)
+        let monthStart = calendar.date(from: components) ?? selectedDate.wrappedValue
+        self._currentMonth = State(initialValue: monthStart)
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // 月份导航栏
+            HStack {
+                Button {
+                    withAnimation {
+                        currentMonth = previousMonth()
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .foregroundColor(.pink)
+                        .padding(8)
+                }
+                
+                Spacer()
+                
+                // 月份标题按钮，点击回到今天
+                Button {
+                    withAnimation {
+                        let today = Date()
+                        selectedDate = today
+                        currentMonth = getFirstDayOfMonth(for: today)
+                    }
+                } label: {
+                    Text(monthYearString)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+                
+                Button {
+                    withAnimation {
+                        currentMonth = nextMonth()
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.pink)
+                        .padding(8)
+                }
+                .disabled(isCurrentMonth)
+            }
+            
+            // 星期标题
+            HStack {
+                ForEach(weekDays, id: \.self) { day in
+                    Text(day)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            
+            // 日期网格 - 使用计算属性确保数据更新时刷新
+            calendarGrid
+        }
+        .onAppear {
+            syncMonthToSelectedDate()
+        }
+        .onChange(of: selectedDate) { _, _ in
+            syncMonthToSelectedDate()
+        }
+        // 监听刷新触发器，强制刷新视图
+        .onChange(of: checkInManager.refreshTrigger) { _, _ in
+            // 刷新触发器变化时，视图会自动重新计算
+        }
+    }
+    
+    // 日历网格 - 使用计算属性确保每次刷新时都重新计算
+    private var calendarGrid: some View {
+        let items = calendarDayItems
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+            ForEach(items) { item in
+                if let date = item.date {
+                    CalendarDayCellView(
+                        date: date,
+                        selectedDate: $selectedDate,
+                        checkInManager: checkInManager,
+                        onTap: { onDateSelected(date) }
+                    )
+                } else {
+                    Color.clear
+                        .frame(height: 36)
+                }
+            }
+        }
+    }
+    
+    // 计算属性：获取日历日期项数组
+    private var calendarDayItems: [CalendarDayItem] {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth) else {
+            return []
+        }
+        
+        let firstDayOfMonth = monthInterval.start
+        let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
+        let emptyDays = firstWeekday - 1
+        
+        guard let daysInMonthCount = calendar.range(of: .day, in: .month, for: currentMonth)?.count else {
+            return []
+        }
+        
+        var items: [CalendarDayItem] = []
+        
+        // 添加空白天数
+        for index in 0..<emptyDays {
+            items.append(CalendarDayItem(date: nil, index: index))
+        }
+        
+        // 添加日期
+        for day in 1...daysInMonthCount {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstDayOfMonth) {
+                items.append(CalendarDayItem(date: date, index: emptyDays + day - 1))
+            }
+        }
+        
+        return items
+    }
+    
+    // 月份年份字符串
+    private var monthYearString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年MM月"
+        return formatter.string(from: currentMonth)
+    }
+    
+    // 是否当前月份（禁用下个月按钮）
+    private var isCurrentMonth: Bool {
+        let currentMonthComponents = calendar.dateComponents([.year, .month], from: Date())
+        let displayedMonthComponents = calendar.dateComponents([.year, .month], from: currentMonth)
+        return currentMonthComponents == displayedMonthComponents
+    }
+    
+    // 获取月份的第一天
+    private func getFirstDayOfMonth(for date: Date) -> Date {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        return calendar.date(from: components) ?? date
+    }
+    
+    // 上一个月
+    private func previousMonth() -> Date {
+        calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
+    }
+    
+    // 下一个月
+    private func nextMonth() -> Date {
+        calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
+    }
+    
+    // 同步月份到选中日期
+    private func syncMonthToSelectedDate() {
+        let selectedComponents = calendar.dateComponents([.year, .month], from: selectedDate)
+        let currentComponents = calendar.dateComponents([.year, .month], from: currentMonth)
+        
+        if selectedComponents.year != currentComponents.year ||
+           selectedComponents.month != currentComponents.month {
+            if let newMonth = calendar.date(from: selectedComponents) {
+                withAnimation {
+                    currentMonth = newMonth
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 日历日期单元格视图
+struct CalendarDayCellView: View {
+    let date: Date
+    @Binding var selectedDate: Date
+    @ObservedObject var checkInManager: DailyCheckInManager
+    let onTap: () -> Void
+    
+    private let calendar = Calendar.current
+    
+    // 计算属性：是否选中
+    private var isSelected: Bool {
+        calendar.isDate(date, inSameDayAs: selectedDate)
+    }
+    
+    // 计算属性：是否今天
+    private var isToday: Bool {
+        calendar.isDateInToday(date)
+    }
+    
+    // 计算属性：是否已打卡 - 每次刷新时重新计算
+    private var isCheckedIn: Bool {
+        checkInManager.hasCheckIn(on: date)
+    }
+    
+    // 计算属性：是否未来日期
+    private var isFuture: Bool {
+        date > Date()
+    }
+    
+    var body: some View {
+        Button {
+            if !isFuture {
+                selectedDate = date
+                onTap()
+            }
+        } label: {
+            ZStack {
+                // 背景圆圈（打卡时显示粉色背景）
+                if isCheckedIn {
+                    Circle()
+                        .fill(Color.pink.opacity(0.2))
+                        .frame(width: 36, height: 36)
+                }
+                
+                // 选中边框
+                if isSelected {
+                    Circle()
+                        .stroke(Color.pink, lineWidth: 2)
+                        .frame(width: 36, height: 36)
+                }
+                
+                // 内容：打勾或日期数字
+                if isCheckedIn {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.pink)
+                } else {
+                    Text("\(calendar.component(.day, from: date))")
+                        .font(.system(size: 14))
+                        .foregroundColor(textColor)
+                }
+            }
+            .frame(height: 36)
+        }
+        .disabled(isFuture)
+    }
+    
+    private var textColor: Color {
+        if isFuture {
+            return .secondary.opacity(0.3)
+        } else if isToday {
+            return .pink
+        } else {
+            return .primary
+        }
+    }
 }
 
 // MARK: - Date 扩展

@@ -49,6 +49,12 @@ final class DailyCheckInManager: ObservableObject {
     @Published var todayOutfitColor: TodayOutfitColor?
     @Published var isLoading = false
     
+    // 已打卡日期的集合（用于快速查询和UI更新）- 存储 yyyy-MM-dd 格式的字符串
+    @Published private var checkedInDatesSet: Set<String> = []
+    
+    // 刷新触发器（用于强制刷新UI）
+    @Published var refreshTrigger: UUID = UUID()
+    
     // 位置天气信息
     @Published var currentWeather: WeatherData?
     @Published var currentLocation: String = ""
@@ -69,6 +75,10 @@ final class DailyCheckInManager: ObservableObject {
     
     private init() {
         loadCheckInData()
+        // 加载已打卡日期集合
+        loadCheckedInDatesSet()
+        // 在集合加载后重新计算本周打卡状态
+        calculateWeekCheckIns()
         // 如果今日已打卡，加载今日穿搭色
         if hasCheckedInToday {
             Task {
@@ -81,6 +91,8 @@ final class DailyCheckInManager: ObservableObject {
     func reloadFromDisk() {
         print("🔄 DailyCheckInManager: Reloading from disk...")
         loadCheckInData()
+        // 重新加载已打卡日期集合
+        loadCheckedInDatesSet()
         // 重新计算本周打卡状态
         calculateWeekCheckIns()
         // 如果今日已打卡，加载今日记录
@@ -134,17 +146,48 @@ final class DailyCheckInManager: ObservableObject {
         weekCheckIns = weekStatus
     }
     
-    // MARK: - 检查某天是否打卡
-    private func hasCheckIn(on date: Date) -> Bool {
+    // MARK: - 加载已打卡日期集合
+    private func loadCheckedInDatesSet() {
+        let records = loadAllRecords()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "zh_CN")
+        dateFormatter.timeZone = TimeZone.current
+        
+        var dateSet: Set<String> = []
+        for record in records {
+            let dateString = dateFormatter.string(from: record.date)
+            dateSet.insert(dateString)
+        }
+        
+        // 如果今天已打卡，也加入集合
+        if hasCheckedInToday {
+            let todayString = dateFormatter.string(from: Date())
+            dateSet.insert(todayString)
+        }
+        
+        checkedInDatesSet = dateSet
+    }
+    
+    // MARK: - 检查某天是否打卡（公开方法供UI使用）
+    func hasCheckIn(on date: Date) -> Bool {
+        let calendar = Calendar.current
+        let targetDate = calendar.startOfDay(for: date)
+        let today = calendar.startOfDay(for: Date())
+        
         // 如果日期是今天，使用hasCheckedInToday快速判断
-        if Calendar.current.isDateInToday(date) {
+        if targetDate == today {
             return hasCheckedInToday
         }
-        // 其他日期查询历史记录
-        let records = loadAllRecords()
-        return records.contains { record in
-            Calendar.current.isDate(record.date, inSameDayAs: date)
-        }
+        
+        // 使用集合快速查询
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "zh_CN")
+        dateFormatter.timeZone = TimeZone.current
+        let dateString = dateFormatter.string(from: targetDate)
+        
+        return checkedInDatesSet.contains(dateString)
     }
     
     // MARK: - 执行打卡
@@ -196,8 +239,17 @@ final class DailyCheckInManager: ObservableObject {
         // 保存最后打卡日期
         UserDefaults.standard.set(Date(), forKey: lastCheckInDateKey)
         
-        // 重新计算本周打卡状态
+        // 更新已打卡日期集合
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todayString = dateFormatter.string(from: Date())
+        checkedInDatesSet.insert(todayString)
+        
+        // 重新计算本周打卡状态（在集合更新后）
         calculateWeekCheckIns()
+        
+        // 触发UI刷新
+        refreshTrigger = UUID()
         
         isLoading = false
         
