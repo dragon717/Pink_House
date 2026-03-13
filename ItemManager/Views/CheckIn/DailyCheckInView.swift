@@ -4,6 +4,7 @@ import UIKit
 // MARK: - 每日打卡视图
 struct DailyCheckInView: View {
     @StateObject private var checkInManager = DailyCheckInManager.shared
+    @StateObject private var greetingManager = DailyGreetingManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     
@@ -89,6 +90,9 @@ struct DailyCheckInView: View {
             }
         }
         .task {
+            // 加载问候语
+            _ = await greetingManager.getCurrentGreeting()
+            
             // 如果已打卡但穿搭色为空，加载今日穿搭色
             if checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
                 await checkInManager.loadTodayOutfitColor()
@@ -140,10 +144,8 @@ struct DailyCheckInView: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.secondary)
             
-            // 问候语
-            Text(greeting)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.primary)
+            // 问候语卡片（可展开查看完整3条）
+            greetingCard
             
             // 连续打卡天数
             HStack(spacing: 8) {
@@ -155,6 +157,72 @@ struct DailyCheckInView: View {
             }
             .padding(.top, 4)
         }
+    }
+    
+    // MARK: - 问候语卡片（显示一句文艺哲理问候）
+    private var greetingCard: some View {
+        VStack(spacing: 12) {
+            // 问候语内容（仅一句）
+            if greetingManager.isLoading {
+                ProgressView()
+                    .scaleEffect(0.8)
+            } else if let greeting = greetingManager.currentGreeting,
+                      let firstMessage = greeting.messages.first {
+                Text(firstMessage)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.primary)
+                    .lineSpacing(6)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 8)
+            } else {
+                // 默认问候语
+                Text("• 岁月漫长，然而值得等待。")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 8)
+            }
+            
+            // 来源标签
+            if let source = greetingManager.currentGreeting?.source {
+                HStack {
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Image(systemName: source == "ai" ? "sparkles" : "pawprint.fill")
+                            .font(.caption)
+                        Text(source == "ai" ? "AI生成" : (source == "cloudkit" ? "云端同步" : "萌宠推荐"))
+                            .font(.caption)
+                    }
+                    .foregroundColor(source == "ai" ? .purple : .orange)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(source == "ai" ? Color.purple.opacity(0.1) : Color.orange.opacity(0.1))
+                    )
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [.pink.opacity(0.3), .purple.opacity(0.2)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .padding(.horizontal, 20)
     }
     
     // MARK: - 七日签到卡片（可点击查看往日穿搭色，可展开为日历）
@@ -640,15 +708,6 @@ struct DailyCheckInView: View {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "MM月dd日 EEEE"
         return formatter.string(from: Date())
-    }
-    
-    private var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 5..<12: return "早安，少女"
-        case 12..<18: return "午安，少女"
-        default: return "晚安，少女"
-        }
     }
     
     private func isToday(weekday: Int) -> Bool {
