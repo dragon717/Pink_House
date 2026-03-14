@@ -24,12 +24,25 @@ struct WardrobeView: View {
     
     // Batch Actions States
     @State private var showingDeleteAlert = false
+    @State private var showingBatchCopyAlert = false
     @State private var showingTagSelection = false
     @State private var tempSelectedTags: [Tag] = []
     @State private var showingAddTagsConfirmation = false
     @State private var showingBrandSelection = false
     @State private var tempSelectedBrand: Brand?
     @State private var showingSetBrandConfirmation = false
+    
+    // Batch Edit States
+    @State private var showingColorSelection = false
+    @State private var tempSelectedColors: [String] = []
+    @State private var showingSizeSelection = false
+    @State private var tempSelectedSizes: [String] = []
+    @State private var showingLengthSelection = false
+    @State private var tempSelectedLengths: [String] = []
+    @State private var showingAccessorySelection = false
+    @State private var tempSelectedAccessories: [String] = []
+    @State private var showingStatusSelection = false
+    @State private var tempSelectedStatus: String? = nil
     
     // Context Menu Actions
     @State private var itemToDelete: Clothing?
@@ -401,14 +414,13 @@ struct WardrobeView: View {
                         Divider()
                             .frame(height: 20)
 
-                        // Add Tags
+                        // Copy
                         Button {
-                            tempSelectedTags = []
-                            showingTagSelection = true
+                            showingBatchCopyAlert = true
                         } label: {
                             VStack(spacing: 4) {
-                                Image(systemName: "tag")
-                                Text("添加标签")
+                                Image(systemName: "doc.on.doc")
+                                Text("复制")
                                     .font(.caption)
                             }
                             .frame(maxWidth: .infinity)
@@ -418,14 +430,62 @@ struct WardrobeView: View {
                         Divider()
                             .frame(height: 20)
 
-                        // Group to Brand
-                        Button {
-                            tempSelectedBrand = nil
-                            showingBrandSelection = true
+                        // More Actions Menu
+                        Menu {
+                            Button {
+                                tempSelectedTags = []
+                                showingTagSelection = true
+                            } label: {
+                                Label("添加标签", systemImage: "tag")
+                            }
+                            
+                            Button {
+                                tempSelectedBrand = nil
+                                showingBrandSelection = true
+                            } label: {
+                                Label("归类品牌", systemImage: "bag")
+                            }
+                            
+                            Divider()
+                            
+                            Button {
+                                tempSelectedColors = []
+                                showingColorSelection = true
+                            } label: {
+                                Label("染上颜色", systemImage: "paintbrush")
+                            }
+                            
+                            Button {
+                                tempSelectedSizes = []
+                                showingSizeSelection = true
+                            } label: {
+                                Label("变换尺码", systemImage: "ruler")
+                            }
+                            
+                            Button {
+                                tempSelectedLengths = []
+                                showingLengthSelection = true
+                            } label: {
+                                Label("设置衣长", systemImage: "lines.measurement.vertical")
+                            }
+                            
+                            Button {
+                                tempSelectedAccessories = []
+                                showingAccessorySelection = true
+                            } label: {
+                                Label("搭配小物", systemImage: "sparkles")
+                            }
+                            
+                            Button {
+                                tempSelectedStatus = nil
+                                showingStatusSelection = true
+                            } label: {
+                                Label("改变状态", systemImage: "arrow.2.circlepath")
+                            }
                         } label: {
                             VStack(spacing: 4) {
-                                Image(systemName: "bag")
-                                Text("归类品牌")
+                                Image(systemName: "ellipsis.circle")
+                                Text("更多")
                                     .font(.caption)
                             }
                             .frame(maxWidth: .infinity)
@@ -475,11 +535,75 @@ struct WardrobeView: View {
                     }
                 }
         }
+        .sheet(isPresented: $showingColorSelection) {
+            BatchStringSelectionView(
+                title: "染上颜色",
+                options: SuggestionManager.shared.getAllColors(),
+                selectedItems: $tempSelectedColors
+            )
+            .onDisappear {
+                if !tempSelectedColors.isEmpty {
+                    batchSetColors(tempSelectedColors)
+                }
+            }
+        }
+        .sheet(isPresented: $showingSizeSelection) {
+            BatchStringSelectionView(
+                title: "变换尺码",
+                options: SuggestionManager.shared.getAllSizes(),
+                selectedItems: $tempSelectedSizes
+            )
+            .onDisappear {
+                if !tempSelectedSizes.isEmpty {
+                    batchSetSizes(tempSelectedSizes)
+                }
+            }
+        }
+        .sheet(isPresented: $showingLengthSelection) {
+            BatchStringSelectionView(
+                title: "设置衣长",
+                options: SuggestionManager.shared.getAllLengths(),
+                selectedItems: $tempSelectedLengths
+            )
+            .onDisappear {
+                if !tempSelectedLengths.isEmpty {
+                    batchSetLengths(tempSelectedLengths)
+                }
+            }
+        }
+        .sheet(isPresented: $showingAccessorySelection) {
+            BatchStringSelectionView(
+                title: "搭配小物",
+                options: SuggestionManager.shared.getAllAccessories(),
+                selectedItems: $tempSelectedAccessories
+            )
+            .onDisappear {
+                if !tempSelectedAccessories.isEmpty {
+                    batchSetAccessories(tempSelectedAccessories)
+                }
+            }
+        }
+        .sheet(isPresented: $showingStatusSelection) {
+            BatchStatusSelectionView(selectedStatus: $tempSelectedStatus)
+                .onDisappear {
+                    if let status = tempSelectedStatus {
+                        batchSetStatus(status)
+                    }
+                }
+        }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除 \(selectedItemIDs.count) 项", role: .destructive) {
                 deleteSelectedItems()
             }
+        }
+        .alert("确认批量复制", isPresented: $showingBatchCopyAlert) {
+            Button("取消", role: .cancel) { }
+            Button("复制 \(selectedItemIDs.count) 项") {
+                batchCopySelectedItems()
+            }
+        } message: {
+            Text("确定要复制选中的 \(selectedItemIDs.count) 件物品吗？")
         }
         .alert("确认添加标签", isPresented: $showingAddTagsConfirmation) {
             Button("取消", role: .cancel) {
@@ -668,6 +792,71 @@ struct WardrobeView: View {
         itemToCopy = nil
     }
     
+    private func batchCopySelectedItems() {
+        let itemsToCopy = clothings.filter { selectedItemIDs.contains($0.id) }
+        
+        autoreleasepool {
+            for item in itemsToCopy {
+                let newItem = Clothing(
+                    name: "\(item.name) 副本",
+                    brand: item.brand,
+                    types: item.types,
+                    colors: item.colors,
+                    sizes: item.sizes,
+                    length: item.length,
+                    condition: item.condition,
+                    accessories: item.accessories,
+                    imagePaths: [], // 先设置为空，后面单独复制图片
+                    isShared: item.isShared,
+                    originalPrice: item.originalPrice,
+                    price: item.price,
+                    deposit: item.deposit,
+                    balance: item.balance,
+                    accessoriesPrice: item.accessoriesPrice,
+                    purchaseDate: Date(),
+                    depositDate: item.depositDate,
+                    isDepositPlan: item.isDepositPlan,
+                    finalPaymentDate: item.finalPaymentDate,
+                    finalPaymentEndDate: item.finalPaymentEndDate,
+                    note: item.note,
+                    stock: item.stock,
+                    status: item.status
+                )
+                newItem.tags = item.tags
+                
+                // 复制小物
+                if let items = item.accessoryItems {
+                    newItem.accessoryItems = items.map { item in
+                        AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex)
+                    }
+                }
+                
+                // 复制图片文件
+                var newImagePaths: [String] = []
+                for path in item.imagePaths {
+                    if !path.isEmpty, let originalImage = ImageManager.shared.loadImage(fileName: path) {
+                        if let newPath = ImageManager.shared.saveImage(originalImage, context: modelContext) {
+                            newImagePaths.append(newPath)
+                        }
+                    }
+                }
+                newItem.imagePaths = newImagePaths
+                
+                modelContext.insert(newItem)
+            }
+        }
+        
+        do {
+            try modelContext.save()
+            updateClothingCountCache()
+        } catch {
+            print("WardrobeView: Failed to save batch copied items: \(error)")
+        }
+        
+        // 保持选择模式，清空选择
+        selectedItemIDs.removeAll()
+    }
+    
     private func addTagsToSelectedItems(_ tags: [Tag]) {
         let items = clothings.filter { selectedItemIDs.contains($0.id) }
         for item in items {
@@ -694,6 +883,60 @@ struct WardrobeView: View {
         
         // Keep selection mode active as requested
         tempSelectedBrand = nil
+    }
+    
+    // MARK: - Batch Edit Methods
+    
+    private func batchSetColors(_ colors: [String]) {
+        let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        let colorString = colors.joined(separator: ",")
+        for item in items {
+            item.colors = colorString
+        }
+        try? modelContext.save()
+        tempSelectedColors = []
+    }
+    
+    private func batchSetSizes(_ sizes: [String]) {
+        let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        let sizeString = sizes.joined(separator: ",")
+        for item in items {
+            item.sizes = sizeString
+        }
+        try? modelContext.save()
+        tempSelectedSizes = []
+    }
+    
+    private func batchSetLengths(_ lengths: [String]) {
+        let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        // 衣长通常是单选，取第一个
+        let lengthString = lengths.first ?? ""
+        for item in items {
+            item.length = lengthString
+        }
+        try? modelContext.save()
+        tempSelectedLengths = []
+    }
+    
+    private func batchSetAccessories(_ accessories: [String]) {
+        let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        let accessoryString = accessories.joined(separator: ",")
+        for item in items {
+            item.accessories = accessoryString
+        }
+        try? modelContext.save()
+        tempSelectedAccessories = []
+    }
+    
+    private func batchSetStatus(_ status: String) {
+        let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        if let newStatus = ClothingStatus(rawValue: status) {
+            for item in items {
+                item.status = newStatus
+            }
+            try? modelContext.save()
+        }
+        tempSelectedStatus = nil
     }
     
     private func saveOrder() {

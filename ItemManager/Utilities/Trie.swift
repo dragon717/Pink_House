@@ -65,4 +65,9 @@ class Trie {
     func clear() {
         root.children.removeAll()
     }
+    
+    // 获取所有单词
+    func getAllWords() -> [String] {
+        return findAllWords(node: root).sorted()
+    }
 }

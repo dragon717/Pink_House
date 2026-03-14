@@ -135,7 +135,9 @@ struct ModernTabView: View {
             }
             
             Tab(value: 3, role: .search) {
-                GlobalSearchView(searchText: $searchText)
+                PetChatView(searchText: $searchText)
+            } label: {
+                Label("萌宠对话", systemImage: "bubble.left.and.bubble.right.fill")
             }
         }
         // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
@@ -441,6 +443,9 @@ struct LegacyTabView: View {
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
+    
+    // 搜索文本状态
+    @State private var searchText = ""
 
     // B22222深红色
     private let selectedColor = Color(red: 0.698, green: 0.133, blue: 0.133)
@@ -529,7 +534,7 @@ struct LegacyTabView: View {
                     .toolbarBackground(.hidden, for: .navigationBar)
             }
         case 3:
-            GlobalSearchViewLegacy()
+            PetChatViewLegacy(searchText: $searchText)
         default:
             NavigationStack {
                 HomeView(selectedTab: $homeTabSelection)
@@ -568,11 +573,11 @@ struct LegacyTabView: View {
                         icon: "face.smiling"
                     )
 
-                    // 搜索 Tab
+                    // 萌宠对话 Tab
                     tabButton(
                         index: 3,
-                        title: "搜索",
-                        icon: "magnifyingglass"
+                        title: "萌宠对话",
+                        icon: "bubble.left.and.bubble.right.fill"
                     )
                 }
                 .frame(height: 56)

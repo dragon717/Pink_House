@@ -244,4 +244,29 @@ class SuggestionManager {
             }
         }
     }
+    
+    // MARK: - 获取所有预设值（用于批量编辑）
+    
+    func getAllColors() -> [String] {
+        return queue.sync {
+            return tries[.color]?.getAllWords() ?? []
+        }
+    }
+    
+    func getAllSizes() -> [String] {
+        return queue.sync {
+            return tries[.size]?.getAllWords() ?? []
+        }
+    }
+    
+    func getAllAccessories() -> [String] {
+        return queue.sync {
+            return tries[.accessory]?.getAllWords() ?? []
+        }
+    }
+    
+    func getAllLengths() -> [String] {
+        // 衣长从数据库中收集，没有固定预设
+        return ["80cm", "90cm", "100cm", "110cm", "120cm", "短款", "中长款", "长款", "超长款"]
+    }
 }
