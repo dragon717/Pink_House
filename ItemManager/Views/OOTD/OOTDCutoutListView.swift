@@ -56,7 +56,7 @@ struct OOTDCutoutListView: View {
     // 完全隐藏状态
     @State private var isCompletelyHidden = false
     
-    private let categories = ["全部", "裙子", "外套", "鞋子", "袜子", "玩偶", "小物", "未分类"]
+    private let categories = ["全部", "裙装", "外套", "鞋子", "袜子", "玩偶", "小物", "未分类"]
     // For picker (exclude "全部")
     private var selectableCategories: [String] {
         categories.filter { $0 != "全部" }
@@ -65,7 +65,7 @@ struct OOTDCutoutListView: View {
     private func iconForCategory(_ category: String) -> String {
         switch category {
         case "全部": return "square.grid.2x2.fill"
-        case "裙子": return "frock.fill"
+        case "裙装": return "frock.fill"
         case "外套": return "jacket.fill"
         case "鞋子": return "shoe.fill"
         case "袜子": return "sun.min.fill" // 暂替代
@@ -106,7 +106,7 @@ struct OOTDCutoutListView: View {
                     
                     let nameInfo = (clothing.name + clothing.types).lowercased()
                     
-                    if selectedCategory == "裙子" && (nameInfo.contains("裙") || nameInfo.contains("jsk") || nameInfo.contains("op") || nameInfo.contains("dress")) {
+                    if selectedCategory == "裙装" && (nameInfo.contains("裙") || nameInfo.contains("jsk") || nameInfo.contains("op") || nameInfo.contains("dress")) {
                         return true
                     }
                     if selectedCategory == "外套" && (nameInfo.contains("外套") || nameInfo.contains("上衣") || nameInfo.contains("开衫") || nameInfo.contains("shirt") || nameInfo.contains("top")) {
@@ -125,7 +125,7 @@ struct OOTDCutoutListView: View {
                 
                 // 特殊处理 "未分类"
                 if selectedCategory == "未分类" {
-                    let standardCategories = ["裙子", "外套", "鞋子", "袜子", "玩偶", "小物"]
+                    let standardCategories = ["裙装", "外套", "鞋子", "袜子", "玩偶", "小物"]
                     if standardCategories.contains(item.category) { return false }
                     if let _ = CutoutService.shared.standardizeCategory(item.category) {
                         return false

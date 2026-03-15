@@ -1,6 +1,6 @@
 //
 //  GRDBDressStockMarketView.swift
-//  裙子股市 - 使用 GRDB 的主界面
+//  裙装股市 - 使用 GRDB 的主界面
 //
 //  完全独立于 SwiftData，使用 GRDB + CloudKit 架构
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 import GRDB
 
-/// 使用 GRDB 的裙子股市主界面
+/// 使用 GRDB 的裙装股市主界面
 struct GRDBDressStockMarketView: View {
     // MARK: - 状态
     
@@ -57,7 +57,7 @@ struct GRDBDressStockMarketView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            .navigationTitle("裙子股市")
+            .navigationTitle("裙装股市")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

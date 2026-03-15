@@ -117,13 +117,13 @@ final class QuizManager: ObservableObject {
     let questions: [QuizQuestion] = [
         QuizQuestion(
             question: "少女衣橱是一款什么类型的应用？",
-            options: ["游戏", "Lolita裙子管理工具", "社交软件", "购物平台"],
+            options: ["游戏", "Lolita裙装管理工具", "社交软件", "购物平台"],
             correctAnswer: 1,
-            explanation: "少女衣橱是一款专为Lolita爱好者设计的裙子管理工具。"
+            explanation: "少女衣橱是一款专为Lolita爱好者设计的裙装管理工具。"
         ),
         QuizQuestion(
             question: "在少女衣橱中，'尾款天使'功能是用来做什么的？",
-            options: ["记录已付尾款", "提醒尾款支付时间", "计算尾款金额", "预约裙子"],
+            options: ["记录已付尾款", "提醒尾款支付时间", "计算尾款金额", "预约裙装"],
             correctAnswer: 1,
             explanation: "尾款天使功能用于提醒用户尾款支付时间，避免错过付款期限。"
         ),
@@ -134,16 +134,16 @@ final class QuizManager: ObservableObject {
             explanation: "股票交易不是少女衣橱的功能，其他都是应用内的功能模块。"
         ),
         QuizQuestion(
-            question: "在少女衣橱社区分享裙子时，应该注意什么？",
+            question: "在少女衣橱社区分享裙装时，应该注意什么？",
             options: ["随意分享他人图片", "尊重版权，分享原创内容", "不需要标注品牌", "可以分享盗版信息"],
             correctAnswer: 1,
             explanation: "在社区分享时应尊重版权，分享原创内容，这是社区的基本准则。"
         ),
         QuizQuestion(
             question: "'追根溯源'功能可以帮助你做什么？",
-            options: ["找到裙子的购买链接", "了解裙子的品牌历史", "查看裙子的原价信息", "联系卖家"],
+            options: ["找到裙装的购买链接", "了解裙装的品牌历史", "查看裙装的原价信息", "联系卖家"],
             correctAnswer: 1,
-            explanation: "追根溯源功能帮助用户了解裙子的品牌历史和相关信息。"
+            explanation: "追根溯源功能帮助用户了解裙装的品牌历史和相关信息。"
         )
     ]
     

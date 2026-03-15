@@ -282,7 +282,7 @@ struct SearchContainerView: View {
                 List {
                     if searchText.isEmpty {
                         Section("搜索建议") {
-                            Label("裙子/小物名称", systemImage: "tshirt")
+                            Label("裙装/小物名称", systemImage: "tshirt")
                             Label("品牌/标签tag", systemImage: "tag")
                         }
                     } else if filteredClothings.isEmpty {
@@ -758,7 +758,7 @@ struct GlobalSearchViewLegacy: View {
                 List {
                     if searchText.isEmpty {
                         Section("搜索建议") {
-                            Label("裙子/小物名称", systemImage: "tshirt")
+                            Label("裙装/小物名称", systemImage: "tshirt")
                             Label("品牌/标签tag", systemImage: "tag")
                         }
                     } else if filteredClothings.isEmpty {

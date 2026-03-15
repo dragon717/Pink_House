@@ -366,7 +366,7 @@ struct ThemePreviewSection: View {
         }
     }
 
-    // 根据裙子填充模式计算图片区域背景
+    // 根据裙装填充模式计算图片区域背景
     private func skirtImageBackground(baseColor: Color) -> Color {
         switch themeManager.skirtFillMode {
         case .solid:
@@ -399,7 +399,7 @@ struct ThemePreviewSection: View {
 
                 // 主题色卡片示例 - 应用卡片样式设置
                 HStack(spacing: 12) {
-                    // 图片占位（模拟裙子图片区域）- 应用裙子填充模式
+                    // 图片占位（模拟裙装图片区域）- 应用裙装填充模式
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(skirtImageBackground(baseColor: cardColors.secondaryRGBA.color))
@@ -413,8 +413,8 @@ struct ThemePreviewSection: View {
 
                     // 信息区域
                     VStack(alignment: .leading, spacing: 6) {
-                        // 裙子名称 - 主要文字
-                        Text("小裙子名称")
+                        // 裙装名称 - 主要文字
+                        Text("小裙装名称")
                             .font(.headline)
                             .foregroundStyle(textColors.primary)
 
@@ -614,9 +614,9 @@ struct CardStyleSection: View {
 
             Divider()
 
-            // 裙子填充模式
+            // 裙装填充模式
             VStack(alignment: .leading, spacing: 12) {
-                Text("裙子图片填充")
+                Text("裙装图片填充")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 

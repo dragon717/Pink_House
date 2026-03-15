@@ -128,7 +128,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .bigWorld: return "世界书"
         case .perler: return "拼豆工坊"
         case .recycleBin: return "回收站"
-        case .dressStock: return "裙子股市"
+        case .dressStock: return "裙装股市"
         case .dataBackup: return "数据备份"
         case .cloudSync: return "iCloud同步"
         case .batchImport: return "批量导入"
@@ -193,8 +193,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             // 拼豆工坊：在VIP界面兑换码输入 "vip拼豆工坊" 解锁
             return .redeemCode("vip拼豆工坊", description: "仍在认真开发和内测中，敬请期待～")
         case .dressStock:
-            // 裙子股市：在VIP界面兑换码输入 "vip裙子股市" 解锁
-            return .redeemCode("vip裙子股市", description: "仍在认真开发和内测中，敬请期待～")
+            // 裙装股市：在VIP界面兑换码输入 "vip裙装股市" 解锁
+            return .redeemCode("vip裙装股市", description: "仍在认真开发和内测中，敬请期待～")
         case .dataBackup, .cloudSync:
             return .free()
         case .batchImport:
@@ -218,7 +218,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     var isHiddenByDefault: Bool {
         switch self {
         case .pet, .bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks:
-            return true // 萌宠、世界书、拼豆工坊、裙子股市、联网社区、魔法任务默认隐藏
+            return true // 萌宠、世界书、拼豆工坊、裙装股市、联网社区、魔法任务默认隐藏
         default:
             return false
         }
@@ -667,7 +667,7 @@ final class FeatureUnlockManager: ObservableObject {
             "vip萌宠": .pet,
             "vip世界书": .bigWorld,
             "vip拼豆工坊": .perler,
-            "vip裙子股市": .dressStock,
+            "vip裙装股市": .dressStock,
             "vip联网": .networkCommunity,
             "vip魔法任务": .magicTasks
         ]

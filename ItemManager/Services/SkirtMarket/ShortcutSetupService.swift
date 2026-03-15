@@ -1,6 +1,6 @@
 //
 //  ShortcutSetupService.swift
-//  裙子股市 - 快捷指令安装服务
+//  裙装股市 - 快捷指令安装服务
 //
 //  提供一键安装快捷指令的功能
 //
@@ -40,7 +40,7 @@ final class ShortcutSetupService {
     func installShortcut(from viewController: UIViewController) {
         let alert = UIAlertController(
             title: "安装快捷指令",
-            message: "这将引导您安装「分享商品到裙子股市」快捷指令，让您可以从闲鱼、小红书等App一键分享商品",
+            message: "这将引导您安装「分享商品到裙装股市」快捷指令，让您可以从闲鱼、小红书等App一键分享商品",
             preferredStyle: .alert
         )
         
@@ -140,7 +140,7 @@ final class ShortcutSetupService {
         let qrImage = generateQRCode(from: "https://www.icloud.com/shortcuts/xxxxxxxxxxxx")
         
         let activityItems: [Any] = [
-            "安装「裙子股市」快捷指令，一键分享商品信息：",
+            "安装「裙装股市」快捷指令，一键分享商品信息：",
             qrImage ?? UIImage()
         ]
         
@@ -252,7 +252,7 @@ final class ShortcutSetupService {
                     ]
                 ]
             ],
-            "WFWorkflowName": "分享商品到裙子股市"
+            "WFWorkflowName": "分享商品到裙装股市"
         ]
     }
     
@@ -344,7 +344,7 @@ struct ShortcutSetupGuideView: View {
         GuideStep(
             icon: "7.circle.fill",
             title: "设置快捷指令名称",
-            description: "点击顶部「快捷指令」，重命名为「分享商品到裙子股市」",
+            description: "点击顶部「快捷指令」，重命名为「分享商品到裙装股市」",
             image: "pencil"
         ),
         GuideStep(

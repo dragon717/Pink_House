@@ -1,28 +1,28 @@
 //
 //  SkirtStockMetric.swift
-//  裙子股市 - 股市指标模型
+//  裙装股市 - 股市指标模型
 //
-//  用于存储特定裙子的市场统计数据，实现K线图和大盘指数
+//  用于存储特定裙装的市场统计数据，实现K线图和大盘指数
 //
 
 import Foundation
 import SwiftData
 
-/// 裙子股市指标 - 用于绘制K线图和大盘指数
+/// 裙装股市指标 - 用于绘制K线图和大盘指数
 @Model
 final class SkirtStockMetric {
     // MARK: - 标识
     
-    /// 唯一标识：裙子名称+时间戳
+    /// 唯一标识：裙装名称+时间戳
     /// 注意：CloudKit不支持unique约束
     var metricID: String = ""
     
     /// 内部UUID
     var id: UUID = UUID()
     
-    // MARK: - 裙子标识
+    // MARK: - 裙装标识
     
-    /// 裙子名称（标准化后的名称）
+    /// 裙装名称（标准化后的名称）
     var skirtName: String = ""
     
     /// 品牌
@@ -111,7 +111,7 @@ final class SkirtStockMetric {
     
     // MARK: - 大盘指数贡献
     
-    /// 该裙子对大盘指数的贡献权重
+    /// 该裙装对大盘指数的贡献权重
     var indexWeight: Double = 1.0
     
     /// 价格变动率（相对于上一时段）
@@ -316,7 +316,7 @@ final class LolitaMarketIndex {
 // MARK: - 查询扩展
 
 extension SkirtStockMetric {
-    /// 按裙子名称查询
+    /// 按裙装名称查询
     static func predicateForSkirtName(_ name: String) -> Predicate<SkirtStockMetric> {
         #Predicate { metric in
             metric.skirtName == name

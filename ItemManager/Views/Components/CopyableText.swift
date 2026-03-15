@@ -73,7 +73,7 @@ struct CopyableInfoRow: View {
         case "衣长": return "arrow.up.and.down"
         case "状态": return "star.circle"
         case "小物": return "sparkles"
-        case "裙子总价", "裙子单价", "原价": return "tag"
+        case "裙装总价", "裙装单价", "原价": return "tag"
         case "库存数量": return "number.circle"
         case "购买日期": return "calendar"
         case "定金日期": return "calendar.badge.clock"

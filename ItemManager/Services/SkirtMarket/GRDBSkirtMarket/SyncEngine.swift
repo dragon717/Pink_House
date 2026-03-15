@@ -1,6 +1,6 @@
 //
 //  SyncEngine.swift
-//  裙子股市 - CloudKit 同步引擎
+//  裙装股市 - CloudKit 同步引擎
 //
 //  使用"影子模型"架构：本地 GRDB + 云端 CloudKit
 //

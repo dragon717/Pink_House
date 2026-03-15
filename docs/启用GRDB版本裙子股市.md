@@ -1,24 +1,24 @@
-# 启用 GRDB 版本裙子股市
+# 启用 GRDB 版本裙装股市
 
 ## 已完成的更改
 
 ### 1. 启用 GRDB 初始化
 在 [ItemManagerApp.swift](file:///Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/ItemManagerApp.swift#L153-L159) 中：
 ```swift
-// 0.7 裙子股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
+// 0.7 裙装股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
 do {
     try await GRDBManager.shared.initialize()
     await SyncEngine.shared.configure()
-    print("✅ 裙子股市功能已启用（GRDB 版本）")
+    print("✅ 裙装股市功能已启用（GRDB 版本）")
 } catch {
-    print("❌ 裙子股市初始化失败: \(error)")
+    print("❌ 裙装股市初始化失败: \(error)")
 }
 ```
 
 ### 2. 更新视图入口
 在 [MainTabView.swift](file:///Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/Views/MainTabView.swift#L743-L744) 中：
 ```swift
-// 使用 GRDB 版本的裙子股市（完全独立于 SwiftData）
+// 使用 GRDB 版本的裙装股市（完全独立于 SwiftData）
 GRDBDressStockMarketView()
 ```
 
@@ -55,9 +55,9 @@ SyncEngine ←→ CloudKit 公共数据库
 
 1. **Clean Build** - Cmd+Shift+K
 2. **运行应用** - 检查控制台输出：
-   - 应该看到 "✅ 裙子股市功能已启用（GRDB 版本）"
+   - 应该看到 "✅ 裙装股市功能已启用（GRDB 版本）"
    - 应该看到 "📦 GRDBManager: 数据库初始化成功"
-3. **进入裙子股市** - 检查是否能正常显示界面
+3. **进入裙装股市** - 检查是否能正常显示界面
 4. **添加测试数据** - 测试添加商品功能
 5. **检查同步** - 测试 CloudKit 同步
 
@@ -69,15 +69,15 @@ SyncEngine ←→ CloudKit 公共数据库
 // 在 ItemManagerApp.swift 中注释掉 GRDB 初始化
 // try await GRDBManager.shared.initialize()
 // await SyncEngine.shared.configure()
-print("⚠️ 裙子股市功能已禁用")
+print("⚠️ 裙装股市功能已禁用")
 ```
 
 ## 注意事项
 
 1. **首次启动** - 会创建新的 SQLite 数据库文件
 2. **iCloud 同步** - 需要登录 iCloud 才能同步到云端
-3. **数据隔离** - 裙子股市数据完全独立于衣橱数据
-4. **备份恢复** - 裙子股市数据不参与 iCloud 文件备份
+3. **数据隔离** - 裙装股市数据完全独立于衣橱数据
+4. **备份恢复** - 裙装股市数据不参与 iCloud 文件备份
 
 ## 文件位置
 

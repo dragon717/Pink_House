@@ -105,7 +105,7 @@ struct SmallWorldMenuOverlay: View {
             case .wealth:
                 return WheelMenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0))
             case .dressStock:
-                return WheelMenuItem(title: "裙子股市", icon: "chart.line.uptrend.xyaxis", destination: .dressStock, color: Color(red: 1.0, green: 0.42, blue: 0.62))
+                return WheelMenuItem(title: "裙装股市", icon: "chart.line.uptrend.xyaxis", destination: .dressStock, color: Color(red: 1.0, green: 0.42, blue: 0.62))
             case .perler:
                 return WheelMenuItem(title: "拼豆", icon: "circle.grid.2x2", destination: .perler, color: Color(red: 1.0, green: 0.55, blue: 0.75))
             case .calendar:

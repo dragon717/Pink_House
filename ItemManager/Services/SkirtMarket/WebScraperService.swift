@@ -1,6 +1,6 @@
 //
 //  WebScraperService.swift
-//  裙子股市 - 数据抓取服务
+//  裙装股市 - 数据抓取服务
 //
 //  实现各平台的数据抓取，包含反爬策略
 //
@@ -476,7 +476,7 @@ extension WebScraperService {
 
 ### 快捷指令集成示例：
 
-1. 创建快捷指令"分享商品到裙子股市"
+1. 创建快捷指令"分享商品到裙装股市"
 2. 动作：获取网页内容 -> 解析商品信息
 3. 动作：打开URL "yourapp://add-item?data=..."
 4. App通过URL Scheme接收数据

@@ -1,6 +1,6 @@
 //
 //  DressStockMarketView.swift
-//  裙子股市 - 主界面（整合版）
+//  裙装股市 - 主界面（整合版）
 //
 //  包含：商品列表 + AI 解析分享链接 + 市场统计 + K线图
 //
@@ -70,7 +70,7 @@ struct DressStockMarketView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
             }
-            .navigationTitle("裙子股市")
+            .navigationTitle("裙装股市")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -204,7 +204,7 @@ struct SearchBar: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             
-            TextField("搜索裙子...", text: $text)
+            TextField("搜索裙装...", text: $text)
                 .textFieldStyle(.plain)
             
             if !text.isEmpty {

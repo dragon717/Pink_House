@@ -417,9 +417,9 @@ struct PetAIAnalyzingView: View {
             PetAIAnalysisResultView(
                 result: PetAIAnalysisResult(
                     question: "这是什么？",
-                    answer: "这是一件漂亮的洛丽塔裙子，粉色系，带有蕾丝装饰。",
+                    answer: "这是一件漂亮的洛丽塔裙装，粉色系，带有蕾丝装饰。",
                     image: nil,
-                    context: "图片中显示了一件粉色的洛丽塔风格裙子"
+                    context: "图片中显示了一件粉色的洛丽塔风格裙装"
                 ),
                 onClose: {}
             )

@@ -1,6 +1,6 @@
 //
 //  GRDBLolitaItem.swift
-//  裙子股市 - GRDB 数据模型
+//  裙装股市 - GRDB 数据模型
 //
 //  完全独立于 SwiftData 的 LolitaItem 模型
 //

@@ -359,8 +359,8 @@ struct ImagePickerGrid: View {
     private func deleteImage(at index: Int) {
         let fileName = imagePaths[index]
         
-        // 逻辑修正：如果被删除的图片是某个抠图文件，且它是当前裙子“一键替换”的成果，
-        // 则应该重置该裙子的 hasReplacedCutoutImage 状态。
+        // 逻辑修正：如果被删除的图片是某个抠图文件，且它是当前裙装“一键替换”的成果，
+        // 则应该重置该裙装的 hasReplacedCutoutImage 状态。
         // 使用 CutoutService 集中处理逻辑
         CutoutService.shared.handleCutoutDeletion(imagePath: fileName, context: modelContext)
         

@@ -38,7 +38,7 @@ struct SearchContext {
 // MARK: - 搜索结果类型
 /// 定义不同类型的搜索结果
 enum SearchResultType: String, CaseIterable {
-    case clothing = "裙子"
+    case clothing = "裙装"
     case brand = "品牌"
     case tag = "标签"
     case ootd = "穿搭"
@@ -124,7 +124,7 @@ class ClothingSearchService: ObservableObject, Searchable {
     /// 获取搜索建议
     func searchSuggestions() -> [String] {
         return [
-            "输入名称搜索裙子",
+            "输入名称搜索裙装",
             "输入品牌名搜索",
             "输入标签名搜索",
             "输入类型如 JSK、OP",

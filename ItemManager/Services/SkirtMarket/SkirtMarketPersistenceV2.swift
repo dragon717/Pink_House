@@ -1,23 +1,23 @@
 //
 //  SkirtMarketPersistenceV2.swift
-//  裙子股市 - SwiftData 多容器架构 V2
+//  裙装股市 - SwiftData 多容器架构 V2
 //
 //  实现完全隔离的双容器架构：
 //  - 主容器：保留原有衣橱数据（Private Database）
-//  - 裙子股市容器：独立的公共数据库（Public Database）
+//  - 裙装股市容器：独立的公共数据库（Public Database）
 //
 
 import Foundation
 import SwiftData
 import CloudKit
 
-/// 裙子股市数据持久化管理器 V2
+/// 裙装股市数据持久化管理器 V2
 /// 使用完全独立的 ModelContainer，与主应用数据完全隔离
 @MainActor
 final class SkirtMarketPersistenceV2 {
     static let shared = SkirtMarketPersistenceV2()
     
-    /// 裙子股市专用的 ModelContainer（完全独立）
+    /// 裙装股市专用的 ModelContainer（完全独立）
     var skirtMarketContainer: ModelContainer?
     
     /// 是否已配置
@@ -30,13 +30,13 @@ final class SkirtMarketPersistenceV2 {
     
     // MARK: - 配置方法
     
-    /// 配置裙子股市的独立数据库
+    /// 配置裙装股市的独立数据库
     /// 使用独立的存储文件，与主应用完全隔离
     func configure() async {
-        print("🏛️ 裙子股市 V2: 开始配置独立数据库...")
+        print("🏛️ 裙装股市 V2: 开始配置独立数据库...")
         
         do {
-            // 1. 创建独立的 Schema（只包含裙子股市模型）
+            // 1. 创建独立的 Schema（只包含裙装股市模型）
             let schema = createSkirtMarketSchema()
             
             // 2. 创建独立的 ModelConfiguration
@@ -48,20 +48,20 @@ final class SkirtMarketPersistenceV2 {
             self.skirtMarketContainer = container
             
             self.isConfigured = true
-            print("✅ 裙子股市 V2: 独立数据库配置成功")
+            print("✅ 裙装股市 V2: 独立数据库配置成功")
             print("   📁 存储位置: 独立的 skirt_market.store 文件")
             
         } catch {
             self.configurationError = error
             self.isConfigured = false
-            print("❌ 裙子股市 V2: 配置失败: \(error)")
+            print("❌ 裙装股市 V2: 配置失败: \(error)")
         }
     }
     
     // MARK: - Schema 定义（完全独立）
     
-    /// 裙子股市专用的 Schema
-    /// 只包含裙子股市相关的模型，不包含任何主应用模型
+    /// 裙装股市专用的 Schema
+    /// 只包含裙装股市相关的模型，不包含任何主应用模型
     private func createSkirtMarketSchema() -> Schema {
         Schema([
             LolitaItem.self,
@@ -91,7 +91,7 @@ final class SkirtMarketPersistenceV2 {
         return config
     }
     
-    /// 获取裙子股市独立的存储目录
+    /// 获取裙装股市独立的存储目录
     /// 确保与主应用的存储完全隔离
     private func getSkirtMarketStoreDirectory() -> URL? {
         let fileManager = FileManager.default
@@ -115,9 +115,9 @@ final class SkirtMarketPersistenceV2 {
                 var mutableURL = skirtMarketDir
                 try mutableURL.setResourceValues(resourceValues)
                 
-                print("📁 创建裙子股市独立存储目录: \(skirtMarketDir.path)")
+                print("📁 创建裙装股市独立存储目录: \(skirtMarketDir.path)")
             } catch {
-                print("❌ 创建裙子股市存储目录失败: \(error)")
+                print("❌ 创建裙装股市存储目录失败: \(error)")
                 return nil
             }
         }
@@ -125,7 +125,7 @@ final class SkirtMarketPersistenceV2 {
         return skirtMarketDir
     }
     
-    /// 配置裙子股市存储文件不参与 iCloud 备份
+    /// 配置裙装股市存储文件不参与 iCloud 备份
     /// 在应用启动时调用
     func excludeFromBackup() {
         guard let container = skirtMarketContainer else { return }
@@ -137,7 +137,7 @@ final class SkirtMarketPersistenceV2 {
                 resourceValues.isExcludedFromBackup = true
                 var mutableURL = storeURL
                 try mutableURL.setResourceValues(resourceValues)
-                print("📁 裙子股市存储文件已排除在 iCloud 备份外")
+                print("📁 裙装股市存储文件已排除在 iCloud 备份外")
             } catch {
                 print("⚠️ 设置备份排除失败: \(error)")
             }
@@ -153,7 +153,7 @@ final class SkirtMarketPersistenceV2 {
     
     // MARK: - 公共方法
     
-    /// 获取裙子股市的主上下文
+    /// 获取裙装股市的主上下文
     var mainContext: ModelContext? {
         guard let container = skirtMarketContainer else { return nil }
         return ModelContext(container)
@@ -180,18 +180,18 @@ final class SkirtMarketPersistenceV2 {
 
 1. **独立的 Schema**
    - 主应用：Clothing, Item, Outfit, Model3D 等
-   - 裙子股市：LolitaItem, SkirtStockMetric, MonitorTask 等
+   - 裙装股市：LolitaItem, SkirtStockMetric, MonitorTask 等
    - 两个 Schema 完全不重叠
 
 2. **独立的存储文件**
    - SwiftData 会自动为不同的 ModelConfiguration 创建独立的存储文件
    - 主应用：default.store
-   - 裙子股市：skirt_market.store（自动命名）
+   - 裙装股市：skirt_market.store（自动命名）
 
 3. **独立的 CloudKit 同步**
    - 每个存储文件对应独立的 CloudKit 容器实例
    - 主应用：Private Database（默认）
-   - 裙子股市：Public Database（通过配置指定）
+   - 裙装股市：Public Database（通过配置指定）
 
 ### 使用方式
 
@@ -206,7 +206,7 @@ struct ItemManagerApp: App {
                     // 配置主应用数据库（原有）
                     await SharedPersistence.shared.configure()
                     
-                    // 配置裙子股市数据库（独立）
+                    // 配置裙装股市数据库（独立）
                     await SkirtMarketPersistenceV2.shared.configure()
                 }
         }
@@ -218,7 +218,7 @@ struct ItemManagerApp: App {
 
 ### 关键区别
 
-| 特性 | 主应用 | 裙子股市 |
+| 特性 | 主应用 | 裙装股市 |
 |------|--------|----------|
 | Schema | Clothing, Item, Outfit... | LolitaItem, SkirtStockMetric... |
 | 存储文件 | default.store | skirt_market.store |
@@ -229,13 +229,13 @@ struct ItemManagerApp: App {
 
 1. **不要混用 ModelContainer**
    - 主应用的视图使用 SharedPersistence.shared.sharedModelContainer
-   - 裙子股市的视图手动获取 SkirtMarketPersistenceV2.shared.mainContext
+   - 裙装股市的视图手动获取 SkirtMarketPersistenceV2.shared.mainContext
 
 2. **@Query 的使用**
    - 主应用：正常使用 @Query
-   - 裙子股市：需要手动获取数据，因为 @Query 默认使用 environment 的 container
+   - 裙装股市：需要手动获取数据，因为 @Query 默认使用 environment 的 container
 
 3. **数据迁移**
    - 两个容器完全独立，不需要考虑迁移问题
-   - 删除裙子股市数据不会影响主应用数据
+   - 删除裙装股市数据不会影响主应用数据
 */

@@ -1,14 +1,14 @@
 //
 //  SkirtIndexCache.swift
-//  裙子股市 - 裙子索引缓存服务
+//  裙装股市 - 裙装索引缓存服务
 //
-//  预下载Public DB中的裙子索引到内存，实现高效去重
+//  预下载Public DB中的裙装索引到内存，实现高效去重
 //
 
 import Foundation
 import SwiftData
 
-/// 裙子索引条目 - 内存中的轻量级去重索引
+/// 裙装索引条目 - 内存中的轻量级去重索引
 struct SkirtIndexEntry: Hashable {
     let platformID: String          // 平台+商品ID
     let semanticHash: String        // 语义哈希（品牌+名称+类型+颜色）
@@ -38,7 +38,7 @@ struct SkirtIndexEntry: Hashable {
     }
 }
 
-/// 裙子索引缓存服务
+/// 裙装索引缓存服务
 /// 负责预下载Public DB中的索引到内存，提供高效的去重查询
 @MainActor
 final class SkirtIndexCache {
@@ -98,7 +98,7 @@ final class SkirtIndexCache {
             refreshContinuation = nil
         }
         
-        print("🔄 开始刷新裙子索引缓存...")
+        print("🔄 开始刷新裙装索引缓存...")
         
         guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             print("❌ 无法获取上下文")

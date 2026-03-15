@@ -243,8 +243,8 @@ struct OverviewStatsCard: View {
             
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    StatBox(title: "总裙子数", value: "\(totalCount)", unit: "件")
-                    StatBox(title: "总裙子价值", value: "¥\(formatPrice(dressValue))", unit: "")
+                    StatBox(title: "总裙装数", value: "\(totalCount)", unit: "件")
+                    StatBox(title: "总裙装价值", value: "¥\(formatPrice(dressValue))", unit: "")
                 }
             }
         }

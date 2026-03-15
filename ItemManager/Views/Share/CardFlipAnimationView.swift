@@ -2,7 +2,7 @@
 //  CardFlipAnimationView.swift
 //  ItemManager
 //
-//  卡牌翻转动画视图 - 裙子放入卡牌正面，沿Y轴旋转展示正反面
+//  卡牌翻转动画视图 - 裙装放入卡牌正面，沿Y轴旋转展示正反面
 //
 
 import SwiftUI

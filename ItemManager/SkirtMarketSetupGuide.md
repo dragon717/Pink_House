@@ -1,4 +1,4 @@
-# 裙子股市 - 快捷指令集成指南
+# 裙装股市 - 快捷指令集成指南
 
 ## 概述
 
@@ -66,7 +66,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // 配置裙子股市
+        // 配置裙装股市
         Task {
             await SkirtMarketPersistence.shared.configure()
             await TaskDispatcher.shared.start()
@@ -201,13 +201,13 @@ completion(JSON.stringify(result));
 2. **分享商品**
    - 在闲鱼/小红书/淘宝中浏览商品
    - 点击分享按钮
-   - 选择「分享商品到裙子股市」
+   - 选择「分享商品到裙装股市」
    - 自动跳转到App并导入商品
 
 3. **查看导入结果**
    - App自动保存商品到数据库
    - 显示导入成功提示
-   - 可以在「裙子股市」界面查看
+   - 可以在「裙装股市」界面查看
 
 ### 开发者端流程
 

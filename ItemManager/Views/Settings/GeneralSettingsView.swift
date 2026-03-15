@@ -209,7 +209,7 @@ struct GeneralSettingsView: View {
             }
             .listRowBackground(Color.clear)
 
-            Section(header: Text("裙子卡片")) {
+            Section(header: Text("裙装卡片")) {
                 Picker("填充模式", selection: $theme.skirtFillMode) {
                     ForEach(SkirtFillMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)

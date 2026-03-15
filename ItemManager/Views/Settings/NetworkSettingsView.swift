@@ -137,21 +137,21 @@ struct NetworkSettingsView: View {
                 FeatureDescriptionRow(
                     icon: "bubble.left.and.bubble.right",
                     title: "社区功能",
-                    description: "在裙子详情页显示社区按钮，可以与其他用户交流分享",
+                    description: "在裙装详情页显示社区按钮，可以与其他用户交流分享",
                     themeManager: themeManager
                 )
                 
                 FeatureDescriptionRow(
                     icon: "arrow.right.circle.fill",
                     title: "追根溯源",
-                    description: "查看裙子的品牌历史和详细信息",
+                    description: "查看裙装的品牌历史和详细信息",
                     themeManager: themeManager
                 )
                 
                 FeatureDescriptionRow(
                     icon: "square.and.arrow.up",
                     title: "加入联网",
-                    description: "在创建或编辑裙子时，可以选择将裙子加入联网社区",
+                    description: "在创建或编辑裙装时，可以选择将裙装加入联网社区",
                     themeManager: themeManager
                 )
             }

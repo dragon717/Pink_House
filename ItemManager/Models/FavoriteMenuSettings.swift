@@ -12,7 +12,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case fashionJournal = "穿搭手帐"
     case smallWorld = "House"
     case wealth = "来财"
-    case dressStock = "裙子股市"
+    case dressStock = "裙装股市"
     case perler = "拼豆工坊"
     case calendar = "梦裙日历"
     case bigWorld = "世界书"

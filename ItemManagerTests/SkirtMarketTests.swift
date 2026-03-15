@@ -2,7 +2,7 @@
 //  SkirtMarketTests.swift
 //  ItemManagerTests
 //
-//  裙子股市单元测试
+//  裙装股市单元测试
 //
 
 import XCTest
@@ -60,7 +60,7 @@ final class SkirtMarketTests: XCTestCase {
         let item = LolitaItem(
             platform: .xianyu,
             platformItemId: "test123",
-            rawTitle: "测试裙子",
+            rawTitle: "测试裙装",
             currentPrice: 1000.0
         )
         item.semanticHash = "test_brand_name_jsk"

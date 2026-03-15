@@ -165,7 +165,7 @@ struct TagSelectionView: View {
                 }
             } message: {
                 if let tag = tagToDelete, let count = tag.clothings?.count {
-                    Text("该标签已被 \(count) 件裙子使用，删除后这些裙子将不再包含此标签。确定要删除吗？")
+                    Text("该标签已被 \(count) 件裙装使用，删除后这些裙装将不再包含此标签。确定要删除吗？")
                 } else {
                     Text("确定要删除此标签吗？")
                 }

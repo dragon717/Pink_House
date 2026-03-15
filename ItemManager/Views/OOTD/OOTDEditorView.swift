@@ -156,7 +156,7 @@ struct OOTDEditorView: View {
                         Button {
                             showingSaveToClothingSheet = true
                         } label: {
-                            Label("保存为裙子主图", systemImage: "photo.badge.arrow.down")
+                            Label("保存为裙装主图", systemImage: "photo.badge.arrow.down")
                         }
                         
                         Button {
@@ -179,7 +179,7 @@ struct OOTDEditorView: View {
                         Button {
                             showingBatchConfirmation = true
                         } label: {
-                            Label("批量处理小裙子", systemImage: "wand.and.stars")
+                            Label("批量处理小裙装", systemImage: "wand.and.stars")
                         }
                         
                         Button {
@@ -634,11 +634,11 @@ struct OOTDEditorView: View {
         }
     }
     
-    // MARK: - 批量处理小裙子
+    // MARK: - 批量处理小裙装
     
     private func processWardrobeSkirts() {
         isProcessing = true
-        processingMessage = "正在批量处理小裙子..."
+        processingMessage = "正在批量处理小裙装..."
         
         Task {
             var count = 0

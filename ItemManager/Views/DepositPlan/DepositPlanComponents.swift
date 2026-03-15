@@ -64,14 +64,14 @@ struct TotalBalanceCard: View {
                 Divider()
                     .frame(height: 30)
                 
-                // 裙子股市
+                // 裙装股市
                 Button {
                     handleQuickAccess(.dressStock)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "chart.line.uptrend.xyaxis")
                             .font(.system(size: 16))
-                        Text("裙子股市")
+                        Text("裙装股市")
                             .font(.caption)
                     }
                     .foregroundStyle(.blue)

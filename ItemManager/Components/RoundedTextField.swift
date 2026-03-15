@@ -38,6 +38,6 @@ struct RoundedTextField: View {
 }
 
 #Preview {
-    RoundedTextField(title: "裙子名称", placeholder: "例如：JSK,OP", text: .constant(""), isRequired: true)
+    RoundedTextField(title: "裙装名称", placeholder: "例如：JSK,OP", text: .constant(""), isRequired: true)
         .padding()
 }

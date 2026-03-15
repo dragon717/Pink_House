@@ -33,7 +33,7 @@ struct GlobalSearchView: View {
             .searchable(
                 text: $searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "搜索裙子、品牌、标签、类型、颜色、尺码、价格..."
+                prompt: "搜索裙装、品牌、标签、类型、颜色、尺码、价格..."
             )
             .onChange(of: searchText) { _, newValue in
                 performSearch(query: newValue)
@@ -134,7 +134,7 @@ struct GlobalSearchView: View {
                 .foregroundStyle(.primary)
             
             VStack(alignment: .leading, spacing: 8) {
-                suggestionRow(icon: "tshirt", text: "输入裙子名称")
+                suggestionRow(icon: "tshirt", text: "输入裙装名称")
                 suggestionRow(icon: "bag", text: "输入品牌名")
                 suggestionRow(icon: "tag", text: "输入标签名")
                 suggestionRow(icon: "paintpalette", text: "输入颜色如 粉色、黑色")
@@ -172,7 +172,7 @@ struct GlobalSearchView: View {
             ], spacing: 12) {
                 capabilityCard(
                     icon: "tshirt",
-                    title: "裙子",
+                    title: "裙装",
                     description: "名称、类型、颜色、尺码",
                     color: themeManager.accentTextColor
                 )

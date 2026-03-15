@@ -36,7 +36,7 @@ struct ClothingBasicInfoView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("裙子信息")
+            Text("裙装信息")
                 .font(.headline)
             
             ImagePickerGrid(imagePaths: $imagePaths)
@@ -44,7 +44,7 @@ struct ClothingBasicInfoView: View {
                     print("ClothingBasicInfoView: imagePaths changed from \(oldValue.count) to \(newValue.count) images")
                 }
             
-            AutoCompleteTextField(title: "裙子名称", placeholder: "请输入裙子名称", text: $name, field: .name, isRequired: true)
+            AutoCompleteTextField(title: "裙装名称", placeholder: "请输入裙装名称", text: $name, field: .name, isRequired: true)
             
             // Brand Field with Selection Button
             VStack(alignment: .leading, spacing: 8) {
@@ -94,7 +94,7 @@ struct ClothingBasicInfoView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "info.circle")
                             .font(.caption)
-                        Text("开启后，其他用户可以在社区中看到这条裙子")
+                        Text("开启后，其他用户可以在社区中看到这条裙装")
                             .font(.caption)
                     }
                     .foregroundStyle(.secondary)
@@ -257,7 +257,7 @@ struct ClothingPriceView: View {
             VStack(spacing: 12) {
                 PriceRow(title: "原价", value: $originalPrice)
                 Divider()
-                PriceRow(title: "裙子总价合计", value: $priceTotal)
+                PriceRow(title: "裙装总价合计", value: $priceTotal)
             }
             
             // 定金和尾款
@@ -618,7 +618,7 @@ struct ClothingPurchaseInfoView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
-                Text("勾选后，该裙子将显示在尾款天使中")
+                Text("勾选后，该裙装将显示在尾款天使中")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 

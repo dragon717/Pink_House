@@ -198,7 +198,7 @@ class ShareCardManager {
         return cardBackImage
     }
     
-    // MARK: - 异步生成裙子分享图片（优化版本）
+    // MARK: - 异步生成裙装分享图片（优化版本）
     func generateClothingShareImageAsync(clothing: Clothing) async -> UIImage? {
         // 在主线程获取需要的值，避免跨actor访问
         let frontImage = self.cardFrontImage
@@ -419,7 +419,7 @@ func executeFlipAnimation(
     }
 }
 
-// MARK: - 裙子分享卡片容器视图（带快速翻转动画）
+// MARK: - 裙装分享卡片容器视图（带快速翻转动画）
 struct ClothingShareCardContainerView: View {
     let clothing: Clothing
     let onShare: (UIImage) -> Void
@@ -448,7 +448,7 @@ struct ClothingShareCardContainerView: View {
             
             // 动画容器 - 固定在屏幕中央，不随分享按钮出现而改变位置
             ZStack {
-                // 正面（裙子内容）
+                // 正面（裙装内容）
                 ClothingShareCardFullView(
                     clothing: clothing,
                     image: clothing.imagePaths.first.flatMap { ImageManager.shared.loadImage(fileName: $0) },

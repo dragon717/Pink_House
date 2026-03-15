@@ -78,9 +78,9 @@ struct ClothingPickerView: View {
                 }
             }
             .listStyle(.plain)
-            .navigationTitle("选择裙子")
+            .navigationTitle("选择裙装")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "搜索裙子...")
+            .searchable(text: $searchText, prompt: "搜索裙装...")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") {

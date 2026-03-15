@@ -1,6 +1,6 @@
 //
 //  SkirtMarketTestDataGenerator.swift
-//  裙子股市 - 测试数据生成器
+//  裙装股市 - 测试数据生成器
 //
 //  用于生成模拟数据以验证功能
 //
@@ -33,7 +33,7 @@ final class SkirtMarketTestDataGenerator {
     private let testKeywords = [
         "AP 辉夜姬", "Baby 铭记", "古典玩偶", "IW 提琴", "VM 小玫瑰",
         "MM 圣女", "JeJ 抱猫", "AP 小白云", "Baby 兔熊", "AP 贝壳",
-        "Lolita 萌款", "日牌 裙子", "国牌 原创"
+        "Lolita 萌款", "日牌 裙装", "国牌 原创"
     ]
     
     // MARK: - 生成测试数据
@@ -64,7 +64,7 @@ final class SkirtMarketTestDataGenerator {
         var generatedCount = 0
         
         for (name, brand, type, basePrice) in testSkirts {
-            // 每个裙子生成3-5个不同平台的商品
+            // 每个裙装生成3-5个不同平台的商品
             let itemCount = Int.random(in: 3...5)
             
             for i in 0..<itemCount {

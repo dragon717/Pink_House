@@ -140,7 +140,7 @@ struct ClothingListView: View {
                 } detail: {
                     ZStack {
                         LiquidBackground()
-                        Text("请选择一件裙子")
+                        Text("请选择一件裙装")
                             .foregroundStyle(.secondary)
                             .font(.title2)
                     }
@@ -171,7 +171,7 @@ struct ClothingListView: View {
                 itemToDelete = nil
             }
         } message: {
-            Text("确定要删除这件裙子吗？此操作无法撤销。")
+            Text("确定要删除这件裙装吗？此操作无法撤销。")
         }
     }
     

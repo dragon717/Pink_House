@@ -1,8 +1,8 @@
 //
 //  SkirtMarketDataProvider.swift
-//  裙子股市 - 独立容器数据提供者
+//  裙装股市 - 独立容器数据提供者
 //
-//  由于裙子股市使用独立的 ModelContainer，无法使用 @Query
+//  由于裙装股市使用独立的 ModelContainer，无法使用 @Query
 //  此类提供手动数据获取和状态管理功能
 //
 
@@ -10,7 +10,7 @@ import Foundation
 import SwiftData
 import Combine
 
-/// 裙子股市数据提供者
+/// 裙装股市数据提供者
 /// 管理独立容器中的数据获取和状态更新
 @MainActor
 final class SkirtMarketDataProvider: ObservableObject {
@@ -59,13 +59,13 @@ final class SkirtMarketDataProvider: ObservableObject {
         await loadRecentItems()
         await loadNodeStatus()
         
-        print("✅ 裙子股市数据加载完成")
+        print("✅ 裙装股市数据加载完成")
     }
     
     /// 加载大盘指数
     private func loadMarketIndices() async {
         guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
-            print("❌ 无法获取裙子股市上下文")
+            print("❌ 无法获取裙装股市上下文")
             return
         }
         

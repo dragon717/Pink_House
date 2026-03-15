@@ -1,15 +1,15 @@
 //
 //  SkirtMarketViewModel.swift
-//  裙子股市 - 视图模型
+//  裙装股市 - 视图模型
 //
-//  管理裙子股市的数据状态和业务逻辑
+//  管理裙装股市的数据状态和业务逻辑
 //
 
 import SwiftUI
 import SwiftData
 import Combine
 
-/// 裙子股市视图模型 - 数据驱动的核心
+/// 裙装股市视图模型 - 数据驱动的核心
 @MainActor
 final class SkirtMarketViewModel: ObservableObject {
     // MARK: - 发布属性
@@ -17,7 +17,7 @@ final class SkirtMarketViewModel: ObservableObject {
     /// 当前选中的标签页
     @Published var selectedTab: MarketTab = .overview
     
-    /// 选中的裙子名称（用于详情展示）
+    /// 选中的裙装名称（用于详情展示）
     @Published var selectedSkirt: String?
     
     /// 是否显示节点面板
@@ -208,7 +208,7 @@ final class SkirtMarketViewModel: ObservableObject {
         marketIndices.first
     }
     
-    /// 按裙子分组的最新指标
+    /// 按裙装分组的最新指标
     var groupedMetrics: [String: SkirtStockMetric] {
         Dictionary(grouping: stockMetrics) { $0.skirtName }
             .compactMapValues { $0.first }
@@ -293,7 +293,7 @@ struct TaskExecutionStats {
 // MARK: - 视图扩展
 
 extension View {
-    /// 应用裙子股市视图模型
+    /// 应用裙装股市视图模型
     func skirtMarketViewModel(_ viewModel: SkirtMarketViewModel) -> some View {
         self.environmentObject(viewModel)
     }

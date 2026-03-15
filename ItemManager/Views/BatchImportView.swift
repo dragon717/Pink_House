@@ -38,7 +38,7 @@ struct BatchImportView: View {
             Form {
                 Section(header: Text("基础信息")) {
                     TextField("系列名称", text: $seriesName)
-                    Text("每张图片将作为一个独立的裙子条目。裙子名称将设置为系列名称。")
+                    Text("每张图片将作为一个独立的裙装条目。裙装名称将设置为系列名称。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

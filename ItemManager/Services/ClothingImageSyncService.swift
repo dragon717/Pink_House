@@ -2,7 +2,7 @@
 //  ClothingImageSyncService.swift
 //  ItemManager
 //
-//  裙子主图 CloudKit 实时同步服务
+//  裙装主图 CloudKit 实时同步服务
 //  使用 Private Database 确保用户数据安全
 //
 
@@ -148,9 +148,9 @@ final class ClothingImageSyncService: ObservableObject {
     
     // MARK: - 图片同步入口
     
-    /// 同步裙子的所有图片到 CloudKit
+    /// 同步裙装的所有图片到 CloudKit
     /// - Parameters:
-    ///   - clothing: 裙子对象
+    ///   - clothing: 裙装对象
     ///   - context: ModelContext
     func syncClothingImages(clothing: Clothing, context: ModelContext) async {
         guard await isCloudKitAvailable else {
@@ -312,7 +312,7 @@ final class ClothingImageSyncService: ObservableObject {
     /// 从 CloudKit 下载图片到本地
     /// - Parameters:
     ///   - imageName: 图片文件名
-    ///   - clothingID: 裙子ID
+    ///   - clothingID: 裙装ID
     ///   - context: ModelContext
     /// - Returns: 下载是否成功
     func downloadImageFromCloudKit(

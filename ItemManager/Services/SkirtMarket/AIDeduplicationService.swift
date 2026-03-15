@@ -1,6 +1,6 @@
 //
 //  AIDeduplicationService.swift
-//  裙子股市 - AI语义去重服务
+//  裙装股市 - AI语义去重服务
 //
 //  使用MiniMax 2.5进行文本分析，Qwen-3-VL进行视觉去重
 //
@@ -659,7 +659,7 @@ final class AIDeduplicationService {
                         "content": [
                             [
                                 "type": "text",
-                                "text": "这两张图片展示的是同一件Lolita裙子吗？请回答'是'或'否'，并简要说明理由。"
+                                "text": "这两张图片展示的是同一件Lolita裙装吗？请回答'是'或'否'，并简要说明理由。"
                             ],
                             [
                                 "type": "image_url",

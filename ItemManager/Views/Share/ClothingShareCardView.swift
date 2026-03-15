@@ -2,7 +2,7 @@
 //  ClothingShareCardView.swift
 //  ItemManager
 //
-//  裙子详情分享卡片视图 - 正反面都显示裙子主图+详细信息
+//  裙装详情分享卡片视图 - 正反面都显示裙装主图+详细信息
 //  使用莫妮卡色系配色方案
 //
 
@@ -68,7 +68,7 @@ extension View {
     }
 }
 
-// MARK: - 裙子分享卡片内容（正反面相同）
+// MARK: - 裙装分享卡片内容（正反面相同）
 struct ClothingShareCardContentView: View {
     let clothing: Clothing
     let image: UIImage?
@@ -76,7 +76,7 @@ struct ClothingShareCardContentView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // 裙子图片
+            // 裙装图片
             if let img = image {
                 Image(uiImage: img)
                     .resizable()
@@ -307,7 +307,7 @@ struct CustomFontProvider: FontProvider {
     }
 }
 
-// MARK: - 裙子分享卡片完整视图（正反面内容相同）
+// MARK: - 裙装分享卡片完整视图（正反面内容相同）
 struct ClothingShareCardFullView: View {
     let clothing: Clothing
     let image: UIImage?

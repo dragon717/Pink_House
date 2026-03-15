@@ -1,8 +1,8 @@
 //
 //  LolitaItem.swift
-//  裙子股市 - 核心商品模型
+//  裙装股市 - 核心商品模型
 //
-//  用于存储从各平台抓取的Lolita裙子/小物信息
+//  用于存储从各平台抓取的Lolita裙装/小物信息
 //
 
 import Foundation

@@ -1,6 +1,6 @@
 //
 //  CloudKitSetup.swift
-//  裙子股市 - CloudKit 容器初始化
+//  裙装股市 - CloudKit 容器初始化
 //
 //  用于首次部署时初始化 CloudKit 容器和记录类型
 //

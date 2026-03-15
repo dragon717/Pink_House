@@ -117,7 +117,7 @@ extension BookDetailView {
             Button {
                 showingBatchConfirmation = true
             } label: {
-                Label("批量处理小裙子", systemImage: "wand.and.stars")
+                Label("批量处理小裙装", systemImage: "wand.and.stars")
             }
 
             Button {

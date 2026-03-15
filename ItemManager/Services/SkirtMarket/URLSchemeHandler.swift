@@ -1,6 +1,6 @@
 //
 //  URLSchemeHandler.swift
-//  裙子股市 - URL Scheme处理器
+//  裙装股市 - URL Scheme处理器
 //
 //  处理从快捷指令传入的商品数据
 //

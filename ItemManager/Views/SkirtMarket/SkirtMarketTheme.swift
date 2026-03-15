@@ -1,13 +1,13 @@
 //
 //  SkirtMarketTheme.swift
-//  裙子股市 - 主题配置
+//  裙装股市 - 主题配置
 //
 //  莫妮卡粉主题配色方案
 //
 
 import SwiftUI
 
-// MARK: - 裙子股市主题配置
+// MARK: - 裙装股市主题配置
 enum SkirtMarketTheme {
     // MARK: - 主题色（莫妮卡粉系）
     
@@ -139,7 +139,7 @@ enum SkirtMarketTheme {
 
 // MARK: - View扩展
 extension View {
-    /// 应用裙子股市卡片样式（自动适配暗夜模式）
+    /// 应用裙装股市卡片样式（自动适配暗夜模式）
     func skirtMarketCardStyle() -> some View {
         self
             .padding(SkirtMarketTheme.cardPadding)

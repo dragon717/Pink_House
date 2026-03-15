@@ -30,12 +30,12 @@ final class Clothing {
     var condition: String = "全新" // 状态：全新/非全新
     var accessories: String = "" // 逗号分隔，小物
     var imagePaths: [String] = [] // 图片路径列表
-    var isShared: Bool = false // 同步到裙子广场
+    var isShared: Bool = false // 同步到裙装广场
     var replacedCutoutID: UUID? = nil // 记录替换主图所使用的抠图 ID
     
     // 价格信息
     var originalPrice: Decimal = 0.0 // 原价
-    var price: Decimal = 0.0 // 裙子总价
+    var price: Decimal = 0.0 // 裙装总价
     var deposit: Decimal = 0.0 // 定金
     var balance: Decimal = 0.0 // 尾款
     var accessoriesPrice: Decimal = 0.0 // 小物总价
@@ -144,13 +144,13 @@ final class Clothing {
     }
     
     // Computed Properties for Total Calculation
-    // 总定金 = (裙子定金 + 小物定金总和) * 库存数量
+    // 总定金 = (裙装定金 + 小物定金总和) * 库存数量
     var totalDeposit: Decimal {
         let accDeposit = accessoryItems?.reduce(Decimal(0)) { $0 + $1.deposit } ?? 0
         return (deposit + accDeposit) * Decimal(stock)
     }
     
-    // 总尾款 = (裙子尾款 + 小物尾款总和) * 库存数量
+    // 总尾款 = (裙装尾款 + 小物尾款总和) * 库存数量
     var totalBalance: Decimal {
         let accBalance = accessoryItems?.reduce(Decimal(0)) { $0 + $1.balance } ?? 0
         return (balance + accBalance) * Decimal(stock)
@@ -191,7 +191,7 @@ final class CutoutItem {
     var width: Double = 0.0
     var height: Double = 0.0
 
-    // 缓存裙子名字，方便在画布中显示（即使原 Clothing 被删除）
+    // 缓存裙装名字，方便在画布中显示（即使原 Clothing 被删除）
     var clothingName: String?
 
     // Use ID instead of Relationship to decouple deletion lifecycle

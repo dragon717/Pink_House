@@ -384,11 +384,11 @@ struct CalendarHotspot: View {
         
         // 数据结构定义：记录每天应该显示什么
         enum DayContent {
-            case thumbnail(Clothing) // 显示裙子缩略图
+            case thumbnail(Clothing) // 显示裙装缩略图
             case circleNumber // 显示带圈数字
         }
         
-        // 预处理有事件的日期 -> 裙子
+        // 预处理有事件的日期 -> 裙装
         let eventMap: [Date: DayContent] = {
             var map = [Date: DayContent]()
             

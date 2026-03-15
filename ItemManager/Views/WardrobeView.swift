@@ -1229,7 +1229,7 @@ struct WardrobeStatsView: View {
 
                 Divider()
 
-                statItem(title: "裙子价值", value: "¥\(NSDecimalNumber(decimal: dressValue).stringValue)", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
+                statItem(title: "裙装价值", value: "¥\(NSDecimalNumber(decimal: dressValue).stringValue)", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
 
                 Divider()
 

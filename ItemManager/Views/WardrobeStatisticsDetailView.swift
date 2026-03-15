@@ -124,12 +124,12 @@ struct OverviewStatsCard: View {
             
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    StatBox(title: "总裙子数", value: "\(totalCount)", unit: "件", color: .brown)
-                    StatBox(title: "总裙子价值", value: "¥\(formatPrice(dressValue))", unit: "", color: .orange)
+                    StatBox(title: "总裙装数", value: "\(totalCount)", unit: "件", color: .brown)
+                    StatBox(title: "总裙装价值", value: "¥\(formatPrice(dressValue))", unit: "", color: .orange)
                 }
                 
                 HStack(spacing: 12) {
-                    StatBox(title: "有小物的裙子", value: "\(accessoriesCount)", unit: "件", color: .purple.opacity(0.8))
+                    StatBox(title: "有小物的裙装", value: "\(accessoriesCount)", unit: "件", color: .purple.opacity(0.8))
                     StatBox(title: "总小物价值", value: "¥\(formatPrice(accessoriesValue))", unit: "", color: .pink.opacity(0.8))
                 }
                 

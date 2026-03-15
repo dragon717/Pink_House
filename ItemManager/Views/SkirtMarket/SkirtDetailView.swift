@@ -1,8 +1,8 @@
 //
 //  SkirtDetailView.swift
-//  裙子股市 - 萌款详情视图
+//  裙装股市 - 萌款详情视图
 //
-//  展示单个裙子的详细股市数据和K线图
+//  展示单个裙装的详细股市数据和K线图
 //
 
 import SwiftUI
@@ -44,7 +44,7 @@ struct SkirtDetailView: View {
     init(skirtName: String) {
         self.skirtName = skirtName
         
-        // 配置查询 - 该裙子的历史数据
+        // 配置查询 - 该裙装的历史数据
         let startDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         let name = skirtName
         

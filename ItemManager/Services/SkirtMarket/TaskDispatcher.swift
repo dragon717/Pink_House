@@ -1,6 +1,6 @@
 //
 //  TaskDispatcher.swift
-//  裙子股市 - 分布式任务分发器
+//  裙装股市 - 分布式任务分发器
 //
 //  实现抢占式任务分配，让多台iPhone协同工作
 //
@@ -235,7 +235,7 @@ final class TaskDispatcher: ObservableObject {
             return
         }
         
-        // 0. 预刷新裙子索引缓存（用于高效去重）
+        // 0. 预刷新裙装索引缓存（用于高效去重）
         await SkirtIndexCache.shared.refreshCache()
         
         // 1. 查询所有任务，然后在内存中过滤待处理的任务
@@ -690,7 +690,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // 配置裙子股市
+        // 配置裙装股市
         Task {
             await SkirtMarketPersistenceV2.shared.configure()
             await TaskDispatcher.shared.start()

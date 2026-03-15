@@ -216,7 +216,7 @@ struct ClothingDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("确定要删除这件裙子吗？它将被移动到回收站，你可以随时恢复。")
+            Text("确定要删除这件裙装吗？它将被移动到回收站，你可以随时恢复。")
         }
         .alert("确认已付尾款", isPresented: $showingConfirmPaymentAlert) {
             Button("取消", role: .cancel) { }
@@ -399,7 +399,7 @@ struct ClothingDetailView: View {
     private var mainInfoCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                // 裙子名称支持长按拷贝
+                // 裙装名称支持长按拷贝
                 CopyableText(
                     text: clothing.name,
                     font: .title2,
@@ -510,7 +510,7 @@ struct ClothingDetailView: View {
     /// 详细信息卡片 - 使用统一配色
     private var detailInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("裙子信息", systemImage: "info.circle.fill")
+            Label("裙装信息", systemImage: "info.circle.fill")
                 .font(.headline)
                 .unifiedPrimary()
             
@@ -559,19 +559,19 @@ struct ClothingDetailView: View {
                     .background(themeManager.tertiaryTextColor.opacity(0.3))
                 
                 // Show Breakdown for Dress
-                InfoRow(label: "裙子定金", value: "¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0))))")
-                InfoRow(label: "裙子尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                InfoRow(label: "裙装定金", value: "¥\(clothing.deposit.formatted(.number.precision(.fractionLength(0))))")
+                InfoRow(label: "裙装尾款", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
             }
             
             if clothing.originalPrice > 0 {
                 InfoRow(label: "原价", value: "¥\(clothing.originalPrice.formatted(.number.precision(.fractionLength(0))))")
             }
             
-            InfoRow(label: "裙子单价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
+            InfoRow(label: "裙装单价", value: "¥\(clothing.price.formatted(.number.precision(.fractionLength(0))))")
             
             if clothing.stock > 1 {
                 InfoRow(label: "库存数量", value: "\(clothing.stock)")
-                InfoRow(label: "裙子总价", value: "¥\((clothing.price * Decimal(clothing.stock)).formatted(.number.precision(.fractionLength(0))))")
+                InfoRow(label: "裙装总价", value: "¥\((clothing.price * Decimal(clothing.stock)).formatted(.number.precision(.fractionLength(0))))")
             }
             
             if let items = clothing.accessoryItems, !items.isEmpty {
@@ -670,8 +670,8 @@ struct ClothingDetailView: View {
             InfoRow(label: "拥有时长", value: "\(duration)天")
             
             if clothing.balance > 0 {
-                // 如果是尾款天使，显示总尾款（含小物），否则只显示裙子尾款（因为普通模式下可能不怎么关注小物尾款，或者也可以统一显示总尾款）
-                // 需求是：加入尾款天使的，自定义小物的定金和裙子的定金 加合显示... 尾款也同理
+                // 如果是尾款天使，显示总尾款（含小物），否则只显示裙装尾款（因为普通模式下可能不怎么关注小物尾款，或者也可以统一显示总尾款）
+                // 需求是：加入尾款天使的，自定义小物的定金和裙装的定金 加合显示... 尾款也同理
                 if clothing.isDepositPlan {
                     InfoRow(label: "总尾款金额", value: "¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                 } else {
@@ -753,7 +753,7 @@ struct InfoRow: View {
         case "衣长": return "arrow.up.and.down"
         case "状态": return "star.circle"
         case "小物": return "sparkles"
-        case "裙子总价", "裙子单价", "原价": return "tag"
+        case "裙装总价", "裙装单价", "原价": return "tag"
         case "库存数量": return "number.circle"
         case "购买日期": return "calendar"
         case "定金日期": return "calendar.badge.clock"

@@ -357,7 +357,7 @@ struct ClothingEditView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // MARK: - 裙子信息
+                    // MARK: - 裙装信息
                     basicInfoSection
                     
                     // MARK: - 标签分类

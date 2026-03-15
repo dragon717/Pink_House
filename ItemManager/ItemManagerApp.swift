@@ -36,7 +36,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
 
-        // 注册裙子股市后台任务
+        // 注册裙装股市后台任务
         registerSkirtMarketBackgroundTask()
 
         return true
@@ -60,7 +60,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
         
         Task {
-            // 执行裙子股市的后台任务
+            // 执行裙装股市的后台任务
             await TaskDispatcher.shared.checkAndClaimTasks()
             task.setTaskCompleted(success: true)
             
@@ -164,13 +164,13 @@ struct MainContentView: View {
                 // 0.6 Validate Model3D references integrity
                 await Model3DValidationService.shared.validateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
                 
-                // 0.7 裙子股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
+                // 0.7 裙装股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
                 do {
                     try await GRDBManager.shared.initialize()
                     await SyncEngine.shared.configure()
-                    print("✅ 裙子股市功能已启用（GRDB 版本）")
+                    print("✅ 裙装股市功能已启用（GRDB 版本）")
                 } catch {
-                    print("❌ 裙子股市初始化失败: \(error)")
+                    print("❌ 裙装股市初始化失败: \(error)")
                 }
                 
                 // 0.8 刷新魔法任务进度（在开屏期间完成）
@@ -201,7 +201,7 @@ struct MainContentView: View {
             if newPhase == .background || newPhase == .inactive {
                 Task {
                     await SharedPersistence.shared.syncWidgetData()
-                    // 调度裙子股市后台任务
+                    // 调度裙装股市后台任务
                     TaskDispatcher.shared.scheduleBackgroundTask()
                 }
             } else if newPhase == .active {

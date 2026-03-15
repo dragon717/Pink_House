@@ -1,6 +1,6 @@
 //
 //  GRDBManager.swift
-//  裙子股市 - GRDB 本地存储管理器
+//  裙装股市 - GRDB 本地存储管理器
 //
 //  使用 GRDB 完全独立于 SwiftData，避免与主应用数据库冲突
 //

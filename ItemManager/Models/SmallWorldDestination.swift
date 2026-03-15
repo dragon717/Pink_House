@@ -12,5 +12,5 @@ enum SmallWorldDestination {
     case wardrobe // 衣橱
     case depositPlan // 尾款天使
     case recycleBin // 回收站
-    case dressStock // 裙子股市
+    case dressStock // 裙装股市
 }

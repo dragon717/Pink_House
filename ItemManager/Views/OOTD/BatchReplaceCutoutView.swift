@@ -24,7 +24,7 @@ struct BatchReplaceCutoutView: View {
                     ContentUnavailableView(
                         "没有可替换的项",
                         systemImage: "photo.on.rectangle.angled",
-                        description: Text("请先执行“批量处理小裙子”以生成抠图，或者所有裙子都已经包含抠图图片。")
+                        description: Text("请先执行“批量处理小裙装”以生成抠图，或者所有裙装都已经包含抠图图片。")
                     )
                 } else {
                     List {
@@ -101,7 +101,7 @@ struct BatchReplaceCutoutView: View {
                 Button("取消", role: .cancel) { }
                 Button("执行", action: performReplacement)
             } message: {
-                Text("将把选中的 \(items.filter { $0.isSelected }.count) 个抠图设置为对应裙子的第一张图片（主图）。原图将后移。")
+                Text("将把选中的 \(items.filter { $0.isSelected }.count) 个抠图设置为对应裙装的第一张图片（主图）。原图将后移。")
             }
         }
     }
@@ -123,7 +123,7 @@ struct BatchReplaceCutoutView: View {
             
             for clothing in allClothing {
                 
-                // 保护机制：若裙子图片里已经有抠图图片（无论在哪个位置），则不应该出现在一键替换列表里
+                // 保护机制：若裙装图片里已经有抠图图片（无论在哪个位置），则不应该出现在一键替换列表里
                 // 这避免了重复添加或打乱用户已有的排序
                 let hasAnyCutout = clothing.imagePaths.contains { path in
                     allCutoutPaths.contains(path)

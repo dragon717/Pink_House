@@ -1,6 +1,6 @@
 //
 //  CloudKitManager.swift
-//  裙子股市 - 原生 CloudKit API 管理器
+//  裙装股市 - 原生 CloudKit API 管理器
 //
 //  使用独立的 CloudKit 容器实现公共数据库功能
 //  容器标识符: iCloud.bugod2.SkirtMarket
@@ -9,7 +9,7 @@
 import Foundation
 import CloudKit
 
-/// CloudKit 管理器 - 操作裙子股市的公共数据库
+/// CloudKit 管理器 - 操作裙装股市的公共数据库
 @MainActor
 final class CloudKitManager {
     static let shared = CloudKitManager()

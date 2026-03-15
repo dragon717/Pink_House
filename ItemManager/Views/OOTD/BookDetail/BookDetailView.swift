@@ -565,11 +565,11 @@ struct BookDetailView: View {
         }
     }
     
-    // MARK: - 批量处理小裙子
+    // MARK: - 批量处理小裙装
     
     private func processWardrobeSkirts() {
         isProcessing = true
-        processingMessage = "正在批量处理小裙子..."
+        processingMessage = "正在批量处理小裙装..."
         
         Task {
             var count = 0

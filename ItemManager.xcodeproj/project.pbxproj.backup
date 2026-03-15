@@ -463,7 +463,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ItemManager/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙子图片";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙装图片";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -512,7 +512,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ItemManager/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "少女心愿";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙子图片";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问您的相册以选择裙装图片";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

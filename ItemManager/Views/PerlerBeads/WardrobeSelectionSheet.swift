@@ -104,7 +104,7 @@ struct WardrobeSelectionSheet: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
             
-            TextField("搜索裙子名称、品牌、标签...", text: $searchText)
+            TextField("搜索裙装名称、品牌、标签...", text: $searchText)
                 .textFieldStyle(.plain)
             
             if !searchText.isEmpty {
@@ -263,7 +263,7 @@ struct WardrobeSelectionSheet: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray.opacity(0.5))
             
-            Text("没有找到符合条件的裙子")
+            Text("没有找到符合条件的裙装")
                 .font(.title3)
                 .fontWeight(.medium)
                 .foregroundColor(.primary)
@@ -283,7 +283,7 @@ struct WardrobeSelectionSheet: View {
                 }
                 .padding(.top, 8)
             } else {
-                Text("衣橱中还没有添加裙子")
+                Text("衣橱中还没有添加裙装")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

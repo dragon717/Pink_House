@@ -1,6 +1,6 @@
 //
 //  SkirtMarketTestDataGenerator.swift
-//  裙子股市 - 测试数据生成器
+//  裙装股市 - 测试数据生成器
 //
 //  用于生成模拟数据以测试界面功能
 //
@@ -19,7 +19,7 @@ final class SkirtMarketTestDataGenerator {
     
     /// 生成完整的测试数据集
     func generateTestData() async {
-        print("🧪 开始生成裙子股市测试数据...")
+        print("🧪 开始生成裙装股市测试数据...")
         
         guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             print("❌ 无法获取上下文")

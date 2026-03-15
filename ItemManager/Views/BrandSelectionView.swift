@@ -202,7 +202,7 @@ struct BrandSelectionView: View {
                 }
             } message: {
                 if let brand = brandToDelete, let count = brand.clothings?.count {
-                    Text("该品牌已被 \(count) 件裙子使用，删除后这些裙子的品牌信息将被清除。确定要删除吗？")
+                    Text("该品牌已被 \(count) 件裙装使用，删除后这些裙装的品牌信息将被清除。确定要删除吗？")
                 } else {
                     Text("确定要删除此品牌吗？")
                 }

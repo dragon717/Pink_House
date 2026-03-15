@@ -297,7 +297,7 @@ struct RecycleBinView: View {
                 ContentUnavailableView(
                     "回收站是空的",
                     systemImage: "trash",
-                    description: Text("删除的裙子会出现在这里")
+                    description: Text("删除的裙装会出现在这里")
                 )
                 .listRowBackground(Color.clear)
             } else {
@@ -503,9 +503,9 @@ struct RecycleBinView: View {
         // 立即保存，确保恢复状态被持久化
         do {
             try modelContext.save()
-            print("RecycleBinView: 恢复裙子 '\(clothing.name)' 成功，lastModified 已更新")
+            print("RecycleBinView: 恢复裙装 '\(clothing.name)' 成功，lastModified 已更新")
         } catch {
-            print("RecycleBinView: 恢复裙子保存失败: \(error)")
+            print("RecycleBinView: 恢复裙装保存失败: \(error)")
         }
     }
     

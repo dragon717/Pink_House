@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 /// 图片同步状态指示器
-/// 显示裙子主图的 CloudKit 同步状态
+/// 显示裙装主图的 CloudKit 同步状态
 struct ImageSyncStatusIndicator: View {
     let imageFileName: String
     

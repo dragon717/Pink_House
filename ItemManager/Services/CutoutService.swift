@@ -101,7 +101,7 @@ class CutoutService {
         // 2.1 自动分类
         var finalCategory = "未分类"
         
-        // 1. 尝试标准化传入的分类 (比如将 "JSK" -> "裙子")
+        // 1. 尝试标准化传入的分类 (比如将 "JSK" -> "裙装")
         // 如果传入了有效的分类（非空且非默认），尝试基于它进行标准化
         if category != "未分类" && !category.isEmpty {
             if let standardized = standardizeCategory(category) {
@@ -152,7 +152,7 @@ class CutoutService {
         return cutoutItem
     }
     
-    /// 当删除图片或抠图时，检查并重置关联裙子的“已替换”状态
+    /// 当删除图片或抠图时，检查并重置关联裙装的“已替换”状态
     /// - Parameters:
     ///   - imagePath: 被删除图片的路径（文件名）
     ///   - context: ModelContext
@@ -300,12 +300,12 @@ class CutoutService {
     }
     
     private func mapIdentifierToCategory(_ id: String) -> String? {
-        // 1. 裙子 (Skirts & Dresses)
+        // 1. 裙装 (Skirts & Dresses)
         let strongDressKeywords = [
             "dress", "skirt", "gown", "frock", "pinafore", "sarong", "kilt"
         ]
         if strongDressKeywords.contains(where: { id.contains($0) }) {
-            return "裙子"
+            return "裙装"
         }
         
         // 3. 外套/上衣 (Outerwear & Tops)
@@ -376,7 +376,7 @@ class CutoutService {
         
         // 映射表 (用户输入习惯 -> 标准分类)
         let mapping: [String: String] = [
-            "jsk": "裙子", "op": "裙子", "sk": "裙子", "连衣裙": "裙子", "半身裙": "裙子", "背带裙": "裙子",
+            "jsk": "裙装", "op": "裙装", "sk": "裙装", "连衣裙": "裙装", "半身裙": "裙装", "背带裙": "裙装",
             "上衣": "外套", "衬衫": "外套", "内搭": "外套", "外套": "外套", "开衫": "外套", "大衣": "外套",
             "鞋": "鞋子", "鞋子": "鞋子", "靴子": "鞋子", "单鞋": "鞋子", "凉鞋": "鞋子",
             "袜": "袜子", "袜子": "袜子", "裤袜": "袜子", "丝袜": "袜子",
