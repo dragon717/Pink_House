@@ -724,16 +724,39 @@ struct PetChatView: View {
                     userInfo: ["isSearching": newValue]
                 )
             }
-            // iOS26+ 悬浮按钮 - 左右两侧，不放在不透明容器里
-            .overlay(alignment: .bottomLeading) {
-                iOS26LeftFloatingButton
-                    .padding(.leading, 16)
-                    .padding(.bottom, 20)
+            // iOS26+ 悬浮按钮 - 使用 safeAreaInset 确保跟随键盘移动
+            .safeAreaInset(edge: .bottom) {
+                // 当搜索栏展开时显示按钮在键盘上方
+                if isSearchPresented {
+                    HStack {
+                        // 左侧菜单按钮
+                        iOS26LeftFloatingButton
+                            .padding(.leading, 16)
+                        
+                        Spacer()
+                        
+                        // 右侧发送按钮
+                        iOS26RightFloatingButton
+                            .padding(.trailing, 16)
+                    }
+                    .padding(.vertical, 60)
+                    .background(.clear) // 透明背景，不遮挡内容
+                }
             }
-            .overlay(alignment: .bottomTrailing) {
-                iOS26RightFloatingButton
-                    .padding(.trailing, 16)
+            // 搜索栏收起时的悬浮按钮（原位显示）
+            .overlay(alignment: .bottom) {
+                if !isSearchPresented {
+                    HStack {
+                        iOS26LeftFloatingButton
+                            .padding(.leading, 16)
+                        
+                        Spacer()
+                        
+                        iOS26RightFloatingButton
+                            .padding(.trailing, 16)
+                    }
                     .padding(.bottom, 20)
+                }
             }
         }
     }
