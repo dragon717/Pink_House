@@ -44,20 +44,20 @@ struct OOTDCanvasView: View {
         GeometryReader { geometry in
             // 获取安全区域 insets
             let safeArea = geometry.safeAreaInsets
-            
+
             // 计算工具栏宽度
             let toolbarWidth: CGFloat = isToolbarVisible ? 72 : 0
             // 画布区域宽度（工具栏右侧的可用空间）
             let canvasAreaWidth = geometry.size.width - toolbarWidth
             let availableHeight = geometry.size.height
-            
+
             // 计算缩放比例以适应可用空间，保留适当边距
             let margin: CGFloat = isLandscape ? 16 : 8
             let fitScale = min(
                 (canvasAreaWidth - margin * 2) / canvasWidth,
                 (availableHeight - margin * 2) / canvasHeight
             )
-            
+
             HStack(spacing: 0) {
                 // 左侧工具栏
                 if isToolbarVisible {
@@ -248,8 +248,24 @@ struct OOTDCanvasView: View {
         }
         .onAppear {
             print("[OOTD] Canvas appeared with \(outfit.items?.count ?? 0) items")
-            for item in outfit.items ?? [] {
-                print("[OOTD] Item \(item.id): x=\(item.x), y=\(item.y), scale=\(item.scale), rot=\(item.rotation), z=\(item.zIndex)")
+
+            // 预加载贴纸图片（最多5张）
+            Task {
+                let imagePaths = (outfit.items ?? []).compactMap { $0.cutout?.imagePath }
+                await OptimizedImageLoader.shared.preloadImages(fileNames: imagePaths)
+            }
+        }
+        .onDisappear {
+            // 清理缓存，释放内存
+            Task {
+                await OptimizedImageLoader.shared.clearCache()
+            }
+        }
+        // 监听内存警告通知
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+            print("[OOTD] Memory warning received, clearing cache")
+            Task {
+                await OptimizedImageLoader.shared.clearCache()
             }
         }
     }
@@ -350,17 +366,40 @@ struct ResizeHandleView: View {
     let onRotationChange: (Double) -> Void
     let onScaleChange: (Double) -> Void
     let onTransformEnd: () -> Void
-    
+
     @State private var initialAngle: Double = 0
     @State private var initialScale: Double = 1.0
     @State private var isDragging = false
     @State private var startLocation: CGPoint = .zero
     @State private var startDistance: CGFloat = 0
     @State private var currentLocation: CGPoint = .zero
-    
-    // 贴纸中心点（相对于画布）
+
+    // 画布尺寸常量
+    private let canvasWidth: CGFloat = 1080
+    private let canvasHeight: CGFloat = 1440
+
+    // 贴纸中心点（相对于画布，绝对坐标）
+    // 兼容老数据：如果坐标大于1.5，说明是绝对坐标，否则是相对坐标需要转换
     private var itemCenter: CGPoint {
-        CGPoint(x: item.x, y: item.y)
+        let x = normalizedX(item.x) * canvasWidth
+        let y = normalizedY(item.y) * canvasHeight
+        return CGPoint(x: x, y: y)
+    }
+
+    /// 将 X 坐标标准化为相对坐标（0-1）
+    private func normalizedX(_ x: Double) -> Double {
+        if x > 1.5 {
+            return x / 1080.0
+        }
+        return x
+    }
+
+    /// 将 Y 坐标标准化为相对坐标（0-1）
+    private func normalizedY(_ y: Double) -> Double {
+        if y > 1.5 {
+            return y / 1440.0
+        }
+        return y
     }
     
     var body: some View {
@@ -434,23 +473,27 @@ struct CanvasItemView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var item: OutfitItem
     @Binding var selectedItemId: UUID?
-    
+
     var isSelected: Bool {
         selectedItemId == item.id
     }
-    
+
     var additionalScale: CGFloat
     var additionalRotation: Angle
-    
+
     var onDelete: () -> Void
     var onBringToFront: () -> Void
     var onBringForward: () -> Void
     var onSendBackward: () -> Void
     var onUpdate: () -> Void // New callback for drag end
-    
+
     @State private var currentOffset: CGSize = .zero
     @State private var loadedImage: UIImage?
     @State private var isLoading = true // Default true to prevent flash of missing state
+
+    // 画布尺寸常量（与 OOTDCanvasView 保持一致）
+    private let canvasWidth: CGFloat = 1080
+    private let canvasHeight: CGFloat = 1440
     
     var body: some View {
         Group {
@@ -472,13 +515,18 @@ struct CanvasItemView: View {
         .frame(width: 200, height: 200) // Base size, adjusted by scale
         .scaleEffect(item.scale * additionalScale)
         .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
-        .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
+        // 使用 position，将相对坐标（0-1）转换为绝对坐标（0-1080/1440）
+        // 兼容老数据：如果坐标大于1，说明是绝对坐标，需要转换为相对坐标
+        .position(
+            x: normalizedX(item.x) * canvasWidth + currentOffset.width,
+            y: normalizedY(item.y) * canvasHeight + currentOffset.height
+        )
         .overlay(
             ZStack {
                 if isSelected {
                     Rectangle()
                         .strokeBorder(Color.pink, lineWidth: 2)
-                    
+
                     // 左上角：向上一层
                     Button(action: onBringForward) {
                         Image(systemName: "arrow.up.circle.fill")
@@ -489,7 +537,7 @@ struct CanvasItemView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .offset(x: -14, y: -14)
-                    
+
                     // 右上角：删除（带二次确认）
                     Button(action: onDelete) {
                         Image(systemName: "trash.circle.fill")
@@ -500,7 +548,7 @@ struct CanvasItemView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .offset(x: 14, y: -14)
-                    
+
                     // 左下角：向下一层
                     Button(action: onSendBackward) {
                         Image(systemName: "arrow.down.circle.fill")
@@ -511,7 +559,7 @@ struct CanvasItemView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .offset(x: -14, y: 14)
-                    
+
                     // 右下角：旋转+缩放手柄
                     ResizeHandleView(
                         item: item,
@@ -525,7 +573,7 @@ struct CanvasItemView: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .offset(x: 14, y: 14)
-                    
+
                     // Name Tag (Bottom Center)
                     if let name = item.cutout?.clothingName, !name.isEmpty {
                         Text(name)
@@ -544,7 +592,11 @@ struct CanvasItemView: View {
             .frame(width: 200, height: 200)
             .scaleEffect(item.scale * additionalScale)
             .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
-            .offset(x: item.x + currentOffset.width, y: item.y + currentOffset.height)
+            // overlay 使用与主视图相同的 position，确保选中框跟随贴纸
+            .position(
+                x: normalizedX(item.x) * canvasWidth + currentOffset.width,
+                y: normalizedY(item.y) * canvasHeight + currentOffset.height
+            )
         )
         .gesture(
             DragGesture(coordinateSpace: .named("ootdCanvas"))
@@ -566,53 +618,68 @@ struct CanvasItemView: View {
                     if let selectedId = selectedItemId, selectedId != item.id {
                         return
                     }
-                    
-                    item.x += value.translation.width
-                    item.y += value.translation.height
+
+                    // 将绝对坐标的位移转换为相对坐标（0-1范围）
+                    // canvasWidth = 1080, canvasHeight = 1440
+                    let deltaXRelative = value.translation.width / canvasWidth
+                    let deltaYRelative = value.translation.height / canvasHeight
+
+                    item.x += Double(deltaXRelative)
+                    item.y += Double(deltaYRelative)
                     currentOffset = .zero
-                    print("[OOTD] Moved item \(item.id) to (\(item.x), \(item.y))")
+                    print("[OOTD] Moved item \(item.id) to relative (\(item.x), \(item.y))")
                     onUpdate()
                 }
         )
         .task(id: item.id) {
-            await loadImage()
+            await loadImageOptimized()
         }
     }
-    
-    private func loadImage() async {
+
+    private func loadImageOptimized() async {
         guard let cutout = item.cutout, !cutout.imagePath.isEmpty else {
             isLoading = false
             loadedImage = nil
             return
         }
-        
+
         isLoading = true
-        
-        // 添加超时机制，防止图片加载卡住
-        let imageTask = Task {
-            await ImageManager.shared.loadImageAsync(fileName: cutout.imagePath)
+
+        // 使用优化的图片加载器，限制图片尺寸为200x200（贴纸显示尺寸）
+        let targetSize = CGSize(width: 200, height: 200)
+        let image = await OptimizedImageLoader.shared.loadStickerImage(
+            fileName: cutout.imagePath,
+            targetSize: targetSize
+        )
+
+        await MainActor.run {
+            loadedImage = image
+            isLoading = false
         }
-        
-        // 3秒超时
-        let timeoutTask = Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3秒
-            imageTask.cancel()
-            return nil as UIImage?
+    }
+
+    // MARK: - 坐标兼容处理（老数据使用绝对坐标，新数据使用相对坐标 0-1）
+
+    /// 将 X 坐标标准化为相对坐标（0-1）
+    /// 如果坐标大于 1，说明是老数据的绝对坐标，需要转换
+    private func normalizedX(_ x: Double) -> Double {
+        // 如果 x > 1，说明是绝对坐标（像素值），转换为相对坐标
+        // 画布宽度 1080，所以除以 1080
+        if x > 1.5 { // 使用 1.5 作为阈值，避免误判（如 1.0 可能是相对坐标的边缘）
+            return x / 1080.0
         }
-        
-        // 等待任一任务完成
-        let result = await withTaskGroup(of: UIImage?.self) { group in
-            group.addTask {
-                await imageTask.value
-            }
-            group.addTask {
-                await timeoutTask.value
-            }
-            return await group.next()!
+        return x
+    }
+
+    /// 将 Y 坐标标准化为相对坐标（0-1）
+    /// 如果坐标大于 1，说明是老数据的绝对坐标，需要转换
+    private func normalizedY(_ y: Double) -> Double {
+        // 如果 y > 1，说明是绝对坐标（像素值），转换为相对坐标
+        // 画布高度 1440，所以除以 1440
+        if y > 1.5 { // 使用 1.5 作为阈值
+            return y / 1440.0
         }
-        
-        loadedImage = result
-        isLoading = false
+        return y
     }
     
     private func missingPlaceholder(text: String) -> some View {

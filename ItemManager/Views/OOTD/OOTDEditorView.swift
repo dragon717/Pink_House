@@ -363,10 +363,11 @@ struct OOTDEditorView: View {
     // MARK: - Helper Methods
     
     private func addToOutfit(_ cutout: CutoutItem) {
+        // 使用相对坐标（0-1范围），0.5, 0.5 是画布中心
         let item = OutfitItem(
             cutout: cutout,
-            x: 0,
-            y: 0,
+            x: 0.5,
+            y: 0.5,
             rotation: 0,
             scale: 1.0,
             zIndex: outfit.items?.count ?? 0
@@ -528,10 +529,12 @@ struct OOTDEditorView: View {
                                     outfit.items = []
                                 }
                                 for (index, cutout) in cutouts.enumerated() {
+                                    // 使用相对坐标（0-1范围），批量添加时稍微错开位置
+                                    let offset = Double(index) * 0.05
                                     let item = OutfitItem(
                                         cutout: cutout,
-                                        x: Double(index * 20),
-                                        y: Double(index * 20),
+                                        x: 0.5 + offset,
+                                        y: 0.5 + offset,
                                         rotation: 0,
                                         scale: 1.0,
                                         zIndex: outfit.items?.count ?? 0
@@ -585,10 +588,12 @@ struct OOTDEditorView: View {
                                         outfit.items = []
                                     }
                                     for (index, cutout) in cutouts.enumerated() {
+                                        // 使用相对坐标（0-1范围），批量添加时稍微错开位置
+                                        let offset = Double(index) * 0.05
                                         let item = OutfitItem(
                                             cutout: cutout,
-                                            x: Double(index * 20),
-                                            y: Double(index * 20),
+                                            x: 0.5 + offset,
+                                            y: 0.5 + offset,
                                             rotation: 0,
                                             scale: 1.0,
                                             zIndex: outfit.items?.count ?? 0

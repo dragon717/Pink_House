@@ -13,6 +13,7 @@ extension Notification.Name {
     static let magicStickerPageMoved = Notification.Name("magicStickerPageMoved")
     static let navigateToBook = Notification.Name("navigateToBook")
     static let navigateToBookDetail = Notification.Name("navigateToBookDetail")
+    static let openMagicStickerWithClothings = Notification.Name("openMagicStickerWithClothings")
 }
 
 struct OOTDDefaultBookView: View {

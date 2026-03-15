@@ -25,12 +25,12 @@ class OutfitSuggestionService {
     ///   - query: 用户输入（如"帮我搭配一套粉色系的出门装"）
     ///   - clothings: 用户衣橱中的所有裙装
     ///   - context: ModelContext用于数据库操作
-    /// - Returns: 生成的Outfit和响应文本
+    /// - Returns: 推荐的裙装列表和响应文本
     func processOutfitRequest(
         query: String,
         clothings: [Clothing],
         context: ModelContext
-    ) async throws -> (Outfit, String) {
+    ) async throws -> ([Clothing], String, String, String) {
         // 1. 获取衣橱上下文
         let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(clothings: clothings)
 
@@ -41,42 +41,19 @@ class OutfitSuggestionService {
             clothings: clothings
         )
 
-        // 3. 获取对应的CutoutItem
-        let cutouts = try await fetchCutoutsForSuggestion(
-            suggestion: suggestion,
-            context: context
-        )
-
-        guard !cutouts.isEmpty else {
-            throw OutfitSuggestionError.noCutoutsAvailable
+        // 3. 获取推荐的裙装
+        let selectedClothings = clothings.filter { clothing in
+            suggestion.selectedItemIDs.contains(clothing.id)
         }
 
-        // 4. 使用布局引擎创建Outfit
-        let outfit = OOTDLayoutEngine.shared.createOutfitWithLayout(
-            cutouts: cutouts,
-            book: nil,
-            description: suggestion.description
-        )
-
-        // 5. 在主线程保存到数据库
-        await MainActor.run {
-            // 先插入 Outfit
-            context.insert(outfit)
-            
-            // 显式插入所有 OutfitItem，确保关系正确
-            if let items = outfit.items {
-                for item in items {
-                    context.insert(item)
-                }
-            }
-            
-            try? context.save()
+        guard !selectedClothings.isEmpty else {
+            throw OutfitSuggestionError.noItemsAvailable
         }
 
-        // 6. 构建响应文本
-        let responseText = buildResponseText(suggestion: suggestion, cutouts: cutouts)
+        // 4. 构建响应文本
+        let responseText = buildResponseText(suggestion: suggestion, clothings: selectedClothings)
 
-        return (outfit, responseText)
+        return (selectedClothings, responseText, suggestion.style, suggestion.occasion)
     }
 
     /// 快速创建搭配（无需AI，基于规则）
@@ -85,76 +62,61 @@ class OutfitSuggestionService {
     ///   - occasion: 场合（日常/约会/茶会等）
     ///   - clothings: 用户衣橱
     ///   - context: ModelContext
-    /// - Returns: 生成的Outfit
+    /// - Returns: 推荐的裙装列表
     func createQuickOutfit(
         style: String,
         occasion: String,
         clothings: [Clothing],
         context: ModelContext
-    ) async throws -> Outfit {
-        // 在主线程执行数据库查询
-        let selectedCutouts = try await MainActor.run {
-            () -> [CutoutItem] in
-            // 获取所有可用的CutoutItem
-            let descriptor = FetchDescriptor<CutoutItem>()
-            let allCutouts = try context.fetch(descriptor)
-
-            // 按类别分组
-            let grouped = Dictionary(grouping: allCutouts) { $0.category }
-
-            // 选择搭配物品（每类选一个）
-            var result: [CutoutItem] = []
-
-            // 优先选择裙装
-            if let dresses = grouped["裙装"], !dresses.isEmpty {
-                result.append(dresses.randomElement()!)
+    ) async throws -> [Clothing] {
+        // 按类别分组
+        let grouped = Dictionary(grouping: clothings) { clothing -> String in
+            // 根据名称判断类别
+            let name = clothing.name.lowercased()
+            if name.contains("jsk") || name.contains("op") || name.contains("sk") || name.contains("裙") {
+                return "裙装"
+            } else if name.contains("外套") || name.contains("开衫") {
+                return "外套"
+            } else if name.contains("鞋") || name.contains("靴") {
+                return "鞋子"
+            } else {
+                return "配饰"
             }
-
-            // 选择上衣/外套
-            if let tops = grouped["外套"], !tops.isEmpty {
-                result.append(tops.randomElement()!)
-            }
-
-            // 选择鞋子
-            if let shoes = grouped["鞋子"], !shoes.isEmpty {
-                result.append(shoes.randomElement()!)
-            }
-
-            // 选择配饰（最多2个）
-            if let accessories = grouped["配饰"], !accessories.isEmpty {
-                result.append(contentsOf: accessories.prefix(2))
-            }
-
-            return result
         }
-
-        guard selectedCutouts.count >= 2 else {
+        
+        // 选择搭配物品（每类选一个）
+        var result: [Clothing] = []
+        
+        // 优先选择裙装
+        if let dresses = grouped["裙装"], !dresses.isEmpty {
+            result.append(dresses.randomElement()!)
+        }
+        
+        // 选择上衣/外套
+        if let tops = grouped["外套"], !tops.isEmpty {
+            result.append(tops.randomElement()!)
+        }
+        
+        // 选择鞋子
+        if let shoes = grouped["鞋子"], !shoes.isEmpty {
+            result.append(shoes.randomElement()!)
+        }
+        
+        // 选择配饰（最多2个）
+        if let accessories = grouped["配饰"], !accessories.isEmpty {
+            result.append(contentsOf: accessories.prefix(2))
+        }
+        
+        // 如果按名称分类没有结果，随机选择2-4件
+        if result.count < 2 {
+            result = Array(clothings.shuffled().prefix(min(4, clothings.count)))
+        }
+        
+        guard result.count >= 2 else {
             throw OutfitSuggestionError.insufficientItems
         }
-
-        // 创建Outfit
-        let outfit = OOTDLayoutEngine.shared.createOutfitWithLayout(
-            cutouts: selectedCutouts,
-            book: nil,
-            description: "\(style)风\(occasion)搭配"
-        )
-
-        // 在主线程保存
-        await MainActor.run {
-            // 先插入 Outfit
-            context.insert(outfit)
-            
-            // 显式插入所有 OutfitItem，确保关系正确
-            if let items = outfit.items {
-                for item in items {
-                    context.insert(item)
-                }
-            }
-            
-            try? context.save()
-        }
-
-        return outfit
+        
+        return result
     }
 
     // MARK: - 私有方法
@@ -185,7 +147,7 @@ class OutfitSuggestionService {
         衣橱数据：
         \(wardrobeContext)
 
-        请从衣橱中选择2-4件单品进行搭配，要求：
+        请从【可用单品列表】中选择2-4件单品进行搭配，要求：
         1. 考虑颜色协调性（同色系或互补色）
         2. 考虑场合适配性
         3. 优先选择JSK/OP作为主体
@@ -200,8 +162,9 @@ class OutfitSuggestionService {
           "reasoning": "搭配理由（50字以内）"
         }
 
-        注意：
-        - selectedItemIDs必须是衣橱中真实存在的物品ID
+        重要提示：
+        - selectedItemIDs必须严格使用【可用单品列表】中提供的ID（UUID格式）
+        - 不要编造ID，必须从列表中选择真实存在的物品ID
         - 如果衣橱为空或物品不足，请返回空数组并说明
         - 描述要符合小橘猫角色（带喵~，用括号表示动作）
         """
@@ -278,7 +241,7 @@ class OutfitSuggestionService {
     }
 
     /// 构建响应文本
-    private func buildResponseText(suggestion: OutfitSuggestionResponse, cutouts: [CutoutItem]) -> String {
+    private func buildResponseText(suggestion: OutfitSuggestionResponse, clothings: [Clothing]) -> String {
         var text = suggestion.description
 
         if !suggestion.reasoning.isEmpty {
@@ -286,8 +249,8 @@ class OutfitSuggestionService {
         }
 
         // 添加物品清单
-        if !cutouts.isEmpty {
-            let names = cutouts.compactMap { $0.clothingName }.joined(separator: "、")
+        if !clothings.isEmpty {
+            let names = clothings.map { $0.name }.joined(separator: "、")
             text += "\n\n包含：\(names)"
         }
 
@@ -298,7 +261,7 @@ class OutfitSuggestionService {
 // MARK: - 错误类型
 
 enum OutfitSuggestionError: Error, LocalizedError {
-    case noCutoutsAvailable
+    case noItemsAvailable
     case insufficientItems
     case invalidJSONFormat
     case parseError(String)
@@ -306,8 +269,8 @@ enum OutfitSuggestionError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noCutoutsAvailable:
-            return "没有找到可用的抠图，请先为裙装生成抠图~"
+        case .noItemsAvailable:
+            return "没有找到推荐的裙装，请检查衣橱数据~"
         case .insufficientItems:
             return "衣橱物品不足，至少需要2件单品才能搭配喵~"
         case .invalidJSONFormat:
