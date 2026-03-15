@@ -267,7 +267,13 @@ struct ClothingListView: View {
             stock: item.stock,
             status: item.status
         )
+        // 复制其他属性
         newItem.tags = item.tags
+        newItem.sortIndex = item.sortIndex
+        newItem.replacedCutoutID = item.replacedCutoutID
+        newItem.model3DPath = item.model3DPath
+        newItem.model3DType = item.model3DType
+        newItem.model3DThumbnailPath = item.model3DThumbnailPath
         
         // Duplicate accessory items
         if let items = item.accessoryItems {

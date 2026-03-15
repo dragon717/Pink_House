@@ -225,33 +225,18 @@ struct DepositPlanView: View {
         self.filteredClothings = result
     }
     
-    // 检查商品是否在当前月份
+    // 检查商品是否在当前月份（只判断预计尾款开始时间）
     private func isClothingInCurrentMonth(_ clothing: Clothing) -> Bool {
-        let calendar = Calendar.current
-        let currentMonthValue = currentMonth
-        
-        if let start = clothing.finalPaymentDate {
-            let month = calendar.component(.month, from: start)
-            if month == currentMonthValue { return true }
-        }
-        if let end = clothing.finalPaymentEndDate {
-            let month = calendar.component(.month, from: end)
-            if month == currentMonthValue { return true }
-        }
-        return false
+        guard let start = clothing.finalPaymentDate else { return false }
+        let month = Calendar.current.component(.month, from: start)
+        return month == currentMonth
     }
-    
-    // 检查商品是否在选中的月份
+
+    // 检查商品是否在选中的月份（只判断预计尾款开始时间）
     private func isClothingInSelectedMonths(_ clothing: Clothing) -> Bool {
-        if let start = clothing.finalPaymentDate {
-            let month = Calendar.current.component(.month, from: start)
-            if selectedMonths.contains(month) { return true }
-        }
-        if let end = clothing.finalPaymentEndDate {
-            let month = Calendar.current.component(.month, from: end)
-            if selectedMonths.contains(month) { return true }
-        }
-        return false
+        guard let start = clothing.finalPaymentDate else { return false }
+        let month = Calendar.current.component(.month, from: start)
+        return selectedMonths.contains(month)
     }
 
     // 检查商品是否是最近添加（一个月内）

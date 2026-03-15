@@ -61,27 +61,17 @@ struct MonthSelectorView: View {
     private var currentMonthStats: (month: Int, count: Int, amount: Decimal, hasData: Bool) {
         let calendar = Calendar.current
         let currentMonth = calendar.component(.month, from: Date())
-        
-        // 统计当前月的所有商品（只要开始时间或结束时间在当前月份都算）
+
+        // 只统计预计尾款开始时间在当前月份的商品
         let monthClothings = clothings.filter { clothing in
-            // 检查开始时间是否在当前月份
-            if let start = clothing.finalPaymentDate {
-                let m = calendar.component(.month, from: start)
-                if m == currentMonth { return true }
-            }
-            
-            // 检查结束时间是否在当前月份
-            if let end = clothing.finalPaymentEndDate {
-                let m = calendar.component(.month, from: end)
-                if m == currentMonth { return true }
-            }
-            
-            return false
+            guard let start = clothing.finalPaymentDate else { return false }
+            let m = calendar.component(.month, from: start)
+            return m == currentMonth
         }
-        
+
         let count = monthClothings.reduce(0) { $0 + $1.stock }
         let amount = monthClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
-        
+
         return (currentMonth, count, amount, count > 0)
     }
     
