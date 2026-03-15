@@ -30,8 +30,9 @@ struct MonthSelectorView: View {
         
         // Count Items (Stock Sum) and Total Amount (Balance Sum)
         // No deduplication for totals
+        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用 totalBalance，不要再乘 stock
         let itemCount = monthlyClothings.reduce(0) { $0 + $1.stock }
-        let amount = monthlyClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        let amount = monthlyClothings.reduce(0) { $0 + $1.totalBalance }
         return (itemCount, amount)
     }
     
@@ -51,8 +52,9 @@ struct MonthSelectorView: View {
         
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
         let styleCount = uniqueStyles.count
-        let paidDeposit = clothings.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
-        let pendingBalance = clothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
+        let paidDeposit = clothings.reduce(0) { $0 + $1.totalDeposit }
+        let pendingBalance = clothings.reduce(0) { $0 + $1.totalBalance }
         
         return (totalCount, styleCount, paidDeposit, pendingBalance)
     }
@@ -70,7 +72,8 @@ struct MonthSelectorView: View {
         }
 
         let count = monthClothings.reduce(0) { $0 + $1.stock }
-        let amount = monthClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
+        let amount = monthClothings.reduce(0) { $0 + $1.totalBalance }
 
         return (currentMonth, count, amount, count > 0)
     }

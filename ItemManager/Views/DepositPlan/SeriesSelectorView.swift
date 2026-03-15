@@ -46,7 +46,8 @@ struct SeriesSelectorView: View {
         }
 
         let count = recentClothings.reduce(0) { $0 + $1.stock }
-        let amount = recentClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
+        let amount = recentClothings.reduce(0) { $0 + $1.totalBalance }
 
         return ("最近添加", count, amount, count > 0)
     }

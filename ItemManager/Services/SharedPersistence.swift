@@ -209,9 +209,9 @@ class SharedContainer {
             
             let depositCount = depositPlans.reduce(0) { $0 + $1.stock }
             let depositStyleCount = depositPlans.count // Number of unique clothing items (styles) in the plan
-            // Note: Use stock count for price calculation
-            let totalDeposit = depositPlans.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
-            let totalBalance = depositPlans.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+            // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+            let totalDeposit = depositPlans.reduce(0) { $0 + $1.totalDeposit }
+            let totalBalance = depositPlans.reduce(0) { $0 + $1.totalBalance }
             
             // 3. Recent Items & Image Processing (Optimized)
             // Extract DTOs for background processing
@@ -237,8 +237,9 @@ class SharedContainer {
                 }
                 
                 let count = monthlyItems.count
-                let mBalance = monthlyItems.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
-                let mDeposit = monthlyItems.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
+                // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+                let mBalance = monthlyItems.reduce(0) { $0 + $1.totalBalance }
+                let mDeposit = monthlyItems.reduce(0) { $0 + $1.totalDeposit }
                 
                 monthStats.append(WidgetMonthInfo(
                     month: month,

@@ -93,30 +93,16 @@ struct DepositItemRow: View {
                     
                     Spacer()
                     
-                    if clothing.stock > 1 {
-                        let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
-                        let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("定金¥\(totalDeposit.formatted(.number.precision(.fractionLength(0))))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(themeManager.accentTextColor)
-                            Text("尾款¥\(totalBalance.formatted(.number.precision(.fractionLength(0))))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(themeManager.accentTextColor)
-                        }
-                    } else {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(themeManager.accentTextColor)
-                            Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
-                                .font(.caption)
-                                .bold()
-                                .foregroundStyle(themeManager.accentTextColor)
-                        }
+                    // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("定金¥\(clothing.totalDeposit.formatted(.number.precision(.fractionLength(0))))")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(themeManager.accentTextColor)
+                        Text("尾款¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(themeManager.accentTextColor)
                     }
                 }
                 
@@ -296,6 +282,14 @@ struct SimpleDepositItemRow: View {
                             Text("尾款待定")
                                 .font(.caption2)
                                 .foregroundStyle(themeManager.tertiaryTextColor)
+                        }
+                        
+                        // 显示数量（当库存大于1时）
+                        if clothing.stock > 1 {
+                            Text("×\(clothing.stock)")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundStyle(themeManager.primaryTextColor)
                         }
                         
                         if let brand = clothing.brand {

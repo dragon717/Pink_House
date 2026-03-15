@@ -251,7 +251,8 @@ struct DepositPlanView: View {
     
     // 计算所有待付尾款（不受年份筛选影响）
     private var totalPendingBalanceAll: Decimal {
-        depositClothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
+        depositClothings.reduce(0) { $0 + $1.totalBalance }
     }
     
     // 计算当前月

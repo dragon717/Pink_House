@@ -585,7 +585,8 @@ class ImageManager {
     private nonisolated func downsample(imageAt imageURL: URL, to pointSize: CGSize, scale: CGFloat) -> UIImage? {
         let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, imageSourceOptions) else {
-            return nil
+            // 如果无法创建 imageSource，尝试回退到正常加载
+            return fallbackLoadImage(at: imageURL)
         }
         
         // Fix: kCGImageSourceThumbnailMaxPixelSize cannot be larger than the original image dimensions
@@ -612,10 +613,21 @@ class ImageManager {
         ] as CFDictionary
         
         guard let downsampledImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions) else {
-            return nil
+            // 降采样失败时回退到正常加载，而不是返回 nil
+            // 这可能是由于某些特殊格式的图片（如某些 PNG 带透明通道）导致降采样失败
+            return fallbackLoadImage(at: imageURL)
         }
         
         return UIImage(cgImage: downsampledImage)
+    }
+    
+    /// 降采样失败时的回退加载方式
+    private nonisolated func fallbackLoadImage(at imageURL: URL) -> UIImage? {
+        guard let data = try? Data(contentsOf: imageURL),
+              let loadedImage = UIImage(data: data) else {
+            return nil
+        }
+        return loadedImage
     }
     
     /// Force decode image on background thread

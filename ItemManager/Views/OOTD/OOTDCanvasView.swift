@@ -132,25 +132,13 @@ struct OOTDCanvasView: View {
     // MARK: - 画布内容
     private func canvasContent(fitScale: CGFloat, canvasAreaWidth: CGFloat, availableHeight: CGFloat) -> some View {
         ZStack {
-            // Background
-            if outfit.canvasType == "blank" {
-                Color.white
-                    .frame(width: canvasWidth, height: canvasHeight)
-            } else if outfit.canvasType == "custom",
-                      let path = outfit.backgroundImagePath,
-                      let uiImage = ImageManager.shared.loadImage(fileName: path) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: canvasWidth, height: canvasHeight)
-                    .clipped()
-            } else {
-                Image("ootd")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: canvasWidth, height: canvasHeight)
-                    .clipped()
-            }
+            // Background - 使用稳定的背景视图，避免重复加载
+            CanvasBackgroundView(
+                canvasType: outfit.canvasType,
+                backgroundImagePath: outfit.backgroundImagePath,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight
+            )
             
             // Canvas Content
             ForEach((outfit.items ?? []).sorted(by: { $0.zIndex < $1.zIndex })) { item in
@@ -586,7 +574,7 @@ struct CanvasItemView: View {
                     onUpdate()
                 }
         )
-        .task(id: item.cutout?.imagePath) {
+        .task(id: item.id) {
             await loadImage()
         }
     }
@@ -599,12 +587,31 @@ struct CanvasItemView: View {
         }
         
         isLoading = true
-        // Try async load
-        if let image = await ImageManager.shared.loadImageAsync(fileName: cutout.imagePath) {
-            loadedImage = image
-        } else {
-            loadedImage = nil
+        
+        // 添加超时机制，防止图片加载卡住
+        let imageTask = Task {
+            await ImageManager.shared.loadImageAsync(fileName: cutout.imagePath)
         }
+        
+        // 3秒超时
+        let timeoutTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3秒
+            imageTask.cancel()
+            return nil as UIImage?
+        }
+        
+        // 等待任一任务完成
+        let result = await withTaskGroup(of: UIImage?.self) { group in
+            group.addTask {
+                await imageTask.value
+            }
+            group.addTask {
+                await timeoutTask.value
+            }
+            return await group.next()!
+        }
+        
+        loadedImage = result
         isLoading = false
     }
     
@@ -624,5 +631,63 @@ struct CanvasItemView: View {
             }
         }
         .padding()
+    }
+}
+
+// MARK: - 画布背景视图
+/// 独立的背景视图，避免在 canvasContent 中直接调用 loadImage 导致反馈循环
+struct CanvasBackgroundView: View {
+    let canvasType: String
+    let backgroundImagePath: String?
+    let canvasWidth: CGFloat
+    let canvasHeight: CGFloat
+    
+    @State private var loadedImage: UIImage?
+    
+    var body: some View {
+        Group {
+            if canvasType == "blank" {
+                Color.white
+                    .frame(width: canvasWidth, height: canvasHeight)
+            } else if canvasType == "custom",
+                      let path = backgroundImagePath {
+                if let uiImage = loadedImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: canvasWidth, height: canvasHeight)
+                        .clipped()
+                } else {
+                    Color.gray.opacity(0.1)
+                        .frame(width: canvasWidth, height: canvasHeight)
+                        .overlay(
+                            ProgressView()
+                        )
+                }
+            } else {
+                Image("ootd")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: canvasWidth, height: canvasHeight)
+                    .clipped()
+            }
+        }
+        .task(id: backgroundImagePath) {
+            await loadBackgroundImage()
+        }
+    }
+    
+    private func loadBackgroundImage() async {
+        guard canvasType == "custom",
+              let path = backgroundImagePath else {
+            loadedImage = nil
+            return
+        }
+        
+        // 使用异步加载，避免阻塞主线程
+        let image = await ImageManager.shared.loadImageAsync(fileName: path)
+        await MainActor.run {
+            loadedImage = image
+        }
     }
 }

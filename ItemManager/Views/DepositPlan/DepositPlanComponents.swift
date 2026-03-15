@@ -226,13 +226,15 @@ struct DepositStatsView: View {
     }
     
     var paidDeposit: Decimal {
-        // Sum of deposit * stock for ALL clothings (Include accessories)
-        clothings.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
+        // Sum of totalDeposit for ALL clothings (Include accessories)
+        // 注意：totalDeposit 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
+        clothings.reduce(0) { $0 + $1.totalDeposit }
     }
-    
+
     var pendingBalance: Decimal {
-        // Sum of balance * stock for ALL clothings (Include accessories)
-        clothings.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        // Sum of totalBalance for ALL clothings (Include accessories)
+        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
+        clothings.reduce(0) { $0 + $1.totalBalance }
     }
     
     var body: some View {

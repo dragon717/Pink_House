@@ -174,8 +174,9 @@ struct ClothingCard: View, Equatable {
                     
                     if showPrice {
                         if clothing.isDepositPlan {
-                            let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
-                            let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
+                            // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+                            let totalDeposit = clothing.totalDeposit
+                            let totalBalance = clothing.totalBalance
                             // 紧凑显示的定金尾款
                             HStack(spacing: 4) {
                                 Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
@@ -448,9 +449,10 @@ struct ClothingRow: View {
                     
                     if showPrice {
                         if clothing.isDepositPlan {
-                            let totalDeposit = clothing.totalDeposit * Decimal(clothing.stock)
-                            let totalBalance = clothing.totalBalance * Decimal(clothing.stock)
-                            
+                            // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+                            let totalDeposit = clothing.totalDeposit
+                            let totalBalance = clothing.totalBalance
+
                             Text("定金: ¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
                                 .foregroundStyle(palette.accent)
@@ -568,11 +570,9 @@ struct ClothingRowBrief: View {
                 if showPrice {
                     if let isDepositPlan = safeGetProperty({ clothing.isDepositPlan }), isDepositPlan {
                         if let totalDeposit = safeGetProperty({ clothing.totalDeposit }),
-                           let totalBalance = safeGetProperty({ clothing.totalBalance }),
-                           let stock = safeGetProperty({ clothing.stock }) {
-                            let depositValue = totalDeposit * Decimal(stock)
-                            let balanceValue = totalBalance * Decimal(stock)
-                            Text("定金¥\(depositValue, format: .number.precision(.fractionLength(0)))+尾款¥\(balanceValue, format: .number.precision(.fractionLength(0)))")
+                           let totalBalance = safeGetProperty({ clothing.totalBalance }) {
+                            // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+                            Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))+尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
                                 .font(.caption)
                                 .bold()
                                 .foregroundStyle(palette.accent)

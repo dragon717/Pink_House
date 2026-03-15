@@ -8,6 +8,27 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - 超时包装函数（使用 PetAIService 中的 TimeoutError）
+func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        // 添加主任务
+        group.addTask {
+            try await operation()
+        }
+
+        // 添加超时任务
+        group.addTask {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            throw TimeoutError()
+        }
+
+        // 等待第一个完成的任务
+        let result = try await group.next()!
+        group.cancelAll()
+        return result
+    }
+}
+
 // MARK: - 消息类型枚举
 enum PetChatMessageType {
     case text           // 普通文本
@@ -16,6 +37,15 @@ enum PetChatMessageType {
     case colorMatch     // 搭配色推荐
     case searchResults  // 搜索结果
     case thinking       // AI思考中
+    case outfitSuggestion // 搭配建议（新增）
+}
+
+// MARK: - 搭配建议数据
+struct OutfitSuggestionData {
+    let outfit: Outfit
+    let description: String
+    let style: String
+    let occasion: String
 }
 
 // MARK: - 萌宠对话消息模型
@@ -31,11 +61,13 @@ struct PetChatMessage: Identifiable {
     var colorRecommendation: ColorRecommendation?  // 搭配色推荐
     var imageName: String?            // 表情图片名称 (如 happy_cat, sleepy_cat)
     var isAIGenerated: Bool           // 是否AI生成
-    
-    init(text: String, isUser: Bool, type: PetChatMessageType = .text, 
+    var outfitSuggestion: OutfitSuggestionData? // 搭配建议（新增）
+
+    init(text: String, isUser: Bool, type: PetChatMessageType = .text,
          clothing: Clothing? = nil, searchResults: [Clothing]? = nil,
          statistics: WardrobeStats? = nil, colorRecommendation: ColorRecommendation? = nil,
-         imageName: String? = nil, isAIGenerated: Bool = false) {
+         imageName: String? = nil, isAIGenerated: Bool = false,
+         outfitSuggestion: OutfitSuggestionData? = nil) {
         self.text = text
         self.isUser = isUser
         self.type = type
@@ -46,6 +78,7 @@ struct PetChatMessage: Identifiable {
         self.colorRecommendation = colorRecommendation
         self.imageName = imageName
         self.isAIGenerated = isAIGenerated
+        self.outfitSuggestion = outfitSuggestion
     }
 }
 
@@ -153,7 +186,8 @@ struct PetChatBubble: View {
     let petName: String
     let onCardTap: (Clothing) -> Void
     let onSearchResultTap: (Clothing) -> Void
-    
+    let onOutfitTap: (OutfitSuggestionData) -> Void
+
     @Environment(ThemeManager.self) private var themeManager
     @State private var showAllResults = false
     @State private var showingReportButton = false
@@ -214,6 +248,12 @@ struct PetChatBubble: View {
                 case .searchResults:
                     if let results = message.searchResults {
                         searchResultsBubble(results)
+                    } else {
+                        textBubble
+                    }
+                case .outfitSuggestion:
+                    if let suggestion = message.outfitSuggestion {
+                        outfitSuggestionBubble(suggestion)
                     } else {
                         textBubble
                     }
@@ -615,6 +655,118 @@ struct PetChatBubble: View {
         )
         .frame(maxWidth: 320, alignment: .leading)
     }
+
+    // MARK: - 搭配建议气泡
+    private func outfitSuggestionBubble(_ suggestion: OutfitSuggestionData) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 描述文本
+            Text(suggestion.description)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+
+            // 风格标签
+            HStack(spacing: 8) {
+                Label(suggestion.style, systemImage: "sparkles")
+                    .font(.caption)
+                    .foregroundStyle(.pink)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.pink.opacity(0.1))
+                    .clipShape(Capsule())
+
+                Label(suggestion.occasion, systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(.purple)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.purple.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+
+            // 预览图（使用Outfit的快照或占位符）
+            if let snapshotPath = suggestion.outfit.snapshotPath,
+               let image = ImageManager.shared.loadImage(fileName: snapshotPath) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                // 显示物品缩略图网格
+                outfitItemsPreview(suggestion.outfit)
+            }
+
+            // 查看详情按钮
+            Button {
+                onOutfitTap(suggestion)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "wand.and.stars")
+                    Text("查看搭配")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [.pink, .pink.opacity(0.8)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+        )
+        .frame(maxWidth: 320, alignment: .leading)
+    }
+
+    // 搭配物品预览
+    private func outfitItemsPreview(_ outfit: Outfit) -> some View {
+        let items = outfit.items ?? []
+        return HStack(spacing: 8) {
+            ForEach(items.prefix(4), id: \.id) { item in
+                if let cutout = item.cutout,
+                   let image = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: 60, height: 60)
+                        .overlay(
+                            Image(systemName: "tshirt")
+                                .foregroundStyle(.gray)
+                        )
+                }
+            }
+
+            if items.count > 4 {
+                Text("+\(items.count - 4)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 40, height: 40)
+                    .background(Color.gray.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
 }
 
 // MARK: - 萌宠对话主视图
@@ -633,6 +785,10 @@ struct PetChatView: View {
     // iOS26搜索栏展开状态（用于控制常用菜单长按交互）
     @State private var isSearchPresented = false
 
+    // 搭配建议相关状态
+    @State private var selectedOutfit: Outfit?
+    @State private var navigateToOutfitEditor = false
+
     // 每日问候管理器
     @StateObject private var greetingManager = DailyGreetingManager.shared
     
@@ -642,25 +798,13 @@ struct PetChatView: View {
                 // 背景
                 LiquidBackground()
                     .ignoresSafeArea()
-                
+
                 // 聊天记录 - 使用overlay放置悬浮按钮
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             ForEach(messages) { message in
-                                PetChatBubble(
-                                    message: message,
-                                    petName: petAI.petName,
-                                    onCardTap: { clothing in
-                                        selectedClothing = clothing
-                                        navigateToDetail = true
-                                    },
-                                    onSearchResultTap: { clothing in
-                                        selectedClothing = clothing
-                                        navigateToDetail = true
-                                    }
-                                )
-                                .id(message.id)
+                                messageBubble(for: message)
                             }
                             
                             if isThinking {
@@ -707,6 +851,11 @@ struct PetChatView: View {
             .navigationDestination(isPresented: $navigateToDetail) {
                 if let clothing = selectedClothing {
                     ClothingDetailView(clothing: clothing)
+                }
+            }
+            .navigationDestination(isPresented: $navigateToOutfitEditor) {
+                if let outfit = selectedOutfit {
+                    OOTDEditorView(outfit: outfit)
                 }
             }
             .onAppear {
@@ -764,26 +913,54 @@ struct PetChatView: View {
     // iOS26+ 左侧悬浮菜单按钮
     private var iOS26LeftFloatingButton: some View {
         Menu {
+            Section("AI搭配") {
+                Button {
+                    handleOutfitSuggestion("帮我搭配一套")
+                } label: {
+                    Label("智能搭配", systemImage: "wand.and.stars")
+                }
+
+                Menu("快速搭配") {
+                    Button {
+                        createQuickOutfit(style: "甜美", occasion: "约会")
+                    } label: {
+                        Label("甜美约会", systemImage: "heart.fill")
+                    }
+
+                    Button {
+                        createQuickOutfit(style: "优雅", occasion: "茶会")
+                    } label: {
+                        Label("优雅茶会", systemImage: "cup.and.saucer.fill")
+                    }
+
+                    Button {
+                        createQuickOutfit(style: "日常", occasion: "出门")
+                    } label: {
+                        Label("日常出门", systemImage: "bag.fill")
+                    }
+                }
+            }
+
             Section("快捷功能") {
                 Button {
                     handleWardrobeStatistics()
                 } label: {
                     Label("统计裙子", systemImage: "chart.pie.fill")
                 }
-                
+
                 Button {
                     handleColorMatch()
                 } label: {
                     Label("今日搭配色", systemImage: "paintpalette.fill")
                 }
-                
+
                 Button {
                     handleDepositPlanQuery()
                 } label: {
                     Label("尾款提醒", systemImage: "tag.fill")
                 }
             }
-            
+
             Section("查找") {
                 Button {
                     // 设置搜索栏文本为"帮我找"
@@ -792,7 +969,7 @@ struct PetChatView: View {
                     Label("查找衣柜", systemImage: "magnifyingglass")
                 }
             }
-            
+
             Section("其他") {
                 Button {
                     // 随机推荐
@@ -800,7 +977,7 @@ struct PetChatView: View {
                 } label: {
                     Label("随机推荐", systemImage: "sparkles")
                 }
-                
+
                 Button {
                     // 今日运势
                     let fortunes = [
@@ -958,39 +1135,71 @@ struct PetChatView: View {
     // 处理用户意图
     private func processUserIntent(_ text: String) {
         let lowercasedText = text.lowercased()
-        
+
         // 检查是否是统计查询
-        if lowercasedText.contains("统计") || lowercasedText.contains("多少") || 
+        if lowercasedText.contains("统计") || lowercasedText.contains("多少") ||
            lowercasedText.contains("价值") || lowercasedText.contains("几件") {
             handleWardrobeStatistics()
             return
         }
-        
+
+        // 检查是否是OOTD/搭配查询（优先于颜色搭配）
+        if lowercasedText.contains("ootd") || lowercasedText.contains("造型") ||
+           lowercasedText.contains("穿搭") || lowercasedText.contains("怎么穿") ||
+           (lowercasedText.contains("搭配") && (lowercasedText.contains("一套") || lowercasedText.contains("出门") || lowercasedText.contains("今天"))) {
+            handleOutfitSuggestion(text)
+            return
+        }
+
         // 检查是否是搭配色查询
-        if lowercasedText.contains("搭配") || lowercasedText.contains("颜色") || 
+        if lowercasedText.contains("搭配") || lowercasedText.contains("颜色") ||
            lowercasedText.contains("穿什么") || lowercasedText.contains("推荐") {
             handleColorMatch()
             return
         }
-        
+
         // 检查是否是搜索查询
-        if lowercasedText.contains("找") || lowercasedText.contains("搜索") || 
+        if lowercasedText.contains("找") || lowercasedText.contains("搜索") ||
            lowercasedText.contains("有没有") {
             handleSearch(text)
             return
         }
-        
+
         // 检查是否是尾款查询
-        if lowercasedText.contains("尾款") || lowercasedText.contains("定金") || 
+        if lowercasedText.contains("尾款") || lowercasedText.contains("定金") ||
            lowercasedText.contains("补款") {
             handleDepositPlanQuery()
             return
         }
-        
+
         // 默认使用AI对话
         handleAIChat(text)
     }
-    
+
+    // 创建消息气泡视图
+    private func messageBubble(for message: PetChatMessage) -> some View {
+        PetChatBubble(
+            message: message,
+            petName: petAI.petName,
+            onCardTap: handleClothingTap,
+            onSearchResultTap: handleClothingTap,
+            onOutfitTap: handleOutfitTap
+        )
+        .id(message.id)
+    }
+
+    // 处理服装点击
+    private func handleClothingTap(_ clothing: Clothing) {
+        selectedClothing = clothing
+        navigateToDetail = true
+    }
+
+    // 处理搭配建议点击
+    private func handleOutfitTap(_ suggestion: OutfitSuggestionData) {
+        selectedOutfit = suggestion.outfit
+        navigateToOutfitEditor = true
+    }
+
     // 处理衣橱统计
     private func handleWardrobeStatistics() {
         isThinking = true
@@ -1157,13 +1366,13 @@ struct PetChatView: View {
     // 处理AI对话
     private func handleAIChat(_ text: String) {
         isThinking = true
-        
+
         Task {
             let response = await petAI.sendMessage(text, enableVoice: false)
-            
+
             await MainActor.run {
                 isThinking = false
-                
+
                 // PetAIService 返回的 ChatMessage 已经解析过 [IMAGE:xxx] 指令
                 // 直接使用 response.imageName 和 response.text
                 let message = PetChatMessage(
@@ -1173,6 +1382,142 @@ struct PetChatView: View {
                     isAIGenerated: true
                 )
                 messages.append(message)
+            }
+        }
+    }
+
+    // MARK: - 搭配建议处理
+
+    /// 处理搭配建议请求
+    private func handleOutfitSuggestion(_ text: String) {
+        // 检查是否有足够的抠图
+        let availableCount = OutfitSuggestionService.shared.availableCutoutCount(context: modelContext)
+        guard availableCount >= 2 else {
+            let message = PetChatMessage(
+                text: "（歪头）主人衣橱里的抠图还不够呢，至少需要2件单品才能搭配喵~ 快去生成一些抠图吧！",
+                isUser: false
+            )
+            messages.append(message)
+            return
+        }
+
+        isThinking = true
+
+        Task {
+            do {
+                // 添加超时机制，防止卡住
+                let (outfit, responseText) = try await withTimeout(seconds: 30) {
+                    try await OutfitSuggestionService.shared.processOutfitRequest(
+                        query: text,
+                        clothings: self.clothings,
+                        context: self.modelContext
+                    )
+                }
+
+                await MainActor.run {
+                    isThinking = false
+
+                    let suggestionData = OutfitSuggestionData(
+                        outfit: outfit,
+                        description: responseText,
+                        style: "日常",
+                        occasion: "日常"
+                    )
+
+                    let message = PetChatMessage(
+                        text: responseText,
+                        isUser: false,
+                        type: .outfitSuggestion,
+                        outfitSuggestion: suggestionData
+                    )
+                    messages.append(message)
+                }
+            } catch is TimeoutError {
+                await MainActor.run {
+                    isThinking = false
+                    let message = PetChatMessage(
+                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
+            } catch {
+                await MainActor.run {
+                    isThinking = false
+
+                    let errorMessage = (error as? OutfitSuggestionError)?.errorDescription ?? "搭配生成失败，请重试喵~"
+                    let message = PetChatMessage(
+                        text: "（挠头）\(errorMessage)",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
+            }
+        }
+    }
+
+    /// 快速创建搭配（无需AI）
+    private func createQuickOutfit(style: String, occasion: String) {
+        let availableCount = OutfitSuggestionService.shared.availableCutoutCount(context: modelContext)
+        guard availableCount >= 2 else {
+            let message = PetChatMessage(
+                text: "（歪头）主人衣橱里的抠图还不够呢，至少需要2件单品才能搭配喵~",
+                isUser: false
+            )
+            messages.append(message)
+            return
+        }
+
+        isThinking = true
+
+        Task {
+            do {
+                // 添加超时机制
+                let outfit = try await withTimeout(seconds: 15) {
+                    try await OutfitSuggestionService.shared.createQuickOutfit(
+                        style: style,
+                        occasion: occasion,
+                        clothings: self.clothings,
+                        context: self.modelContext
+                    )
+                }
+
+                await MainActor.run {
+                    isThinking = false
+
+                    let suggestionData = OutfitSuggestionData(
+                        outfit: outfit,
+                        description: "为你准备了一套\(style)风\(occasion)搭配~",
+                        style: style,
+                        occasion: occasion
+                    )
+
+                    let message = PetChatMessage(
+                        text: "（眼睛发亮）为你准备了一套\(style)风\(occasion)搭配，快来看看吧喵~",
+                        isUser: false,
+                        type: .outfitSuggestion,
+                        outfitSuggestion: suggestionData
+                    )
+                    messages.append(message)
+                }
+            } catch is TimeoutError {
+                await MainActor.run {
+                    isThinking = false
+                    let message = PetChatMessage(
+                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
+            } catch {
+                await MainActor.run {
+                    isThinking = false
+                    let message = PetChatMessage(
+                        text: "（挠头）搭配生成失败：\(error.localizedDescription)",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
             }
         }
     }
@@ -1250,7 +1595,11 @@ struct PetChatViewLegacy: View {
     @State private var isThinking = false
     @State private var selectedClothing: Clothing?
     @State private var navigateToDetail = false
-    
+
+    // 搭配建议相关状态
+    @State private var selectedOutfit: Outfit?
+    @State private var navigateToOutfitEditor = false
+
     @StateObject private var greetingManager = DailyGreetingManager.shared
     
     var body: some View {
@@ -1264,19 +1613,7 @@ struct PetChatViewLegacy: View {
                         ScrollView {
                             LazyVStack(spacing: 16) {
                                 ForEach(messages) { message in
-                                    PetChatBubble(
-                                        message: message,
-                                        petName: petAI.petName,
-                                        onCardTap: { clothing in
-                                            selectedClothing = clothing
-                                            navigateToDetail = true
-                                        },
-                                        onSearchResultTap: { clothing in
-                                            selectedClothing = clothing
-                                            navigateToDetail = true
-                                        }
-                                    )
-                                    .id(message.id)
+                                    legacyMessageBubble(for: message)
                                 }
                                 
                                 if isThinking {
@@ -1311,6 +1648,11 @@ struct PetChatViewLegacy: View {
                     ClothingDetailView(clothing: clothing)
                 }
             }
+            .navigationDestination(isPresented: $navigateToOutfitEditor) {
+                if let outfit = selectedOutfit {
+                    OOTDEditorView(outfit: outfit)
+                }
+            }
             .onAppear {
                 if messages.isEmpty {
                     loadInitialGreeting()
@@ -1319,7 +1661,7 @@ struct PetChatViewLegacy: View {
             }
         }
     }
-    
+
     // 萌宠对话框样式的输入区域（iOS18版本）- 放在底部导航栏上方
     private var petDialogueInputArea: some View {
         VStack(spacing: 0) {
@@ -1327,24 +1669,51 @@ struct PetChatViewLegacy: View {
             HStack(spacing: 12) {
                 // 左侧功能菜单按钮
                 Menu {
+                    // AI搭配菜单
+                    Menu("AI搭配") {
+                        Button {
+                            handleOutfitSuggestion("帮我搭配一套")
+                        } label: {
+                            Label("智能搭配", systemImage: "wand.and.stars")
+                        }
+
+                        Button {
+                            createQuickOutfit(style: "甜美", occasion: "约会")
+                        } label: {
+                            Label("甜美约会", systemImage: "heart")
+                        }
+
+                        Button {
+                            createQuickOutfit(style: "优雅", occasion: "茶会")
+                        } label: {
+                            Label("优雅茶会", systemImage: "cup.and.saucer")
+                        }
+
+                        Button {
+                            createQuickOutfit(style: "日常", occasion: "出门")
+                        } label: {
+                            Label("日常出门", systemImage: "bag")
+                        }
+                    }
+
                     Button {
                         handleWardrobeStatistics()
                     } label: {
                         Label("统计裙子", systemImage: "chart.pie")
                     }
-                    
+
                     Button {
                         handleColorMatch()
                     } label: {
                         Label("今日搭配色", systemImage: "paintpalette")
                     }
-                    
+
                     Button {
                         handleDepositPlanQuery()
                     } label: {
                         Label("尾款提醒", systemImage: "tag")
                     }
-                    
+
                     Button {
                         // 查找衣柜功能
                         inputText = "帮我找"
@@ -1487,40 +1856,72 @@ struct PetChatViewLegacy: View {
         
         processUserIntent(userText)
     }
-    
+
+    // 创建消息气泡视图（Legacy版本）
+    private func legacyMessageBubble(for message: PetChatMessage) -> some View {
+        PetChatBubble(
+            message: message,
+            petName: petAI.petName,
+            onCardTap: legacyHandleClothingTap,
+            onSearchResultTap: legacyHandleClothingTap,
+            onOutfitTap: legacyHandleOutfitTap
+        )
+        .id(message.id)
+    }
+
+    // 处理服装点击（Legacy版本）
+    private func legacyHandleClothingTap(_ clothing: Clothing) {
+        selectedClothing = clothing
+        navigateToDetail = true
+    }
+
+    // 处理搭配建议点击（Legacy版本）
+    private func legacyHandleOutfitTap(_ suggestion: OutfitSuggestionData) {
+        selectedOutfit = suggestion.outfit
+        navigateToOutfitEditor = true
+    }
+
     private func processUserIntent(_ text: String) {
         let lowercasedText = text.lowercased()
-        
+
         if lowercasedText.contains("统计") || lowercasedText.contains("多少") ||
            lowercasedText.contains("价值") || lowercasedText.contains("几件") {
             handleWardrobeStatistics()
             return
         }
-        
+
+        // 检查是否是OOTD/搭配查询（优先于颜色搭配）
+        if lowercasedText.contains("ootd") || lowercasedText.contains("造型") ||
+           lowercasedText.contains("穿搭") || lowercasedText.contains("怎么穿") ||
+           (lowercasedText.contains("搭配") && (lowercasedText.contains("一套") || lowercasedText.contains("出门") || lowercasedText.contains("今天"))) {
+            handleOutfitSuggestion(text)
+            return
+        }
+
         if lowercasedText.contains("搭配") || lowercasedText.contains("颜色") ||
            lowercasedText.contains("穿什么") || lowercasedText.contains("推荐") {
             handleColorMatch()
             return
         }
-        
+
         if lowercasedText.contains("找") || lowercasedText.contains("搜索") ||
            lowercasedText.contains("有没有") {
             handleSearch(text)
             return
         }
-        
+
         if lowercasedText.contains("尾款") || lowercasedText.contains("定金") ||
            lowercasedText.contains("补款") {
             handleDepositPlanQuery()
             return
         }
-        
+
         handleAIChat(text)
     }
-    
+
     private func handleWardrobeStatistics() {
         isThinking = true
-        
+
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
         let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
         let mostExpensiveItem = clothings.max(by: { ($0.price + $0.accessoriesPrice) < ($1.price + $1.accessoriesPrice) })
@@ -1691,6 +2092,142 @@ struct PetChatViewLegacy: View {
                     isAIGenerated: true
                 )
                 messages.append(message)
+            }
+        }
+    }
+
+    // MARK: - 搭配建议处理（Legacy版本）
+
+    /// 处理搭配建议请求
+    private func handleOutfitSuggestion(_ text: String) {
+        // 检查是否有足够的抠图
+        let availableCount = OutfitSuggestionService.shared.availableCutoutCount(context: modelContext)
+        guard availableCount >= 2 else {
+            let message = PetChatMessage(
+                text: "（歪头）主人衣橱里的抠图还不够呢，至少需要2件单品才能搭配喵~ 快去生成一些抠图吧！",
+                isUser: false
+            )
+            messages.append(message)
+            return
+        }
+
+        isThinking = true
+
+        Task {
+            do {
+                // 添加超时机制
+                let (outfit, responseText) = try await withTimeout(seconds: 30) {
+                    try await OutfitSuggestionService.shared.processOutfitRequest(
+                        query: text,
+                        clothings: self.clothings,
+                        context: self.modelContext
+                    )
+                }
+
+                await MainActor.run {
+                    isThinking = false
+
+                    let suggestionData = OutfitSuggestionData(
+                        outfit: outfit,
+                        description: responseText,
+                        style: "日常",
+                        occasion: "日常"
+                    )
+
+                    let message = PetChatMessage(
+                        text: responseText,
+                        isUser: false,
+                        type: .outfitSuggestion,
+                        outfitSuggestion: suggestionData
+                    )
+                    messages.append(message)
+                }
+            } catch is TimeoutError {
+                await MainActor.run {
+                    isThinking = false
+                    let message = PetChatMessage(
+                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
+            } catch {
+                await MainActor.run {
+                    isThinking = false
+
+                    let errorMessage = (error as? OutfitSuggestionError)?.errorDescription ?? "搭配生成失败，请重试喵~"
+                    let message = PetChatMessage(
+                        text: "（挠头）\(errorMessage)",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
+            }
+        }
+    }
+
+    /// 快速创建搭配（无需AI）
+    private func createQuickOutfit(style: String, occasion: String) {
+        let availableCount = OutfitSuggestionService.shared.availableCutoutCount(context: modelContext)
+        guard availableCount >= 2 else {
+            let message = PetChatMessage(
+                text: "（歪头）主人衣橱里的抠图还不够呢，至少需要2件单品才能搭配喵~",
+                isUser: false
+            )
+            messages.append(message)
+            return
+        }
+
+        isThinking = true
+
+        Task {
+            do {
+                // 添加超时机制
+                let outfit = try await withTimeout(seconds: 15) {
+                    try await OutfitSuggestionService.shared.createQuickOutfit(
+                        style: style,
+                        occasion: occasion,
+                        clothings: self.clothings,
+                        context: self.modelContext
+                    )
+                }
+
+                await MainActor.run {
+                    isThinking = false
+
+                    let suggestionData = OutfitSuggestionData(
+                        outfit: outfit,
+                        description: "为你准备了一套\(style)风\(occasion)搭配~",
+                        style: style,
+                        occasion: occasion
+                    )
+
+                    let message = PetChatMessage(
+                        text: "（眼睛发亮）为你准备了一套\(style)风\(occasion)搭配，快来看看吧喵~",
+                        isUser: false,
+                        type: .outfitSuggestion,
+                        outfitSuggestion: suggestionData
+                    )
+                    messages.append(message)
+                }
+            } catch is TimeoutError {
+                await MainActor.run {
+                    isThinking = false
+                    let message = PetChatMessage(
+                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
+            } catch {
+                await MainActor.run {
+                    isThinking = false
+                    let message = PetChatMessage(
+                        text: "（挠头）搭配生成失败：\(error.localizedDescription)",
+                        isUser: false
+                    )
+                    messages.append(message)
+                }
             }
         }
     }

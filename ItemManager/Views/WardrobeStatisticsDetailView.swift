@@ -409,15 +409,18 @@ struct DepositStatsCard: View {
     }
     
     var totalAmount: Decimal {
-        depositPlans.reduce(0) { $0 + (($1.totalDeposit + $1.totalBalance) * Decimal($1.stock)) }
+        // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+        depositPlans.reduce(0) { $0 + $1.totalDeposit + $1.totalBalance }
     }
-    
+
     var paidDeposit: Decimal {
-        depositPlans.reduce(0) { $0 + ($1.totalDeposit * Decimal($1.stock)) }
+        // 注意：totalDeposit 已经包含了 stock 的乘法，所以这里直接使用
+        depositPlans.reduce(0) { $0 + $1.totalDeposit }
     }
-    
+
     var pendingBalance: Decimal {
-        depositPlans.reduce(0) { $0 + ($1.totalBalance * Decimal($1.stock)) }
+        // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用
+        depositPlans.reduce(0) { $0 + $1.totalBalance }
     }
     
     var body: some View {
