@@ -144,14 +144,16 @@ final class Clothing {
     }
     
     // Computed Properties for Total Calculation
+    // 总定金 = (裙子定金 + 小物定金总和) * 库存数量
     var totalDeposit: Decimal {
         let accDeposit = accessoryItems?.reduce(Decimal(0)) { $0 + $1.deposit } ?? 0
-        return deposit + accDeposit
+        return (deposit + accDeposit) * Decimal(stock)
     }
     
+    // 总尾款 = (裙子尾款 + 小物尾款总和) * 库存数量
     var totalBalance: Decimal {
         let accBalance = accessoryItems?.reduce(Decimal(0)) { $0 + $1.balance } ?? 0
-        return balance + accBalance
+        return (balance + accBalance) * Decimal(stock)
     }
 }
 
