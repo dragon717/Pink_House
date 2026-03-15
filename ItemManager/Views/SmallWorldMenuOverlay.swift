@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -49,6 +50,9 @@ struct SmallWorldMenuOverlay: View {
 
     // 轮盘旋转状态
     @State private var wheelRotation: Double = 0
+
+    // iOS26萌宠对话搜索栏展开状态（展开时禁用长按交互）
+    @State private var isPetChatSearching = false
 
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
@@ -186,37 +190,40 @@ struct SmallWorldMenuOverlay: View {
             }
 
             // 触发区域 - 只在TabBar位置显示，不覆盖整个屏幕
-            Color.clear
-                .contentShape(Rectangle())
-                .frame(width: triggerAreaWidth, height: triggerHeight)
-                .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
-                .onLongPressGesture(
-                    minimumDuration: longPressDuration,
-                    maximumDistance: 20,
-                    pressing: { isPressing in
-                        if isPressing {
-                            self.isPressing = true
-                            self.startLocation = CGPoint(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
-                            #if canImport(UIKit)
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                            #endif
-                            startLongPressTimer()
-                        } else {
-                            handlePressEnded()
+            // 当在萌宠对话页面时，完全禁用触发区域（避免与搜索栏冲突）
+            if selectedTab != 3 {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .frame(width: triggerAreaWidth, height: triggerHeight)
+                    .position(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
+                    .onLongPressGesture(
+                        minimumDuration: longPressDuration,
+                        maximumDistance: 20,
+                        pressing: { pressing in
+                            if pressing {
+                                self.isPressing = true
+                                self.startLocation = CGPoint(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
+                                #if canImport(UIKit)
+                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                generator.impactOccurred()
+                                #endif
+                                startLongPressTimer()
+                            } else {
+                                handlePressEnded()
+                            }
+                        },
+                        perform: {
+                            triggerMenu(smallWorldTabCenterX: smallWorldTabCenterX, smallWorldTabCenterY: smallWorldTabCenterY)
                         }
-                    },
-                    perform: {
-                        triggerMenu(smallWorldTabCenterX: smallWorldTabCenterX, smallWorldTabCenterY: smallWorldTabCenterY)
+                    )
+                    .onTapGesture {
+                        if showMenu {
+                            closeMenu()
+                        } else {
+                            handleTapAction()
+                        }
                     }
-                )
-                .onTapGesture {
-                    if showMenu {
-                        closeMenu()
-                    } else {
-                        handleTapAction()
-                    }
-                }
+            }
         }
         .ignoresSafeArea()
         .onChange(of: scenePhase) { newPhase in
@@ -227,6 +234,16 @@ struct SmallWorldMenuOverlay: View {
         .onChange(of: selectedTab) { newValue in
             if newValue != 1 {
                 closeMenu()
+            }
+            // 当切换到非萌宠对话页面时，重置搜索状态
+            if newValue != 3 {
+                isPetChatSearching = false
+            }
+        }
+        // 监听萌宠对话搜索栏状态变化
+        .onReceive(NotificationCenter.default.publisher(for: .petChatSearchStateChanged)) { notification in
+            if let isSearching = notification.userInfo?["isSearching"] as? Bool {
+                isPetChatSearching = isSearching
             }
         }
     }

@@ -29,10 +29,13 @@ struct PetChatMessage: Identifiable {
     var searchResults: [Clothing]?    // 搜索结果
     var statistics: WardrobeStats?    // 统计数据
     var colorRecommendation: ColorRecommendation?  // 搭配色推荐
+    var imageName: String?            // 表情图片名称 (如 happy_cat, sleepy_cat)
+    var isAIGenerated: Bool           // 是否AI生成
     
     init(text: String, isUser: Bool, type: PetChatMessageType = .text, 
          clothing: Clothing? = nil, searchResults: [Clothing]? = nil,
-         statistics: WardrobeStats? = nil, colorRecommendation: ColorRecommendation? = nil) {
+         statistics: WardrobeStats? = nil, colorRecommendation: ColorRecommendation? = nil,
+         imageName: String? = nil, isAIGenerated: Bool = false) {
         self.text = text
         self.isUser = isUser
         self.type = type
@@ -41,6 +44,8 @@ struct PetChatMessage: Identifiable {
         self.searchResults = searchResults
         self.statistics = statistics
         self.colorRecommendation = colorRecommendation
+        self.imageName = imageName
+        self.isAIGenerated = isAIGenerated
     }
 }
 
@@ -151,26 +156,40 @@ struct PetChatBubble: View {
     
     @Environment(ThemeManager.self) private var themeManager
     @State private var showAllResults = false
+    @State private var showingReportButton = false
+    
+    // 获取当前宠物角色
+    private var currentPetCharacter: PetCharacter {
+        guard let petId = PetDataManager.shared.status.selectedPetId,
+              let character = PetCharacter(rawValue: petId) else {
+            return .naicha // 默认返回奶茶
+        }
+        return character
+    }
     
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             if !message.isUser {
-                // AI头像
-                ZStack {
-                    Circle()
-                        .fill(Color.pink.opacity(0.2))
-                        .frame(width: 36, height: 36)
-                    
-                    Image(systemName: "pawprint.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.pink)
-                }
+                // AI头像 - 使用萌宠肖像
+                petAvatarView
             } else {
                 Spacer()
             }
             
             // 消息内容
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
+                // AI生成标识
+                if !message.isUser && message.isAIGenerated {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .font(.caption2)
+                        Text("AI 生成")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(.pink.opacity(0.8))
+                    .padding(.leading, 4)
+                }
+                
                 switch message.type {
                 case .text, .thinking:
                     textBubble
@@ -200,23 +219,34 @@ struct PetChatBubble: View {
                     }
                 }
                 
-                // 时间戳
-                Text(message.timestamp, style: .time)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                // 时间戳和举报按钮
+                HStack(spacing: 12) {
+                    Text(formatTimestamp(message.timestamp))
+                        .font(.caption2)
+                        .foregroundStyle(.gray.opacity(0.8))
+                    
+                    // 举报按钮 (长按后显示)
+                    if !message.isUser && message.isAIGenerated && showingReportButton {
+                        Button(action: {
+                            showingReportButton = false
+                        }) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "exclamationmark.bubble")
+                                    .font(.caption2)
+                                Text("举报")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.pink)
+                        }
+                        .transition(.opacity.combined(with: .scale))
+                    }
+                }
+                .padding(.leading, message.isUser ? 0 : 4)
             }
             
             if message.isUser {
-                // 用户头像
-                ZStack {
-                    Circle()
-                        .fill(Color.blue.opacity(0.2))
-                        .frame(width: 36, height: 36)
-                    
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.blue)
-                }
+                // 用户头像 - 使用 UserAvatarView
+                userAvatarView
             } else {
                 Spacer()
             }
@@ -224,19 +254,93 @@ struct PetChatBubble: View {
         .padding(.horizontal, 12)
     }
     
+    // 萌宠头像视图 - 使用 happy_cat 表情图片
+    private var petAvatarView: some View {
+        Image("happy_cat")
+            .resizable()
+            .scaledToFill()
+            .frame(width: 40, height: 40)
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.pink.opacity(0.3), lineWidth: 2)
+            )
+    }
+    
+    // 用户头像视图 - 使用账户与同步界面的 UserAvatarView
+    private var userAvatarView: some View {
+        UserAvatarView(
+            givenName: AuthenticationManager.shared.givenName,
+            familyName: AuthenticationManager.shared.familyName,
+            customAvatarPath: AuthenticationManager.shared.customAvatarPath,
+            size: 40
+        )
+    }
+    
+    // 格式化时间戳为 HH:mm:ss
+    private func formatTimestamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
+    }
+    
     // 文本气泡
     private var textBubble: some View {
-        Text(message.text)
-            .font(.subheadline)
-            .foregroundStyle(message.isUser ? .white : .primary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(message.isUser ? Color.pink : Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-            )
-            .frame(maxWidth: 280, alignment: message.isUser ? .trailing : .leading)
+        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
+            // 表情图片 (仅AI消息且存在图片时显示)
+            if !message.isUser, let imageName = message.imageName {
+                if let image = UIImage(named: imageName) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 200)
+                        .cornerRadius(12)
+                        .overlay(alignment: .bottomTrailing) {
+                            // 印章效果
+                            PetStampView()
+                                .scaleEffect(0.5)
+                                .padding(4)
+                        }
+                } else {
+                    // 图片不存在时显示占位符
+                    ZStack {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.1))
+                            .frame(width: 150, height: 150)
+                            .cornerRadius(12)
+                        
+                        VStack {
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.gray)
+                            Text(imageName)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+            }
+            
+            // 文本内容
+            Text(message.text)
+                .font(.subheadline)
+                .foregroundStyle(message.isUser ? .white : .primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(message.isUser ? Color.pink : Color(.systemBackground))
+                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                )
+        }
+        .frame(maxWidth: 280, alignment: message.isUser ? .trailing : .leading)
+        .onLongPressGesture {
+            if !message.isUser && message.isAIGenerated {
+                withAnimation {
+                    showingReportButton = true
+                }
+            }
+        }
     }
     
     // 衣橱卡片气泡
@@ -519,14 +623,16 @@ struct PetChatView: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
-    
+
     @StateObject private var petAI = PetAIService.shared
     @State private var messages: [PetChatMessage] = []
     @State private var inputText = ""
     @State private var isThinking = false
     @State private var selectedClothing: Clothing?
     @State private var navigateToDetail = false
-    
+    // iOS26搜索栏展开状态（用于控制常用菜单长按交互）
+    @State private var isSearchPresented = false
+
     // 每日问候管理器
     @StateObject private var greetingManager = DailyGreetingManager.shared
     
@@ -589,6 +695,7 @@ struct PetChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
                 text: $searchText,
+                isPresented: $isSearchPresented,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "和萌宠对话、搜索裙子..."
             )
@@ -608,6 +715,14 @@ struct PetChatView: View {
                 }
                 // 配置AI服务
                 configureAIService()
+            }
+            .onChange(of: isSearchPresented) { oldValue, newValue in
+                // 当iOS26搜索栏展开/收起时，通知常用菜单禁用/启用长按交互
+                NotificationCenter.default.post(
+                    name: .petChatSearchStateChanged,
+                    object: nil,
+                    userInfo: ["isSearching": newValue]
+                )
             }
             // iOS26+ 悬浮按钮 - 左右两侧，不放在不透明容器里
             .overlay(alignment: .bottomLeading) {
@@ -980,7 +1095,11 @@ struct PetChatView: View {
     private func handleDepositPlanQuery() {
         isThinking = true
         
+        // 计算完整的衣橱统计数据
+        let totalCount = clothings.reduce(0) { $0 + $1.stock }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
         let depositPlans = clothings.filter { $0.isDepositPlan }
+        let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -994,11 +1113,11 @@ struct PetChatView: View {
             }
             
             let stats = WardrobeStats(
-                totalCount: 0,
-                totalValue: 0,
+                totalCount: totalCount,
+                totalValue: totalValue,
                 mostExpensiveItem: nil,
                 depositPlanCount: depositPlans.count,
-                totalDeposit: 0,
+                totalDeposit: totalDeposit,
                 totalBalance: totalBalance
             )
             
@@ -1022,13 +1141,49 @@ struct PetChatView: View {
             await MainActor.run {
                 isThinking = false
                 
+                // PetAIService 返回的 ChatMessage 已经解析过 [IMAGE:xxx] 指令
+                // 直接使用 response.imageName 和 response.text
                 let message = PetChatMessage(
                     text: response.text,
-                    isUser: false
+                    isUser: false,
+                    imageName: response.imageName,
+                    isAIGenerated: true
                 )
                 messages.append(message)
             }
         }
+    }
+}
+
+// MARK: - 印章视图 (参考萌宠日记)
+struct PetStampView: View {
+    var body: some View {
+        ZStack {
+            // 外圈圆环
+            Circle()
+                .stroke(Color(hex: "FF69B4").opacity(0.6), lineWidth: 3)
+                .frame(width: 60, height: 60)
+            
+            // 内部双圆环装饰
+            Circle()
+                .stroke(Color(hex: "FF69B4").opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3]))
+                .frame(width: 52, height: 52)
+            
+            // 猫爪
+            Image(systemName: "pawprint.fill")
+                .font(.system(size: 30))
+                .foregroundStyle(Color(hex: "FF69B4").opacity(0.5))
+                .rotationEffect(.degrees(10))
+            
+            // 文字装饰
+            Text("REVIEWED")
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color(hex: "FF69B4"))
+                .offset(y: 22)
+                .rotationEffect(.degrees(-10))
+        }
+        .compositingGroup()
+        .opacity(0.8)
     }
 }
 
@@ -1459,7 +1614,11 @@ struct PetChatViewLegacy: View {
     private func handleDepositPlanQuery() {
         isThinking = true
         
+        // 计算完整的衣橱统计数据
+        let totalCount = clothings.reduce(0) { $0 + $1.stock }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
         let depositPlans = clothings.filter { $0.isDepositPlan }
+        let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -1473,11 +1632,11 @@ struct PetChatViewLegacy: View {
             }
             
             let stats = WardrobeStats(
-                totalCount: 0,
-                totalValue: 0,
+                totalCount: totalCount,
+                totalValue: totalValue,
                 mostExpensiveItem: nil,
                 depositPlanCount: depositPlans.count,
-                totalDeposit: 0,
+                totalDeposit: totalDeposit,
                 totalBalance: totalBalance
             )
             
@@ -1500,9 +1659,13 @@ struct PetChatViewLegacy: View {
             await MainActor.run {
                 isThinking = false
                 
+                // PetAIService 返回的 ChatMessage 已经解析过 [IMAGE:xxx] 指令
+                // 直接使用 response.imageName 和 response.text
                 let message = PetChatMessage(
                     text: response.text,
-                    isUser: false
+                    isUser: false,
+                    imageName: response.imageName,
+                    isAIGenerated: true
                 )
                 messages.append(message)
             }

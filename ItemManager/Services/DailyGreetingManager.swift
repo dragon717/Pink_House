@@ -268,16 +268,8 @@ final class DailyGreetingManager: ObservableObject {
             return getDefaultPoeticGreeting()
         }
         
-        // 直接返回第一条问候语的核心内容（去掉•符号）
+        // 直接返回第一条问候语的完整内容（去掉•符号）
         let primary = greeting.primaryMessage
-        
-        // 如果问候语包含"，"，取后半部分更诗意的内容
-        if let range = primary.range(of: "，") {
-            let afterComma = String(primary[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-            if !afterComma.isEmpty {
-                return afterComma
-            }
-        }
         
         return primary.isEmpty ? getDefaultPoeticGreeting() : primary
     }
