@@ -438,7 +438,8 @@ class OOTDLayoutEngine {
                     y: Double(layout.y),  // 相对坐标 0-1
                     rotation: layout.rotation,
                     scale: Double(layout.scale),
-                    zIndex: layout.zIndex
+                    zIndex: layout.zIndex,
+                    coordinateVersion: 2  // 新数据使用版本 2（相对坐标）
                 )
                 // 设置双向关系
                 item.outfit = outfit

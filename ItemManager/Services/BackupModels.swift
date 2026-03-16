@@ -461,7 +461,10 @@ struct OutfitItemDTO: Codable {
     let scale: Double
     let zIndex: Int
     let cutoutID: UUID?
-    
+    // 坐标版本：1 = 老版本（绝对坐标，像素值），2 = 新版本（相对坐标，0-1）
+    // 默认值为 1 以兼容旧备份文件
+    var coordinateVersion: Int? = 1
+
     // Redundant Backup Data for Robust Restore
     var backupImagePath: String?
     var backupImageWidth: Double?
@@ -491,6 +494,9 @@ struct OOTDSnapshotItemDTO: Codable {
     let height: Double
     let zIndex: Int
     let rotation: Double
+    // 坐标版本：1 = 老版本（绝对坐标，像素值），2 = 新版本（相对坐标，0-1）
+    // 默认值为 1 以兼容旧备份文件
+    var coordinateVersion: Int? = 1
 }
 
 // MARK: - Model3D DTO (v1.5)

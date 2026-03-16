@@ -705,7 +705,8 @@ class SwiftDataMigrationManager: ObservableObject {
             y: source.y,
             rotation: source.rotation,
             scale: source.scale,
-            zIndex: source.zIndex
+            zIndex: source.zIndex,
+            coordinateVersion: source.coordinateVersion
         )
         new.id = source.id
         return new

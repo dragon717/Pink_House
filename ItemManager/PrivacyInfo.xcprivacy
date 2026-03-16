@@ -4,7 +4,7 @@
 <dict>
     <!-- 隐私清单版本 -->
     <key>NSPrivacyTracking</key>
-    <false/>
+    <true/>
     
     <key>NSPrivacyTrackingDomains</key>
     <array/>

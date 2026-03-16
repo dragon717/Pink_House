@@ -43,10 +43,10 @@ struct OOTDPreviewView: View {
                         .frame(width: 200, height: 200)
                         .scaleEffect(item.scale)
                         .rotationEffect(Angle(degrees: item.rotation))
-                        // 兼容老数据：如果坐标大于1.5，说明是绝对坐标，需要转换为相对坐标
+                        // 注意：App启动时已通过 OOTDCoordinateMigrationService 将所有数据迁移为相对坐标
                         .position(
-                            x: normalizedX(item.x) * canvasWidth,
-                            y: normalizedY(item.y) * canvasHeight
+                            x: item.x * canvasWidth,
+                            y: item.y * canvasHeight
                         )
                 }
             }
@@ -55,21 +55,4 @@ struct OOTDPreviewView: View {
         .clipped()
     }
 
-    // MARK: - 坐标兼容处理（老数据使用绝对坐标，新数据使用相对坐标 0-1）
-
-    /// 将 X 坐标标准化为相对坐标（0-1）
-    private func normalizedX(_ x: Double) -> Double {
-        if x > 1.5 {
-            return x / 1080.0
-        }
-        return x
-    }
-
-    /// 将 Y 坐标标准化为相对坐标（0-1）
-    private func normalizedY(_ y: Double) -> Double {
-        if y > 1.5 {
-            return y / 1440.0
-        }
-        return y
-    }
 }

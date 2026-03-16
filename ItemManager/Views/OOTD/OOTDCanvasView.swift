@@ -379,27 +379,9 @@ struct ResizeHandleView: View {
     private let canvasHeight: CGFloat = 1440
 
     // 贴纸中心点（相对于画布，绝对坐标）
-    // 兼容老数据：如果坐标大于1.5，说明是绝对坐标，否则是相对坐标需要转换
+    // 注意：App启动时已通过 OOTDCoordinateMigrationService 将所有数据迁移为相对坐标
     private var itemCenter: CGPoint {
-        let x = normalizedX(item.x) * canvasWidth
-        let y = normalizedY(item.y) * canvasHeight
-        return CGPoint(x: x, y: y)
-    }
-
-    /// 将 X 坐标标准化为相对坐标（0-1）
-    private func normalizedX(_ x: Double) -> Double {
-        if x > 1.5 {
-            return x / 1080.0
-        }
-        return x
-    }
-
-    /// 将 Y 坐标标准化为相对坐标（0-1）
-    private func normalizedY(_ y: Double) -> Double {
-        if y > 1.5 {
-            return y / 1440.0
-        }
-        return y
+        CGPoint(x: item.x * canvasWidth, y: item.y * canvasHeight)
     }
     
     var body: some View {
@@ -516,10 +498,10 @@ struct CanvasItemView: View {
         .scaleEffect(item.scale * additionalScale)
         .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
         // 使用 position，将相对坐标（0-1）转换为绝对坐标（0-1080/1440）
-        // 兼容老数据：如果坐标大于1，说明是绝对坐标，需要转换为相对坐标
+        // 注意：App启动时已通过 OOTDCoordinateMigrationService 将所有数据迁移为相对坐标
         .position(
-            x: normalizedX(item.x) * canvasWidth + currentOffset.width,
-            y: normalizedY(item.y) * canvasHeight + currentOffset.height
+            x: item.x * canvasWidth + currentOffset.width,
+            y: item.y * canvasHeight + currentOffset.height
         )
         .overlay(
             ZStack {
@@ -593,9 +575,10 @@ struct CanvasItemView: View {
             .scaleEffect(item.scale * additionalScale)
             .rotationEffect(Angle(degrees: item.rotation) + additionalRotation)
             // overlay 使用与主视图相同的 position，确保选中框跟随贴纸
+            // 注意：App启动时已通过 OOTDCoordinateMigrationService 将所有数据迁移为相对坐标
             .position(
-                x: normalizedX(item.x) * canvasWidth + currentOffset.width,
-                y: normalizedY(item.y) * canvasHeight + currentOffset.height
+                x: item.x * canvasWidth + currentOffset.width,
+                y: item.y * canvasHeight + currentOffset.height
             )
         )
         .gesture(
@@ -620,14 +603,13 @@ struct CanvasItemView: View {
                     }
 
                     // 将绝对坐标的位移转换为相对坐标（0-1范围）
-                    // canvasWidth = 1080, canvasHeight = 1440
+                    // 注意：App启动时已通过 OOTDCoordinateMigrationService 将所有数据迁移为 version=2（相对坐标）
                     let deltaXRelative = value.translation.width / canvasWidth
                     let deltaYRelative = value.translation.height / canvasHeight
-
                     item.x += Double(deltaXRelative)
                     item.y += Double(deltaYRelative)
                     currentOffset = .zero
-                    print("[OOTD] Moved item \(item.id) to relative (\(item.x), \(item.y))")
+                    print("[OOTD] Moved item \(item.id) to (\(item.x), \(item.y))")
                     onUpdate()
                 }
         )
@@ -658,30 +640,6 @@ struct CanvasItemView: View {
         }
     }
 
-    // MARK: - 坐标兼容处理（老数据使用绝对坐标，新数据使用相对坐标 0-1）
-
-    /// 将 X 坐标标准化为相对坐标（0-1）
-    /// 如果坐标大于 1，说明是老数据的绝对坐标，需要转换
-    private func normalizedX(_ x: Double) -> Double {
-        // 如果 x > 1，说明是绝对坐标（像素值），转换为相对坐标
-        // 画布宽度 1080，所以除以 1080
-        if x > 1.5 { // 使用 1.5 作为阈值，避免误判（如 1.0 可能是相对坐标的边缘）
-            return x / 1080.0
-        }
-        return x
-    }
-
-    /// 将 Y 坐标标准化为相对坐标（0-1）
-    /// 如果坐标大于 1，说明是老数据的绝对坐标，需要转换
-    private func normalizedY(_ y: Double) -> Double {
-        // 如果 y > 1，说明是绝对坐标（像素值），转换为相对坐标
-        // 画布高度 1440，所以除以 1440
-        if y > 1.5 { // 使用 1.5 作为阈值
-            return y / 1440.0
-        }
-        return y
-    }
-    
     private func missingPlaceholder(text: String) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)

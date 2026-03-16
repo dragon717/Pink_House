@@ -322,7 +322,8 @@ class BackupService {
                         width: displayWidth,
                         height: displayHeight,
                         zIndex: item.zIndex,
-                        rotation: item.rotation
+                        rotation: item.rotation,
+                        coordinateVersion: item.coordinateVersion
                     )
                     items.append(itemDTO)
                 }
@@ -1823,6 +1824,9 @@ class BackupService {
                     let scale = cutout.width > 0 ? (itemDTO.width / cutout.width) : 1.0
                     
                     let item: OutfitItem
+                    // 获取坐标版本，默认为 1（兼容旧备份）
+                    let coordVersion = itemDTO.coordinateVersion ?? 1
+
                     if let ex = globalItemMap[itemDTO.id] {
                         item = ex
                         item.x = itemDTO.x
@@ -1830,11 +1834,12 @@ class BackupService {
                         item.rotation = itemDTO.rotation
                         item.scale = scale
                         item.zIndex = itemDTO.zIndex
-                        
+                        item.coordinateVersion = coordVersion
+
                         // Remove dangerous check for item.outfit?.id which causes crash if old outfit is invalid
                         // We will rely on outfit.items.append(item) to establish relationship
                     } else {
-                        item = OutfitItem(cutout: cutout, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: scale, zIndex: itemDTO.zIndex)
+                        item = OutfitItem(cutout: cutout, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: scale, zIndex: itemDTO.zIndex, coordinateVersion: coordVersion)
                         item.id = itemDTO.id
                         modelContext.insert(item)
                         globalItemMap[item.id] = item // Update global map
@@ -1894,6 +1899,9 @@ class BackupService {
                     }
                     for itemDTO in dto.items {
                         let item: OutfitItem
+                        // 获取坐标版本，默认为 1（兼容旧备份）
+                        let coordVersion = itemDTO.coordinateVersion ?? 1
+
                         if let ex = itemMap[itemDTO.id] {
                             item = ex
                             item.x = itemDTO.x
@@ -1901,8 +1909,9 @@ class BackupService {
                             item.rotation = itemDTO.rotation
                             item.scale = itemDTO.scale
                             item.zIndex = itemDTO.zIndex
+                            item.coordinateVersion = coordVersion
                         } else {
-                            item = OutfitItem(cutout: nil, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: itemDTO.scale, zIndex: itemDTO.zIndex)
+                            item = OutfitItem(cutout: nil, x: itemDTO.x, y: itemDTO.y, rotation: itemDTO.rotation, scale: itemDTO.scale, zIndex: itemDTO.zIndex, coordinateVersion: coordVersion)
                             item.id = itemDTO.id
                             modelContext.insert(item)
                             item.outfit = outfit

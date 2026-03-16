@@ -501,7 +501,8 @@ struct BookDetailView: View {
         modelContext.insert(newPage)
 
         for item in page.items ?? [] {
-            let newItem = OutfitItem(cutout: item.cutout, x: item.x, y: item.y, rotation: item.rotation, scale: item.scale, zIndex: item.zIndex)
+            // 复制时保持原有的 coordinateVersion，不强制转换为新版本
+            let newItem = OutfitItem(cutout: item.cutout, x: item.x, y: item.y, rotation: item.rotation, scale: item.scale, zIndex: item.zIndex, coordinateVersion: item.coordinateVersion)
             if newPage.items == nil {
                 newPage.items = []
             }
@@ -742,13 +743,15 @@ struct BookDetailView: View {
                 // 复制书页中的物品
                 if let items = page.items {
                     for item in items {
+                        // 复制时保持原有的 coordinateVersion，不强制转换为新版本
                         let newItem = OutfitItem(
                             cutout: item.cutout,
                             x: item.x,
                             y: item.y,
                             rotation: item.rotation,
                             scale: item.scale,
-                            zIndex: item.zIndex
+                            zIndex: item.zIndex,
+                            coordinateVersion: item.coordinateVersion
                         )
                         if newPage.items == nil {
                             newPage.items = []

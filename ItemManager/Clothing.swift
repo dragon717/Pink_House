@@ -285,19 +285,24 @@ final class OutfitItem {
     var scale: Double = 1.0
     var zIndex: Int = 0
     
+    // 坐标版本：1 = 老版本（绝对坐标，像素值），2 = 新版本（相对坐标，0-1）
+    // 默认值为 1 以兼容老数据，新创建的数据应设置为 2
+    var coordinateVersion: Int = 1
+    
     @Relationship(deleteRule: .nullify)
     var cutout: CutoutItem?
     
     @Relationship(deleteRule: .nullify)
     var outfit: Outfit?
     
-    init(cutout: CutoutItem?, x: Double, y: Double, rotation: Double, scale: Double, zIndex: Int) {
+    init(cutout: CutoutItem?, x: Double, y: Double, rotation: Double, scale: Double, zIndex: Int, coordinateVersion: Int = 2) {
         self.cutout = cutout
         self.x = x
         self.y = y
         self.rotation = rotation
         self.scale = scale
         self.zIndex = zIndex
+        self.coordinateVersion = coordinateVersion
     }
 }
 

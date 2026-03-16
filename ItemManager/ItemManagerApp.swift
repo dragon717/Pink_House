@@ -177,7 +177,10 @@ struct MainContentView: View {
                 await MainActor.run {
                     FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
                 }
-                
+
+                // 0.9 OOTD坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
+                await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
+
                 // 1. Minimum splash duration (aesthetic + buffer)
                 try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
                 

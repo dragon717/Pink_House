@@ -370,7 +370,8 @@ struct OOTDEditorView: View {
             y: 0.5,
             rotation: 0,
             scale: 1.0,
-            zIndex: outfit.items?.count ?? 0
+            zIndex: outfit.items?.count ?? 0,
+            coordinateVersion: 2  // 新数据使用版本 2（相对坐标）
         )
         if outfit.items == nil {
             outfit.items = []
@@ -537,7 +538,8 @@ struct OOTDEditorView: View {
                                         y: 0.5 + offset,
                                         rotation: 0,
                                         scale: 1.0,
-                                        zIndex: outfit.items?.count ?? 0
+                                        zIndex: outfit.items?.count ?? 0,
+                                        coordinateVersion: 2  // 新数据使用版本 2（相对坐标）
                                     )
                                     outfit.items?.append(item)
                                 }
@@ -596,7 +598,8 @@ struct OOTDEditorView: View {
                                             y: 0.5 + offset,
                                             rotation: 0,
                                             scale: 1.0,
-                                            zIndex: outfit.items?.count ?? 0
+                                            zIndex: outfit.items?.count ?? 0,
+                                            coordinateVersion: 2  // 新数据使用版本 2（相对坐标）
                                         )
                                         outfit.items?.append(item)
                                     }
