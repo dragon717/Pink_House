@@ -63,7 +63,7 @@ struct ModernTabView: View {
             return "世界书"
         case .calendar:
             return "梦裙日历"
-        case .wealth:
+        case .wealth(_):
             return "来财"
         case .pet:
             return petDataManager.status.displayName
@@ -92,7 +92,7 @@ struct ModernTabView: View {
             return "globe.asia.australia"
         case .calendar:
             return "calendar"
-        case .wealth:
+        case .wealth(_):
             return "yensign.circle"
         case .pet:
             return "pawprint"
@@ -114,7 +114,14 @@ struct ModernTabView: View {
             return "chart.line.uptrend.xyaxis"
         }
     }
-    
+
+    private var isOnMenu: Bool {
+        if case .menu = smallWorldDestination {
+            return true
+        }
+        return false
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
@@ -204,7 +211,10 @@ struct ModernTabView: View {
     }
     
     private var isSimulationActive: Bool {
-        return smallWorldDestination == .wealth
+        if case .wealth(_) = smallWorldDestination {
+            return true
+        }
+        return false
     }
 }
 
@@ -390,11 +400,12 @@ struct SmallWorldContainerView: View {
                 homeTab: $homeTab,
                 destination: $destination
             )
-        case .wealth:
+        case .wealth(let initialTab):
             WealthViewWithBackButton(
                 selectedTab: $selectedTab,
                 homeTab: $homeTab,
-                destination: $destination
+                destination: $destination,
+                initialTab: initialTab
             )
         case .calendar:
             DreamDressCalendarViewWithBackButton(
@@ -596,11 +607,15 @@ struct LegacyTabView: View {
 
     private func tabButton(index: Int, title: String, icon: String) -> some View {
         let isSelected = selectedTab == index
+        let isNotOnMenu: Bool = {
+            if case .menu = smallWorldDestination { return false }
+            return true
+        }()
 
         return Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 // 修复：如果已经在 House Tab (index=1) 且当前不在 menu 页面，则返回到 menu
-                if index == 1 && selectedTab == 1 && smallWorldDestination != .menu {
+                if index == 1 && selectedTab == 1 && isNotOnMenu {
                     smallWorldDestination = .menu
                 } else {
                     selectedTab = index
@@ -626,7 +641,7 @@ struct LegacyTabView: View {
         switch smallWorldDestination {
         case .bigWorld: return "世界书"
         case .calendar: return "梦裙日历"
-        case .wealth: return "来财"
+        case .wealth(_): return "来财"
         case .pet: return petDataManager.status.displayName
         case .ootd: return "穿搭手帐"
         case .ootdDefaultBook: return "魔法贴纸"
@@ -643,7 +658,7 @@ struct LegacyTabView: View {
         switch smallWorldDestination {
         case .bigWorld: return "globe.asia.australia"
         case .calendar: return "calendar"
-        case .wealth: return "yensign.circle"
+        case .wealth(_): return "yensign.circle"
         case .pet: return "pawprint"
         case .ootd: return "book.pages"
         case .ootdDefaultBook: return "book.pages"
@@ -691,11 +706,12 @@ struct SmallWorldContainerViewLegacy: View {
                 homeTab: $homeTab,
                 destination: $destination
             )
-        case .wealth:
+        case .wealth(let initialTab):
             WealthViewWithBackButtonLegacy(
                 selectedTab: $selectedTab,
                 homeTab: $homeTab,
-                destination: $destination
+                destination: $destination,
+                initialTab: initialTab
             )
         case .calendar:
             DreamDressCalendarViewWithBackButtonLegacy(
@@ -1067,9 +1083,10 @@ struct WealthViewWithBackButtonLegacy: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
+    var initialTab: WealthMainTab? = nil
 
     var body: some View {
-        WealthView()
+        WealthView(initialTab: initialTab)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     SmallWorldBackButtonLegacy(
@@ -1600,9 +1617,10 @@ struct WealthViewWithBackButton: View {
     @Binding var selectedTab: Int
     @Binding var homeTab: HomeTab
     @Binding var destination: SmallWorldDestination
-    
+    var initialTab: WealthMainTab? = nil
+
     var body: some View {
-        WealthView()
+        WealthView(initialTab: initialTab)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     SmallWorldBackButton(

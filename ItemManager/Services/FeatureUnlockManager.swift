@@ -232,7 +232,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .pet: return .pet
         case .ootd: return .ootd
         case .ootdDefaultBook: return .ootdDefaultBook
-        case .wealth: return .wealth
+        case .wealth: return .wealth(nil)
         case .calendar: return .calendar
         case .bigWorld: return .bigWorld
         case .perler: return .perler
@@ -774,7 +774,7 @@ extension SmallWorldDestination {
         case .pet: return .pet
         case .ootd: return .ootd
         case .ootdDefaultBook: return .ootdDefaultBook
-        case .wealth: return .wealth
+        case .wealth(_): return .wealth
         case .calendar: return .calendar
         case .bigWorld: return .bigWorld
         case .perler: return .perler

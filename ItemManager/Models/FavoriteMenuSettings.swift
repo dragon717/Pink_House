@@ -70,7 +70,7 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
         case .ootd: return .ootdDefaultBook
         case .fashionJournal: return .ootd
         case .smallWorld: return .menu
-        case .wealth: return .wealth
+        case .wealth: return .wealth(nil)
         case .dressStock: return .dressStock
         case .perler: return .perler
         case .calendar: return .calendar

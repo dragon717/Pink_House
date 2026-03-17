@@ -24,7 +24,10 @@ struct WealthView: View {
     @ObservedObject private var soundManager = SoundManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @Environment(ThemeManager.self) private var themeManager
-    
+
+    // 初始页签（从外部传入）
+    var initialTab: WealthMainTab? = nil
+
     // 主页面签选择
     @State private var selectedMainTab: WealthMainTab = .divination
     
@@ -117,7 +120,12 @@ struct WealthView: View {
             }
             .onAppear {
                 handleOnAppear()
-                
+
+                // 如果有指定初始页签，切换到该页签
+                if let initialTab = initialTab {
+                    selectedMainTab = initialTab
+                }
+
                 // 通知媒体状态管理器切换到财富页面
                 print("💰 WealthView.onAppear: 准备切换到财富页面")
                 mediaStateManager.switchToPage(.wealth)

@@ -47,7 +47,7 @@ struct TotalBalanceCard: View {
                 
                 // 马上来财
                 Button {
-                    handleQuickAccess(.wealth)
+                    handleQuickAccess(.wealth(nil))
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: "dollarsign.circle")

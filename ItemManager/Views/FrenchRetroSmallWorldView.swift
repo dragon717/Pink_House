@@ -218,7 +218,7 @@ struct FrenchRetroSmallWorldView: View {
 
             // 3. 猪 (来财)
             InteractionHotspot(rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "马上来财", labelPosition: CGPoint(x: 0.85, y: 0.72)) {
-                navigate(to: .wealth)
+                navigate(to: .wealth(nil))
             }
 
             // 4. 墙上的日历 (梦裙日历)

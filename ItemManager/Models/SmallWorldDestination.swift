@@ -5,7 +5,7 @@ enum SmallWorldDestination {
     case ootd
     case ootdDefaultBook // OOTD直达默认手帐
     case pet
-    case wealth
+    case wealth(WealthMainTab? = nil) // 来财，可选指定子页签
     case calendar
     case bigWorld
     case perler // 拼豆

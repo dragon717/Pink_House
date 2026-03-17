@@ -103,7 +103,7 @@ struct SmallWorldMenuOverlay: View {
             case .smallWorld:
                 return WheelMenuItem(title: "House", icon: "house.fill", destination: .menu, color: Color(red: 0.4, green: 0.8, blue: 0.9))
             case .wealth:
-                return WheelMenuItem(title: "来财", icon: "yensign.circle", destination: .wealth, color: Color(red: 1.0, green: 0.84, blue: 0.0))
+                return WheelMenuItem(title: "来财", icon: "yensign.circle", destination: .wealth(nil), color: Color(red: 1.0, green: 0.84, blue: 0.0))
             case .dressStock:
                 return WheelMenuItem(title: "裙装股市", icon: "chart.line.uptrend.xyaxis", destination: .dressStock, color: Color(red: 1.0, green: 0.42, blue: 0.62))
             case .perler:
@@ -470,13 +470,21 @@ struct SmallWorldMenuOverlay: View {
     private func handleTapAction() {
         DispatchQueue.main.async {
             if self.selectedTab == 1 {
-                if self.smallWorldDestination != .menu {
+                if !self.isOnMenu {
                     self.smallWorldDestination = .menu
                 }
             } else {
                 self.selectedTab = 1
             }
         }
+    }
+
+    // 判断是否在菜单页面
+    private var isOnMenu: Bool {
+        if case .menu = smallWorldDestination {
+            return true
+        }
+        return false
     }
 
     private func handlePressEnded() {

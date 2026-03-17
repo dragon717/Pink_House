@@ -63,8 +63,8 @@ struct RococoSmallWorldView: View {
             HotspotData(name: "穿搭手帐", rect: CGRect(x: 0.35, y: 0.53, width: 0.08, height: 0.19), color: .orange, label: "穿搭手帐", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.41, y: 0.725), destination: .ootd) {
                 navigate(to: .ootd)
             },
-            HotspotData(name: "来财", rect: CGRect(x: 0.46, y: 0.68, width: 0.06, height: 0.08), color: .yellow, label: "马上来财", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.52, y: 0.77), destination: .wealth) {
-                navigate(to: .wealth)
+            HotspotData(name: "来财", rect: CGRect(x: 0.46, y: 0.68, width: 0.06, height: 0.08), color: .yellow, label: "马上来财", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.52, y: 0.77), destination: .wealth(nil)) {
+                navigate(to: .wealth(nil))
             },
             HotspotData(name: "衣橱", rect: CGRect(x: 0.45, y: 0.12, width: 0.24, height: 0.24), color: .blue, label: "少女衣橱", labelStyle: .diagonal(angle: -35), labelPosition: CGPoint(x: 0.525, y: 0.12), destination: nil) {
                 withAnimation(.easeIn(duration: 0.5)) {
@@ -276,9 +276,9 @@ struct RococoSmallWorldView: View {
         // 检查功能是否已解锁
         if destination.canAccess {
             // 特殊处理：尾款天使和衣橱需要跳转到 Tab 0 (衣橱Tab)
-            if destination == .depositPlan {
+            if case .depositPlan = destination {
                 tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
-            } else if destination == .wardrobe {
+            } else if case .wardrobe = destination {
                 tabNavigationManager.navigate(to: .wardrobe(.wardrobe))
             } else {
                 // 已解锁，正常导航到House内部页面

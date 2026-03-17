@@ -1590,7 +1590,8 @@ struct PetChatView: View {
             isUser: false
         )
         messages.append(message)
-        TabNavigationManager.shared.navigate(to: .smallWorld(.wealth))
+        // 直接跳转到来财的数钱页签
+        TabNavigationManager.shared.navigate(to: .smallWorld(.wealth(.moneyCounting)))
     }
     
     // 处理AI对话
@@ -2501,7 +2502,8 @@ struct PetChatViewLegacy: View {
             isUser: false
         )
         messages.append(message)
-        TabNavigationManager.shared.navigate(to: .smallWorld(.wealth))
+        // 直接跳转到来财的数钱页签
+        TabNavigationManager.shared.navigate(to: .smallWorld(.wealth(.moneyCounting)))
     }
     
     private func handleAIChat(_ text: String) {
