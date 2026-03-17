@@ -5,6 +5,7 @@ import SwiftData
 /// AI返回的搭配建议数据结构
 struct OutfitSuggestionResponse {
     let description: String
+    let selectedItemNames: [String]
     let selectedItemIDs: [UUID]
     let style: String
     let occasion: String
@@ -31,26 +32,20 @@ class OutfitSuggestionService {
         clothings: [Clothing],
         context: ModelContext
     ) async throws -> ([Clothing], String, String, String) {
-        // 1. 获取衣橱上下文
-        let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(clothings: clothings)
-
-        // 2. 调用AI获取搭配建议
+        // 1. 调用AI获取搭配建议
         let suggestion = try await fetchOutfitSuggestionFromAI(
             query: query,
-            wardrobeContext: wardrobeContext,
             clothings: clothings
         )
 
-        // 3. 获取推荐的裙装
-        let selectedClothings = clothings.filter { clothing in
-            suggestion.selectedItemIDs.contains(clothing.id)
-        }
+        // 2. 获取推荐的裙装
+        let selectedClothings = matchSelectedClothings(suggestion: suggestion, clothings: clothings)
 
         guard !selectedClothings.isEmpty else {
             throw OutfitSuggestionError.noItemsAvailable
         }
 
-        // 4. 构建响应文本
+        // 3. 构建响应文本
         let responseText = buildResponseText(suggestion: suggestion, clothings: selectedClothings)
 
         return (selectedClothings, responseText, suggestion.style, suggestion.occasion)
@@ -124,30 +119,50 @@ class OutfitSuggestionService {
     /// 从AI获取搭配建议
     private func fetchOutfitSuggestionFromAI(
         query: String,
-        wardrobeContext: String,
         clothings: [Clothing]
     ) async throws -> OutfitSuggestionResponse {
+        let summary = WardrobeContextManager.shared.generateWardrobeSummary(
+            clothings: clothings,
+            includeItemList: false
+        )
+        let candidatesJSON = WardrobeContextManager.shared.generateRelevantItemsJSON(
+            query: query,
+            clothings: clothings,
+            maxItems: 18
+        )
+        
         // 构建Prompt
-        let prompt = buildOutfitPrompt(query: query, wardrobeContext: wardrobeContext)
+        let prompt = buildOutfitPrompt(
+            query: query,
+            wardrobeSummary: summary,
+            candidatesJSON: candidatesJSON
+        )
 
         // 调用AI服务
-        let aiMessage = await PetAIService.shared.sendMessage(prompt, enableVoice: false)
+        let aiMessage = await PetAIService.shared.sendMessage(
+            prompt,
+            enableVoice: false,
+            responseMode: .raw
+        )
 
         // 解析响应
         return try parseAIResponse(aiMessage.text, clothings: clothings)
     }
 
     /// 构建搭配专用Prompt
-    private func buildOutfitPrompt(query: String, wardrobeContext: String) -> String {
+    private func buildOutfitPrompt(query: String, wardrobeSummary: String, candidatesJSON: String) -> String {
         return """
         你是主人的专业Lo裙搭配师，精通Lolita时尚穿搭。
 
         用户需求：\(query)
 
-        衣橱数据：
-        \(wardrobeContext)
+        衣橱摘要：
+        \(wardrobeSummary)
+        
+        已遴选候选单品（JSON，仅名字和特征）：
+        \(candidatesJSON)
 
-        请从【可用单品列表】中选择2-4件单品进行搭配，要求：
+        请从上述候选单品中选择2-4件进行搭配，要求：
         1. 考虑颜色协调性（同色系或互补色）
         2. 考虑场合适配性
         3. 优先选择JSK/OP作为主体
@@ -156,17 +171,17 @@ class OutfitSuggestionService {
         请严格按以下JSON格式返回（不要包含其他内容）：
         {
           "description": "搭配描述（30字以内，带喵~）",
-          "selectedItemIDs": ["物品ID1", "物品ID2", ...],
+          "selectedItemNames": ["单品名称1", "单品名称2", ...],
           "style": "甜美/优雅/哥特/CLA/日常",
           "occasion": "日常/约会/茶会/通勤",
           "reasoning": "搭配理由（50字以内）"
         }
 
         重要提示：
-        - selectedItemIDs必须严格使用【可用单品列表】中提供的ID（UUID格式）
-        - 不要编造ID，必须从列表中选择真实存在的物品ID
-        - 如果衣橱为空或物品不足，请返回空数组并说明
+        - selectedItemNames 必须从候选单品中挑选，不要编造不存在名称
+        - 如果候选不足，请返回空数组并说明
         - 描述要符合小橘猫角色（带喵~，用括号表示动作）
+        - 只返回 JSON，不要额外解释
         """
     }
 
@@ -188,6 +203,9 @@ class OutfitSuggestionService {
         do {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 let description = json["description"] as? String ?? "为你搭配了一套~喵"
+                let selectedNames = (json["selectedItemNames"] as? [String] ?? [])
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
                 let idStrings = json["selectedItemIDs"] as? [String] ?? []
                 let style = json["style"] as? String ?? "日常"
                 let occasion = json["occasion"] as? String ?? "日常"
@@ -203,6 +221,7 @@ class OutfitSuggestionService {
 
                 return OutfitSuggestionResponse(
                     description: description,
+                    selectedItemNames: selectedNames,
                     selectedItemIDs: validIDs,
                     style: style,
                     occasion: occasion,
@@ -255,6 +274,48 @@ class OutfitSuggestionService {
         }
 
         return text
+    }
+    
+    private func matchSelectedClothings(
+        suggestion: OutfitSuggestionResponse,
+        clothings: [Clothing]
+    ) -> [Clothing] {
+        var selected: [Clothing] = []
+        var seen = Set<UUID>()
+        
+        // 优先按名字匹配
+        for rawName in suggestion.selectedItemNames {
+            let name = rawName.lowercased()
+            let exact = clothings.first { $0.name.lowercased() == name }
+            let fuzzy = clothings.first { $0.name.lowercased().contains(name) || name.contains($0.name.lowercased()) }
+            if let matched = exact ?? fuzzy, seen.insert(matched.id).inserted {
+                selected.append(matched)
+            }
+        }
+        
+        // 兼容旧格式：按 ID 匹配
+        if selected.count < 2 {
+            for id in suggestion.selectedItemIDs {
+                if let matched = clothings.first(where: { $0.id == id }),
+                   seen.insert(matched.id).inserted {
+                    selected.append(matched)
+                }
+            }
+        }
+        
+        // 最小兜底：保障至少有两件可展示
+        if selected.count < 2 {
+            for clothing in clothings.prefix(4) {
+                if seen.insert(clothing.id).inserted {
+                    selected.append(clothing)
+                }
+                if selected.count >= 2 {
+                    break
+                }
+            }
+        }
+        
+        return selected
     }
 }
 

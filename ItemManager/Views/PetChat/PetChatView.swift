@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CoreLocation
 
 // MARK: - 超时包装函数（使用 PetAIService 中的 TimeoutError）
 func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
@@ -836,7 +837,7 @@ struct PetChatView: View {
 
     // 每日问候管理器
     @StateObject private var greetingManager = DailyGreetingManager.shared
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -928,36 +929,30 @@ struct PetChatView: View {
             .safeAreaInset(edge: .bottom) {
                 // 当搜索栏展开时显示按钮在键盘上方
                 if isSearchPresented {
-                    HStack {
-                        // 左侧菜单按钮
-                        iOS26LeftFloatingButton
-                            .padding(.leading, 16)
-                        
-                        Spacer()
-                        
-                        // 右侧发送按钮
-                        iOS26RightFloatingButton
-                            .padding(.trailing, 16)
-                    }
-                    .padding(.vertical, 60)
-                    .background(.clear) // 透明背景，不遮挡内容
+                    floatingButtonsRow
+                        .padding(.vertical, 60)
+                        .background(.clear) // 透明背景，不遮挡内容
                 }
             }
             // 搜索栏收起时的悬浮按钮（原位显示）
             .overlay(alignment: .bottom) {
                 if !isSearchPresented {
-                    HStack {
-                        iOS26LeftFloatingButton
-                            .padding(.leading, 16)
-                        
-                        Spacer()
-                        
-                        iOS26RightFloatingButton
-                            .padding(.trailing, 16)
-                    }
-                    .padding(.bottom, 20)
+                    floatingButtonsRow
+                        .padding(.bottom, 20)
                 }
             }
+        }
+    }
+    
+    private var floatingButtonsRow: some View {
+        HStack {
+            iOS26LeftFloatingButton
+                .padding(.leading, 16)
+            
+            Spacer()
+            
+            iOS26RightFloatingButton
+                .padding(.trailing, 16)
         }
     }
     
@@ -1004,11 +999,23 @@ struct PetChatView: View {
                 } label: {
                     Label("今日搭配色", systemImage: "paintpalette.fill")
                 }
+                
+                Button {
+                    handleWeatherOutfitGuidance()
+                } label: {
+                    Label("查看天气穿搭", systemImage: "cloud.sun.rain.fill")
+                }
 
                 Button {
                     handleDepositPlanQuery()
                 } label: {
                     Label("尾款提醒", systemImage: "tag.fill")
+                }
+                
+                Button {
+                    navigateToWealthCounting()
+                } label: {
+                    Label("去来财数钞票", systemImage: "yensign.circle.fill")
                 }
             }
 
@@ -1092,7 +1099,7 @@ struct PetChatView: View {
         // 处理用户意图
         processUserIntent(userText)
     }
-    
+
     // 从搜索栏发送消息 - 等同于 PetDialogueInputView 的功能
     private func sendMessageFromSearchBar() {
         let userText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1150,7 +1157,10 @@ struct PetChatView: View {
     
     // 配置AI服务
     private func configureAIService() {
-        let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(clothings: clothings)
+        let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(
+            clothings: clothings,
+            includeItemList: false
+        )
         petAI.ensureConfiguration(
             role: .kitten,
             petName: PetDataManager.shared.status.displayName,
@@ -1199,6 +1209,14 @@ struct PetChatView: View {
            lowercasedText.contains("穿搭") || lowercasedText.contains("怎么穿") ||
            (lowercasedText.contains("搭配") && (lowercasedText.contains("一套") || lowercasedText.contains("出门") || lowercasedText.contains("今天"))) {
             handleOutfitSuggestion(text)
+            return
+        }
+        
+        // 检查是否是天气相关穿搭
+        if lowercasedText.contains("天气") || lowercasedText.contains("温度") ||
+           lowercasedText.contains("下雨") || lowercasedText.contains("雨伞") ||
+           lowercasedText.contains("风大") {
+            handleWeatherOutfitGuidance()
             return
         }
 
@@ -1523,12 +1541,72 @@ struct PetChatView: View {
         }
     }
     
+    private func handleWeatherOutfitGuidance() {
+        isThinking = true
+        let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(from: clothings)
+        
+        Task { @MainActor in
+            let weather = await fetchCurrentWeather()
+            let responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
+            let items = selection.combinedItems
+
+            isThinking = false
+            let message = PetChatMessage(
+                text: responseText,
+                isUser: false,
+                type: items.isEmpty ? .text : .searchResults,
+                searchResults: items.isEmpty ? nil : items
+            )
+            messages.append(message)
+        }
+    }
+    
+    @MainActor
+    private func fetchCurrentWeather() async -> WeatherData? {
+        let locationService = LocationService.shared
+        let weatherService = WeatherService.shared
+        
+        if let location = await locationService.getCurrentLocation() {
+            let cityInfo = await locationService.reverseGeocode(location)
+            let city = cityInfo?.city ?? locationService.currentCity
+            return await weatherService.fetchWeather(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                city: city == "未知城市" ? "当前位置" : city
+            )
+        }
+        
+        let cachedCity = locationService.currentCity
+        if cachedCity != "未知城市" {
+            return await weatherService.fetchWeatherForCity(cachedCity)
+        }
+        
+        return nil
+    }
+    
+    private func navigateToWealthCounting() {
+        let message = PetChatMessage(
+            text: "走吧，我们去「来财」数钞票放松一下～",
+            isUser: false
+        )
+        messages.append(message)
+        TabNavigationManager.shared.navigate(to: .smallWorld(.wealth))
+    }
+    
     // 处理AI对话
     private func handleAIChat(_ text: String) {
         isThinking = true
 
         Task {
-            let response = await petAI.sendMessage(text, enableVoice: false)
+            let prompt = WardrobeContextManager.shared.buildPromptWithRelevantWardrobeContext(
+                query: text,
+                clothings: clothings
+            )
+            let response = await petAI.sendMessage(
+                prompt,
+                displayText: text,
+                enableVoice: false
+            )
 
             await MainActor.run {
                 isThinking = false
@@ -1596,7 +1674,7 @@ struct PetChatView: View {
                 await MainActor.run {
                     isThinking = false
                     let message = PetChatMessage(
-                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        text: "（蹭蹭你）我刚刚卡壳了喵…可以试试切稳定网络、把需求说短一点（场景+风格），或者等半分钟再试，我会继续陪你慢慢挑~",
                         isUser: false
                     )
                     messages.append(message)
@@ -1664,7 +1742,7 @@ struct PetChatView: View {
                 await MainActor.run {
                     isThinking = false
                     let message = PetChatMessage(
-                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        text: "（蹭蹭你）我刚刚卡壳了喵…可以试试切稳定网络、把需求说短一点（场景+风格），或者等半分钟再试，我会继续陪你慢慢挑~",
                         isUser: false
                     )
                     messages.append(message)
@@ -1765,7 +1843,6 @@ struct PetChatViewLegacy: View {
     @State private var isSavingOutfit = false
 
     @StateObject private var greetingManager = DailyGreetingManager.shared
-    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -1877,11 +1954,23 @@ struct PetChatViewLegacy: View {
                     } label: {
                         Label("今日搭配色", systemImage: "paintpalette")
                     }
+                    
+                    Button {
+                        handleWeatherOutfitGuidance()
+                    } label: {
+                        Label("查看天气穿搭", systemImage: "cloud.sun.rain.fill")
+                    }
 
                     Button {
                         handleDepositPlanQuery()
                     } label: {
                         Label("尾款提醒", systemImage: "tag")
+                    }
+                    
+                    Button {
+                        navigateToWealthCounting()
+                    } label: {
+                        Label("去来财数钞票", systemImage: "yensign.circle.fill")
                     }
 
                     Button {
@@ -1981,6 +2070,7 @@ struct PetChatViewLegacy: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
     
+    
     // 从底部输入框发送消息 - 等同于 PetDialogueInputView 的功能
     private func sendMessageFromInput() {
         let userText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1996,9 +2086,12 @@ struct PetChatViewLegacy: View {
         // 处理用户意图
         processUserIntent(userText)
     }
-    
+
     private func configureAIService() {
-        let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(clothings: clothings)
+        let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(
+            clothings: clothings,
+            includeItemList: false
+        )
         petAI.ensureConfiguration(
             role: .kitten,
             petName: PetDataManager.shared.status.displayName,
@@ -2173,6 +2266,13 @@ struct PetChatViewLegacy: View {
            lowercasedText.contains("穿搭") || lowercasedText.contains("怎么穿") ||
            (lowercasedText.contains("搭配") && (lowercasedText.contains("一套") || lowercasedText.contains("出门") || lowercasedText.contains("今天"))) {
             handleOutfitSuggestion(text)
+            return
+        }
+        
+        if lowercasedText.contains("天气") || lowercasedText.contains("温度") ||
+           lowercasedText.contains("下雨") || lowercasedText.contains("雨伞") ||
+           lowercasedText.contains("风大") {
+            handleWeatherOutfitGuidance()
             return
         }
 
@@ -2352,11 +2452,71 @@ struct PetChatViewLegacy: View {
         }
     }
     
+    private func handleWeatherOutfitGuidance() {
+        isThinking = true
+        let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(from: clothings)
+        
+        Task { @MainActor in
+            let weather = await fetchCurrentWeather()
+            let responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
+            let items = selection.combinedItems
+
+            isThinking = false
+            let message = PetChatMessage(
+                text: responseText,
+                isUser: false,
+                type: items.isEmpty ? .text : .searchResults,
+                searchResults: items.isEmpty ? nil : items
+            )
+            messages.append(message)
+        }
+    }
+    
+    @MainActor
+    private func fetchCurrentWeather() async -> WeatherData? {
+        let locationService = LocationService.shared
+        let weatherService = WeatherService.shared
+        
+        if let location = await locationService.getCurrentLocation() {
+            let cityInfo = await locationService.reverseGeocode(location)
+            let city = cityInfo?.city ?? locationService.currentCity
+            return await weatherService.fetchWeather(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                city: city == "未知城市" ? "当前位置" : city
+            )
+        }
+        
+        let cachedCity = locationService.currentCity
+        if cachedCity != "未知城市" {
+            return await weatherService.fetchWeatherForCity(cachedCity)
+        }
+        
+        return nil
+    }
+    
+    private func navigateToWealthCounting() {
+        let message = PetChatMessage(
+            text: "走吧，我们去「来财」数钞票放松一下～",
+            isUser: false
+        )
+        messages.append(message)
+        TabNavigationManager.shared.navigate(to: .smallWorld(.wealth))
+    }
+    
     private func handleAIChat(_ text: String) {
         isThinking = true
         
         Task {
-            let response = await petAI.sendMessage(text, enableVoice: false)
+            let prompt = WardrobeContextManager.shared.buildPromptWithRelevantWardrobeContext(
+                query: text,
+                clothings: clothings
+            )
+            let response = await petAI.sendMessage(
+                prompt,
+                displayText: text,
+                enableVoice: false
+            )
             
             await MainActor.run {
                 isThinking = false
@@ -2425,7 +2585,7 @@ struct PetChatViewLegacy: View {
                 await MainActor.run {
                     isThinking = false
                     let message = PetChatMessage(
-                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        text: "（抱住你）我刚刚想太久啦喵…你可以先给我“场景+风格”短句，或换稳定网络再试一次，我会乖乖继续帮你配~",
                         isUser: false
                     )
                     messages.append(message)
@@ -2493,7 +2653,7 @@ struct PetChatViewLegacy: View {
                 await MainActor.run {
                     isThinking = false
                     let message = PetChatMessage(
-                        text: "（挠头）搭配生成超时了，请检查网络后重试喵~",
+                        text: "（抱住你）我刚刚想太久啦喵…你可以先给我“场景+风格”短句，或换稳定网络再试一次，我会乖乖继续帮你配~",
                         isUser: false
                     )
                     messages.append(message)

@@ -324,14 +324,21 @@ class PetAIService: ObservableObject {
         print("🛑 [PetAIService] 用户停止生成")
     }
     
-    func sendMessage(_ text: String, userImagePath: String? = nil, displayText: String? = nil, enableVoice: Bool = true) async -> ChatMessage {
-        print("🐾 [Debug] 准备发送消息给奶茶猫 (DeepSeek): \(text)")
+    func sendMessage(
+        _ text: String,
+        userImagePath: String? = nil,
+        displayText: String? = nil,
+        enableVoice: Bool = true,
+        responseMode: AIResponseMode = .humanized
+    ) async -> ChatMessage {
+        print("🐾 [PetAIService] sendMessage length=\(text.count)")
+        let historyUserText = displayText ?? text
         
         // 重置停止标志
         shouldStopGeneration = false
         
         // 1. 记录用户消息 (Use displayText if available, otherwise raw text)
-        let userMsg = ChatMessage(text: displayText ?? text, imagePath: userImagePath, isUser: true)
+        let userMsg = ChatMessage(text: historyUserText, imagePath: userImagePath, isUser: true)
         self.allMessages.append(userMsg)
         self.uiMessages.append(userMsg)
         self.saveMessages()
@@ -352,13 +359,17 @@ class PetAIService: ObservableObject {
         print("🔍 [PetAIService] 发送请求 - Provider: \(provider)")
         if apiKey.isEmpty {
             print("❌ [PetAIService] Error: API Key is empty! Cannot send request.")
-            let errorMsg = ChatMessage(text: "配置错误：API Key 为空。请检查 GenerativeAI-Info.plist。", isUser: false)
+            let errorMsg = ChatMessage(
+                text: "（贴贴）我现在还连不上云端大脑，先去「智能萌宠设置」检查一下密钥，再来找我喵~",
+                imageName: "curious_cat",
+                isUser: false
+            )
             self.allMessages.append(errorMsg)
             self.uiMessages.append(errorMsg)
             self.saveMessages()
             return errorMsg
         }
-        print("🔑 [PetAIService] API Key (Masked): \(apiKey.prefix(6))...\(apiKey.suffix(4))")
+        print("🔑 [PetAIService] API Key ready")
         
         do {
             // ... (TaskGroup logic)
@@ -398,9 +409,9 @@ class PetAIService: ObservableObject {
                             system: systemPrompt // Optional
                         )
                         
-                        print("📡 [PetAIService] Minimax Request Body: \(String(data: try JSONEncoder().encode(body), encoding: .utf8) ?? "")")
-                        
-                        request.httpBody = try JSONEncoder().encode(body)
+                        let bodyData = try JSONEncoder().encode(body)
+                        print("📡 [PetAIService] Minimax payload bytes: \(bodyData.count)")
+                        request.httpBody = bodyData
                         
                         let (data, response) = try await URLSession.shared.data(for: request)
                         
@@ -435,9 +446,9 @@ class PetAIService: ObservableObject {
                         let messagesToSend = [historyToSend.first!] + historyToSend.suffix(10)
                         
                         let body = DSRequest(model: "deepseek-chat", messages: messagesToSend, stream: false)
-                        print("📡 [PetAIService] DeepSeek Request Body: \(String(data: try JSONEncoder().encode(body), encoding: .utf8) ?? "")")
-                        
-                        request.httpBody = try JSONEncoder().encode(body)
+                        let bodyData = try JSONEncoder().encode(body)
+                        print("📡 [PetAIService] DeepSeek payload bytes: \(bodyData.count)")
+                        request.httpBody = bodyData
                         
                         // 发送请求
                         let (data, response) = try await URLSession.shared.data(for: request)
@@ -469,20 +480,21 @@ class PetAIService: ObservableObject {
             }
             
             // 成功处理 (回到 MainActor)
-            print("✅ [Debug] 收到 \(provider) 响应: \(replyContent)")
+            print("✅ [PetAIService] 收到响应，长度=\(replyContent.count)")
             
             // 更新历史
-            self.history.append(DSMessage(role: "user", content: text))
+            self.history.append(DSMessage(role: "user", content: historyUserText))
             self.history.append(DSMessage(role: "assistant", content: replyContent))
             
             let (cleanText, imageName) = parseResponse(replyContent)
+            let displayResponse = responseMode == .raw ? cleanText : PetResponseHumanizer.humanize(cleanText)
 
             // 触发语音朗读 (TTS) - 仅在启用语音时播放
             if enableVoice {
-                PetVoiceManager.shared.speak(cleanText, for: self.role)
+                PetVoiceManager.shared.speak(displayResponse, for: self.role)
             }
 
-            let aiMsg = ChatMessage(text: cleanText, imageName: imageName, isUser: false)
+            let aiMsg = ChatMessage(text: displayResponse, imageName: imageName, isUser: false)
             self.allMessages.append(aiMsg)
             self.uiMessages.append(aiMsg)
             self.saveMessages()
@@ -490,14 +502,22 @@ class PetAIService: ObservableObject {
             
         } catch is TimeoutError {
             print("❌ [Debug] 请求超时 (30s)")
-            let errorMsg = ChatMessage(text: "（打呼噜...）\(provider) 好像有点慢喵...", imageName: "sleepy_cat", isUser: false)
+            let errorMsg = ChatMessage(
+                text: "（抱住你）刚刚网络有点挤住了喵…我们可以换个稳定网络、把问题说短一点，或者等半分钟再试一次，我会一直陪着你的~",
+                imageName: "sleepy_cat",
+                isUser: false
+            )
             self.allMessages.append(errorMsg)
             self.uiMessages.append(errorMsg)
             self.saveMessages()
             return errorMsg
         } catch {
             print("❌ [Debug] 请求发生错误: \(error)")
-            let errorMsg = ChatMessage(text: "错误: \(error.localizedDescription) (请检查 \(provider) API_KEY)", isUser: false)
+            let errorMsg = ChatMessage(
+                text: "（蹭蹭）我这边刚刚绊了一下喵…可以检查网络或稍后再试，我会继续努力给你更好的建议~",
+                imageName: "curious_cat",
+                isUser: false
+            )
             self.allMessages.append(errorMsg)
             self.uiMessages.append(errorMsg)
             self.saveMessages()
