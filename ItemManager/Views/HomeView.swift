@@ -73,6 +73,7 @@ struct HomeView: View {
     @State private var isEditing = false
     @State private var isSearchActive = false
     @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
+    @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
     
     // Filter States
     @State private var selectedTagIDs: Set<UUID> = []
@@ -174,12 +175,26 @@ struct HomeView: View {
                 BatchImportView()
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    tabSwitcher
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    actionButtons
+                if wardrobeNavigationStyle == .classic {
+                    ToolbarItem(placement: .topBarLeading) {
+                        tabSwitcher
+                    }
+                    
+                    ToolbarItem(placement: .topBarTrailing) {
+                        classicActionButtons
+                    }
+                } else {
+                    ToolbarItem(placement: .topBarLeading) {
+                        fashionLeadingButtons
+                    }
+                    
+                    ToolbarItem(placement: .principal) {
+                        fashionTabSwitcher
+                    }
+                    
+                    ToolbarItem(placement: .topBarTrailing) {
+                        fashionTrailingButtons
+                    }
                 }
             }
             .toolbarBackground(.visible, for: .navigationBar)
@@ -275,7 +290,15 @@ struct HomeView: View {
         }
     }
     
-    private var actionButtons: some View {
+    private var fashionTabSwitcher: some View {
+        WardrobeFashionTabSwitcher(selectedTab: $selectedTab, monthIndicator: depositMonthIndicator)
+    }
+    
+    private var isInWardrobeEditMode: Bool {
+        selectedTab == .wardrobe && (isSelectionMode || (sortOption == .custom && isEditing))
+    }
+    
+    private var classicActionButtons: some View {
         HStack(spacing: 6) {
             // 完成编辑按钮（编辑模式时直接显示）
             if selectedTab == .wardrobe && isSelectionMode {
@@ -287,24 +310,49 @@ struct HomeView: View {
                 doneSortButton
             }
             
-            // 检查是否处于任何编辑模式
-            let isInEditMode = selectedTab == .wardrobe && (isSelectionMode || (sortOption == .custom && isEditing))
-            
             // 排序、筛选、视图直接显示在导航栏（非编辑模式时显示）
-            if !isInEditMode {
+            if !isInWardrobeEditMode {
                 sortButton
                 filterButton
                 displayButton
             }
             
             // 补款提醒（仅尾款天使标签页，且非编辑模式）
-            if selectedTab == .depositPlan && !isInEditMode {
+            if selectedTab == .depositPlan && !isInWardrobeEditMode {
                 notificationButton
             }
             
             // 更多菜单 - 包含搜索、编辑、自定义排序等功能
             moreMenuButton
             
+            addButton
+        }
+    }
+    
+    private var fashionLeadingButtons: some View {
+        HStack(spacing: 6) {
+            if selectedTab == .wardrobe && isSelectionMode {
+                doneEditButton
+            }
+            
+            if selectedTab == .wardrobe && sortOption == .custom && isEditing {
+                doneSortButton
+            }
+            
+            if !isInWardrobeEditMode {
+                sortButton
+                filterButton
+            }
+        }
+    }
+    
+    private var fashionTrailingButtons: some View {
+        HStack(spacing: 6) {
+            if !isInWardrobeEditMode {
+                displayButton
+            }
+            
+            moreMenuButton
             addButton
         }
     }
@@ -379,6 +427,11 @@ struct HomeView: View {
                     } label: {
                         Label("调整顺序", systemImage: "list.number")
                     }
+                }
+            } else if selectedTab == .depositPlan {
+                Divider()
+                NavigationLink(destination: NotificationSettingsView()) {
+                    Label("补款提醒设置", systemImage: "bell.badge")
                 }
             }
             
@@ -786,12 +839,7 @@ struct HomeView: View {
 }
 
 extension HomeView {
-    private enum DepositMonthIndicatorType {
-        case current(Int)
-        case next(Int)
-    }
-    
-    private var depositMonthIndicator: DepositMonthIndicatorType? {
+    private var depositMonthIndicator: WardrobeMonthIndicator? {
         let calendar = Calendar.current
         let now = Date()
         

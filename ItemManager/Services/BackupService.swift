@@ -73,6 +73,7 @@ class BackupService {
         "UserPreference_SortOption",
         "UserPreference_ViewLayout",
         "UserPreference_DepositDisplayMode",
+        "UserPreference_WardrobeNavigationStyle",
         "shouldShowWealthContainerBackground",
         "visualModelPriority",
         "textModelPriority",

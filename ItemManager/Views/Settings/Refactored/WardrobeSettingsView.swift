@@ -16,10 +16,24 @@ struct WardrobeSettingsView: View {
     @State private var isLoadingImage = false
     @State private var showingMissingOriginalAlert = false
     
+    // Wardrobe Style
+    @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
+    
     var body: some View {
         @Bindable var theme = themeManager
         
         AdaptiveSettingsView(title: "梦幻衣橱") {
+            // MARK: - 界面样式
+            AdaptiveSection(header: "界面样式") {
+                Picker("选择样式", selection: $wardrobeNavigationStyle) {
+                    ForEach(WardrobeNavigationStyle.allCases) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .adaptiveRow(showDivider: false)
+            }
+            
             // MARK: - 外观个性化
             appAppearanceSection(theme: theme)
             
