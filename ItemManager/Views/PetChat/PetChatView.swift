@@ -64,12 +64,14 @@ struct PetChatMessage: Identifiable {
     var imageName: String?            // 表情图片名称 (如 happy_cat, sleepy_cat)
     var isAIGenerated: Bool           // 是否AI生成
     var outfitSuggestion: OutfitSuggestionData? // 搭配建议（新增）
+    var widgets: [PetWidgetData]?     // 生成式UI组件
 
     init(text: String, isUser: Bool, type: PetChatMessageType = .text,
          clothing: Clothing? = nil, searchResults: [Clothing]? = nil,
          statistics: WardrobeStats? = nil, colorRecommendation: ColorRecommendation? = nil,
          imageName: String? = nil, isAIGenerated: Bool = false,
-         outfitSuggestion: OutfitSuggestionData? = nil) {
+         outfitSuggestion: OutfitSuggestionData? = nil,
+         widgets: [PetWidgetData]? = nil) {
         self.text = text
         self.isUser = isUser
         self.type = type
@@ -81,6 +83,7 @@ struct PetChatMessage: Identifiable {
         self.imageName = imageName
         self.isAIGenerated = isAIGenerated
         self.outfitSuggestion = outfitSuggestion
+        self.widgets = widgets
     }
 }
 
@@ -189,8 +192,10 @@ struct PetChatBubble: View {
     let onCardTap: (Clothing) -> Void
     let onSearchResultTap: (Clothing) -> Void
     let onOutfitTap: (OutfitSuggestionData) -> Void
+    let onWidgetAction: (PetWidgetOption) -> Void
 
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showAllResults = false
     @State private var showingReportButton = false
     
@@ -260,6 +265,11 @@ struct PetChatBubble: View {
                         textBubble
                     }
                 }
+
+                if let widgets = message.widgets, !widgets.isEmpty {
+                    PetGenerativeWidgetHost(widgets: widgets, onAction: onWidgetAction)
+                        .frame(maxWidth: 320, alignment: message.isUser ? .trailing : .leading)
+                }
                 
                 // 时间戳和举报按钮
                 HStack(spacing: 12) {
@@ -325,6 +335,52 @@ struct PetChatBubble: View {
         formatter.dateFormat = "HH:mm:ss"
         return formatter.string(from: date)
     }
+
+    private var skinTheme: PetChatSkinTheme {
+        themeManager.petChatSkinTheme
+    }
+
+    private var bubbleCornerRadius: CGFloat {
+        skinTheme.cornerRadius
+    }
+
+    private var aiBubbleTextColor: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+
+    @ViewBuilder
+    private func bubbleBackground(isUser: Bool) -> some View {
+        if skinTheme == .classic {
+            RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                .fill(isUser ? Color.pink : Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+        } else if isUser {
+            RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                .fill(
+                    LinearGradient(
+                        colors: skinTheme.userBubbleColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: Color.pink.opacity(0.25), radius: 6, x: 0, y: 2)
+        } else {
+            RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                        .stroke(
+                            LinearGradient(
+                                colors: skinTheme.assistantStrokeColors,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.07), radius: 5, x: 0, y: 2)
+        }
+    }
     
     // 文本气泡
     private var textBubble: some View {
@@ -366,14 +422,10 @@ struct PetChatBubble: View {
             // 文本内容
             Text(message.text)
                 .font(.subheadline)
-                .foregroundStyle(message.isUser ? .white : .primary)
+                .foregroundStyle(message.isUser ? .white : aiBubbleTextColor)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(message.isUser ? Color.pink : Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                )
+                .background(bubbleBackground(isUser: message.isUser))
         }
         .frame(maxWidth: 280, alignment: message.isUser ? .trailing : .leading)
         .onLongPressGesture {
@@ -448,11 +500,7 @@ struct PetChatBubble: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        )
+        .background(bubbleBackground(isUser: false))
         .frame(maxWidth: 320, alignment: .leading)
     }
     
@@ -482,11 +530,7 @@ struct PetChatBubble: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        )
+        .background(bubbleBackground(isUser: false))
         .frame(maxWidth: 320, alignment: .leading)
     }
     
@@ -532,11 +576,7 @@ struct PetChatBubble: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        )
+        .background(bubbleBackground(isUser: false))
         .frame(maxWidth: 320, alignment: .leading)
     }
     
@@ -650,11 +690,7 @@ struct PetChatBubble: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        )
+        .background(bubbleBackground(isUser: false))
         .frame(maxWidth: 320, alignment: .leading)
     }
 
@@ -764,11 +800,7 @@ struct PetChatBubble: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        )
+        .background(bubbleBackground(isUser: false))
         .frame(maxWidth: 320, alignment: .leading)
     }
 
@@ -816,6 +848,7 @@ struct PetChatBubble: View {
 struct PetChatView: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
 
     @StateObject private var petAI = PetAIService.shared
@@ -844,6 +877,16 @@ struct PetChatView: View {
                 // 背景
                 LiquidBackground()
                     .ignoresSafeArea()
+                if themeManager.petChatSkinTheme == .magic {
+                    LinearGradient(
+                        colors: PetChatSkinTheme.magic.previewBackgroundColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .opacity(0.45)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                }
 
                 // 聊天记录 - 使用overlay放置悬浮按钮
                 ScrollViewReader { proxy in
@@ -1173,7 +1216,8 @@ struct PetChatView: View {
         let greeting = greetingManager.getGreetingTitle()
         let welcomeMessage = PetChatMessage(
             text: "\(greeting)喵~ 我是你的专属衣橱管家\(petAI.petName)，有什么可以帮你的吗？",
-            isUser: false
+            isUser: false,
+            widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
         )
         messages.append(welcomeMessage)
     }
@@ -1245,6 +1289,28 @@ struct PetChatView: View {
         handleAIChat(text)
     }
 
+    private func handleWidgetAction(_ option: PetWidgetOption) {
+        switch option.command {
+        case "outfit_suggest":
+            handleOutfitSuggestion("帮我搭配一套")
+        case "weather_guidance":
+            handleWeatherOutfitGuidance()
+        case "search_prompt":
+            searchText = "帮我找"
+        case "mood_support":
+            handleAIChat("我有点累，想被温柔安慰一下，也想听听今天适合什么穿搭。")
+        default:
+            if option.command.hasPrefix("ask:") {
+                let query = String(option.command.dropFirst(4))
+                if !query.isEmpty {
+                    let userMessage = PetChatMessage(text: query, isUser: true)
+                    messages.append(userMessage)
+                    processUserIntent(query)
+                }
+            }
+        }
+    }
+
     // 创建消息气泡视图
     private func messageBubble(for message: PetChatMessage) -> some View {
         PetChatBubble(
@@ -1252,7 +1318,8 @@ struct PetChatView: View {
             petName: petAI.petName,
             onCardTap: handleClothingTap,
             onSearchResultTap: handleClothingTap,
-            onOutfitTap: handleOutfitTap
+            onOutfitTap: handleOutfitTap,
+            onWidgetAction: handleWidgetAction
         )
         .id(message.id)
     }
@@ -1549,13 +1616,15 @@ struct PetChatView: View {
             let weather = await fetchCurrentWeather()
             let responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
             let items = selection.combinedItems
+            let widgets = PetChatWidgetFactory.weatherGuidanceWidgets(weather: weather, selection: selection)
 
             isThinking = false
             let message = PetChatMessage(
                 text: responseText,
                 isUser: false,
                 type: items.isEmpty ? .text : .searchResults,
-                searchResults: items.isEmpty ? nil : items
+                searchResults: items.isEmpty ? nil : items,
+                widgets: widgets
             )
             messages.append(message)
         }
@@ -1599,26 +1668,34 @@ struct PetChatView: View {
         isThinking = true
 
         Task {
-            let prompt = WardrobeContextManager.shared.buildPromptWithRelevantWardrobeContext(
+            let wardrobeContext = WardrobeContextManager.shared.buildWardrobeContextBlockIfNeeded(
                 query: text,
                 clothings: clothings
+            )
+            let prompt = PetGenerativePromptBuilder.buildPrompt(
+                userQuery: text,
+                wardrobeContextBlock: wardrobeContext
             )
             let response = await petAI.sendMessage(
                 prompt,
                 displayText: text,
                 enableVoice: false
             )
+            let renderContent = PetGenerativeUIParser.buildRenderableContent(
+                rawText: response.rawText ?? response.text,
+                fallbackDisplayText: response.text,
+                userQuery: text
+            )
 
             await MainActor.run {
                 isThinking = false
 
-                // PetAIService 返回的 ChatMessage 已经解析过 [IMAGE:xxx] 指令
-                // 直接使用 response.imageName 和 response.text
                 let message = PetChatMessage(
-                    text: response.text,
+                    text: renderContent.text,
                     isUser: false,
                     imageName: response.imageName,
-                    isAIGenerated: true
+                    isAIGenerated: true,
+                    widgets: renderContent.widgets
                 )
                 messages.append(message)
             }
@@ -1826,6 +1903,7 @@ struct QuickActionButton: View {
 struct PetChatViewLegacy: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
     
     @StateObject private var petAI = PetAIService.shared
@@ -1849,6 +1927,16 @@ struct PetChatViewLegacy: View {
             ZStack {
                 LiquidBackground()
                     .ignoresSafeArea()
+                if themeManager.petChatSkinTheme == .magic {
+                    LinearGradient(
+                        colors: PetChatSkinTheme.magic.previewBackgroundColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .opacity(0.45)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                }
                 
                 VStack(spacing: 0) {
                     ScrollViewReader { proxy in
@@ -2104,7 +2192,8 @@ struct PetChatViewLegacy: View {
         let greeting = greetingManager.getGreetingTitle()
         let welcomeMessage = PetChatMessage(
             text: "\(greeting)喵~ 我是你的专属衣橱管家\(petAI.petName)，有什么可以帮你的吗？",
-            isUser: false
+            isUser: false,
+            widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
         )
         messages.append(welcomeMessage)
     }
@@ -2128,7 +2217,8 @@ struct PetChatViewLegacy: View {
             petName: petAI.petName,
             onCardTap: legacyHandleClothingTap,
             onSearchResultTap: legacyHandleClothingTap,
-            onOutfitTap: legacyHandleOutfitTap
+            onOutfitTap: legacyHandleOutfitTap,
+            onWidgetAction: legacyHandleWidgetAction
         )
         .id(message.id)
     }
@@ -2298,6 +2388,28 @@ struct PetChatViewLegacy: View {
         handleAIChat(text)
     }
 
+    private func legacyHandleWidgetAction(_ option: PetWidgetOption) {
+        switch option.command {
+        case "outfit_suggest":
+            handleOutfitSuggestion("帮我搭配一套")
+        case "weather_guidance":
+            handleWeatherOutfitGuidance()
+        case "search_prompt":
+            inputText = "帮我找"
+        case "mood_support":
+            handleAIChat("我有点累，想被温柔安慰一下，也想听听今天适合什么穿搭。")
+        default:
+            if option.command.hasPrefix("ask:") {
+                let query = String(option.command.dropFirst(4))
+                if !query.isEmpty {
+                    let userMessage = PetChatMessage(text: query, isUser: true)
+                    messages.append(userMessage)
+                    processUserIntent(query)
+                }
+            }
+        }
+    }
+
     private func handleWardrobeStatistics() {
         isThinking = true
 
@@ -2461,13 +2573,15 @@ struct PetChatViewLegacy: View {
             let weather = await fetchCurrentWeather()
             let responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
             let items = selection.combinedItems
+            let widgets = PetChatWidgetFactory.weatherGuidanceWidgets(weather: weather, selection: selection)
 
             isThinking = false
             let message = PetChatMessage(
                 text: responseText,
                 isUser: false,
                 type: items.isEmpty ? .text : .searchResults,
-                searchResults: items.isEmpty ? nil : items
+                searchResults: items.isEmpty ? nil : items,
+                widgets: widgets
             )
             messages.append(message)
         }
@@ -2508,28 +2622,36 @@ struct PetChatViewLegacy: View {
     
     private func handleAIChat(_ text: String) {
         isThinking = true
-        
+
         Task {
-            let prompt = WardrobeContextManager.shared.buildPromptWithRelevantWardrobeContext(
+            let wardrobeContext = WardrobeContextManager.shared.buildWardrobeContextBlockIfNeeded(
                 query: text,
                 clothings: clothings
+            )
+            let prompt = PetGenerativePromptBuilder.buildPrompt(
+                userQuery: text,
+                wardrobeContextBlock: wardrobeContext
             )
             let response = await petAI.sendMessage(
                 prompt,
                 displayText: text,
                 enableVoice: false
             )
-            
+            let renderContent = PetGenerativeUIParser.buildRenderableContent(
+                rawText: response.rawText ?? response.text,
+                fallbackDisplayText: response.text,
+                userQuery: text
+            )
+
             await MainActor.run {
                 isThinking = false
-                
-                // PetAIService 返回的 ChatMessage 已经解析过 [IMAGE:xxx] 指令
-                // 直接使用 response.imageName 和 response.text
+
                 let message = PetChatMessage(
-                    text: response.text,
+                    text: renderContent.text,
                     isUser: false,
                     imageName: response.imageName,
-                    isAIGenerated: true
+                    isAIGenerated: true,
+                    widgets: renderContent.widgets
                 )
                 messages.append(message)
             }

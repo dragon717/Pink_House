@@ -96,6 +96,27 @@ class WardrobeContextManager {
         请用自然口语回答，不要复述 JSON 键名，不要输出代码块。
         """
     }
+
+    func buildWardrobeContextBlockIfNeeded(
+        query: String,
+        clothings: [Clothing],
+        maxItems: Int = 12
+    ) -> String? {
+        guard shouldAttachWardrobeContext(for: query) else {
+            return nil
+        }
+
+        let summary = generateWardrobeSummary(clothings: clothings, includeItemList: false)
+        let relevantJSON = generateRelevantItemsJSON(query: query, clothings: clothings, maxItems: maxItems)
+
+        return """
+        以下是衣橱摘要（仅供参考）：
+        \(summary)
+
+        以下是遴选后的候选单品（JSON，仅包含名字和特征）：
+        \(relevantJSON)
+        """
+    }
     
     func generateRelevantItemsJSON(query: String, clothings: [Clothing], maxItems: Int = 12) -> String {
         guard !clothings.isEmpty else {

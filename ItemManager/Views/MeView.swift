@@ -182,7 +182,7 @@ struct MeView: View {
                         NavigationLink(destination: MagicColorSettingsView()) {
                             SettingsGridItem(
                                 title: "魔法配色",
-                                subtitle: "智能配色 · 客制化配色",
+                                subtitle: "智能配色 · 客制化 · 魔法皮肤",
                                 icon: "wand.and.stars",
                                 iconColor: .purple
                             )
@@ -881,4 +881,3 @@ struct SettingsRow: View {
         .padding(.vertical, 2)
     }
 }
-

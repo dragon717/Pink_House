@@ -66,6 +66,38 @@ struct MagicColorSettingsView: View {
                 // 内容区域
                 ScrollView {
                     VStack(spacing: 20) {
+                        NavigationLink(destination: PetChatSkinSettingsView()) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "message.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.pink)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.pink.opacity(0.12))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("魔法皮肤")
+                                        .font(.headline)
+                                        .foregroundStyle(themeManager.primaryTextColor)
+                                    Text("萌宠对话皮肤设置与预览")
+                                        .font(.caption)
+                                        .foregroundStyle(themeManager.secondaryTextColor)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(.systemBackground).opacity(0.75))
+                            )
+                        }
+                        .buttonStyle(.plain)
+
                         // 卡片样式设置（所有模式共用）
                         CardStyleSection(
                             cardStyle: $cardStyle,

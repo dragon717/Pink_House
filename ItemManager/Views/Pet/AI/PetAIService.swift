@@ -494,7 +494,12 @@ class PetAIService: ObservableObject {
                 PetVoiceManager.shared.speak(displayResponse, for: self.role)
             }
 
-            let aiMsg = ChatMessage(text: displayResponse, imageName: imageName, isUser: false)
+            let aiMsg = ChatMessage(
+                text: displayResponse,
+                rawText: cleanText,
+                imageName: imageName,
+                isUser: false
+            )
             self.allMessages.append(aiMsg)
             self.uiMessages.append(aiMsg)
             self.saveMessages()

@@ -53,15 +53,16 @@ enum PetResponseHumanizer {
     
     private static func narrative(from payload: Any) -> String? {
         if let dict = payload as? [String: Any] {
-            return narrative(from: dict)
+            return narrativeFromDict(dict)
         }
         if let array = payload as? [[String: Any]], let first = array.first {
-            return narrative(from: first)
+            return narrativeFromDict(first)
         }
         return nil
     }
-    
-    private static func narrative(from dict: [String: Any]) -> String {
+
+    // 使用不同的方法名避免递归调用歧义
+    private static func narrativeFromDict(_ dict: [String: Any]) -> String {
         var parts: [String] = []
         
         if let primary = firstString(in: dict, keys: [

@@ -76,6 +76,13 @@ class ThemeManager {
             themeColorConfig = newConfig
         }
     }
+
+    // MARK: - Pet Chat Skin
+    var petChatSkinTheme: PetChatSkinTheme = .classic {
+        didSet {
+            UserDefaults.standard.set(petChatSkinTheme.rawValue, forKey: "pet_chat_skin_theme")
+        }
+    }
     
     // MARK: - Card Settings
     var cardStyle: CardStyle = .transparent {
@@ -360,6 +367,11 @@ class ThemeManager {
             self.cardTintColorHex = savedCardTint
         }
 
+        if let savedPetChatSkin = UserDefaults.standard.string(forKey: "pet_chat_skin_theme"),
+           let skin = PetChatSkinTheme(rawValue: savedPetChatSkin) {
+            self.petChatSkinTheme = skin
+        }
+
         // 加载图片填充色调配置
         if let savedImageFillTint = UserDefaults.standard.string(forKey: "theme_image_fill_tint_color") {
             self.imageFillTintColorHex = savedImageFillTint
@@ -573,6 +585,11 @@ class ThemeManager {
 
         if let savedCardTint = UserDefaults.standard.string(forKey: "theme_card_tint_color") {
             self.cardTintColorHex = savedCardTint
+        }
+
+        if let savedPetChatSkin = UserDefaults.standard.string(forKey: "pet_chat_skin_theme"),
+           let skin = PetChatSkinTheme(rawValue: savedPetChatSkin) {
+            self.petChatSkinTheme = skin
         }
 
         // 重新加载图片填充色调配置
