@@ -277,6 +277,35 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
         case .maomao: return "happy_dog"
         }
     }
+    
+    // 各种表情图片名称映射
+    var angryImageName: String {
+        switch self {
+        case .naicha: return "angry_cat"
+        case .maomao: return "angry_dog"
+        }
+    }
+    
+    var curiousImageName: String {
+        switch self {
+        case .naicha: return "curious_cat"
+        case .maomao: return "curious_dog"
+        }
+    }
+    
+    var sleepyImageName: String {
+        switch self {
+        case .naicha: return "sleepy_cat"
+        case .maomao: return "sleepy_dog"
+        }
+    }
+    
+    var thinkingImageName: String {
+        switch self {
+        case .naicha: return "thinking_cat"
+        case .maomao: return "thinking_dog"
+        }
+    }
 }
 
 // MARK: - Pet Behavior Protocol

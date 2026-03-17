@@ -871,6 +871,12 @@ struct PetChatView: View {
 
     // 每日问候管理器
     @StateObject private var greetingManager = DailyGreetingManager.shared
+    
+    // 搜索框提示文字，使用用户起的宠物名字
+    private var searchPrompt: String {
+        let petName = PetDataManager.shared.status.displayName
+        return "和\(petName)对话、搜索裙子..."
+    }
 
     var body: some View {
         NavigationStack {
@@ -931,7 +937,7 @@ struct PetChatView: View {
                 text: $searchText,
                 isPresented: $isSearchPresented,
                 placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "和萌宠对话、搜索裙子..."
+                prompt: searchPrompt
             )
             .onSubmit(of: .search) {
                 if !searchText.isEmpty {
@@ -1234,12 +1240,12 @@ struct PetChatView: View {
     // 加载初始问候
     private func loadInitialGreeting() {
         let greeting = greetingManager.getGreetingTitle()
-        // 根据当前宠物使用对应的问候语和宠物类型名
+        // 根据当前宠物使用对应的问候语和用户起的宠物名字
         let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
         let greetingSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
-        let petTypeName = currentCharacter.displayName // 使用宠物类型名（奶茶/毛毛）
+        let petDisplayName = PetDataManager.shared.status.displayName // 使用用户起的宠物名字
         let welcomeMessage = PetChatMessage(
-            text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petTypeName)，有什么可以帮你的吗？",
+            text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petDisplayName)，有什么可以帮你的吗？",
             isUser: false,
             widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
         )
@@ -1947,6 +1953,13 @@ struct PetChatViewLegacy: View {
     @State private var isSavingOutfit = false
 
     @StateObject private var greetingManager = DailyGreetingManager.shared
+    
+    // 输入框提示文字，使用用户起的宠物名字
+    private var inputPlaceholder: String {
+        let petName = PetDataManager.shared.status.displayName
+        return "和\(petName)对话、搜索裙子..."
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -2108,7 +2121,7 @@ struct PetChatViewLegacy: View {
                 // 中间输入框（萌宠对话框样式）
                 ZStack(alignment: .leading) {
                     if inputText.isEmpty {
-                        Text("和萌宠对话、搜索裙子...")
+                        Text(inputPlaceholder)
                             .foregroundStyle(.gray.opacity(0.6))
                             .padding(.horizontal, 16)
                     }
@@ -2223,12 +2236,12 @@ struct PetChatViewLegacy: View {
     
     private func loadInitialGreeting() {
         let greeting = greetingManager.getGreetingTitle()
-        // 根据当前宠物使用对应的问候语和宠物类型名
+        // 根据当前宠物使用对应的问候语和用户起的宠物名字
         let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
         let greetingSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
-        let petTypeName = currentCharacter.displayName // 使用宠物类型名（奶茶/毛毛）
+        let petDisplayName = PetDataManager.shared.status.displayName // 使用用户起的宠物名字
         let welcomeMessage = PetChatMessage(
-            text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petTypeName)，有什么可以帮你的吗？",
+            text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petDisplayName)，有什么可以帮你的吗？",
             isUser: false,
             widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
         )
