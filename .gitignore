@@ -14,5 +14,3 @@ asserts/*.mp4
 asserts/*.ttf
 asserts/*.mp3
 
-.gemini/settings.json
-.env
