@@ -59,12 +59,19 @@ final class DailyCheckInManager: ObservableObject {
     @Published var currentWeather: WeatherData?
     @Published var currentLocation: String = ""
     
+    // 预加载状态
+    @Published var isPreloadingOutfitColor = false
+    @Published var preloadError: String?
+    
     private let checkInKey = "dailyCheckIn.records"
     private let lastCheckInDateKey = "dailyCheckIn.lastDate"
     private let consecutiveDaysKey = "dailyCheckIn.consecutiveDays"
     private let totalDaysKey = "dailyCheckIn.totalDays"
     
     private let container = CKContainer(identifier: "iCloud.bugod2.SkirtMarket")
+    
+    // 内存管理：缓存清理定时器
+    private var cacheCleanupTimer: Timer?
     
     // 2025年Lolita流行色
     private let trendyColors2025 = [
@@ -85,6 +92,8 @@ final class DailyCheckInManager: ObservableObject {
                 await loadTodayOutfitColor()
             }
         }
+        // 启动内存管理
+        setupCacheCleanup()
     }
     
     // MARK: - 从磁盘重新加载（用于备份恢复后）
@@ -322,6 +331,157 @@ final class DailyCheckInManager: ObservableObject {
             return []
         }
         return records
+    }
+    
+    // MARK: - 启动缓存清理（内存管理）
+    private func setupCacheCleanup() {
+        // 每 30 分钟清理一次过期的缓存数据
+        cacheCleanupTimer = Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { [weak self] _ in
+            self?.cleanupExpiredCache()
+        }
+    }
+    
+    // MARK: - 清理过期缓存
+    private func cleanupExpiredCache() {
+        // 清理超过 7 天的未打卡日期穿搭色缓存
+        let calendar = Calendar.current
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        
+        let records = loadAllRecords()
+        let filteredRecords = records.filter { $0.date > sevenDaysAgo }
+        
+        if filteredRecords.count != records.count {
+            if let data = try? JSONEncoder().encode(filteredRecords) {
+                UserDefaults.standard.set(data, forKey: checkInKey)
+                print("✅ [DailyCheckInManager] 清理过期缓存完成")
+            }
+        }
+    }
+    
+    // MARK: - 处理内存警告（释放不必要的资源）
+    func handleMemoryWarning() {
+        // 清理缓存定时器
+        cacheCleanupTimer?.invalidate()
+        cacheCleanupTimer = nil
+        
+        // 清除今日穿搭色缓存（如果未打卡）
+        if !hasCheckedInToday {
+            todayOutfitColor = nil
+            print("🧹 [DailyCheckInManager] 内存警告：已清理今日穿搭色缓存")
+        }
+        
+        // 清除天气和位置缓存
+        currentWeather = nil
+        currentLocation = ""
+        
+        print("🧹 [DailyCheckInManager] 内存警告：已清理所有缓存")
+    }
+    
+    // MARK: - 预加载今日穿搭色（App 启动时调用）
+    func preloadTodayOutfitColor() async {
+        guard !hasCheckedInToday else {
+            // 已打卡则直接加载
+            await loadTodayOutfitColor()
+            return
+        }
+        
+        guard !isPreloadingOutfitColor else {
+            // 已在预加载中
+            return
+        }
+        
+        isPreloadingOutfitColor = true
+        preloadError = nil
+        
+        do {
+            // 1. 首先尝试从 CloudKit 获取
+            if let cloudKitColor = await fetchFromCloudKit() {
+                todayOutfitColor = cloudKitColor
+                print("✅ [DailyCheckInManager] 预加载：从 CloudKit 获取到今日穿搭色")
+                isPreloadingOutfitColor = false
+                return
+            }
+            
+            // 2. CloudKit 没有，调用 AI 生成
+            print("☁️ [DailyCheckInManager] 预加载：CloudKit 无数据，调用 AI 生成...")
+            
+            // 确保 AI 配置已加载
+            PetAIService.shared.ensureConfiguration(
+                role: .kitten,
+                petName: PetDataManager.shared.status.displayName,
+                wardrobeContext: ""
+            )
+            
+            let season = LocationService.shared.getCurrentSeason()
+            let weather = currentWeather
+            let location = currentLocation
+            
+            // 调用 AI 生成穿搭色
+            if let aiResponse = await PetAIService.shared.generateTodayOutfitColors(
+                season: season,
+                weather: weather,
+                location: location
+            ) {
+                // 将 AI 生成的颜色转换为 ColorInfo 数组
+                let colorInfos = aiResponse.colors.map { ColorInfo(name: $0.name, hex: $0.hex) }
+                let aiOutfit = TodayOutfitColor(
+                    colors: colorInfos,
+                    accessories: aiResponse.accessories,
+                    description: aiResponse.description,
+                    source: "ai",
+                    weather: weather?.condition.rawValue,
+                    location: location.isEmpty ? nil : location,
+                    temperature: weather?.temperature,
+                    season: season.displayName,
+                    petName: PetDataManager.shared.status.displayName
+                )
+                
+                // 上传到 CloudKit 公共数据库
+                await uploadToCloudKit(
+                    colors: aiResponse.colors,
+                    accessories: aiResponse.accessories,
+                    description: aiResponse.description
+                )
+                
+                todayOutfitColor = aiOutfit
+                print("✅ [DailyCheckInManager] 预加载：AI 生成并上传今日穿搭色")
+            } else {
+                // AI 生成失败，使用本地算法
+                print("⚠️ [DailyCheckInManager] 预加载：AI 生成失败，使用本地算法")
+                let localOutfit = await generateLocally()
+                todayOutfitColor = localOutfit
+            }
+        } catch {
+            preloadError = error.localizedDescription
+            print("❌ [DailyCheckInManager] 预加载失败：\(error)")
+        }
+        
+        isPreloadingOutfitColor = false
+    }
+    
+    // MARK: - 预加载本周穿搭色（可选优化，低内存设备慎用）
+    func preloadWeekOutfitColors() async {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekday = calendar.component(.weekday, from: today)
+        let mondayOffset = (weekday + 5) % 7
+        guard let monday = calendar.date(byAdding: .day, value: -mondayOffset, to: today) else { return }
+        
+        print("📅 [DailyCheckInManager] 开始预加载本周穿搭色...")
+        
+        for i in 0..<7 {
+            guard let date = calendar.date(byAdding: .day, value: i, to: monday) else { continue }
+            
+            // 跳过今天（今天会单独预加载）和已打卡的日期
+            if calendar.isDateInToday(date) || hasCheckIn(on: date) {
+                continue
+            }
+            
+            // 尝试从 CloudKit 获取
+            _ = await fetchOutfitColor(for: date)
+        }
+        
+        print("✅ [DailyCheckInManager] 本周穿搭色预加载完成")
     }
     
     // MARK: - 加载今日穿搭色（用于已打卡状态）

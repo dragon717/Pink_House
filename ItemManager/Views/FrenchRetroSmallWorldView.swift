@@ -228,9 +228,9 @@ struct FrenchRetroSmallWorldView: View {
                 }
             }
 
-            // 5. 尾款天使 (衣橱右边)
-            InteractionHotspot(rect: CGRect(x: 0.6, y: 0.42, width: 0.07, height: 0.12), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .purple, label: "尾款天使", labelStyle: .horizontal(angle: 0), labelPosition: CGPoint(x: 0.635, y: 0.56)) {
-                // 使用 TabNavigationManager 正确导航到衣橱Tab的尾款天使
+            // 5. 心愿尾款 (衣橱右边)
+            InteractionHotspot(rect: CGRect(x: 0.6, y: 0.42, width: 0.07, height: 0.12), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .purple, label: "心愿尾款", labelStyle: .horizontal(angle: 0), labelPosition: CGPoint(x: 0.635, y: 0.56)) {
+                // 使用 TabNavigationManager 正确导航到衣橱Tab的心愿尾款
                 tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
             }
 
@@ -393,7 +393,7 @@ struct CalendarHotspot: View {
             var map = [Date: DayContent]()
             
             for clothing in allClothings {
-                // 1. 只看尾款天使
+                // 1. 只看心愿尾款
                 guard clothing.isDepositPlan else { continue }
                 
                 // 2. 必须有尾款日期

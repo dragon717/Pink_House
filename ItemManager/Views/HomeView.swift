@@ -281,7 +281,7 @@ struct HomeView: View {
                         Image(systemName: selectedTab == .depositPlan ? "calendar.badge.clock" : "calendar")
                             .font(.system(size: 16))
                     }
-                    Text("尾款天使")
+                    Text("心愿尾款")
                         .font(.system(size: 10, weight: selectedTab == .depositPlan ? .bold : .medium))
                 }
                 .foregroundStyle(selectedTab == .depositPlan ? Color.brown : .secondary)
@@ -317,7 +317,7 @@ struct HomeView: View {
                 displayButton
             }
             
-            // 补款提醒（仅尾款天使标签页，且非编辑模式）
+            // 补款提醒（仅心愿尾款标签页，且非编辑模式）
             if selectedTab == .depositPlan && !isInWardrobeEditMode {
                 notificationButton
             }

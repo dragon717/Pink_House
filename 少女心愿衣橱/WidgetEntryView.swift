@@ -214,7 +214,7 @@ struct MediumWidgetView: View {
                             .font(.caption)
                             .foregroundStyle(.white)
                         let currentYear = Calendar.current.component(.year, from: Date())
-                        WidgetOutlinedText(text: "\(currentYear)年月度尾款天使", size: 14, weight: .bold)
+                        WidgetOutlinedText(text: "\(currentYear)年月度心愿尾款", size: 14, weight: .bold)
                     }
                     WidgetOutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName))) · 总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 10, weight: .regular, color: .white.opacity(0.9))
                 }
@@ -266,7 +266,7 @@ struct LargeWidgetView: View {
                             .font(.title3)
                             .foregroundStyle(.white)
                         let currentYear = Calendar.current.component(.year, from: Date())
-                        WidgetOutlinedText(text: "\(currentYear)年度尾款天使表", size: 20, weight: .heavy)
+                        WidgetOutlinedText(text: "\(currentYear)年度心愿尾款表", size: 20, weight: .heavy)
                     }
                     
                     HStack(spacing: 12) {

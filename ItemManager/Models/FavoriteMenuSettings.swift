@@ -6,7 +6,7 @@ import Combine
 // MARK: - 常用菜单功能项
 enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     case wardrobe = "衣橱"
-    case finalPayment = "尾款天使"
+    case finalPayment = "心愿尾款"
     case pet = "萌宠"
     case ootd = "魔法贴纸"
     case fashionJournal = "穿搭手帐"

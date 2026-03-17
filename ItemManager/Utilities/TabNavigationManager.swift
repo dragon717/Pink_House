@@ -17,7 +17,7 @@ enum TabNavigationDestination {
 // MARK: - House页面来源
 enum SmallWorldSource {
     case wardrobe      // 来自衣橱
-    case depositPlan   // 来自尾款天使
+    case depositPlan   // 来自心愿尾款
     case smallWorld    // 来自House菜单
 }
 
@@ -30,7 +30,7 @@ class TabNavigationManager: ObservableObject {
     @Published var navigateToSmallWorld: SmallWorldDestination?
     
     // 记录进入House前的来源，用于智能返回
-    // 当用户从Tab 0（衣橱/尾款天使）跳转到House时，记录当时的HomeTab
+    // 当用户从Tab 0（衣橱/心愿尾款）跳转到House时，记录当时的HomeTab
     // 当用户在House内部切换时，保持这个值不变
     @Published var lastHomeTabBeforeSmallWorld: HomeTab = .wardrobe
     

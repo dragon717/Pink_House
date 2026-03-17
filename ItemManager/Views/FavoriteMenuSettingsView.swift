@@ -8,8 +8,8 @@ struct FavoriteMenuSettingsView: View {
     @State private var isEditing = false
     @State private var showMaxItemsAlert = false
 
-    // 所有可选功能
-    private let allItems = FavoriteMenuItem.allCases
+    // 所有可选功能（排除萌宠，因为有独立的萌宠对话 Tab）
+    private let allItems = FavoriteMenuItem.allCases.filter { $0 != .pet }
     private let maxItems = 5
 
     var body: some View {
@@ -105,12 +105,12 @@ struct FavoriteMenuSettingsView: View {
         }
     }
     
-    // 计算已选中且已解锁的功能（用于显示）
+    // 计算已选中且已解锁的功能（用于显示，排除萌宠）
     private var selectedAndUnlockedItems: [FavoriteMenuItem] {
-        settingsManager.selectedItems.filter { $0.isUnlocked }
+        settingsManager.selectedItems.filter { $0.isUnlocked && $0 != .pet }
     }
     
-    // 计算还未选中且已解锁的功能
+    // 计算还未选中且已解锁的功能（排除萌宠）
     private var availableItems: [FavoriteMenuItem] {
         allItems.filter { item in
             !settingsManager.selectedItems.contains(item) && item.isUnlocked

@@ -81,7 +81,7 @@ struct SmallWorldMenuOverlay: View {
         favoriteMenuItems
     }
 
-    // 根据用户设置生成常用菜单项，只显示已解锁的功能，最多5个
+    // 根据用户设置生成常用菜单项，只显示已解锁的功能，最多 5 个
     private var favoriteMenuItems: [WheelMenuItem] {
         favoriteMenuManager.selectedItems.compactMap { item in
             // 检查功能是否已解锁，未解锁则不显示
@@ -89,11 +89,16 @@ struct SmallWorldMenuOverlay: View {
                 return nil
             }
             
+            // 萌宠功能不在常用菜单中显示（因为有独立的萌宠对话 Tab）
+            if item == .pet {
+                return nil
+            }
+            
             switch item {
             case .wardrobe:
                 return WheelMenuItem(title: "衣橱", icon: "cabinet.fill", destination: .wardrobe, color: Color(red: 1.0, green: 0.41, blue: 0.71))
             case .finalPayment:
-                return WheelMenuItem(title: "尾款天使", icon: "tag.fill", destination: .depositPlan, color: Color(red: 1.0, green: 0.07, blue: 0.58))
+                return WheelMenuItem(title: "心愿尾款", icon: "tag.fill", destination: .depositPlan, color: Color(red: 1.0, green: 0.07, blue: 0.58))
             case .pet:
                 return WheelMenuItem(title: petDataManager.status.displayName, icon: "pawprint", destination: .pet, color: Color(red: 1.0, green: 0.65, blue: 0.55))
             case .ootd:
@@ -115,7 +120,7 @@ struct SmallWorldMenuOverlay: View {
             case .recycleBin:
                 return WheelMenuItem(title: "回收站", icon: "trash.fill", destination: .recycleBin, color: Color(red: 0.5, green: 0.5, blue: 0.5))
             }
-        }.prefix(5).map { $0 } // 最多显示5个
+        }.prefix(5).map { $0 } // 最多显示 5 个
     }
 
     // 布局参数
@@ -545,7 +550,7 @@ struct SmallWorldMenuOverlay: View {
                     // 使用 TabNavigationManager 跳转到衣橱 Tab
                     tabNavigationManager.navigate(to: .wardrobe(.wardrobe))
                 case .depositPlan:
-                    // 使用 TabNavigationManager 跳转到尾款天使 Tab
+                    // 使用 TabNavigationManager 跳转到心愿尾款 Tab
                     tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
                 default:
                     // 其他功能在House Tab 内跳转

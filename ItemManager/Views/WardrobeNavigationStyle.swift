@@ -35,7 +35,7 @@ struct WardrobeFashionTabSwitcher: View {
     let monthIndicator: WardrobeMonthIndicator?
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             tabButton(
                 title: "少女衣橱",
                 icon: "cabinet.fill",
@@ -44,18 +44,17 @@ struct WardrobeFashionTabSwitcher: View {
             )
             
             tabButton(
-                title: "尾款天使",
+                title: "心愿尾款",
                 icon: "calendar.badge.clock",
                 targetTab: .depositPlan,
                 activeColor: .brown
             )
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(
             Capsule()
-                .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.5)
+                .fill(Color(uiColor: .systemGray5))
         )
     }
     
@@ -73,46 +72,21 @@ struct WardrobeFashionTabSwitcher: View {
                 selectedTab = targetTab
             }
         } label: {
-            VStack(spacing: 3) {
-                iconView(icon: icon, targetTab: targetTab, isSelected: isSelected, activeColor: activeColor)
+            VStack(spacing: 2) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
                 Text(title)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: isSelected ? .semibold : .medium))
             }
             .foregroundStyle(isSelected ? activeColor : .secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color.white.opacity(0.78) : Color.clear)
+                    .fill(isSelected ? Color(uiColor: .systemBackground) : Color.clear)
+                    .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 1, x: 0, y: 1)
             )
         }
         .buttonStyle(.plain)
-    }
-    
-    @ViewBuilder
-    private func iconView(
-        icon: String,
-        targetTab: HomeTab,
-        isSelected: Bool,
-        activeColor: Color
-    ) -> some View {
-        if targetTab == .depositPlan,
-           selectedTab == .wardrobe,
-           let monthIndicator {
-            switch monthIndicator {
-            case .current(let day):
-                CalendarDayIcon(day: day)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.pink)
-            case .next(let day):
-                CalendarDayIcon(day: day)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.brown)
-            }
-        } else {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? activeColor : .secondary)
-        }
     }
 }

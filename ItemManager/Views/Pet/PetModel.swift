@@ -269,6 +269,14 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
     var portraitImageName: String {
         return "\(rawValue)_portrait"
     }
+    
+    // 萌宠对话中使用的happy表情图片名
+    var happyImageName: String {
+        switch self {
+        case .naicha: return "happy_cat"
+        case .maomao: return "happy_dog"
+        }
+    }
 }
 
 // MARK: - Pet Behavior Protocol

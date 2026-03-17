@@ -18,7 +18,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        // iOS 26+ 设置TabBar全局样式
+        // iOS 26+ 设置 TabBar 全局样式
         if #available(iOS 26.0, *) {
             let appearance = UITabBarAppearance()
             appearance.configureWithTransparentBackground()
@@ -27,7 +27,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             appearance.stackedLayoutAppearance.normal.iconColor = UIColor.label
             appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.label]
 
-            // 设置选中项的颜色（B22222深红色）
+            // 设置选中项的颜色（B22222 深红色）
             let selectedColor = UIColor(red: 0.698, green: 0.133, blue: 0.133, alpha: 1.0)
             appearance.stackedLayoutAppearance.selected.iconColor = selectedColor
             appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
@@ -38,6 +38,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
         // 注册裙装股市后台任务
         registerSkirtMarketBackgroundTask()
+        
+        // 注册内存警告通知
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            DailyCheckInManager.shared.handleMemoryWarning()
+            print("📱 [AppDelegate] 收到内存警告通知")
+        }
 
         return true
     }
@@ -178,8 +188,14 @@ struct MainContentView: View {
                     FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
                 }
 
-                // 0.9 OOTD坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
+                // 0.9 OOTD 坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
                 await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
+
+                // 0.10 预加载每日打卡数据（今日穿搭色 AI 请求）
+                await DailyCheckInManager.shared.preloadTodayOutfitColor()
+                
+                // 0.11 预加载本周穿搭色（可选优化，低内存设备建议注释掉）
+                // await DailyCheckInManager.shared.preloadWeekOutfitColors()
 
                 // 1. Minimum splash duration (aesthetic + buffer)
                 try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
@@ -194,7 +210,7 @@ struct MainContentView: View {
                 }
                 
                 // 4. 检查是否需要显示每日打卡（开屏结束后）
-                try? await Task.sleep(nanoseconds: 300_000_000) // 等待0.3秒确保动画完成
+                try? await Task.sleep(nanoseconds: 300_000_000) // 等待 0.3 秒确保动画完成
                 await MainActor.run {
                     checkAndShowDailyCheckIn()
                 }

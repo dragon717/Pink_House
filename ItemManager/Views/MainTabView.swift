@@ -78,7 +78,7 @@ struct ModernTabView: View {
         case .wardrobe:
             return "衣橱"
         case .depositPlan:
-            return "尾款天使"
+            return "心愿尾款"
         case .recycleBin:
             return "回收站"
         case .dressStock:
@@ -158,10 +158,9 @@ struct ModernTabView: View {
             // 只有萌宠功能已解锁时才显示悬浮宠物
             if FeatureUnlockManager.shared.isUnlocked(.pet) {
                 PetOverlayView(action: {
-                    // 修复：点击悬浮小猫时同时切换到 House Tab 并设置目的地为萌宠
+                    // 点击悬浮小猫：切换到萌宠对话 Tab
                     withAnimation {
-                        selectedTab = 1
-                        smallWorldDestination = .pet
+                        selectedTab = 3
                     }
                 }, petName: petDataManager.status.displayName)
             }
@@ -477,10 +476,9 @@ struct LegacyTabView: View {
             // 只有萌宠功能已解锁时才显示悬浮宠物
             if FeatureUnlockManager.shared.isUnlocked(.pet) {
                 PetOverlayView(action: {
-                    // 修复：点击悬浮小猫时同时切换到 House Tab 并设置目的地为萌宠
+                    // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
                     withAnimation {
-                        selectedTab = 1
-                        smallWorldDestination = .pet
+                        selectedTab = 3
                     }
                 }, petName: petDataManager.status.displayName)
             }
@@ -648,7 +646,7 @@ struct LegacyTabView: View {
         case .menu: return "House"
         case .perler: return "拼豆工坊"
         case .wardrobe: return "衣橱"
-        case .depositPlan: return "尾款天使"
+        case .depositPlan: return "心愿尾款"
         case .recycleBin: return "回收站"
         case .dressStock: return "裙子股市"
         }
@@ -1367,7 +1365,7 @@ struct SmallWorldBackButton: View {
                     homeTab = .wardrobe
                     selectedTab = 0
                 case .depositPlan:
-                    // 返回尾款天使
+                    // 返回心愿尾款
                     homeTab = .depositPlan
                     selectedTab = 0
                 case .smallWorld:

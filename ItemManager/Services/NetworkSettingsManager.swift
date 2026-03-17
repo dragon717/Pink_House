@@ -122,10 +122,10 @@ final class QuizManager: ObservableObject {
             explanation: "少女衣橱是一款专为Lolita爱好者设计的裙装管理工具。"
         ),
         QuizQuestion(
-            question: "在少女衣橱中，'尾款天使'功能是用来做什么的？",
+            question: "在少女衣橱中，'心愿尾款'功能是用来做什么的？",
             options: ["记录已付尾款", "提醒尾款支付时间", "计算尾款金额", "预约裙装"],
             correctAnswer: 1,
-            explanation: "尾款天使功能用于提醒用户尾款支付时间，避免错过付款期限。"
+            explanation: "心愿尾款功能用于提醒用户尾款支付时间，避免错过付款期限。"
         ),
         QuizQuestion(
             question: "以下哪个不是少女衣橱的功能模块？",

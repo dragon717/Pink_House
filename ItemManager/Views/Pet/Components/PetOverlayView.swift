@@ -199,9 +199,12 @@ struct PetOverlayView: View {
     private func handleTap(at location: CGPoint) {
         guard interactionManager.state == .idle else { return }
         HapticEngineManager.shared.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
-        withAnimation {
-            action()
-        }
+        
+        // 执行传入的 action（切换到萌宠对话 Tab）
+        action()
+        
+        // 发送通知自动展开搜索栏（iOS 18+ 兼容）
+        NotificationCenter.default.post(name: .autoExpandPetChatSearch, object: nil)
     }
     
     private func handleDragEnded(at location: CGPoint, in geometry: GeometryProxy) {

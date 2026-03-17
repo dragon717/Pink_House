@@ -243,6 +243,8 @@ extension Notification.Name {
     static let wealthMediaShouldStop = Notification.Name("wealthMediaShouldStop")
     // 萌宠对话搜索栏状态变化通知（用于控制常用菜单长按交互）
     static let petChatSearchStateChanged = Notification.Name("petChatSearchStateChanged")
+    // 自动展开萌宠对话搜索栏通知
+    static let autoExpandPetChatSearch = Notification.Name("autoExpandPetChatSearch")
 }
 
 // MARK: - View Modifier

@@ -119,7 +119,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .wardrobe: return "少女衣橱"
-        case .finalPayment: return "尾款天使"
+        case .finalPayment: return "心愿尾款"
         case .pet: return "萌宠"
         case .ootd: return "穿搭手帐"
         case .ootdDefaultBook: return "魔法贴纸"

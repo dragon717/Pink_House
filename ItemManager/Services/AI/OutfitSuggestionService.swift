@@ -25,21 +25,29 @@ class OutfitSuggestionService {
     /// - Parameters:
     ///   - query: 用户输入（如"帮我搭配一套粉色系的出门装"）
     ///   - clothings: 用户衣橱中的所有裙装
-    ///   - context: ModelContext用于数据库操作
+    ///   - context: ModelContext 用于数据库操作
     /// - Returns: 推荐的裙装列表和响应文本
     func processOutfitRequest(
         query: String,
         clothings: [Clothing],
         context: ModelContext
     ) async throws -> ([Clothing], String, String, String) {
-        // 1. 调用AI获取搭配建议
+        // 过滤掉心愿尾款的裙装（只从非心愿尾款中选择）
+        let availableClothings = clothings.filter { !$0.isDepositPlan }
+        
+        // 检查是否有足够的非心愿尾款裙装
+        guard availableClothings.count >= 2 else {
+            throw OutfitSuggestionError.insufficientNonDepositItems
+        }
+        
+        // 1. 调用 AI 获取搭配建议
         let suggestion = try await fetchOutfitSuggestionFromAI(
             query: query,
-            clothings: clothings
+            clothings: availableClothings
         )
 
         // 2. 获取推荐的裙装
-        let selectedClothings = matchSelectedClothings(suggestion: suggestion, clothings: clothings)
+        let selectedClothings = matchSelectedClothings(suggestion: suggestion, clothings: availableClothings)
 
         guard !selectedClothings.isEmpty else {
             throw OutfitSuggestionError.noItemsAvailable
@@ -51,7 +59,7 @@ class OutfitSuggestionService {
         return (selectedClothings, responseText, suggestion.style, suggestion.occasion)
     }
 
-    /// 快速创建搭配（无需AI，基于规则）
+    /// 快速创建搭配（无需 AI，基于规则）
     /// - Parameters:
     ///   - style: 风格（甜美/优雅/哥特等）
     ///   - occasion: 场合（日常/约会/茶会等）
@@ -64,8 +72,16 @@ class OutfitSuggestionService {
         clothings: [Clothing],
         context: ModelContext
     ) async throws -> [Clothing] {
+        // 过滤掉心愿尾款的裙装（只从非心愿尾款中选择）
+        let availableClothings = clothings.filter { !$0.isDepositPlan }
+        
+        // 检查是否有足够的非心愿尾款裙装
+        guard availableClothings.count >= 2 else {
+            throw OutfitSuggestionError.insufficientNonDepositItems
+        }
+        
         // 按类别分组
-        let grouped = Dictionary(grouping: clothings) { clothing -> String in
+        let grouped = Dictionary(grouping: availableClothings) { clothing -> String in
             // 根据名称判断类别
             let name = clothing.name.lowercased()
             if name.contains("jsk") || name.contains("op") || name.contains("sk") || name.contains("裙") {
@@ -97,14 +113,14 @@ class OutfitSuggestionService {
             result.append(shoes.randomElement()!)
         }
         
-        // 选择配饰（最多2个）
+        // 选择配饰（最多 2 个）
         if let accessories = grouped["配饰"], !accessories.isEmpty {
             result.append(contentsOf: accessories.prefix(2))
         }
         
-        // 如果按名称分类没有结果，随机选择2-4件
+        // 如果按名称分类没有结果，随机选择 2-4 件
         if result.count < 2 {
-            result = Array(clothings.shuffled().prefix(min(4, clothings.count)))
+            result = Array(availableClothings.shuffled().prefix(min(4, availableClothings.count)))
         }
         
         guard result.count >= 2 else {
@@ -324,6 +340,7 @@ class OutfitSuggestionService {
 enum OutfitSuggestionError: Error, LocalizedError {
     case noItemsAvailable
     case insufficientItems
+    case insufficientNonDepositItems
     case invalidJSONFormat
     case parseError(String)
     case aiServiceError(String)
@@ -331,15 +348,17 @@ enum OutfitSuggestionError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noItemsAvailable:
-            return "没有找到推荐的裙装，请检查衣橱数据~"
+            return "（歪头）主人衣橱里好像没有合适的裙子呢，要不要先添置几件新的呀？喵~"
         case .insufficientItems:
-            return "衣橱物品不足，至少需要2件单品才能搭配喵~"
+            return "（蹭蹭）主人衣橱里的裙子还不够呢，至少要有 2 件才能帮我搭配喵~"
+        case .insufficientNonDepositItems:
+            return "（蹭蹭）主人衣橱里已经到手的裙子还不够呢~ 至少要有 2 件才能智能搭配喵！那些还没补尾款的不算哦~"
         case .invalidJSONFormat:
-            return "AI响应格式不正确，请重试~"
+            return "（挠头）我刚刚有点晕，没听懂主人的意思，可以再说一次喵？"
         case .parseError(let message):
-            return "解析失败：\(message)"
+            return "（歪头）我好像理解错了，让我再想想喵..."
         case .aiServiceError(let message):
-            return "AI服务错误：\(message)"
+            return "（蹭蹭）刚刚网络好像卡了一下下，主人再试一次好不好喵？"
         }
     }
 }

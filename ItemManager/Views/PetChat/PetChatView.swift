@@ -306,9 +306,9 @@ struct PetChatBubble: View {
         .padding(.horizontal, 12)
     }
     
-    // 萌宠头像视图 - 使用 happy_cat 表情图片
+    // 萌宠头像视图 - 根据当前选中的宠物显示对应happy表情图片
     private var petAvatarView: some View {
-        Image("happy_cat")
+        Image(currentPetCharacter.happyImageName)
             .resizable()
             .scaledToFill()
             .frame(width: 40, height: 40)
@@ -520,7 +520,7 @@ struct PetChatBubble: View {
                 }
                 
                 if stats.depositPlanCount > 0 {
-                    statRow(icon: "tag", title: "尾款天使", value: "\(stats.depositPlanCount) 款")
+                    statRow(icon: "tag", title: "心愿尾款", value: "\(stats.depositPlanCount) 款")
                     statRow(icon: "creditcard", title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: stats.totalBalance).stringValue)")
                 }
             }
@@ -857,8 +857,9 @@ struct PetChatView: View {
     @State private var isThinking = false
     @State private var selectedClothing: Clothing?
     @State private var navigateToDetail = false
-    // iOS26搜索栏展开状态（用于控制常用菜单长按交互）
+    // iOS26 搜索栏展开状态（用于控制常用菜单长按交互）
     @State private var isSearchPresented = false
+    @State private var hasEnteredOnce = false
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
@@ -957,11 +958,28 @@ struct PetChatView: View {
                 if messages.isEmpty {
                     loadInitialGreeting()
                 }
-                // 配置AI服务
+                // 配置 AI 服务
                 configureAIService()
+                // 首次进入萌宠对话页面时，自动展开搜索栏
+                if !hasEnteredOnce {
+                    hasEnteredOnce = true
+                    withAnimation {
+                        isSearchPresented = true
+                    }
+                }
+                // 监听自动展开搜索栏的通知
+                NotificationCenter.default.addObserver(
+                    forName: .autoExpandPetChatSearch,
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    withAnimation {
+                        isSearchPresented = true
+                    }
+                }
             }
             .onChange(of: isSearchPresented) { oldValue, newValue in
-                // 当iOS26搜索栏展开/收起时，通知常用菜单禁用/启用长按交互
+                // 当 iOS26 搜索栏展开/收起时，通知常用菜单禁用/启用长按交互
                 NotificationCenter.default.post(
                     name: .petChatSearchStateChanged,
                     object: nil,
@@ -1198,14 +1216,16 @@ struct PetChatView: View {
         }
     }
     
-    // 配置AI服务
+    // 配置AI服务 - 根据当前选中的宠物使用对应的AI角色
     private func configureAIService() {
         let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(
             clothings: clothings,
             includeItemList: false
         )
+        // 获取当前宠物角色，使用对应的AI人设
+        let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
         petAI.ensureConfiguration(
-            role: .kitten,
+            role: currentCharacter.aiRole,
             petName: PetDataManager.shared.status.displayName,
             wardrobeContext: wardrobeContext
         )
@@ -1214,8 +1234,12 @@ struct PetChatView: View {
     // 加载初始问候
     private func loadInitialGreeting() {
         let greeting = greetingManager.getGreetingTitle()
+        // 根据当前宠物使用对应的问候语和宠物类型名
+        let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
+        let greetingSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
+        let petTypeName = currentCharacter.displayName // 使用宠物类型名（奶茶/毛毛）
         let welcomeMessage = PetChatMessage(
-            text: "\(greeting)喵~ 我是你的专属衣橱管家\(petAI.petName)，有什么可以帮你的吗？",
+            text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petTypeName)，有什么可以帮你的吗？",
             isUser: false,
             widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
         )
@@ -1912,6 +1936,7 @@ struct PetChatViewLegacy: View {
     @State private var isThinking = false
     @State private var selectedClothing: Clothing?
     @State private var navigateToDetail = false
+    @State private var hasEnteredOnce = false
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
@@ -1994,11 +2019,17 @@ struct PetChatViewLegacy: View {
                     loadInitialGreeting()
                 }
                 configureAIService()
+                // 首次进入萌宠对话页面时，自动展开搜索栏
+                if !hasEnteredOnce {
+                    hasEnteredOnce = true
+                    // iOS 18 以下版本不支持 isPresented，使用 searchText 触发搜索模式
+                    searchText = " "
+                }
             }
         }
     }
 
-    // 萌宠对话框样式的输入区域（iOS18版本）- 放在底部导航栏上方
+    // 萌宠对话框样式的输入区域（iOS18 版本）- 放在底部导航栏上方
     private var petDialogueInputArea: some View {
         VStack(spacing: 0) {
             // 使用萌宠对话框样式
@@ -2181,8 +2212,10 @@ struct PetChatViewLegacy: View {
             clothings: clothings,
             includeItemList: false
         )
+        // 获取当前宠物角色，使用对应的AI人设
+        let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
         petAI.ensureConfiguration(
-            role: .kitten,
+            role: currentCharacter.aiRole,
             petName: PetDataManager.shared.status.displayName,
             wardrobeContext: wardrobeContext
         )
@@ -2190,8 +2223,12 @@ struct PetChatViewLegacy: View {
     
     private func loadInitialGreeting() {
         let greeting = greetingManager.getGreetingTitle()
+        // 根据当前宠物使用对应的问候语和宠物类型名
+        let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
+        let greetingSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
+        let petTypeName = currentCharacter.displayName // 使用宠物类型名（奶茶/毛毛）
         let welcomeMessage = PetChatMessage(
-            text: "\(greeting)喵~ 我是你的专属衣橱管家\(petAI.petName)，有什么可以帮你的吗？",
+            text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petTypeName)，有什么可以帮你的吗？",
             isUser: false,
             widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
         )

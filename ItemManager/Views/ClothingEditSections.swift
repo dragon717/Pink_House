@@ -611,14 +611,14 @@ struct ClothingPurchaseInfoView: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("加入尾款天使", isOn: $isDepositPlan)
+                Toggle("加入心愿尾款", isOn: $isDepositPlan)
                     .tint(.green)
                 
-                Text("① 无限量创建尾款天使")
+                Text("① 无限量创建心愿尾款")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
-                Text("勾选后，该裙装将显示在尾款天使中")
+                Text("勾选后，该裙装将显示在心愿尾款中")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
@@ -719,7 +719,7 @@ struct ClothingPurchaseInfoView: View {
                                 .cornerRadius(8)
                             }
                             
-                            Text("设置预计尾款时间范围，方便在尾款天使中统计和提醒")
+                            Text("设置预计尾款时间范围，方便在心愿尾款中统计和提醒")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

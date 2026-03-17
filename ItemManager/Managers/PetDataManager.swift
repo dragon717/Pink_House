@@ -141,6 +141,16 @@ class PetDataManager: ObservableObject {
         }
     }
     
+    // MARK: - 获取当前宠物角色
+    /// 获取当前选中的宠物角色，如果没有选中则默认返回奶茶
+    func getCurrentPetCharacter() -> PetCharacter {
+        guard let petId = status.selectedPetId,
+              let character = PetCharacter(rawValue: petId) else {
+            return .naicha // 默认返回奶茶
+        }
+        return character
+    }
+    
     // MARK: - Currency API (For external systems)
     
     func getCurrency(type: PetCurrency) -> Int {

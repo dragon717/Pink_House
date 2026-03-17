@@ -97,10 +97,12 @@ struct DailyCheckInView: View {
             if checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
                 await checkInManager.loadTodayOutfitColor()
             }
-
-            // 如果未打卡且穿搭色为空，从 CloudKit 获取今日穿搭色
-            if !checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
-                await checkInManager.fetchTodayOutfitColorFromCloudKit()
+            // 未打卡时，穿搭色已在 App 启动时预加载，这里只处理预加载失败的情况
+            else if !checkInManager.hasCheckedInToday && checkInManager.todayOutfitColor == nil {
+                // 仅在预加载失败时重新尝试
+                if checkInManager.preloadError != nil {
+                    await checkInManager.fetchTodayOutfitColorFromCloudKit()
+                }
             }
 
             // 请求位置权限

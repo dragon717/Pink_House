@@ -202,7 +202,7 @@ extension View {
                                         }
                                     }
                                 )) {
-                                    Label("只看尾款天使", systemImage: "star")
+                                    Label("只看心愿尾款", systemImage: "star")
                                 }
                             } label: {
                                 Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
@@ -250,7 +250,7 @@ extension View {
                                         }
                                     }
                                 )) {
-                                    Label("只看尾款天使", systemImage: "star")
+                                    Label("只看心愿尾款", systemImage: "star")
                                 }
                             } label: {
                                 Image(systemName: showFilter.wrappedValue ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")

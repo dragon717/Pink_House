@@ -26,7 +26,7 @@ class WardrobeContextManager {
         let mostExpensiveItem = clothings.max(by: { ($0.price + $0.accessoriesPrice) < ($1.price + $1.accessoriesPrice) })
         let mostExpensivePrice = mostExpensiveItem.map { $0.price + $0.accessoriesPrice } ?? 0
 
-        // 3. 尾款天使统计
+        // 3. 心愿尾款统计
         let depositPlans = clothings.filter { $0.isDepositPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
@@ -44,7 +44,7 @@ class WardrobeContextManager {
 
         if !depositPlans.isEmpty {
             summary += """
-            \n- 尾款天使（预定中）：\(depositPlans.count) 款
+            \n- 心愿尾款（预定中）：\(depositPlans.count) 款
             - 已付定金总额：¥\(NSDecimalNumber(decimal: totalDeposit).stringValue)
             - 待付尾款总额：¥\(NSDecimalNumber(decimal: totalBalance).stringValue)
             """
@@ -237,7 +237,7 @@ class WardrobeContextManager {
         features.append("价格:¥\(NSDecimalNumber(decimal: clothing.price).stringValue)")
         
         if clothing.isDepositPlan {
-            features.append("尾款天使:是")
+            features.append("心愿尾款:是")
         }
         
         let accessoryCandidates = collectAccessories(for: clothing)

@@ -65,7 +65,7 @@ AI 的回答质量取决于输入的信息量。单纯的文本输入往往不�
 ### 4.2 调试与迭代
 - 建立 `Prompt` 版本控制。
 - 收集 Bad Case（AI 说胡话、出戏），反向优化 `System Prompt` 中的 `Negative Constraints`（负向约束）。
-- 定期更新 `PROJECT_CONCEPTS.md`，让 AI 理解最新的项目术语（如“尾款天使”不是系列，是支付模式）。
+- 定期更新 `PROJECT_CONCEPTS.md`，让 AI 理解最新的项目术语（如“心愿尾款”不是系列，是支付模式）。
 
 ---
 

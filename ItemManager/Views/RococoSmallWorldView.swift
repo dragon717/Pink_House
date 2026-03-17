@@ -82,7 +82,7 @@ struct RococoSmallWorldView: View {
                     isPlayingOpeningAnimation = true
                 }
             },
-            HotspotData(name: "尾款天使", rect: CGRect(x: 0.08, y: 0.54, width: 0.1, height: 0.11), color: .blue, label: "尾款天使", labelStyle: .diagonal(angle: 35), labelPosition: CGPoint(x: 0.1, y: 0.66), destination: .depositPlan) {
+            HotspotData(name: "心愿尾款", rect: CGRect(x: 0.08, y: 0.54, width: 0.1, height: 0.11), color: .blue, label: "心愿尾款", labelStyle: .diagonal(angle: 35), labelPosition: CGPoint(x: 0.1, y: 0.66), destination: .depositPlan) {
                 navigate(to: .depositPlan)
             },
             // 萌宠会动
@@ -275,7 +275,7 @@ struct RococoSmallWorldView: View {
     private func navigate(to destination: SmallWorldDestination) {
         // 检查功能是否已解锁
         if destination.canAccess {
-            // 特殊处理：尾款天使和衣橱需要跳转到 Tab 0 (衣橱Tab)
+            // 特殊处理：心愿尾款和衣橱需要跳转到 Tab 0 (衣橱Tab)
             if case .depositPlan = destination {
                 tabNavigationManager.navigate(to: .wardrobe(.depositPlan))
             } else if case .wardrobe = destination {

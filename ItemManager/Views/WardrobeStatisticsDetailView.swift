@@ -28,7 +28,7 @@ struct WardrobeStatisticsDetailView: View {
                     // 2. 标签分类统计
                     TagStatsCard(clothings: clothings)
                     
-                    // 3. 尾款天使统计
+                    // 3. 心愿尾款统计
                     DepositStatsCard(clothings: clothings)
                     
                     // 4. 购买时间统计
@@ -213,32 +213,43 @@ struct TagStatsCard: View {
         let value: Decimal
     }
     
+    // 将无标签放到最后的排序统计
     var stats: [TagStat] {
         var map: [String: (count: Int, value: Decimal)] = [:]
         
-        // Handle "No Tag"
-        let noTagClothings = clothings.filter { $0.tags == nil || $0.tags!.isEmpty }
-        if !noTagClothings.isEmpty {
-            let count = noTagClothings.reduce(0) { $0 + $1.stock }
-            let value = noTagClothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
-            map["无标签"] = (count, value)
-        }
-        
-        // Handle Tags
+        // Handle Tags (先处理有标签的)
         for clothing in clothings {
             guard let tags = clothing.tags, !tags.isEmpty else { continue }
             let itemValue = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
             
-            // If item has multiple tags, how do we count?
-            // Usually we count it for EACH tag.
+            // 如果一个物品有多个标签，每个标签都计数
             for tag in tags {
                 let current = map[tag.name, default: (0, 0)]
                 map[tag.name] = (current.count + clothing.stock, current.value + itemValue)
             }
         }
         
-        return map.map { TagStat(name: $0.key, count: $0.value.count, value: $0.value.value) }
+        // Handle "No Tag" (放到最后)
+        let noTagClothings = clothings.filter { $0.tags == nil || $0.tags!.isEmpty }
+        var noTagStat: TagStat?
+        if !noTagClothings.isEmpty {
+            let count = noTagClothings.reduce(0) { $0 + $1.stock }
+            let value = noTagClothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
+            noTagStat = TagStat(name: "无标签", count: count, value: value)
+        } else {
+            noTagStat = nil
+        }
+        
+        // 有标签的按数量降序排列
+        var sortedStats = map.map { TagStat(name: $0.key, count: $0.value.count, value: $0.value.value) }
             .sorted { $0.count > $1.count }
+        
+        // 将无标签放到最后
+        if let noTagStat = noTagStat {
+            sortedStats.append(noTagStat)
+        }
+        
+        return sortedStats
     }
     
     var maxCount: Int {
@@ -263,7 +274,7 @@ struct TagStatsCard: View {
                     .padding()
             } else {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Count Stats
+                    // Count Stats - 使用滚动条显示所有标签
                     VStack(alignment: .leading, spacing: 12) {
                         Text("数量统计")
                             .font(.subheadline)
@@ -271,25 +282,26 @@ struct TagStatsCard: View {
                         
                         HeaderRow(left: "标签", right: "数量", extra: "占比")
                         
-                        ForEach(stats.prefix(5)) { stat in
-                            StatRow(
-                                label: stat.name,
-                                value: "\(stat.count)",
-                                percentage: Double(stat.count) / Double(maxCount), // Bar width relative to max
-                                displayPercentage: "\(Int(Double(stat.count) / Double(stats.reduce(0) { $0 + $1.count }) * 100))%", // Share of total? No, usually share of total items? But items can have multiple tags.
-                                // Let's use share of displayed Max for bar, and share of THIS category relative to max?
-                                // The screenshot shows "100.0%" for "No Tag" which is the only one.
-                                // Let's calculate percentage relative to max or total?
-                                // Screenshot: 2 items, No Tag: 2, 100%.
-                                // So it's percentage of total items (or total tag occurrences).
-                                barColor: .gray
-                            )
+                        // 使用ScrollView支持滚动，显示所有标签
+                        ScrollView(.vertical, showsIndicators: true) {
+                            VStack(spacing: 8) {
+                                ForEach(stats) { stat in
+                                    StatRow(
+                                        label: stat.name,
+                                        value: "\(stat.count)",
+                                        percentage: Double(stat.count) / Double(maxCount),
+                                        displayPercentage: "\(Int(Double(stat.count) / Double(stats.reduce(0) { $0 + $1.count }) * 100))%",
+                                        barColor: stat.name == "无标签" ? .gray.opacity(0.6) : .gray
+                                    )
+                                }
+                            }
                         }
+                        .frame(maxHeight: 200) // 限制最大高度，超出可滚动
                     }
                     
                     Divider()
                     
-                    // Value Stats
+                    // Value Stats - 使用滚动条显示所有标签
                     VStack(alignment: .leading, spacing: 12) {
                         Text("价值统计")
                             .font(.subheadline)
@@ -297,19 +309,24 @@ struct TagStatsCard: View {
                         
                         HeaderRow(left: "标签", right: "价值", extra: "占比")
                         
-                        ForEach(stats.prefix(5)) { stat in
-                            let maxVal = Double(NSDecimalNumber(decimal: maxValue).doubleValue)
-                            let currentVal = Double(NSDecimalNumber(decimal: stat.value).doubleValue)
-                            
-                            StatRow(
-                                label: stat.name,
-                                value: "¥\(NSDecimalNumber(decimal: stat.value).stringValue)",
-                                percentage: maxVal > 0 ? currentVal / maxVal : 0,
-                                displayPercentage: "", // Value percentage might be complex if sum > total due to overlap.
-                                // Let's just show bar and value.
-                                barColor: .gray
-                            )
+                        // 使用ScrollView支持滚动，显示所有标签
+                        ScrollView(.vertical, showsIndicators: true) {
+                            VStack(spacing: 8) {
+                                ForEach(stats) { stat in
+                                    let maxVal = Double(NSDecimalNumber(decimal: maxValue).doubleValue)
+                                    let currentVal = Double(NSDecimalNumber(decimal: stat.value).doubleValue)
+                                    
+                                    StatRow(
+                                        label: stat.name,
+                                        value: "¥\(NSDecimalNumber(decimal: stat.value).stringValue)",
+                                        percentage: maxVal > 0 ? currentVal / maxVal : 0,
+                                        displayPercentage: "",
+                                        barColor: stat.name == "无标签" ? .gray.opacity(0.6) : .gray
+                                    )
+                                }
+                            }
                         }
+                        .frame(maxHeight: 200) // 限制最大高度，超出可滚动
                     }
                 }
             }
@@ -396,7 +413,7 @@ struct StatRow: View {
 }
 
 
-// MARK: - 3. 尾款天使统计
+// MARK: - 3. 心愿尾款统计
 struct DepositStatsCard: View {
     let clothings: [Clothing]
     
@@ -425,13 +442,13 @@ struct DepositStatsCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("尾款天使统计", systemImage: "list.clipboard.fill")
+            Label("心愿尾款统计", systemImage: "list.clipboard.fill")
                 .font(.headline)
                 .foregroundStyle(.brown)
             
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    StatBox(title: "尾款天使数量", value: "\(planCount)", unit: "件", color: .brown)
+                    StatBox(title: "心愿尾款数量", value: "\(planCount)", unit: "件", color: .brown)
                     StatBox(title: "总金额", value: "¥\(NSDecimalNumber(decimal: totalAmount).stringValue)", unit: "", color: .green)
                 }
                 

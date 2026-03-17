@@ -430,7 +430,7 @@ class ThemeManager {
 
     /// 当前应用版本号（用于强制重置默认主题）
     private static let appVersionKey = "app_theme_version"
-    private static let targetVersion = "1.0.0" // 目标版本号，当版本变化时触发重置
+    private static let targetVersion = "1.0.1" // 目标版本号，当版本变化时触发重置
 
     /// 检查并根据版本号应用默认主题
     private func checkAndApplyVersionBasedDefaultTheme() {
@@ -439,55 +439,67 @@ class ThemeManager {
 
         // 如果版本号不同，强制设置默认预设方案
         if savedVersion != currentVersion {
-            print("🎨 [ThemeManager] 版本变化 detected: \(savedVersion ?? "nil") -> \(currentVersion)，强制设置莫妮卡主题为默认")
+            print("🎨 [ThemeManager] 版本变化 detected: \(savedVersion ?? "nil") -> \(currentVersion)，强制设置时尚样式为默认")
 
-            // 强制设置为莫妮卡主题
-            forceApplyMonicaTheme()
+            // 强制设置为时尚样式
+            forceApplyFashionStyle()
 
             // 保存新版本号
             UserDefaults.standard.set(currentVersion, forKey: Self.appVersionKey)
         }
     }
 
-    /// 强制应用莫妮卡粉主题（作为App默认方案）
-    private func forceApplyMonicaTheme() {
-        // 重置背景色为莫妮卡粉
-        self.backgroundColorHex = "#FFE6EF"
-        self.backgroundStyle = .color
+    /// 强制应用时尚样式（作为 App 默认方案）
+    private func forceApplyFashionStyle() {
+        // 1. 设置梦幻衣橱默认为时尚样式
+        UserDefaults.standard.set(WardrobeNavigationStyle.fashion.rawValue, forKey: "UserPreference_WardrobeNavigationStyle")
+        
+        // 2. 检查用户是否已自定义图片背景，如果有则不覆盖
+        let hasCustomImageBackground = (backgroundStyle == .image && backgroundImage != nil)
+        
+        if !hasCustomImageBackground {
+            // 用户没有自定义图片背景，才应用莫妮卡粉主题
+            // 重置背景色为莫妮卡粉
+            self.backgroundColorHex = "#FFE6EF"
+            self.backgroundStyle = .color
 
-        // 重置为客制化配色模式
-        var newConfig = themeColorConfig
-        newConfig.colorSchemeMode = .custom
-        newConfig.customColorConfig.selectedPresetId = "monica_pink" // 莫妮卡粉主题ID
+            // 重置为客制化配色模式，设置莫妮卡粉主题
+            var newConfig = themeColorConfig
+            newConfig.colorSchemeMode = .custom
+            newConfig.customColorConfig.selectedPresetId = "monica_pink" // 莫妮卡粉主题 ID
 
-        // 同步莫妮卡粉预设的颜色到 currentCustom
-        let monicaPinkPreset = CustomColorPresets.monicaPink
-        newConfig.customColorConfig.currentCustom.textPrimaryRGBA = monicaPinkPreset.textPrimaryRGBA
-        newConfig.customColorConfig.currentCustom.textSecondaryRGBA = monicaPinkPreset.textSecondaryRGBA
-        newConfig.customColorConfig.currentCustom.textTertiaryRGBA = monicaPinkPreset.textTertiaryRGBA
-        newConfig.customColorConfig.currentCustom.textAccentRGBA = monicaPinkPreset.textAccentRGBA
-        newConfig.customColorConfig.currentCustom.cardConfig = monicaPinkPreset.cardConfig
+            // 同步莫妮卡粉预设的颜色到 currentCustom
+            let monicaPinkPreset = CustomColorPresets.monicaPink
+            newConfig.customColorConfig.currentCustom.textPrimaryRGBA = monicaPinkPreset.textPrimaryRGBA
+            newConfig.customColorConfig.currentCustom.textSecondaryRGBA = monicaPinkPreset.textSecondaryRGBA
+            newConfig.customColorConfig.currentCustom.textTertiaryRGBA = monicaPinkPreset.textTertiaryRGBA
+            newConfig.customColorConfig.currentCustom.textAccentRGBA = monicaPinkPreset.textAccentRGBA
+            newConfig.customColorConfig.currentCustom.cardConfig = monicaPinkPreset.cardConfig
 
-        // 同步暗夜模式配色
-        if monicaPinkPreset.supportsDarkMode {
-            newConfig.customColorConfig.currentCustom.darkTextPrimaryRGBA = monicaPinkPreset.darkTextPrimaryRGBA ?? monicaPinkPreset.textPrimaryRGBA
-            newConfig.customColorConfig.currentCustom.darkTextSecondaryRGBA = monicaPinkPreset.darkTextSecondaryRGBA ?? monicaPinkPreset.textSecondaryRGBA
-            newConfig.customColorConfig.currentCustom.darkTextTertiaryRGBA = monicaPinkPreset.darkTextTertiaryRGBA ?? monicaPinkPreset.textTertiaryRGBA
-            newConfig.customColorConfig.currentCustom.darkTextAccentRGBA = monicaPinkPreset.darkTextAccentRGBA ?? monicaPinkPreset.textAccentRGBA
-            newConfig.customColorConfig.currentCustom.darkCardConfig = monicaPinkPreset.darkCardConfig ?? monicaPinkPreset.cardConfig
+            // 同步暗夜模式配色
+            if monicaPinkPreset.supportsDarkMode {
+                newConfig.customColorConfig.currentCustom.darkTextPrimaryRGBA = monicaPinkPreset.darkTextPrimaryRGBA ?? monicaPinkPreset.textPrimaryRGBA
+                newConfig.customColorConfig.currentCustom.darkTextSecondaryRGBA = monicaPinkPreset.darkTextSecondaryRGBA ?? monicaPinkPreset.textSecondaryRGBA
+                newConfig.customColorConfig.currentCustom.darkTextTertiaryRGBA = monicaPinkPreset.darkTextTertiaryRGBA ?? monicaPinkPreset.textTertiaryRGBA
+                newConfig.customColorConfig.currentCustom.darkTextAccentRGBA = monicaPinkPreset.darkTextAccentRGBA ?? monicaPinkPreset.textAccentRGBA
+                newConfig.customColorConfig.currentCustom.darkCardConfig = monicaPinkPreset.darkCardConfig ?? monicaPinkPreset.cardConfig
+            }
+
+            newConfig.customColorConfig.currentCustom.updatedAt = Date()
+
+            // 应用新配置（不触发保存，避免循环）
+            isLoadingConfig = true
+            themeColorConfig = newConfig
+            isLoadingConfig = false
+
+            // 保存配置
+            saveThemeColorConfig()
+            
+            print("✅ [ThemeManager] 时尚样式 + 莫妮卡粉主题已强制设置为默认方案")
+        } else {
+            // 用户已有自定义图片背景，只设置时尚样式，不覆盖主题
+            print("✅ [ThemeManager] 检测到自定义图片背景，仅设置时尚样式，保留用户主题")
         }
-
-        newConfig.customColorConfig.currentCustom.updatedAt = Date()
-
-        // 应用新配置（不触发保存，避免循环）
-        isLoadingConfig = true
-        themeColorConfig = newConfig
-        isLoadingConfig = false
-
-        // 保存配置
-        saveThemeColorConfig()
-
-        print("✅ [ThemeManager] 莫妮卡粉主题已强制设置为默认方案")
     }
     
     var backgroundColor: Color {
