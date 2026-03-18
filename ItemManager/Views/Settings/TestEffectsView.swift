@@ -11,6 +11,7 @@ enum LabModule: String, CaseIterable, Identifiable {
     case magicTasks = "魔法任务"
     case checkIn = "签到打卡"
     case petReference = "萌宠参考"
+    case clearPetChat = "清除对话"
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .magicTasks: return "wand.and.stars"
         case .checkIn: return "checkmark.seal.fill"
         case .petReference: return "pawprint.fill"
+        case .clearPetChat: return "trash.circle.fill"
         }
     }
 
@@ -37,6 +39,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .magicTasks: return .purple
         case .checkIn: return .red
         case .petReference: return .orange
+        case .clearPetChat: return .red
         }
     }
 
@@ -50,6 +53,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .magicTasks: return "状态 · 重置"
         case .checkIn: return "记录 · 重置"
         case .petReference: return "萌宠 · 互动 · AI"
+        case .clearPetChat: return "萌宠 · 历史 · 清除"
         }
     }
 }
@@ -234,6 +238,8 @@ struct LabModuleDetailView: View {
                     case .petReference:
                         // 萌宠参考直接跳转到萌宠界面，不会走到这里
                         EmptyView()
+                    case .clearPetChat:
+                        ClearPetChatTestView()
                     }
                 }
             }
@@ -1860,5 +1866,124 @@ struct PetHomeViewWithCloseButton: View {
             .padding(.trailing, 20)
             .padding(.top, 60)
         }
+    }
+}
+
+// MARK: - 清除萌宠对话历史测试子视图
+struct ClearPetChatTestView: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @State private var showClearAlert = false
+    @State private var showClearedSuccess = false
+    @State private var messageCount: Int = 0
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // 统计信息卡片
+                VStack(spacing: 16) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(themeManager.accentTextColor)
+
+                    VStack(spacing: 4) {
+                        Text("\(messageCount)")
+                            .font(.system(size: 48, weight: .bold))
+                            .foregroundStyle(themeManager.primaryTextColor)
+                        Text("当前对话记录数")
+                            .font(.caption)
+                            .foregroundStyle(themeManager.secondaryTextColor)
+                    }
+                }
+                .padding(30)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal)
+                .padding(.top, 20)
+
+                // 说明文字
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("功能说明")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("清除萌宠对话的所有历史记录", systemImage: "checkmark.circle")
+                        Label("包括用户消息和AI回复", systemImage: "checkmark.circle")
+                        Label("操作后无法恢复", systemImage: "exclamationmark.triangle")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(themeManager.cardBackgroundColor.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal)
+
+                // 清除按钮
+                Button {
+                    showClearAlert = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash.fill")
+                        Text("清除所有对话历史")
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(themeManager.tertiaryTextColor)
+                    .cornerRadius(16)
+                }
+                .padding(.horizontal)
+                .shadow(color: themeManager.tertiaryTextColor.opacity(0.3), radius: 8, x: 0, y: 4)
+
+                Text("此操作将永久删除所有萌宠对话记录，请谨慎操作")
+                    .font(.caption)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
+                Spacer(minLength: 100)
+            }
+        }
+        .alert("确认清除", isPresented: $showClearAlert) {
+            Button("取消", role: .cancel) {}
+            Button("清除", role: .destructive) {
+                clearPetChatHistory()
+            }
+        } message: {
+            Text("这将清除所有萌宠对话历史记录，此操作不可恢复。确定要继续吗？")
+        }
+        .alert("清除成功", isPresented: $showClearedSuccess) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text("萌宠对话历史记录已清除")
+        }
+        .onAppear {
+            loadMessageCount()
+        }
+    }
+
+    private func loadMessageCount() {
+        messageCount = PetChatTranscriptStore.load().count
+    }
+
+    private func clearPetChatHistory() {
+        // 清除萌宠对话历史记录
+        UserDefaults.standard.removeObject(forKey: "pet_chat_transcript_v3")
+        messageCount = 0
+        showClearedSuccess = true
     }
 }

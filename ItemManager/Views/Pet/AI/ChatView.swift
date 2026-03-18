@@ -44,6 +44,7 @@ struct ChatView: View {
     // AI 免责声明状态
     @AppStorage("hasShownAIDisclaimer") private var hasShownAIDisclaimer = false
     @State private var showingDisclaimer = false
+    @State private var showingHistorySearch = false
     
     // 初始化时传入 Service
     init(service: PetAIService) {
@@ -194,6 +195,14 @@ struct ChatView: View {
         .navigationTitle("\(petAI.petName)的日记")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    showingHistorySearch = true
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .foregroundStyle(.pink)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: {
                     withAnimation {
@@ -235,7 +244,7 @@ struct ChatView: View {
                 hasShownAIDisclaimer = true
             }
         } message: {
-            Text("AI 生成的内容可能不准确或具有误导性，请注意甄别。\n\n本应用使用 DeepSeek、Minimax 等第三方 AI 服务，对话内容仅存储在您的设备本地。")
+            Text("AI 生成的内容可能不准确或具有误导性，请注意甄别。\n\n本应用使用第三方 AI 服务，对话内容仅存储在您的设备本地。")
         }
         // AI 内容举报弹窗
         .sheet(isPresented: $showingReportSheet) {
@@ -245,6 +254,11 @@ struct ChatView: View {
                 onSubmit: submitReport,
                 onCancel: { showingReportSheet = false }
             )
+        }
+        .sheet(isPresented: $showingHistorySearch) {
+            PetChatHistorySearchSheet { query in
+                sendMessageFromHistory(query)
+            }
         }
         // 举报成功提示
         .alert("举报已提交", isPresented: $showingReportSuccess) {
@@ -319,8 +333,10 @@ struct ChatView: View {
         Task {
             // 模拟一点延迟，让交互更自然
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
-            
-            _ = await petAI.sendMessage(userText)
+
+            let prompt = buildPrompt(for: userText)
+
+            _ = await petAI.sendMessage(prompt, displayText: userText)
             
             await MainActor.run {
                 isSending = false
@@ -331,8 +347,43 @@ struct ChatView: View {
             }
         }
     }
+
+    private func currentPersonaProfile() -> PetPersonaProfile {
+        let character = PetDataManager.shared.getCurrentPetCharacter()
+        return PetPersonaRegistry.profile(for: character.aiRole, petName: petAI.petName)
+    }
+
+    private func sendMessageFromHistory(_ query: String) {
+        let userText = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !userText.isEmpty else { return }
+
+        isSending = true
+        Task {
+            let prompt = buildPrompt(for: userText)
+
+            _ = await petAI.sendMessage(prompt, displayText: userText)
+
+            await MainActor.run {
+                isSending = false
+            }
+        }
+    }
+
+    private func buildPrompt(for userText: String) -> String {
+        let persona = currentPersonaProfile()
+        let module = PetChatIntentRouter.detect(from: userText).module
+        return PetGenerativePromptBuilder.buildPrompt(
+            input: .init(
+                userQuery: userText,
+                wardrobeContextBlock: nil,
+                persona: persona,
+                module: module,
+                recentAssistantReplies: PetGenerativePromptBuilder.recentAssistantReplies(
+                    from: petAI.uiMessages,
+                    isUser: \.isUser,
+                    text: \.text
+                )
+            )
+        )
+    }
 }
-
-
-
-

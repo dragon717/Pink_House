@@ -1304,7 +1304,11 @@ extension PetAIService {
         """
 
         // 发送请求给AI（禁用语音播报）
-        let response = await sendMessage(prompt, enableVoice: false)
+        let response = await sendMessage(
+            prompt,
+            enableVoice: false,
+            responseMode: .raw
+        )
 
         // 检查响应是否包含错误信息
         if response.text.contains("配置错误") || response.text.contains("API Key") {

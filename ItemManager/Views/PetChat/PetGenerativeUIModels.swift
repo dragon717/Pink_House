@@ -214,7 +214,12 @@ enum PetGenerativeUIParser {
         fallbackDisplayText: String,
         userQuery: String
     ) -> PetGenerativeRenderContent {
-        let parsed = parseEnvelope(from: rawText)
+        let parsed: PetGenerativeEnvelope?
+        if shouldAttemptStructuredParse(rawText) {
+            parsed = parseEnvelope(from: rawText)
+        } else {
+            parsed = nil
+        }
         let parsedText = parsed?.displayText?.trimmingCharacters(in: .whitespacesAndNewlines)
         var resolvedWidgets = sanitizeWidgets(parsed?.resolvedWidgets ?? [])
 
@@ -243,6 +248,10 @@ enum PetGenerativeUIParser {
             }
         }
         return nil
+    }
+
+    private static func shouldAttemptStructuredParse(_ text: String) -> Bool {
+        text.contains("{") || text.contains("```")
     }
 
     private static func decodeEnvelope(from candidate: String) -> PetGenerativeEnvelope? {

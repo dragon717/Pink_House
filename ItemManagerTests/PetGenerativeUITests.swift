@@ -96,6 +96,26 @@ final class PetGenerativeUITests: XCTestCase {
         XCTAssertTrue(prompt.contains("outfit_suggest"))
     }
 
+    func testPromptBuilderSupportsPersonaAndModule() {
+        let persona = PetPersonaRegistry.profile(for: .kitten, petName: "奶茶")
+        let prompt = PetGenerativePromptBuilder.buildPrompt(
+            input: .init(
+                userQuery: "我今天有点焦虑",
+                wardrobeContextBlock: nil,
+                persona: persona,
+                module: .mood,
+                recentAssistantReplies: ["别急，我陪你慢慢来喵~"]
+            )
+        )
+
+        XCTAssertTrue(prompt.contains("你正在扮演"))
+        XCTAssertTrue(prompt.contains("角色卡"))
+        XCTAssertTrue(prompt.contains("模块目标"))
+        XCTAssertTrue(prompt.contains("可用本地工具"))
+        XCTAssertTrue(prompt.contains("宠物状态约束"))
+        XCTAssertTrue(prompt.contains("避免重复句式"))
+    }
+
     func testWeatherWidgetFactoryBuildsContainerWithChildren() {
         let dress = Clothing(name: "薄荷JSK", types: "JSK")
         let shoe = Clothing(name: "玛丽珍鞋", types: "鞋")
@@ -116,5 +136,92 @@ final class PetGenerativeUITests: XCTestCase {
         XCTAssertEqual(widgets.first?.type, .container)
         XCTAssertEqual(widgets.first?.children.count, 3)
         XCTAssertEqual(widgets.first?.children.first?.type, .weatherCard)
+    }
+
+    func testIntentRouterDetectsMoodAndOutfit() {
+        XCTAssertEqual(PetChatIntentRouter.detect(from: "我有点焦虑，先安慰我"), .moodSupport)
+        XCTAssertEqual(PetChatIntentRouter.detect(from: "帮我搭配一套出门穿搭"), .outfitSuggestion)
+        XCTAssertEqual(PetChatIntentRouter.detect(from: "刚刚搭配的三件衣服价格多少"), .lastOutfitPrice)
+    }
+
+    func testRecentAssistantRepliesHelperFiltersUserMessages() {
+        let messages = [
+            ChatMessage(text: "你好", isUser: true),
+            ChatMessage(text: "喵~我在", isUser: false),
+            ChatMessage(text: "今天下雨吗", isUser: true),
+            ChatMessage(text: "有小雨，记得带伞", isUser: false)
+        ]
+
+        let replies = PetGenerativePromptBuilder.recentAssistantReplies(
+            from: messages,
+            isUser: \.isUser,
+            text: \.text
+        )
+
+        XCTAssertEqual(replies.count, 2)
+        XCTAssertEqual(replies.first, "喵~我在")
+        XCTAssertEqual(replies.last, "有小雨，记得带伞")
+    }
+
+    func testActionSanitizerRejectsUnknownIdentifier() {
+        let invalid = PetConversationToolbox.sanitizeActionIdentifier("random_unknown_action", role: .kitten)
+        let valid = PetConversationToolbox.sanitizeActionIdentifier("happy_cat", role: .kitten)
+
+        XCTAssertNil(invalid)
+        XCTAssertEqual(valid, "happy_cat")
+    }
+
+    func testMemoryStoreRecordsLatestOutfitPriceSummary() {
+        let first = Clothing(name: "薄荷JSK", price: 699)
+        let second = Clothing(name: "奶白玛丽珍", price: 399)
+        let third = Clothing(name: "透明雨伞", price: 129)
+
+        PetConversationMemoryStore.shared.recordOutfitSelection(
+            clothings: [first, second, third],
+            role: .kitten
+        )
+
+        let summary = PetConversationMemoryStore.shared.latestOutfitPriceSummary(for: .kitten)
+        XCTAssertNotNil(summary)
+        XCTAssertTrue(summary?.contains("薄荷JSK") == true)
+        XCTAssertTrue(summary?.contains("合计") == true)
+    }
+
+    func testChatMessageDecodesLegacyTimestampString() throws {
+        let json = """
+        {
+          "id": "\(UUID().uuidString)",
+          "text": "历史消息",
+          "isUser": false,
+          "timestamp": "2026-03-19T10:00:00Z"
+        }
+        """
+        let data = Data(json.utf8)
+        let message = try JSONDecoder().decode(ChatMessage.self, from: data)
+        XCTAssertEqual(message.text, "历史消息")
+    }
+
+    func testPromptIncludesOutfitPriceHintWhenAsked() {
+        let a = Clothing(name: "奶白JSK", price: 500)
+        let b = Clothing(name: "玛丽珍", price: 300)
+        let c = Clothing(name: "透明伞", price: 100)
+        PetConversationMemoryStore.shared.recordOutfitSelection(
+            clothings: [a, b, c],
+            role: .kitten
+        )
+
+        let persona = PetPersonaRegistry.profile(for: .kitten, petName: "奶茶")
+        let prompt = PetGenerativePromptBuilder.buildPrompt(
+            input: .init(
+                userQuery: "刚刚搭配的三件衣服价格多少",
+                wardrobeContextBlock: nil,
+                persona: persona,
+                module: .wardrobe,
+                recentAssistantReplies: []
+            )
+        )
+
+        XCTAssertTrue(prompt.contains("最近搭配价格快照"))
+        XCTAssertTrue(prompt.contains("合计"))
     }
 }

@@ -563,8 +563,9 @@ class PetViewModel: ObservableObject {
             Task {
                 // 显示加载状态 (可选)
                 // await MainActor.run { self.recognizedSpeechText += "..." }
-                
-                let response = await ai.sendMessage(text)
+
+                let prompt = buildPromptForSpeechInput(text, ai: ai)
+                let response = await ai.sendMessage(prompt, displayText: text)
                 
                 await MainActor.run {
                     // 更新字幕为 AI 的回复
@@ -592,7 +593,8 @@ class PetViewModel: ObservableObject {
         
         Task {
             // 发送一个特殊的提示给 AI，让它主动发起对话
-            let prompt = "（用户一直看着你，但没有说话，看起来在发呆，或者是环境太吵了听不清。请用你的语气问他怎么不说话了，或者卖个萌。）"
+            let seed = "用户一直看着你但没有说话，可能在发呆或环境吵听不清。请主动关心并轻轻开启话题。"
+            let prompt = buildPromptForSpeechInput(seed, ai: ai, moduleOverride: .mood)
             
             // 这里的 displayText 会显示在聊天记录中，显示 "..." 表示沉默
             let response = await ai.sendMessage(prompt, displayText: "...")
@@ -606,6 +608,31 @@ class PetViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func buildPromptForSpeechInput(
+        _ text: String,
+        ai: PetAIService,
+        moduleOverride: PetConversationModule? = nil
+    ) -> String {
+        let character = PetDataManager.shared.getCurrentPetCharacter()
+        let persona = PetPersonaRegistry.profile(for: character.aiRole, petName: status.displayName)
+        let module = moduleOverride ?? PetChatIntentRouter.detect(from: text).module
+        let recentAssistantReplies = PetGenerativePromptBuilder.recentAssistantReplies(
+            from: ai.uiMessages,
+            isUser: \.isUser,
+            text: \.text
+        )
+
+        return PetGenerativePromptBuilder.buildPrompt(
+            input: .init(
+                userQuery: text,
+                wardrobeContextBlock: nil,
+                persona: persona,
+                module: module,
+                recentAssistantReplies: recentAssistantReplies
+            )
+        )
     }
     
     private func handleAIAction(_ action: String) {

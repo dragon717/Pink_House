@@ -30,6 +30,33 @@ func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws 
     }
 }
 
+private func activePetPersonaProfile(petName: String) -> PetPersonaProfile {
+    guard let petId = PetDataManager.shared.status.selectedPetId,
+          let character = PetCharacter(rawValue: petId) else {
+        return PetPersonaRegistry.profile(for: .kitten, petName: petName)
+    }
+    return PetPersonaRegistry.profile(for: character.aiRole, petName: petName)
+}
+
+private func activePetRole() -> PetRole {
+    guard let petId = PetDataManager.shared.status.selectedPetId,
+          let character = PetCharacter(rawValue: petId) else {
+        return .kitten
+    }
+    return character.aiRole
+}
+
+private func wardrobeContextBudget(for intent: PetChatIntent) -> Int {
+    switch intent {
+    case .outfitSuggestion, .weatherGuidance:
+        return 10
+    case .wardrobeStats, .search, .depositPlan, .lastOutfitPrice:
+        return 8
+    case .colorMatch, .moodSupport, .generalChat:
+        return 6
+    }
+}
+
 // MARK: - 消息类型枚举
 enum PetChatMessageType {
     case text           // 普通文本
@@ -55,6 +82,7 @@ struct PetChatMessage: Identifiable {
     let id = UUID()
     let text: String
     let isUser: Bool
+    let isUserAuthored: Bool      // 仅用户亲自输入的消息才用于“可复用历史”
     let type: PetChatMessageType
     let timestamp: Date
     var clothing: Clothing?           // 关联的衣橱卡片
@@ -67,15 +95,18 @@ struct PetChatMessage: Identifiable {
     var widgets: [PetWidgetData]?     // 生成式UI组件
 
     init(text: String, isUser: Bool, type: PetChatMessageType = .text,
+         isUserAuthored: Bool? = nil,
          clothing: Clothing? = nil, searchResults: [Clothing]? = nil,
          statistics: WardrobeStats? = nil, colorRecommendation: ColorRecommendation? = nil,
          imageName: String? = nil, isAIGenerated: Bool = false,
+         timestamp: Date = Date(),
          outfitSuggestion: OutfitSuggestionData? = nil,
          widgets: [PetWidgetData]? = nil) {
         self.text = text
         self.isUser = isUser
+        self.isUserAuthored = isUserAuthored ?? isUser
         self.type = type
-        self.timestamp = Date()
+        self.timestamp = timestamp
         self.clothing = clothing
         self.searchResults = searchResults
         self.statistics = statistics
@@ -860,6 +891,7 @@ struct PetChatView: View {
     // iOS26 搜索栏展开状态（用于控制常用菜单长按交互）
     @State private var isSearchPresented = false
     @State private var hasEnteredOnce = false
+    @State private var showingHistorySearch = false
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
@@ -949,6 +981,11 @@ struct PetChatView: View {
                     ClothingDetailView(clothing: clothing)
                 }
             }
+            .sheet(isPresented: $showingHistorySearch) {
+                PetChatHistorySearchSheet { query in
+                    reuseHistoryQuery(query)
+                }
+            }
             // 保存成功提示覆盖层
             .overlay {
                 if showingSaveSuccessToast {
@@ -991,6 +1028,9 @@ struct PetChatView: View {
                     object: nil,
                     userInfo: ["isSearching": newValue]
                 )
+            }
+            .onChange(of: messages.count) { _, _ in
+                PetChatTranscriptStore.save(messages: messages)
             }
             // iOS26+ 悬浮按钮 - 使用 safeAreaInset 确保跟随键盘移动
             .safeAreaInset(edge: .bottom) {
@@ -1093,6 +1133,12 @@ struct PetChatView: View {
                 } label: {
                     Label("查找衣柜", systemImage: "magnifyingglass")
                 }
+
+                Button {
+                    showingHistorySearch = true
+                } label: {
+                    Label("历史消息查询", systemImage: "clock.arrow.circlepath")
+                }
             }
 
             Section("其他") {
@@ -1167,6 +1213,15 @@ struct PetChatView: View {
         processUserIntent(userText)
     }
 
+    private func reuseHistoryQuery(_ query: String) {
+        let userText = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !userText.isEmpty else { return }
+
+        let userMessage = PetChatMessage(text: userText, isUser: true)
+        messages.append(userMessage)
+        processUserIntent(userText)
+    }
+
     // 从搜索栏发送消息 - 等同于 PetDialogueInputView 的功能
     private func sendMessageFromSearchBar() {
         let userText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1182,7 +1237,7 @@ struct PetChatView: View {
         // 处理用户意图（和底部输入框一样的逻辑）
         processUserIntent(userText)
     }
-    
+
     // 处理来自搜索栏的搜索（菜单中的搜索功能）
     private func handleSearchFromSearchBar(_ query: String) {
         // 添加用户搜索消息
@@ -1239,6 +1294,12 @@ struct PetChatView: View {
     
     // 加载初始问候
     private func loadInitialGreeting() {
+        let localTranscript = PetChatTranscriptStore.load()
+        if !localTranscript.isEmpty {
+            messages = localTranscript
+            return
+        }
+
         let greeting = greetingManager.getGreetingTitle()
         // 根据当前宠物使用对应的问候语和用户起的宠物名字
         let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
@@ -1269,54 +1330,24 @@ struct PetChatView: View {
     
     // 处理用户意图
     private func processUserIntent(_ text: String) {
-        let lowercasedText = text.lowercased()
-
-        // 检查是否是统计查询
-        if lowercasedText.contains("统计") || lowercasedText.contains("多少") ||
-           lowercasedText.contains("价值") || lowercasedText.contains("几件") {
+        switch PetChatIntentRouter.detect(from: text) {
+        case .wardrobeStats:
             handleWardrobeStatistics()
-            return
-        }
-
-        // 检查是否是OOTD/搭配查询（优先于颜色搭配）
-        if lowercasedText.contains("ootd") || lowercasedText.contains("造型") ||
-           lowercasedText.contains("穿搭") || lowercasedText.contains("怎么穿") ||
-           (lowercasedText.contains("搭配") && (lowercasedText.contains("一套") || lowercasedText.contains("出门") || lowercasedText.contains("今天"))) {
+        case .outfitSuggestion:
             handleOutfitSuggestion(text)
-            return
-        }
-        
-        // 检查是否是天气相关穿搭
-        if lowercasedText.contains("天气") || lowercasedText.contains("温度") ||
-           lowercasedText.contains("下雨") || lowercasedText.contains("雨伞") ||
-           lowercasedText.contains("风大") {
+        case .lastOutfitPrice:
+            handleLastOutfitPriceQuery()
+        case .weatherGuidance:
             handleWeatherOutfitGuidance()
-            return
-        }
-
-        // 检查是否是搭配色查询
-        if lowercasedText.contains("搭配") || lowercasedText.contains("颜色") ||
-           lowercasedText.contains("穿什么") || lowercasedText.contains("推荐") {
+        case .colorMatch:
             handleColorMatch()
-            return
-        }
-
-        // 检查是否是搜索查询
-        if lowercasedText.contains("找") || lowercasedText.contains("搜索") ||
-           lowercasedText.contains("有没有") {
+        case .search:
             handleSearch(text)
-            return
-        }
-
-        // 检查是否是尾款查询
-        if lowercasedText.contains("尾款") || lowercasedText.contains("定金") ||
-           lowercasedText.contains("补款") {
+        case .depositPlan:
             handleDepositPlanQuery()
-            return
+        case .moodSupport, .generalChat:
+            handleAIChat(text)
         }
-
-        // 默认使用AI对话
-        handleAIChat(text)
     }
 
     private func handleWidgetAction(_ option: PetWidgetOption) {
@@ -1333,7 +1364,7 @@ struct PetChatView: View {
             if option.command.hasPrefix("ask:") {
                 let query = String(option.command.dropFirst(4))
                 if !query.isEmpty {
-                    let userMessage = PetChatMessage(text: query, isUser: true)
+                    let userMessage = PetChatMessage(text: query, isUser: true, isUserAuthored: false)
                     messages.append(userMessage)
                     processUserIntent(query)
                 }
@@ -1637,6 +1668,22 @@ struct PetChatView: View {
             messages.append(message)
         }
     }
+
+    private func handleLastOutfitPriceQuery() {
+        let role = activePetRole()
+        let text: String
+        if let summary = PetConversationMemoryStore.shared.latestOutfitPriceSummary(for: role) {
+            text = "（翻出小账本）\(summary)～要不要我按这个预算再给你一套同风格的？"
+        } else {
+            text = "（挠挠耳朵）我这边还没记到最近一套搭配价格喵，先让我给你搭一套，再帮你精确算总价吧。"
+        }
+
+        let message = PetChatMessage(
+            text: text,
+            isUser: false
+        )
+        messages.append(message)
+    }
     
     private func handleWeatherOutfitGuidance() {
         isThinking = true
@@ -1659,7 +1706,7 @@ struct PetChatView: View {
             messages.append(message)
         }
     }
-    
+
     @MainActor
     private func fetchCurrentWeather() async -> WeatherData? {
         let locationService = LocationService.shared
@@ -1698,13 +1745,27 @@ struct PetChatView: View {
         isThinking = true
 
         Task {
+            let detectedIntent = PetChatIntentRouter.detect(from: text)
             let wardrobeContext = WardrobeContextManager.shared.buildWardrobeContextBlockIfNeeded(
                 query: text,
-                clothings: clothings
+                clothings: clothings,
+                module: detectedIntent.module,
+                maxItems: wardrobeContextBudget(for: detectedIntent)
+            )
+            let persona = activePetPersonaProfile(petName: petAI.petName)
+            let recentAssistantReplies = PetGenerativePromptBuilder.recentAssistantReplies(
+                from: messages,
+                isUser: \.isUser,
+                text: \.text
             )
             let prompt = PetGenerativePromptBuilder.buildPrompt(
-                userQuery: text,
-                wardrobeContextBlock: wardrobeContext
+                input: .init(
+                    userQuery: text,
+                    wardrobeContextBlock: wardrobeContext,
+                    persona: persona,
+                    module: detectedIntent.module,
+                    recentAssistantReplies: recentAssistantReplies
+                )
             )
             let response = await petAI.sendMessage(
                 prompt,
@@ -1761,6 +1822,10 @@ struct PetChatView: View {
 
                 await MainActor.run {
                     isThinking = false
+                    PetConversationMemoryStore.shared.recordOutfitSelection(
+                        clothings: selectedClothings,
+                        role: activePetRole()
+                    )
 
                     let suggestionData = OutfitSuggestionData(
                         clothings: selectedClothings,
@@ -1829,6 +1894,10 @@ struct PetChatView: View {
 
                 await MainActor.run {
                     isThinking = false
+                    PetConversationMemoryStore.shared.recordOutfitSelection(
+                        clothings: selectedClothings,
+                        role: activePetRole()
+                    )
 
                     let suggestionData = OutfitSuggestionData(
                         clothings: selectedClothings,
@@ -1943,6 +2012,7 @@ struct PetChatViewLegacy: View {
     @State private var selectedClothing: Clothing?
     @State private var navigateToDetail = false
     @State private var hasEnteredOnce = false
+    @State private var showingHistorySearch = false
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
@@ -2016,6 +2086,11 @@ struct PetChatViewLegacy: View {
                     ClothingDetailView(clothing: clothing)
                 }
             }
+            .sheet(isPresented: $showingHistorySearch) {
+                PetChatHistorySearchSheet { query in
+                    reuseHistoryQuery(query)
+                }
+            }
             // 保存成功提示覆盖层
             .overlay {
                 if showingSaveSuccessToast {
@@ -2038,6 +2113,9 @@ struct PetChatViewLegacy: View {
                     // iOS 18 以下版本不支持 isPresented，使用 searchText 触发搜索模式
                     searchText = " "
                 }
+            }
+            .onChange(of: messages.count) { _, _ in
+                PetChatTranscriptStore.save(messages: messages)
             }
         }
     }
@@ -2111,6 +2189,12 @@ struct PetChatViewLegacy: View {
                         inputText = "帮我找"
                     } label: {
                         Label("查找衣柜", systemImage: "magnifyingglass")
+                    }
+
+                    Button {
+                        showingHistorySearch = true
+                    } label: {
+                        Label("历史消息查询", systemImage: "clock.arrow.circlepath")
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
@@ -2220,6 +2304,15 @@ struct PetChatViewLegacy: View {
         processUserIntent(userText)
     }
 
+    private func reuseHistoryQuery(_ query: String) {
+        let userText = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !userText.isEmpty else { return }
+
+        let userMessage = PetChatMessage(text: userText, isUser: true)
+        messages.append(userMessage)
+        processUserIntent(userText)
+    }
+
     private func configureAIService() {
         let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(
             clothings: clothings,
@@ -2235,6 +2328,12 @@ struct PetChatViewLegacy: View {
     }
     
     private func loadInitialGreeting() {
+        let localTranscript = PetChatTranscriptStore.load()
+        if !localTranscript.isEmpty {
+            messages = localTranscript
+            return
+        }
+
         let greeting = greetingManager.getGreetingTitle()
         // 根据当前宠物使用对应的问候语和用户起的宠物名字
         let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
@@ -2394,48 +2493,24 @@ struct PetChatViewLegacy: View {
     }
 
     private func processUserIntent(_ text: String) {
-        let lowercasedText = text.lowercased()
-
-        if lowercasedText.contains("统计") || lowercasedText.contains("多少") ||
-           lowercasedText.contains("价值") || lowercasedText.contains("几件") {
+        switch PetChatIntentRouter.detect(from: text) {
+        case .wardrobeStats:
             handleWardrobeStatistics()
-            return
-        }
-
-        // 检查是否是OOTD/搭配查询（优先于颜色搭配）
-        if lowercasedText.contains("ootd") || lowercasedText.contains("造型") ||
-           lowercasedText.contains("穿搭") || lowercasedText.contains("怎么穿") ||
-           (lowercasedText.contains("搭配") && (lowercasedText.contains("一套") || lowercasedText.contains("出门") || lowercasedText.contains("今天"))) {
+        case .outfitSuggestion:
             handleOutfitSuggestion(text)
-            return
-        }
-        
-        if lowercasedText.contains("天气") || lowercasedText.contains("温度") ||
-           lowercasedText.contains("下雨") || lowercasedText.contains("雨伞") ||
-           lowercasedText.contains("风大") {
+        case .lastOutfitPrice:
+            handleLastOutfitPriceQuery()
+        case .weatherGuidance:
             handleWeatherOutfitGuidance()
-            return
-        }
-
-        if lowercasedText.contains("搭配") || lowercasedText.contains("颜色") ||
-           lowercasedText.contains("穿什么") || lowercasedText.contains("推荐") {
+        case .colorMatch:
             handleColorMatch()
-            return
-        }
-
-        if lowercasedText.contains("找") || lowercasedText.contains("搜索") ||
-           lowercasedText.contains("有没有") {
+        case .search:
             handleSearch(text)
-            return
-        }
-
-        if lowercasedText.contains("尾款") || lowercasedText.contains("定金") ||
-           lowercasedText.contains("补款") {
+        case .depositPlan:
             handleDepositPlanQuery()
-            return
+        case .moodSupport, .generalChat:
+            handleAIChat(text)
         }
-
-        handleAIChat(text)
     }
 
     private func legacyHandleWidgetAction(_ option: PetWidgetOption) {
@@ -2452,7 +2527,7 @@ struct PetChatViewLegacy: View {
             if option.command.hasPrefix("ask:") {
                 let query = String(option.command.dropFirst(4))
                 if !query.isEmpty {
-                    let userMessage = PetChatMessage(text: query, isUser: true)
+                    let userMessage = PetChatMessage(text: query, isUser: true, isUserAuthored: false)
                     messages.append(userMessage)
                     processUserIntent(query)
                 }
@@ -2614,6 +2689,22 @@ struct PetChatViewLegacy: View {
             messages.append(message)
         }
     }
+
+    private func handleLastOutfitPriceQuery() {
+        let role = activePetRole()
+        let text: String
+        if let summary = PetConversationMemoryStore.shared.latestOutfitPriceSummary(for: role) {
+            text = "（翻出小账本）\(summary)～你要我顺便按这个价位再补一套吗？"
+        } else {
+            text = "（挠挠耳朵）我这边还没记到最近一套搭配价格喵，先让我给你搭一套，再帮你精确算总价吧。"
+        }
+
+        let message = PetChatMessage(
+            text: text,
+            isUser: false
+        )
+        messages.append(message)
+    }
     
     private func handleWeatherOutfitGuidance() {
         isThinking = true
@@ -2674,13 +2765,27 @@ struct PetChatViewLegacy: View {
         isThinking = true
 
         Task {
+            let detectedIntent = PetChatIntentRouter.detect(from: text)
             let wardrobeContext = WardrobeContextManager.shared.buildWardrobeContextBlockIfNeeded(
                 query: text,
-                clothings: clothings
+                clothings: clothings,
+                module: detectedIntent.module,
+                maxItems: wardrobeContextBudget(for: detectedIntent)
+            )
+            let persona = activePetPersonaProfile(petName: petAI.petName)
+            let recentAssistantReplies = PetGenerativePromptBuilder.recentAssistantReplies(
+                from: messages,
+                isUser: \.isUser,
+                text: \.text
             )
             let prompt = PetGenerativePromptBuilder.buildPrompt(
-                userQuery: text,
-                wardrobeContextBlock: wardrobeContext
+                input: .init(
+                    userQuery: text,
+                    wardrobeContextBlock: wardrobeContext,
+                    persona: persona,
+                    module: detectedIntent.module,
+                    recentAssistantReplies: recentAssistantReplies
+                )
             )
             let response = await petAI.sendMessage(
                 prompt,
@@ -2738,6 +2843,10 @@ struct PetChatViewLegacy: View {
 
                 await MainActor.run {
                     isThinking = false
+                    PetConversationMemoryStore.shared.recordOutfitSelection(
+                        clothings: selectedClothings,
+                        role: activePetRole()
+                    )
 
                     let suggestionData = OutfitSuggestionData(
                         clothings: selectedClothings,
@@ -2806,6 +2915,10 @@ struct PetChatViewLegacy: View {
 
                 await MainActor.run {
                     isThinking = false
+                    PetConversationMemoryStore.shared.recordOutfitSelection(
+                        clothings: selectedClothings,
+                        role: activePetRole()
+                    )
 
                     let suggestionData = OutfitSuggestionData(
                         clothings: selectedClothings,

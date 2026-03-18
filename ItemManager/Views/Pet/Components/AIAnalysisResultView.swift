@@ -294,7 +294,27 @@ struct AIAnalysisResultView: View {
         }
         
         Task {
-            let aiMsg = await PetAIService.shared.sendMessage(text)
+            let character = PetDataManager.shared.getCurrentPetCharacter()
+            let persona = PetPersonaRegistry.profile(
+                for: character.aiRole,
+                petName: PetDataManager.shared.status.displayName
+            )
+            let module = PetChatIntentRouter.detect(from: text).module
+            let recentAssistantReplies = PetGenerativePromptBuilder.recentAssistantReplies(
+                from: localMessages,
+                isUser: \.isUser,
+                text: \.text
+            )
+            let prompt = PetGenerativePromptBuilder.buildPrompt(
+                input: .init(
+                    userQuery: text,
+                    wardrobeContextBlock: nil,
+                    persona: persona,
+                    module: module,
+                    recentAssistantReplies: recentAssistantReplies
+                )
+            )
+            let aiMsg = await PetAIService.shared.sendMessage(prompt, displayText: text)
             await MainActor.run {
                 withAnimation {
                     localMessages.append(aiMsg)

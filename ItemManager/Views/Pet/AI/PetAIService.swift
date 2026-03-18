@@ -83,6 +83,21 @@ class PetAIService: ObservableObject {
     // 停止生成标志
     private var shouldStopGeneration = false
     
+    // 小内存设备优化：低内存保留30条，中档50条，高内存80条
+    private var latestWindowSize: Int {
+        let memoryInGB = ProcessInfo.processInfo.physicalMemory / 1_073_741_824
+        if memoryInGB >= 6 { return 80 }
+        if memoryInGB >= 4 { return 50 }
+        return 30
+    }
+    private let historyPageSize = 20
+    private let maxPersistedMessages = 1200
+    private var isHistoryExpanded = false
+
+    private var personaProfile: PetPersonaProfile {
+        PetPersonaRegistry.profile(for: role, petName: petName)
+    }
+    
     private init() {
         // Initialize with placeholder history
         self.history = [
@@ -110,6 +125,7 @@ class PetAIService: ObservableObject {
         }
         
         do {
+            trimPersistedMessagesIfNeeded()
             let data = try JSONEncoder().encode(allMessages)
             try data.write(to: messagesFileURL)
         } catch {
@@ -132,16 +148,15 @@ class PetAIService: ObservableObject {
         do {
             let data = try Data(contentsOf: messagesFileURL)
             let messages = try JSONDecoder().decode([ChatMessage].self, from: data)
-            self.allMessages = messages
-            
-            // 初始只加载最后 2 条，提升进入速度
-            let count = messages.count
-            let loadCount = min(count, 2)
-            let startIndex = count - loadCount
-            self.uiMessages = Array(messages[startIndex..<count])
+            if messages.count > maxPersistedMessages {
+                self.allMessages = Array(messages.suffix(maxPersistedMessages))
+            } else {
+                self.allMessages = messages
+            }
+            loadLatestMessagesToUI()
             
             isHistoryLoaded = true
-            print("✅ [PetAIService] Successfully loaded \(count) messages.")
+            print("✅ [PetAIService] Successfully loaded \(allMessages.count) messages.")
         } catch {
             print("❌ [PetAIService] Failed to load chat history: \(error)")
             
@@ -165,14 +180,14 @@ class PetAIService: ObservableObject {
     
     // 加载更多历史记录 (分页)
     func loadMoreHistory() {
+        isHistoryExpanded = true
         let currentCount = uiMessages.count
         let totalCount = allMessages.count
         
         guard currentCount < totalCount else { return }
         
         let remaining = totalCount - currentCount
-        let pageSize = 20
-        let loadCount = min(pageSize, remaining)
+        let loadCount = min(historyPageSize, remaining)
         
         let endIndex = totalCount - currentCount
         let startIndex = endIndex - loadCount
@@ -183,12 +198,78 @@ class PetAIService: ObservableObject {
         self.uiMessages.insert(contentsOf: newMessages, at: 0)
     }
     
-    // 重置 UI 显示为最新的 2 条 (用于退出页面时释放内存)
+    // 重置 UI 显示为最新窗口（默认 30 条，用于退出页面时释放内存）
     func resetToLatest() {
+        loadLatestMessagesToUI()
+    }
+
+    // 持久化历史查询（支持分页和关键词）
+    func queryPersistedHistory(
+        keyword: String? = nil,
+        page: Int = 0,
+        pageSize: Int = 20,
+        onlyUserMessages: Bool = false
+    ) -> [ChatMessage] {
+        let normalizedPage = max(0, page)
+        let normalizedSize = max(1, min(pageSize, 50))
+        let baseMessages = onlyUserMessages ? allMessages.filter(\.isUser) : allMessages
+        let filtered: [ChatMessage]
+        
+        if let keyword, !keyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            filtered = baseMessages.filter {
+                $0.text.localizedCaseInsensitiveContains(keyword) ||
+                ($0.rawText?.localizedCaseInsensitiveContains(keyword) ?? false)
+            }
+        } else {
+            filtered = baseMessages
+        }
+        
+        let newestFirst = Array(filtered.reversed())
+        let start = normalizedPage * normalizedSize
+        guard start < newestFirst.count else { return [] }
+        let end = min(newestFirst.count, start + normalizedSize)
+        return Array(newestFirst[start..<end])
+    }
+    
+    func persistedHistoryCount(onlyUserMessages: Bool = false) -> Int {
+        if onlyUserMessages {
+            return allMessages.filter(\.isUser).count
+        }
+        return allMessages.count
+    }
+    
+    private func loadLatestMessagesToUI() {
+        isHistoryExpanded = false
         let count = allMessages.count
-        let loadCount = min(count, 2)
+        guard count > 0 else {
+            uiMessages = []
+            return
+        }
+        let loadCount = min(count, latestWindowSize)
         let startIndex = count - loadCount
-        self.uiMessages = Array(allMessages[startIndex..<count])
+        uiMessages = Array(allMessages[startIndex..<count])
+    }
+    
+    private func appendToHistory(_ message: ChatMessage, appendToUI: Bool = true) {
+        allMessages.append(message)
+        if appendToUI {
+            uiMessages.append(message)
+            // 默认窗口模式下限制 30 条，避免常驻内存增长
+            if !isHistoryExpanded, uiMessages.count > latestWindowSize {
+                uiMessages.removeFirst(uiMessages.count - latestWindowSize)
+            }
+        }
+    }
+    
+    private func trimPersistedMessagesIfNeeded() {
+        guard allMessages.count > maxPersistedMessages else { return }
+        let removeCount = allMessages.count - maxPersistedMessages
+        allMessages.removeFirst(removeCount)
+        let validIDs = Set(allMessages.map(\.id))
+        uiMessages = uiMessages.filter { validIDs.contains($0.id) }
+        if !isHistoryExpanded, uiMessages.count > latestWindowSize {
+            uiMessages.removeFirst(uiMessages.count - latestWindowSize)
+        }
     }
     
     private func saveImageToDisk(image: UIImage) -> String? {
@@ -232,21 +313,18 @@ class PetAIService: ObservableObject {
     
     // 动态更新上下文 (例如衣橱数据变化或识别了新图片)
     func updateSystemContext(wardrobeContext: String) {
-        // 重新构建 System Prompt
-        let basePrompt = role.systemPrompt(petName: petName)
+        let persona = personaProfile
         let fullPrompt = """
-        \(basePrompt)
-        
-        【衣橱管家模式】
-        你不仅是宠物，还是主人的贴心闺蜜和衣橱大管家。
-        你对主人的衣橱了如指掌，以下是衣橱的最新数据：
+        你是\(persona.displayName)（\(persona.species)）。
+        角色风格：\(persona.stylePrompt)
+        禁止词：\(persona.forbiddenWords.joined(separator: "、"))
+
+        你不仅是宠物，也是主人的衣橱管家。
+        当问题与衣橱有关时，仅基于给定数据回答，不编造。
+        请保持口语化、拟人化、自然，不要机械重复。
+
+        当前衣橱摘要：
         \(wardrobeContext)
-        
-        回复策略：
-        1. 当主人问及“最贵”、“多少钱”等问题时，请基于上述数据精准回答。
-        2. 满足主人的虚荣心，夸赞她的眼光，但不要太露骨，要像闺蜜一样真诚。
-        3. 如果主人展示了图片（通过[视觉输入]），请结合衣橱数据进行点评。
-        4. 依然保持宠物的口癖（喵/汪），但在讨论裙装时可以表现得更专业一点（懂Lo圈黑话）。
         """
         
         // 更新历史中的第一条 (System Prompt)
@@ -333,14 +411,23 @@ class PetAIService: ObservableObject {
     ) async -> ChatMessage {
         print("🐾 [PetAIService] sendMessage length=\(text.count)")
         let historyUserText = displayText ?? text
+        if let displayText,
+           !displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           displayText != "..." {
+            let module = PetChatIntentRouter.detect(from: displayText).module
+            PetConversationMemoryStore.shared.recordUserSignal(
+                query: displayText,
+                role: role,
+                module: module
+            )
+        }
         
         // 重置停止标志
         shouldStopGeneration = false
         
         // 1. 记录用户消息 (Use displayText if available, otherwise raw text)
         let userMsg = ChatMessage(text: historyUserText, imagePath: userImagePath, isUser: true)
-        self.allMessages.append(userMsg)
-        self.uiMessages.append(userMsg)
+        appendToHistory(userMsg)
         self.saveMessages()
         
         self.isProcessing = true
@@ -353,19 +440,18 @@ class PetAIService: ObservableObject {
         // 捕获必要的上下文以传递给后台任务
         let currentHistory = self.history
         let apiKey = self.apiKey
-        let role = self.role
         let provider = self.provider
+        let historyLimit = historyMessageLimit(forPromptLength: text.count)
         
         print("🔍 [PetAIService] 发送请求 - Provider: \(provider)")
         if apiKey.isEmpty {
             print("❌ [PetAIService] Error: API Key is empty! Cannot send request.")
             let errorMsg = ChatMessage(
-                text: "（贴贴）我现在还连不上云端大脑，先去「智能萌宠设置」检查一下密钥，再来找我喵~",
-                imageName: "curious_cat",
+                text: personaProfile.keyMissingReply,
+                imageName: defaultErrorImageName(),
                 isUser: false
             )
-            self.allMessages.append(errorMsg)
-            self.uiMessages.append(errorMsg)
+            appendToHistory(errorMsg)
             self.saveMessages()
             return errorMsg
         }
@@ -396,7 +482,7 @@ class PetAIService: ObservableObject {
                         // DeepSeek history uses "assistant", Anthropic uses "assistant" too.
                         var messagesToSend = currentHistory
                             .filter { $0.role != "system" }
-                            .suffix(10)
+                            .suffix(historyLimit)
                             .map { MinimaxMessage(role: $0.role, content: $0.content) }
                         
                         messagesToSend.append(MinimaxMessage(role: "user", content: text))
@@ -443,7 +529,7 @@ class PetAIService: ObservableObject {
                         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
                         
                         // 只发送最近的 N 条历史
-                        let messagesToSend = [historyToSend.first!] + historyToSend.suffix(10)
+                        let messagesToSend = [historyToSend.first!] + historyToSend.suffix(historyLimit)
                         
                         let body = DSRequest(model: "deepseek-chat", messages: messagesToSend, stream: false)
                         let bodyData = try JSONEncoder().encode(body)
@@ -487,7 +573,23 @@ class PetAIService: ObservableObject {
             self.history.append(DSMessage(role: "assistant", content: replyContent))
             
             let (cleanText, imageName) = parseResponse(replyContent)
-            let displayResponse = responseMode == .raw ? cleanText : PetResponseHumanizer.humanize(cleanText)
+            let recentAssistantReplies = uiMessages
+                .filter { !$0.isUser }
+                .suffix(4)
+                .map(\.text)
+
+            let displayResponse: String
+            switch responseMode {
+            case .raw:
+                displayResponse = cleanText
+            case .humanized:
+                displayResponse = PetResponseHumanizer.humanize(
+                    cleanText,
+                    persona: personaProfile,
+                    recentAssistantReplies: recentAssistantReplies
+                )
+            }
+            PetConversationMemoryStore.shared.recordAssistantSignal(reply: displayResponse, role: role)
 
             // 触发语音朗读 (TTS) - 仅在启用语音时播放
             if enableVoice {
@@ -500,31 +602,28 @@ class PetAIService: ObservableObject {
                 imageName: imageName,
                 isUser: false
             )
-            self.allMessages.append(aiMsg)
-            self.uiMessages.append(aiMsg)
+            appendToHistory(aiMsg)
             self.saveMessages()
             return aiMsg
             
         } catch is TimeoutError {
             print("❌ [Debug] 请求超时 (30s)")
             let errorMsg = ChatMessage(
-                text: "（抱住你）刚刚网络有点挤住了喵…我们可以换个稳定网络、把问题说短一点，或者等半分钟再试一次，我会一直陪着你的~",
-                imageName: "sleepy_cat",
+                text: personaProfile.timeoutReplies.randomElement() ?? "我稍微卡了一下，换个稳定网络我们再试一次。",
+                imageName: defaultTimeoutImageName(),
                 isUser: false
             )
-            self.allMessages.append(errorMsg)
-            self.uiMessages.append(errorMsg)
+            appendToHistory(errorMsg)
             self.saveMessages()
             return errorMsg
         } catch {
             print("❌ [Debug] 请求发生错误: \(error)")
             let errorMsg = ChatMessage(
-                text: "（蹭蹭）我这边刚刚绊了一下喵…可以检查网络或稍后再试，我会继续努力给你更好的建议~",
-                imageName: "curious_cat",
+                text: personaProfile.errorReplies.randomElement() ?? "我刚刚失手了，咱们再试一次。",
+                imageName: defaultErrorImageName(),
                 isUser: false
             )
-            self.allMessages.append(errorMsg)
-            self.uiMessages.append(errorMsg)
+            appendToHistory(errorMsg)
             self.saveMessages()
             return errorMsg
         }
@@ -557,7 +656,33 @@ class PetAIService: ObservableObject {
             cleanText = regex.stringByReplacingMatches(in: text, options: [], range: NSRange(location: 0, length: nsString.length), withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
         }
         
-        return (cleanText, imageName)
+        let safeImageName = PetConversationToolbox.sanitizeActionIdentifier(imageName, role: role)
+        return (cleanText, safeImageName)
+    }
+
+    private func defaultTimeoutImageName() -> String {
+        switch role {
+        case .kitten: return "sleepy_cat"
+        case .goldenRetriever: return "sleepy_dog"
+        }
+    }
+
+    private func defaultErrorImageName() -> String {
+        switch role {
+        case .kitten: return "curious_cat"
+        case .goldenRetriever: return "curious_dog"
+        }
+    }
+
+    private func historyMessageLimit(forPromptLength length: Int) -> Int {
+        switch length {
+        case ..<900:
+            return 10
+        case 900..<1800:
+            return 8
+        default:
+            return 6
+        }
     }
     
     func deleteMessages(ids: Set<UUID>) {

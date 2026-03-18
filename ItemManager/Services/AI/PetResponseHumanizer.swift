@@ -22,6 +22,17 @@ enum PetResponseHumanizer {
         
         return stripModelNames(in: cleanupCodeLikeText(trimmed))
     }
+
+    static func humanize(
+        _ raw: String,
+        persona: PetPersonaProfile,
+        recentAssistantReplies: [String]
+    ) -> String {
+        var output = humanize(raw)
+        output = stripForbiddenWords(in: output, persona: persona)
+        output = avoidMechanicalRepeat(output, persona: persona, recentAssistantReplies: recentAssistantReplies)
+        return normalizeSpaces(output)
+    }
     
     private static func stripCodeFence(_ text: String) -> String {
         guard let regex = try? NSRegularExpression(pattern: fencedCodePattern) else {
@@ -66,7 +77,7 @@ enum PetResponseHumanizer {
         var parts: [String] = []
         
         if let primary = firstString(in: dict, keys: [
-            "response", "answer", "message", "description", "content", "summary"
+            "response", "answer", "message", "description", "content", "summary", "text"
         ]) {
             parts.append(primary)
         }
@@ -177,10 +188,51 @@ enum PetResponseHumanizer {
     
     private static func stripModelNames(in text: String) -> String {
         var output = text
-        let blocked = ["DeepSeek", "deepseek", "Minimax", "MiniMax", "大模型", "模型建议"]
+        let blocked = [
+            "DeepSeek", "deepseek",
+            "Minimax", "MiniMax",
+            "OpenAI", "openai",
+            "Claude", "claude",
+            "Gemini", "gemini",
+            "大模型", "模型建议"
+        ]
         for token in blocked {
             output = output.replacingOccurrences(of: token, with: "")
         }
         return normalizeSpaces(output)
+    }
+
+    private static func stripForbiddenWords(in text: String, persona: PetPersonaProfile) -> String {
+        var output = text
+        for token in persona.forbiddenWords where !token.isEmpty {
+            output = output.replacingOccurrences(of: token, with: "", options: .caseInsensitive)
+        }
+        return normalizeSpaces(output)
+    }
+
+    private static func avoidMechanicalRepeat(
+        _ text: String,
+        persona: PetPersonaProfile,
+        recentAssistantReplies: [String]
+    ) -> String {
+        let normalizedCurrent = normalizeSpaces(text)
+        guard !normalizedCurrent.isEmpty else { return normalizedCurrent }
+
+        let recent = recentAssistantReplies
+            .suffix(4)
+            .map { normalizeSpaces($0) }
+
+        let duplicated = recent.contains { old in
+            old == normalizedCurrent || old.hasPrefix(normalizedCurrent) || normalizedCurrent.hasPrefix(old)
+        }
+
+        guard duplicated, let suffix = persona.warmthSuffixes.randomElement() else {
+            return normalizedCurrent
+        }
+
+        if normalizedCurrent.contains(suffix) {
+            return normalizedCurrent
+        }
+        return "\(normalizedCurrent) \(suffix)"
     }
 }
