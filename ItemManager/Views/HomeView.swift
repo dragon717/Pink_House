@@ -117,6 +117,7 @@ struct HomeView: View {
     @State private var showingCommunityImportAlert = false
     
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+    @ObservedObject private var networkManager = NetworkSettingsManager.shared
     
     var body: some View {
         NavigationStack {
@@ -774,7 +775,10 @@ struct HomeView: View {
             
             Button { showingBatchImportSheet = true } label: { Label("批量导入", systemImage: "square.and.arrow.down.on.square") }
             
-            Button { showingCommunityImportAlert = true } label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
+            // 从社区导入：跟随联网功能显示/隐藏
+            if networkManager.canShowNetworkUI() {
+                Button { showingCommunityImportAlert = true } label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
+            }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16))
