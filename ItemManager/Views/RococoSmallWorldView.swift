@@ -329,12 +329,15 @@ struct RococoSmallWorldView: View {
                     roomContent(imageName: imageName, hotspots: hotspots)
                 }
             } else {
-                Image(imageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .overlay(
-                        roomContent(imageName: imageName, hotspots: hotspots)
-                    )
+                // 修复：使用 GeometryReader 获取图片实际显示尺寸，确保热区坐标计算正确
+                GeometryReader { imageGeo in
+                    Image(imageName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .overlay(
+                            roomContent(imageName: imageName, hotspots: hotspots, containerSize: imageGeo.size)
+                        )
+                }
             }
         }
         .frame(width: width, height: height)
@@ -342,66 +345,78 @@ struct RococoSmallWorldView: View {
     }
     
     @ViewBuilder
-    private func roomContent(imageName: String, hotspots: [HotspotData]) -> some View {
-        GeometryReader { geo in
-            ZStack(alignment: .topLeading) {
-                ForEach(hotspots) { hotspot in
-                    ZStack {
-                        Button(action: {
-                            print("[RococoSmallWorldView] 热区点击: \(hotspot.name), 坐标: (\(hotspot.rect.minX), \(hotspot.rect.minY)), 尺寸: \(geo.size)")
-                            hotspot.action()
-                        }) {
-                            if showDebugHotspots {
-                                ZStack {
-                                    Rectangle()
-                                        .fill(hotspot.color.opacity(0.3))
-                                        .border(hotspot.color, width: 2)
-                                    Text(hotspot.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.white)
-                                        .padding(4)
-                                        .background(.black.opacity(0.6))
-                                        .cornerRadius(4)
-                                }
-                                .contentShape(Rectangle())
-                            } else {
-                                // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
-                                Color.black.opacity(0.001)
-                                    .contentShape(Rectangle())
+    private func roomContent(imageName: String, hotspots: [HotspotData], containerSize: CGSize? = nil) -> some View {
+        // 如果提供了 containerSize，直接使用；否则使用 GeometryReader 获取
+        if let size = containerSize {
+            roomHotspotsContent(imageName: imageName, hotspots: hotspots, size: size)
+        } else {
+            GeometryReader { geo in
+                roomHotspotsContent(imageName: imageName, hotspots: hotspots, size: geo.size)
+            }
+        }
+    }
+    
+    // 提取热区内容到单独的方法，避免代码重复
+    @ViewBuilder
+    private func roomHotspotsContent(imageName: String, hotspots: [HotspotData], size: CGSize) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(hotspots) { hotspot in
+                ZStack {
+                    Button(action: {
+                        print("[RococoSmallWorldView] 热区点击: \(hotspot.name), 坐标: (\(hotspot.rect.minX), \(hotspot.rect.minY)), 尺寸: \(size)")
+                        hotspot.action()
+                    }) {
+                        if showDebugHotspots {
+                            ZStack {
+                                Rectangle()
+                                    .fill(hotspot.color.opacity(0.3))
+                                    .border(hotspot.color, width: 2)
+                                Text(hotspot.name)
+                                    .font(.caption)
+                                    .foregroundStyle(.white)
+                                    .padding(4)
+                                    .background(.black.opacity(0.6))
+                                    .cornerRadius(4)
                             }
-                        }
-                        .frame(
-                            width: max(1, hotspot.rect.width * geo.size.width),
-                            height: max(1, hotspot.rect.height * geo.size.height)
-                        )
-                        .position(
-                            x: (hotspot.rect.minX + hotspot.rect.width/2) * geo.size.width,
-                            y: (hotspot.rect.minY + hotspot.rect.height/2) * geo.size.height
-                        )
-                        
-                        if let label = hotspot.label {
-                            let labelPos = hotspot.labelPosition ?? CGPoint(x: hotspot.rect.midX, y: hotspot.rect.midY)
-                            
-                            FloatingTextLabel(text: label, style: hotspot.labelStyle)
-                                .allowsHitTesting(false)
-                                .position(
-                                    x: labelPos.x * geo.size.width,
-                                    y: labelPos.y * geo.size.height
-                                )
+                            .contentShape(Rectangle())
+                        } else {
+                            // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
+                            Color.black.opacity(0.001)
+                                .contentShape(Rectangle())
                         }
                     }
-                    .frame(width: geo.size.width, height: geo.size.height)
-                }
-                
-                // 萌宠功能已解锁时才显示悬浮小猫
-                if FeatureUnlockManager.shared.isUnlocked(.pet) {
-                    SmallWorldPetOverlay(
-                        viewModel: petViewModel,
-                        roomIndex: imageName.contains("rococo_1") ? 0 : 1,
-                        geometry: geo
+                    .frame(
+                        width: max(1, hotspot.rect.width * size.width),
+                        height: max(1, hotspot.rect.height * size.height)
                     )
-                    .allowsHitTesting(petViewModel.isDebugMode)
+                    .position(
+                        x: (hotspot.rect.minX + hotspot.rect.width/2) * size.width,
+                        y: (hotspot.rect.minY + hotspot.rect.height/2) * size.height
+                    )
+                    
+                    if let label = hotspot.label {
+                        let labelPos = hotspot.labelPosition ?? CGPoint(x: hotspot.rect.midX, y: hotspot.rect.midY)
+                        
+                        FloatingTextLabel(text: label, style: hotspot.labelStyle)
+                            .allowsHitTesting(false)
+                            .position(
+                                x: labelPos.x * size.width,
+                                y: labelPos.y * size.height
+                            )
+                    }
                 }
+                .frame(width: size.width, height: size.height)
+            }
+            
+            // 萌宠功能已解锁时才显示悬浮小猫
+            if FeatureUnlockManager.shared.isUnlocked(.pet) {
+                // 使用固定尺寸创建 GeometryProxy 的替代方案
+                SmallWorldPetOverlay(
+                    viewModel: petViewModel,
+                    roomIndex: imageName.contains("rococo_1") ? 0 : 1,
+                    containerSize: size
+                )
+                .allowsHitTesting(petViewModel.isDebugMode)
             }
         }
     }

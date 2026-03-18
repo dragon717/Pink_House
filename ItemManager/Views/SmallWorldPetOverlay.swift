@@ -3,7 +3,13 @@ import SwiftUI
 struct SmallWorldPetOverlay: View {
     @ObservedObject var viewModel: SmallWorldPetViewModel
     let roomIndex: Int
-    let geometry: GeometryProxy
+    var geometry: GeometryProxy? = nil
+    var containerSize: CGSize? = nil
+    
+    // 获取实际使用的尺寸
+    private var size: CGSize {
+        containerSize ?? geometry?.size ?? CGSize(width: 100, height: 100)
+    }
     
     var body: some View {
         ZStack {
@@ -22,8 +28,8 @@ struct SmallWorldPetOverlay: View {
                 
                 petView
                     .position(
-                        x: viewModel.currentPosition.x * geometry.size.width,
-                        y: viewModel.currentPosition.y * geometry.size.height
+                        x: viewModel.currentPosition.x * size.width,
+                        y: viewModel.currentPosition.y * size.height
                     )
             }
         }
@@ -77,7 +83,7 @@ struct SmallWorldPetOverlay: View {
             // Show paths for this room
             ForEach(viewModel.config.paths.filter { $0.roomIndex == roomIndex }) { path in
                 ZStack {
-                    PathShape(nodes: path.nodes, geometry: geometry)
+                    PathShape(nodes: path.nodes, size: size)
                         .stroke(path.id == viewModel.selectedPathId ? Color.red : Color.blue.opacity(0.8), style: StrokeStyle(lineWidth: 3, dash: [5]))
                     
                     ForEach(path.nodes) { node in
@@ -85,16 +91,16 @@ struct SmallWorldPetOverlay: View {
                             .fill(path.id == viewModel.selectedPathId ? Color.green : Color.yellow)
                             .frame(width: 16, height: 16)
                             .position(
-                                x: node.x * geometry.size.width,
-                                y: node.y * geometry.size.height
+                                x: node.x * size.width,
+                                y: node.y * size.height
                             )
                             .gesture(
                                 DragGesture()
                                     .onChanged { value in
                                         viewModel.selectedPathId = path.id
                                         // Calculate new normalized position
-                                        let newX = min(max(value.location.x / geometry.size.width, 0), 1)
-                                        let newY = min(max(value.location.y / geometry.size.height, 0), 1)
+                                        let newX = min(max(value.location.x / size.width, 0), 1)
+                                        let newY = min(max(value.location.y / size.height, 0), 1)
                                         viewModel.updateNodePosition(nodeId: node.id, x: newX, y: newY)
                                     }
                             )
@@ -114,8 +120,8 @@ struct SmallWorldPetOverlay: View {
                                 .background(Circle().fill(Color.white))
                         }
                         .position(
-                            x: start.x * geometry.size.width,
-                            y: (start.y - 0.08) * geometry.size.height
+                            x: start.x * size.width,
+                            y: (start.y - 0.08) * size.height
                         )
                     }
                 }
@@ -126,18 +132,25 @@ struct SmallWorldPetOverlay: View {
 
 struct PathShape: Shape {
     let nodes: [PathNode]
-    let geometry: GeometryProxy
+    var geometry: GeometryProxy? = nil
+    var size: CGSize? = nil
+    
+    // 获取实际使用的尺寸
+    private var effectiveSize: CGSize {
+        size ?? geometry?.size ?? CGSize(width: 100, height: 100)
+    }
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
         guard let first = nodes.first else { return path }
         
-        let p0 = CGPoint(x: first.x * geometry.size.width, y: first.y * geometry.size.height)
+        let effectiveSize = self.effectiveSize
+        let p0 = CGPoint(x: first.x * effectiveSize.width, y: first.y * effectiveSize.height)
         path.move(to: p0)
         
         for i in 1..<nodes.count {
             let node = nodes[i]
-            let p = CGPoint(x: node.x * geometry.size.width, y: node.y * geometry.size.height)
+            let p = CGPoint(x: node.x * effectiveSize.width, y: node.y * effectiveSize.height)
             path.addLine(to: p)
         }
         
