@@ -44,6 +44,13 @@ struct WardrobeView: View {
     @State private var showingStatusSelection = false
     @State private var tempSelectedStatus: String? = nil
     
+    // 合并为小物到裙装
+    @State private var showingMergeToAccessorySheet = false
+    @State private var targetClothingForMerge: Clothing? = nil
+    @State private var showingMergeConfirmation = false
+    @State private var showingDeleteAfterMergeConfirmation = false
+    @State private var mergedItemCount = 0
+    
     // Context Menu Actions
     @State private var itemToDelete: Clothing?
     @State private var showingDeleteSingleAlert = false
@@ -320,7 +327,7 @@ struct WardrobeView: View {
                             .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
                             .padding(.bottom, 100)
                             }
-                            .padding(.top, 10)
+                            // 移除顶部padding，避免时尚样式下出现大块空白
                         }
                         .onDrop(of: [UTType.text], isTargeted: nil) { _ in
                             self.draggingItem = nil
@@ -481,6 +488,14 @@ struct WardrobeView: View {
                                 showingStatusSelection = true
                             } label: {
                                 Label("改变状态", systemImage: "arrow.2.circlepath")
+                            }
+                            
+                            Divider()
+                            
+                            Button {
+                                showingMergeToAccessorySheet = true
+                            } label: {
+                                Label("合并为小物到裙装", systemImage: "arrow.down.square")
                             }
                         } label: {
                             VStack(spacing: 4) {
@@ -656,8 +671,48 @@ struct WardrobeView: View {
             }
         } message: {
             if let item = itemToCopy {
-                Text("确定要复制“\(item.name)”吗？")
+                Text("确定要复制「\(item.name)」吗？")
             }
+        }
+        // 合并为小物到裙装 - 选择目标裙装
+        .sheet(isPresented: $showingMergeToAccessorySheet) {
+            MergeToAccessorySheet(
+                selectedItemIDs: selectedItemIDs,
+                allClothings: clothings,
+                onSelect: { targetClothing in
+                    targetClothingForMerge = targetClothing
+                    showingMergeConfirmation = true
+                }
+            )
+        }
+        // 合并确认弹窗
+        .alert("确认合并", isPresented: $showingMergeConfirmation) {
+            Button("取消", role: .cancel) {
+                targetClothingForMerge = nil
+            }
+            Button("确认合并") {
+                if let target = targetClothingForMerge {
+                    performMergeToAccessory(targetClothing: target)
+                }
+            }
+        } message: {
+            if let target = targetClothingForMerge {
+                Text("确定要将选中的 \(selectedItemIDs.count) 件裙装作为小物合并到「\(target.name)」中吗？")
+            }
+        }
+        // 合并后是否删除原裙装
+        .alert("合并完成", isPresented: $showingDeleteAfterMergeConfirmation) {
+            Button("保留原裙装") {
+                // 清空选择但保持选择模式
+                selectedItemIDs.removeAll()
+                targetClothingForMerge = nil
+            }
+            Button("删除原裙装", role: .destructive) {
+                deleteSelectedItems()
+                targetClothingForMerge = nil
+            }
+        } message: {
+            Text("已成功合并 \(mergedItemCount) 个小物。是否删除原选中的裙装？")
         }
     }
     
@@ -937,6 +992,83 @@ struct WardrobeView: View {
             try? modelContext.save()
         }
         tempSelectedStatus = nil
+    }
+    
+    // MARK: - 合并为小物到裙装
+    
+    /// 将选中的裙装作为小物合并到目标裙装中
+    private func performMergeToAccessory(targetClothing: Clothing) {
+        // 获取选中的裙装（排除目标裙装本身）
+        let selectedClothings = clothings.filter { 
+            selectedItemIDs.contains($0.id) && $0.id != targetClothing.id 
+        }
+        
+        guard !selectedClothings.isEmpty else {
+            // 如果没有有效的选中项（可能只选中了目标本身），直接返回
+            targetClothingForMerge = nil
+            return
+        }
+        
+        var newAccessoryItems: [AccessoryItem] = []
+        var sortIndex = targetClothing.accessoryItems?.count ?? 0
+        
+        // 为每个选中的裙装创建小物
+        for clothing in selectedClothings {
+            let stock = clothing.stock
+            let baseName = clothing.name
+            let deposit = clothing.deposit
+            let balance = clothing.balance
+            let price = clothing.price
+            
+            // 如果库存大于1，拆分成多个小物
+            if stock > 1 {
+                for i in 1...stock {
+                    let accessoryName = "\(baseName) #\(i)"
+                    let accessory = AccessoryItem(
+                        name: accessoryName,
+                        price: price,
+                        deposit: deposit,
+                        balance: balance,
+                        sortIndex: sortIndex
+                    )
+                    accessory.clothing = targetClothing
+                    newAccessoryItems.append(accessory)
+                    sortIndex += 1
+                }
+            } else {
+                // 库存为1，不添加编号
+                let accessory = AccessoryItem(
+                    name: baseName,
+                    price: price,
+                    deposit: deposit,
+                    balance: balance,
+                    sortIndex: sortIndex
+                )
+                accessory.clothing = targetClothing
+                newAccessoryItems.append(accessory)
+                sortIndex += 1
+            }
+        }
+        
+        // 将小物添加到目标裙装
+        if targetClothing.accessoryItems == nil {
+            targetClothing.accessoryItems = []
+        }
+        targetClothing.accessoryItems?.append(contentsOf: newAccessoryItems)
+        
+        // 更新目标裙装的自定义小物总价
+        let totalAccessoryPrice = newAccessoryItems.reduce(Decimal(0)) { $0 + $1.price }
+        targetClothing.accessoriesPrice += totalAccessoryPrice
+        
+        // 保存更改
+        do {
+            try modelContext.save()
+            mergedItemCount = newAccessoryItems.count
+            showingDeleteAfterMergeConfirmation = true
+        } catch {
+            print("❌ 合并小物失败: \(error)")
+            targetClothingForMerge = nil
+        }
     }
     
     private func saveOrder() {
@@ -1462,6 +1594,74 @@ struct BookDetailViewFromWardrobe: View {
         .sheet(item: $selectedOutfit) { outfit in
             NavigationStack {
                 PageFlipEditorContainer(initialOutfit: outfit)
+            }
+        }
+    }
+}
+
+// MARK: - 合并为小物选择目标裙装 Sheet
+
+struct MergeToAccessorySheet: View {
+    let selectedItemIDs: Set<UUID>
+    let allClothings: [Clothing]
+    let onSelect: (Clothing) -> Void
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    
+    // 过滤掉已选中的裙装，只显示可选的目标裙装
+    var availableClothings: [Clothing] {
+        allClothings.filter { !selectedItemIDs.contains($0.id) && $0.deletedAt == nil }
+    }
+    
+    var filteredClothings: [Clothing] {
+        if searchText.isEmpty {
+            return availableClothings
+        }
+        return availableClothings.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText) ||
+            ($0.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                if availableClothings.isEmpty {
+                    Section {
+                        ContentUnavailableView {
+                            Label("没有可选的裙装", systemImage: "hanger")
+                        } description: {
+                            Text("请确保除了选中的裙装外，衣橱中还有其他裙装")
+                        }
+                    }
+                } else {
+                    Section {
+                        ForEach(filteredClothings) { clothing in
+                            ClothingRow(clothing: clothing)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    onSelect(clothing)
+                                    dismiss()
+                                }
+                        }
+                    } header: {
+                        if !searchText.isEmpty {
+                            Text("找到 \(filteredClothings.count) 件裙装")
+                        }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle("选择目标裙装")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "搜索裙装名称或品牌")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
             }
         }
     }

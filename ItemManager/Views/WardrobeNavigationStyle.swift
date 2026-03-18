@@ -56,6 +56,8 @@ struct WardrobeFashionTabSwitcher: View {
             Capsule()
                 .fill(Color(uiColor: .systemGray5))
         )
+        // 修复：添加固定高度，避免导航栏高度不一致导致的空白
+        .frame(height: 36)
     }
     
     @ViewBuilder

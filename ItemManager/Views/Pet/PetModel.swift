@@ -415,9 +415,25 @@ struct VIPStatus: Codable {
     var vipNumber: String? = nil // 特殊编号
     var cardStyle: VIPCardStyle = .blackGold // Default style
     
+    // VIP试用期相关字段
+    var trialUsed: Bool = false // 是否已使用过试用期
+    var trialStartDate: Date? = nil // 试用期开始时间
+    var trialExpireDate: Date? = nil // 试用期结束时间
+    
     var isExpired: Bool {
         guard let date = expireDate else { return true }
         return date < Date()
+    }
+    
+    // 是否正在试用期中
+    var isInTrialPeriod: Bool {
+        guard let trialExpire = trialExpireDate else { return false }
+        return trialExpire > Date()
+    }
+    
+    // 是否可以显示试用期弹窗（未使用试用期且当前不是VIP）
+    var canShowTrialOffer: Bool {
+        return !trialUsed && !isActive
     }
 }
 

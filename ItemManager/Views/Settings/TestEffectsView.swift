@@ -10,6 +10,7 @@ enum LabModule: String, CaseIterable, Identifiable {
     case featureUnlock = "功能解锁"
     case magicTasks = "魔法任务"
     case checkIn = "签到打卡"
+    case petReference = "萌宠参考"
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .featureUnlock: return "lock.open.fill"
         case .magicTasks: return "wand.and.stars"
         case .checkIn: return "checkmark.seal.fill"
+        case .petReference: return "pawprint.fill"
         }
     }
 
@@ -34,6 +36,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .featureUnlock: return .green
         case .magicTasks: return .purple
         case .checkIn: return .red
+        case .petReference: return .orange
         }
     }
 
@@ -46,6 +49,7 @@ enum LabModule: String, CaseIterable, Identifiable {
         case .featureUnlock: return "解锁 · 显示"
         case .magicTasks: return "状态 · 重置"
         case .checkIn: return "记录 · 重置"
+        case .petReference: return "萌宠 · 互动 · AI"
         }
     }
 }
@@ -77,33 +81,41 @@ struct TestEffectsView: View {
     ]
     
     var body: some View {
-        ZStack {
-            LiquidBackground()
-            
-            ScrollView {
-                VStack(spacing: 20) {
-                    Text("选择实验模块进入测试")
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                        .padding(.top, 20)
-                    
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(LabModule.allCases) { module in
-                            LabGridItem(module: module) {
-                                selectedModule = module
+        NavigationStack {
+            ZStack {
+                LiquidBackground()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        Text("选择实验模块进入测试")
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                            .padding(.top, 20)
+                        
+                        LazyVGrid(columns: columns, spacing: 16) {
+                            ForEach(LabModule.allCases) { module in
+                                LabGridItem(module: module) {
+                                    selectedModule = module
+                                }
                             }
                         }
+                        .padding(.horizontal)
+                        
+                        Spacer(minLength: 50)
                     }
-                    .padding(.horizontal)
-                    
-                    Spacer(minLength: 50)
                 }
             }
-        }
-        .navigationTitle("实验室")
-        .sheet(item: $selectedModule) { module in
-            LabModuleDetailView(module: module)
+            .navigationTitle("实验室")
+            .sheet(item: $selectedModule) { module in
+                Group {
+                    if module == .petReference {
+                        PetHomeViewWithCloseButton()
+                    } else {
+                        LabModuleDetailView(module: module)
+                    }
+                }
+            }
         }
     }
 }
@@ -219,6 +231,9 @@ struct LabModuleDetailView: View {
                         MagicTasksTestView()
                     case .checkIn:
                         CheckInTestView()
+                    case .petReference:
+                        // 萌宠参考直接跳转到萌宠界面，不会走到这里
+                        EmptyView()
                     }
                 }
             }
@@ -1825,3 +1840,25 @@ struct IAPTestView: View {
 }
 
 // 公告预览遮罩已移至 NoticeAdminView.swift
+
+// MARK: - 带关闭按钮的萌宠界面
+struct PetHomeViewWithCloseButton: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            PetHomeView()
+            
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .background(Circle().fill(.black.opacity(0.3)))
+            }
+            .padding(.trailing, 20)
+            .padding(.top, 60)
+        }
+    }
+}

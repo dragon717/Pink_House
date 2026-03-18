@@ -76,6 +76,67 @@ class VIPManager: ObservableObject {
         return (true, "开通成功！有效期至 \(newExpireDate.formatted(date: .numeric, time: .omitted))")
     }
     
+    // MARK: - VIP试用期相关方法
+    
+    /// 是否可以显示试用期弹窗
+    var canShowTrialOffer: Bool {
+        let status = PetDataManager.shared.status
+        return status.vipStatus.canShowTrialOffer
+    }
+    
+    /// 是否正在试用期中
+    var isInTrialPeriod: Bool {
+        let status = PetDataManager.shared.status
+        return status.vipStatus.isInTrialPeriod
+    }
+    
+    /// 开始VIP试用期（3天）
+    func startTrialPeriod() -> (success: Bool, message: String) {
+        var status = PetDataManager.shared.status
+        
+        // 检查是否已使用过试用期
+        guard !status.vipStatus.trialUsed else {
+            return (false, "您已经使用过试用期了")
+        }
+        
+        // 检查当前是否已经是VIP
+        guard !status.vipStatus.isActive || status.vipStatus.isExpired else {
+            return (false, "您已经是VIP会员了")
+        }
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // 设置试用期为3天
+        guard let trialExpireDate = calendar.date(byAdding: .day, value: 3, to: now) else {
+            return (false, "系统错误，请稍后重试")
+        }
+        
+        // 更新VIP状态
+        status.vipStatus.trialUsed = true
+        status.vipStatus.trialStartDate = now
+        status.vipStatus.trialExpireDate = trialExpireDate
+        status.vipStatus.isActive = true
+        status.vipStatus.expireDate = trialExpireDate
+        
+        // 生成VIP编号
+        if status.vipStatus.vipNumber == nil {
+            status.vipStatus.vipNumber = generateLuckyNumber()
+        }
+        
+        // 保存
+        PetDataManager.shared.saveStatus(status)
+        
+        // 更新本地状态
+        reloadStatus()
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MM月dd日"
+        let expireDateString = dateFormatter.string(from: trialExpireDate)
+        
+        return (true, "试用期已开启！有效期至 \(expireDateString)")
+    }
+    
     // Generate a lucky number (6-8 digits, favoring 6, 8, 9, 0)
     private func generateLuckyNumber() -> String {
         let length = Int.random(in: 6...8)

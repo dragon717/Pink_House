@@ -188,17 +188,18 @@ struct HomeView: View {
                     ToolbarItem(placement: .topBarLeading) {
                         fashionLeadingButtons
                     }
-                    
+
                     ToolbarItem(placement: .principal) {
                         fashionTabSwitcher
                     }
-                    
+
                     ToolbarItem(placement: .topBarTrailing) {
                         fashionTrailingButtons
                     }
                 }
             }
             .toolbarBackground(.visible, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
             // 只在搜索激活时显示搜索栏，默认隐藏常驻搜索框
             .applySearchableIfNeeded(
                 text: Binding(

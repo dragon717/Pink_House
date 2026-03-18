@@ -15,6 +15,10 @@ struct VIPCenterView: View {
     @State private var redeemResultMessage = ""
     @Environment(ThemeManager.self) private var themeManager
     
+    // VIP试用期弹窗状态
+    @State private var showTrialPopup = false
+    @State private var hasCheckedTrialOnAppear = false
+    
     // MARK: - Style Helpers
     private var privilegeTitleColor: Color {
         vipManager.cardStyle == .monicaPink ? Color(hex: "FF69B4") : Color(hex: "FFD700")
@@ -204,6 +208,34 @@ struct VIPCenterView: View {
             Button("确定", role: .cancel) { }
         } message: {
             Text(redeemResultMessage)
+        }
+        // VIP试用期弹窗
+        .overlay {
+            if showTrialPopup {
+                VIPTrialPopupView(
+                    isPresented: $showTrialPopup,
+                    onConfirm: {
+                        // 用户点击确认体验，开始试用期
+                        let result = vipManager.startTrialPeriod()
+                        alertMessage = result.message
+                        showingPurchaseAlert = true
+                    },
+                    onDismiss: {
+                        // 用户点击稍后，只是关闭弹窗，下次还会显示
+                        print("用户选择稍后体验VIP")
+                    }
+                )
+            }
+        }
+        .onAppear {
+            // 每次进入VIP界面时检查是否需要显示试用期弹窗
+            // 使用延迟确保视图已完全加载
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if !hasCheckedTrialOnAppear && vipManager.canShowTrialOffer {
+                    showTrialPopup = true
+                }
+                hasCheckedTrialOnAppear = true
+            }
         }
     }
     

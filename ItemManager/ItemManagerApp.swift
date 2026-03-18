@@ -141,6 +141,10 @@ struct MainContentView: View {
             // 全局拷贝提示覆盖层
             GlobalCopyToast()
                 .zIndex(4)
+            
+            // 全局 Toast 提示覆盖层
+            GlobalToast()
+                .zIndex(5)
         }
         .sheet(isPresented: $showDailyCheckIn) {
             DailyCheckInView()
@@ -191,8 +195,19 @@ struct MainContentView: View {
                 // 0.9 OOTD 坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
                 await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
 
-                // 0.10 预加载每日打卡数据（今日穿搭色 AI 请求）
-                await DailyCheckInManager.shared.preloadTodayOutfitColor()
+                // 0.10 并行预加载每日打卡数据（问候语 + 穿搭色）
+                // 使用 TaskGroup 实现并行加载，减少开屏等待时间
+                await withTaskGroup(of: Void.self) { group in
+                    // 预加载今日问候语
+                    group.addTask {
+                        _ = await DailyGreetingManager.shared.getCurrentGreeting()
+                    }
+                    
+                    // 预加载今日穿搭色
+                    group.addTask {
+                        await DailyCheckInManager.shared.preloadTodayOutfitColor()
+                    }
+                }
                 
                 // 0.11 预加载本周穿搭色（可选优化，低内存设备建议注释掉）
                 // await DailyCheckInManager.shared.preloadWeekOutfitColors()

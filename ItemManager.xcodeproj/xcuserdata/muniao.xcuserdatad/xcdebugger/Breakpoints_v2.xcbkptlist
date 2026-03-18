@@ -16,8 +16,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1005"
             endingLineNumber = "1005"
-            landmarkName = "body"
-            landmarkType = "24">
+            landmarkName = "performMergeToAccessory(targetClothing:)"
+            landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy

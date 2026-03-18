@@ -660,10 +660,11 @@ struct DailyCheckInView: View {
 
 
     
-    // MARK: - 执行打卡
+    // MARK: - 执行打卡（使用快速打卡，优先用户体验）
     private func performCheckIn() {
         Task {
-            if let _ = await checkInManager.performCheckIn() {
+            // 使用快速打卡方法，立即响应用户
+            if let _ = await checkInManager.performQuickCheckIn() {
                 await MainActor.run {
                     withAnimation {
                         showCelebration = true

@@ -191,6 +191,8 @@ class IAPTestManager: ObservableObject {
     }
 
     /// 取消VIP（测试用）
+    /// 注意：此方法仅清除VIP激活状态和过期时间，但保留试用期已使用的标记
+    /// 用于测试"试用期过后不会触发试用期弹窗"的场景
     func deactivateVIP() {
         if isTestMode {
             mockIsVIP = false
@@ -198,11 +200,14 @@ class IAPTestManager: ObservableObject {
         }
 
         var status = PetDataManager.shared.status
+        // 只清除VIP激活状态和过期时间
         status.vipStatus.isActive = false
         status.vipStatus.expireDate = Date()
+        // 注意：保留 trialUsed, trialStartDate, trialExpireDate 用于测试
+        // 这样试用期标记仍然保留，不会再次触发试用期弹窗
         PetDataManager.shared.saveStatus(status)
 
-        print("[IAPTestManager] ✅ VIP已取消")
+        print("[IAPTestManager] ✅ VIP已取消（试用期标记已保留）")
     }
 
     // MARK: - 首次购买测试

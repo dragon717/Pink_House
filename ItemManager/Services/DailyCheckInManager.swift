@@ -49,6 +49,9 @@ final class DailyCheckInManager: ObservableObject {
     @Published var todayOutfitColor: TodayOutfitColor?
     @Published var isLoading = false
     
+    // 打卡错误信息（用于向用户显示异步操作失败）
+    @Published var lastCheckInError: String?
+    
     // 已打卡日期的集合（用于快速查询和UI更新）- 存储 yyyy-MM-dd 格式的字符串
     @Published private var checkedInDatesSet: Set<String> = []
     
@@ -199,7 +202,179 @@ final class DailyCheckInManager: ObservableObject {
         return checkedInDatesSet.contains(dateString)
     }
     
-    // MARK: - 执行打卡
+    // MARK: - 执行快速打卡（优先用户体验，异步补全数据）
+    /// 立即返回打卡结果，位置和天气信息在后台异步获取并更新
+    func performQuickCheckIn() async -> CheckInRecord? {
+        guard !hasCheckedInToday else {
+            return nil
+        }
+        
+        // 1. 使用预加载的穿搭色（立即响应，不等待）
+        let outfitColor: TodayOutfitColor
+        if let preloaded = todayOutfitColor {
+            outfitColor = preloaded
+        } else {
+            outfitColor = await generateLocalOutfitColor()
+        }
+        
+        // 2. 获取萌宠名字
+        let petName = PetDataManager.shared.status.displayName
+        
+        // 3. 立即创建打卡记录（不包含位置和天气，后续异步补全）
+        let record = CheckInRecord(
+            id: UUID().uuidString,
+            date: Date(),
+            colors: outfitColor.colorNames,
+            colorHexes: outfitColor.colors.map { $0.hex },
+            accessories: outfitColor.accessories,
+            weather: nil, // 异步补全
+            location: nil, // 异步补全
+            temperature: nil, // 异步补全
+            season: LocationService.shared.getCurrentSeason().displayName,
+            isAIGenerated: outfitColor.source == "ai",
+            petName: petName
+        )
+        
+        // 4. 立即更新UI状态（让用户立即看到打卡成功）
+        todayCheckIn = record
+        todayOutfitColor = outfitColor
+        updateConsecutiveDays()
+        totalDays += 1
+        UserDefaults.standard.set(totalDays, forKey: totalDaysKey)
+        FeatureUnlockManager.shared.updateLoginDays(totalDays)
+        UserDefaults.standard.set(Date(), forKey: lastCheckInDateKey)
+        
+        // 更新已打卡日期集合
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let todayString = dateFormatter.string(from: Date())
+        checkedInDatesSet.insert(todayString)
+        calculateWeekCheckIns()
+        refreshTrigger = UUID()
+        
+        // 5. 先保存基础记录（确保打卡状态已持久化）
+        saveCheckInRecord(record)
+        
+        // 6. 后台异步获取位置和天气，补全记录
+        Task {
+            await completeCheckInRecordAsync(recordID: record.id)
+        }
+        
+        return record
+    }
+    
+    // MARK: - 异步补全打卡记录（获取位置、天气并更新记录）
+    private func completeCheckInRecordAsync(recordID: String) async {
+        print("🔄 [DailyCheckInManager] 开始异步补全打卡记录...")
+        
+        do {
+            // 获取位置和天气（带超时保护）
+            try await fetchLocationAndWeatherWithTimeout()
+            
+            // 更新记录
+            var records = loadAllRecords()
+            if let index = records.firstIndex(where: { $0.id == recordID }) {
+                let oldRecord = records[index]
+                let updatedRecord = CheckInRecord(
+                    id: oldRecord.id,
+                    date: oldRecord.date,
+                    colors: oldRecord.colors,
+                    colorHexes: oldRecord.colorHexes,
+                    accessories: oldRecord.accessories,
+                    weather: currentWeather?.condition.rawValue,
+                    location: currentLocation,
+                    temperature: currentWeather?.temperature,
+                    season: oldRecord.season,
+                    isAIGenerated: oldRecord.isAIGenerated,
+                    petName: oldRecord.petName
+                )
+                
+                records[index] = updatedRecord
+                
+                if let data = try? JSONEncoder().encode(records) {
+                    UserDefaults.standard.set(data, forKey: checkInKey)
+                    
+                    // 更新当前显示的打卡记录
+                    await MainActor.run {
+                        if let today = todayCheckIn, today.id == recordID {
+                            todayCheckIn = updatedRecord
+                        }
+                    }
+                    
+                    print("✅ [DailyCheckInManager] 异步补全打卡记录完成")
+                }
+            }
+        } catch {
+            // 异步补全失败，记录错误但不影响用户已打卡的状态
+            print("⚠️ [DailyCheckInManager] 异步补全打卡记录失败: \(error)")
+            await MainActor.run {
+                lastCheckInError = "位置和天气信息获取失败"
+                // 显示友好的提示，告知用户部分信息未同步
+                ToastManager.shared.showWarning("打卡成功！但天气信息获取失败，不影响打卡记录")
+            }
+        }
+    }
+    
+    // MARK: - 带超时的位置和天气获取
+    private func fetchLocationAndWeatherWithTimeout() async throws {
+        // 使用 withTimeout 包装位置和天气获取
+        try await withTimeout(seconds: 10) {
+            await self.fetchLocationAndWeather()
+        }
+    }
+    
+    // MARK: - 超时包装器
+    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            // 添加实际任务
+            group.addTask {
+                await operation()
+            }
+            
+            // 添加超时任务
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw TimeoutError()
+            }
+            
+            // 返回先完成的任务结果
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+    
+    private struct TimeoutError: Error {}
+    
+    // MARK: - 生成本地穿搭色（快速回退，不依赖网络）
+    private func generateLocalOutfitColor() async -> TodayOutfitColor {
+        let season = LocationService.shared.getCurrentSeason()
+        let petName = PetDataManager.shared.status.displayName
+        
+        // 根据季节选择颜色
+        let seasonColors = season.recommendedColors
+        var selectedColors: [String] = []
+        selectedColors.append(seasonColors.randomElement()!)
+        selectedColors.append(trendyColors2025.randomElement()!)
+        selectedColors.append(seasonColors.randomElement()!)
+        selectedColors = Array(Set(selectedColors)).prefix(3).map { $0 }
+        
+        let colorInfos = selectedColors.map { ColorInfo(name: $0) }
+        
+        return TodayOutfitColor(
+            colors: colorInfos,
+            accessories: generateAccessoriesAdvice(season: season, weather: nil),
+            description: generateDescription(season: season, weather: nil, colors: selectedColors),
+            source: "pet",
+            weather: nil,
+            location: nil,
+            temperature: nil,
+            season: season.displayName,
+            petName: petName
+        )
+    }
+    
+    // MARK: - 执行打卡（旧方法，保留用于兼容）
     func performCheckIn() async -> CheckInRecord? {
         guard !hasCheckedInToday else {
             return nil

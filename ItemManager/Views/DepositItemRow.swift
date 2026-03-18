@@ -12,7 +12,6 @@ struct DepositItemRow: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     let clothing: Clothing
-    @State private var isExpanded: Bool = false
     @State private var showEditNoteAlert: Bool = false
     @State private var editingNote: String = ""
     @State private var thumbnailImage: UIImage?
@@ -108,37 +107,13 @@ struct DepositItemRow: View {
                 
                 Divider()
                 
-                // Timeline Section
+                // Timeline Section - 只显示两个阶段：定金和尾款
                 VStack(spacing: 12) {
-                    if isExpanded {
-                        // Phase 1: Purchase
-                        TimelineRow(title: "下单", date: clothing.purchaseDate)
-                    }
+                    // Phase 1: Deposit (Always shown)
+                    TimelineRow(title: "定金", date: clothing.depositDate, trailing: getDepositStatus())
                     
-                    // Phase 2: Deposit (Always shown or shown as part of list)
-                    TimelineRow(title: "定金", date: clothing.depositDate, trailing: getDepositTimeStatus())
-                    
-                    if isExpanded {
-                        // Phase 3: Final Payment
-                        TimelineRow(title: "尾款", date: clothing.finalPaymentDate)
-                    }
-                    
-                    Button {
-                        withAnimation {
-                            isExpanded.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Text(isExpanded ? "收起" : "展开全部 (3个阶段)")
-                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
+                    // Phase 2: Final Payment
+                    TimelineRow(title: "尾款", date: clothing.finalPaymentDate, trailing: getFinalPaymentStatus())
                 }
                 
                 // Note Section
@@ -194,29 +169,53 @@ struct DepositItemRow: View {
         return Self.dateFormatter.string(from: date)
     }
     
-    private func getDepositTimeStatus() -> String? {
+    private func getDepositStatus() -> String? {
         guard let date = clothing.depositDate else { return nil }
         let now = Date()
         let calendar = Calendar.current
         
-        // Calculate days between now and target date
-        let components = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date))
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
         
-        if let days = components.day {
-            if days > 0 {
-                return "距离开始: \(days)天"
-            } else if days == 0 {
-                // Check if it's future time today or past time today
-                if date > now {
-                    return "即将开始"
-                } else {
-                    return "已开始: 今天"
+        if days > 0 {
+            return "距定金: \(days)天"
+        } else if days == 0 {
+            return "定金日"
+        } else {
+            return "定金已结束"
+        }
+    }
+    
+    private func getFinalPaymentStatus() -> String? {
+        guard let depositDate = clothing.depositDate,
+              let finalPaymentDate = clothing.finalPaymentDate else { return nil }
+        
+        let now = Date()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let depositDay = calendar.startOfDay(for: depositDate)
+        
+        let daysFromDeposit = calendar.dateComponents([.day], from: depositDay, to: today).day ?? 0
+        
+        if daysFromDeposit < 0 {
+            return "还没开定金"
+        } else if daysFromDeposit == 0 {
+            return nil
+        } else {
+            let daysToFinalPayment = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: finalPaymentDate)).day ?? 0
+            
+            if let endDate = clothing.finalPaymentEndDate {
+                let daysToEnd = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: endDate)).day ?? 0
+                if daysToEnd < 0 {
+                    return "尾款已过，请处理"
                 }
+            }
+            
+            if daysToFinalPayment > 0 {
+                return "距尾款: \(daysToFinalPayment)天"
             } else {
-                return "已开始: \(abs(days))天"
+                return nil
             }
         }
-        return nil
     }
 }
 

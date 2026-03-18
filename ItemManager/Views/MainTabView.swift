@@ -225,7 +225,6 @@ struct WardrobeTabContent: View {
     var body: some View {
         NavigationStack {
             HomeView(selectedTab: $homeTabSelection)
-                .toolbarBackground(.hidden, for: .navigationBar)
         }
     }
 }

@@ -29,8 +29,15 @@ class LocationService: NSObject, ObservableObject {
     
     // MARK: - 获取当前位置
     func getCurrentLocation() async -> CLLocation? {
-        guard locationStatus == .authorizedWhenInUse || locationStatus == .authorizedAlways else {
+        // 如果权限未确定，先请求权限并等待用户响应
+        if locationStatus == .notDetermined {
             requestAuthorization()
+            // 等待权限状态变更，最多等待5秒
+            let permissionGranted = await waitForAuthorization()
+            guard permissionGranted else { return nil }
+        }
+        
+        guard locationStatus == .authorizedWhenInUse || locationStatus == .authorizedAlways else {
             return nil
         }
         
@@ -57,6 +64,21 @@ class LocationService: NSObject, ObservableObject {
                 self.locationManager.stopUpdatingLocation()
             }
         }
+    }
+    
+    // MARK: - 等待权限授权完成
+    private func waitForAuthorization() async -> Bool {
+        // 最多等待5秒让用户做出权限选择
+        for _ in 0..<50 {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
+            if locationStatus == .authorizedWhenInUse || locationStatus == .authorizedAlways {
+                return true
+            }
+            if locationStatus == .denied || locationStatus == .restricted {
+                return false
+            }
+        }
+        return locationStatus == .authorizedWhenInUse || locationStatus == .authorizedAlways
     }
     
     // MARK: - 反向地理编码获取城市信息
