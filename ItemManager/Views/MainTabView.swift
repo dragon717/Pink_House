@@ -50,6 +50,8 @@ struct ModernTabView: View {
     @Binding var homeTabSelection: HomeTab
     @Binding var smallWorldDestination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
@@ -122,6 +124,10 @@ struct ModernTabView: View {
         return false
     }
 
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
@@ -152,6 +158,7 @@ struct ModernTabView: View {
         .applySearchToolbarBehavior()
         .toolbarBackground(.clear, for: .tabBar)
         .toolbarBackground(.hidden, for: .tabBar)
+        .tint(magicPalette.accent)
         .environment(\.isSimulationActive, isSimulationActive)
         .overlay {
             RewardBubbleView()
@@ -449,6 +456,8 @@ struct LegacyTabView: View {
     @Binding var homeTabSelection: HomeTab
     @Binding var smallWorldDestination: SmallWorldDestination
     @Binding var isPlayingOpeningAnimation: Bool
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
@@ -456,8 +465,9 @@ struct LegacyTabView: View {
     // 搜索文本状态
     @State private var searchText = ""
 
-    // B22222深红色
-    private let selectedColor = Color(red: 0.698, green: 0.133, blue: 0.133)
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
 
     var body: some View {
         ZStack {
@@ -592,7 +602,15 @@ struct LegacyTabView: View {
                 // 白色背景，适配暗黑模式，椭圆胶囊形状
                 .background(
                     Capsule()
-                        .fill(Color(.systemBackground))
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .fill(magicPalette.navigationBackground.opacity(colorScheme == .dark ? 0.78 : 0.88))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(magicPalette.quickOptionStroke.opacity(0.55), lineWidth: 1)
+                        )
                         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: -2)
                 )
                 .padding(.horizontal, 16)
@@ -622,13 +640,11 @@ struct LegacyTabView: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
-                    // 未选中黑色（适配暗黑模式），选中B22222深红色
-                    .foregroundColor(isSelected ? selectedColor : .primary)
+                    .foregroundColor(isSelected ? magicPalette.accent : magicPalette.secondaryText)
 
                 Text(title)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                    // 未选中黑色（适配暗黑模式），选中B22222深红色
-                    .foregroundColor(isSelected ? selectedColor : .primary)
+                    .foregroundColor(isSelected ? magicPalette.accent : magicPalette.secondaryText)
             }
             .frame(maxWidth: .infinity)
         }

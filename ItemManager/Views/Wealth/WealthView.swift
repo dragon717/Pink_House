@@ -24,6 +24,7 @@ struct WealthView: View {
     @ObservedObject private var soundManager = SoundManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
 
     // 初始页签（从外部传入）
     var initialTab: WealthMainTab? = nil
@@ -56,6 +57,10 @@ struct WealthView: View {
                 return partialResult + ((clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock))
             }
         }
+    }
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
     
     var body: some View {
@@ -100,6 +105,10 @@ struct WealthView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(magicPalette.navigationBackground, for: .navigationBar)
+            .toolbarColorScheme(magicPalette.navigationBackground.isDark ? .dark : .light, for: .navigationBar)
+            .tint(magicPalette.accent)
             .toolbar {
                 leadingToolbarContent
                 centerToolbarContent
@@ -212,7 +221,7 @@ struct WealthView: View {
                     } label: {
                         Image(systemName: soundManager.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                             .font(.caption)
-                            .foregroundStyle(soundManager.isSoundEnabled ? .blue : .gray)
+                            .foregroundStyle(soundManager.isSoundEnabled ? magicPalette.accent : magicPalette.tertiaryText)
                     }
                     
                     Button {
@@ -220,7 +229,7 @@ struct WealthView: View {
                     } label: {
                         Image(systemName: hapticManager.isHapticsEnabled ? "iphone.radiowaves.left.and.right" : "iphone.slash")
                             .font(.caption)
-                            .foregroundStyle(hapticManager.isHapticsEnabled ? .yellow : .gray)
+                            .foregroundStyle(hapticManager.isHapticsEnabled ? magicPalette.cardAccent : magicPalette.tertiaryText)
                     }
                 }
             }

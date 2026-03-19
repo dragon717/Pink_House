@@ -31,8 +31,15 @@ enum WardrobeMonthIndicator {
 }
 
 struct WardrobeFashionTabSwitcher: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
     @Binding var selectedTab: HomeTab
     let monthIndicator: WardrobeMonthIndicator?
+
+    private var palette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
     
     var body: some View {
         HStack(spacing: 2) {
@@ -40,21 +47,21 @@ struct WardrobeFashionTabSwitcher: View {
                 title: "少女衣橱",
                 icon: "cabinet.fill",
                 targetTab: .wardrobe,
-                activeColor: .pink
+                activeColor: palette.accent
             )
             
             tabButton(
                 title: "心愿尾款",
                 icon: "calendar.badge.clock",
                 targetTab: .depositPlan,
-                activeColor: .brown
+                activeColor: palette.cardAccent
             )
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 3)
         .background(
             Capsule()
-                .fill(Color(uiColor: .systemGray5))
+                .fill(palette.segmentedBackground)
         )
         // 修复：添加固定高度，避免导航栏高度不一致导致的空白
         .frame(height: 36)
@@ -85,7 +92,7 @@ struct WardrobeFashionTabSwitcher: View {
             .padding(.vertical, 4)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color(uiColor: .systemBackground) : Color.clear)
+                    .fill(isSelected ? palette.segmentedSelectedBackground : Color.clear)
                     .shadow(color: isSelected ? Color.black.opacity(0.08) : Color.clear, radius: 1, x: 0, y: 1)
             )
         }

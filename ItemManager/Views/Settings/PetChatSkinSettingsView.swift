@@ -15,7 +15,7 @@ struct PetChatSkinSettingsView: View {
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        colors: skin.userBubbleColors,
+                                        colors: skin.resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme),
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
@@ -53,6 +53,8 @@ struct PetChatSkinSettingsView: View {
 }
 
 private struct PetChatSkinPreviewCard: View {
+    @Environment(ThemeManager.self) private var themeManager
+
     let theme: PetChatSkinTheme
     let colorScheme: ColorScheme
 
@@ -87,10 +89,10 @@ private struct PetChatSkinPreviewCard: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 14)
                 .fill(
                     LinearGradient(
-                        colors: theme.previewBackgroundColors,
+                        colors: theme.resolvedPreviewBackgroundColors(themeManager: themeManager, colorScheme: colorScheme),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -102,7 +104,7 @@ private struct PetChatSkinPreviewCard: View {
         RoundedRectangle(cornerRadius: theme.cornerRadius)
             .fill(
                 LinearGradient(
-                    colors: theme.userBubbleColors,
+                    colors: theme.resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -116,7 +118,7 @@ private struct PetChatSkinPreviewCard: View {
                 RoundedRectangle(cornerRadius: theme.cornerRadius)
                     .stroke(
                         LinearGradient(
-                            colors: theme.assistantStrokeColors,
+                            colors: theme.resolvedAssistantStrokeColors(themeManager: themeManager, colorScheme: colorScheme),
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
@@ -131,7 +133,11 @@ private struct PetChatSkinPreviewCard: View {
             .font(.caption2)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(Color.pink.opacity(0.12))
+            .background(theme.resolvedQuickOptionFill(themeManager: themeManager, colorScheme: colorScheme))
+            .overlay(
+                Capsule()
+                    .stroke(theme.resolvedQuickOptionStroke(themeManager: themeManager, colorScheme: colorScheme), lineWidth: 1)
+            )
             .clipShape(Capsule())
     }
 }

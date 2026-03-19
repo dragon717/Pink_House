@@ -106,6 +106,8 @@ struct MagicColorSettingsView: View {
                             tintOpacity: $tintOpacity
                         )
 
+                        MagicThemeModuleSection()
+
                         // 配色设置
                         switch selectedTab {
                         case .magic:

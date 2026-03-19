@@ -27,11 +27,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             appearance.stackedLayoutAppearance.normal.iconColor = UIColor.label
             appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.label]
 
-            // 设置选中项的颜色（B22222 深红色）
-            let selectedColor = UIColor(red: 0.698, green: 0.133, blue: 0.133, alpha: 1.0)
-            appearance.stackedLayoutAppearance.selected.iconColor = selectedColor
-            appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
-
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
@@ -104,6 +99,7 @@ struct ItemManagerApp: App {
             MainContentView()
                 .environment(themeManager)
                 .environment(calendarThemeManager)
+                .tint(themeManager.accentTextColor)
         }
         .modelContainer(SharedPersistence.shared.sharedModelContainer)
     }

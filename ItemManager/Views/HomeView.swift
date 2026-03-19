@@ -62,6 +62,8 @@ struct CalendarDayIcon: View {
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
@@ -118,6 +120,10 @@ struct HomeView: View {
     
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @ObservedObject private var networkManager = NetworkSettingsManager.shared
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
     
     var body: some View {
         NavigationStack {
@@ -198,8 +204,10 @@ struct HomeView: View {
                     }
                 }
             }
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(magicPalette.navigationBackground.isDark ? .dark : .light, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
+            .tint(magicPalette.accent)
             // 只在搜索激活时显示搜索栏，默认隐藏常驻搜索框
             .applySearchableIfNeeded(
                 text: Binding(
@@ -251,7 +259,7 @@ struct HomeView: View {
                     Text("少女衣橱")
                         .font(.system(size: 10, weight: selectedTab == .wardrobe ? .bold : .medium))
                 }
-                .foregroundStyle(selectedTab == .wardrobe ? Color.brown : .secondary)
+                .foregroundStyle(selectedTab == .wardrobe ? magicPalette.accent : magicPalette.secondaryText)
                 .frame(height: 44) // Ensure touch target meets guidelines
             }
             
@@ -267,12 +275,12 @@ struct HomeView: View {
                             case .current(let day):
                                 CalendarDayIcon(day: day)
                                     .font(.system(size: 18))
-                                    .foregroundStyle(Color.pink)
+                                    .foregroundStyle(magicPalette.accent)
                                     .frame(width: 24, height: 24)
                             case .next(let day):
                                 CalendarDayIcon(day: day)
                                     .font(.system(size: 18))
-                                    .foregroundStyle(Color.brown)
+                                    .foregroundStyle(magicPalette.cardAccent)
                                 .frame(width: 24, height: 24)
                             }
                         } else {
@@ -286,7 +294,7 @@ struct HomeView: View {
                     Text("心愿尾款")
                         .font(.system(size: 10, weight: selectedTab == .depositPlan ? .bold : .medium))
                 }
-                .foregroundStyle(selectedTab == .depositPlan ? Color.brown : .secondary)
+                .foregroundStyle(selectedTab == .depositPlan ? magicPalette.cardAccent : magicPalette.secondaryText)
                 .frame(height: 44) // Ensure touch target meets guidelines
             }
         }
@@ -367,7 +375,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 20))
-                .foregroundStyle(.pink)
+                .foregroundStyle(magicPalette.accent)
         }
     }
     
@@ -380,11 +388,11 @@ struct HomeView: View {
             if #available(iOS 26.0, *) {
                 Image(systemName: "list.number.badge.ellipsis")
                     .font(.system(size: 20))
-                    .foregroundStyle(.pink)
+                    .foregroundStyle(magicPalette.accent)
             } else {
                 Image(systemName: "checkmark.circle")
                     .font(.system(size: 20))
-                    .foregroundStyle(.pink)
+                    .foregroundStyle(magicPalette.accent)
             }
         }
     }
@@ -393,7 +401,7 @@ struct HomeView: View {
         NavigationLink(destination: NotificationSettingsView()) {
             Image(systemName: "bell")
                 .font(.system(size: 16))
-                .foregroundStyle(.primary)
+                .foregroundStyle(magicPalette.navigationForeground)
         }
     }
     
@@ -440,7 +448,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 16))
-                .foregroundStyle(.primary)
+                .foregroundStyle(magicPalette.navigationForeground)
         }
     }
     
@@ -455,7 +463,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: "arrow.up.arrow.down")
                 .font(.system(size: 16))
-                .foregroundStyle(.primary)
+                .foregroundStyle(magicPalette.navigationForeground)
         }
     }
     
@@ -531,7 +539,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.system(size: 16))
-                .foregroundStyle(.primary)
+                .foregroundStyle(magicPalette.navigationForeground)
                 .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
         }
     }
@@ -743,7 +751,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
                 .font(.system(size: 16))
-                .foregroundStyle(.primary)
+                .foregroundStyle(magicPalette.navigationForeground)
         }
     }
     
@@ -783,7 +791,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16))
-                .foregroundStyle(.primary)
+                .foregroundStyle(magicPalette.navigationForeground)
         }
         .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {
             Button("好的", role: .cancel) { }

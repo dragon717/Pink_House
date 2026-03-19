@@ -376,7 +376,7 @@ struct PetChatBubble: View {
     }
 
     private var aiBubbleTextColor: Color {
-        colorScheme == .dark ? .white : .primary
+        themeManager.primaryTextColor
     }
 
     @ViewBuilder
@@ -389,12 +389,12 @@ struct PetChatBubble: View {
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(
                     LinearGradient(
-                        colors: skinTheme.userBubbleColors,
+                        colors: skinTheme.resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: Color.pink.opacity(0.25), radius: 6, x: 0, y: 2)
+                .shadow(color: themeManager.accentTextColor.opacity(0.25), radius: 6, x: 0, y: 2)
         } else {
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(.ultraThinMaterial)
@@ -402,7 +402,7 @@ struct PetChatBubble: View {
                     RoundedRectangle(cornerRadius: bubbleCornerRadius)
                         .stroke(
                             LinearGradient(
-                                colors: skinTheme.assistantStrokeColors,
+                                colors: skinTheme.resolvedAssistantStrokeColors(themeManager: themeManager, colorScheme: colorScheme),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -880,6 +880,7 @@ struct PetChatView: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
 
     @StateObject private var petAI = PetAIService.shared
@@ -900,6 +901,7 @@ struct PetChatView: View {
     // 保存成功提示状态
     @State private var showingSaveSuccessToast = false
     @State private var isSavingOutfit = false
+    @State private var showingThemeSwitchOverlay = false
 
     // 每日问候管理器
     @StateObject private var greetingManager = DailyGreetingManager.shared
@@ -913,19 +915,9 @@ struct PetChatView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // 背景
+                // 背景 - 使用 LiquidBackground，不使用魔法配色/客制化配色的背景色
                 LiquidBackground()
                     .ignoresSafeArea()
-                if themeManager.petChatSkinTheme == .magic {
-                    LinearGradient(
-                        colors: PetChatSkinTheme.magic.previewBackgroundColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .opacity(0.45)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                }
 
                 // 聊天记录 - 使用overlay放置悬浮按钮
                 ScrollViewReader { proxy in
@@ -988,13 +980,21 @@ struct PetChatView: View {
             }
             // 保存成功提示覆盖层
             .overlay {
-                if showingSaveSuccessToast {
-                    OutfitSaveSuccessToast(message: "已保存到默认手帐")
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                        .zIndex(100)
+                ZStack {
+                    if showingThemeSwitchOverlay {
+                        PetThemeSwitchOverlay()
+                            .transition(.opacity)
+                            .zIndex(90)
+                    }
+
+                    if showingSaveSuccessToast {
+                        OutfitSaveSuccessToast(message: "已保存到默认手帐")
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.9).combined(with: .opacity)
+                            ))
+                            .zIndex(100)
+                    }
                 }
             }
             .onAppear {
@@ -1330,6 +1330,10 @@ struct PetChatView: View {
     
     // 处理用户意图
     private func processUserIntent(_ text: String) {
+        if handleThemeConversationIntent(text) {
+            return
+        }
+
         switch PetChatIntentRouter.detect(from: text) {
         case .wardrobeStats:
             handleWardrobeStatistics()
@@ -1347,6 +1351,29 @@ struct PetChatView: View {
             handleDepositPlanQuery()
         case .moodSupport, .generalChat:
             handleAIChat(text)
+        }
+    }
+
+    private func handleThemeConversationIntent(_ text: String) -> Bool {
+        guard let result = PetThemeConversationEngine.handleIfNeeded(userText: text, themeManager: themeManager) else {
+            return false
+        }
+        if result.shouldAnimate {
+            triggerThemeSwitchAnimation()
+        }
+        let reply = PetChatMessage(text: result.reply, isUser: false, isAIGenerated: true)
+        messages.append(reply)
+        return true
+    }
+
+    private func triggerThemeSwitchAnimation() {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            showingThemeSwitchOverlay = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            withAnimation(.easeOut(duration: 0.28)) {
+                showingThemeSwitchOverlay = false
+            }
         }
     }
 
@@ -2003,6 +2030,7 @@ struct PetChatViewLegacy: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
     
     @StateObject private var petAI = PetAIService.shared
@@ -2021,6 +2049,7 @@ struct PetChatViewLegacy: View {
     // 保存成功提示状态
     @State private var showingSaveSuccessToast = false
     @State private var isSavingOutfit = false
+    @State private var showingThemeSwitchOverlay = false
 
     @StateObject private var greetingManager = DailyGreetingManager.shared
     
@@ -2033,19 +2062,10 @@ struct PetChatViewLegacy: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // 背景 - 使用 LiquidBackground，不使用魔法配色/客制化配色的背景色
                 LiquidBackground()
                     .ignoresSafeArea()
-                if themeManager.petChatSkinTheme == .magic {
-                    LinearGradient(
-                        colors: PetChatSkinTheme.magic.previewBackgroundColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .opacity(0.45)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                }
-                
+
                 VStack(spacing: 0) {
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -2093,13 +2113,21 @@ struct PetChatViewLegacy: View {
             }
             // 保存成功提示覆盖层
             .overlay {
-                if showingSaveSuccessToast {
-                    OutfitSaveSuccessToast(message: "已保存到默认手帐")
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.9).combined(with: .opacity)
-                        ))
-                        .zIndex(100)
+                ZStack {
+                    if showingThemeSwitchOverlay {
+                        PetThemeSwitchOverlay()
+                            .transition(.opacity)
+                            .zIndex(90)
+                    }
+
+                    if showingSaveSuccessToast {
+                        OutfitSaveSuccessToast(message: "已保存到默认手帐")
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.9).combined(with: .opacity)
+                            ))
+                            .zIndex(100)
+                    }
                 }
             }
             .onAppear {
@@ -2493,6 +2521,10 @@ struct PetChatViewLegacy: View {
     }
 
     private func processUserIntent(_ text: String) {
+        if handleThemeConversationIntent(text) {
+            return
+        }
+
         switch PetChatIntentRouter.detect(from: text) {
         case .wardrobeStats:
             handleWardrobeStatistics()
@@ -2510,6 +2542,29 @@ struct PetChatViewLegacy: View {
             handleDepositPlanQuery()
         case .moodSupport, .generalChat:
             handleAIChat(text)
+        }
+    }
+
+    private func handleThemeConversationIntent(_ text: String) -> Bool {
+        guard let result = PetThemeConversationEngine.handleIfNeeded(userText: text, themeManager: themeManager) else {
+            return false
+        }
+        if result.shouldAnimate {
+            triggerThemeSwitchAnimation()
+        }
+        let reply = PetChatMessage(text: result.reply, isUser: false, isAIGenerated: true)
+        messages.append(reply)
+        return true
+    }
+
+    private func triggerThemeSwitchAnimation() {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            showingThemeSwitchOverlay = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            withAnimation(.easeOut(duration: 0.28)) {
+                showingThemeSwitchOverlay = false
+            }
         }
     }
 

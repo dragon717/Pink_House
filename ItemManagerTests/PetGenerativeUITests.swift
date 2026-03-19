@@ -224,4 +224,39 @@ final class PetGenerativeUITests: XCTestCase {
         XCTAssertTrue(prompt.contains("最近搭配价格快照"))
         XCTAssertTrue(prompt.contains("合计"))
     }
+
+    func testThemeConversationEngineSwitchesMagicThemeAndSkin() {
+        let manager = ThemeManager.shared
+        let originalConfig = manager.themeColorConfig
+        let originalSkin = manager.petChatSkinTheme
+        defer {
+            manager.themeColorConfig = originalConfig
+            manager.petChatSkinTheme = originalSkin
+        }
+
+        let result = PetThemeConversationEngine.handleIfNeeded(
+            userText: "帮我切换成魔法配色",
+            themeManager: manager
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(manager.colorSchemeMode, .magic)
+        XCTAssertEqual(manager.petChatSkinTheme, .magic)
+        XCTAssertTrue(result?.shouldAnimate == true)
+    }
+
+    func testThemeConversationEngineCanSaveThemeSet() {
+        let manager = ThemeManager.shared
+        let originalConfig = manager.themeColorConfig
+        defer { manager.themeColorConfig = originalConfig }
+
+        let uniqueName = "单测主题_\(Int(Date().timeIntervalSince1970))"
+        let result = PetThemeConversationEngine.handleIfNeeded(
+            userText: "请把这套主题保存，命名为\(uniqueName)",
+            themeManager: manager
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertTrue(manager.availableThemeSetNames().contains(uniqueName))
+    }
 }
