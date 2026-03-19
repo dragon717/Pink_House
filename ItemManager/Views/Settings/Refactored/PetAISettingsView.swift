@@ -46,21 +46,11 @@ struct PetAISettingsView: View {
             }
             
             AdaptiveSection(header: "萌宠形象") {
-                NavigationLink(destination: PetChatSkinSettingsView()) {
-                    HStack {
-                        Image(systemName: "message.fill")
-                            .foregroundStyle(.pink)
-                        Text("萌宠对话皮肤")
-                        Spacer()
-                    }
-                }
-                .adaptiveRow()
-
-                NavigationLink(destination: PetCustomizationView()) {
+                NavigationLink(destination: MagicColorSettingsView()) {
                     HStack {
                         Image(systemName: "paintpalette.fill")
                             .foregroundStyle(.orange)
-                        Text("气泡与轨迹个性化")
+                        Text("主题配色")
                         Spacer()
                     }
                 }

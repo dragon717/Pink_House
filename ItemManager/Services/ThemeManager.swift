@@ -174,19 +174,42 @@ class ThemeManager {
             return cardColors.backgroundRGBA.color
         }
         
-        // 魔法配色：基于用户设置的背景色生成卡片背景色
-        // 根据当前是亮色还是暗夜模式，生成适合的卡片背景色
-        if isDark {
-            // 暗夜模式：比背景色稍亮一点，增加层次感
-            // 使用白色叠加来提亮背景色
-            return backgroundColor.opacity(0.9)
+        // 魔法配色：基于用户设置的背景色智能生成卡片背景色
+        // 根据背景色的亮度，生成与之协调的卡片背景色
+        return generateMagicCardBackground(isDarkMode: isDark)
+    }
+    
+    /// 为魔法配色智能生成卡片背景色
+    private func generateMagicCardBackground(isDarkMode: Bool) -> Color {
+        let bgColor = backgroundColor
+        let isDarkBackground = bgColor.isDark
+        
+        // 提取背景色的HSB值
+        let uiColor = UIColor(bgColor)
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            // 如果无法提取HSB，使用默认颜色
+            return isDarkMode ? Color(white: 0.2) : Color(white: 0.95)
+        }
+        
+        if isDarkMode {
+            // 暗夜模式：生成比背景色稍亮的颜色，保持色调一致
+            // 降低饱和度，提高亮度，使卡片有层次感但不过分鲜艳
+            let newSaturation = max(saturation * 0.6, 0.1)
+            let newBrightness = min(brightness * 1.3, 0.35)
+            return Color(hue: Double(hue), saturation: Double(newSaturation), brightness: Double(newBrightness))
         } else {
-            // 亮色模式：使用半透明白色，与背景色融合
-            // 如果背景色是浅色，使用白色半透明；如果是深色，使用更亮的颜色
-            if backgroundColor.isDark {
-                return Color.white.opacity(0.95)
+            // 亮色模式：基于背景色生成柔和的卡片色
+            if isDarkBackground {
+                // 如果背景是深色，使用浅灰色作为卡片背景
+                return Color(white: 0.95)
             } else {
-                return Color.white.opacity(0.85)
+                // 如果背景是浅色，生成与背景色调一致但更亮/更饱和的颜色
+                // 降低饱和度使颜色更柔和，提高亮度使卡片突出
+                let newSaturation = max(saturation * 0.4, 0.05)
+                let newBrightness = min(brightness * 1.15, 0.98)
+                return Color(hue: Double(hue), saturation: Double(newSaturation), brightness: Double(newBrightness))
             }
         }
     }

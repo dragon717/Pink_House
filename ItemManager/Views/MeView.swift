@@ -178,10 +178,10 @@ struct MeView: View {
                         // 马上来财设置
                         WealthHapticsSettingsCard()
 
-                        // 魔法配色
+                        // 主题配色
                         NavigationLink(destination: MagicColorSettingsView()) {
                             SettingsGridItem(
-                                title: "魔法配色",
+                                title: "主题配色",
                                 subtitle: "智能配色 · 客制化 · 魔法皮肤",
                                 icon: "wand.and.stars",
                                 iconColor: .purple
