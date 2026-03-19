@@ -153,6 +153,18 @@ struct WardrobeView: View {
         }
     }
     
+    // 特殊筛选值：与 HomeView 中定义的一致
+    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    
+    // 字符串类型字段的"无"标记
+    static let noTypeMarker = "__NO_TYPE__"
+    static let noColorMarker = "__NO_COLOR__"
+    static let noSizeMarker = "__NO_SIZE__"
+    static let noLengthMarker = "__NO_LENGTH__"
+    static let noConditionMarker = "__NO_CONDITION__"
+    static let noAccessoryMarker = "__NO_ACCESSORY__"
+    
     var filteredClothings: [Clothing] {
         // 使用 ClothingSearchService 进行搜索
         let searchService = ClothingSearchService(clothings: clothings)
@@ -165,6 +177,9 @@ struct WardrobeView: View {
             let matchesTag: Bool
             if selectedTagIDs.isEmpty {
                 matchesTag = true
+            } else if selectedTagIDs.contains(WardrobeView.noTagUUID) {
+                // 筛选"无标签"：标签为空或nil
+                matchesTag = clothing.tags?.isEmpty ?? true
             } else {
                 let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
                 matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
@@ -173,6 +188,9 @@ struct WardrobeView: View {
             let matchesBrand: Bool
             if selectedBrandIDs.isEmpty {
                 matchesBrand = true
+            } else if selectedBrandIDs.contains(WardrobeView.noBrandUUID) {
+                // 筛选"无品牌"：品牌为nil
+                matchesBrand = clothing.brand == nil
             } else {
                 if let brand = clothing.brand {
                     matchesBrand = selectedBrandIDs.contains(brand.id)
@@ -191,7 +209,15 @@ struct WardrobeView: View {
             
             let matchesCondition: Bool = selectedConditions.isEmpty || !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
             
-            let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
+            let matchesAccessory: Bool
+            if selectedAccessories.isEmpty {
+                matchesAccessory = true
+            } else if selectedAccessories.contains(WardrobeView.noAccessoryMarker) {
+                // 筛选"无小物"：小物字段为空
+                matchesAccessory = clothing.accessories.isEmpty
+            } else {
+                matchesAccessory = !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
+            }
             
             return matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
         }

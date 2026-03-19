@@ -39,6 +39,11 @@ struct ClothingListView: View {
     // 3D模型筛选
     @State private var showOnly3DModels = false
     
+    // 特殊筛选值：与 HomeView 中定义的一致
+    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let noAccessoryMarker = "__NO_ACCESSORY__"
+    
     // 价格显示设置 - 使用单例管理器
     //@ObservedObject private var privacyManager = PrivacyManager.shared
     
@@ -83,6 +88,9 @@ struct ClothingListView: View {
             let matchesTag: Bool
             if selectedTagIDs.isEmpty {
                 matchesTag = true
+            } else if selectedTagIDs.contains(ClothingListView.noTagUUID) {
+                // 筛选"无标签"：标签为空或nil
+                matchesTag = clothing.tags?.isEmpty ?? true
             } else {
                 let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
                 matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
@@ -91,6 +99,9 @@ struct ClothingListView: View {
             let matchesBrand: Bool
             if selectedBrandIDs.isEmpty {
                 matchesBrand = true
+            } else if selectedBrandIDs.contains(ClothingListView.noBrandUUID) {
+                // 筛选"无品牌"：品牌为nil
+                matchesBrand = clothing.brand == nil
             } else {
                 if let brand = clothing.brand {
                     matchesBrand = selectedBrandIDs.contains(brand.id)
@@ -115,7 +126,15 @@ struct ClothingListView: View {
             
             let matchesCondition: Bool = selectedConditions.isEmpty || !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
             
-            let matchesAccessory: Bool = selectedAccessories.isEmpty || !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
+            let matchesAccessory: Bool
+            if selectedAccessories.isEmpty {
+                matchesAccessory = true
+            } else if selectedAccessories.contains(ClothingListView.noAccessoryMarker) {
+                // 筛选"无小物"：小物字段为空
+                matchesAccessory = clothing.accessories.isEmpty
+            } else {
+                matchesAccessory = !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
+            }
             
             // 3D模型筛选
             let matches3DFilter: Bool = !showOnly3DModels || clothing.is3DModel

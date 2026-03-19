@@ -17,6 +17,11 @@ struct ClothingFilterMenu: View {
     
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     
+    // 特殊筛选值：与 HomeView 中定义的一致
+    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let noAccessoryMarker = "__NO_ACCESSORY__"
+    
     var body: some View {
         Menu {
             // Tags Filter
@@ -25,6 +30,23 @@ struct ClothingFilterMenu: View {
                     selectedTagIDs.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无标签选项
+                Button {
+                    if selectedTagIDs.contains(ClothingFilterMenu.noTagUUID) {
+                        selectedTagIDs.remove(ClothingFilterMenu.noTagUUID)
+                    } else {
+                        selectedTagIDs.removeAll()
+                        selectedTagIDs.insert(ClothingFilterMenu.noTagUUID)
+                    }
+                } label: {
+                    HStack {
+                        Text("无标签")
+                        if selectedTagIDs.contains(ClothingFilterMenu.noTagUUID) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(tags) { tag in
@@ -45,7 +67,12 @@ struct ClothingFilterMenu: View {
                     }
                 }
             } label: {
-                let selectedTagName = selectedTagIDs.first.flatMap { id in tags.first(where: { $0.id == id })?.name }
+                let selectedTagName: String? = selectedTagIDs.first.flatMap { id in
+                    if id == ClothingFilterMenu.noTagUUID {
+                        return "无标签"
+                    }
+                    return tags.first(where: { $0.id == id })?.name
+                }
                 Label(selectedTagName ?? "标签", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
             }
             
@@ -55,6 +82,23 @@ struct ClothingFilterMenu: View {
                     selectedBrandIDs.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无品牌选项
+                Button {
+                    if selectedBrandIDs.contains(ClothingFilterMenu.noBrandUUID) {
+                        selectedBrandIDs.remove(ClothingFilterMenu.noBrandUUID)
+                    } else {
+                        selectedBrandIDs.removeAll()
+                        selectedBrandIDs.insert(ClothingFilterMenu.noBrandUUID)
+                    }
+                } label: {
+                    HStack {
+                        Text("无品牌")
+                        if selectedBrandIDs.contains(ClothingFilterMenu.noBrandUUID) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(brands) { brand in
@@ -75,7 +119,12 @@ struct ClothingFilterMenu: View {
                     }
                 }
             } label: {
-                let selectedBrandName = selectedBrandIDs.first.flatMap { id in brands.first(where: { $0.id == id })?.name }
+                let selectedBrandName: String? = selectedBrandIDs.first.flatMap { id in
+                    if id == ClothingFilterMenu.noBrandUUID {
+                        return "无品牌"
+                    }
+                    return brands.first(where: { $0.id == id })?.name
+                }
                 Label(selectedBrandName ?? "品牌", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
             }
             
@@ -135,13 +184,54 @@ struct ClothingFilterMenu: View {
                 selection: $selectedConditions
             )
         case .accessories:
-            FilterStringSection(
-                title: "小物",
-                icon: "sparkles",
-                selectedIcon: "sparkles.rectangle.stack.fill",
-                options: getAllValues(for: \.accessories),
-                selection: $selectedAccessories
-            )
+            // 小物筛选需要特殊处理"无小物"选项
+            Menu {
+                Button(role: .destructive) {
+                    selectedAccessories.removeAll()
+                } label: {
+                    Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无小物选项
+                Button {
+                    if selectedAccessories.contains(ClothingFilterMenu.noAccessoryMarker) {
+                        selectedAccessories.remove(ClothingFilterMenu.noAccessoryMarker)
+                    } else {
+                        selectedAccessories.removeAll()
+                        selectedAccessories.insert(ClothingFilterMenu.noAccessoryMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无小物")
+                        if selectedAccessories.contains(ClothingFilterMenu.noAccessoryMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                ForEach(getAllValues(for: \.accessories), id: \.self) { accessory in
+                    Button {
+                        if selectedAccessories.contains(accessory) {
+                            selectedAccessories.remove(accessory)
+                        } else {
+                            selectedAccessories.removeAll()
+                            selectedAccessories.insert(accessory)
+                        }
+                    } label: {
+                        HStack {
+                            Text(accessory)
+                            if selectedAccessories.contains(accessory) {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                let selectedAccessoryName: String? = selectedAccessories.first.flatMap { accessory in
+                    accessory == ClothingFilterMenu.noAccessoryMarker ? "无小物" : accessory
+                }
+                Label(selectedAccessoryName ?? "小物", systemImage: selectedAccessories.isEmpty ? "sparkles" : "sparkles.rectangle.stack.fill")
+            }
         }
     }
     

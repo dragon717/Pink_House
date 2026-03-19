@@ -87,6 +87,18 @@ struct HomeView: View {
     @State private var selectedConditions: Set<String> = []
     @State private var selectedAccessories: Set<String> = []
     
+    // 特殊筛选值：用于表示"无标签"、"无品牌"等
+    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    
+    // 字符串类型字段的"无"标记
+    static let noTypeMarker = "__NO_TYPE__"
+    static let noColorMarker = "__NO_COLOR__"
+    static let noSizeMarker = "__NO_SIZE__"
+    static let noLengthMarker = "__NO_LENGTH__"
+    static let noConditionMarker = "__NO_CONDITION__"
+    static let noAccessoryMarker = "__NO_ACCESSORY__"
+    
     // For Wardrobe View
     @State private var wardrobeSearchText = ""
     
@@ -344,24 +356,24 @@ struct HomeView: View {
             if selectedTab == .wardrobe && isSelectionMode {
                 doneEditButton
             }
-            
+
             if selectedTab == .wardrobe && sortOption == .custom && isEditing {
                 doneSortButton
             }
-            
+
             if !isInWardrobeEditMode {
                 sortButton
-                filterButton
+                displayButton
             }
         }
     }
-    
+
     private var fashionTrailingButtons: some View {
         HStack(spacing: 6) {
             if !isInWardrobeEditMode {
-                displayButton
+                filterButton
             }
-            
+
             moreMenuButton
             addButton
         }
@@ -477,6 +489,23 @@ struct HomeView: View {
                     Label("清除筛选", systemImage: "xmark.circle")
                 }
                 
+                // 无标签选项
+                Button {
+                    if selectedTagIDs.contains(HomeView.noTagUUID) {
+                        selectedTagIDs.remove(HomeView.noTagUUID)
+                    } else {
+                        selectedTagIDs.removeAll()
+                        selectedTagIDs.insert(HomeView.noTagUUID)
+                    }
+                } label: {
+                    HStack {
+                        Text("无标签")
+                        if selectedTagIDs.contains(HomeView.noTagUUID) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
                 ForEach(tags) { tag in
                     Button {
                         if selectedTagIDs.contains(tag.id) {
@@ -495,7 +524,12 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                let selectedTagName = selectedTagIDs.first.flatMap { id in tags.first(where: { $0.id == id })?.name }
+                let selectedTagName: String? = selectedTagIDs.first.flatMap { id in
+                    if id == HomeView.noTagUUID {
+                        return "无标签"
+                    }
+                    return tags.first(where: { $0.id == id })?.name
+                }
                 Label(selectedTagName ?? "标签", systemImage: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
             }
             
@@ -505,6 +539,23 @@ struct HomeView: View {
                     selectedBrandIDs.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无品牌选项
+                Button {
+                    if selectedBrandIDs.contains(HomeView.noBrandUUID) {
+                        selectedBrandIDs.remove(HomeView.noBrandUUID)
+                    } else {
+                        selectedBrandIDs.removeAll()
+                        selectedBrandIDs.insert(HomeView.noBrandUUID)
+                    }
+                } label: {
+                    HStack {
+                        Text("无品牌")
+                        if selectedBrandIDs.contains(HomeView.noBrandUUID) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(brands) { brand in
@@ -525,7 +576,12 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                let selectedBrandName = selectedBrandIDs.first.flatMap { id in brands.first(where: { $0.id == id })?.name }
+                let selectedBrandName: String? = selectedBrandIDs.first.flatMap { id in
+                    if id == HomeView.noBrandUUID {
+                        return "无品牌"
+                    }
+                    return brands.first(where: { $0.id == id })?.name
+                }
                 Label(selectedBrandName ?? "品牌", systemImage: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
             }
             
@@ -555,6 +611,23 @@ struct HomeView: View {
                     Label("清除筛选", systemImage: "xmark.circle")
                 }
                 
+                // 无类型选项
+                Button {
+                    if selectedTypes.contains(HomeView.noTypeMarker) {
+                        selectedTypes.remove(HomeView.noTypeMarker)
+                    } else {
+                        selectedTypes.removeAll()
+                        selectedTypes.insert(HomeView.noTypeMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无类型")
+                        if selectedTypes.contains(HomeView.noTypeMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
                 ForEach(getAllValues(for: \.types), id: \.self) { type in
                     Button {
                         if selectedTypes.contains(type) {
@@ -573,7 +646,10 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                Label(selectedTypes.first ?? "类型", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
+                let selectedTypeName: String? = selectedTypes.first.flatMap { type in
+                    type == HomeView.noTypeMarker ? "无类型" : type
+                }
+                Label(selectedTypeName ?? "类型", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
             }
             
         case .colors:
@@ -582,6 +658,23 @@ struct HomeView: View {
                     selectedColors.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无颜色选项
+                Button {
+                    if selectedColors.contains(HomeView.noColorMarker) {
+                        selectedColors.remove(HomeView.noColorMarker)
+                    } else {
+                        selectedColors.removeAll()
+                        selectedColors.insert(HomeView.noColorMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无颜色")
+                        if selectedColors.contains(HomeView.noColorMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(getAllValues(for: \.colors), id: \.self) { color in
@@ -602,7 +695,10 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                Label(selectedColors.first ?? "颜色", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
+                let selectedColorName: String? = selectedColors.first.flatMap { color in
+                    color == HomeView.noColorMarker ? "无颜色" : color
+                }
+                Label(selectedColorName ?? "颜色", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
             }
             
         case .sizes:
@@ -611,6 +707,23 @@ struct HomeView: View {
                     selectedSizes.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无尺码选项
+                Button {
+                    if selectedSizes.contains(HomeView.noSizeMarker) {
+                        selectedSizes.remove(HomeView.noSizeMarker)
+                    } else {
+                        selectedSizes.removeAll()
+                        selectedSizes.insert(HomeView.noSizeMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无尺码")
+                        if selectedSizes.contains(HomeView.noSizeMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(getAllValues(for: \.sizes), id: \.self) { size in
@@ -631,7 +744,10 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                Label(selectedSizes.first ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
+                let selectedSizeName: String? = selectedSizes.first.flatMap { size in
+                    size == HomeView.noSizeMarker ? "无尺码" : size
+                }
+                Label(selectedSizeName ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
             }
             
         case .length:
@@ -640,6 +756,23 @@ struct HomeView: View {
                     selectedLengths.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无衣长选项
+                Button {
+                    if selectedLengths.contains(HomeView.noLengthMarker) {
+                        selectedLengths.remove(HomeView.noLengthMarker)
+                    } else {
+                        selectedLengths.removeAll()
+                        selectedLengths.insert(HomeView.noLengthMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无衣长")
+                        if selectedLengths.contains(HomeView.noLengthMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(getAllValues(for: \.length), id: \.self) { length in
@@ -660,7 +793,10 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                Label(selectedLengths.first ?? "衣长", systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
+                let selectedLengthName: String? = selectedLengths.first.flatMap { length in
+                    length == HomeView.noLengthMarker ? "无衣长" : length
+                }
+                Label(selectedLengthName ?? "衣长", systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
             }
             
         case .condition:
@@ -669,6 +805,23 @@ struct HomeView: View {
                     selectedConditions.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无状态选项
+                Button {
+                    if selectedConditions.contains(HomeView.noConditionMarker) {
+                        selectedConditions.remove(HomeView.noConditionMarker)
+                    } else {
+                        selectedConditions.removeAll()
+                        selectedConditions.insert(HomeView.noConditionMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无状态")
+                        if selectedConditions.contains(HomeView.noConditionMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(getAllValues(for: \.condition), id: \.self) { condition in
@@ -689,7 +842,10 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                Label(selectedConditions.first ?? "状态", systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
+                let selectedConditionName: String? = selectedConditions.first.flatMap { condition in
+                    condition == HomeView.noConditionMarker ? "无状态" : condition
+                }
+                Label(selectedConditionName ?? "状态", systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
             }
             
         case .accessories:
@@ -698,6 +854,23 @@ struct HomeView: View {
                     selectedAccessories.removeAll()
                 } label: {
                     Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无小物选项
+                Button {
+                    if selectedAccessories.contains("__NO_ACCESSORY__") {
+                        selectedAccessories.remove("__NO_ACCESSORY__")
+                    } else {
+                        selectedAccessories.removeAll()
+                        selectedAccessories.insert("__NO_ACCESSORY__")
+                    }
+                } label: {
+                    HStack {
+                        Text("无小物")
+                        if selectedAccessories.contains("__NO_ACCESSORY__") {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
                 
                 ForEach(getAllValues(for: \.accessories), id: \.self) { accessory in
@@ -718,7 +891,10 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                Label(selectedAccessories.first ?? "小物", systemImage: selectedAccessories.isEmpty ? "crown" : "crown.fill")
+                let selectedAccessoryName: String? = selectedAccessories.first.flatMap { accessory in
+                    accessory == "__NO_ACCESSORY__" ? "无小物" : accessory
+                }
+                Label(selectedAccessoryName ?? "小物", systemImage: selectedAccessories.isEmpty ? "crown" : "crown.fill")
             }
         }
     }
@@ -803,33 +979,65 @@ struct HomeView: View {
         
         // Tags
         if !selectedTagIDs.isEmpty {
-            let names = selectedTagIDs.compactMap { id in tags.first(where: { $0.id == id })?.name }
+            var names: [String] = []
+            for id in selectedTagIDs {
+                if id == HomeView.noTagUUID {
+                    names.append("无标签")
+                } else if let tag = tags.first(where: { $0.id == id }) {
+                    names.append(tag.name)
+                }
+            }
             if !names.isEmpty { descriptions.append(names.joined(separator: "/")) }
         }
         
         // Brands
         if !selectedBrandIDs.isEmpty {
-            let names = selectedBrandIDs.compactMap { id in brands.first(where: { $0.id == id })?.name }
+            var names: [String] = []
+            for id in selectedBrandIDs {
+                if id == HomeView.noBrandUUID {
+                    names.append("无品牌")
+                } else if let brand = brands.first(where: { $0.id == id }) {
+                    names.append(brand.name)
+                }
+            }
             if !names.isEmpty { descriptions.append(names.joined(separator: "/")) }
         }
         
         // Types
-        if !selectedTypes.isEmpty { descriptions.append(selectedTypes.joined(separator: "/")) }
+        if !selectedTypes.isEmpty {
+            let names = selectedTypes.map { $0 == HomeView.noTypeMarker ? "无类型" : $0 }
+            descriptions.append(names.joined(separator: "/"))
+        }
         
         // Colors
-        if !selectedColors.isEmpty { descriptions.append(selectedColors.joined(separator: "/")) }
+        if !selectedColors.isEmpty {
+            let names = selectedColors.map { $0 == HomeView.noColorMarker ? "无颜色" : $0 }
+            descriptions.append(names.joined(separator: "/"))
+        }
         
         // Sizes
-        if !selectedSizes.isEmpty { descriptions.append(selectedSizes.joined(separator: "/")) }
+        if !selectedSizes.isEmpty {
+            let names = selectedSizes.map { $0 == HomeView.noSizeMarker ? "无尺码" : $0 }
+            descriptions.append(names.joined(separator: "/"))
+        }
         
         // Lengths
-        if !selectedLengths.isEmpty { descriptions.append(selectedLengths.joined(separator: "/")) }
+        if !selectedLengths.isEmpty {
+            let names = selectedLengths.map { $0 == HomeView.noLengthMarker ? "无衣长" : $0 }
+            descriptions.append(names.joined(separator: "/"))
+        }
         
         // Conditions
-        if !selectedConditions.isEmpty { descriptions.append(selectedConditions.joined(separator: "/")) }
+        if !selectedConditions.isEmpty {
+            let names = selectedConditions.map { $0 == HomeView.noConditionMarker ? "无状态" : $0 }
+            descriptions.append(names.joined(separator: "/"))
+        }
         
         // Accessories
-        if !selectedAccessories.isEmpty { descriptions.append(selectedAccessories.joined(separator: "/")) }
+        if !selectedAccessories.isEmpty {
+            let names = selectedAccessories.map { $0 == HomeView.noAccessoryMarker ? "无小物" : $0 }
+            descriptions.append(names.joined(separator: "/"))
+        }
         
         if descriptions.isEmpty { return nil }
         return descriptions.joined(separator: " + ")

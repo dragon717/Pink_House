@@ -30,6 +30,10 @@ struct WardrobeSelectionSheet: View {
     // 选中回调
     let onSelect: (Clothing) -> Void
     
+    // 特殊筛选值：与 HomeView 中定义的一致
+    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    
     // 筛选后的衣物列表
     var filteredClothings: [Clothing] {
         let searchService = ClothingSearchService(clothings: clothings)
@@ -41,6 +45,9 @@ struct WardrobeSelectionSheet: View {
             let matchesBrand: Bool
             if selectedBrandIDs.isEmpty {
                 matchesBrand = true
+            } else if selectedBrandIDs.contains(WardrobeSelectionSheet.noBrandUUID) {
+                // 筛选"无品牌"：品牌为nil
+                matchesBrand = clothing.brand == nil
             } else {
                 if let brand = clothing.brand {
                     matchesBrand = selectedBrandIDs.contains(brand.id)
@@ -53,6 +60,9 @@ struct WardrobeSelectionSheet: View {
             let matchesTag: Bool
             if selectedTagIDs.isEmpty {
                 matchesTag = true
+            } else if selectedTagIDs.contains(WardrobeSelectionSheet.noTagUUID) {
+                // 筛选"无标签"：标签为空或nil
+                matchesTag = clothing.tags?.isEmpty ?? true
             } else {
                 let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
                 matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
@@ -165,6 +175,19 @@ struct WardrobeSelectionSheet: View {
             
             Divider()
             
+            // 无品牌选项
+            Button {
+                toggleBrandSelection(WardrobeSelectionSheet.noBrandUUID)
+            } label: {
+                HStack {
+                    Text("无品牌")
+                    Spacer()
+                    if selectedBrandIDs.contains(WardrobeSelectionSheet.noBrandUUID) {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            
             ForEach(brands) { brand in
                 Button {
                     toggleBrandSelection(brand.id)
@@ -181,7 +204,7 @@ struct WardrobeSelectionSheet: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: selectedBrandIDs.isEmpty ? "bag" : "bag.fill")
-                Text(selectedBrandIDs.isEmpty ? "品牌" : "已选 \(selectedBrandIDs.count)")
+                Text(brandFilterLabel)
                     .font(.caption)
             }
             .padding(.horizontal, 12)
@@ -189,6 +212,17 @@ struct WardrobeSelectionSheet: View {
             .background(selectedBrandIDs.isEmpty ? Color.gray.opacity(0.1) : Color.pink.opacity(0.1))
             .foregroundColor(selectedBrandIDs.isEmpty ? .primary : .pink)
             .clipShape(Capsule())
+        }
+    }
+    
+    // 品牌筛选标签文字
+    private var brandFilterLabel: String {
+        if selectedBrandIDs.isEmpty {
+            return "品牌"
+        } else if selectedBrandIDs.contains(WardrobeSelectionSheet.noBrandUUID) {
+            return "无品牌"
+        } else {
+            return "已选 \(selectedBrandIDs.count)"
         }
     }
     
@@ -202,6 +236,19 @@ struct WardrobeSelectionSheet: View {
             }
             
             Divider()
+            
+            // 无标签选项
+            Button {
+                toggleTagSelection(WardrobeSelectionSheet.noTagUUID)
+            } label: {
+                HStack {
+                    Text("无标签")
+                    Spacer()
+                    if selectedTagIDs.contains(WardrobeSelectionSheet.noTagUUID) {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
             
             ForEach(tags) { tag in
                 Button {
@@ -222,7 +269,7 @@ struct WardrobeSelectionSheet: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: selectedTagIDs.isEmpty ? "tag" : "tag.fill")
-                Text(selectedTagIDs.isEmpty ? "标签" : "已选 \(selectedTagIDs.count)")
+                Text(tagFilterLabel)
                     .font(.caption)
             }
             .padding(.horizontal, 12)
@@ -230,6 +277,17 @@ struct WardrobeSelectionSheet: View {
             .background(selectedTagIDs.isEmpty ? Color.gray.opacity(0.1) : Color.pink.opacity(0.1))
             .foregroundColor(selectedTagIDs.isEmpty ? .primary : .pink)
             .clipShape(Capsule())
+        }
+    }
+    
+    // 标签筛选标签文字
+    private var tagFilterLabel: String {
+        if selectedTagIDs.isEmpty {
+            return "标签"
+        } else if selectedTagIDs.contains(WardrobeSelectionSheet.noTagUUID) {
+            return "无标签"
+        } else {
+            return "已选 \(selectedTagIDs.count)"
         }
     }
     
