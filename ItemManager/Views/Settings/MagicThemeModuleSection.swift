@@ -21,6 +21,11 @@ struct MagicThemeModuleSection: View {
     @State private var customThemeName: String = ""
     @State private var pendingThemeName: String = ""
 
+    // 删除主题相关状态
+    @State private var showDeleteConfirmAlert = false
+    @State private var pendingDeleteThemeId: String?
+    @State private var pendingDeleteThemeName: String = ""
+
     // 检查魔法配色是否已解锁
     private var isMagicColorUnlocked: Bool {
         unlockManager.isUnlocked(.themeCustomize)
@@ -87,7 +92,10 @@ struct MagicThemeModuleSection: View {
                         ) {
                             _ = themeManager.applyThemeSet(named: theme.name)
                         } onDelete: {
-                            themeManager.deleteThemeSet(id: theme.id)
+                            // 显示删除确认弹窗
+                            pendingDeleteThemeId = theme.id
+                            pendingDeleteThemeName = theme.name
+                            showDeleteConfirmAlert = true
                         }
                     }
                 }
@@ -153,6 +161,18 @@ struct MagicThemeModuleSection: View {
         } message: {
             Text("已存在名为「\(pendingThemeName)」的主题方案，是否覆盖？")
         }
+        // 删除确认弹窗
+        .alert("确认删除", isPresented: $showDeleteConfirmAlert) {
+            Button("取消", role: .cancel) {
+                pendingDeleteThemeId = nil
+                pendingDeleteThemeName = ""
+            }
+            Button("删除", role: .destructive) {
+                performDelete()
+            }
+        } message: {
+            Text("确定要删除主题「\(pendingDeleteThemeName)」吗？此操作不可恢复。")
+        }
     }
 
     // MARK: - 保存主题处理
@@ -178,6 +198,15 @@ struct MagicThemeModuleSection: View {
         _ = themeManager.saveCurrentThemeAsSet(named: pendingThemeName)
         customThemeName = ""
         pendingThemeName = ""
+    }
+
+    // MARK: - 删除主题处理
+    private func performDelete() {
+        if let themeId = pendingDeleteThemeId {
+            themeManager.deleteThemeSet(id: themeId)
+        }
+        pendingDeleteThemeId = nil
+        pendingDeleteThemeName = ""
     }
 
     // MARK: - 自定义颜色区域（紧凑布局）

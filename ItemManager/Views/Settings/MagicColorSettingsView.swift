@@ -105,6 +105,12 @@ struct MagicColorSettingsView: View {
                 skirtFillMode = themeManager.skirtFillMode
                 transparentOpacity = themeManager.transparentOpacity
                 tintOpacity = themeManager.tintOpacity
+                
+                // 如果当前是客制化配色且没有选中预设（即使用个性化主题），默认展开我的主题方案
+                let config = themeManager.themeColorConfig
+                if config.colorSchemeMode == .custom && config.customColorConfig.selectedPresetId == nil {
+                    isMyThemesExpanded = true
+                }
             }
         }
     }
@@ -332,8 +338,11 @@ struct CustomColorTabContent: View {
                 }
 
                 // 个性化豆腐块 - 点击展开我的主题方案
+                // 当选中个性化主题（即没有选中预设）时，显示为选中状态
+                let isPersonalizationSelected = themeManager.colorSchemeMode == .custom
+                    && themeManager.themeColorConfig.customColorConfig.selectedPresetId == nil
                 CustomThemeButton(
-                    isSelected: isMyThemesExpanded
+                    isSelected: isPersonalizationSelected
                 ) {
                     onPersonalizationTap()
                 }
