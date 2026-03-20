@@ -137,10 +137,9 @@ struct ClothingBasicInfoView: View {
                 case .colors:
                     AutoCompleteTextField(title: "", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
                 case .sizes:
-                    // 尺码行特殊处理，添加尺码表图片选择器
                     HStack(spacing: 8) {
                         AutoCompleteTextField(title: "", placeholder: "例如: S,M,L", text: $sizes, field: .size)
-                        ChartImagePicker(imagePath: $sizeChartImagePath, placeholder: "添加表图")
+                        ChartImagePicker(imagePath: $sizeChartImagePath, placeholder: "添加表图", editMode: true)
                     }
                 case .length:
                     AutoCompleteTextField(title: "", placeholder: "例如: 90cm", text: $length, field: .size)
