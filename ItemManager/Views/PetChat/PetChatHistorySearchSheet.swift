@@ -94,9 +94,18 @@ struct PetChatHistorySearchSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     let count = PetChatTranscriptStore.count(onlyUserMessages: true)
-                    Text("\(count)条")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Button {
+                        // 点击可刷新数据
+                        reload()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption2)
+                            Text("\(count)条可复用")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.pink)
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("关闭") { dismiss() }
