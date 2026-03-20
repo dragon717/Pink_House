@@ -41,7 +41,7 @@ struct DepositPlanView: View {
     @State private var showStats = false // 默认隐藏总待付尾款统计
     @State private var showYearStats = false // 默认隐藏年份统计（独立控制）
     @State private var isMonthSelectorExpanded: Bool = false // 默认折叠，显示最近月份
-    @State private var isSeriesSelectorExpanded: Bool = false // 默认折叠，显示最近添加
+    @State private var isSeriesSelectorExpanded: Bool = true // 默认展开，显示系列
     
     @State private var filteredClothings: [Clothing] = []
     @State private var baseClothings: [Clothing] = []
