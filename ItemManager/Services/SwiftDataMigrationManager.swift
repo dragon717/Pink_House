@@ -659,7 +659,8 @@ class SwiftDataMigrationManager: ObservableObject {
             price: source.price,
             deposit: source.deposit,
             balance: source.balance,
-            sortIndex: source.sortIndex
+            sortIndex: source.sortIndex,
+            imagePaths: source.imagePaths
         )
         new.id = source.id
         return new

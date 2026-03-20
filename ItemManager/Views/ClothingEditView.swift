@@ -10,6 +10,25 @@ import SwiftData
 import Foundation
 import Combine
 
+// MARK: - 标签数据（用于草稿保存）
+struct TagData: Codable {
+    let id: UUID
+    let name: String
+    let colorHex: String
+    
+    init(from tag: Tag) {
+        self.id = tag.id
+        self.name = tag.name
+        self.colorHex = tag.colorHex
+    }
+    
+    init(id: UUID, name: String, colorHex: String) {
+        self.id = id
+        self.name = name
+        self.colorHex = colorHex
+    }
+}
+
 // MARK: - 编辑草稿数据结构
 struct ClothingEditDraft: Codable {
     let id: UUID
@@ -36,6 +55,9 @@ struct ClothingEditDraft: Codable {
     let finalPaymentEndDate: Date
     let note: String
     let accessoryList: [AccessoryItemData]
+    let sizeChartImagePath: String?  // 尺码表图片路径
+    let priceChartImagePath: String? // 价格表图片路径
+    let selectedTags: [TagData]      // 选中的标签
     let timestamp: Date
     
     init(id: UUID = UUID(),
@@ -61,7 +83,10 @@ struct ClothingEditDraft: Codable {
          finalPaymentDate: Date,
          finalPaymentEndDate: Date,
          note: String,
-         accessoryList: [AccessoryItemData]) {
+         accessoryList: [AccessoryItemData],
+         sizeChartImagePath: String? = nil,
+         priceChartImagePath: String? = nil,
+         selectedTags: [TagData] = []) {
         self.id = id
         self.name = name
         self.brandName = brandName
@@ -86,6 +111,9 @@ struct ClothingEditDraft: Codable {
         self.finalPaymentEndDate = finalPaymentEndDate
         self.note = note
         self.accessoryList = accessoryList
+        self.sizeChartImagePath = sizeChartImagePath
+        self.priceChartImagePath = priceChartImagePath
+        self.selectedTags = selectedTags
         self.timestamp = Date()
     }
 }
@@ -197,6 +225,10 @@ struct ClothingEditView: View {
     @State private var imagePaths: [String] = []
     @State private var isShared: Bool = false
     
+    // 表图字段
+    @State private var sizeChartImagePath: String? = nil
+    @State private var priceChartImagePath: String? = nil
+    
     // Tag States
     @State private var showingAddTagSheet = false
     @State private var selectedTags: [Tag] = []
@@ -297,6 +329,7 @@ struct ClothingEditView: View {
             length: $length,
             condition: $condition,
             accessories: $accessories,
+            sizeChartImagePath: $sizeChartImagePath,
             showingBrandSelection: $showingBrandSelection,
             showingGenericSelection: $showingGenericSelection,
             activeSelectionField: $activeSelectionField
@@ -321,6 +354,7 @@ struct ClothingEditView: View {
             accessoriesPrice: $accessoriesPrice,
             stock: $stock,
             accessoryList: $accessoryList,
+            priceChartImagePath: $priceChartImagePath,
             onShowToast: handleShowToast
         )
     }
@@ -496,6 +530,10 @@ struct ClothingEditView: View {
                 note = c.note
                 selectedTags = c.tags ?? []
                 
+                // 加载表图字段
+                sizeChartImagePath = c.sizeChartImagePath
+                priceChartImagePath = c.priceChartImagePath
+                
                 // 加载时，如果定金和尾款都存在，则自动校正总价
                 if depositVal > 0 && balanceVal > 0 {
                     priceTotal = depositVal + balanceVal
@@ -567,6 +605,8 @@ struct ClothingEditView: View {
     // 保存当前状态为草稿
     private func saveCurrentStateAsDraft() {
         print("ClothingEditView: saveCurrentStateAsDraft called, draftID: \(draftID), imagePaths count: \(imagePaths.count), name: \(name)")
+        // 将选中的标签转换为可编码的TagData数组
+        let tagDataList = selectedTags.map { TagData(from: $0) }
         let draft = ClothingEditDraft(
             id: draftID,
             name: name,
@@ -591,10 +631,13 @@ struct ClothingEditView: View {
             finalPaymentDate: finalPaymentDate,
             finalPaymentEndDate: finalPaymentEndDate,
             note: note,
-            accessoryList: accessoryList
+            accessoryList: accessoryList,
+            sizeChartImagePath: sizeChartImagePath,
+            priceChartImagePath: priceChartImagePath,
+            selectedTags: tagDataList
         )
         draftManager.saveDraft(draft)
-        print("ClothingEditView: Draft saved successfully with \(draft.imagePaths.count) images")
+        print("ClothingEditView: Draft saved successfully with \(draft.imagePaths.count) images, \(tagDataList.count) tags")
     }
 
     // 更新当前草稿到管理器（用于后台保存）
@@ -602,6 +645,8 @@ struct ClothingEditView: View {
         // 只有在新建模式下才更新草稿
         guard !isEditing else { return }
 
+        // 将选中的标签转换为可编码的TagData数组
+        let tagDataList = selectedTags.map { TagData(from: $0) }
         let draft = ClothingEditDraft(
             id: draftID,
             name: name,
@@ -626,15 +671,18 @@ struct ClothingEditView: View {
             finalPaymentDate: finalPaymentDate,
             finalPaymentEndDate: finalPaymentEndDate,
             note: note,
-            accessoryList: accessoryList
+            accessoryList: accessoryList,
+            sizeChartImagePath: sizeChartImagePath,
+            priceChartImagePath: priceChartImagePath,
+            selectedTags: tagDataList
         )
         draftManager.currentDraft = draft
-        print("ClothingEditView: Updated current draft with \(draft.imagePaths.count) images")
+        print("ClothingEditView: Updated current draft with \(draft.imagePaths.count) images, \(tagDataList.count) tags")
     }
 
     // 从草稿恢复状态
     private func restoreFromDraft(_ draft: ClothingEditDraft) {
-        print("ClothingEditView: restoreFromDraft called, draft has \(draft.imagePaths.count) images, current has \(imagePaths.count) images")
+        print("ClothingEditView: restoreFromDraft called, draft has \(draft.imagePaths.count) images, \(draft.selectedTags.count) tags, current has \(imagePaths.count) images")
         name = draft.name
         brandName = draft.brandName
         types = draft.types
@@ -643,14 +691,10 @@ struct ClothingEditView: View {
         length = draft.length
         condition = draft.condition
         accessories = draft.accessories
-        // 只有当草稿中的图片数量 >= 当前图片数量时才恢复图片
-        // 避免覆盖用户刚添加但还没保存到草稿的图片
-        if draft.imagePaths.count >= imagePaths.count {
-            print("ClothingEditView: Restoring \(draft.imagePaths.count) images from draft")
-            imagePaths = draft.imagePaths
-        } else {
-            print("ClothingEditView: Skipping image restore, draft has \(draft.imagePaths.count) images, current has \(imagePaths.count)")
-        }
+        // 恢复图片引用 - 草稿中的图片应该被完全恢复
+        // 注意：这里直接赋值，不需要条件判断，因为草稿恢复应该恢复所有保存的状态
+        print("ClothingEditView: Restoring \(draft.imagePaths.count) images from draft")
+        imagePaths = draft.imagePaths
         isShared = draft.isShared
         originalPrice = draft.originalPrice
         priceTotal = draft.priceTotal
@@ -665,8 +709,36 @@ struct ClothingEditView: View {
         finalPaymentEndDate = draft.finalPaymentEndDate
         note = draft.note
         accessoryList = draft.accessoryList
+        sizeChartImagePath = draft.sizeChartImagePath
+        priceChartImagePath = draft.priceChartImagePath
         draftID = draft.id
-        print("ClothingEditView: Draft restored, draftID set to \(draftID)")
+        
+        // 恢复标签：从TagData数组中恢复Tag对象
+        // 先尝试从数据库中找到对应的Tag，如果找不到则创建临时Tag对象
+        restoreTags(from: draft.selectedTags)
+        
+        print("ClothingEditView: Draft restored, draftID set to \(draftID), restored \(selectedTags.count) tags")
+    }
+    
+    // 从TagData恢复标签对象
+    private func restoreTags(from tagDataList: [TagData]) {
+        var restoredTags: [Tag] = []
+        for tagData in tagDataList {
+            // 尝试从数据库中查找对应的Tag
+            let descriptor = FetchDescriptor<Tag>(predicate: #Predicate { $0.id == tagData.id })
+            if let existingTag = try? modelContext.fetch(descriptor).first {
+                // 数据库中存在该标签，使用数据库中的对象
+                restoredTags.append(existingTag)
+            } else {
+                // 数据库中不存在，创建一个新的Tag对象（可能是标签已被删除）
+                // 为了保持数据完整性，我们创建一个新的Tag
+                let newTag = Tag(name: tagData.name, colorHex: tagData.colorHex)
+                newTag.id = tagData.id
+                modelContext.insert(newTag)
+                restoredTags.append(newTag)
+            }
+        }
+        selectedTags = restoredTags
     }
     
     // 重置所有状态（用于新建时清除草稿）
@@ -696,6 +768,8 @@ struct ClothingEditView: View {
         note = ""
         accessoryList = []
         selectedTags = []
+        sizeChartImagePath = nil
+        priceChartImagePath = nil
         draftID = UUID()
         print("ClothingEditView: All states reset, new draftID: \(draftID)")
     }
@@ -947,6 +1021,10 @@ struct ClothingEditView: View {
             c.tags = selectedTags
             c.updatedAt = Date()
             
+            // 保存表图字段
+            c.sizeChartImagePath = sizeChartImagePath
+            c.priceChartImagePath = priceChartImagePath
+            
             // Update notification
             NotificationManager.shared.scheduleNotification(for: c)
         } else {
@@ -976,6 +1054,10 @@ struct ClothingEditView: View {
                 note: note,
                 stock: stock
             )
+            
+            // 保存表图字段
+            newClothing.sizeChartImagePath = sizeChartImagePath
+            newClothing.priceChartImagePath = priceChartImagePath
             
             let newItems = accessoryList.enumerated().map { index, data in
                 AccessoryItem(name: data.name, price: Decimal(data.price), deposit: Decimal(data.deposit), balance: Decimal(data.balance), sortIndex: index)

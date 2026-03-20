@@ -887,7 +887,7 @@ struct WardrobeView: View {
         // Duplicate accessory items
         if let items = item.accessoryItems {
             newItem.accessoryItems = items.map { item in
-                AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex)
+                AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex, imagePaths: item.imagePaths)
             }
         }
         
@@ -948,7 +948,7 @@ struct WardrobeView: View {
                 // 复制小物
                 if let items = item.accessoryItems {
                     newItem.accessoryItems = items.map { item in
-                        AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex)
+                        AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex, imagePaths: item.imagePaths)
                     }
                 }
                 
@@ -1085,6 +1085,7 @@ struct WardrobeView: View {
             let deposit = clothing.deposit
             let balance = clothing.balance
             let price = clothing.price
+            let imagePaths = clothing.imagePaths.isEmpty ? nil : clothing.imagePaths // 复制原裙装的图片路径，空数组转为nil
             
             // 如果库存大于1，拆分成多个小物
             if stock > 1 {
@@ -1095,7 +1096,8 @@ struct WardrobeView: View {
                         price: price,
                         deposit: deposit,
                         balance: balance,
-                        sortIndex: sortIndex
+                        sortIndex: sortIndex,
+                        imagePaths: imagePaths // 将原裙装图片路径复制给小物
                     )
                     accessory.clothing = targetClothing
                     newAccessoryItems.append(accessory)
@@ -1108,7 +1110,8 @@ struct WardrobeView: View {
                     price: price,
                     deposit: deposit,
                     balance: balance,
-                    sortIndex: sortIndex
+                    sortIndex: sortIndex,
+                    imagePaths: imagePaths // 将原裙装图片路径复制给小物
                 )
                 accessory.clothing = targetClothing
                 newAccessoryItems.append(accessory)

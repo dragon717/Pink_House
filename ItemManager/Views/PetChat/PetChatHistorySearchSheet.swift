@@ -93,7 +93,8 @@ struct PetChatHistorySearchSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Text("可复用 \(PetChatTranscriptStore.count(onlyUserMessages: true)) 条")
+                    let count = PetChatTranscriptStore.count(onlyUserMessages: true)
+                    Text("\(count)条")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

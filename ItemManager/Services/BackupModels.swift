@@ -421,6 +421,8 @@ struct AccessoryItemDTO: Codable {
     let deposit: Decimal?
     let balance: Decimal?
     let sortIndex: Int
+    // v1.5+ 小物图片路径支持
+    let imagePaths: [String]?
 }
 
 

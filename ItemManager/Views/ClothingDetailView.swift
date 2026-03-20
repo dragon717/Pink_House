@@ -321,7 +321,7 @@ struct ClothingDetailView: View {
         // Duplicate accessory items
         if let items = clothing.accessoryItems {
             newClothing.accessoryItems = items.map { item in
-                AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex)
+                AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex, imagePaths: item.imagePaths)
             }
         }
         
@@ -533,7 +533,42 @@ struct ClothingDetailView: View {
         case .colors:
             InfoRow(label: "颜色", value: clothing.colors.isEmpty ? "未填写" : clothing.colors)
         case .sizes:
-            InfoRow(label: "尺码", value: clothing.sizes.isEmpty ? "未填写" : clothing.sizes)
+            // 尺码行特殊处理，显示尺码表缩略图
+            HStack {
+                Image(systemName: "ruler")
+                    .font(.caption)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
+                    .frame(width: 20)
+                
+                Text("尺码")
+                    .font(.subheadline)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                
+                Spacer()
+                
+                // 显示尺码表缩略图（如果有）
+                if let path = clothing.sizeChartImagePath,
+                   let image = ImageManager.shared.loadImage(fileName: path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                        .onTapGesture {
+                            // 点击可以查看大图
+                            // TODO: 可以实现大图预览
+                        }
+                }
+                
+                Text(clothing.sizes.isEmpty ? "未填写" : clothing.sizes)
+                    .font(.subheadline)
+                    .foregroundStyle(themeManager.primaryTextColor)
+            }
+            .contentShape(Rectangle())
         case .length:
             InfoRow(label: "衣长", value: clothing.length.isEmpty ? "未填写" : clothing.length)
         case .condition:
@@ -546,9 +581,32 @@ struct ClothingDetailView: View {
     /// 价格信息卡片 - 使用统一配色
     private var priceInfoCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("价格信息", systemImage: "yensign.circle.fill")
-                .font(.headline)
-                .unifiedPrimary()
+            // 价格信息标题行，右侧显示价格表缩略图
+            HStack {
+                Label("价格信息", systemImage: "yensign.circle.fill")
+                    .font(.headline)
+                    .unifiedPrimary()
+                
+                Spacer()
+                
+                // 显示价格表缩略图（如果有）
+                if let path = clothing.priceChartImagePath,
+                   let image = ImageManager.shared.loadImage(fileName: path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                        .onTapGesture {
+                            // 点击可以查看大图
+                            // TODO: 可以实现大图预览
+                        }
+                }
+            }
             
             if clothing.isDepositPlan {
                 // Show total deposit/balance including accessories

@@ -322,6 +322,9 @@ class WardrobeContextManager {
     }
 
     private func assembleWeatherOutfitItems(from sortedClothings: [Clothing]) -> [Clothing] {
+        // 过滤掉心愿尾款的裙装（只从已到手单品中选择）
+        let availableClothings = sortedClothings.filter { !$0.isDepositPlan }
+
         var pickedIDs = Set<UUID>()
         var result: [Clothing] = []
 
@@ -335,10 +338,10 @@ class WardrobeContextManager {
             }
         }
 
-        let dresses = sortedClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: dressHints) }
-        let shoes = sortedClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: shoeHints) }
-        let umbrellas = sortedClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: umbrellaHints) }
-        let accessories = sortedClothings.filter {
+        let dresses = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: dressHints) }
+        let shoes = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: shoeHints) }
+        let umbrellas = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: umbrellaHints) }
+        let accessories = availableClothings.filter {
             let searchable = buildSearchableText(for: $0)
             return containsAny(in: searchable, hints: accessoryHints) || !(($0.accessoryItems ?? []).isEmpty)
         }
@@ -349,10 +352,10 @@ class WardrobeContextManager {
         append(Array(accessories.prefix(3)), limit: 3)
 
         if result.isEmpty {
-            return sortedClothings
+            return availableClothings
         }
 
-        for item in sortedClothings where result.count < 12 {
+        for item in availableClothings where result.count < 12 {
             guard pickedIDs.insert(item.id).inserted else { continue }
             result.append(item)
         }

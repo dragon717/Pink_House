@@ -7,6 +7,7 @@
 
 import UserNotifications
 import SwiftUI
+import SwiftData
 
 class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationManager()
@@ -40,21 +41,21 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     var daysBeforeList: [Int] {
         get {
             if let list = UserDefaults.standard.array(forKey: Keys.depositNotificationDaysList) as? [Int] {
-                return list
+                return list.sorted()
             }
             // Migration: if old key exists, use it
             if UserDefaults.standard.object(forKey: Keys.depositNotificationDaysBefore) != nil {
                 let oldDay = UserDefaults.standard.integer(forKey: Keys.depositNotificationDaysBefore)
                 return [oldDay]
             }
-            return [0] // Default
+            return [0] // Default: 当天
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: Keys.depositNotificationDaysList)
+            UserDefaults.standard.set(newValue.sorted(), forKey: Keys.depositNotificationDaysList)
         }
     }
     
-    // Compatibility property (optional, but good to keep basic logic working if accessed elsewhere)
+    // Compatibility property
     var daysBefore: Int {
         get { daysBeforeList.first ?? 0 }
         set { daysBeforeList = [newValue] }
@@ -84,10 +85,10 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         return settings.authorizationStatus
     }
     
-    // MARK: - Scheduling
+    // MARK: - Scheduling with Record Creation
     @MainActor
-    func scheduleNotification(for clothing: Clothing) {
-        // Cancel existing first (synchronously removes all potential variants)
+    func scheduleNotification(for clothing: Clothing, modelContext: ModelContext? = nil) {
+        // Cancel existing first
         cancelNotification(for: clothing)
         
         guard isEnabled, clothing.isDepositPlan, let finalDate = clothing.finalPaymentDate else {
@@ -135,6 +136,17 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                     print("Error scheduling notification for \(clothing.name): \(error)")
                 }
             }
+            
+            // 创建提醒记录
+            if let context = modelContext {
+                let record = DepositNotificationRecord(
+                    clothingID: clothing.id,
+                    clothingName: clothing.name,
+                    scheduledDate: triggerDate,
+                    daysBefore: days
+                )
+                context.insert(record)
+            }
         }
     }
     
@@ -146,9 +158,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         center.removePendingNotificationRequests(withIdentifiers: [clothing.id.uuidString])
         center.removeDeliveredNotifications(withIdentifiers: [clothing.id.uuidString])
         
-        // Remove all potential variants based on supported options
-        // Ideally we should fetch pending requests to be sure, but that's async.
-        // For now, we iterate through all possible options provided in UI.
+        // Remove all potential variants
         let potentialDays = [0, 1, 3, 7, 15, 30]
         let idsToRemove = potentialDays.map { "\(clothing.id.uuidString)_\($0)" }
         
@@ -157,7 +167,7 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
     
     @MainActor
-    func rescheduleAllNotifications(clothings: [Clothing]) async {
+    func rescheduleAllNotifications(clothings: [Clothing], modelContext: ModelContext? = nil) async {
         let center = UNUserNotificationCenter.current()
         center.removeAllPendingNotificationRequests()
         
@@ -170,8 +180,118 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
         
         for clothing in clothings {
-            scheduleNotification(for: clothing)
+            scheduleNotification(for: clothing, modelContext: modelContext)
         }
+        
+        // Save context if provided
+        if let context = modelContext {
+            try? context.save()
+        }
+    }
+    
+    // MARK: - Record Management
+    
+    /// 获取所有提醒记录
+    @MainActor
+    func getAllRecords(modelContext: ModelContext) -> [DepositNotificationRecord] {
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            sortBy: [SortDescriptor(\.scheduledDate, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    /// 获取即将到期的提醒
+    @MainActor
+    func getUpcomingRecords(modelContext: ModelContext, days: Int = 7) -> [DepositNotificationRecord] {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let futureDate = calendar.date(byAdding: .day, value: days, to: now) else { return [] }
+
+        let targetNow = now
+        let targetFuture = futureDate
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate<DepositNotificationRecord> { record in
+                record.scheduledDate >= targetNow && record.scheduledDate <= targetFuture && !record.isTriggered
+            },
+            sortBy: [SortDescriptor(\.scheduledDate, order: .forward)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    /// 获取历史提醒（已触发）
+    @MainActor
+    func getTriggeredRecords(modelContext: ModelContext, limit: Int = 50) -> [DepositNotificationRecord] {
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate { $0.isTriggered == true },
+            sortBy: [SortDescriptor(\.scheduledDate, order: .reverse)]
+        )
+        var records = (try? modelContext.fetch(descriptor)) ?? []
+        if records.count > limit {
+            records = Array(records.prefix(limit))
+        }
+        return records
+    }
+    
+    /// 清理过期记录（保留最近90天的记录）
+    @MainActor
+    func cleanupOldRecords(modelContext: ModelContext, daysToKeep: Int = 90) {
+        let calendar = Calendar.current
+        let cutoffDate = calendar.date(byAdding: .day, value: -daysToKeep, to: Date()) ?? Date()
+
+        let targetCutoff = cutoffDate
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate<DepositNotificationRecord> { record in
+                record.scheduledDate < targetCutoff && record.isTriggered
+            }
+        )
+
+        if let oldRecords = try? modelContext.fetch(descriptor) {
+            for record in oldRecords {
+                modelContext.delete(record)
+            }
+            try? modelContext.save()
+        }
+    }
+    
+    /// 根据设置生成所有提醒记录（用于历史补款多次显示）
+    @MainActor
+    func generateRecordsForDepositPlan(clothing: Clothing, modelContext: ModelContext) {
+        guard clothing.isDepositPlan, let finalDate = clothing.finalPaymentDate else { return }
+
+        let calendar = Calendar.current
+        let finalDateStart = calendar.startOfDay(for: finalDate)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: notificationTime)
+        let clothingID = clothing.id
+
+        // 获取现有记录进行对比
+        let allRecords = getAllRecords(modelContext: modelContext)
+        let existingKeys = Set(allRecords.map { "\($0.clothingID.uuidString)_\($0.daysBefore)" })
+
+        for days in daysBeforeList {
+            guard let targetDate = calendar.date(byAdding: .day, value: -days, to: finalDateStart) else { continue }
+
+            var triggerComponents = calendar.dateComponents([.year, .month, .day], from: targetDate)
+            triggerComponents.hour = timeComponents.hour
+            triggerComponents.minute = timeComponents.minute
+
+            guard let triggerDate = calendar.date(from: triggerComponents) else { continue }
+
+            // 检查是否已存在相同记录
+            let recordKey = "\(clothingID.uuidString)_\(days)"
+            if existingKeys.contains(recordKey) {
+                continue // 已存在，跳过
+            }
+
+            let record = DepositNotificationRecord(
+                clothingID: clothingID,
+                clothingName: clothing.name,
+                scheduledDate: triggerDate,
+                daysBefore: days
+            )
+            modelContext.insert(record)
+        }
+
+        try? modelContext.save()
     }
     
     private func formatDate(_ date: Date) -> String {

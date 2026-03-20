@@ -24,6 +24,9 @@ struct ClothingBasicInfoView: View {
     @Binding var condition: String
     @Binding var accessories: String
     
+    // 表图字段
+    @Binding var sizeChartImagePath: String?
+    
     // UI State
     @Binding var showingBrandSelection: Bool
     @Binding var showingGenericSelection: Bool
@@ -134,7 +137,11 @@ struct ClothingBasicInfoView: View {
                 case .colors:
                     AutoCompleteTextField(title: "", placeholder: "例如: 粉色,白色", text: $colors, field: .color)
                 case .sizes:
-                    AutoCompleteTextField(title: "", placeholder: "例如: S,M,L", text: $sizes, field: .size)
+                    // 尺码行特殊处理，添加尺码表图片选择器
+                    HStack(spacing: 8) {
+                        AutoCompleteTextField(title: "", placeholder: "例如: S,M,L", text: $sizes, field: .size)
+                        ChartImagePicker(imagePath: $sizeChartImagePath, placeholder: "添加表图")
+                    }
                 case .length:
                     AutoCompleteTextField(title: "", placeholder: "例如: 90cm", text: $length, field: .size)
                 case .condition:
@@ -224,6 +231,9 @@ struct ClothingPriceView: View {
     @Binding var stock: Int
     @Binding var accessoryList: [AccessoryItemData]
     
+    // 价格表图片
+    @Binding var priceChartImagePath: String?
+    
     // 回调闭包用于显示 Toast
     var onShowToast: ((String, ToastType) -> Void)?
     
@@ -250,8 +260,13 @@ struct ClothingPriceView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Text("价格信息")
-                .font(.headline)
+            // 价格信息标题行，右侧添加价格表图片选择器
+            HStack {
+                Text("价格信息")
+                    .font(.headline)
+                Spacer()
+                ChartImagePicker(imagePath: $priceChartImagePath, placeholder: "添加表图")
+            }
             
             // 原价和总价
             VStack(spacing: 12) {

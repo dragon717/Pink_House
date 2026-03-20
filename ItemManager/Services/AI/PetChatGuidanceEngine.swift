@@ -58,15 +58,17 @@ enum PetChatGuidanceEngine {
     private static let umbrellaKeywords = ["伞", "雨伞", "晴雨伞", "折叠伞", "防晒伞"]
     
     static func pickWeatherOutfitItems(from clothings: [Clothing]) -> WeatherWardrobeSelection {
-        let ordered = clothings.sorted { $0.createdAt > $1.createdAt }
-        
+        // 过滤掉心愿尾款的裙装（只从已到手单品中选择）
+        let availableClothings = clothings.filter { !$0.isDepositPlan }
+        let ordered = availableClothings.sorted { $0.createdAt > $1.createdAt }
+
         var dresses: [Clothing] = []
         var shoes: [Clothing] = []
         var umbrellas: [Clothing] = []
-        
+
         for clothing in ordered {
             let searchable = buildSearchableText(for: clothing)
-            
+
             if dresses.count < 3, containsAny(in: searchable, keywords: dressKeywords) {
                 dresses.append(clothing)
             }
@@ -76,16 +78,16 @@ enum PetChatGuidanceEngine {
             if umbrellas.count < 2, containsAny(in: searchable, keywords: umbrellaKeywords) {
                 umbrellas.append(clothing)
             }
-            
+
             if dresses.count >= 3, shoes.count >= 2, umbrellas.count >= 2 {
                 break
             }
         }
-        
+
         if dresses.isEmpty {
             dresses = Array(ordered.prefix(min(3, ordered.count)))
         }
-        
+
         return WeatherWardrobeSelection(dresses: dresses, shoes: shoes, umbrellas: umbrellas)
     }
     

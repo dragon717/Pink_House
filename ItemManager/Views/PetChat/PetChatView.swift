@@ -379,11 +379,16 @@ struct PetChatBubble: View {
         themeManager.primaryTextColor
     }
 
+    private var userBubbleTextColor: Color {
+        skinTheme.resolvedUserBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
     @ViewBuilder
     private func bubbleBackground(isUser: Bool) -> some View {
         if skinTheme == .classic {
+            // 经典皮肤：使用主题色适配
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                .fill(isUser ? Color.pink : Color(.systemBackground))
+                .fill(isUser ? themeManager.accentTextColor : Color(.systemBackground))
                 .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
         } else if isUser {
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
@@ -453,7 +458,7 @@ struct PetChatBubble: View {
             // 文本内容
             Text(message.text)
                 .font(.subheadline)
-                .foregroundStyle(message.isUser ? .white : aiBubbleTextColor)
+                .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(bubbleBackground(isUser: message.isUser))

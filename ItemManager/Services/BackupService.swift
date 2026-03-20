@@ -224,7 +224,8 @@ class BackupService {
                         price: item.price,
                         deposit: item.deposit,
                         balance: item.balance,
-                        sortIndex: item.sortIndex
+                        sortIndex: item.sortIndex,
+                        imagePaths: item.imagePaths
                     )
                 }
                 
@@ -1586,7 +1587,8 @@ class BackupService {
                         price: accDTO.price,
                         deposit: accDTO.deposit ?? 0,
                         balance: accDTO.balance ?? 0,
-                        sortIndex: accDTO.sortIndex
+                        sortIndex: accDTO.sortIndex,
+                        imagePaths: accDTO.imagePaths // v1.5+ 支持小物图片路径，旧备份默认为nil
                     )
                     accItem.id = accDTO.id
                     newItems.append(accItem)

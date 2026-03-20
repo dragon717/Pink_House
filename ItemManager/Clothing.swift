@@ -33,6 +33,10 @@ final class Clothing {
     var isShared: Bool = false // 同步到裙装广场
     var replacedCutoutID: UUID? = nil // 记录替换主图所使用的抠图 ID
     
+    // 表图信息
+    var sizeChartImagePath: String? = nil  // 尺码表图片路径
+    var priceChartImagePath: String? = nil // 价格表图片路径
+    
     // 价格信息
     var originalPrice: Decimal = 0.0 // 原价
     var price: Decimal = 0.0 // 裙装总价
@@ -165,16 +169,18 @@ final class AccessoryItem {
     var deposit: Decimal = 0.0 // 定金
     var balance: Decimal = 0.0 // 尾款
     var sortIndex: Int = 0
+    var imagePaths: [String]? = nil // 图片路径列表，合并时从原裙装复制
     
     @Relationship(deleteRule: .nullify)
     var clothing: Clothing?
     
-    init(name: String, price: Decimal, deposit: Decimal = 0.0, balance: Decimal = 0.0, sortIndex: Int = 0) {
+    init(name: String, price: Decimal, deposit: Decimal = 0.0, balance: Decimal = 0.0, sortIndex: Int = 0, imagePaths: [String]? = nil) {
         self.name = name
         self.price = price
         self.deposit = deposit
         self.balance = balance
         self.sortIndex = sortIndex
+        self.imagePaths = imagePaths
     }
 }
 

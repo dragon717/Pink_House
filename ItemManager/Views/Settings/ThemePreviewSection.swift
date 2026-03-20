@@ -364,7 +364,7 @@ struct ThemePreviewSection: View {
                     Spacer()
                     Text("主人：先给我看天气穿搭～")
                         .font(.caption)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(skinTheme.resolvedUserBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
@@ -400,6 +400,7 @@ struct ThemePreviewSection: View {
     private func petChatPreviewChip(_ text: String, skinTheme: PetChatSkinTheme) -> some View {
         Text(text)
             .font(.caption2)
+            .foregroundStyle(skinTheme.resolvedQuickOptionTextColor(themeManager: themeManager, colorScheme: colorScheme))
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(skinTheme.resolvedQuickOptionFill(themeManager: themeManager, colorScheme: colorScheme))

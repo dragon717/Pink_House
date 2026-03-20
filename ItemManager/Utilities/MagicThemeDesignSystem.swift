@@ -23,6 +23,7 @@ struct MagicThemePalette {
     let quickOptionText: Color
 
     let bubbleUserColors: [Color]
+    let bubbleUserTextColor: Color
     let bubbleAssistantStrokeColors: [Color]
     let bubblePreviewBackgroundColors: [Color]
 }
@@ -70,6 +71,7 @@ enum MagicThemeDesignSystem {
             quickOptionStroke: accent.opacity(isDark ? 0.45 : 0.28),
             quickOptionText: accent.mixed(with: .black, amount: isDark ? 0.0 : 0.08),
             bubbleUserColors: [bubbleStart, bubbleEnd],
+            bubbleUserTextColor: .white,
             bubbleAssistantStrokeColors: [
                 accent.opacity(isDark ? 0.58 : 0.44),
                 cardAccent.opacity(isDark ? 0.48 : 0.34)

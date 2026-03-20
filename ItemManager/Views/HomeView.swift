@@ -104,6 +104,7 @@ struct HomeView: View {
     
     // For Deposit Plan View
     @State private var depositSearchText = ""
+    @State private var showingDepositNotificationSheet = false
     @AppStorage("UserPreference_DepositDisplayMode") private var depositDisplayMode: DepositDisplayMode = .detail
     
     // View Layout Management
@@ -249,6 +250,11 @@ struct HomeView: View {
                     )
                 }
             }
+            .sheet(isPresented: $showingDepositNotificationSheet) {
+                NavigationStack {
+                    DepositNotificationView()
+                }
+            }
         }
     }
     
@@ -374,8 +380,17 @@ struct HomeView: View {
                 filterButton
             }
 
+            // 补款提醒（仅心愿尾款标签页，且非编辑模式）
+            if selectedTab == .depositPlan && !isInWardrobeEditMode {
+                notificationButton
+            }
+
             moreMenuButton
-            addButton
+
+            // 仅在少女衣橱标签页显示创建按钮
+            if selectedTab == .wardrobe {
+                addButton
+            }
         }
     }
     
@@ -410,7 +425,9 @@ struct HomeView: View {
     }
     
     private var notificationButton: some View {
-        NavigationLink(destination: NotificationSettingsView()) {
+        Button {
+            showingDepositNotificationSheet = true
+        } label: {
             Image(systemName: "bell")
                 .font(.system(size: 16))
                 .foregroundStyle(magicPalette.navigationForeground)
@@ -449,11 +466,6 @@ struct HomeView: View {
                     } label: {
                         Label("调整顺序", systemImage: "list.number")
                     }
-                }
-            } else if selectedTab == .depositPlan {
-                Divider()
-                NavigationLink(destination: NotificationSettingsView()) {
-                    Label("补款提醒设置", systemImage: "bell.badge")
                 }
             }
             

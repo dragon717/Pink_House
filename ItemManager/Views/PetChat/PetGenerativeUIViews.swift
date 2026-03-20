@@ -42,7 +42,7 @@ private struct PetQuickOptionsWidget: View {
         let skin = themeManager.petChatSkinTheme
         let optionFill = skin.resolvedQuickOptionFill(themeManager: themeManager, colorScheme: colorScheme)
         let optionStroke = skin.resolvedQuickOptionStroke(themeManager: themeManager, colorScheme: colorScheme)
-        let optionText = MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme).quickOptionText
+        let optionText = skin.resolvedQuickOptionTextColor(themeManager: themeManager, colorScheme: colorScheme)
 
         VStack(alignment: .leading, spacing: 8) {
             if let title = widget.title, !title.isEmpty {
