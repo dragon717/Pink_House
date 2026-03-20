@@ -36,13 +36,26 @@ struct MonthSelectorView: View {
         return (itemCount, amount)
     }
     
-    // 计算年份统计
+    // 计算年份统计（根据选中的月份筛选，未选中则显示全年）
     private var yearStats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal) {
+        // 根据选中的月份筛选商品，未选中则使用全部
+        let filteredClothings: [Clothing]
+        if selectedMonths.isEmpty {
+            filteredClothings = clothings
+        } else {
+            let calendar = Calendar.current
+            filteredClothings = clothings.filter { clothing in
+                guard let date = clothing.finalPaymentDate else { return false }
+                let month = calendar.component(.month, from: date)
+                return selectedMonths.contains(month)
+            }
+        }
+        
         // 去重计算款数
         var seenKeys: Set<String> = []
         var uniqueStyles: [Clothing] = []
         
-        for clothing in clothings {
+        for clothing in filteredClothings {
             let key = "\(clothing.name)|\(clothing.deposit)|\(clothing.balance)"
             if !seenKeys.contains(key) {
                 seenKeys.insert(key)
@@ -50,11 +63,11 @@ struct MonthSelectorView: View {
             }
         }
         
-        let totalCount = clothings.reduce(0) { $0 + $1.stock }
+        let totalCount = filteredClothings.reduce(0) { $0 + $1.stock }
         let styleCount = uniqueStyles.count
         // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
-        let paidDeposit = clothings.reduce(0) { $0 + $1.totalDeposit }
-        let pendingBalance = clothings.reduce(0) { $0 + $1.totalBalance }
+        let paidDeposit = filteredClothings.reduce(0) { $0 + $1.totalDeposit }
+        let pendingBalance = filteredClothings.reduce(0) { $0 + $1.totalBalance }
         
         return (totalCount, styleCount, paidDeposit, pendingBalance)
     }

@@ -20,13 +20,21 @@ struct SeriesSelectorView: View {
     // Adaptive grid columns
     let columns = [GridItem(.adaptive(minimum: 100), spacing: 10)]
 
-    // 计算系列视图的年份统计
+    // 计算系列视图的年份统计（根据选中的系列筛选，未选中则显示全部系列）
     private var yearStats: (totalCount: Int, styleCount: Int, paidDeposit: Decimal, pendingBalance: Decimal) {
-        // 从 seriesList 计算总计
-        let totalCount = seriesList.reduce(0) { $0 + $1.itemCount }
-        let styleCount = seriesList.count
-        let paidDeposit = seriesList.reduce(0) { $0 + $1.totalDeposit }
-        let pendingBalance = seriesList.reduce(0) { $0 + $1.totalBalance }
+        // 根据选中的系列筛选，未选中则使用全部系列
+        let filteredSeries: [SeriesInfo]
+        if selectedSeries.isEmpty {
+            filteredSeries = seriesList
+        } else {
+            filteredSeries = seriesList.filter { selectedSeries.contains($0.name) }
+        }
+        
+        // 从筛选后的系列计算总计
+        let totalCount = filteredSeries.reduce(0) { $0 + $1.itemCount }
+        let styleCount = filteredSeries.count
+        let paidDeposit = filteredSeries.reduce(0) { $0 + $1.totalDeposit }
+        let pendingBalance = filteredSeries.reduce(0) { $0 + $1.totalBalance }
 
         return (totalCount, styleCount, paidDeposit, pendingBalance)
     }

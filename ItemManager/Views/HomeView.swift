@@ -379,6 +379,8 @@ struct HomeView: View {
                 displayButton
             }
         }
+        // 修复：设置固定宽度，与右侧按钮区域保持对称，确保中间标签居中
+        .frame(width: 80, alignment: .leading)
     }
 
     private var fashionTrailingButtons: some View {
@@ -399,6 +401,8 @@ struct HomeView: View {
                 addButton
             }
         }
+        // 修复：设置固定宽度，与左侧按钮区域保持对称，确保中间标签居中
+        .frame(width: 80, alignment: .trailing)
     }
     
     private var doneEditButton: some View {
