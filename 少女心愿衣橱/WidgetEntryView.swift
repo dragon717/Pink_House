@@ -181,7 +181,7 @@ struct SmallWidgetView: View {
                 Spacer()
                 VStack(spacing: 0) {
                     WidgetOutlinedText(text: "\(monthData?.count ?? 0)", size: 28, weight: .heavy)
-                    WidgetOutlinedText(text: "款待付", size: 10, weight: .medium, color: .white.opacity(0.8))
+                    WidgetOutlinedText(text: "件待付", size: 10, weight: .medium, color: .white.opacity(0.8))
                 }
                 
                 Rectangle()
@@ -235,7 +235,7 @@ struct MediumWidgetView: View {
                         StatCard(
                             title: "\(data.month)月",
                             value: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))",
-                            subValue: "\(data.count)款",
+                            subValue: "\(data.count)件",
                             highlight: data.month == currentMonth
                         )
                     }
