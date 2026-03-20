@@ -74,12 +74,13 @@ struct WardrobeView: View {
     let selectedLengths: Set<String>
     let selectedConditions: Set<String>
     let selectedAccessories: Set<String>
-    
+    let depositStatusFilter: DepositStatusFilter
+
     // Filter Actions
     let filterDescription: String?
     let onClearFilter: (() -> Void)?
     
-    init(searchText: Binding<String>, 
+    init(searchText: Binding<String>,
          isSelectionMode: Binding<Bool>,
          isEditing: Binding<Bool>,
          sortOption: SortOption,
@@ -92,6 +93,7 @@ struct WardrobeView: View {
          selectedLengths: Set<String>,
          selectedConditions: Set<String>,
          selectedAccessories: Set<String>,
+         depositStatusFilter: DepositStatusFilter,
          filterDescription: String? = nil,
          onClearFilter: (() -> Void)? = nil) {
         _searchText = searchText
@@ -100,7 +102,7 @@ struct WardrobeView: View {
         self.sortOption = sortOption
         _clothings = Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }, sort: sortOption.sortDescriptors)
         self.viewLayout = viewLayout
-        
+
         self.selectedTagIDs = selectedTagIDs
         self.selectedBrandIDs = selectedBrandIDs
         self.selectedTypes = selectedTypes
@@ -109,7 +111,8 @@ struct WardrobeView: View {
         self.selectedLengths = selectedLengths
         self.selectedConditions = selectedConditions
         self.selectedAccessories = selectedAccessories
-        
+        self.depositStatusFilter = depositStatusFilter
+
         self.filterDescription = filterDescription
         self.onClearFilter = onClearFilter
     }
@@ -258,8 +261,19 @@ struct WardrobeView: View {
             } else {
                 matchesAccessory = !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
             }
-            
-            return matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory
+
+            // 心愿尾款筛选
+            let matchesDepositStatus: Bool
+            switch depositStatusFilter {
+            case .all:
+                matchesDepositStatus = true
+            case .owned:
+                matchesDepositStatus = !clothing.isDepositPlan
+            case .depositPlan:
+                matchesDepositStatus = clothing.isDepositPlan
+            }
+
+            return matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesDepositStatus
         }
         
         // Apply sorting based on sortOption
@@ -1703,6 +1717,7 @@ struct MergeToAccessorySheet: View {
     @State private var selectedLengths: Set<String> = []
     @State private var selectedConditions: Set<String> = []
     @State private var selectedAccessories: Set<String> = []
+    @State private var depositStatusFilter: DepositStatusFilter = .all
 
     private var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -1716,7 +1731,8 @@ struct MergeToAccessorySheet: View {
         selectedSizes.count +
         selectedLengths.count +
         selectedConditions.count +
-        selectedAccessories.count
+        selectedAccessories.count +
+        (depositStatusFilter != .all ? 1 : 0)
     }
 
     // 过滤掉已选中的裙装，只显示可选的目标裙装
@@ -1827,6 +1843,16 @@ struct MergeToAccessorySheet: View {
             }
         }
 
+        // 心愿尾款筛选
+        switch depositStatusFilter {
+        case .all:
+            break
+        case .owned:
+            result = result.filter { !$0.isDepositPlan }
+        case .depositPlan:
+            result = result.filter { $0.isDepositPlan }
+        }
+
         return result
     }
 
@@ -1925,7 +1951,8 @@ struct MergeToAccessorySheet: View {
                     selectedSizes: $selectedSizes,
                     selectedLengths: $selectedLengths,
                     selectedConditions: $selectedConditions,
-                    selectedAccessories: $selectedAccessories
+                    selectedAccessories: $selectedAccessories,
+                    depositStatusFilter: $depositStatusFilter
                 )
             }
         }
@@ -2009,6 +2036,7 @@ struct MergeAccessoryFilterSheet: View {
     @Binding var selectedLengths: Set<String>
     @Binding var selectedConditions: Set<String>
     @Binding var selectedAccessories: Set<String>
+    @Binding var depositStatusFilter: DepositStatusFilter
 
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
     @State private var expandedSection: MergeFilterSection? = nil
@@ -2025,7 +2053,8 @@ struct MergeAccessoryFilterSheet: View {
         selectedSizes.count +
         selectedLengths.count +
         selectedConditions.count +
-        selectedAccessories.count
+        selectedAccessories.count +
+        (depositStatusFilter != .all ? 1 : 0)
     }
 
     var body: some View {
@@ -2070,13 +2099,41 @@ struct MergeAccessoryFilterSheet: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    if totalFilterCount > 0 {
-                        Button {
-                            clearAllFilters()
+                    HStack(spacing: 12) {
+                        // 心愿尾款筛选
+                        Menu {
+                            ForEach(DepositStatusFilter.allCases) { filter in
+                                Button {
+                                    depositStatusFilter = filter
+                                } label: {
+                                    HStack {
+                                        Text(filter.displayName)
+                                        if depositStatusFilter == filter {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
                         } label: {
-                            Text("清除全部")
-                                .font(.subheadline)
-                                .foregroundStyle(.red)
+                            HStack(spacing: 4) {
+                                Image(systemName: depositStatusFilter == .all ? "heart" : "heart.fill")
+                                if depositStatusFilter != .all {
+                                    Text("\(depositStatusFilter == .owned ? "已拥有" : "心愿")")
+                                        .font(.caption)
+                                }
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(depositStatusFilter == .all ? magicPalette.secondaryText : magicPalette.accent)
+                        }
+
+                        if totalFilterCount > 0 {
+                            Button {
+                                clearAllFilters()
+                            } label: {
+                                Text("清除")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.red)
+                            }
                         }
                     }
                 }
@@ -2496,6 +2553,7 @@ struct MergeAccessoryFilterSheet: View {
         selectedLengths.removeAll()
         selectedConditions.removeAll()
         selectedAccessories.removeAll()
+        depositStatusFilter = .all
     }
 
     private func getAllValues(for keyPath: KeyPath<Clothing, String>) -> [String] {

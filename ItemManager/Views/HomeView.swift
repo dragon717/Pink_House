@@ -108,8 +108,7 @@ struct HomeView: View {
     // For Wardrobe View
     @State private var wardrobeSearchText = ""
     @State private var showingMultiDimensionalFilterSheet = false
-    
-    // For Deposit Plan View
+    @State private var depositStatusFilter: DepositStatusFilter = .all
     @State private var depositSearchText = ""
     @State private var showingDepositNotificationSheet = false
     @AppStorage("UserPreference_DepositDisplayMode") private var depositDisplayMode: DepositDisplayMode = .detail
@@ -168,6 +167,7 @@ struct HomeView: View {
                         selectedLengths: selectedLengths,
                         selectedConditions: selectedConditions,
                         selectedAccessories: selectedAccessories,
+                        depositStatusFilter: depositStatusFilter,
                         filterDescription: getFilterDescription(),
                         onClearFilter: clearAllFilters
                     )
@@ -532,7 +532,8 @@ struct HomeView: View {
                         selectedSizes: $selectedSizes,
                         selectedLengths: $selectedLengths,
                         selectedConditions: $selectedConditions,
-                        selectedAccessories: $selectedAccessories
+                        selectedAccessories: $selectedAccessories,
+                        depositStatusFilter: $depositStatusFilter
                     )
                 }
             } else {
@@ -1121,6 +1122,7 @@ struct HomeView: View {
         selectedLengths.removeAll()
         selectedConditions.removeAll()
         selectedAccessories.removeAll()
+        depositStatusFilter = .all
     }
 }
 

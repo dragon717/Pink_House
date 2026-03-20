@@ -5,13 +5,30 @@ import SwiftData
 enum FilterMode: String, CaseIterable, Identifiable {
     case classic = "classic"
     case multiDimensional = "multiDimensional"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .classic: return "经典筛选"
         case .multiDimensional: return "多维筛选"
+        }
+    }
+}
+
+// MARK: - 心愿尾款筛选状态
+enum DepositStatusFilter: String, CaseIterable, Identifiable {
+    case all = "all"
+    case owned = "owned"
+    case depositPlan = "depositPlan"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .all: return "全部"
+        case .owned: return "已拥有/全款"
+        case .depositPlan: return "心愿尾款"
         }
     }
 }
@@ -21,12 +38,12 @@ struct MultiDimensionalFilterSheet: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
-    
+
     // 数据
     let clothings: [Clothing]
     let tags: [Tag]
     let brands: [Brand]
-    
+
     // 筛选状态绑定
     @Binding var selectedTagIDs: Set<UUID>
     @Binding var selectedBrandIDs: Set<UUID>
@@ -36,9 +53,12 @@ struct MultiDimensionalFilterSheet: View {
     @Binding var selectedLengths: Set<String>
     @Binding var selectedConditions: Set<String>
     @Binding var selectedAccessories: Set<String>
-    
+
+    // 心愿尾款筛选状态
+    @Binding var depositStatusFilter: DepositStatusFilter
+
     @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
-    
+
     // 特殊筛选值
     static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -48,14 +68,14 @@ struct MultiDimensionalFilterSheet: View {
     static let noLengthMarker = "__NO_LENGTH__"
     static let noConditionMarker = "__NO_CONDITION__"
     static let noAccessoryMarker = "__NO_ACCESSORY__"
-    
+
     // 当前展开的区块
     @State private var expandedSection: FilterSection? = nil
-    
+
     private var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
-    
+
     // 计算所有筛选条件的数量
     private var totalFilterCount: Int {
         selectedTagIDs.count +
@@ -65,7 +85,8 @@ struct MultiDimensionalFilterSheet: View {
         selectedSizes.count +
         selectedLengths.count +
         selectedConditions.count +
-        selectedAccessories.count
+        selectedAccessories.count +
+        (depositStatusFilter != .all ? 1 : 0)
     }
     
     var body: some View {
@@ -127,15 +148,43 @@ struct MultiDimensionalFilterSheet: View {
                             .foregroundStyle(magicPalette.secondaryText)
                     }
                 }
-                
+
                 ToolbarItem(placement: .topBarTrailing) {
-                    if totalFilterCount > 0 {
-                        Button {
-                            clearAllFilters()
+                    HStack(spacing: 12) {
+                        // 心愿尾款筛选
+                        Menu {
+                            ForEach(DepositStatusFilter.allCases) { filter in
+                                Button {
+                                    depositStatusFilter = filter
+                                } label: {
+                                    HStack {
+                                        Text(filter.displayName)
+                                        if depositStatusFilter == filter {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
                         } label: {
-                            Text("清除全部")
-                                .font(.subheadline)
-                                .foregroundStyle(.red)
+                            HStack(spacing: 4) {
+                                Image(systemName: depositStatusFilter == .all ? "heart" : "heart.fill")
+                                if depositStatusFilter != .all {
+                                    Text("\(depositStatusFilter == .owned ? "已拥有" : "心愿")")
+                                        .font(.caption)
+                                }
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(depositStatusFilter == .all ? magicPalette.secondaryText : magicPalette.accent)
+                        }
+
+                        if totalFilterCount > 0 {
+                            Button {
+                                clearAllFilters()
+                            } label: {
+                                Text("清除")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.red)
+                            }
                         }
                     }
                 }
@@ -609,6 +658,7 @@ struct MultiDimensionalFilterSheet: View {
         selectedLengths.removeAll()
         selectedConditions.removeAll()
         selectedAccessories.removeAll()
+        depositStatusFilter = .all
     }
     
     // Helper to extract unique values from comma-separated strings
