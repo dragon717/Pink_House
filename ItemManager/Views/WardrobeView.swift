@@ -199,15 +199,55 @@ struct WardrobeView: View {
                 }
             }
             
-            let matchesType: Bool = selectedTypes.isEmpty || !selectedTypes.isDisjoint(with: splitValues(clothing.types))
+            let matchesType: Bool
+            if selectedTypes.isEmpty {
+                matchesType = true
+            } else if selectedTypes.contains(WardrobeView.noTypeMarker) {
+                // 筛选"无类型"：类型字段为空
+                matchesType = clothing.types.isEmpty
+            } else {
+                matchesType = !selectedTypes.isDisjoint(with: splitValues(clothing.types))
+            }
             
-            let matchesColor: Bool = selectedColors.isEmpty || !selectedColors.isDisjoint(with: splitValues(clothing.colors))
+            let matchesColor: Bool
+            if selectedColors.isEmpty {
+                matchesColor = true
+            } else if selectedColors.contains(WardrobeView.noColorMarker) {
+                // 筛选"无颜色"：颜色字段为空
+                matchesColor = clothing.colors.isEmpty
+            } else {
+                matchesColor = !selectedColors.isDisjoint(with: splitValues(clothing.colors))
+            }
             
-            let matchesSize: Bool = selectedSizes.isEmpty || !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
+            let matchesSize: Bool
+            if selectedSizes.isEmpty {
+                matchesSize = true
+            } else if selectedSizes.contains(WardrobeView.noSizeMarker) {
+                // 筛选"无尺码"：尺码字段为空
+                matchesSize = clothing.sizes.isEmpty
+            } else {
+                matchesSize = !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
+            }
             
-            let matchesLength: Bool = selectedLengths.isEmpty || !selectedLengths.isDisjoint(with: splitValues(clothing.length))
+            let matchesLength: Bool
+            if selectedLengths.isEmpty {
+                matchesLength = true
+            } else if selectedLengths.contains(WardrobeView.noLengthMarker) {
+                // 筛选"无衣长"：衣长字段为空
+                matchesLength = clothing.length.isEmpty
+            } else {
+                matchesLength = !selectedLengths.isDisjoint(with: splitValues(clothing.length))
+            }
             
-            let matchesCondition: Bool = selectedConditions.isEmpty || !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            let matchesCondition: Bool
+            if selectedConditions.isEmpty {
+                matchesCondition = true
+            } else if selectedConditions.contains(WardrobeView.noConditionMarker) {
+                // 筛选"无状态"：状态字段为空
+                matchesCondition = clothing.condition.isEmpty
+            } else {
+                matchesCondition = !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            }
             
             let matchesAccessory: Bool
             if selectedAccessories.isEmpty {

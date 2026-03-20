@@ -20,6 +20,13 @@ struct ClothingFilterMenu: View {
     // 特殊筛选值：与 HomeView 中定义的一致
     static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    
+    // 字符串类型字段的"无"标记
+    static let noTypeMarker = "__NO_TYPE__"
+    static let noColorMarker = "__NO_COLOR__"
+    static let noSizeMarker = "__NO_SIZE__"
+    static let noLengthMarker = "__NO_LENGTH__"
+    static let noConditionMarker = "__NO_CONDITION__"
     static let noAccessoryMarker = "__NO_ACCESSORY__"
     
     var body: some View {
@@ -144,45 +151,255 @@ struct ClothingFilterMenu: View {
     private func buildFilterSection(for field: ClothingField) -> some View {
         switch field {
         case .types:
-            FilterStringSection(
-                title: "类型",
-                icon: "tshirt",
-                selectedIcon: "tshirt.fill",
-                options: getAllValues(for: \.types),
-                selection: $selectedTypes
-            )
+            // 类型筛选需要特殊处理"无类型"选项
+            Menu {
+                Button(role: .destructive) {
+                    selectedTypes.removeAll()
+                } label: {
+                    Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无类型选项
+                Button {
+                    if selectedTypes.contains(ClothingFilterMenu.noTypeMarker) {
+                        selectedTypes.remove(ClothingFilterMenu.noTypeMarker)
+                    } else {
+                        selectedTypes.removeAll()
+                        selectedTypes.insert(ClothingFilterMenu.noTypeMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无类型")
+                        if selectedTypes.contains(ClothingFilterMenu.noTypeMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                ForEach(getAllValues(for: \.types), id: \.self) { type in
+                    Button {
+                        if selectedTypes.contains(type) {
+                            selectedTypes.remove(type)
+                        } else {
+                            selectedTypes.removeAll()
+                            selectedTypes.insert(type)
+                        }
+                    } label: {
+                        HStack {
+                            Text(type)
+                            if selectedTypes.contains(type) {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                let selectedTypeName: String? = selectedTypes.first.flatMap { type in
+                    type == ClothingFilterMenu.noTypeMarker ? "无类型" : type
+                }
+                Label(selectedTypeName ?? "类型", systemImage: selectedTypes.isEmpty ? "tshirt" : "tshirt.fill")
+            }
+            
         case .colors:
-            FilterStringSection(
-                title: "颜色",
-                icon: "paintpalette",
-                selectedIcon: "paintpalette.fill",
-                options: getAllValues(for: \.colors),
-                selection: $selectedColors
-            )
+            // 颜色筛选需要特殊处理"无颜色"选项
+            Menu {
+                Button(role: .destructive) {
+                    selectedColors.removeAll()
+                } label: {
+                    Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无颜色选项
+                Button {
+                    if selectedColors.contains(ClothingFilterMenu.noColorMarker) {
+                        selectedColors.remove(ClothingFilterMenu.noColorMarker)
+                    } else {
+                        selectedColors.removeAll()
+                        selectedColors.insert(ClothingFilterMenu.noColorMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无颜色")
+                        if selectedColors.contains(ClothingFilterMenu.noColorMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                ForEach(getAllValues(for: \.colors), id: \.self) { color in
+                    Button {
+                        if selectedColors.contains(color) {
+                            selectedColors.remove(color)
+                        } else {
+                            selectedColors.removeAll()
+                            selectedColors.insert(color)
+                        }
+                    } label: {
+                        HStack {
+                            Text(color)
+                            if selectedColors.contains(color) {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                let selectedColorName: String? = selectedColors.first.flatMap { color in
+                    color == ClothingFilterMenu.noColorMarker ? "无颜色" : color
+                }
+                Label(selectedColorName ?? "颜色", systemImage: selectedColors.isEmpty ? "paintpalette" : "paintpalette.fill")
+            }
+            
         case .sizes:
-            FilterStringSection(
-                title: "尺码",
-                icon: "ruler",
-                selectedIcon: "ruler.fill",
-                options: getAllValues(for: \.sizes),
-                selection: $selectedSizes
-            )
+            // 尺码筛选需要特殊处理"无尺码"选项
+            Menu {
+                Button(role: .destructive) {
+                    selectedSizes.removeAll()
+                } label: {
+                    Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无尺码选项
+                Button {
+                    if selectedSizes.contains(ClothingFilterMenu.noSizeMarker) {
+                        selectedSizes.remove(ClothingFilterMenu.noSizeMarker)
+                    } else {
+                        selectedSizes.removeAll()
+                        selectedSizes.insert(ClothingFilterMenu.noSizeMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无尺码")
+                        if selectedSizes.contains(ClothingFilterMenu.noSizeMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                ForEach(getAllValues(for: \.sizes), id: \.self) { size in
+                    Button {
+                        if selectedSizes.contains(size) {
+                            selectedSizes.remove(size)
+                        } else {
+                            selectedSizes.removeAll()
+                            selectedSizes.insert(size)
+                        }
+                    } label: {
+                        HStack {
+                            Text(size)
+                            if selectedSizes.contains(size) {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                let selectedSizeName: String? = selectedSizes.first.flatMap { size in
+                    size == ClothingFilterMenu.noSizeMarker ? "无尺码" : size
+                }
+                Label(selectedSizeName ?? "尺码", systemImage: selectedSizes.isEmpty ? "ruler" : "ruler.fill")
+            }
+            
         case .length:
-            FilterStringSection(
-                title: "衣长",
-                icon: "arrow.up.and.down",
-                selectedIcon: "arrow.up.and.down.circle.fill",
-                options: getAllValues(for: \.length),
-                selection: $selectedLengths
-            )
+            // 衣长筛选需要特殊处理"无衣长"选项
+            Menu {
+                Button(role: .destructive) {
+                    selectedLengths.removeAll()
+                } label: {
+                    Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无衣长选项
+                Button {
+                    if selectedLengths.contains(ClothingFilterMenu.noLengthMarker) {
+                        selectedLengths.remove(ClothingFilterMenu.noLengthMarker)
+                    } else {
+                        selectedLengths.removeAll()
+                        selectedLengths.insert(ClothingFilterMenu.noLengthMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无衣长")
+                        if selectedLengths.contains(ClothingFilterMenu.noLengthMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                ForEach(getAllValues(for: \.length), id: \.self) { length in
+                    Button {
+                        if selectedLengths.contains(length) {
+                            selectedLengths.remove(length)
+                        } else {
+                            selectedLengths.removeAll()
+                            selectedLengths.insert(length)
+                        }
+                    } label: {
+                        HStack {
+                            Text(length)
+                            if selectedLengths.contains(length) {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                let selectedLengthName: String? = selectedLengths.first.flatMap { length in
+                    length == ClothingFilterMenu.noLengthMarker ? "无衣长" : length
+                }
+                Label(selectedLengthName ?? "衣长", systemImage: selectedLengths.isEmpty ? "arrow.up.and.down" : "arrow.up.and.down.circle.fill")
+            }
+            
         case .condition:
-            FilterStringSection(
-                title: "状态",
-                icon: "star",
-                selectedIcon: "star.fill",
-                options: getAllValues(for: \.condition),
-                selection: $selectedConditions
-            )
+            // 状态筛选需要特殊处理"无状态"选项
+            Menu {
+                Button(role: .destructive) {
+                    selectedConditions.removeAll()
+                } label: {
+                    Label("清除筛选", systemImage: "xmark.circle")
+                }
+                
+                // 无状态选项
+                Button {
+                    if selectedConditions.contains(ClothingFilterMenu.noConditionMarker) {
+                        selectedConditions.remove(ClothingFilterMenu.noConditionMarker)
+                    } else {
+                        selectedConditions.removeAll()
+                        selectedConditions.insert(ClothingFilterMenu.noConditionMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text("无状态")
+                        if selectedConditions.contains(ClothingFilterMenu.noConditionMarker) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                ForEach(getAllValues(for: \.condition), id: \.self) { condition in
+                    Button {
+                        if selectedConditions.contains(condition) {
+                            selectedConditions.remove(condition)
+                        } else {
+                            selectedConditions.removeAll()
+                            selectedConditions.insert(condition)
+                        }
+                    } label: {
+                        HStack {
+                            Text(condition)
+                            if selectedConditions.contains(condition) {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                let selectedConditionName: String? = selectedConditions.first.flatMap { condition in
+                    condition == ClothingFilterMenu.noConditionMarker ? "无状态" : condition
+                }
+                Label(selectedConditionName ?? "状态", systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
+            }
+            
         case .accessories:
             // 小物筛选需要特殊处理"无小物"选项
             Menu {

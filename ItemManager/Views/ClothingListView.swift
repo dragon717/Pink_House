@@ -42,6 +42,13 @@ struct ClothingListView: View {
     // 特殊筛选值：与 HomeView 中定义的一致
     static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    
+    // 字符串类型字段的"无"标记
+    static let noTypeMarker = "__NO_TYPE__"
+    static let noColorMarker = "__NO_COLOR__"
+    static let noSizeMarker = "__NO_SIZE__"
+    static let noLengthMarker = "__NO_LENGTH__"
+    static let noConditionMarker = "__NO_CONDITION__"
     static let noAccessoryMarker = "__NO_ACCESSORY__"
     
     // 价格显示设置 - 使用单例管理器
@@ -116,15 +123,50 @@ struct ClothingListView: View {
                 return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
             }
             
-            let matchesType: Bool = selectedTypes.isEmpty || !selectedTypes.isDisjoint(with: splitValues(clothing.types))
+            let matchesType: Bool
+            if selectedTypes.isEmpty {
+                matchesType = true
+            } else if selectedTypes.contains(ClothingListView.noTypeMarker) {
+                matchesType = clothing.types.isEmpty
+            } else {
+                matchesType = !selectedTypes.isDisjoint(with: splitValues(clothing.types))
+            }
             
-            let matchesColor: Bool = selectedColors.isEmpty || !selectedColors.isDisjoint(with: splitValues(clothing.colors))
+            let matchesColor: Bool
+            if selectedColors.isEmpty {
+                matchesColor = true
+            } else if selectedColors.contains(ClothingListView.noColorMarker) {
+                matchesColor = clothing.colors.isEmpty
+            } else {
+                matchesColor = !selectedColors.isDisjoint(with: splitValues(clothing.colors))
+            }
             
-            let matchesSize: Bool = selectedSizes.isEmpty || !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
+            let matchesSize: Bool
+            if selectedSizes.isEmpty {
+                matchesSize = true
+            } else if selectedSizes.contains(ClothingListView.noSizeMarker) {
+                matchesSize = clothing.sizes.isEmpty
+            } else {
+                matchesSize = !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
+            }
             
-            let matchesLength: Bool = selectedLengths.isEmpty || !selectedLengths.isDisjoint(with: splitValues(clothing.length))
+            let matchesLength: Bool
+            if selectedLengths.isEmpty {
+                matchesLength = true
+            } else if selectedLengths.contains(ClothingListView.noLengthMarker) {
+                matchesLength = clothing.length.isEmpty
+            } else {
+                matchesLength = !selectedLengths.isDisjoint(with: splitValues(clothing.length))
+            }
             
-            let matchesCondition: Bool = selectedConditions.isEmpty || !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            let matchesCondition: Bool
+            if selectedConditions.isEmpty {
+                matchesCondition = true
+            } else if selectedConditions.contains(ClothingListView.noConditionMarker) {
+                matchesCondition = clothing.condition.isEmpty
+            } else {
+                matchesCondition = !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            }
             
             let matchesAccessory: Bool
             if selectedAccessories.isEmpty {
