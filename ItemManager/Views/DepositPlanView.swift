@@ -67,18 +67,6 @@ struct DepositPlanView: View {
     let selectedConditions: Set<String>
     let selectedAccessories: Set<String>
     
-    // 特殊筛选值：与 HomeView 中定义的一致
-    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-    
-    // 字符串类型字段的"无"标记
-    static let noTypeMarker = "__NO_TYPE__"
-    static let noColorMarker = "__NO_COLOR__"
-    static let noSizeMarker = "__NO_SIZE__"
-    static let noLengthMarker = "__NO_LENGTH__"
-    static let noConditionMarker = "__NO_CONDITION__"
-    static let noAccessoryMarker = "__NO_ACCESSORY__"
-    
     // Sort option - stored to apply sorting manually since @Query doesn't update dynamically
     let sortOption: SortOption
     
@@ -112,114 +100,40 @@ struct DepositPlanView: View {
         self.sortOption = sortOption
     }
     
-    // Helper for splitting strings with support for both English and Chinese commas
-    func splitValues(_ string: String) -> Set<String> {
-        let normalized = string.replacingOccurrences(of: ",", with: ",")
-        return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
-    }
-    
     private func updateBaseClothings() {
-        let result = depositClothings.filter { clothing in
-            let matchesSearch: Bool
-            if searchText.isEmpty {
-                matchesSearch = true
-            } else {
-                matchesSearch = clothing.name.localizedCaseInsensitiveContains(searchText) ||
-                (clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false)
-            }
-            
-            let matchesTag: Bool
-            if selectedTagIDs.isEmpty {
-                matchesTag = true
-            } else if selectedTagIDs.contains(DepositPlanView.noTagUUID) {
-                // 筛选"无标签"：标签为空或nil
-                matchesTag = clothing.tags?.isEmpty ?? true
-            } else {
-                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
-                matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
-            }
-            
-            let matchesBrand: Bool
-            if selectedBrandIDs.isEmpty {
-                matchesBrand = true
-            } else if selectedBrandIDs.contains(DepositPlanView.noBrandUUID) {
-                // 筛选"无品牌"：品牌为nil
-                matchesBrand = clothing.brand == nil
-            } else {
-                if let brand = clothing.brand {
-                    matchesBrand = selectedBrandIDs.contains(brand.id)
-                } else {
-                    matchesBrand = false
-                }
-            }
-            
-            let matchesType: Bool
-            if selectedTypes.isEmpty {
-                matchesType = true
-            } else if selectedTypes.contains(DepositPlanView.noTypeMarker) {
-                matchesType = clothing.types.isEmpty
-            } else {
-                matchesType = !selectedTypes.isDisjoint(with: splitValues(clothing.types))
-            }
-            
-            let matchesColor: Bool
-            if selectedColors.isEmpty {
-                matchesColor = true
-            } else if selectedColors.contains(DepositPlanView.noColorMarker) {
-                matchesColor = clothing.colors.isEmpty
-            } else {
-                matchesColor = !selectedColors.isDisjoint(with: splitValues(clothing.colors))
-            }
-            
-            let matchesSize: Bool
-            if selectedSizes.isEmpty {
-                matchesSize = true
-            } else if selectedSizes.contains(DepositPlanView.noSizeMarker) {
-                matchesSize = clothing.sizes.isEmpty
-            } else {
-                matchesSize = !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
-            }
-            
-            let matchesLength: Bool
-            if selectedLengths.isEmpty {
-                matchesLength = true
-            } else if selectedLengths.contains(DepositPlanView.noLengthMarker) {
-                matchesLength = clothing.length.isEmpty
-            } else {
-                matchesLength = !selectedLengths.isDisjoint(with: splitValues(clothing.length))
-            }
-            
-            let matchesCondition: Bool
-            if selectedConditions.isEmpty {
-                matchesCondition = true
-            } else if selectedConditions.contains(DepositPlanView.noConditionMarker) {
-                matchesCondition = clothing.condition.isEmpty
-            } else {
-                matchesCondition = !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
-            }
-            
-            let matchesAccessory: Bool
-            if selectedAccessories.isEmpty {
-                matchesAccessory = true
-            } else if selectedAccessories.contains(DepositPlanView.noAccessoryMarker) {
-                // 筛选"无小物"：小物字段为空
-                matchesAccessory = clothing.accessories.isEmpty
-            } else {
-                matchesAccessory = !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
-            }
-            
+        // 使用 ClothingSearchService 进行搜索
+        let searchService = ClothingSearchService(clothings: depositClothings)
+        let searchResults = searchService.search(query: searchText)
+        
+        // 如果没有搜索词，返回所有衣物
+        let baseResults = searchText.isEmpty ? depositClothings : searchResults
+        
+        // 使用统一的筛选服务（不包含年份筛选）
+        let config = ClothingFilterService.FilterConfig(
+            selectedTagIDs: selectedTagIDs,
+            selectedBrandIDs: selectedBrandIDs,
+            selectedTypes: selectedTypes,
+            selectedColors: selectedColors,
+            selectedSizes: selectedSizes,
+            selectedLengths: selectedLengths,
+            selectedConditions: selectedConditions,
+            selectedAccessories: selectedAccessories,
+            depositStatusFilter: .all // 心愿尾款视图只显示 depositPlan，已经在 Query 中过滤
+        )
+        
+        let filtered = ClothingFilterService.filter(baseResults, config: config)
+        
+        // 应用年份筛选
+        let result = filtered.filter { clothing in
             // Year Filter (Global)
             // Year logic: Based on finalPaymentDate (Start of final payment period)
-            let matchesYear: Bool
             if let date = clothing.finalPaymentDate {
                 let calendar = Calendar.current
                 let year = calendar.component(.year, from: date)
-                matchesYear = (year == selectedYear)
+                return year == selectedYear
             } else {
-                matchesYear = false
+                return false
             }
-            
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesYear
         }
         
         // Apply sorting based on sortOption

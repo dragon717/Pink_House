@@ -365,7 +365,7 @@ struct HomeView: View {
     }
     
     private var fashionLeadingButtons: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             if selectedTab == .wardrobe && isSelectionMode {
                 doneEditButton
             }
@@ -379,12 +379,10 @@ struct HomeView: View {
                 displayButton
             }
         }
-        // 修复：设置固定宽度，与右侧按钮区域保持对称，确保中间标签居中
-        .frame(width: 80, alignment: .leading)
     }
 
     private var fashionTrailingButtons: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             if !isInWardrobeEditMode {
                 filterButton
             }
@@ -401,8 +399,6 @@ struct HomeView: View {
                 addButton
             }
         }
-        // 修复：设置固定宽度，与左侧按钮区域保持对称，确保中间标签居中
-        .frame(width: 80, alignment: .trailing)
     }
     
     private var doneEditButton: some View {
@@ -412,11 +408,11 @@ struct HomeView: View {
             }
         } label: {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 20))
+                .font(.system(size: 18))
                 .foregroundStyle(magicPalette.accent)
         }
     }
-    
+
     private var doneSortButton: some View {
         Button {
             withAnimation {
@@ -425,11 +421,11 @@ struct HomeView: View {
         } label: {
             if #available(iOS 26.0, *) {
                 Image(systemName: "list.number.badge.ellipsis")
-                    .font(.system(size: 20))
+                    .font(.system(size: 18))
                     .foregroundStyle(magicPalette.accent)
             } else {
                 Image(systemName: "checkmark.circle")
-                    .font(.system(size: 20))
+                    .font(.system(size: 18))
                     .foregroundStyle(magicPalette.accent)
             }
         }
@@ -441,18 +437,18 @@ struct HomeView: View {
         } label: {
             ZStack {
                 Image(systemName: "bell")
-                    .font(.system(size: 16))
+                    .font(.system(size: 14))
                     .foregroundStyle(magicPalette.navigationForeground)
-                
+
                 if !upcomingNotificationRecords.isEmpty {
                     Text("\(min(upcomingNotificationRecords.count, 99))")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
                         .background(magicPalette.cardAccent)
                         .clipShape(Capsule())
-                        .offset(x: 10, y: -8)
+                        .offset(x: 8, y: -6)
                 }
             }
         }
@@ -495,11 +491,11 @@ struct HomeView: View {
             
         } label: {
             Image(systemName: "ellipsis.circle")
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
         }
     }
-    
+
     private var sortButton: some View {
         Menu {
             Picker("排序", selection: $sortOption) {
@@ -510,7 +506,7 @@ struct HomeView: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
         }
     }
@@ -550,7 +546,7 @@ struct HomeView: View {
     // 筛选按钮标签
     private var filterButtonLabel: some View {
         Image(systemName: "line.3.horizontal.decrease.circle")
-            .font(.system(size: 16))
+            .font(.system(size: 14))
             .foregroundStyle(magicPalette.navigationForeground)
             .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
     }
@@ -1000,11 +996,11 @@ struct HomeView: View {
             }
         } label: {
             Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
         }
     }
-    
+
     // 草稿管理器
     private var draftManager: ClothingEditDraftManager { ClothingEditDraftManager.shared }
     
@@ -1040,7 +1036,7 @@ struct HomeView: View {
             }
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
         }
         .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {

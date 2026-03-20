@@ -39,18 +39,6 @@ struct ClothingListView: View {
     // 3D模型筛选
     @State private var showOnly3DModels = false
     
-    // 特殊筛选值：与 HomeView 中定义的一致
-    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-    
-    // 字符串类型字段的"无"标记
-    static let noTypeMarker = "__NO_TYPE__"
-    static let noColorMarker = "__NO_COLOR__"
-    static let noSizeMarker = "__NO_SIZE__"
-    static let noLengthMarker = "__NO_LENGTH__"
-    static let noConditionMarker = "__NO_CONDITION__"
-    static let noAccessoryMarker = "__NO_ACCESSORY__"
-    
     // 价格显示设置 - 使用单例管理器
     //@ObservedObject private var privacyManager = PrivacyManager.shared
     
@@ -75,113 +63,31 @@ struct ClothingListView: View {
     }
     
     var filteredClothings: [Clothing] {
-        clothings.filter { clothing in
-            let matchesSearch: Bool
-            if searchText.isEmpty {
-                matchesSearch = true
-            } else {
-                // Optimization: Check simple string properties first
-                matchesSearch = clothing.name.localizedCaseInsensitiveContains(searchText) ||
-                    clothing.types.localizedCaseInsensitiveContains(searchText) ||
-                    clothing.colors.localizedCaseInsensitiveContains(searchText) ||
-                    clothing.sizes.localizedCaseInsensitiveContains(searchText) ||
-                    clothing.length.localizedCaseInsensitiveContains(searchText) ||
-                    clothing.condition.localizedCaseInsensitiveContains(searchText) ||
-                    clothing.accessories.localizedCaseInsensitiveContains(searchText) ||
-                    (clothing.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                    (clothing.tags?.contains { $0.name.localizedCaseInsensitiveContains(searchText) } ?? false)
-            }
-            
-            let matchesTag: Bool
-            if selectedTagIDs.isEmpty {
-                matchesTag = true
-            } else if selectedTagIDs.contains(ClothingListView.noTagUUID) {
-                // 筛选"无标签"：标签为空或nil
-                matchesTag = clothing.tags?.isEmpty ?? true
-            } else {
-                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
-                matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
-            }
-            
-            let matchesBrand: Bool
-            if selectedBrandIDs.isEmpty {
-                matchesBrand = true
-            } else if selectedBrandIDs.contains(ClothingListView.noBrandUUID) {
-                // 筛选"无品牌"：品牌为nil
-                matchesBrand = clothing.brand == nil
-            } else {
-                if let brand = clothing.brand {
-                    matchesBrand = selectedBrandIDs.contains(brand.id)
-                } else {
-                    matchesBrand = false
-                }
-            }
-            
-            // Helper for splitting strings with support for both English and Chinese commas
-            func splitValues(_ string: String) -> Set<String> {
-                let normalized = string.replacingOccurrences(of: "，", with: ",")
-                return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
-            }
-            
-            let matchesType: Bool
-            if selectedTypes.isEmpty {
-                matchesType = true
-            } else if selectedTypes.contains(ClothingListView.noTypeMarker) {
-                matchesType = clothing.types.isEmpty
-            } else {
-                matchesType = !selectedTypes.isDisjoint(with: splitValues(clothing.types))
-            }
-            
-            let matchesColor: Bool
-            if selectedColors.isEmpty {
-                matchesColor = true
-            } else if selectedColors.contains(ClothingListView.noColorMarker) {
-                matchesColor = clothing.colors.isEmpty
-            } else {
-                matchesColor = !selectedColors.isDisjoint(with: splitValues(clothing.colors))
-            }
-            
-            let matchesSize: Bool
-            if selectedSizes.isEmpty {
-                matchesSize = true
-            } else if selectedSizes.contains(ClothingListView.noSizeMarker) {
-                matchesSize = clothing.sizes.isEmpty
-            } else {
-                matchesSize = !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
-            }
-            
-            let matchesLength: Bool
-            if selectedLengths.isEmpty {
-                matchesLength = true
-            } else if selectedLengths.contains(ClothingListView.noLengthMarker) {
-                matchesLength = clothing.length.isEmpty
-            } else {
-                matchesLength = !selectedLengths.isDisjoint(with: splitValues(clothing.length))
-            }
-            
-            let matchesCondition: Bool
-            if selectedConditions.isEmpty {
-                matchesCondition = true
-            } else if selectedConditions.contains(ClothingListView.noConditionMarker) {
-                matchesCondition = clothing.condition.isEmpty
-            } else {
-                matchesCondition = !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
-            }
-            
-            let matchesAccessory: Bool
-            if selectedAccessories.isEmpty {
-                matchesAccessory = true
-            } else if selectedAccessories.contains(ClothingListView.noAccessoryMarker) {
-                // 筛选"无小物"：小物字段为空
-                matchesAccessory = clothing.accessories.isEmpty
-            } else {
-                matchesAccessory = !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
-            }
-            
-            // 3D模型筛选
-            let matches3DFilter: Bool = !showOnly3DModels || clothing.is3DModel
-            
-            return matchesSearch && matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matches3DFilter
+        // 使用 ClothingSearchService 进行搜索
+        let searchService = ClothingSearchService(clothings: clothings)
+        let searchResults = searchService.search(query: searchText)
+        
+        // 如果没有搜索词，返回所有衣物
+        let baseResults = searchText.isEmpty ? clothings : searchResults
+        
+        // 使用统一的筛选服务
+        let config = ClothingFilterService.FilterConfig(
+            selectedTagIDs: selectedTagIDs,
+            selectedBrandIDs: selectedBrandIDs,
+            selectedTypes: selectedTypes,
+            selectedColors: selectedColors,
+            selectedSizes: selectedSizes,
+            selectedLengths: selectedLengths,
+            selectedConditions: selectedConditions,
+            selectedAccessories: selectedAccessories,
+            depositStatusFilter: .all
+        )
+        
+        let filtered = ClothingFilterService.filter(baseResults, config: config)
+        
+        // 应用3D模型筛选
+        return filtered.filter { clothing in
+            !showOnly3DModels || clothing.is3DModel
         }
     }
     
@@ -336,11 +242,23 @@ struct ClothingListView: View {
         newItem.model3DType = item.model3DType
         newItem.model3DThumbnailPath = item.model3DThumbnailPath
         
+        // 复制尺码表图和价格表图
+        newItem.sizeChartImagePath = item.sizeChartImagePath
+        newItem.priceChartImagePath = item.priceChartImagePath
+        
         // Duplicate accessory items
         if let items = item.accessoryItems {
             newItem.accessoryItems = items.map { item in
                 AccessoryItem(name: item.name, price: item.price, deposit: item.deposit, balance: item.balance, sortIndex: item.sortIndex, imagePaths: item.imagePaths)
             }
+        }
+        
+        // 增加尺码表图和价格表图的引用计数
+        if let sizeChartPath = item.sizeChartImagePath {
+            ImageManager.shared.incrementRefCount(fileName: sizeChartPath, context: modelContext)
+        }
+        if let priceChartPath = item.priceChartImagePath {
+            ImageManager.shared.incrementRefCount(fileName: priceChartPath, context: modelContext)
         }
         
         modelContext.insert(newItem)

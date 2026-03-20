@@ -327,6 +327,10 @@ struct ClothingDetailView: View {
         
         newClothing.tags = clothing.tags
         
+        // 复制尺码表图和价格表图
+        newClothing.sizeChartImagePath = clothing.sizeChartImagePath
+        newClothing.priceChartImagePath = clothing.priceChartImagePath
+        
         // Duplicate accessory items
         if let items = clothing.accessoryItems {
             newClothing.accessoryItems = items.map { item in
@@ -337,6 +341,13 @@ struct ClothingDetailView: View {
         // Increment reference count for images
         for imagePath in clothing.imagePaths {
             ImageManager.shared.incrementRefCount(fileName: imagePath, context: modelContext)
+        }
+        // 增加尺码表图和价格表图的引用计数
+        if let sizeChartPath = clothing.sizeChartImagePath {
+            ImageManager.shared.incrementRefCount(fileName: sizeChartPath, context: modelContext)
+        }
+        if let priceChartPath = clothing.priceChartImagePath {
+            ImageManager.shared.incrementRefCount(fileName: priceChartPath, context: modelContext)
         }
         
         modelContext.insert(newClothing)

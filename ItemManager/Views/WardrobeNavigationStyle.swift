@@ -57,18 +57,18 @@ struct WardrobeFashionTabSwitcher: View {
                 activeColor: palette.cardAccent
             )
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
         .background(
             Capsule()
                 .fill(palette.segmentedBackground)
         )
-        // 修复：添加固定高度，避免导航栏高度不一致导致的空白
-        .frame(height: 36)
+        // 修复：减小固定高度，使导航栏更紧凑
+        .frame(height: 32)
         // 修复：确保在 principal 位置居中显示
         .frame(maxWidth: .infinity, alignment: .center)
     }
-    
+
     @ViewBuilder
     private func tabButton(
         title: String,
@@ -77,21 +77,21 @@ struct WardrobeFashionTabSwitcher: View {
         activeColor: Color
     ) -> some View {
         let isSelected = selectedTab == targetTab
-        
+
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 selectedTab = targetTab
             }
         } label: {
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                 Text(title)
-                    .font(.system(size: 9, weight: isSelected ? .semibold : .medium))
+                    .font(.system(size: 8, weight: isSelected ? .semibold : .medium))
             }
             .foregroundStyle(isSelected ? activeColor : .secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
             .background(
                 Capsule()
                     .fill(isSelected ? palette.segmentedSelectedBackground : Color.clear)

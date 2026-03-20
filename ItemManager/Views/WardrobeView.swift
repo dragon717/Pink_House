@@ -156,18 +156,6 @@ struct WardrobeView: View {
         }
     }
     
-    // 特殊筛选值：与 HomeView 中定义的一致
-    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-    
-    // 字符串类型字段的"无"标记
-    static let noTypeMarker = "__NO_TYPE__"
-    static let noColorMarker = "__NO_COLOR__"
-    static let noSizeMarker = "__NO_SIZE__"
-    static let noLengthMarker = "__NO_LENGTH__"
-    static let noConditionMarker = "__NO_CONDITION__"
-    static let noAccessoryMarker = "__NO_ACCESSORY__"
-    
     var filteredClothings: [Clothing] {
         // 使用 ClothingSearchService 进行搜索
         let searchService = ClothingSearchService(clothings: clothings)
@@ -176,105 +164,20 @@ struct WardrobeView: View {
         // 如果没有搜索词，返回所有衣物
         let baseResults = searchText.isEmpty ? clothings : searchResults
         
-        let result = baseResults.filter { clothing in
-            let matchesTag: Bool
-            if selectedTagIDs.isEmpty {
-                matchesTag = true
-            } else if selectedTagIDs.contains(WardrobeView.noTagUUID) {
-                // 筛选"无标签"：标签为空或nil
-                matchesTag = clothing.tags?.isEmpty ?? true
-            } else {
-                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
-                matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
-            }
-            
-            let matchesBrand: Bool
-            if selectedBrandIDs.isEmpty {
-                matchesBrand = true
-            } else if selectedBrandIDs.contains(WardrobeView.noBrandUUID) {
-                // 筛选"无品牌"：品牌为nil
-                matchesBrand = clothing.brand == nil
-            } else {
-                if let brand = clothing.brand {
-                    matchesBrand = selectedBrandIDs.contains(brand.id)
-                } else {
-                    matchesBrand = false
-                }
-            }
-            
-            let matchesType: Bool
-            if selectedTypes.isEmpty {
-                matchesType = true
-            } else if selectedTypes.contains(WardrobeView.noTypeMarker) {
-                // 筛选"无类型"：类型字段为空
-                matchesType = clothing.types.isEmpty
-            } else {
-                matchesType = !selectedTypes.isDisjoint(with: splitValues(clothing.types))
-            }
-            
-            let matchesColor: Bool
-            if selectedColors.isEmpty {
-                matchesColor = true
-            } else if selectedColors.contains(WardrobeView.noColorMarker) {
-                // 筛选"无颜色"：颜色字段为空
-                matchesColor = clothing.colors.isEmpty
-            } else {
-                matchesColor = !selectedColors.isDisjoint(with: splitValues(clothing.colors))
-            }
-            
-            let matchesSize: Bool
-            if selectedSizes.isEmpty {
-                matchesSize = true
-            } else if selectedSizes.contains(WardrobeView.noSizeMarker) {
-                // 筛选"无尺码"：尺码字段为空
-                matchesSize = clothing.sizes.isEmpty
-            } else {
-                matchesSize = !selectedSizes.isDisjoint(with: splitValues(clothing.sizes))
-            }
-            
-            let matchesLength: Bool
-            if selectedLengths.isEmpty {
-                matchesLength = true
-            } else if selectedLengths.contains(WardrobeView.noLengthMarker) {
-                // 筛选"无衣长"：衣长字段为空
-                matchesLength = clothing.length.isEmpty
-            } else {
-                matchesLength = !selectedLengths.isDisjoint(with: splitValues(clothing.length))
-            }
-            
-            let matchesCondition: Bool
-            if selectedConditions.isEmpty {
-                matchesCondition = true
-            } else if selectedConditions.contains(WardrobeView.noConditionMarker) {
-                // 筛选"无状态"：状态字段为空
-                matchesCondition = clothing.condition.isEmpty
-            } else {
-                matchesCondition = !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
-            }
-            
-            let matchesAccessory: Bool
-            if selectedAccessories.isEmpty {
-                matchesAccessory = true
-            } else if selectedAccessories.contains(WardrobeView.noAccessoryMarker) {
-                // 筛选"无小物"：小物字段为空
-                matchesAccessory = clothing.accessories.isEmpty
-            } else {
-                matchesAccessory = !selectedAccessories.isDisjoint(with: splitValues(clothing.accessories))
-            }
-
-            // 心愿尾款筛选
-            let matchesDepositStatus: Bool
-            switch depositStatusFilter {
-            case .all:
-                matchesDepositStatus = true
-            case .owned:
-                matchesDepositStatus = !clothing.isDepositPlan
-            case .depositPlan:
-                matchesDepositStatus = clothing.isDepositPlan
-            }
-
-            return matchesTag && matchesBrand && matchesType && matchesColor && matchesSize && matchesLength && matchesCondition && matchesAccessory && matchesDepositStatus
-        }
+        // 使用统一的筛选服务
+        let config = ClothingFilterService.FilterConfig(
+            selectedTagIDs: selectedTagIDs,
+            selectedBrandIDs: selectedBrandIDs,
+            selectedTypes: selectedTypes,
+            selectedColors: selectedColors,
+            selectedSizes: selectedSizes,
+            selectedLengths: selectedLengths,
+            selectedConditions: selectedConditions,
+            selectedAccessories: selectedAccessories,
+            depositStatusFilter: depositStatusFilter
+        )
+        
+        let result = ClothingFilterService.filter(baseResults, config: config)
         
         // Apply sorting based on sortOption
         // Note: @Query doesn't update dynamically when sortOption changes,
@@ -297,12 +200,6 @@ struct WardrobeView: View {
         case .createdAtDesc:
             return result.sorted { $0.createdAt > $1.createdAt }
         }
-    }
-    
-    // Helper for splitting strings with support for both English and Chinese commas
-    func splitValues(_ string: String) -> Set<String> {
-        let normalized = string.replacingOccurrences(of: "，", with: ",")
-        return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
     }
     
     var body: some View {
@@ -898,6 +795,10 @@ struct WardrobeView: View {
         )
         newItem.tags = item.tags
         
+        // 复制尺码表图和价格表图
+        newItem.sizeChartImagePath = item.sizeChartImagePath
+        newItem.priceChartImagePath = item.priceChartImagePath
+        
         // Duplicate accessory items
         if let items = item.accessoryItems {
             newItem.accessoryItems = items.map { item in
@@ -915,6 +816,16 @@ struct WardrobeView: View {
             }
         }
         newItem.imagePaths = newImagePaths
+        
+        // 复制尺码表图和价格表图文件（避免共享同一文件）
+        if let sizeChartPath = item.sizeChartImagePath, !sizeChartPath.isEmpty,
+           let originalSizeChart = ImageManager.shared.loadImage(fileName: sizeChartPath) {
+            newItem.sizeChartImagePath = ImageManager.shared.saveImage(originalSizeChart, context: modelContext)
+        }
+        if let priceChartPath = item.priceChartImagePath, !priceChartPath.isEmpty,
+           let originalPriceChart = ImageManager.shared.loadImage(fileName: priceChartPath) {
+            newItem.priceChartImagePath = ImageManager.shared.saveImage(originalPriceChart, context: modelContext)
+        }
         
         modelContext.insert(newItem)
         do {

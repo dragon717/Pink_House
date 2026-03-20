@@ -30,46 +30,19 @@ struct WardrobeSelectionSheet: View {
     // 选中回调
     let onSelect: (Clothing) -> Void
     
-    // 特殊筛选值：与 HomeView 中定义的一致
-    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-    
     // 筛选后的衣物列表
     var filteredClothings: [Clothing] {
         let searchService = ClothingSearchService(clothings: clothings)
         let searchResults = searchService.search(query: searchText)
         let baseResults = searchText.isEmpty ? clothings : searchResults
         
-        return baseResults.filter { clothing in
-            // 品牌筛选
-            let matchesBrand: Bool
-            if selectedBrandIDs.isEmpty {
-                matchesBrand = true
-            } else if selectedBrandIDs.contains(WardrobeSelectionSheet.noBrandUUID) {
-                // 筛选"无品牌"：品牌为nil
-                matchesBrand = clothing.brand == nil
-            } else {
-                if let brand = clothing.brand {
-                    matchesBrand = selectedBrandIDs.contains(brand.id)
-                } else {
-                    matchesBrand = false
-                }
-            }
-            
-            // Tag 筛选
-            let matchesTag: Bool
-            if selectedTagIDs.isEmpty {
-                matchesTag = true
-            } else if selectedTagIDs.contains(WardrobeSelectionSheet.noTagUUID) {
-                // 筛选"无标签"：标签为空或nil
-                matchesTag = clothing.tags?.isEmpty ?? true
-            } else {
-                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
-                matchesTag = !selectedTagIDs.isDisjoint(with: clothingTagIDs)
-            }
-            
-            return matchesBrand && matchesTag
-        }
+        // 使用统一的筛选服务
+        let config = ClothingFilterService.FilterConfig(
+            selectedTagIDs: selectedTagIDs,
+            selectedBrandIDs: selectedBrandIDs
+        )
+        
+        return ClothingFilterService.filter(baseResults, config: config)
     }
     
     // 网格布局
@@ -177,12 +150,12 @@ struct WardrobeSelectionSheet: View {
             
             // 无品牌选项
             Button {
-                toggleBrandSelection(WardrobeSelectionSheet.noBrandUUID)
+                toggleBrandSelection(ClothingFilterService.noBrandUUID)
             } label: {
                 HStack {
                     Text("无品牌")
                     Spacer()
-                    if selectedBrandIDs.contains(WardrobeSelectionSheet.noBrandUUID) {
+                    if selectedBrandIDs.contains(ClothingFilterService.noBrandUUID) {
                         Image(systemName: "checkmark")
                     }
                 }
@@ -219,7 +192,7 @@ struct WardrobeSelectionSheet: View {
     private var brandFilterLabel: String {
         if selectedBrandIDs.isEmpty {
             return "品牌"
-        } else if selectedBrandIDs.contains(WardrobeSelectionSheet.noBrandUUID) {
+        } else if selectedBrandIDs.contains(ClothingFilterService.noBrandUUID) {
             return "无品牌"
         } else {
             return "已选 \(selectedBrandIDs.count)"
@@ -239,12 +212,12 @@ struct WardrobeSelectionSheet: View {
             
             // 无标签选项
             Button {
-                toggleTagSelection(WardrobeSelectionSheet.noTagUUID)
+                toggleTagSelection(ClothingFilterService.noTagUUID)
             } label: {
                 HStack {
                     Text("无标签")
                     Spacer()
-                    if selectedTagIDs.contains(WardrobeSelectionSheet.noTagUUID) {
+                    if selectedTagIDs.contains(ClothingFilterService.noTagUUID) {
                         Image(systemName: "checkmark")
                     }
                 }
@@ -284,7 +257,7 @@ struct WardrobeSelectionSheet: View {
     private var tagFilterLabel: String {
         if selectedTagIDs.isEmpty {
             return "标签"
-        } else if selectedTagIDs.contains(WardrobeSelectionSheet.noTagUUID) {
+        } else if selectedTagIDs.contains(ClothingFilterService.noTagUUID) {
             return "无标签"
         } else {
             return "已选 \(selectedTagIDs.count)"
