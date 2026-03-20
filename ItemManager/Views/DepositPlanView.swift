@@ -40,8 +40,8 @@ struct DepositPlanView: View {
     @State private var isAnalyzing: Bool = false
     @State private var showStats = false // 默认隐藏总待付尾款统计
     @State private var showYearStats = false // 默认隐藏年份统计（独立控制）
-    @State private var isMonthSelectorExpanded: Bool = true // 月份选择器展开状态
-    @State private var isSeriesSelectorExpanded: Bool = true // 系列选择器展开状态
+    @State private var isMonthSelectorExpanded: Bool = false // 默认折叠，显示最近月份
+    @State private var isSeriesSelectorExpanded: Bool = false // 默认折叠，显示最近添加
     
     @State private var filteredClothings: [Clothing] = []
     @State private var baseClothings: [Clothing] = []
@@ -254,8 +254,8 @@ struct DepositPlanView: View {
             if viewMode == .monthly {
                 // 月份视图
                 if !isMonthSelectorExpanded {
-                    // 面板隐藏时，显示当前月
-                    return isClothingInCurrentMonth(clothing)
+                    // 面板折叠时，显示最近月份
+                    return isClothingInRecentMonth(clothing)
                 }
                 if selectedMonths.isEmpty {
                     // 面板展开且未选中月份：显示全年
@@ -293,6 +293,13 @@ struct DepositPlanView: View {
         return month == currentMonth
     }
 
+    // 检查商品是否在最近月份（当面板折叠时使用）
+    private func isClothingInRecentMonth(_ clothing: Clothing) -> Bool {
+        guard let start = clothing.finalPaymentDate else { return false }
+        let month = Calendar.current.component(.month, from: start)
+        return month == recentMonth
+    }
+
     // 检查商品是否在选中的月份（只判断预计尾款开始时间）
     private func isClothingInSelectedMonths(_ clothing: Clothing) -> Bool {
         guard let start = clothing.finalPaymentDate else { return false }
@@ -319,6 +326,34 @@ struct DepositPlanView: View {
     // 计算当前月
     private var currentMonth: Int {
         Calendar.current.component(.month, from: Date())
+    }
+
+    // 计算最近有数据的月份（优先找当前时间之后的月份，如果没有则取最后一个有数据的月份）
+    private var recentMonth: Int {
+        let calendar = Calendar.current
+        let now = Date()
+
+        // 收集所有有数据的月份
+        let monthsWithData = baseClothings.compactMap { clothing -> Int? in
+            guard let date = clothing.finalPaymentDate else { return nil }
+            return calendar.component(.month, from: date)
+        }
+
+        guard !monthsWithData.isEmpty else {
+            // 没有数据时返回当前月份
+            return calendar.component(.month, from: now)
+        }
+
+        // 去重并排序
+        let uniqueMonths = Set(monthsWithData).sorted()
+
+        // 优先找当前月份之后的月份
+        if let afterCurrent = uniqueMonths.first(where: { $0 >= calendar.component(.month, from: now) }) {
+            return afterCurrent
+        }
+
+        // 没有之后的月份，取最后一个
+        return uniqueMonths.last ?? calendar.component(.month, from: now)
     }
 
     // 视图模式选择器

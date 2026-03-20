@@ -260,12 +260,11 @@ struct ClothingPriceView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // 价格信息标题行，右侧添加价格表图片选择器
             HStack {
                 Text("价格信息")
                     .font(.headline)
                 Spacer()
-                ChartImagePicker(imagePath: $priceChartImagePath, placeholder: "添加表图")
+                ChartImagePicker(imagePath: $priceChartImagePath, placeholder: "添加表图", editMode: true)
             }
             
             // 原价和总价

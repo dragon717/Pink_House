@@ -3,55 +3,50 @@
 //  ItemManager
 //
 //  可复用的表图选择器组件，用于尺码表和价格表
+//  支持高质量图片保存和异步加载
 //
 
 import SwiftUI
 import PhotosUI
 
-/// 表图选择器组件
-/// 用于在编辑页选择尺码表或价格表图片
 struct ChartImagePicker: View {
     @Binding var imagePath: String?
     let placeholder: String
-    
+    var editMode: Bool = false
+
     @Environment(\.modelContext) private var modelContext
-    
-    // 图片选择状态
+
     @State private var selectedItem: PhotosPickerItem?
     @State private var showingPhotosPicker = false
-    
-    // 裁剪状态
     @State private var imageToCrop: UIImage?
     @State private var showingCropper = false
-    
+    @State private var showingFullScreenViewer = false
+    @State private var showingDeleteAlert = false
+    @State private var loadedThumbnail: UIImage?
+
+    private let thumbnailSize: CGFloat = 40
+
     var body: some View {
         Button(action: {
-            showingPhotosPicker = true
-        }) {
-            if let path = imagePath,
-               let image = ImageManager.shared.loadImage(fileName: path) {
-                // 已选择图片，显示缩略图
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-            } else {
-                // 未选择图片，显示添加按钮
-                VStack(spacing: 1) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12))
-                    Text(placeholder)
-                        .font(.system(size: 8))
+            if imagePath != nil {
+                if editMode {
+                    showingDeleteAlert = true
+                } else {
+                    showingFullScreenViewer = true
                 }
-                .foregroundStyle(.secondary)
-                .frame(width: 40, height: 40)
-                .background(Color(uiColor: .tertiarySystemFill))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                showingPhotosPicker = true
+            }
+        }) {
+            if imagePath != nil {
+                ChartImageThumbnail(
+                    imagePath: imagePath,
+                    size: thumbnailSize,
+                    loadedThumbnail: loadedThumbnail,
+                    showExpandIcon: !editMode
+                )
+            } else {
+                addButtonView
             }
         }
         .buttonStyle(PlainButtonStyle())
@@ -62,19 +57,14 @@ struct ChartImagePicker: View {
         )
         .onChange(of: selectedItem) { _, newItem in
             guard let item = newItem else { return }
-            
             Task {
-                do {
-                    if let data = try await item.loadTransferable(type: Data.self),
-                       let uiImage = UIImage(data: data) {
-                        await MainActor.run {
-                            imageToCrop = uiImage
-                            showingCropper = true
-                            selectedItem = nil
-                        }
+                if let data = try await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    await MainActor.run {
+                        imageToCrop = uiImage
+                        showingCropper = true
+                        selectedItem = nil
                     }
-                } catch {
-                    print("加载图片失败: \(error)")
                 }
             }
         }
@@ -82,9 +72,9 @@ struct ChartImagePicker: View {
             if let image = imageToCrop {
                 ImageCropView(
                     image: image,
-                    aspectRatio: 1.0,  // 1:1 比例
-                    targetWidth: 512,  // 输出尺寸
-                    overlayType: .rectangle,
+                    aspectRatio: nil,
+                    targetWidth: 1920,
+                    overlayType: .none,
                     onCrop: { croppedImage in
                         saveImage(croppedImage)
                         showingCropper = false
@@ -97,14 +87,116 @@ struct ChartImagePicker: View {
                 )
             }
         }
-    }
-    
-    /// 保存裁剪后的图片
-    private func saveImage(_ image: UIImage) {
-        // 使用 PNG 格式保留透明度（如果需要）
-        if let fileName = ImageManager.shared.saveImage(image, context: modelContext, format: .png) {
-            imagePath = fileName
+        .sheet(isPresented: $showingFullScreenViewer) {
+            if let path = imagePath {
+                ChartImageViewer(imagePath: path) { [self] in
+                    showingFullScreenViewer = false
+                }
+                .presentationBackground(.black)
+                .ignoresSafeArea()
+            }
         }
+        .alert("修改表图", isPresented: $showingDeleteAlert) {
+            Button("查看大图") {
+                showingFullScreenViewer = true
+            }
+            Button("更换图片") {
+                showingPhotosPicker = true
+            }
+            Button("删除图片", role: .destructive) {
+                deleteImage()
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("选择操作")
+        }
+        .task {
+            await loadThumbnail()
+        }
+    }
+
+    private var addButtonView: some View {
+        VStack(spacing: 1) {
+            Image(systemName: "plus")
+                .font(.system(size: 12))
+            Text(placeholder)
+                .font(.system(size: 8))
+        }
+        .foregroundStyle(.secondary)
+        .frame(width: thumbnailSize, height: thumbnailSize)
+        .background(Color(uiColor: .tertiarySystemFill))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func saveImage(_ image: UIImage) {
+        if let fileName = ImageManager.shared.saveChartImage(image, context: modelContext) {
+            imagePath = fileName
+            Task { await loadThumbnail() }
+        }
+    }
+
+    private func deleteImage() {
+        if let path = imagePath {
+            ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+            imagePath = nil
+            loadedThumbnail = nil
+        }
+    }
+
+    private func loadThumbnail() async {
+        guard let path = imagePath else { return }
+        let thumbnail = await ImageManager.shared.loadImageAsync(fileName: path, targetSize: CGSize(width: thumbnailSize * 2, height: thumbnailSize * 2))
+        await MainActor.run {
+            loadedThumbnail = thumbnail
+        }
+    }
+}
+
+struct ChartImageThumbnail: View {
+    let imagePath: String?
+    let size: CGFloat
+    let loadedThumbnail: UIImage?
+    var showExpandIcon: Bool = true
+
+    var body: some View {
+        ZStack {
+            if let thumbnail = loadedThumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else if let path = imagePath,
+                      let image = ImageManager.shared.loadImage(fileName: path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                Color(uiColor: .tertiarySystemFill)
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
+        .overlay(
+            Group {
+                if showExpandIcon {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.white)
+                        .padding(3)
+                        .background(Color.black.opacity(0.5))
+                        .clipShape(Circle())
+                        .padding(4)
+                }
+            },
+            alignment: .bottomTrailing
+        )
     }
 }
 

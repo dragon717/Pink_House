@@ -59,23 +59,50 @@ struct MonthSelectorView: View {
         return (totalCount, styleCount, paidDeposit, pendingBalance)
     }
     
-    // 计算当前月的统计
+    // 计算最近有数据的月份（优先找当前时间之后的月份，如果没有则取最后一个有数据的月份）
+    private var recentMonth: Int {
+        let calendar = Calendar.current
+        let now = Date()
+
+        // 收集所有有数据的月份
+        let monthsWithData = clothings.compactMap { clothing -> Int? in
+            guard let date = clothing.finalPaymentDate else { return nil }
+            return calendar.component(.month, from: date)
+        }
+
+        guard !monthsWithData.isEmpty else {
+            // 没有数据时返回当前月份
+            return calendar.component(.month, from: now)
+        }
+
+        // 去重并排序
+        let uniqueMonths = Set(monthsWithData).sorted()
+
+        // 优先找当前月份之后的月份
+        if let afterCurrent = uniqueMonths.first(where: { $0 >= calendar.component(.month, from: now) }) {
+            return afterCurrent
+        }
+
+        // 没有之后的月份，取最后一个
+        return uniqueMonths.last ?? calendar.component(.month, from: now)
+    }
+
+    // 计算最近月份的统计（使用最近月份而不是当前月份）
     private var currentMonthStats: (month: Int, count: Int, amount: Decimal, hasData: Bool) {
         let calendar = Calendar.current
-        let currentMonth = calendar.component(.month, from: Date())
 
-        // 只统计预计尾款开始时间在当前月份的商品
+        // 使用最近月份而不是当前月份
         let monthClothings = clothings.filter { clothing in
             guard let start = clothing.finalPaymentDate else { return false }
             let m = calendar.component(.month, from: start)
-            return m == currentMonth
+            return m == recentMonth
         }
 
         let count = monthClothings.reduce(0) { $0 + $1.stock }
         // 注意：totalBalance 已经包含了 stock 的乘法，所以这里直接使用，不要再乘 stock
         let amount = monthClothings.reduce(0) { $0 + $1.totalBalance }
 
-        return (currentMonth, count, amount, count > 0)
+        return (recentMonth, count, amount, count > 0)
     }
     
     var body: some View {
@@ -87,7 +114,7 @@ struct MonthSelectorView: View {
                 }
             } label: {
                 HStack {
-                    Text("年度预估尾款 (点我隐藏并显示当前月)")
+                    Text(isExpanded ? "年度预估尾款 (点我折叠)" : "年度预估尾款 (点我展开)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                     Spacer()

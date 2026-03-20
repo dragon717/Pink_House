@@ -61,7 +61,7 @@ struct SeriesSelectorView: View {
                 }
             } label: {
                 HStack {
-                    Text("按系列预估尾款 (点我隐藏并显示最近添加)")
+                    Text(isExpanded ? "按系列预估尾款 (点我折叠)" : "按系列预估尾款 (点我展开)")
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                     

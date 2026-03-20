@@ -380,7 +380,87 @@ class ImageManager {
             return nil
         }
     }
-    
+
+    /// 保存表图（尺码表/价格表）：高质量、高压缩率
+    /// - 使用 HEIF/HEIC 格式实现更高压缩率和更好质量
+    /// - 保持原始比例，不强制裁剪
+    /// - 输出分辨率提高到 1920px 宽度
+    /// - 兼容老数据：使用 jpeg 格式回退
+    func saveChartImage(_ image: UIImage, context: ModelContext) -> String? {
+        let maxWidth: CGFloat = 1920
+        let originalSize = image.size
+        let scale = originalSize.width > maxWidth ? maxWidth / originalSize.width : 1.0
+        let newSize = CGSize(
+            width: originalSize.width * scale,
+            height: originalSize.height * scale
+        )
+
+        let resizedImage = image.resized(toMaxDimension: newSize.width)
+        let normalizedImage = resizedImage.normalized(forceCopy: true)
+
+        guard let data = convertImage(normalizedImage, format: .heic(quality: 0.85)) else {
+            AppLogger.info("HEIC not supported, falling back to JPEG quality 0.9")
+            guard let jpegData = normalizedImage.jpegData(compressionQuality: 0.9) else {
+                AppLogger.error("Failed to convert chart image to JPEG")
+                return nil
+            }
+            return saveChartImageData(jpegData, fileExtension: "jpg", context: context)
+        }
+
+        return saveChartImageData(data, fileExtension: "heic", context: context)
+    }
+
+    private func saveChartImageData(_ data: Data, fileExtension: String, context: ModelContext) -> String? {
+        let hash = computeHash(data: data)
+        let descriptor = FetchDescriptor<StoredImage>(predicate: #Predicate { $0.imageHash == hash })
+
+        do {
+            let results = try context.fetch(descriptor)
+
+            if let existingImage = results.first {
+                existingImage.refCount += 1
+                existingImage.updatedAt = Date()
+                existingImage.lastModified = Date()
+                AppLogger.info("Chart image exists (Hash: \(hash)), incrementing refCount to \(existingImage.refCount)")
+
+                if let image = UIImage(data: data) {
+                    let cost = Int(image.size.width * image.size.height * 4)
+                    memoryCache.setObject(image, forKey: existingImage.fileName as NSString, cost: cost)
+                }
+
+                return existingImage.fileName
+            } else {
+                let fileName = "\(UUID().uuidString).\(fileExtension)"
+                let fileURL = imagesDirectory.appendingPathComponent(fileName)
+
+                try data.write(to: fileURL)
+
+                if isICloudAvailable {
+                    try? ensureFileUploadedToiCloud(fileURL: fileURL)
+                }
+
+                let storedImage = StoredImage(imageHash: hash, fileName: fileName)
+                context.insert(storedImage)
+
+                if let image = UIImage(data: data) {
+                    let cost = Int(image.size.width * image.size.height * 4)
+                    memoryCache.setObject(image, forKey: fileName as NSString, cost: cost)
+                }
+
+                AppLogger.info("New chart image saved (Hash: \(hash), File: \(fileName), Size: \(data.count / 1024)KB)")
+
+                Task {
+                    await ClothingImageSyncService.shared.syncPendingImages()
+                }
+
+                return fileName
+            }
+        } catch {
+            AppLogger.error("Failed to save chart image: \(error)")
+            return nil
+        }
+    }
+
     /// 删除图片：减少引用计数 -> (<=0) 删除文件
     func deleteImage(fileName: String, context: ModelContext) {
         let descriptor = FetchDescriptor<StoredImage>(predicate: #Predicate { $0.fileName == fileName })
