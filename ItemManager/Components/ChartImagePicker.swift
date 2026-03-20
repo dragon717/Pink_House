@@ -42,11 +42,11 @@ struct ChartImagePicker: View {
                     )
             } else {
                 // 未选择图片，显示添加按钮
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     Image(systemName: "plus")
-                        .font(.system(size: 14))
+                        .font(.system(size: 12))
                     Text(placeholder)
-                        .font(.caption2)
+                        .font(.system(size: 8))
                 }
                 .foregroundStyle(.secondary)
                 .frame(width: 40, height: 40)

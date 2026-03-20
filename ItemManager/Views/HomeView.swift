@@ -67,6 +67,11 @@ struct HomeView: View {
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
+    @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == false }) private var pendingNotificationRecords: [DepositNotificationRecord]
+
+    private var upcomingNotificationRecords: [DepositNotificationRecord] {
+        pendingNotificationRecords.filter { $0.scheduledDate >= Date() }
+    }
 
     @Binding var selectedTab: HomeTab
     @State private var showingAddSheet = false
@@ -428,9 +433,22 @@ struct HomeView: View {
         Button {
             showingDepositNotificationSheet = true
         } label: {
-            Image(systemName: "bell")
-                .font(.system(size: 16))
-                .foregroundStyle(magicPalette.navigationForeground)
+            ZStack {
+                Image(systemName: "bell")
+                    .font(.system(size: 16))
+                    .foregroundStyle(magicPalette.navigationForeground)
+                
+                if !upcomingNotificationRecords.isEmpty {
+                    Text("\(min(upcomingNotificationRecords.count, 99))")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(magicPalette.cardAccent)
+                        .clipShape(Capsule())
+                        .offset(x: 10, y: -8)
+                }
+            }
         }
     }
     

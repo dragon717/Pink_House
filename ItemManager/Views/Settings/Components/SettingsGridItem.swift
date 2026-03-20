@@ -76,12 +76,12 @@ struct SettingsGridItem: View {
                     .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
                 
             case .tinted:
-                // 色调：使用主题强调色作为色调
+                // 色调：使用主题卡片背景色作为色调
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+                            .fill(cardColors.backgroundRGBA.color.opacity(themeManager.tintOpacity))
                     )
                     .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
             }

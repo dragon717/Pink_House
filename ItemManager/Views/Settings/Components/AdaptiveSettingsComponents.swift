@@ -102,10 +102,10 @@ struct AdaptiveSection<Content: View>: View {
                 Rectangle()
                     .fill(.ultraThinMaterial)
             case .tinted:
-                // 色调模式：使用高斯模糊材质叠加主题色调
+                // 色调模式：使用高斯模糊材质叠加主题卡片背景色
                 Rectangle()
                     .fill(.ultraThinMaterial)
-                    .overlay(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+                    .overlay(cardColors.backgroundRGBA.color.opacity(themeManager.tintOpacity))
             }
         }
     }

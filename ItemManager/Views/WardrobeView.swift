@@ -1077,6 +1077,7 @@ struct WardrobeView: View {
         
         var newAccessoryItems: [AccessoryItem] = []
         var sortIndex = targetClothing.accessoryItems?.count ?? 0
+        var allMergedImagePaths: [String] = [] // 收集所有被合并裙装的图片路径
         
         // 为每个选中的裙装创建小物
         for clothing in selectedClothings {
@@ -1086,6 +1087,11 @@ struct WardrobeView: View {
             let balance = clothing.balance
             let price = clothing.price
             let imagePaths = clothing.imagePaths.isEmpty ? nil : clothing.imagePaths // 复制原裙装的图片路径，空数组转为nil
+            
+            // 收集图片路径用于追加到目标裙装
+            if let paths = imagePaths {
+                allMergedImagePaths.append(contentsOf: paths)
+            }
             
             // 如果库存大于1，拆分成多个小物
             if stock > 1 {
@@ -1117,6 +1123,11 @@ struct WardrobeView: View {
                 newAccessoryItems.append(accessory)
                 sortIndex += 1
             }
+        }
+        
+        // 将图片路径追加到目标裙装的 imagePaths 后面
+        if !allMergedImagePaths.isEmpty {
+            targetClothing.imagePaths.append(contentsOf: allMergedImagePaths)
         }
         
         // 将小物添加到目标裙装

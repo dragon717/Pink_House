@@ -21,6 +21,10 @@ struct ClothingDetailView: View {
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
     @State private var showingShareSheet = false
+    
+    // 表图大图查看状态
+    @State private var showingChartImageViewer = false
+    @State private var chartImagePathToView: String? = nil
 
     @AppStorage("isPayBalanceCelebrationEnabled") private var isPayBalanceCelebrationEnabled = false
 
@@ -195,6 +199,11 @@ struct ClothingDetailView: View {
             if !clothing.imagePaths.isEmpty {
                 ImageViewer(imagePaths: clothing.imagePaths, selectedIndex: $currentImageIndex)
             }
+        }
+        .sheet(isPresented: $showingChartImageViewer) {
+            chartImageViewerSheet
+                .presentationBackground(.black)
+                .ignoresSafeArea()
         }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
@@ -559,8 +568,9 @@ struct ClothingDetailView: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                         .onTapGesture {
-                            // 点击可以查看大图
-                            // TODO: 可以实现大图预览
+                            // 点击查看大图
+                            chartImagePathToView = path
+                            showingChartImageViewer = true
                         }
                 }
                 
@@ -602,8 +612,9 @@ struct ClothingDetailView: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                         .onTapGesture {
-                            // 点击可以查看大图
-                            // TODO: 可以实现大图预览
+                            // 点击查看大图
+                            chartImagePathToView = path
+                            showingChartImageViewer = true
                         }
                 }
             }
@@ -704,6 +715,18 @@ struct ClothingDetailView: View {
         .padding()
         .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
         .unifiedShadow(.card)
+    }
+    
+    /// 表图大图查看 Sheet
+    private var chartImageViewerSheet: some View {
+        // 使用 Group 确保视图立即创建，避免 if let 导致的延迟
+        Group {
+            if let path = chartImagePathToView {
+                ChartImageViewer(imagePath: path, onDismiss: { showingChartImageViewer = false })
+            } else {
+                Color.black
+            }
+        }
     }
     
     /// 购买信息卡片 - 使用统一配色

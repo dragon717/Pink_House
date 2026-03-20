@@ -112,7 +112,7 @@ struct AccountCard: View {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+                            .fill(cardColors.backgroundRGBA.color.opacity(themeManager.tintOpacity))
                     )
                     .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
             }

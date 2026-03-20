@@ -58,7 +58,7 @@ struct MeView: View {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(cardColors.accentRGBA.color.opacity(themeManager.tintOpacity))
+                            .fill(cardColors.backgroundRGBA.color.opacity(themeManager.tintOpacity))
                     )
                     .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
             }

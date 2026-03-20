@@ -140,6 +140,7 @@ struct ZoomableImageView: UIViewRepresentable {
     let imagePath: String
     
     func makeUIView(context: Context) -> UIScrollView {
+        print("[ZoomableImageView] makeUIView called, imagePath: \(imagePath)")
         let scrollView = UIScrollView()
         scrollView.delegate = context.coordinator
         scrollView.maximumZoomScale = 5.0
@@ -147,7 +148,6 @@ struct ZoomableImageView: UIViewRepresentable {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.backgroundColor = .black
-        // Important: contentInsetAdjustmentBehavior = .never to avoid safe area insets messing up zoom
         scrollView.contentInsetAdjustmentBehavior = .never
         
         let imageView = UIImageView()
@@ -158,7 +158,6 @@ struct ZoomableImageView: UIViewRepresentable {
         scrollView.addSubview(imageView)
         context.coordinator.imageView = imageView
         
-        // Double tap to zoom
         let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleDoubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTap)
@@ -167,17 +166,26 @@ struct ZoomableImageView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIScrollView, context: Context) {
+        print("[ZoomableImageView] updateUIView called, imagePath: \(imagePath), currentPath: \(context.coordinator.currentPath ?? "nil")")
         if context.coordinator.currentPath != imagePath {
+            print("[ZoomableImageView] Path changed, loading image...")
             context.coordinator.currentPath = imagePath
             uiView.zoomScale = 1.0
             
             Task {
+                print("[ZoomableImageView] Task started for: \(imagePath)")
                 if let image = await ImageManager.shared.loadImageAsync(fileName: imagePath) {
+                    print("[ZoomableImageView] Image loaded successfully")
                     await MainActor.run {
                         context.coordinator.imageView?.image = image
+                        print("[ZoomableImageView] Image set to imageView")
                     }
+                } else {
+                    print("[ZoomableImageView] Image load failed!")
                 }
             }
+        } else {
+            print("[ZoomableImageView] Path unchanged, skipping load")
         }
     }
     

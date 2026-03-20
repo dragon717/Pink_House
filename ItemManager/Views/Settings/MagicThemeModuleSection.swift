@@ -231,37 +231,45 @@ struct MagicThemeModuleSection: View {
                     CompactColorButton(
                         title: "主标题",
                         color: currentTheme.textColors(forDarkMode: colorScheme == .dark).primary.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .primary && showingColorPicker
                     ) {
-                        colorPickerType = .primary
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .primary
+                            showingColorPicker = true
+                        }
                     }
 
                     CompactColorButton(
                         title: "副标题",
                         color: currentTheme.textColors(forDarkMode: colorScheme == .dark).secondary.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .secondary && showingColorPicker
                     ) {
-                        colorPickerType = .secondary
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .secondary
+                            showingColorPicker = true
+                        }
                     }
 
                     CompactColorButton(
                         title: "辅助文字",
                         color: currentTheme.textColors(forDarkMode: colorScheme == .dark).tertiary.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .tertiary && showingColorPicker
                     ) {
-                        colorPickerType = .tertiary
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .tertiary
+                            showingColorPicker = true
+                        }
                     }
 
                     CompactColorButton(
                         title: "强调色",
                         color: currentTheme.textColors(forDarkMode: colorScheme == .dark).accent.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .accent && showingColorPicker
                     ) {
-                        colorPickerType = .accent
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .accent
+                            showingColorPicker = true
+                        }
                     }
                 }
             }
@@ -279,37 +287,45 @@ struct MagicThemeModuleSection: View {
                     CompactColorButton(
                         title: "卡片背景",
                         color: currentTheme.cardColors(forDarkMode: colorScheme == .dark).backgroundRGBA.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .cardBackground && showingColorPicker
                     ) {
-                        colorPickerType = .cardBackground
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .cardBackground
+                            showingColorPicker = true
+                        }
                     }
 
                     CompactColorButton(
                         title: "卡片强调",
                         color: currentTheme.cardColors(forDarkMode: colorScheme == .dark).accentRGBA.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .cardAccent && showingColorPicker
                     ) {
-                        colorPickerType = .cardAccent
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .cardAccent
+                            showingColorPicker = true
+                        }
                     }
 
                     CompactColorButton(
                         title: "定金标记",
                         color: currentTheme.cardColors(forDarkMode: colorScheme == .dark).depositRGBA.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .deposit && showingColorPicker
                     ) {
-                        colorPickerType = .deposit
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .deposit
+                            showingColorPicker = true
+                        }
                     }
 
                     CompactColorButton(
                         title: "尾款标记",
                         color: currentTheme.cardColors(forDarkMode: colorScheme == .dark).finalPaymentRGBA.color,
-                        isSelected: false
+                        isSelected: colorPickerType == .finalPayment && showingColorPicker
                     ) {
-                        colorPickerType = .finalPayment
-                        showingColorPicker = true
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            colorPickerType = .finalPayment
+                            showingColorPicker = true
+                        }
                     }
                 }
             }

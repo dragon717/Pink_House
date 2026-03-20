@@ -69,13 +69,18 @@ struct ThemePreviewSection: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             // 背景 - 填充整个区域
             themeBackground
                 .ignoresSafeArea()
 
-            // 预览内容 - 使用TabView实现左右滑动
-            VStack(spacing: 8) {
+            // 预览内容 - 使用 TabView 实现左右滑动
+            VStack(spacing: 4) {
+                // 灰色遮罩 - 只覆盖预览区域（到红曲线位置）
+                Color.black
+                    .opacity(themeManager.backgroundStyle == .image ? 0.3 : 0.1)
+                    .frame(height: 280)
+
                 // 标签
                 HStack {
                     Text("主题预览")
@@ -83,24 +88,23 @@ struct ThemePreviewSection: View {
                         .foregroundStyle(textColors.tertiary)
                     Spacer()
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.horizontal, 16)
 
                 // 左右滑动的模块预览
                 TabView {
-                    // 第1页：主题色卡片示例（原预览）
+                    // 第 1 页：主题色卡片示例（原预览）
                     clothingCardPreview
 
-                    // 第2页：梦幻衣橱模块预览
+                    // 第 2 页：梦幻衣橱模块预览
                     wardrobeModulePreview
 
-                    // 第3页：梦裙日历模块预览
+                    // 第 3 页：梦裙日历模块预览
                     calendarModulePreview
 
-                    // 第4页：马上来财模块预览
+                    // 第 4 页：马上来财模块预览
                     wealthModulePreview
 
-                    // 第5页：萌宠对话气泡预览
+                    // 第 5 页：萌宠对话气泡预览
                     petChatBubblePreview
                 }
                 .tabViewStyle(.page(indexDisplayMode: .always))
@@ -113,7 +117,7 @@ struct ThemePreviewSection: View {
                     LegendItem(color: textColors.tertiary, label: "辅助")
                     LegendItem(color: textColors.accent, label: "强调")
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 4)
             }
         }
@@ -426,10 +430,6 @@ struct ThemePreviewSection: View {
                 }
             }
         }
-        // 添加暗色遮罩提高文字可读性，纯色背景使用较低的透明度
-        .overlay(
-            Color.black.opacity(themeManager.backgroundStyle == .image ? 0.3 : 0.1)
-        )
     }
 }
 
