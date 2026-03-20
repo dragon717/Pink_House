@@ -19,6 +19,9 @@ struct WardrobeSettingsView: View {
     // Wardrobe Style
     @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
     
+    // Filter Mode
+    @AppStorage("UserPreference_FilterMode") private var filterMode: FilterMode = .classic
+    
     var body: some View {
         @Bindable var theme = themeManager
         
@@ -28,6 +31,17 @@ struct WardrobeSettingsView: View {
                 Picker("选择样式", selection: $wardrobeNavigationStyle) {
                     ForEach(WardrobeNavigationStyle.allCases) { style in
                         Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .adaptiveRow(showDivider: false)
+            }
+            
+            // MARK: - 筛选模式
+            AdaptiveSection(header: "筛选模式", footer: "经典筛选使用下拉菜单；多维筛选使用半屏Sheet，支持多选和更直观的操作。") {
+                Picker("筛选模式", selection: $filterMode) {
+                    ForEach(FilterMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)

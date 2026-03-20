@@ -1685,54 +1685,203 @@ struct MergeToAccessorySheet: View {
     let selectedItemIDs: Set<UUID>
     let allClothings: [Clothing]
     let onSelect: (Clothing) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+    @Query(sort: \Tag.name) private var tags: [Tag]
+    @Query(sort: \Brand.name) private var brands: [Brand]
+    @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+
     @State private var searchText = ""
-    
+    @State private var showingFilterSheet = false
+    @State private var selectedTagIDs: Set<UUID> = []
+    @State private var selectedBrandIDs: Set<UUID> = []
+    @State private var selectedTypes: Set<String> = []
+    @State private var selectedColors: Set<String> = []
+    @State private var selectedSizes: Set<String> = []
+    @State private var selectedLengths: Set<String> = []
+    @State private var selectedConditions: Set<String> = []
+    @State private var selectedAccessories: Set<String> = []
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var totalFilterCount: Int {
+        selectedTagIDs.count +
+        selectedBrandIDs.count +
+        selectedTypes.count +
+        selectedColors.count +
+        selectedSizes.count +
+        selectedLengths.count +
+        selectedConditions.count +
+        selectedAccessories.count
+    }
+
     // 过滤掉已选中的裙装，只显示可选的目标裙装
     var availableClothings: [Clothing] {
         allClothings.filter { !selectedItemIDs.contains($0.id) && $0.deletedAt == nil }
     }
-    
+
     var filteredClothings: [Clothing] {
-        if searchText.isEmpty {
-            return availableClothings
+        var result = availableClothings
+
+        // 搜索过滤
+        if !searchText.isEmpty {
+            result = result.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                ($0.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+            }
         }
-        return availableClothings.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            ($0.brand?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+
+        // 标签筛选
+        if !selectedTagIDs.isEmpty {
+            result = result.filter { clothing in
+                if selectedTagIDs.contains(MergeToAccessorySheet.noTagUUID) {
+                    return clothing.tags?.isEmpty ?? true
+                }
+                let clothingTagIDs = Set(clothing.tags?.map { $0.id } ?? [])
+                return !selectedTagIDs.isDisjoint(with: clothingTagIDs)
+            }
         }
+
+        // 品牌筛选
+        if !selectedBrandIDs.isEmpty {
+            result = result.filter { clothing in
+                if selectedBrandIDs.contains(MergeToAccessorySheet.noBrandUUID) {
+                    return clothing.brand == nil
+                }
+                if let brand = clothing.brand {
+                    return selectedBrandIDs.contains(brand.id)
+                }
+                return false
+            }
+        }
+
+        // 类型筛选
+        if !selectedTypes.isEmpty {
+            result = result.filter { clothing in
+                if selectedTypes.contains(MergeToAccessorySheet.noTypeMarker) {
+                    return clothing.types.isEmpty
+                }
+                return selectedTypes.contains { type in
+                    clothing.types.localizedCaseInsensitiveContains(type)
+                }
+            }
+        }
+
+        // 颜色筛选
+        if !selectedColors.isEmpty {
+            result = result.filter { clothing in
+                if selectedColors.contains(MergeToAccessorySheet.noColorMarker) {
+                    return clothing.colors.isEmpty
+                }
+                return selectedColors.contains { color in
+                    clothing.colors.localizedCaseInsensitiveContains(color)
+                }
+            }
+        }
+
+        // 尺码筛选
+        if !selectedSizes.isEmpty {
+            result = result.filter { clothing in
+                if selectedSizes.contains(MergeToAccessorySheet.noSizeMarker) {
+                    return clothing.sizes.isEmpty
+                }
+                return selectedSizes.contains { size in
+                    clothing.sizes.localizedCaseInsensitiveContains(size)
+                }
+            }
+        }
+
+        // 衣长筛选
+        if !selectedLengths.isEmpty {
+            result = result.filter { clothing in
+                if selectedLengths.contains(MergeToAccessorySheet.noLengthMarker) {
+                    return clothing.length.isEmpty
+                }
+                return selectedLengths.contains(clothing.length)
+            }
+        }
+
+        // 状态筛选
+        if !selectedConditions.isEmpty {
+            result = result.filter { clothing in
+                if selectedConditions.contains(MergeToAccessorySheet.noConditionMarker) {
+                    return clothing.condition.isEmpty
+                }
+                return selectedConditions.contains(clothing.condition)
+            }
+        }
+
+        // 小物筛选
+        if !selectedAccessories.isEmpty {
+            result = result.filter { clothing in
+                if selectedAccessories.contains(MergeToAccessorySheet.noAccessoryMarker) {
+                    return clothing.accessories.isEmpty
+                }
+                return selectedAccessories.contains { accessory in
+                    clothing.accessories.localizedCaseInsensitiveContains(accessory)
+                }
+            }
+        }
+
+        return result
     }
-    
+
+    static let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let noTypeMarker = "__NO_TYPE__"
+    static let noColorMarker = "__NO_COLOR__"
+    static let noSizeMarker = "__NO_SIZE__"
+    static let noLengthMarker = "__NO_LENGTH__"
+    static let noConditionMarker = "__NO_CONDITION__"
+    static let noAccessoryMarker = "__NO_ACCESSORY__"
+
     var body: some View {
         NavigationStack {
-            List {
-                if availableClothings.isEmpty {
-                    Section {
-                        ContentUnavailableView {
-                            Label("没有可选的裙装", systemImage: "hanger")
-                        } description: {
-                            Text("请确保除了选中的裙装外，衣橱中还有其他裙装")
+            VStack(spacing: 0) {
+                // 已选条件标签
+                selectedFiltersChips
+
+                // 列表
+                List {
+                    if availableClothings.isEmpty {
+                        Section {
+                            ContentUnavailableView {
+                                Label("没有可选的裙装", systemImage: "hanger")
+                            } description: {
+                                Text("请确保除了选中的裙装外，衣橱中还有其他裙装")
+                            }
                         }
-                    }
-                } else {
-                    Section {
-                        ForEach(filteredClothings) { clothing in
-                            ClothingRow(clothing: clothing)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    onSelect(clothing)
-                                    dismiss()
-                                }
+                    } else if filteredClothings.isEmpty {
+                        Section {
+                            ContentUnavailableView {
+                                Label("没有符合条件的裙装", systemImage: "magnifyingglass")
+                            } description: {
+                                Text("试试调整筛选条件")
+                            }
                         }
-                    } header: {
-                        if !searchText.isEmpty {
-                            Text("找到 \(filteredClothings.count) 件裙装")
+                    } else {
+                        Section {
+                            ForEach(filteredClothings) { clothing in
+                                ClothingRow(clothing: clothing)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        onSelect(clothing)
+                                        dismiss()
+                                    }
+                            }
+                        } header: {
+                            if !searchText.isEmpty || totalFilterCount > 0 {
+                                Text("找到 \(filteredClothings.count) 件裙装")
+                            }
                         }
                     }
                 }
+                .listStyle(.plain)
             }
-            .listStyle(.plain)
             .navigationTitle("选择目标裙装")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "搜索裙装名称或品牌")
@@ -1742,7 +1891,620 @@ struct MergeToAccessorySheet: View {
                         dismiss()
                     }
                 }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingFilterSheet = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                            if totalFilterCount > 0 {
+                                Text("\(totalFilterCount)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(magicPalette.accent)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .foregroundStyle(totalFilterCount > 0 ? magicPalette.accent : magicPalette.secondaryText)
+                }
+            }
+            .sheet(isPresented: $showingFilterSheet) {
+                MergeAccessoryFilterSheet(
+                    clothings: availableClothings,
+                    tags: tags,
+                    brands: brands,
+                    selectedTagIDs: $selectedTagIDs,
+                    selectedBrandIDs: $selectedBrandIDs,
+                    selectedTypes: $selectedTypes,
+                    selectedColors: $selectedColors,
+                    selectedSizes: $selectedSizes,
+                    selectedLengths: $selectedLengths,
+                    selectedConditions: $selectedConditions,
+                    selectedAccessories: $selectedAccessories
+                )
             }
         }
     }
+
+    // 已选条件标签列表（显示在搜索框下方）
+    @ViewBuilder
+    private var selectedFiltersChips: some View {
+        if totalFilterCount > 0 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(selectedFilterItems.prefix(3)), id: \.self) { item in
+                        filterChip(item: item)
+                    }
+                    if selectedFilterItems.count > 3 {
+                        Text("+\(selectedFilterItems.count - 3)")
+                            .font(.caption)
+                            .foregroundStyle(magicPalette.secondaryText)
+                    }
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private var selectedFilterItems: [String] {
+        var items: [String] = []
+
+        for id in selectedTagIDs {
+            if id == MergeToAccessorySheet.noTagUUID {
+                items.append("无标签")
+            } else if let tag = tags.first(where: { $0.id == id }) {
+                items.append(tag.name)
+            }
+        }
+
+        for id in selectedBrandIDs {
+            if id == MergeToAccessorySheet.noBrandUUID {
+                items.append("无品牌")
+            } else if let brand = brands.first(where: { $0.id == id }) {
+                items.append(brand.name)
+            }
+        }
+
+        items.append(contentsOf: selectedTypes.map { $0 == MergeToAccessorySheet.noTypeMarker ? "无类型" : $0 })
+        items.append(contentsOf: selectedColors.map { $0 == MergeToAccessorySheet.noColorMarker ? "无颜色" : $0 })
+        items.append(contentsOf: selectedSizes.map { $0 == MergeToAccessorySheet.noSizeMarker ? "无尺码" : $0 })
+        items.append(contentsOf: selectedLengths.map { $0 == MergeToAccessorySheet.noLengthMarker ? "无衣长" : $0 })
+        items.append(contentsOf: selectedConditions.map { $0 == MergeToAccessorySheet.noConditionMarker ? "无状态" : $0 })
+        items.append(contentsOf: selectedAccessories.map { $0 == MergeToAccessorySheet.noAccessoryMarker ? "无小物" : $0 })
+
+        return items
+    }
+
+    private func filterChip(item: String) -> some View {
+        Text(item)
+            .font(.caption)
+            .foregroundStyle(magicPalette.accent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(magicPalette.accent.opacity(0.15))
+            .cornerRadius(12)
+    }
+}
+
+// MARK: - 合并小物筛选Sheet
+struct MergeAccessoryFilterSheet: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
+
+    let clothings: [Clothing]
+    let tags: [Tag]
+    let brands: [Brand]
+
+    @Binding var selectedTagIDs: Set<UUID>
+    @Binding var selectedBrandIDs: Set<UUID>
+    @Binding var selectedTypes: Set<String>
+    @Binding var selectedColors: Set<String>
+    @Binding var selectedSizes: Set<String>
+    @Binding var selectedLengths: Set<String>
+    @Binding var selectedConditions: Set<String>
+    @Binding var selectedAccessories: Set<String>
+
+    @ObservedObject private var visibilityManager = FieldVisibilityManager.shared
+    @State private var expandedSection: MergeFilterSection? = nil
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var totalFilterCount: Int {
+        selectedTagIDs.count +
+        selectedBrandIDs.count +
+        selectedTypes.count +
+        selectedColors.count +
+        selectedSizes.count +
+        selectedLengths.count +
+        selectedConditions.count +
+        selectedAccessories.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LiquidBackground()
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    if totalFilterCount > 0 {
+                        selectedFiltersSummary
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                    }
+
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            filterRow(section: .tags, title: "标签", icon: "tag", selectedCount: selectedTagIDs.count, options: tagOptions)
+                            filterRow(section: .brands, title: "品牌", icon: "bag", selectedCount: selectedBrandIDs.count, options: brandOptions)
+
+                            ForEach(visibilityManager.fieldOrder, id: \.self) { field in
+                                if visibilityManager.isVisible(field) {
+                                    dynamicFilterRow(for: field)
+                                }
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .navigationTitle("筛选")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(magicPalette.secondaryText)
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    if totalFilterCount > 0 {
+                        Button {
+                            clearAllFilters()
+                        } label: {
+                            Text("清除全部")
+                                .font(.subheadline)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+            }
+            .tint(magicPalette.accent)
+        }
+        .presentationDetents([.fraction(0.7)])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var selectedFiltersSummary: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("已选条件 (\(totalFilterCount))")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(magicPalette.primaryText)
+                Spacer()
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(selectedFilterItems, id: \.id) { item in
+                        selectedFilterChip(item: item)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(magicPalette.cardBackground)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(magicPalette.secondaryText.opacity(0.3), lineWidth: 0.5)
+        )
+    }
+
+    private struct SelectedFilterItem: Identifiable {
+        let id = UUID()
+        let section: MergeFilterSection
+        let value: String
+        let rawValue: String
+    }
+
+    private var selectedFilterItems: [SelectedFilterItem] {
+        var items: [SelectedFilterItem] = []
+
+        for id in selectedTagIDs {
+            let name = id == MergeToAccessorySheet.noTagUUID ? "无标签" : tags.first(where: { $0.id == id })?.name ?? ""
+            items.append(SelectedFilterItem(section: .tags, value: name, rawValue: id.uuidString))
+        }
+
+        for id in selectedBrandIDs {
+            let name = id == MergeToAccessorySheet.noBrandUUID ? "无品牌" : brands.first(where: { $0.id == id })?.name ?? ""
+            items.append(SelectedFilterItem(section: .brands, value: name, rawValue: id.uuidString))
+        }
+
+        for type in selectedTypes {
+            let name = type == MergeToAccessorySheet.noTypeMarker ? "无类型" : type
+            items.append(SelectedFilterItem(section: .types, value: name, rawValue: type))
+        }
+
+        for color in selectedColors {
+            let name = color == MergeToAccessorySheet.noColorMarker ? "无颜色" : color
+            items.append(SelectedFilterItem(section: .colors, value: name, rawValue: color))
+        }
+
+        for size in selectedSizes {
+            let name = size == MergeToAccessorySheet.noSizeMarker ? "无尺码" : size
+            items.append(SelectedFilterItem(section: .sizes, value: name, rawValue: size))
+        }
+
+        for length in selectedLengths {
+            let name = length == MergeToAccessorySheet.noLengthMarker ? "无衣长" : length
+            items.append(SelectedFilterItem(section: .length, value: name, rawValue: length))
+        }
+
+        for condition in selectedConditions {
+            let name = condition == MergeToAccessorySheet.noConditionMarker ? "无状态" : condition
+            items.append(SelectedFilterItem(section: .condition, value: name, rawValue: condition))
+        }
+
+        for accessory in selectedAccessories {
+            let name = accessory == MergeToAccessorySheet.noAccessoryMarker ? "无小物" : accessory
+            items.append(SelectedFilterItem(section: .accessories, value: name, rawValue: accessory))
+        }
+
+        return items
+    }
+
+    private func selectedFilterChip(item: SelectedFilterItem) -> some View {
+        HStack(spacing: 4) {
+            Text(item.value)
+                .font(.caption)
+                .fontWeight(.medium)
+
+            Button {
+                removeFilterItem(item)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 12))
+            }
+        }
+        .foregroundStyle(magicPalette.accent)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(magicPalette.accent.opacity(0.15))
+        .cornerRadius(16)
+    }
+
+    private func removeFilterItem(_ item: SelectedFilterItem) {
+        switch item.section {
+        case .tags:
+            if let uuid = UUID(uuidString: item.rawValue) {
+                selectedTagIDs.remove(uuid)
+            }
+        case .brands:
+            if let uuid = UUID(uuidString: item.rawValue) {
+                selectedBrandIDs.remove(uuid)
+            }
+        case .types:
+            selectedTypes.remove(item.rawValue)
+        case .colors:
+            selectedColors.remove(item.rawValue)
+        case .sizes:
+            selectedSizes.remove(item.rawValue)
+        case .length:
+            selectedLengths.remove(item.rawValue)
+        case .condition:
+            selectedConditions.remove(item.rawValue)
+        case .accessories:
+            selectedAccessories.remove(item.rawValue)
+        }
+    }
+
+    private func filterRow(section: MergeFilterSection, title: String, icon: String, selectedCount: Int, options: [MergeFilterOption]) -> some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    expandedSection = expandedSection == section ? nil : section
+                }
+            } label: {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.system(size: 18))
+                        .foregroundStyle(selectedCount > 0 ? magicPalette.accent : magicPalette.secondaryText)
+                        .frame(width: 28)
+
+                    Text(title)
+                        .font(.body)
+                        .foregroundStyle(magicPalette.primaryText)
+
+                    Spacer()
+
+                    if selectedCount > 0 {
+                        Text("\(selectedCount)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(magicPalette.accent)
+                            .cornerRadius(10)
+                    }
+
+                    Image(systemName: expandedSection == section ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14))
+                        .foregroundStyle(magicPalette.secondaryText)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(magicPalette.cardBackground)
+            }
+            .buttonStyle(.plain)
+
+            if expandedSection == section {
+                filterOptionsGrid(options: options, section: section)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .background(magicPalette.cardBackground)
+            }
+        }
+        .background(magicPalette.cardBackground)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(selectedCount > 0 ? magicPalette.accent.opacity(0.5) : magicPalette.secondaryText.opacity(0.3), lineWidth: selectedCount > 0 ? 1.5 : 0.5)
+        )
+    }
+
+    private func dynamicFilterRow(for field: ClothingField) -> some View {
+        let (title, icon, selectedCount, options) = fieldConfig(for: field)
+        return filterRow(section: mergeFilterSection(for: field), title: title, icon: icon, selectedCount: selectedCount, options: options)
+    }
+
+    private func fieldConfig(for field: ClothingField) -> (title: String, icon: String, count: Int, options: [MergeFilterOption]) {
+        switch field {
+        case .types:
+            return ("类型", "tshirt", selectedTypes.count, typeOptions)
+        case .colors:
+            return ("颜色", "paintpalette", selectedColors.count, colorOptions)
+        case .sizes:
+            return ("尺码", "ruler", selectedSizes.count, sizeOptions)
+        case .length:
+            return ("衣长", "arrow.up.and.down", selectedLengths.count, lengthOptions)
+        case .condition:
+            return ("状态", "star", selectedConditions.count, conditionOptions)
+        case .accessories:
+            return ("小物", "sparkles", selectedAccessories.count, accessoryOptions)
+        }
+    }
+
+    private func mergeFilterSection(for field: ClothingField) -> MergeFilterSection {
+        switch field {
+        case .types: return .types
+        case .colors: return .colors
+        case .sizes: return .sizes
+        case .length: return .length
+        case .condition: return .condition
+        case .accessories: return .accessories
+        }
+    }
+
+    private func filterOptionsGrid(options: [MergeFilterOption], section: MergeFilterSection) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 8)], spacing: 8) {
+            ForEach(options) { option in
+                filterOptionButton(option: option, section: section)
+            }
+        }
+    }
+
+    private func filterOptionButton(option: MergeFilterOption, section: MergeFilterSection) -> some View {
+        let isSelected = isOptionSelected(option: option, section: section)
+
+        return Button {
+            toggleOption(option: option, section: section)
+        } label: {
+            Text(option.displayName)
+                .font(.subheadline)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .foregroundStyle(isSelected ? magicPalette.accent : magicPalette.secondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? magicPalette.accent.opacity(0.15) : magicPalette.cardBackground.opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSelected ? magicPalette.accent : magicPalette.secondaryText.opacity(0.3), lineWidth: isSelected ? 1.5 : 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private struct MergeFilterOption: Identifiable {
+        let id = UUID()
+        let value: String
+        let displayName: String
+    }
+
+    private var tagOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noTagUUID.uuidString, displayName: "无标签"))
+        options.append(contentsOf: tags.map { MergeFilterOption(value: $0.id.uuidString, displayName: $0.name) })
+        return options
+    }
+
+    private var brandOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noBrandUUID.uuidString, displayName: "无品牌"))
+        options.append(contentsOf: brands.map { MergeFilterOption(value: $0.id.uuidString, displayName: $0.name) })
+        return options
+    }
+
+    private var typeOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noTypeMarker, displayName: "无类型"))
+        let values = getAllValues(for: \.types)
+        options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
+        return options
+    }
+
+    private var colorOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noColorMarker, displayName: "无颜色"))
+        let values = getAllValues(for: \.colors)
+        options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
+        return options
+    }
+
+    private var sizeOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noSizeMarker, displayName: "无尺码"))
+        let values = getAllValues(for: \.sizes)
+        options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
+        return options
+    }
+
+    private var lengthOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noLengthMarker, displayName: "无衣长"))
+        let values = getAllValues(for: \.length)
+        options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
+        return options
+    }
+
+    private var conditionOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noConditionMarker, displayName: "无状态"))
+        let values = getAllValues(for: \.condition)
+        options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
+        return options
+    }
+
+    private var accessoryOptions: [MergeFilterOption] {
+        var options: [MergeFilterOption] = []
+        options.append(MergeFilterOption(value: MergeToAccessorySheet.noAccessoryMarker, displayName: "无小物"))
+        let values = getAllValues(for: \.accessories)
+        options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
+        return options
+    }
+
+    private func isOptionSelected(option: MergeFilterOption, section: MergeFilterSection) -> Bool {
+        switch section {
+        case .tags:
+            if let uuid = UUID(uuidString: option.value) {
+                return selectedTagIDs.contains(uuid)
+            }
+            return false
+        case .brands:
+            if let uuid = UUID(uuidString: option.value) {
+                return selectedBrandIDs.contains(uuid)
+            }
+            return false
+        case .types:
+            return selectedTypes.contains(option.value)
+        case .colors:
+            return selectedColors.contains(option.value)
+        case .sizes:
+            return selectedSizes.contains(option.value)
+        case .length:
+            return selectedLengths.contains(option.value)
+        case .condition:
+            return selectedConditions.contains(option.value)
+        case .accessories:
+            return selectedAccessories.contains(option.value)
+        }
+    }
+
+    private func toggleOption(option: MergeFilterOption, section: MergeFilterSection) {
+        switch section {
+        case .tags:
+            if let uuid = UUID(uuidString: option.value) {
+                if selectedTagIDs.contains(uuid) {
+                    selectedTagIDs.remove(uuid)
+                } else {
+                    selectedTagIDs.insert(uuid)
+                }
+            }
+        case .brands:
+            if let uuid = UUID(uuidString: option.value) {
+                if selectedBrandIDs.contains(uuid) {
+                    selectedBrandIDs.remove(uuid)
+                } else {
+                    selectedBrandIDs.insert(uuid)
+                }
+            }
+        case .types:
+            if selectedTypes.contains(option.value) {
+                selectedTypes.remove(option.value)
+            } else {
+                selectedTypes.insert(option.value)
+            }
+        case .colors:
+            if selectedColors.contains(option.value) {
+                selectedColors.remove(option.value)
+            } else {
+                selectedColors.insert(option.value)
+            }
+        case .sizes:
+            if selectedSizes.contains(option.value) {
+                selectedSizes.remove(option.value)
+            } else {
+                selectedSizes.insert(option.value)
+            }
+        case .length:
+            if selectedLengths.contains(option.value) {
+                selectedLengths.remove(option.value)
+            } else {
+                selectedLengths.insert(option.value)
+            }
+        case .condition:
+            if selectedConditions.contains(option.value) {
+                selectedConditions.remove(option.value)
+            } else {
+                selectedConditions.insert(option.value)
+            }
+        case .accessories:
+            if selectedAccessories.contains(option.value) {
+                selectedAccessories.remove(option.value)
+            } else {
+                selectedAccessories.insert(option.value)
+            }
+        }
+    }
+
+    private func clearAllFilters() {
+        selectedTagIDs.removeAll()
+        selectedBrandIDs.removeAll()
+        selectedTypes.removeAll()
+        selectedColors.removeAll()
+        selectedSizes.removeAll()
+        selectedLengths.removeAll()
+        selectedConditions.removeAll()
+        selectedAccessories.removeAll()
+    }
+
+    private func getAllValues(for keyPath: KeyPath<Clothing, String>) -> [String] {
+        let allString = clothings.map { $0[keyPath: keyPath] }.joined(separator: ",")
+        let normalizedString = allString.replacingOccurrences(of: "，", with: ",")
+        return Array(Set(normalizedString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })).sorted()
+    }
+}
+
+enum MergeFilterSection {
+    case tags, brands, types, colors, sizes, length, condition, accessories
 }

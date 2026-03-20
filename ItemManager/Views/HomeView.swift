@@ -81,6 +81,7 @@ struct HomeView: View {
     @State private var isSearchActive = false
     @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
     @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
+    @AppStorage("UserPreference_FilterMode") private var filterMode: FilterMode = .classic
     
     // Filter States
     @State private var selectedTagIDs: Set<UUID> = []
@@ -106,6 +107,7 @@ struct HomeView: View {
     
     // For Wardrobe View
     @State private var wardrobeSearchText = ""
+    @State private var showingMultiDimensionalFilterSheet = false
     
     // For Deposit Plan View
     @State private var depositSearchText = ""
@@ -510,6 +512,46 @@ struct HomeView: View {
     }
     
     private var filterButton: some View {
+        Group {
+            if filterMode == .multiDimensional {
+                // 多维筛选模式 - 使用Sheet
+                Button {
+                    showingMultiDimensionalFilterSheet = true
+                } label: {
+                    filterButtonLabel
+                }
+                .sheet(isPresented: $showingMultiDimensionalFilterSheet) {
+                    MultiDimensionalFilterSheet(
+                        clothings: allClothings,
+                        tags: tags,
+                        brands: brands,
+                        selectedTagIDs: $selectedTagIDs,
+                        selectedBrandIDs: $selectedBrandIDs,
+                        selectedTypes: $selectedTypes,
+                        selectedColors: $selectedColors,
+                        selectedSizes: $selectedSizes,
+                        selectedLengths: $selectedLengths,
+                        selectedConditions: $selectedConditions,
+                        selectedAccessories: $selectedAccessories
+                    )
+                }
+            } else {
+                // 经典筛选模式 - 使用Menu
+                classicFilterMenu
+            }
+        }
+    }
+    
+    // 筛选按钮标签
+    private var filterButtonLabel: some View {
+        Image(systemName: "line.3.horizontal.decrease.circle")
+            .font(.system(size: 16))
+            .foregroundStyle(magicPalette.navigationForeground)
+            .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+    }
+    
+    // 经典筛选菜单
+    private var classicFilterMenu: some View {
         Menu {
             // Tags Filter
             Menu {
@@ -623,10 +665,7 @@ struct HomeView: View {
             }
             
         } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 16))
-                .foregroundStyle(magicPalette.navigationForeground)
-                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+            filterButtonLabel
         }
     }
     
