@@ -49,7 +49,7 @@ struct WardrobeFashionTabSwitcher: View {
                 targetTab: .wardrobe,
                 activeColor: palette.accent
             )
-            
+
             tabButton(
                 title: "心愿尾款",
                 icon: "calendar.badge.clock",
@@ -65,6 +65,8 @@ struct WardrobeFashionTabSwitcher: View {
         )
         // 修复：添加固定高度，避免导航栏高度不一致导致的空白
         .frame(height: 36)
+        // 修复：确保在 principal 位置居中显示
+        .frame(maxWidth: .infinity, alignment: .center)
     }
     
     @ViewBuilder

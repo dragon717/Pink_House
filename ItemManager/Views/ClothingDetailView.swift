@@ -751,12 +751,13 @@ struct ClothingDetailView: View {
             InfoRow(label: "拥有时长", value: "\(duration)天")
             
             if clothing.balance > 0 {
-                // 如果是心愿尾款，显示总尾款（含小物），否则只显示裙装尾款（因为普通模式下可能不怎么关注小物尾款，或者也可以统一显示总尾款）
-                // 需求是：加入心愿尾款的，自定义小物的定金和裙装的定金 加合显示... 尾款也同理
+                // 如果是心愿尾款，显示总尾款（含小物），否则显示尾款×库存的总价格
                 if clothing.isDepositPlan {
                     InfoRow(label: "总尾款金额", value: "¥\(clothing.totalBalance.formatted(.number.precision(.fractionLength(0))))")
                 } else {
-                    InfoRow(label: "尾款金额", value: "¥\(clothing.balance.formatted(.number.precision(.fractionLength(0))))")
+                    // 非心愿尾款时，显示尾款×库存的总价格
+                    let totalBalance = clothing.balance * Decimal(clothing.stock)
+                    InfoRow(label: "尾款金额", value: "¥\(totalBalance.formatted(.number.precision(.fractionLength(0))))")
                 }
             }
             

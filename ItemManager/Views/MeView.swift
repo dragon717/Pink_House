@@ -182,7 +182,7 @@ struct MeView: View {
                         NavigationLink(destination: MagicColorSettingsView()) {
                             SettingsGridItem(
                                 title: "主题配色",
-                                subtitle: "智能配色 · 客制化 · 魔法皮肤",
+                                subtitle: "配色方案 · 魔法皮肤",
                                 icon: "wand.and.stars",
                                 iconColor: .purple
                             )

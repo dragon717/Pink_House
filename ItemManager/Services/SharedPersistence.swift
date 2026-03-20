@@ -183,8 +183,8 @@ class SharedContainer {
         let context = sharedModelContainer.mainContext
         
         do {
-            // 1. Fetch Data
-            let descriptor = FetchDescriptor<Clothing>(sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
+            // 1. Fetch Data (只获取未删除的数据)
+            let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
             let clothings = try context.fetch(descriptor)
             
             // 2. Calculate Stats

@@ -59,8 +59,10 @@ class SeriesAnalyzer {
                     let stock = clothing.stock
                     candidateItemCounts[candidate, default: 0] += stock
                     
-                    candidateBalances[candidate, default: 0] += (clothing.balance * Decimal(stock))
-                    candidateDeposits[candidate, default: 0] += (clothing.deposit * Decimal(stock))
+                    // 注意：clothing.balance 和 clothing.deposit 已经是 totalBalance 和 totalDeposit
+                    // 它们在 Clothing 模型中已经乘以了 stock，所以这里直接使用，不要再乘 stock
+                    candidateBalances[candidate, default: 0] += clothing.balance
+                    candidateDeposits[candidate, default: 0] += clothing.deposit
                     candidateClothingIDs[candidate, default: []].insert(clothing.id)
                 }
             }
