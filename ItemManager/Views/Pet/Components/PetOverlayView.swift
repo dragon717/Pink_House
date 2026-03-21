@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Vision
+import AVKit
 
 // MARK: - 重构后的 PetOverlayView
 // 职责：只负责布局和状态协调，将具体逻辑委托给专门的组件
@@ -28,6 +29,17 @@ struct PetOverlayView: View {
     @State private var capturedImage: UIImage?
     @State private var analysisResult: PetAIAnalysisResult?
     
+    // MARK: - iOS 26 TabBar 收起行走动画状态
+    
+    @State private var isTabBarCollapsed: Bool = false
+    @State private var walkingDirection: WalkingDirection = .right
+    @State private var walkingProgress: CGFloat = 0
+    @State private var walkingY: CGFloat = 0
+    
+    enum WalkingDirection {
+        case left, right
+    }
+    
     // MARK: - 轨迹效果状态
     
     @AppStorage("petTrailTheme") private var trailTheme: PetTrailTheme = .defaultPink
@@ -41,6 +53,8 @@ struct PetOverlayView: View {
     private let visionROISize: CGFloat = 400
     private let screenshotScale: CGFloat = 0.5
     private let visionCheckInterval: TimeInterval = 0.3
+    private let walkingDuration: Double = 10.0 // 单程行走10秒
+    private let walkingAmplitude: CGFloat = 15.0 // 波浪振幅
     
     // MARK: - 计算属性
     
@@ -78,10 +92,68 @@ struct PetOverlayView: View {
             .gesture(dragGesture(in: geometry))
             .coordinateSpace(name: "PetOverlaySpace")
             .animation(getAnimation(for: interactionManager.state), value: interactionManager.state)
-            .onAppear { isBreathing = true }
+            .onAppear { 
+                isBreathing = true
+            }
             .onChange(of: gestureHandler.dragPosition) { newPosition in
                 interactionManager.updateDragPosition(newPosition)
             }
+            // 使用onReceive处理TabBar收起通知，避免在struct中使用weak self
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TabBarCollapseStateChanged"))) { notification in
+                if let isCollapsed = notification.userInfo?["isCollapsed"] as? Bool {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.isTabBarCollapsed = isCollapsed
+                    }
+                    if isCollapsed {
+                        self.startWalkingAnimation()
+                    } else {
+                        self.stopWalkingAnimation()
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - iOS 26 TabBar 收起检测
+    
+    private func startWalkingAnimation() {
+        // 重置行走进度
+        walkingProgress = 0
+        walkingDirection = .right
+        
+        // 开始行走动画循环
+        animateWalking()
+    }
+    
+    private func stopWalkingAnimation() {
+        // 停止动画，重置状态
+        withAnimation(.easeOut(duration: 0.3)) {
+            walkingProgress = 0
+            walkingY = 0
+        }
+    }
+    
+    private func animateWalking() {
+        guard isTabBarCollapsed else { return }
+        
+        // 使用线性动画，单程10秒
+        withAnimation(.linear(duration: walkingDuration)) {
+            walkingProgress = (walkingDirection == .right) ? 1 : 0
+        }
+        
+        // 10秒后切换方向
+        // 使用捕获列表捕获当前状态的副本，避免在值类型中使用weak self
+        let currentDirection = walkingDirection
+        let currentIsCollapsed = isTabBarCollapsed
+        DispatchQueue.main.asyncAfter(deadline: .now() + walkingDuration) {
+            // 检查状态是否仍然有效
+            guard currentIsCollapsed else { return }
+            
+            // 切换方向
+            self.walkingDirection = (currentDirection == .right) ? .left : .right
+            
+            // 继续动画
+            self.animateWalking()
         }
     }
     
@@ -113,18 +185,30 @@ struct PetOverlayView: View {
     @ViewBuilder
     private func petViewLayer(geometry: GeometryProxy) -> some View {
         // 新手引导跑步动画期间隐藏原悬浮小猫
-        let shouldHide = guideManager.isRunningAnimation || 
+        let shouldHide = guideManager.isRunningAnimation ||
                         (guideManager.currentStep == .pointing && guideManager.showPointingVideo)
-        
-        PetImageView(
-            petImagePrefix: petImagePrefix,
-            state: interactionManager.state,
-            isBreathing: isBreathing,
-            catWidth: catWidth,
-            position: calculatePosition(geometry: geometry),
-            rotation: getRotationAngle()
-        )
-        .opacity(isHiddenForSnapshot || shouldHide ? 0 : 1)
+
+        // TabBar 收起时使用行走动画视图
+        if isTabBarCollapsed && interactionManager.state == .idle {
+            WalkingPetView(
+                petImagePrefix: petImagePrefix,
+                catWidth: catWidth,
+                position: calculateWalkingPosition(geometry: geometry),
+                walkingY: walkingY,
+                isMovingRight: walkingDirection == .right
+            )
+            .opacity(isHiddenForSnapshot || shouldHide ? 0 : 1)
+        } else {
+            PetImageView(
+                petImagePrefix: petImagePrefix,
+                state: interactionManager.state,
+                isBreathing: isBreathing,
+                catWidth: catWidth,
+                position: calculatePosition(geometry: geometry),
+                rotation: getRotationAngle()
+            )
+            .opacity(isHiddenForSnapshot || shouldHide ? 0 : 1)
+        }
     }
     
     @ViewBuilder
@@ -287,8 +371,38 @@ struct PetOverlayView: View {
     
     private func getIdlePosition(geometry: GeometryProxy) -> CGPoint {
         let x = idleX ?? (geometry.size.width / 2)
-        let y = geometry.size.height - geometry.safeAreaInsets.bottom - (catWidth / 2)
+        // TabBar 收起时，小猫移动到屏幕底部（不受安全区域限制）
+        let y = isTabBarCollapsed
+            ? geometry.size.height - (catWidth / 2) + 10 // 稍微超出屏幕底部
+            : geometry.size.height - geometry.safeAreaInsets.bottom - (catWidth / 2)
         return CGPoint(x: x, y: y)
+    }
+    
+    // MARK: - 行走位置计算
+    
+    private func calculateWalkingPosition(geometry: GeometryProxy) -> CGPoint {
+        let safeMargin: CGFloat = 40
+        let minX = safeMargin
+        let maxX = geometry.size.width - safeMargin
+        
+        // 根据进度计算X位置
+        let currentX = minX + (maxX - minX) * walkingProgress
+        
+        // 计算波浪Y偏移（正弦波）
+        // 使用 walkingProgress * 2π 来完成一个完整的波浪周期
+        let wavePhase = walkingProgress * 2 * .pi
+        let waveOffset = sin(wavePhase) * walkingAmplitude
+        
+        // 更新 walkingY 用于视图
+        DispatchQueue.main.async {
+            self.walkingY = waveOffset
+        }
+        
+        // Y位置：屏幕底部（不受安全区域限制）+ 波浪偏移
+        let baseY = geometry.size.height - (catWidth / 2) + 10
+        let y = baseY + waveOffset
+        
+        return CGPoint(x: currentX, y: y)
     }
     
     private func getSnapPosition(in size: CGSize) -> CGPoint {
@@ -385,6 +499,147 @@ struct PetOverlayView: View {
         let normY = 1.0 - (minY + actualH) / screenSize.height
         
         return CGRect(x: normX, y: max(0, normY), width: normW, height: normH)
+    }
+}
+
+// MARK: - 行走宠物视图（TabBar收起时使用）
+
+struct WalkingPetView: View {
+    let petImagePrefix: String
+    let catWidth: CGFloat
+    let position: CGPoint
+    let walkingY: CGFloat
+    let isMovingRight: Bool
+    
+    var body: some View {
+        // 使用视频播放器显示行走动画
+        PetWalkingVideoPlayer(
+            videoName: "\(petImagePrefix)_right_run",
+            isMovingRight: isMovingRight,
+            catWidth: catWidth
+        )
+        .frame(width: catWidth, height: catWidth)
+        .position(position)
+        .offset(y: walkingY)
+    }
+}
+
+// MARK: - 宠物行走视频播放器
+
+struct PetWalkingVideoPlayer: UIViewRepresentable {
+    let videoName: String
+    let isMovingRight: Bool
+    let catWidth: CGFloat
+    
+    func makeUIView(context: Context) -> UIView {
+        let containerView = UIView()
+        containerView.backgroundColor = .clear
+        
+        // 创建视频播放器
+        let playerView = PetVideoPlayerUIView(
+            videoName: videoName,
+            isMovingRight: isMovingRight
+        )
+        playerView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(playerView)
+        
+        NSLayoutConstraint.activate([
+            playerView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            playerView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            playerView.widthAnchor.constraint(equalToConstant: catWidth),
+            playerView.heightAnchor.constraint(equalToConstant: catWidth)
+        ])
+        
+        context.coordinator.playerView = playerView
+        return containerView
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {
+        // 更新方向（镜像）
+        context.coordinator.playerView?.updateDirection(isMovingRight: isMovingRight)
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator {
+        var playerView: PetVideoPlayerUIView?
+    }
+}
+
+// MARK: - 宠物视频播放器 UIView
+
+class PetVideoPlayerUIView: UIView {
+    private var playerLayer: AVPlayerLayer?
+    private var player: AVQueuePlayer?
+    private var looper: AVPlayerLooper?
+    private var isMovingRight: Bool = true
+    
+    init(videoName: String, isMovingRight: Bool) {
+        self.isMovingRight = isMovingRight
+        super.init(frame: .zero)
+        setupPlayer(videoName: videoName)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func setupPlayer(videoName: String) {
+        // 查找视频资源
+        var url: URL?
+        
+        // 尝试从 asserts/naicha 目录加载
+        if videoName.hasPrefix("naicha_") {
+            url = Bundle.main.url(forResource: videoName, withExtension: "mov", subdirectory: "asserts/naicha")
+        }
+        
+        // 回退到主 bundle
+        if url == nil {
+            url = Bundle.main.url(forResource: videoName, withExtension: "mov")
+        }
+        
+        guard let validUrl = url else {
+            print("Error: Could not find video resource: \(videoName)")
+            return
+        }
+        
+        // 创建播放器
+        let player = AVQueuePlayer()
+        self.player = player
+        
+        let playerLayer = AVPlayerLayer(player: player)
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = UIColor.clear.cgColor
+        layer.addSublayer(playerLayer)
+        self.playerLayer = playerLayer
+        
+        // 设置循环播放
+        let playerItem = AVPlayerItem(url: validUrl)
+        looper = AVPlayerLooper(player: player, templateItem: playerItem)
+        
+        // 更新方向（镜像）
+        updateDirection(isMovingRight: isMovingRight)
+        
+        // 开始播放
+        player.play()
+    }
+    
+    func updateDirection(isMovingRight: Bool) {
+        self.isMovingRight = isMovingRight
+        
+        // 向左走时镜像视频
+        if isMovingRight {
+            playerLayer?.setAffineTransform(.identity)
+        } else {
+            playerLayer?.setAffineTransform(CGAffineTransform(scaleX: -1, y: 1))
+        }
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer?.frame = bounds
     }
 }
 

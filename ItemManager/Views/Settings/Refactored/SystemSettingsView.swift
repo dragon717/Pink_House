@@ -90,17 +90,6 @@ struct SystemSettingsView: View {
             
             // MARK: - 存储与性能
             AdaptiveSection(header: "存储与性能") {
-                Button(action: performStorageCleanup) {
-                    HStack {
-                        Label("清理未使用的图片", systemImage: "trash")
-                        Spacer()
-                        Text("释放空间")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .adaptiveRow()
-                
                 Toggle(isOn: $useAggressiveMemoryOptimization) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("积极内存优化")
@@ -265,16 +254,4 @@ struct SystemSettingsView: View {
         }
     }
     
-    private func performStorageCleanup() {
-        isLoading = true
-        loadingMessage = "正在扫描并清理..."
-        Task {
-            let count = ImageManager.shared.cleanOrphanedImages(context: modelContext)
-            await MainActor.run {
-                isLoading = false
-                message = "清理完成，共删除了 \(count) 个未使用的图片文件。"
-                showingMessage = true
-            }
-        }
-    }
 }

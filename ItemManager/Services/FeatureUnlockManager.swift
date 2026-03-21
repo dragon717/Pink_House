@@ -25,7 +25,7 @@ enum UnlockConditionType: String, CaseIterable, Identifiable {
         case .loginDays: return "签到解锁"
         case .petLevel: return "萌宠等级"
         case .redeemCode: return "兑换码解锁"
-        case .manual: return "活动解锁"
+        case .manual: return "体验完成任务"
         }
     }
     
@@ -88,7 +88,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     // 核心功能（默认解锁）
     case wardrobe = "wardrobe"
     case finalPayment = "finalPayment"
-    
+
     // House 功能
     case pet = "pet"
     case ootd = "ootd"
@@ -99,7 +99,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     case perler = "perler"
     case recycleBin = "recycleBin"
     case dressStock = "dressStock"
-    
+
     // 设置中的子功能
     case dataBackup = "dataBackup"
     case cloudSync = "cloudSync"
@@ -107,10 +107,15 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     case themeCustomize = "themeCustomize"
     case widgetCustomize = "widgetCustomize"
     case aiAnalysis = "aiAnalysis"
-    
+
+    // 筛选功能
+    case filterClassic = "filterClassic"  // 经典筛选/多维筛选
+    case spaceBook = "spaceBook"  // 空间手帐
+    case batchEdit = "batchEdit"  // 批量编辑
+
     // 联网功能
     case networkCommunity = "networkCommunity"
-    
+
     // 魔法任务
     case magicTasks = "magicTasks"
     
@@ -140,6 +145,12 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return "联网社区"
         case .magicTasks:
             return "魔法任务"
+        case .filterClassic:
+            return "筛选偏好"
+        case .spaceBook:
+            return "空间手帐"
+        case .batchEdit:
+            return "批量编辑"
         }
     }
     
@@ -167,6 +178,12 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return "network"
         case .magicTasks:
             return "sparkles"
+        case .filterClassic:
+            return "line.3.horizontal.decrease.circle.fill"
+        case .spaceBook:
+            return "cube.transparent.fill"
+        case .batchEdit:
+            return "square.and.pencil"
         }
     }
     
@@ -211,14 +228,24 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .magicTasks:
             // 魔法任务：在VIP界面兑换码输入 "vip魔法任务" 解锁
             return .redeemCode("vip魔法任务", description: "仍在认真开发和内测中，敬请期待～")
+        case .filterClassic:
+            return .manual(description: "体验筛选偏好功能")
+        case .spaceBook:
+            return .manual(description: "体验空间手帐功能")
+        case .batchEdit:
+            return .manual(description: "体验批量编辑功能")
         }
     }
     
     // 是否默认隐藏
     var isHiddenByDefault: Bool {
         switch self {
-        case .pet, .bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks:
-            return true // 萌宠、世界书、拼豆工坊、裙装股市、联网社区、魔法任务默认隐藏
+        case .pet, .bigWorld, .perler, .dressStock:
+            return true // 萌宠、世界书、拼豆工坊、裙装股市默认隐藏
+        case .networkCommunity, .magicTasks:
+            return false  // 联网社区和魔法任务默认显示
+        case .filterClassic, .spaceBook, .batchEdit:
+            return false  // 这些功能默认显示，作为魔法任务可获取鱼币
         default:
             return false
         }

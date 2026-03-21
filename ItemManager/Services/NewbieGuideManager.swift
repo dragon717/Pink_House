@@ -73,6 +73,9 @@ extension FeatureUnlockManager {
         .cloudSync,       // iCloud同步
         .batchImport,     // 批量导入
         .themeCustomize,  // 魔法配色
+        .filterClassic,   // 筛选偏好
+        .spaceBook,       // 空间手帐
+        .batchEdit,       // 批量编辑
         .ootd,            // 穿搭手帐
         .wealth,          // 来财求签
     ]
@@ -792,6 +795,12 @@ struct FirstUseGuideOverlay: View {
             batchImportGuideContent
         case .themeCustomize:
             themeGuideContent
+        case .filterClassic:
+            filterClassicGuideContent
+        case .spaceBook:
+            spaceBookGuideContent
+        case .batchEdit:
+            batchEditGuideContent
         case .ootd:
             ootdGuideContent
         case .wealth:
@@ -1027,6 +1036,249 @@ struct FirstUseGuideOverlay: View {
                         guideManager.completeFirstUseGuide()
                     } label: {
                         Text("知道了")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 20)
+                            .background(Color.green)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 100)
+        }
+    }
+
+    // MARK: - 筛选偏好引导
+
+    private var filterClassicGuideContent: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button {
+                    guideManager.dismissFirstUseGuide()
+                } label: {
+                    Text("跳过")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 60)
+
+            Spacer()
+
+            VStack(spacing: 16) {
+                Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(.purple)
+
+                Text("筛选偏好")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("选择适合你的筛选样式")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if showingFullDescription {
+                    Text("经典筛选：简洁直观，适合快速浏览\n多维筛选：多重条件组合，精准定位")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                        .padding(.top, 8)
+                }
+
+                HStack(spacing: 12) {
+                    Button {
+                        withAnimation {
+                            showingFullDescription.toggle()
+                        }
+                    } label: {
+                        Text(showingFullDescription ? "收起" : "了解更多")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                    }
+
+                    Button {
+                        guideManager.completeFirstUseGuide()
+                    } label: {
+                        Text("去设置")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 20)
+                            .background(Color.purple)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 100)
+        }
+    }
+
+    // MARK: - 空间手帐引导
+
+    private var spaceBookGuideContent: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button {
+                    guideManager.dismissFirstUseGuide()
+                } label: {
+                    Text("跳过")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 60)
+
+            Spacer()
+
+            VStack(spacing: 16) {
+                Image(systemName: "cube.transparent.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(.blue)
+
+                Text("空间手帐")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("3D展示你的衣橱")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if showingFullDescription {
+                    Text("在3D空间中浏览你的裙子收藏~\n\n可以从任意角度欣赏你的衣橱\n还能查看裙子的详细信息")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                        .padding(.top, 8)
+                }
+
+                HStack(spacing: 12) {
+                    Button {
+                        withAnimation {
+                            showingFullDescription.toggle()
+                        }
+                    } label: {
+                        Text(showingFullDescription ? "收起" : "了解更多")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                    }
+
+                    Button {
+                        guideManager.completeFirstUseGuide()
+                    } label: {
+                        Text("去体验")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 20)
+                            .background(Color.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+            )
+            .padding(.horizontal, 20)
+            .padding(.bottom, 100)
+        }
+    }
+
+    // MARK: - 批量编辑引导
+
+    private var batchEditGuideContent: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button {
+                    guideManager.dismissFirstUseGuide()
+                } label: {
+                    Text("跳过")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 60)
+
+            Spacer()
+
+            VStack(spacing: 16) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 50))
+                    .foregroundStyle(.green)
+
+                Text("批量编辑")
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                Text("一次修改多条裙子")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if showingFullDescription {
+                    Text("选择多条裙子同时编辑~\n\n可以批量修改标签、分类、季节等信息\n省时省力管理你的衣橱")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                        .padding(.top, 8)
+                }
+
+                HStack(spacing: 12) {
+                    Button {
+                        withAnimation {
+                            showingFullDescription.toggle()
+                        }
+                    } label: {
+                        Text(showingFullDescription ? "收起" : "了解更多")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                    }
+
+                    Button {
+                        guideManager.completeFirstUseGuide()
+                    } label: {
+                        Text("去体验")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.vertical, 10)

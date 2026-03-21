@@ -128,12 +128,37 @@ struct ModernTabView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    // MARK: - TabBar 收起检测状态
+    @State private var lastSafeAreaBottom: CGFloat = 0
+    @State private var isTabBarCollapsed: Bool = false
+
+    // MARK: - TabBar 收起检测方法
+    private func checkTabBarCollapse(safeAreaBottom: CGFloat) {
+        // iOS 26+ 当 TabBar 收起时，safeAreaInsets.bottom 会变小
+        // 正常 TabBar 高度约为 83-90，收起后约为 34（仅 Home Indicator）
+        let collapseThreshold: CGFloat = 50.0
+
+        let wasCollapsed = isTabBarCollapsed
+        isTabBarCollapsed = safeAreaBottom < collapseThreshold
+
+        // 状态变化时发送通知
+        if wasCollapsed != isTabBarCollapsed {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("TabBarCollapseStateChanged"),
+                object: nil,
+                userInfo: ["isCollapsed": isTabBarCollapsed]
+            )
+        }
+
+        lastSafeAreaBottom = safeAreaBottom
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
                 WardrobeTabContent(homeTabSelection: $homeTabSelection)
             }
-            
+
             Tab(smallWorldTabTitle, systemImage: smallWorldTabIcon, value: 1) {
                 SmallWorldTabContent(
                     selectedTab: $selectedTab,
@@ -142,11 +167,11 @@ struct ModernTabView: View {
                     isPlayingOpeningAnimation: $isPlayingOpeningAnimation
                 )
             }
-            
+
             Tab("我", systemImage: "face.smiling", value: 2) {
                 MeTabContent()
             }
-            
+
             Tab(value: 3, role: .search) {
                 PetChatView(searchText: $searchText)
             } label: {
@@ -160,6 +185,19 @@ struct ModernTabView: View {
         .toolbarBackground(.hidden, for: .tabBar)
         .tint(magicPalette.accent)
         .environment(\.isSimulationActive, isSimulationActive)
+        // 使用 GeometryReader 检测 safeAreaInsets 变化来判断 TabBar 收起状态
+        .background(
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        lastSafeAreaBottom = geometry.safeAreaInsets.bottom
+                        checkTabBarCollapse(safeAreaBottom: geometry.safeAreaInsets.bottom)
+                    }
+                    .onChange(of: geometry.safeAreaInsets.bottom) { _, newValue in
+                        checkTabBarCollapse(safeAreaBottom: newValue)
+                    }
+            }
+        )
         .overlay {
             RewardBubbleView()
             // 悬浮宠物默认显示，不再依赖解锁状态

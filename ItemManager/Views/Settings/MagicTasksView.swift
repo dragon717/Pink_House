@@ -153,8 +153,7 @@ struct MagicTaskRow: View {
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(themeManager.primaryTextColor)
 
-                    let condition = manager.getCondition(for: feature)
-                    Text(condition.description)
+                    Text(feature.defaultCondition.description)
                         .font(.caption)
                         .foregroundColor(themeManager.secondaryTextColor)
                         .lineLimit(1)
@@ -274,18 +273,19 @@ struct MagicTaskDetailView: View {
                     }
                     .listRowBackground(Color.clear)
 
-                    // 解锁条件
-                    Section("解锁条件") {
+                    // 任务信息
+                    Section("任务信息") {
                         let condition = manager.getCondition(for: feature)
+                        let conditionType = UnlockConditionType(rawValue: condition.type)
 
                         HStack {
-                            Image(systemName: conditionIcon(for: condition))
+                            Image(systemName: conditionType?.icon ?? "sparkles")
                                 .frame(width: 24)
                                 .foregroundColor(themeManager.accentTextColor)
-                            Text("解锁方式")
+                            Text("任务类型")
                                 .foregroundColor(themeManager.primaryTextColor)
                             Spacer()
-                            Text(UnlockConditionType(rawValue: condition.type)?.displayName ?? "未知")
+                            Text(conditionType?.displayName ?? "体验任务")
                                 .foregroundColor(themeManager.secondaryTextColor)
                         }
 
@@ -296,7 +296,7 @@ struct MagicTaskDetailView: View {
                             Text("任务说明")
                                 .foregroundColor(themeManager.primaryTextColor)
                             Spacer()
-                            Text(condition.description)
+                            Text(feature.defaultCondition.description)
                                 .foregroundColor(themeManager.secondaryTextColor)
                                 .multilineTextAlignment(.trailing)
                         }
@@ -360,36 +360,30 @@ struct MagicTaskDetailView: View {
                         }
                     }
 
-                    // 已解锁信息显示和操作
-                    if manager.isUnlocked(feature) {
-                        Section("解锁信息") {
-                            if let unlockedAt = manager.getStatus(for: feature).unlockedAt {
-                                HStack {
-                                    Text("解锁时间")
-                                        .foregroundColor(themeManager.primaryTextColor)
-                                    Spacer()
-                                    Text(unlockedAt, style: .date)
-                                        .foregroundColor(themeManager.secondaryTextColor)
-                                }
-                            }
+                    // 任务操作按钮
+                    let condition = manager.getCondition(for: feature)
+                    let isExperienceTask = condition.type == UnlockConditionType.manual.rawValue
+                    let isUnlocked = manager.isUnlocked(feature)
+                    let hasDestination = feature.destination != nil || feature.isSettingsFeature
 
-                            if let unlockedBy = manager.getStatus(for: feature).unlockedBy {
-                                HStack {
-                                    Text("解锁方式")
-                                        .foregroundColor(themeManager.primaryTextColor)
-                                    Spacer()
-                                    Text(unlockedBy)
-                                        .foregroundColor(themeManager.secondaryTextColor)
-                                }
-                            }
+                    // 任务状态
+                    Section("任务状态") {
+                        HStack {
+                            Text("任务状态")
+                                .foregroundColor(themeManager.primaryTextColor)
+                            Spacer()
+                            Text(isUnlocked ? "已完成" : "未完成")
+                                .foregroundColor(isUnlocked ? themeManager.accentTextColor : themeManager.secondaryTextColor)
                         }
+                    }
 
-                        // 引导使用按钮（首次使用时显示）
-                        if manager.isUnlocked(feature) && FeatureUnlockManager.guidedFeatures.contains(feature) {
+                    // 体验型任务：始终显示两个按钮
+                    if isExperienceTask {
+                        // 新手引导按钮
+                        if FeatureUnlockManager.guidedFeatures.contains(feature) {
                             Section {
                                 Button {
                                     dismiss()
-                                    // 触发首次使用引导
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                         NotificationCenter.default.post(
                                             name: .showFirstUseGuide,
@@ -401,7 +395,7 @@ struct MagicTaskDetailView: View {
                                     HStack {
                                         Spacer()
                                         Image(systemName: "sparkles")
-                                        Text("引导使用")
+                                        Text("新手引导")
                                             .fontWeight(.medium)
                                         Spacer()
                                     }
@@ -410,57 +404,30 @@ struct MagicTaskDetailView: View {
                             }
                         }
 
-                        // 进入功能按钮（如果该功能有对应页面）
-                        if let destination = feature.destination {
+                        // 进入功能按钮
+                        if hasDestination {
                             Section {
                                 Button {
-                                    // 关闭详情页
                                     dismiss()
-                                    // 延迟后跳转到对应功能
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        NotificationCenter.default.post(
-                                            name: .navigateToSmallWorldDestination,
-                                            object: nil,
-                                            userInfo: ["destination": destination]
-                                        )
-                                    }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "arrow.right.circle.fill")
-                                        Text("进入 \(feature.displayName)")
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                    }
-                                }
-                                .tint(themeManager.accentTextColor)
-                            }
-                        } else if feature.isSettingsFeature {
-                            // 设置功能跳转
-                            Section {
-                                Button {
-                                    dismiss()
-                                    // 批量导入在衣橱界面，萌宠智能对话在萌宠对话Tab，其他设置在"我"页面
-                                    if feature == .batchImport {
-                                        // 跳转到衣橱页面
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        if let destination = feature.destination {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToSmallWorldDestination,
+                                                object: nil,
+                                                userInfo: ["destination": destination]
+                                            )
+                                        } else if feature == .batchImport {
                                             NotificationCenter.default.post(
                                                 name: .navigateToHomeTab,
                                                 object: nil,
                                                 userInfo: ["homeTab": "wardrobe"]
                                             )
-                                        }
-                                    } else if feature == .aiAnalysis {
-                                        // 萌宠智能对话跳转到萌宠对话Tab
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        } else if feature == .aiAnalysis {
                                             NotificationCenter.default.post(
                                                 name: .navigateToPetChat,
                                                 object: nil
                                             )
-                                        }
-                                    } else {
-                                        // 其他设置功能跳转到"我"页面
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        } else {
                                             NotificationCenter.default.post(
                                                 name: .navigateToSettings,
                                                 object: nil,
@@ -472,7 +439,136 @@ struct MagicTaskDetailView: View {
                                     HStack {
                                         Spacer()
                                         Image(systemName: "arrow.right.circle.fill")
-                                        Text("进入 \(feature.displayName)")
+                                        Text("进入功能")
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                    }
+                                }
+                                .tint(themeManager.accentTextColor)
+                            }
+                        }
+                    }
+                    // 解锁型任务：根据解锁状态显示不同按钮
+                    else if isUnlocked {
+                        // 已解锁：显示"新手引导"和"进入功能"
+                        if FeatureUnlockManager.guidedFeatures.contains(feature) {
+                            Section {
+                                Button {
+                                    dismiss()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        NotificationCenter.default.post(
+                                            name: .showFirstUseGuide,
+                                            object: nil,
+                                            userInfo: ["feature": feature.rawValue]
+                                        )
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "sparkles")
+                                        Text("新手引导")
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                    }
+                                }
+                                .tint(.pink)
+                            }
+                        }
+
+                        if hasDestination {
+                            Section {
+                                Button {
+                                    dismiss()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        if let destination = feature.destination {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToSmallWorldDestination,
+                                                object: nil,
+                                                userInfo: ["destination": destination]
+                                            )
+                                        } else if feature == .batchImport {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToHomeTab,
+                                                object: nil,
+                                                userInfo: ["homeTab": "wardrobe"]
+                                            )
+                                        } else if feature == .aiAnalysis {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToPetChat,
+                                                object: nil
+                                            )
+                                        } else {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToSettings,
+                                                object: nil,
+                                                userInfo: ["feature": feature.rawValue]
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "arrow.right.circle.fill")
+                                        Text("进入功能")
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                    }
+                                }
+                                .tint(themeManager.accentTextColor)
+                            }
+                        }
+                    } else {
+                        // 未解锁：显示"了解任务"和"前往体验"
+                        Section {
+                            Button {
+                                // 展示任务说明/进度信息
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "info.circle")
+                                    Text("了解任务")
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                }
+                            }
+                            .tint(.gray)
+                        }
+
+                        if hasDestination {
+                            Section {
+                                Button {
+                                    dismiss()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        if let destination = feature.destination {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToSmallWorldDestination,
+                                                object: nil,
+                                                userInfo: ["destination": destination]
+                                            )
+                                        } else if feature == .batchImport {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToHomeTab,
+                                                object: nil,
+                                                userInfo: ["homeTab": "wardrobe"]
+                                            )
+                                        } else if feature == .aiAnalysis {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToPetChat,
+                                                object: nil
+                                            )
+                                        } else {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToSettings,
+                                                object: nil,
+                                                userInfo: ["feature": feature.rawValue]
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "arrow.right.circle")
+                                        Text("前往体验")
                                             .fontWeight(.medium)
                                         Spacer()
                                     }
