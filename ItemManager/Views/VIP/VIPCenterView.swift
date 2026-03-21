@@ -114,8 +114,8 @@ struct VIPCenterView: View {
                             .padding()
                             .background(
                                 LinearGradient(
-                                    colors: vipManager.cardStyle == .monicaPink 
-                                        ? [Color(hex: "FF69B4"), Color(hex: "FFC0CB")] 
+                                    colors: vipManager.cardStyle == .monicaPink
+                                        ? [Color(hex: "FF69B4"), Color(hex: "FFC0CB")]
                                         : [Color(hex: "FFD700"), Color(hex: "B8860B")],
                                     startPoint: .leading,
                                     endPoint: .trailing
@@ -124,6 +124,8 @@ struct VIPCenterView: View {
                             .foregroundStyle(vipManager.cardStyle == .monicaPink ? .white : .black)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
+                        // 萌宠对话引导充值按钮高亮锚点
+                        .petChatGuideAnchor(.rechargeButton)
                         
                         if vipManager.isVIP {
                             /*
@@ -181,6 +183,8 @@ struct VIPCenterView: View {
                     } label: {
                         Label("使用兑换码", systemImage: "gift")
                     }
+                    // 萌宠对话引导兑换按钮高亮锚点
+                    .petChatGuideAnchor(.redeemButton)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .foregroundStyle(.white)

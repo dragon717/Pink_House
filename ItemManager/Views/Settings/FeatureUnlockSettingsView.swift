@@ -7,11 +7,10 @@ struct FeatureUnlockSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showUnlockConfirmation = false
-    @State private var showLockConfirmation = false
-    @State private var selectedFeature: FeatureItem?
-    @State private var showUnlockAlert = false
-    @State private var unlockMessage = ""
+    // 只获取通过魔法任务解锁的功能
+    private var magicTaskFeatures: [FeatureItem] {
+        manager.getLockableFeatures()
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,335 +20,145 @@ struct FeatureUnlockSettingsView: View {
                     .ignoresSafeArea()
 
                 // 内容
-                featureManagementView
+                featureToggleView
             }
             .navigationTitle("功能管理")
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("解锁确认", isPresented: $showUnlockConfirmation) {
-                Button("取消", role: .cancel) { }
-                Button("解锁") {
-                    if let feature = selectedFeature {
-                        unlockFeature(feature)
-                    }
-                }
-            } message: {
-                if let feature = selectedFeature {
-                    let condition = manager.getCondition(for: feature)
-                    Text("确定要解锁 \(feature.displayName) 吗？\n\(condition.description)")
-                }
-            }
-            .alert("锁定确认", isPresented: $showLockConfirmation) {
-                Button("取消", role: .cancel) { }
-                Button("锁定", role: .destructive) {
-                    if let feature = selectedFeature {
-                        manager.lock(feature)
-                    }
-                }
-            } message: {
-                if let feature = selectedFeature {
-                    Text("确定要锁定 \(feature.displayName) 吗？锁定后需要重新满足条件才能使用。")
-                }
-            }
-            .alert("解锁结果", isPresented: $showUnlockAlert) {
-                Button("知道了", role: .cancel) { }
-            } message: {
-                Text(unlockMessage)
-            }
+            .navigationBarTitleDisplayMode(.inline
+            )
         }
     }
-    
-    // MARK: - 功能管理视图
-    private var featureManagementView: some View {
+
+    // MARK: - 功能开关视图
+    private var featureToggleView: some View {
         List {
-            // 已解锁且显示的功能
+            // 说明文字
             Section {
-                let accessibleFeatures = manager.getAccessibleFeatures()
-                if accessibleFeatures.isEmpty {
-                    Text("暂无已解锁的功能")
-                        .foregroundColor(themeManager.secondaryTextColor)
-                        .font(.caption)
-                } else {
-                    ForEach(accessibleFeatures) { feature in
-                        AccessibleFeatureRow(
-                            feature: feature,
-                            onHide: { manager.setVisible(feature, visible: false) },
-                            onLock: {
-                                selectedFeature = feature
-                                showLockConfirmation = true
-                            }
-                        )
-                    }
-                }
-            } header: {
                 HStack {
-                    Text("已解锁且显示")
-                        .foregroundColor(themeManager.primaryTextColor)
                     Spacer()
-                    Text("\(manager.getAccessibleFeatures().count) 个")
-                        .font(.caption)
-                        .foregroundColor(themeManager.secondaryTextColor)
+                    VStack(spacing: 8) {
+                        Image(systemName: "switch.2")
+                            .font(.system(size: 32))
+                            .foregroundColor(themeManager.accentTextColor)
+
+                        Text("功能开关")
+                            .font(.headline)
+                            .foregroundColor(themeManager.primaryTextColor)
+
+                        Text("开启或关闭通过魔法任务解锁的功能\n关闭后功能将从菜单中隐藏")
+                            .font(.caption)
+                            .foregroundColor(themeManager.secondaryTextColor)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.vertical, 16)
+                    Spacer()
                 }
             }
+            .listRowBackground(Color.clear)
 
-            // 已解锁但不显示的功能
+            // 功能开关列表
             Section {
-                let unlockedHiddenFeatures = manager.getUnlockedFeatures().filter { !manager.isVisible($0) }
-                if unlockedHiddenFeatures.isEmpty {
-                    Text("暂无隐藏的功能")
-                        .foregroundColor(themeManager.secondaryTextColor)
-                        .font(.caption)
-                } else {
-                    ForEach(unlockedHiddenFeatures) { feature in
-                        HiddenFeatureRow(
-                            feature: feature,
-                            onShow: { manager.setVisible(feature, visible: true) },
-                            onLock: {
-                                selectedFeature = feature
-                                showLockConfirmation = true
-                            }
-                        )
-                    }
+                ForEach(magicTaskFeatures) { feature in
+                    FeatureToggleRow(feature: feature)
                 }
             } header: {
-                HStack {
-                    Text("已解锁但隐藏")
-                        .foregroundColor(themeManager.primaryTextColor)
-                    Spacer()
-                    Text("\(manager.getUnlockedFeatures().filter { !manager.isVisible($0) }.count) 个")
-                        .font(.caption)
-                        .foregroundColor(themeManager.secondaryTextColor)
-                }
-            }
-
-            // 未解锁的功能
-            Section {
-                let lockedFeatures = FeatureItem.allCases.filter { !manager.isUnlocked($0) }
-                if lockedFeatures.isEmpty {
-                    Text("所有功能已解锁")
-                        .foregroundColor(themeManager.secondaryTextColor)
-                        .font(.caption)
-                } else {
-                    ForEach(lockedFeatures) { feature in
-                        LockedFeatureRow(
-                            feature: feature,
-                            onUnlock: {
-                                selectedFeature = feature
-                                showUnlockConfirmation = true
-                            }
-                        )
-                    }
-                }
-            } header: {
-                HStack {
-                    Text("未解锁")
-                        .foregroundColor(themeManager.primaryTextColor)
-                    Spacer()
-                    Text("\(FeatureItem.allCases.filter { !manager.isUnlocked($0) }.count) 个")
-                        .font(.caption)
-                        .foregroundColor(themeManager.secondaryTextColor)
-                }
+                Text("魔法任务功能")
+                    .foregroundColor(themeManager.primaryTextColor)
+            } footer: {
+                Text("只有已解锁的功能才能开启，未解锁的功能需要先完成魔法任务")
+                    .foregroundColor(themeManager.secondaryTextColor)
             }
         }
         .scrollContentBackground(.hidden)
     }
-    
-    private func unlockFeature(_ feature: FeatureItem) {
-        let result = manager.unlock(feature)
-        
-        switch result {
-        case .success:
-            unlockMessage = "\(feature.displayName) 解锁成功！"
-        case .alreadyUnlocked:
-            unlockMessage = "\(feature.displayName) 已经解锁了"
-        case .conditionNotMet(let message):
-            unlockMessage = "解锁失败：\(message)"
-        case .insufficientResource(let type, let required, let current):
-            unlockMessage = "\(type)不足，需要 \(required)，当前只有 \(current)"
-        }
-        
-        showUnlockAlert = true
-    }
 }
 
-// MARK: - 可访问功能行（已解锁且显示）
-struct AccessibleFeatureRow: View {
+// MARK: - 功能开关行
+struct FeatureToggleRow: View {
     let feature: FeatureItem
-    let onHide: () -> Void
-    let onLock: () -> Void
+
+    @StateObject private var manager = FeatureUnlockManager.shared
     @Environment(ThemeManager.self) private var themeManager
+    @State private var isEnabled: Bool = false
 
     var body: some View {
-        HStack {
-            Image(systemName: feature.icon)
-                .frame(width: 24)
-                .foregroundColor(themeManager.accentTextColor)
+        HStack(spacing: 12) {
+            // 图标
+            ZStack {
+                Circle()
+                    .fill(backgroundColor)
+                    .frame(width: 36, height: 36)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(feature.displayName)
+                Image(systemName: feature.icon)
                     .font(.system(size: 16))
+                    .foregroundColor(iconColor)
+            }
+
+            // 内容
+            VStack(alignment: .leading, spacing: 4) {
+                Text(feature.displayName)
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(themeManager.primaryTextColor)
 
-                Text("已解锁 · 显示中")
+                Text(statusText)
                     .font(.caption)
-                    .foregroundColor(themeManager.accentTextColor)
+                    .foregroundColor(statusColor)
             }
 
             Spacer()
 
-            Menu {
-                Button {
-                    onHide()
-                } label: {
-                    Label("隐藏", systemImage: "eye.slash")
+            // 开关
+            Toggle("", isOn: $isEnabled)
+                .labelsHidden()
+                .disabled(!manager.isUnlocked(feature))
+                .onChange(of: isEnabled) { oldValue, newValue in
+                    // 同步开关状态到功能显示状态
+                    manager.setVisible(feature, visible: newValue)
                 }
-
-                Button(role: .destructive) {
-                    onLock()
-                } label: {
-                    Label("重新锁定", systemImage: "lock.fill")
-                }
-            } label: {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(themeManager.accentTextColor)
-                    .font(.title3)
-            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .onAppear {
+            // 初始化开关状态
+            isEnabled = manager.isVisible(feature) && manager.isUnlocked(feature)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: FeatureUnlockManager.featureStatusChangedNotification)) { _ in
+            // 当功能状态改变时更新开关
+            isEnabled = manager.isVisible(feature) && manager.isUnlocked(feature)
+        }
     }
-}
 
-// MARK: - 隐藏功能行（已解锁但不显示）
-struct HiddenFeatureRow: View {
-    let feature: FeatureItem
-    let onShow: () -> Void
-    let onLock: () -> Void
-    @Environment(ThemeManager.self) private var themeManager
+    // MARK: - 样式计算
 
-    var body: some View {
-        HStack {
-            Image(systemName: feature.icon)
-                .frame(width: 24)
-                .foregroundColor(themeManager.secondaryTextColor)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(feature.displayName)
-                    .font(.system(size: 16))
-                    .foregroundColor(themeManager.secondaryTextColor)
-
-                Text("已解锁 · 已隐藏")
-                    .font(.caption)
-                    .foregroundColor(themeManager.tertiaryTextColor)
-            }
-
-            Spacer()
-
-            Menu {
-                Button {
-                    onShow()
-                } label: {
-                    Label("显示", systemImage: "eye")
-                }
-
-                Button(role: .destructive) {
-                    onLock()
-                } label: {
-                    Label("重新锁定", systemImage: "lock.fill")
-                }
-            } label: {
-                Image(systemName: "eye.slash.fill")
-                    .foregroundColor(themeManager.tertiaryTextColor)
-                    .font(.title3)
-            }
+    private var backgroundColor: Color {
+        if manager.isUnlocked(feature) {
+            return themeManager.accentTextColor.opacity(0.1)
+        } else {
+            return themeManager.tertiaryTextColor.opacity(0.1)
         }
-        .padding(.vertical, 4)
     }
-}
 
-// MARK: - 锁定功能行（未解锁）
-struct LockedFeatureRow: View {
-    let feature: FeatureItem
-    let onUnlock: () -> Void
-
-    @StateObject private var manager = FeatureUnlockManager.shared
-    @Environment(ThemeManager.self) private var themeManager
-
-    var body: some View {
-        HStack {
-            Image(systemName: feature.icon)
-                .frame(width: 24)
-                .foregroundColor(themeManager.secondaryTextColor)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(feature.displayName)
-                    .font(.system(size: 16))
-                    .foregroundColor(themeManager.secondaryTextColor)
-
-                let condition = manager.getCondition(for: feature)
-                Text(condition.description)
-                    .font(.caption)
-                    .foregroundColor(themeManager.tertiaryTextColor)
-            }
-
-            Spacer()
-
-            let check = manager.checkUnlockCondition(feature)
-
-            if check.met {
-                Button {
-                    onUnlock()
-                } label: {
-                    Text("解锁")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(themeManager.accentTextColor)
-                        .cornerRadius(12)
-                }
-            } else {
-                Image(systemName: "lock.fill")
-                    .foregroundColor(themeManager.tertiaryTextColor)
-                    .font(.title3)
-            }
+    private var iconColor: Color {
+        if manager.isUnlocked(feature) {
+            return themeManager.accentTextColor
+        } else {
+            return themeManager.tertiaryTextColor
         }
-        .padding(.vertical, 4)
     }
-}
 
-// MARK: - 状态徽章
-struct StatusBadge: View {
-    let feature: FeatureItem
-
-    @StateObject private var manager = FeatureUnlockManager.shared
-    @Environment(ThemeManager.self) private var themeManager
-
-    var body: some View {
-        let isUnlocked = manager.isUnlocked(feature)
-        let isVisible = manager.isVisible(feature)
-
-        HStack(spacing: 6) {
-            if isUnlocked && isVisible {
-                Image(systemName: "checkmark.circle.fill")
-                Text("已解锁")
-            } else if isUnlocked && !isVisible {
-                Image(systemName: "eye.slash.fill")
-                Text("已隐藏")
-            } else {
-                Image(systemName: "lock.fill")
-                Text("未解锁")
-            }
+    private var statusText: String {
+        if manager.isUnlocked(feature) {
+            return manager.isVisible(feature) ? "已开启" : "已关闭"
+        } else {
+            let condition = manager.getCondition(for: feature)
+            return "未解锁 · \(condition.description)"
         }
-        .font(.caption)
-        .fontWeight(.medium)
-        .foregroundColor(isUnlocked ? (isVisible ? themeManager.accentTextColor : themeManager.tertiaryTextColor) : themeManager.secondaryTextColor)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            (isUnlocked ? (isVisible ? themeManager.accentTextColor : themeManager.tertiaryTextColor) : themeManager.secondaryTextColor)
-                .opacity(0.15)
-        )
-        .cornerRadius(12)
+    }
+
+    private var statusColor: Color {
+        if manager.isUnlocked(feature) {
+            return manager.isVisible(feature) ? themeManager.accentTextColor : themeManager.secondaryTextColor
+        } else {
+            return themeManager.tertiaryTextColor
+        }
     }
 }
 

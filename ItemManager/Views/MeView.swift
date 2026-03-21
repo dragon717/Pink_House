@@ -91,6 +91,8 @@ struct MeView: View {
                     // 1. VIP 卡片 (大卡片 1x2)
                     vipSection
                         .padding(.horizontal)
+                        // 萌宠对话引导VIP卡片高亮锚点
+                        .petChatGuideAnchor(.vipCard)
 
                     // 2. 魔法任务入口
                     NavigationLink(destination: MagicTasksView(), isActive: $showMagicTasks) {
