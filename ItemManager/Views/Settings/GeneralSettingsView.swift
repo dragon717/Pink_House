@@ -522,11 +522,93 @@ struct GeneralSettingsView: View {
             Text("预留")
                 .foregroundStyle(.secondary)
         }
+        
+        // 新手引导重置
+        NewbieGuideResetRow()
     }
 }
 
 extension UIImage: Identifiable {
     public var id: String {
         return UUID().uuidString
+    }
+}
+
+// MARK: - 新手引导重置行
+
+struct NewbieGuideResetRow: View {
+    @ObservedObject private var guideManager = NewbieGuideManager.shared
+    @State private var showingResetConfirmation = false
+    @State private var showingRestartGuide = false
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "person.fill.questionmark")
+                .foregroundStyle(.orange)
+            Text("新手引导")
+            Spacer()
+            
+            if guideManager.state.isCompleted {
+                Text("已完成")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else if guideManager.state.skippedAt != nil {
+                Text("已跳过")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                Text("未开始")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Color.gray.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingResetConfirmation = true
+        }
+        .confirmationDialog("新手引导", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("重新开启引导") {
+                guideManager.resetGuide()
+                showingRestartGuide = true
+            }
+            
+            if guideManager.state.isCompleted || guideManager.state.skippedAt != nil {
+                Button("标记为已完成", role: .destructive) {
+                    // 已经是完成状态，无需操作
+                }
+                .disabled(true)
+            }
+            
+            Button("取消", role: .cancel) {}
+        } message: {
+            if guideManager.state.isCompleted {
+                Text("新手引导已完成。你可以重置引导状态来重新体验。")
+            } else if guideManager.state.skippedAt != nil {
+                Text("新手引导已跳过。你可以重置引导状态来重新体验。")
+            } else {
+                Text("新手引导尚未开始或正在进行中。")
+            }
+        }
+        .alert("新手引导已重置", isPresented: $showingRestartGuide) {
+            Button("知道了") {}
+        } message: {
+            Text("下次启动应用时将重新显示新手引导。")
+        }
     }
 }

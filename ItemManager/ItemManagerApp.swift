@@ -112,6 +112,7 @@ struct MainContentView: View {
     @State private var showSplash = true
     @State private var showMigrationOverlay = false
     @State private var showDailyCheckIn = false
+    @StateObject private var guideManager = NewbieGuideManager.shared
     
     var body: some View {
         ZStack {
@@ -220,10 +221,14 @@ struct MainContentView: View {
                     showSplash = false
                 }
                 
-                // 4. 检查是否需要显示每日打卡（开屏结束后）
+                // 4. 启动新手引导（开屏结束后）
                 try? await Task.sleep(nanoseconds: 300_000_000) // 等待 0.3 秒确保动画完成
                 await MainActor.run {
-                    checkAndShowDailyCheckIn()
+                    guideManager.startGuide()
+                    // 检查是否需要显示每日打卡（仅在未显示新手引导时）
+                    if !guideManager.isShowingGuide {
+                        checkAndShowDailyCheckIn()
+                    }
                 }
             }
         }

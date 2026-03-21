@@ -162,15 +162,13 @@ struct ModernTabView: View {
         .environment(\.isSimulationActive, isSimulationActive)
         .overlay {
             RewardBubbleView()
-            // 只有萌宠功能已解锁时才显示悬浮宠物
-            if FeatureUnlockManager.shared.isUnlocked(.pet) {
-                PetOverlayView(action: {
-                    // 点击悬浮小猫：切换到萌宠对话 Tab
-                    withAnimation {
-                        selectedTab = 3
-                    }
-                }, petName: petDataManager.status.displayName)
-            }
+            // 悬浮宠物默认显示，不再依赖解锁状态
+            PetOverlayView(action: {
+                // 点击悬浮小猫：切换到萌宠对话 Tab
+                withAnimation {
+                    selectedTab = 3
+                }
+            }, petName: petDataManager.status.displayName)
             // 修复：使用正确的 Binding 传递 selectedTab
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
@@ -482,15 +480,13 @@ struct LegacyTabView: View {
         }
         .overlay {
             RewardBubbleView()
-            // 只有萌宠功能已解锁时才显示悬浮宠物
-            if FeatureUnlockManager.shared.isUnlocked(.pet) {
-                PetOverlayView(action: {
-                    // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
-                    withAnimation {
-                        selectedTab = 3
-                    }
-                }, petName: petDataManager.status.displayName)
-            }
+            // 悬浮宠物默认显示，不再依赖解锁状态
+            PetOverlayView(action: {
+                // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
+                withAnimation {
+                    selectedTab = 3
+                }
+            }, petName: petDataManager.status.displayName)
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
                 smallWorldDestination: $smallWorldDestination,
@@ -1241,6 +1237,7 @@ struct MainTabView: View {
                 }
                 .noticePopup()
                 .withMagicTaskCompletions()
+                .withNewbieGuide()
             } else {
                 // iOS 18-25 使用自定义红色背景底部导航栏
                 LegacyTabView(
@@ -1262,6 +1259,7 @@ struct MainTabView: View {
                 }
                 .noticePopup()
                 .withMagicTaskCompletions()
+                .withNewbieGuide()
             }
         }
         // 监听解锁后的跳转通知

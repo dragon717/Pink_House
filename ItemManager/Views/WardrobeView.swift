@@ -1330,9 +1330,17 @@ struct WardrobeStatsView: View {
     var dressValue: Decimal {
         clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
     }
-    
+
     var totalValue: Decimal {
         clothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
+    }
+
+    // 将Decimal格式化为整数（个位精度）的字符串
+    private func formatValue(_ value: Decimal) -> String {
+        let doubleValue = NSDecimalNumber(decimal: value).doubleValue
+        // 四舍五入到个位
+        let roundedValue = round(doubleValue)
+        return String(format: "%.0f", roundedValue)
     }
     
     // 获取默认手帐，如果没有则创建（只考虑未删除的手帐）
@@ -1366,11 +1374,11 @@ struct WardrobeStatsView: View {
 
                 Divider()
 
-                statItem(title: "裙装价值", value: "¥\(NSDecimalNumber(decimal: dressValue).stringValue)", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
+                statItem(title: "裙装价值", value: "¥\(formatValue(dressValue))", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
 
                 Divider()
 
-                statItem(title: "总价值", value: "¥\(NSDecimalNumber(decimal: totalValue).stringValue)", isVisible: $showTotalValue)
+                statItem(title: "总价值", value: "¥\(formatValue(totalValue))", isVisible: $showTotalValue)
             }
 
             // Bottom Actions - 三个功能入口
@@ -1443,6 +1451,7 @@ struct WardrobeStatsView: View {
 
     private func statItem(title: String, value: String, isVisible: Binding<Bool>, valueColor: Color? = nil) -> some View {
         VStack(spacing: 4) {
+            // 标题行：使用固定高度确保对齐
             HStack(spacing: 4) {
                 Text(title)
                     .font(.caption)
@@ -1460,12 +1469,15 @@ struct WardrobeStatsView: View {
                         .contentShape(Rectangle()) // Make it easier to tap
                 }
             }
+            .frame(height: 16) // 固定标题行高度
 
+            // 数值行：使用固定高度确保对齐
             Text(isVisible.wrappedValue ? value : "****")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(valueColor ?? palette.primary)
                 .contentTransition(.numericText())
+                .frame(height: 28) // 固定数值行高度
         }
         .frame(maxWidth: .infinity)
     }

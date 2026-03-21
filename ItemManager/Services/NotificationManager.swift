@@ -294,6 +294,97 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         try? modelContext.save()
     }
     
+    // MARK: - 未读通知管理
+    
+    /// 获取未读的通知记录数量（用于小红点显示）
+    @MainActor
+    func getUnreadTriggeredCount(modelContext: ModelContext) -> Int {
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate { $0.isTriggered == true && $0.isRead == false }
+        )
+        return (try? modelContext.fetchCount(descriptor)) ?? 0
+    }
+    
+    /// 获取未读的通知记录列表
+    @MainActor
+    func getUnreadTriggeredRecords(modelContext: ModelContext) -> [DepositNotificationRecord] {
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate { $0.isTriggered == true && $0.isRead == false },
+            sortBy: [SortDescriptor(\.actualDate, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    /// 一键标记所有已触发通知为已读
+    @MainActor
+    func markAllTriggeredAsRead(modelContext: ModelContext) {
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate { $0.isTriggered == true && $0.isRead == false }
+        )
+        
+        if let records = try? modelContext.fetch(descriptor) {
+            for record in records {
+                record.markAsRead()
+            }
+            try? modelContext.save()
+        }
+    }
+    
+    /// 一键清除所有已读通知
+    @MainActor
+    func clearAllReadNotifications(modelContext: ModelContext) {
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate { $0.isTriggered == true && $0.isRead == true }
+        )
+        
+        if let records = try? modelContext.fetch(descriptor) {
+            for record in records {
+                modelContext.delete(record)
+            }
+            try? modelContext.save()
+        }
+    }
+    
+    /// 限制历史记录数量（保留最新的50条）
+    @MainActor
+    func enforceHistoryLimit(modelContext: ModelContext, limit: Int = 50) {
+        // 获取所有已触发的记录，按时间倒序
+        let descriptor = FetchDescriptor<DepositNotificationRecord>(
+            predicate: #Predicate { $0.isTriggered == true },
+            sortBy: [SortDescriptor(\.actualDate, order: .reverse)]
+        )
+        
+        guard let allRecords = try? modelContext.fetch(descriptor) else { return }
+        
+        // 如果超过限制，删除多余的旧记录
+        if allRecords.count > limit {
+            let recordsToDelete = allRecords.suffix(from: limit)
+            for record in recordsToDelete {
+                modelContext.delete(record)
+            }
+            try? modelContext.save()
+        }
+    }
+    
+    /// 添加历史记录（模拟Apple通知，用于测试或手动添加）
+    @MainActor
+    func addNotificationHistory(clothing: Clothing, daysBefore: Int, triggerDate: Date, modelContext: ModelContext) {
+        let record = DepositNotificationRecord(
+            clothingID: clothing.id,
+            clothingName: clothing.name,
+            scheduledDate: triggerDate,
+            daysBefore: daysBefore,
+            source: "apple"
+        )
+        record.markAsTriggered(source: "apple")
+        modelContext.insert(record)
+        
+        // 添加后检查并限制数量
+        enforceHistoryLimit(modelContext: modelContext)
+        
+        try? modelContext.save()
+    }
+    
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"

@@ -67,10 +67,11 @@ struct HomeView: View {
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
-    @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == false }) private var pendingNotificationRecords: [DepositNotificationRecord]
+    @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == true && $0.isRead == false }) private var unreadNotificationRecords: [DepositNotificationRecord]
 
-    private var upcomingNotificationRecords: [DepositNotificationRecord] {
-        pendingNotificationRecords.filter { $0.scheduledDate >= Date() }
+    /// 未读通知数量（用于小红点显示）
+    private var unreadNotificationCount: Int {
+        unreadNotificationRecords.count
     }
 
     @Binding var selectedTab: HomeTab
@@ -436,12 +437,12 @@ struct HomeView: View {
             showingDepositNotificationSheet = true
         } label: {
             ZStack {
-                Image(systemName: "bell")
+                Image(systemName: unreadNotificationCount > 0 ? "bell.badge" : "bell")
                     .font(.system(size: 14))
                     .foregroundStyle(magicPalette.navigationForeground)
 
-                if !upcomingNotificationRecords.isEmpty {
-                    Text("\(min(upcomingNotificationRecords.count, 99))")
+                if unreadNotificationCount > 0 {
+                    Text("\(min(unreadNotificationCount, 99))")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 3)

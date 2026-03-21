@@ -21,21 +21,25 @@ final class DepositNotificationRecord {
     var isRead: Bool = false
     var createdAt: Date = Date()
     var lastModified: Date = Date()
+    /// 通知来源：apple = Apple推送通知, local = 本地记录
+    var source: String = "local"
     
-    init(clothingID: UUID, clothingName: String, scheduledDate: Date, daysBefore: Int) {
+    init(clothingID: UUID, clothingName: String, scheduledDate: Date, daysBefore: Int, source: String = "local") {
         self.id = UUID()
         self.clothingID = clothingID
         self.clothingName = clothingName
         self.scheduledDate = scheduledDate
         self.daysBefore = daysBefore
+        self.source = source
         self.createdAt = Date()
         self.lastModified = Date()
     }
     
     /// 标记为已触发
-    func markAsTriggered() {
+    func markAsTriggered(source: String = "apple") {
         self.isTriggered = true
         self.actualDate = Date()
+        self.source = source
         self.lastModified = Date()
     }
     

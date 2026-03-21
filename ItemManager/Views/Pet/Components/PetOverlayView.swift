@@ -17,6 +17,7 @@ struct PetOverlayView: View {
     @StateObject private var visionManager = VisionManager.shared
     @StateObject private var gestureHandler = PetGestureHandler()
     @StateObject private var aiAnalysisService = PetAIAnalysisService.shared
+    @StateObject private var guideManager = NewbieGuideManager.shared
     
     // MARK: - 状态管理（精简后的核心状态）
     
@@ -111,6 +112,10 @@ struct PetOverlayView: View {
     
     @ViewBuilder
     private func petViewLayer(geometry: GeometryProxy) -> some View {
+        // 新手引导跑步动画期间隐藏原悬浮小猫
+        let shouldHide = guideManager.isRunningAnimation || 
+                        (guideManager.currentStep == .pointing && guideManager.showPointingVideo)
+        
         PetImageView(
             petImagePrefix: petImagePrefix,
             state: interactionManager.state,
@@ -119,7 +124,7 @@ struct PetOverlayView: View {
             position: calculatePosition(geometry: geometry),
             rotation: getRotationAngle()
         )
-        .opacity(isHiddenForSnapshot ? 0 : 1)
+        .opacity(isHiddenForSnapshot || shouldHide ? 0 : 1)
     }
     
     @ViewBuilder

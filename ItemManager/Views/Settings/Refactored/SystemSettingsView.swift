@@ -2,6 +2,9 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+// 导入新手引导重置行组件
+// 注意：NewbieGuideResetRow 定义在 GeneralSettingsView.swift 中
+
 struct SystemSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var languageManager = LanguageManager.shared
@@ -59,7 +62,11 @@ struct SystemSettingsView: View {
                 } label: {
                     Label("打开系统设置", systemImage: "gear")
                 }
-                .adaptiveRow(showDivider: false)
+                .adaptiveRow()
+                
+                // 新手引导重置
+                NewbieGuideResetRow()
+                    .adaptiveRow(showDivider: false)
             }
             
             // MARK: - 数据备份与恢复

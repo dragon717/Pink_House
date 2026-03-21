@@ -19,11 +19,23 @@ struct DepositNotificationView: View {
     @State private var notificationTime: Date = Date()
     @State private var isExpanded = false
     @State private var showPermissionAlert = false
+    @State private var showClearReadConfirmation = false
 
     @Query(filter: #Predicate<Clothing> { $0.isDepositPlan == true && $0.deletedAt == nil }) private var depositPlans: [Clothing]
+    @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == true }, sort: \DepositNotificationRecord.actualDate, order: .reverse) private var triggeredRecords: [DepositNotificationRecord]
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    /// 未读记录数量
+    private var unreadCount: Int {
+        triggeredRecords.filter { !$0.isRead }.count
+    }
+
+    /// 已读记录数量
+    private var readCount: Int {
+        triggeredRecords.filter { $0.isRead }.count
     }
 
     var body: some View {
@@ -51,6 +63,8 @@ struct DepositNotificationView: View {
         }
         .onAppear {
             loadSettings()
+            // 进入页面时限制历史记录数量
+            NotificationManager.shared.enforceHistoryLimit(modelContext: modelContext)
         }
         .alert("需要通知权限", isPresented: $showPermissionAlert) {
             Button("去设置", role: .none) {
@@ -61,6 +75,14 @@ struct DepositNotificationView: View {
             Button("取消", role: .cancel) { }
         } message: {
             Text("请在设置中允许 App 发送通知，以便接收补款提醒。")
+        }
+        .alert("清除已读通知", isPresented: $showClearReadConfirmation) {
+            Button("清除", role: .destructive) {
+                NotificationManager.shared.clearAllReadNotifications(modelContext: modelContext)
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("确定要清除所有已读的通知记录吗？此操作不可撤销。")
         }
     }
 
@@ -187,19 +209,61 @@ struct DepositNotificationView: View {
 
     // MARK: - 历史补款记录（已发送的提醒）
 
-    @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == true }, sort: \DepositNotificationRecord.actualDate, order: .reverse) private var triggeredRecords: [DepositNotificationRecord]
-
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // 标题栏：标题 + 数量 + 操作按钮
             HStack {
                 Text("已发送提醒")
                     .font(.headline)
 
                 Spacer()
 
-                Text("\(triggeredRecords.count) 条")
-                    .font(.caption)
-                    .foregroundStyle(palette.secondaryText)
+                // 显示未读/总数
+                HStack(spacing: 4) {
+                    if unreadCount > 0 {
+                        Text("\(unreadCount) 未读")
+                            .font(.caption)
+                            .foregroundStyle(palette.cardAccent)
+                    }
+                    Text("/ \(triggeredRecords.count) 条")
+                        .font(.caption)
+                        .foregroundStyle(palette.secondaryText)
+                }
+            }
+
+            // 操作按钮栏
+            if !triggeredRecords.isEmpty {
+                HStack(spacing: 12) {
+                    // 一键已读按钮
+                    if unreadCount > 0 {
+                        Button {
+                            NotificationManager.shared.markAllTriggeredAsRead(modelContext: modelContext)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle")
+                                Text("一键已读")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(palette.accent)
+                        }
+                    }
+
+                    Spacer()
+
+                    // 一键清除已读按钮
+                    if readCount > 0 {
+                        Button {
+                            showClearReadConfirmation = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text("清除已读")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(palette.secondaryText)
+                        }
+                    }
+                }
             }
 
             if triggeredRecords.isEmpty {
@@ -312,6 +376,7 @@ struct TriggeredNotificationCard: View {
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -335,38 +400,82 @@ struct TriggeredNotificationCard: View {
             // 已发送的提醒列表
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(records) { record in
-                    HStack {
-                        // 提醒时间
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(formatDate(record.scheduledDate))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-
-                            Text(formatActualTime(record.actualDate))
-                                .font(.caption)
-                                .foregroundStyle(palette.secondaryText)
-                        }
-
-                        Spacer()
-
-                        // 提前天数标签
-                        Text(dayText(for: record.daysBefore))
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(palette.accent.opacity(0.15))
-                            .foregroundStyle(palette.accent)
-                            .clipShape(Capsule())
-                    }
-                    .padding(8)
-                    .background(Color(uiColor: .tertiarySystemGroupedBackground))
-                    .cornerRadius(8)
+                    NotificationRecordRow(record: record)
                 }
             }
         }
         .padding(12)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
+    }
+}
+
+// MARK: - 单条通知记录行
+
+struct NotificationRecordRow: View {
+    let record: DepositNotificationRecord
+
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
+
+    private var palette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // 未读指示器
+            if !record.isRead {
+                Circle()
+                    .fill(palette.cardAccent)
+                    .frame(width: 6, height: 6)
+            } else {
+                Circle()
+                    .fill(Color.clear)
+                    .frame(width: 6, height: 6)
+            }
+
+            // 提醒时间
+            VStack(alignment: .leading, spacing: 2) {
+                Text(formatDate(record.scheduledDate))
+                    .font(.subheadline)
+                    .fontWeight(record.isRead ? .regular : .medium)
+
+                HStack(spacing: 4) {
+                    // 来源标记
+                    if record.source == "apple" {
+                        Image(systemName: "apple.logo")
+                            .font(.system(size: 8))
+                    }
+                    Text(formatActualTime(record.actualDate))
+                        .font(.caption)
+                        .foregroundStyle(palette.secondaryText)
+                }
+            }
+
+            Spacer()
+
+            // 提前天数标签
+            Text(dayText(for: record.daysBefore))
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(record.isRead ? palette.secondaryText.opacity(0.1) : palette.accent.opacity(0.15))
+                .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
+                .clipShape(Capsule())
+        }
+        .padding(8)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground))
+        .cornerRadius(8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // 点击标记为已读
+            if !record.isRead {
+                record.markAsRead()
+                try? modelContext.save()
+            }
+        }
     }
 
     private func formatDate(_ date: Date) -> String {

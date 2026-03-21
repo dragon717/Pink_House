@@ -16,26 +16,27 @@ enum CropOverlayType: Equatable {
 
 struct ImageCropView: View {
     let image: UIImage
-    let aspectRatio: CGFloat? // Width / Height
-    let targetWidth: CGFloat? // Optional target width for output
+    let aspectRatio: CGFloat?
+    let targetWidth: CGFloat?
     let overlayType: CropOverlayType
     let onCrop: (UIImage) -> Void
     let onCancel: () -> Void
-    
+
     @State private var scale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastScale: CGFloat = 1.0
     @State private var lastOffset: CGSize = .zero
-    
-    // Optimization states
+
     @State private var displayedImage: UIImage?
     @State private var isPreparing = true
-    
-    init(image: UIImage, 
-         aspectRatio: CGFloat? = nil, 
-         targetWidth: CGFloat? = nil, 
+
+    private let maxDisplayDimension: CGFloat = 2560
+
+    init(image: UIImage,
+         aspectRatio: CGFloat? = nil,
+         targetWidth: CGFloat? = nil,
          overlayType: CropOverlayType = .rectangle,
-         onCrop: @escaping (UIImage) -> Void, 
+         onCrop: @escaping (UIImage) -> Void,
          onCancel: @escaping () -> Void) {
         self.image = image
         self.aspectRatio = aspectRatio
@@ -44,13 +45,42 @@ struct ImageCropView: View {
         self.onCrop = onCrop
         self.onCancel = onCancel
     }
-    
+
+    private func prepareImageDisplay() async -> UIImage? {
+        let originalSize = image.size
+
+        if aspectRatio == nil {
+            if max(originalSize.width, originalSize.height) <= maxDisplayDimension {
+                return image
+            }
+
+            let aspect = originalSize.width / originalSize.height
+            let targetSize: CGSize
+
+            if aspect > 1 {
+                targetSize = CGSize(width: maxDisplayDimension, height: maxDisplayDimension / aspect)
+            } else {
+                targetSize = CGSize(width: maxDisplayDimension * aspect, height: maxDisplayDimension)
+            }
+
+            return await image.byPreparingThumbnail(ofSize: targetSize) ?? image
+        } else {
+            if max(originalSize.width, originalSize.height) <= maxDisplayDimension {
+                return image
+            }
+
+            let scaleValue = maxDisplayDimension / max(originalSize.width, originalSize.height)
+            let newSize = CGSize(width: originalSize.width * scaleValue, height: originalSize.height * scaleValue)
+            return await image.byPreparingThumbnail(ofSize: newSize) ?? image
+        }
+    }
+
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
                 ZStack {
                     Color.black.ignoresSafeArea()
-                    
+
                     if isPreparing {
                         VStack {
                             ProgressView()
@@ -63,36 +93,30 @@ struct ImageCropView: View {
                     } else if let displayImg = displayedImage {
                         VStack {
                             Spacer()
-                            
-                            // Calculate crop area dimensions
+
                             let cropSize: CGSize = {
                                 if let ratio = aspectRatio {
-                                    // With padding for specific aspect ratio
                                     let width = geometry.size.width - 40
                                     let height = width / ratio
-                                    
-                                    // Check if height fits
-                                    if height > geometry.size.height - 100 { // Allow some vertical padding
+
+                                    if height > geometry.size.height - 100 {
                                         let h = geometry.size.height - 100
                                         let w = h * ratio
                                         return CGSize(width: w, height: h)
                                     }
-                                    
+
                                     return CGSize(width: width, height: height)
                                 } else {
-                                    // Full screen for nil aspect ratio
                                     return geometry.size
                                 }
                             }()
-                            
+
                             ZStack {
-                                // Mask to clip content visually
-                                Color.black // Background behind image
-                                
-                                // The Image
+                                Color.black
+
                                 Image(uiImage: displayImg)
                                     .resizable()
-                                    .scaledToFill()
+                                    .scaledToFit()
                                     .scaleEffect(scale)
                                     .offset(offset)
                                     .gesture(
@@ -105,7 +129,6 @@ struct ImageCropView: View {
                                                 }
                                                 .onEnded { _ in
                                                     lastScale = 1.0
-                                                    // Optional: Add bounds check or bounce back here
                                                     if scale < 0.5 { withAnimation { scale = 0.5 } }
                                                     if scale > 5.0 { withAnimation { scale = 5.0 } }
                                                 },
@@ -126,15 +149,11 @@ struct ImageCropView: View {
                                     )
                             }
                             .frame(width: cropSize.width, height: cropSize.height)
-                            // Apply clip shape based on overlay type
-                            .clipShape(AnyShape(shapeForOverlay()))
-                            .overlay(
-                                overlayView()
-                            )
-                            .contentShape(Rectangle()) // Ensure gestures work within the frame
-                            
+                            .clipped()
+                            .overlay(overlayView())
+
                             Spacer()
-                            
+
                             Text("双指缩放，单指拖动")
                                 .foregroundStyle(.gray)
                                 .padding(.bottom)
@@ -150,8 +169,7 @@ struct ImageCropView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("完成") {
                             guard let displayImg = displayedImage else { return }
-                            
-                            // Calculate crop dimensions again for consistency
+
                             let cropSize: CGSize = {
                                 if let ratio = aspectRatio {
                                     let width = geometry.size.width - 40
@@ -166,31 +184,22 @@ struct ImageCropView: View {
                                     return geometry.size
                                 }
                             }()
-                            
-                            // Determine output size
-                            // If targetWidth is provided, use it.
-                            // Otherwise, if we downsampled, maybe we should try to be smart, 
-                            // but simpler is to output at the "display resolution" scaled up to match original if needed?
-                            // No, let's keep it simple:
-                            // If targetWidth is set (e.g. 1080), we output at that width.
-                            // If not, we output at the cropSize * screenScale (basically screen res crop).
-                            
+
                             let outputWidth: CGFloat
                             let outputHeight: CGFloat
                             let multiplier: CGFloat
-                            
+
                             if let targetW = targetWidth {
                                 outputWidth = targetW
                                 outputHeight = outputWidth / (cropSize.width / cropSize.height)
                                 multiplier = outputWidth / cropSize.width
                             } else {
-                                // Default to 2x or 3x screen scale for good quality
                                 let screenScale = UIScreen.main.scale
                                 outputWidth = cropSize.width * screenScale
                                 outputHeight = cropSize.height * screenScale
                                 multiplier = screenScale
                             }
-                            
+
                             cropImage(image: displayImg, width: outputWidth, height: outputHeight, multiplier: multiplier)
                         }
                         .foregroundStyle(.white)
@@ -200,11 +209,11 @@ struct ImageCropView: View {
             }
         }
         .task {
-            // Optimization: Prepare image in background
-            await prepareImage()
+            displayedImage = await prepareImageDisplay()
+            isPreparing = false
         }
     }
-    
+
     private func shapeForOverlay() -> any Shape {
         switch overlayType {
         case .rectangle:
@@ -214,10 +223,10 @@ struct ImageCropView: View {
         case .roundedRectangle(let radius):
             return RoundedRectangle(cornerRadius: radius)
         case .none:
-            return Rectangle() // Default clip to rectangle for none
+            return Rectangle()
         }
     }
-    
+
     @ViewBuilder
     private func overlayView() -> some View {
         switch overlayType {
@@ -231,60 +240,28 @@ struct ImageCropView: View {
             EmptyView()
         }
     }
-    
-    private func prepareImage() async {
-        // Max dimension to keep in memory for display
-        // 2560px is good enough for any phone screen (even Pro Max is ~1290pt @3x ~> 4000px, but 2560 is safe for memory)
-        // Actually, for "Low Memory", let's be conservative. 2048 is a standard texture size.
-        let maxDimension: CGFloat = 2048 
-        
-        let originalSize = image.size
-        
-        if max(originalSize.width, originalSize.height) > maxDimension {
-            // Resize needed
-            let scale = maxDimension / max(originalSize.width, originalSize.height)
-            let newSize = CGSize(width: originalSize.width * scale, height: originalSize.height * scale)
-            
-            // Perform resize on background thread
-            let resized = await image.byPreparingThumbnail(ofSize: newSize)
-            
-            await MainActor.run {
-                self.displayedImage = resized ?? image // Fallback to original if fail
-                self.isPreparing = false
-            }
-        } else {
-            await MainActor.run {
-                self.displayedImage = image
-                self.isPreparing = false
-            }
-        }
-    }
-    
+
     @MainActor
     private func cropImage(image: UIImage, width: CGFloat, height: CGFloat, multiplier: CGFloat) {
-        // Render the view at high resolution
         let renderer = ImageRenderer(content:
             ZStack {
-                Color.clear // Ensure background is transparent
+                Color.clear
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
                     .scaleEffect(scale)
                     .offset(x: offset.width * multiplier, y: offset.height * multiplier)
                     .frame(width: width, height: height)
-                    .clipped()
             }
             .frame(width: width, height: height)
         )
-        
-        // Ensure we get a good quality image
-        renderer.scale = 1.0 
-        renderer.isOpaque = false // Enable transparency support
-        
+
+        renderer.scale = 1.0
+        renderer.isOpaque = false
+
         if let cropped = renderer.uiImage {
             onCrop(cropped)
         } else {
-            // Fallback (shouldn't happen usually)
             onCancel()
         }
     }
