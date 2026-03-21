@@ -1442,8 +1442,9 @@ struct WardrobeStatsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(16)
+        .background {
+            CardBackgroundView(cornerRadius: 16)
+        }
         .sheet(isPresented: $showDailyCheckIn) {
             DailyCheckInView()
         }

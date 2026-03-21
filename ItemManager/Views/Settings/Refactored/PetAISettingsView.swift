@@ -54,6 +54,16 @@ struct PetAISettingsView: View {
                         Spacer()
                     }
                 }
+                .adaptiveRow()
+
+                NavigationLink(destination: PetCustomizationView()) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.pink)
+                        Text("拖拽轨迹与气泡")
+                        Spacer()
+                    }
+                }
                 .adaptiveRow(showDivider: false)
             }
         }

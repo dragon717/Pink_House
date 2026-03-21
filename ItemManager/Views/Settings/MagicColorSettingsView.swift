@@ -13,8 +13,9 @@ struct MagicColorSettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
 
-    // 当前选中的页签
+    // 当前选中的页签，initTab 用于首次显示的页签（外部指定）
     @State private var selectedTab: ColorSchemeMode = .custom
+    @State private var initTab: ColorSchemeMode?
 
     // 功能解锁管理器
     @StateObject private var unlockManager = FeatureUnlockManager.shared
@@ -31,55 +32,83 @@ struct MagicColorSettingsView: View {
     // 我的主题方案展开状态
     @State private var isMyThemesExpanded: Bool = false
 
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // 预览区域 - 主题色卡片示例
-                ThemePreviewSection()
-                    .frame(height: 260)
-
-                // 内容区域
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // 配色模式页签（原生魔法配色 / 客制化配色）
-                        colorSchemeModeTabs
-
-                        // 卡片样式设置（所有模式共用）
-                        CardStyleSection(
-                            cardStyle: $cardStyle,
-                            skirtFillMode: $skirtFillMode,
-                            transparentOpacity: $transparentOpacity,
-                            tintOpacity: $tintOpacity
-                        )
-
-                        // 配色设置内容
-                        switch selectedTab {
-                        case .magic:
-                            MagicColorTabContent()
-                        case .custom:
-                            CustomColorTabContent(
-                                isMyThemesExpanded: $isMyThemesExpanded,
-                                onPresetSelected: { preset in
-                                    applyPreset(preset)
-                                },
-                                onPersonalizationTap: {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        isMyThemesExpanded.toggle()
-                                    }
-                                }
-                            )
-                        }
-
-                        // 我的主题方案模块（点击个性化后展开）
-                        if selectedTab == .custom && isMyThemesExpanded {
-                            MagicThemeModuleSection()
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
-                    }
-                    .padding()
+    // 主题背景 - 不使用全局模糊
+    private var themeBackground: some View {
+        Group {
+            switch themeManager.backgroundStyle {
+            case .color:
+                themeManager.backgroundColor
+            case .image:
+                if let image = themeManager.backgroundImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    // 没有图片时回退到背景色
+                    themeManager.backgroundColor
                 }
             }
-            .background(LiquidBackground())
+        }
+        .ignoresSafeArea()
+    }
+
+    init(initialTab: ColorSchemeMode? = nil) {
+        _initTab = State(initialValue: initialTab)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // 底层背景
+                themeBackground
+                
+                VStack(spacing: 0) {
+                    // 预览区域 - 主题色卡片示例
+                    ThemePreviewSection()
+                        .frame(height: 260)
+
+                    // 内容区域
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // 配色模式页签（原生魔法配色 / 客制化配色）
+                            colorSchemeModeTabs
+
+                            // 卡片样式设置（所有模式共用）
+                            CardStyleSection(
+                                cardStyle: $cardStyle,
+                                skirtFillMode: $skirtFillMode,
+                                transparentOpacity: $transparentOpacity,
+                                tintOpacity: $tintOpacity
+                            )
+
+                            // 配色设置内容
+                            switch selectedTab {
+                            case .magic:
+                                MagicColorTabContent()
+                            case .custom:
+                                CustomColorTabContent(
+                                    isMyThemesExpanded: $isMyThemesExpanded,
+                                    onPresetSelected: { preset in
+                                        applyPreset(preset)
+                                    },
+                                    onPersonalizationTap: {
+                                        withAnimation(.easeInOut(duration: 0.25)) {
+                                            isMyThemesExpanded.toggle()
+                                        }
+                                    }
+                                )
+                            }
+
+                            // 我的主题方案模块（点击个性化后展开）
+                            if selectedTab == .custom && isMyThemesExpanded {
+                                MagicThemeModuleSection()
+                                    .transition(.move(edge: .top).combined(with: .opacity))
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
             .navigationTitle("主题配色")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -94,18 +123,23 @@ struct MagicColorSettingsView: View {
                 Text(condition.description)
             }
             .onAppear {
-                let savedMode = themeManager.colorSchemeMode
-                if savedMode == .magic && !unlockManager.isUnlocked(.themeCustomize) {
-                    selectedTab = .custom
-                    themeManager.switchColorSchemeMode(to: .custom)
+                // 优先使用外部指定的初始页签
+                if let tab = initTab {
+                    selectedTab = tab
                 } else {
-                    selectedTab = savedMode
+                    let savedMode = themeManager.colorSchemeMode
+                    if savedMode == .magic && !unlockManager.isUnlocked(.themeCustomize) {
+                        selectedTab = .custom
+                        themeManager.switchColorSchemeMode(to: .custom)
+                    } else {
+                        selectedTab = savedMode
+                    }
                 }
                 cardStyle = themeManager.cardStyle
                 skirtFillMode = themeManager.skirtFillMode
                 transparentOpacity = themeManager.transparentOpacity
                 tintOpacity = themeManager.tintOpacity
-                
+
                 // 如果当前是客制化配色且没有选中预设（即使用个性化主题），默认展开我的主题方案
                 let config = themeManager.themeColorConfig
                 if config.colorSchemeMode == .custom && config.customColorConfig.selectedPresetId == nil {
@@ -430,4 +464,11 @@ struct PetChatSkinSection: View {
 #Preview {
     MagicColorSettingsView()
         .environment(ThemeManager.shared)
+}
+
+// MARK: - 魔法配色页面包装（用于从魔法任务跳转，自动切换到魔法配色标签）
+struct MagicColorSettingsViewWithMagicTab: View {
+    var body: some View {
+        MagicColorSettingsView(initialTab: .magic)
+    }
 }

@@ -17,11 +17,12 @@ struct ThemePreviewSection: View {
         let isDark = colorScheme == .dark
         switch themeManager.colorSchemeMode {
         case .magic:
-            // 魔法配色：使用自适应调色板生成主题
+            // 魔法配色：使用自适应调色板生成主题，使用 cardTintColor 作为强调色
             return ThemePreset.fromAdaptivePalette(
                 themeManager.adaptivePalette,
                 cardBackground: themeManager.cardBackgroundColor,
-                isDarkMode: isDark
+                isDarkMode: isDark,
+                accentColor: themeManager.cardTintColor
             )
         case .custom:
             // 客制化配色：使用当前自定义主题
@@ -69,28 +70,23 @@ struct ThemePreviewSection: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // 背景 - 填充整个区域
-            themeBackground
-                .ignoresSafeArea()
+        // 预览内容 - 使用 TabView 实现左右滑动
+        VStack(spacing: 4) {
+            // 标签
+            HStack {
+                Text("主题预览")
+                    .font(.caption)
+                    .foregroundStyle(textColors.tertiary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
 
-            // 预览内容 - 使用 TabView 实现左右滑动
-            VStack(spacing: 4) {
-                // 灰色遮罩 - 只覆盖预览区域（到红曲线位置）
+            // 左右滑动的模块预览（带灰色遮罩）
+            ZStack {
+                // 灰色遮罩 - 覆盖整个预览区域
                 Color.black
                     .opacity(themeManager.backgroundStyle == .image ? 0.3 : 0.1)
-                    .frame(height: 280)
 
-                // 标签
-                HStack {
-                    Text("主题预览")
-                        .font(.caption)
-                        .foregroundStyle(textColors.tertiary)
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-
-                // 左右滑动的模块预览
                 TabView {
                     // 第 1 页：主题色卡片示例（原预览）
                     clothingCardPreview
@@ -108,18 +104,18 @@ struct ThemePreviewSection: View {
                     petChatBubblePreview
                 }
                 .tabViewStyle(.page(indexDisplayMode: .always))
-                .frame(height: 180)
-
-                // 图例说明
-                HStack(spacing: 16) {
-                    LegendItem(color: textColors.primary, label: "主要")
-                    LegendItem(color: textColors.secondary, label: "次要")
-                    LegendItem(color: textColors.tertiary, label: "辅助")
-                    LegendItem(color: textColors.accent, label: "强调")
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
             }
+            .frame(height: 180)
+
+            // 图例说明
+            HStack(spacing: 16) {
+                LegendItem(color: textColors.primary, label: "主要")
+                LegendItem(color: textColors.secondary, label: "次要")
+                LegendItem(color: textColors.tertiary, label: "辅助")
+                LegendItem(color: textColors.accent, label: "强调")
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
         }
     }
 
@@ -415,22 +411,6 @@ struct ThemePreviewSection: View {
             .clipShape(Capsule())
     }
 
-    private var themeBackground: some View {
-        Group {
-            switch themeManager.backgroundStyle {
-            case .color:
-                themeManager.backgroundColor
-            case .image:
-                if let image = themeManager.backgroundImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Color.black
-                }
-            }
-        }
-    }
 }
 
 // MARK: - 图例项

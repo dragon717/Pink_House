@@ -1285,7 +1285,16 @@ struct MainTabView: View {
             withAnimation {
                 selectedTab = 2 // 切换到"我"Tab
             }
-            // 这里可以进一步细化跳转到具体设置项
+            // 如果有具体功能参数，延迟后发送到 MeView 处理导航
+            if let feature = notification.userInfo?["feature"] as? String {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    NotificationCenter.default.post(
+                        name: .navigateToSettingsFeature,
+                        object: nil,
+                        userInfo: ["feature": feature]
+                    )
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToHomeTab)) { notification in
             // 跳转到衣橱页面（用于批量导入等功能）
@@ -1312,6 +1321,80 @@ struct MainTabView: View {
                     object: nil
                 )
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPetChat)) { _ in
+            // 跳转到萌宠对话页面
+            withAnimation {
+                selectedTab = 3
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showFirstUseGuide)) { notification in
+            // 显示功能首次使用引导
+            if let featureString = notification.userInfo?["feature"] as? String,
+               let feature = FeatureItem(rawValue: featureString) {
+                // 跳转到对应功能并显示引导
+                navigateToFeatureWithGuide(feature)
+            }
+        }
+    }
+
+    private func navigateToFeatureWithGuide(_ feature: FeatureItem) {
+        switch feature {
+        case .dataBackup:
+            // 跳转到设置页面的备份功能
+            withAnimation {
+                selectedTab = 2
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(
+                    name: .navigateToSettings,
+                    object: nil,
+                    userInfo: ["feature": "dataBackup"]
+                )
+            }
+        case .cloudSync:
+            // 跳转到设置页面的iCloud同步功能
+            withAnimation {
+                selectedTab = 2
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(
+                    name: .navigateToSettings,
+                    object: nil,
+                    userInfo: ["feature": "cloudSync"]
+                )
+            }
+        case .themeCustomize:
+            // 跳转到设置页面的主题功能
+            withAnimation {
+                selectedTab = 2
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(
+                    name: .navigateToSettings,
+                    object: nil,
+                    userInfo: ["feature": "themeCustomize"]
+                )
+            }
+        case .ootd:
+            // 跳转到衣橱页面，然后显示OOTD
+            withAnimation {
+                selectedTab = 0
+                homeTabSelection = .wardrobe
+            }
+        case .wealth:
+            // 跳转到萌宠页面
+            withAnimation {
+                selectedTab = 3
+            }
+        case .batchImport:
+            // 跳转到衣橱页面的批量导入
+            withAnimation {
+                selectedTab = 0
+                homeTabSelection = .wardrobe
+            }
+        default:
+            break
         }
     }
 }

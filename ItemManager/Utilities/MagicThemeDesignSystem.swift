@@ -52,6 +52,10 @@ enum MagicThemeDesignSystem {
             }
         }()
 
+        // 分段选择器背景
+        let segmentedBackground = cardBackground.opacity(isDark ? 0.46 : 0.72)
+        let segmentedSelectedBackground = cardBackground.mixed(with: .white, amount: isDark ? 0.08 : 0.18)
+
         let bubbleStart = accent.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
         let bubbleEnd = cardAccent.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
 
@@ -64,8 +68,8 @@ enum MagicThemeDesignSystem {
             cardAccent: cardAccent,
             navigationBackground: navigationBackground,
             navigationForeground: navigationBackground.contrastColor,
-            segmentedBackground: cardAccent.opacity(isDark ? 0.22 : 0.14),
-            segmentedSelectedBackground: cardBackground.mixed(with: .white, amount: isDark ? 0.08 : 0.18),
+            segmentedBackground: segmentedBackground,
+            segmentedSelectedBackground: segmentedSelectedBackground,
             segmentedSelectedForeground: text.primary.color,
             quickOptionFill: accent.opacity(isDark ? 0.20 : 0.12),
             quickOptionStroke: accent.opacity(isDark ? 0.45 : 0.28),

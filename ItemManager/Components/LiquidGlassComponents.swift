@@ -83,6 +83,7 @@ struct LiquidBackground: View {
 
 // MARK: - Glass Card
 /// 统一配色的玻璃卡片组件，支持魔法配色和客制化配色
+/// 使用 CardBackgroundView 统一处理卡片背景，确保色调强度实时变化
 struct GlassCard<Content: View>: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -97,75 +98,16 @@ struct GlassCard<Content: View>: View {
         self.content = content()
     }
 
-    /// 当前卡片样式（根据 ThemeManager 配置）
-    private var cardStyle: UnifiedColorConfig.CardStyle {
-        UnifiedColorConfig.CardStyle.current(from: themeManager)
-    }
-
     var body: some View {
         ZStack {
-            // 根据配置选择背景样式
-            cardBackground
-
-            // 边框（仅非全透明模式下显示）
-            if !isFullyTransparent {
-                cardBorder
-            }
+            // 使用 CardBackgroundView 统一处理卡片背景
+            CardBackgroundView(cornerRadius: cornerRadius)
 
             content
                 .padding(padding)
         }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .unifiedShadow(.card)
-    }
-    
-    /// 卡片背景
-    @ViewBuilder
-    private var cardBackground: some View {
-        switch cardStyle {
-        case .ultraThinMaterial:
-            // 优化：低内存设备使用简单颜色
-            if ProcessInfo.processInfo.physicalMemory <= 2 * 1024 * 1024 * 1024 {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemBackground).opacity(0.8))
-            } else {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.9)
-            }
-        default:
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(cardStyle.backgroundColor(colorScheme: colorScheme))
-        }
-    }
-    
-    /// 卡片边框
-    private var cardBorder: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .stroke(
-                LinearGradient(
-                    colors: borderColors,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-            )
-    }
-    
-    /// 边框颜色（根据配色模式调整）
-    private var borderColors: [Color] {
-        let isDark = colorScheme == .dark
-        return [
-            isDark ? Color.white.opacity(0.3) : Color.white.opacity(0.6),
-            isDark ? Color.white.opacity(0.05) : Color.white.opacity(0.1)
-        ]
-    }
-    
-    /// 是否为全透明模式
-    private var isFullyTransparent: Bool {
-        if case .fullyTransparent = cardStyle {
-            return true
-        }
-        return false
     }
 }
 

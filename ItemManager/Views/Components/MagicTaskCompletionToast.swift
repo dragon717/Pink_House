@@ -529,6 +529,12 @@ struct MagicTaskCompletionStackView: View {
                                 object: nil,
                                 userInfo: ["destination": destination]
                             )
+                        } else if feature == .aiAnalysis {
+                            // 萌宠智能对话跳转到萌宠对话Tab
+                            NotificationCenter.default.post(
+                                name: .navigateToPetChat,
+                                object: nil
+                            )
                         } else if feature.isSettingsFeature {
                             NotificationCenter.default.post(
                                 name: .navigateToSettings,

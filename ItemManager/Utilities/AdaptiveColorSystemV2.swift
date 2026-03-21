@@ -123,12 +123,12 @@ struct ThemePreset: Codable, Identifiable {
     }
 
     /// 从自适应调色板创建主题预设（用于魔法配色预览）
-    static func fromAdaptivePalette(_ palette: AdaptivePalette, cardBackground: Color, isDarkMode: Bool) -> ThemePreset {
+    static func fromAdaptivePalette(_ palette: AdaptivePalette, cardBackground: Color, isDarkMode: Bool, accentColor: Color) -> ThemePreset {
         // 将 Color 转换为 ColorRGBA
         let primaryRGBA = palette.primary.rgba ?? ColorRGBA(r: 0, g: 0, b: 0)
         let secondaryRGBA = palette.secondary.rgba ?? ColorRGBA(r: 0.3, g: 0.3, b: 0.3)
         let tertiaryRGBA = palette.tertiary.rgba ?? ColorRGBA(r: 0.5, g: 0.5, b: 0.5)
-        let accentRGBA = palette.accent.rgba ?? ColorRGBA(r: 1, g: 0.4, b: 0.7)
+        let accentRGBA = accentColor.rgba ?? ColorRGBA(r: 1, g: 0.4, b: 0.7)
         let cardBgRGBA = cardBackground.rgba ?? ColorRGBA(r: 1, g: 1, b: 1)
 
         let cardConfig = CardColorConfig(

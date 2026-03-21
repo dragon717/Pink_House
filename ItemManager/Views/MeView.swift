@@ -4,6 +4,15 @@ import AuthenticationServices
 import SwiftData
 import CloudKit
 
+// MARK: - 设置功能导航目的地
+enum SettingsNavigationDestination: String, Identifiable {
+    case themeCustomize = "themeCustomize"
+    case widgetCustomize = "widgetCustomize"
+    case batchImport = "batchImport"
+
+    var id: String { rawValue }
+}
+
 struct MeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
@@ -12,13 +21,14 @@ struct MeView: View {
     @StateObject private var authManager = AuthenticationManager.shared
     @StateObject private var cloudManager = CloudSyncManager.shared
     @ObservedObject private var vipManager = VIPManager.shared
-    
+
     @State private var isImporting = false
     @State private var showingImportAlert = false
     @State private var importMessage = ""
     @State private var showingCloudSyncSheet = false
     @State private var showMagicTasks = false
-    
+    @State private var navigationDestination: String? = nil
+
     // Grid Layout
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -81,7 +91,7 @@ struct MeView: View {
                     // 1. VIP 卡片 (大卡片 1x2)
                     vipSection
                         .padding(.horizontal)
-                    
+
                     // 2. 魔法任务入口
                     NavigationLink(destination: MagicTasksView(), isActive: $showMagicTasks) {
                         HStack(spacing: 16) {
@@ -247,6 +257,18 @@ struct MeView: View {
                 LiquidBackground()
             }
             .navigationTitle("我")
+            .navigationDestination(for: String.self) { destination in
+                switch destination {
+                case "themeCustomize":
+                    MagicColorSettingsView()
+                case "widgetCustomize":
+                    WidgetSettingsView()
+                case "batchImport":
+                    WardrobeSettingsView()
+                default:
+                    EmptyView()
+                }
+            }
             .sheet(isPresented: $showingCloudSyncSheet) {
                 CloudSyncSheetView(
                     authManager: authManager,
@@ -275,6 +297,29 @@ struct MeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .showMagicTasks)) { _ in
                 showMagicTasks = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToSettingsFeature)) { notification in
+                if let feature = notification.userInfo?["feature"] as? String {
+                    navigationDestination = feature
+                }
+            }
+            .overlay {
+                hiddenNavigationLinks
+            }
+        }
+    }
+
+    // MARK: - 隐藏的 NavigationLink 用于编程导航
+    private var hiddenNavigationLinks: some View {
+        Group {
+            NavigationLink(destination: MagicColorSettingsViewWithMagicTab(), tag: "themeCustomize", selection: $navigationDestination) {
+                EmptyView()
+            }
+            NavigationLink(destination: WidgetSettingsView(), tag: "widgetCustomize", selection: $navigationDestination) {
+                EmptyView()
+            }
+            NavigationLink(destination: WardrobeSettingsView(), tag: "batchImport", selection: $navigationDestination) {
+                EmptyView()
             }
         }
     }

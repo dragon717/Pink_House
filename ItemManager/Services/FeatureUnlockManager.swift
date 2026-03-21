@@ -135,7 +135,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .themeCustomize: return "魔法配色"
         case .widgetCustomize: return "小组件定制"
         case .aiAnalysis:
-            return "AI智能分析"
+            return "萌宠智能对话"
         case .networkCommunity:
             return "联网社区"
         case .magicTasks:
@@ -162,7 +162,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .themeCustomize: return "paintpalette.fill"
         case .widgetCustomize: return "rectangle.grid.2x2.fill"
         case .aiAnalysis:
-            return "brain.fill"
+            return "bubble.left.and.bubble.right.fill"
         case .networkCommunity:
             return "network"
         case .magicTasks:

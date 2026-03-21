@@ -546,6 +546,12 @@ struct GlobalUnlockNotificationOverlay: View {
                                 object: nil,
                                 userInfo: ["destination": destination]
                             )
+                        } else if feature == .aiAnalysis {
+                            // 萌宠智能对话跳转到萌宠对话页面
+                            NotificationCenter.default.post(
+                                name: .navigateToPetChat,
+                                object: nil
+                            )
                         } else if feature.isSettingsFeature {
                             // 设置功能，跳转到设置页面
                             NotificationCenter.default.post(
@@ -565,9 +571,12 @@ struct GlobalUnlockNotificationOverlay: View {
 extension Notification.Name {
     static let navigateToSmallWorldDestination = Notification.Name("navigateToSmallWorldDestination")
     static let navigateToSettings = Notification.Name("navigateToSettings")
+    static let navigateToSettingsFeature = Notification.Name("navigateToSettingsFeature")
     static let navigateToHomeTab = Notification.Name("navigateToHomeTab")
     static let navigateToMagicTasks = Notification.Name("navigateToMagicTasks")
     static let showMagicTasks = Notification.Name("showMagicTasks")
+    static let navigateToPetChat = Notification.Name("navigateToPetChat")
+    static let showFirstUseGuide = Notification.Name("showFirstUseGuide")
 }
 
 // MARK: - View 扩展

@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - 魔法任务视图
 struct MagicTasksView: View {
     @StateObject private var manager = FeatureUnlockManager.shared
+    @StateObject private var guideManager = NewbieGuideManager.shared
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) private var dismiss
 
@@ -383,6 +384,32 @@ struct MagicTaskDetailView: View {
                             }
                         }
 
+                        // 引导使用按钮（首次使用时显示）
+                        if manager.isUnlocked(feature) && FeatureUnlockManager.guidedFeatures.contains(feature) {
+                            Section {
+                                Button {
+                                    dismiss()
+                                    // 触发首次使用引导
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        NotificationCenter.default.post(
+                                            name: .showFirstUseGuide,
+                                            object: nil,
+                                            userInfo: ["feature": feature.rawValue]
+                                        )
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "sparkles")
+                                        Text("引导使用")
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                    }
+                                }
+                                .tint(.pink)
+                            }
+                        }
+
                         // 进入功能按钮（如果该功能有对应页面）
                         if let destination = feature.destination {
                             Section {
@@ -413,7 +440,7 @@ struct MagicTaskDetailView: View {
                             Section {
                                 Button {
                                     dismiss()
-                                    // 批量导入在衣橱界面，其他设置在"我"页面
+                                    // 批量导入在衣橱界面，萌宠智能对话在萌宠对话Tab，其他设置在"我"页面
                                     if feature == .batchImport {
                                         // 跳转到衣橱页面
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -421,6 +448,14 @@ struct MagicTaskDetailView: View {
                                                 name: .navigateToHomeTab,
                                                 object: nil,
                                                 userInfo: ["homeTab": "wardrobe"]
+                                            )
+                                        }
+                                    } else if feature == .aiAnalysis {
+                                        // 萌宠智能对话跳转到萌宠对话Tab
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            NotificationCenter.default.post(
+                                                name: .navigateToPetChat,
+                                                object: nil
                                             )
                                         }
                                     } else {

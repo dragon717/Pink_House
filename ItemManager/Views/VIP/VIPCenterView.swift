@@ -90,7 +90,7 @@ struct VIPCenterView: View {
                             .fontWeight(.bold)
                             .foregroundStyle(privilegeTitleColor)
                         
-                        privilegeRow(icon: "brain.head.profile", title: "智能对话", desc: "解锁基于 DeepSeek 的超强 AI 对话能力，萌宠变身贴心闺蜜。")
+                        privilegeRow(icon: "brain.head.profile", title: "智能对话", desc: "解锁基于语言大模型 的超强 AI 对话能力，萌宠变身贴心管家。")
                         privilegeRow(icon: "mic.fill", title: "语音交互", desc: "支持自然语言语音对话，无需打字。")
                         privilegeRow(icon: "crown.fill", title: "尊贵身份", desc: getCardDescription())
                     }

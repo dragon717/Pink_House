@@ -1,253 +1,203 @@
 ---
 name: "swiftui-theme-adaptation"
-description: "SwiftUI主题色适配技能。当需要为SwiftUI视图添加魔法配色主题支持、适配暗黑模式、统一颜色管理时调用。包含ThemeManager使用、颜色映射、卡片背景、边框样式等最佳实践。"
+description: "SwiftUI 主题色适配技能。当需要为 SwiftUI 视图添加魔法配色主题支持、适配暗黑模式、统一颜色管理时调用。包含 ThemeManager 使用、颜色映射、卡片背景、边框样式等最佳实践。"
 ---
 
-# SwiftUI 主题色适配技能
+# SwiftUI 主题色适配最佳实践
 
-## 概述
+## 核心原则
 
-本技能用于将 SwiftUI 视图适配到魔法配色主题系统，确保界面在不同主题色下保持一致性和美观性。
+1. **背景层分离**：预览区域和设置区域应使用独立的背景层，避免遮罩冲突
+2. **颜色统一管理**：通过 ThemeManager 集中管理所有主题相关颜色
+3. **暗黑模式适配**：所有颜色配置必须同时支持亮色和暗色模式
+4. **遮罩局部化**：灰色遮罩只应用于特定预览区域，不应影响全局
 
-## 何时调用
+## 主题背景实现
 
-- 为新页面/组件添加主题色支持
-- 修改现有视图的颜色适配
-- 统一项目中的颜色管理
-- 添加暗黑模式支持
-- 创建可复用的主题化组件
-
-## 核心概念
-
-### 1. ThemeManager 颜色体系
+### 正确的背景层结构
 
 ```swift
-@Environment(ThemeManager.self) private var themeManager
-```
-
-| 属性 | 用途 | 适用场景 |
-|------|------|----------|
-| `primaryTextColor` | 主要文字 | 标题、重要内容 |
-| `secondaryTextColor` | 次要文字 | 描述、提示信息 |
-| `tertiaryTextColor` | 辅助文字 | 禁用状态、次要按钮 |
-| `accentTextColor` | 强调色 | 图标、按钮、选中状态、进度条 |
-| `cardBackgroundColor` | 卡片背景 | 容器、列表项、统计卡片 |
-
-### 2. 暗黑模式适配
-
-```swift
-@Environment(\.colorScheme) private var colorScheme
-
-// 根据模式调整透明度
-.background(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
-```
-
-### 3. 标准卡片样式
-
-```swift
-.background(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
-.cornerRadius(16)
-.overlay(
-    RoundedRectangle(cornerRadius: 16)
-        .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-)
-```
-
-## 适配步骤
-
-### 步骤 1: 注入 ThemeManager
-
-```swift
-struct MyView: View {
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme  // 如需暗黑模式适配
-    // ...
-}
-```
-
-### 步骤 2: 替换硬编码颜色
-
-**Before:**
-```swift
-Text("标题")
-    .foregroundColor(.primary)
-
-.background(Color.gray.opacity(0.1))
-```
-
-**After:**
-```swift
-Text("标题")
-    .foregroundStyle(themeManager.primaryTextColor)
-
-.background(themeManager.cardBackgroundColor.opacity(0.5))
-```
-
-### 步骤 3: 适配容器背景
-
-**列表项示例:**
-```swift
-HStack {
-    // 内容
-}
-.padding(.vertical, 12)
-.padding(.horizontal, 16)
-.background(
-    RoundedRectangle(cornerRadius: 16)
-        .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
-)
-.overlay(
-    RoundedRectangle(cornerRadius: 16)
-        .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-)
-```
-
-**统计卡片示例:**
-```swift
-VStack {
-    // 内容
-}
-.padding()
-.background(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.5 : 0.8))
-.cornerRadius(16)
-.overlay(
-    RoundedRectangle(cornerRadius: 16)
-        .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-)
-```
-
-### 步骤 4: 适配子组件
-
-对于可复用组件，注入 ThemeManager:
-
-```swift
-struct MyComponent: View {
-    @Environment(ThemeManager.self) private var themeManager
-    // ...
-}
-```
-
-## 颜色映射规范
-
-### 文字颜色
-
-| 元素 | 颜色 |
-|------|------|
-| 标题/主要文字 | `themeManager.primaryTextColor` |
-| 描述/副标题 | `themeManager.secondaryTextColor` |
-| 禁用/提示 | `themeManager.tertiaryTextColor` |
-| 强调/选中 | `themeManager.accentTextColor` |
-
-### 图标颜色
-
-| 状态 | 颜色 |
-|------|------|
-| 正常图标 | `themeManager.accentTextColor` |
-| 次要图标 | `themeManager.secondaryTextColor` |
-| 禁用图标 | `themeManager.tertiaryTextColor` |
-
-### 按钮颜色
-
-| 类型 | 颜色 |
-|------|------|
-| 主要按钮背景 | `themeManager.accentTextColor` |
-| 次要按钮 | `themeManager.secondaryTextColor` |
-| 危险/删除 | `themeManager.tertiaryTextColor` |
-
-### 进度条/图表
-
-| 元素 | 颜色 |
-|------|------|
-| 进度条填充 | `themeManager.accentTextColor` |
-| 进度条背景 | `themeManager.secondaryTextColor.opacity(0.2)` |
-| 图表线条 | `themeManager.accentTextColor` |
-| 图表填充 | `themeManager.accentTextColor.opacity(0.3)` |
-
-## 常见场景
-
-### 场景 1: List 中的卡片项
-
-```swift
-List {
-    ForEach(items) { item in
-        ItemRow(item: item)
-            .listRowBackground(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.6 : 0.8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-                    )
-                    .padding(.vertical, 4)
-            )
+// ✅ 推荐：在 NavigationStack 内使用 ZStack 分离背景和内容
+var body: some View {
+    NavigationStack {
+        ZStack {
+            // 底层背景 - 使用主题背景
+            themeBackground
+            
+            // 上层内容
+            VStack {
+                ThemePreviewSection()
+                ScrollView { ... }
+            }
+        }
+        .navigationTitle("主题配色")
     }
 }
-.scrollContentBackground(.hidden)
-```
 
-### 场景 2: 统计卡片
-
-```swift
-VStack(alignment: .leading, spacing: 16) {
-    Label("统计标题", systemImage: "chart")
-        .font(.headline)
-        .foregroundStyle(themeManager.accentTextColor)
-    
-    // 内容
+// 主题背景视图
+private var themeBackground: some View {
+    Group {
+        switch themeManager.backgroundStyle {
+        case .color:
+            themeManager.backgroundColor
+        case .image:
+            if let image = themeManager.backgroundImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                // 没有图片时回退到背景色，避免黑色区域
+                themeManager.backgroundColor
+            }
+        }
+    }
+    .ignoresSafeArea() // 填充整个屏幕包括安全区域
 }
-.padding()
-.background(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.5 : 0.8))
-.cornerRadius(16)
-.overlay(
-    RoundedRectangle(cornerRadius: 16)
-        .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-)
 ```
 
-### 场景 3: 子组件（StatBox、ItemRow 等）
+### 避免的错误
 
 ```swift
-struct StatBox: View {
-    let title: String
-    let value: String
-    let color: Color
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
-    
+// ❌ 错误：在 VStack 外部使用 .background() 可能导致内容区域外出现黑色
+VStack { ... }
+    .background(LiquidBackground()) // 包含全局模糊遮罩
+
+// ❌ 错误：没有回退颜色导致黑色区域
+case .image:
+    if let image = themeManager.backgroundImage {
+        Image(uiImage: image).resizable().scaledToFill()
+    } else {
+        Color.black // 会产生黑色区域！
+    }
+```
+
+## 预览区域遮罩
+
+### 局部遮罩实现
+
+```swift
+// ✅ 推荐：在预览区域内部使用 ZStack 实现局部遮罩
+struct ThemePreviewSection: View {
     var body: some View {
         VStack {
-            Text(title)
-                .foregroundStyle(themeManager.secondaryTextColor)
-            Text(value)
-                .foregroundStyle(color)  // 传入的颜色
+            // 标签
+            HStack { ... }
+            
+            // 带遮罩的预览卡片
+            ZStack {
+                // 灰色遮罩 - 只覆盖预览区域
+                Color.black
+                    .opacity(themeManager.backgroundStyle == .image ? 0.3 : 0.1)
+                
+                TabView { ... }
+                    .tabViewStyle(.page(indexDisplayMode: .always))
+            }
+            .frame(height: 180)
+            
+            // 图例
+            HStack { ... }
         }
-        .padding()
-        .background(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.3 : 0.5))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(themeManager.accentTextColor.opacity(0.1), lineWidth: 1)
+        // 不要添加额外的背景层
+    }
+}
+```
+
+## 颜色映射到语义化 UI
+
+### MagicThemePalette 使用
+
+```swift
+// 定义完整的语义化颜色系统
+struct MagicThemePalette {
+    let primaryText: Color
+    let secondaryText: Color
+    let tertiaryText: Color
+    let accent: Color
+    
+    let cardBackground: Color
+    let cardAccent: Color
+    
+    let navigationBackground: Color
+    let navigationForeground: Color
+    
+    let segmentedBackground: Color           // ✅ 必须定义
+    let segmentedSelectedBackground: Color   // ✅ 必须定义
+    let segmentedSelectedForeground: Color
+    
+    // ... 其他颜色
+}
+
+// 在构建 palette 时，确保所有字段都有定义
+enum MagicThemeDesignSystem {
+    static func palette(themeManager: ThemeManager, colorScheme: ColorScheme) -> MagicThemePalette {
+        let isDark = colorScheme == .dark
+        let theme = themeManager.themeColorConfig.currentTheme(forDarkMode: isDark)
+        let card = theme.cardColors(forDarkMode: isDark)
+        let cardBackground = card.backgroundRGBA.color
+        let cardAccent = card.accentRGBA.color
+        
+        // ✅ 定义所有需要的颜色变量
+        let segmentedBackground = cardBackground.opacity(isDark ? 0.46 : 0.72)
+        let segmentedSelectedBackground = cardBackground.mixed(with: .white, amount: isDark ? 0.08 : 0.18)
+        
+        return MagicThemePalette(
+            primaryText: ...,
+            segmentedBackground: segmentedBackground,           // ✅ 使用定义的变量
+            segmentedSelectedBackground: segmentedSelectedBackground, // ✅ 使用定义的变量
+            ...
         )
     }
 }
 ```
 
-## 注意事项
+## 常见问题排查
 
-1. **始终注入 ThemeManager**: 不要在视图间传递颜色，统一通过环境注入
-2. **保持透明度一致**: 暗黑模式下使用 0.6，亮色模式下使用 0.8
-3. **添加边框**: 卡片建议添加 `accentTextColor.opacity(0.15)` 的细边框
-4. **圆角统一**: 大卡片使用 16，小盒子使用 12
-5. **隐藏默认背景**: List 使用 `.scrollContentBackground(.hidden)`
+### 问题 1：出现黑色/灰色区域
+**症状**：视图底部或边缘出现黑色区域
+**原因**：
+- 背景没有使用 `.ignoresSafeArea()`
+- 图片背景为空时返回 `Color.black`
+- 使用了包含全局模糊的 `LiquidBackground()`
 
-## 检查清单
+**解决**：
+1. 确保背景视图使用 `.ignoresSafeArea()`
+2. 图片为空时回退到 `themeManager.backgroundColor`
+3. 避免在设置页面使用 `LiquidBackground()`
 
-- [ ] 注入 `@Environment(ThemeManager.self)`
-- [ ] 注入 `@Environment(\.colorScheme)`（如需暗黑模式适配）
-- [ ] 替换所有 `.foregroundColor(.primary)` → `.foregroundStyle(themeManager.primaryTextColor)`
-- [ ] 替换所有 `.foregroundColor(.secondary)` → `.foregroundStyle(themeManager.secondaryTextColor)`
-- [ ] 替换所有 `.foregroundColor(.gray)` → `.foregroundStyle(themeManager.tertiaryTextColor)`
-- [ ] 替换所有强调色 → `themeManager.accentTextColor`
-- [ ] 替换所有背景色 → `themeManager.cardBackgroundColor`
-- [ ] 添加圆角和边框
-- [ ] 检查暗黑模式下的显示效果
+### 问题 2：遮罩覆盖范围错误
+**症状**：灰色遮罩超出了预览区域
+**原因**：
+- 遮罩放在了外层 ZStack
+- 遮罩高度设置不当
+
+**解决**：
+1. 将遮罩限制在预览区域的 ZStack 内部
+2. 使用固定高度 `.frame(height: 180)` 控制范围
+
+### 问题 3：编译错误 "Cannot find X in scope"
+**症状**：MagicThemePalette 初始化时报错
+**原因**：缺少字段定义
+
+**解决**：
+1. 检查 `MagicThemePalette` 结构体定义的所有字段
+2. 确保 `palette()` 函数中为每个字段都提供了值
+3. 对于计算型字段，先定义局部变量再使用
+
+## 暗黑模式适配要点
+
+```swift
+// ✅ 推荐：所有颜色都区分明暗模式
+let opacity = isDark ? 0.46 : 0.72
+let mixedAmount = isDark ? 0.08 : 0.18
+
+// 使用三元表达式确保一致性
+Color.black.opacity(isDark ? 0.3 : 0.1)
+```
+
+## 文件组织
+
+当文件超过 500 行时，按功能拆分：
+- `MagicColorSettingsView.swift` - 主视图
+- `ThemePreviewSection.swift` - 预览组件
+- `ColorSettingsComponents.swift` - 共享组件
+- `MagicThemeDesignSystem.swift` - 颜色映射系统

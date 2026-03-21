@@ -258,7 +258,7 @@ struct PetChatBubble: View {
                         Text("AI 生成")
                             .font(.caption2)
                     }
-                    .foregroundStyle(.pink.opacity(0.8))
+                    .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.8))
                     .padding(.leading, 4)
                 }
                 
@@ -319,7 +319,7 @@ struct PetChatBubble: View {
                                 Text("举报")
                                     .font(.caption2)
                             }
-                            .foregroundStyle(.pink)
+                            .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                         }
                         .transition(.opacity.combined(with: .scale))
                     }
@@ -346,7 +346,7 @@ struct PetChatBubble: View {
             .clipShape(Circle())
             .overlay(
                 Circle()
-                    .stroke(Color.pink.opacity(0.3), lineWidth: 2)
+                    .stroke(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.3), lineWidth: 2)
             )
     }
     
@@ -376,7 +376,7 @@ struct PetChatBubble: View {
     }
 
     private var aiBubbleTextColor: Color {
-        themeManager.primaryTextColor
+        skinTheme.resolvedAssistantBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme)
     }
 
     private var userBubbleTextColor: Color {
@@ -390,31 +390,17 @@ struct PetChatBubble: View {
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(isUser ? themeManager.accentTextColor : Color(.systemBackground))
                 .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        } else if isUser {
+        } else {
+            // 魔法皮肤：萌宠气泡和用户气泡使用相同的渐变配色，只是方向相反
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(
                     LinearGradient(
                         colors: skinTheme.resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        startPoint: isUser ? .topLeading : .bottomTrailing,
+                        endPoint: isUser ? .bottomTrailing : .topLeading
                     )
                 )
                 .shadow(color: themeManager.accentTextColor.opacity(0.25), radius: 6, x: 0, y: 2)
-        } else {
-            RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                        .stroke(
-                            LinearGradient(
-                                colors: skinTheme.resolvedAssistantStrokeColors(themeManager: themeManager, colorScheme: colorScheme),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.18 : 0.07), radius: 5, x: 0, y: 2)
         }
     }
     
@@ -478,7 +464,7 @@ struct PetChatBubble: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(message.text)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(aiBubbleTextColor)
             
             Button {
                 onCardTap(clothing)
@@ -491,17 +477,17 @@ struct PetChatBubble: View {
                             displaySize: CGSize(width: 60, height: 60),
                             contentMode: .fill,
                             cornerRadius: 8,
-                            placeholderColor: Color.gray.opacity(0.2)
+                            placeholderColor: themeManager.tertiaryTextColor.opacity(0.2)
                         )
                         .frame(width: 60, height: 60)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.2))
+                            .fill(themeManager.tertiaryTextColor.opacity(0.2))
                             .frame(width: 60, height: 60)
                             .overlay(
                                 Image(systemName: "tshirt")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(themeManager.secondaryTextColor)
                             )
                     }
                     
@@ -510,26 +496,27 @@ struct PetChatBubble: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .lineLimit(1)
+                            .foregroundStyle(aiBubbleTextColor)
                         
                         if let brand = clothing.brand {
                             Text(brand.name)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         
                         Text("¥\(NSDecimalNumber(decimal: clothing.price + clothing.accessoriesPrice).stringValue)")
                             .font(.caption)
-                            .foregroundStyle(.pink)
+                            .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                     }
                     
                     Spacer()
                     
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(themeManager.tertiaryTextColor)
                 }
                 .padding(12)
-                .background(Color(.secondarySystemBackground))
+                .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(PlainButtonStyle())
@@ -545,7 +532,7 @@ struct PetChatBubble: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(message.text)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(aiBubbleTextColor)
             
             VStack(spacing: 10) {
                 statRow(icon: "hanger", title: "总件数", value: "\(stats.totalCount) 件")
@@ -561,7 +548,7 @@ struct PetChatBubble: View {
                 }
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground))
+            .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .padding(.horizontal, 16)
@@ -574,19 +561,19 @@ struct PetChatBubble: View {
         HStack {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundStyle(.pink)
+                .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                 .frame(width: 20)
             
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(themeManager.secondaryTextColor)
             
             Spacer()
             
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundStyle(.primary)
+                .foregroundStyle(aiBubbleTextColor)
                 .lineLimit(1)
         }
     }
@@ -596,7 +583,7 @@ struct PetChatBubble: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(message.text)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(aiBubbleTextColor)
             
             // 色卡展示
             HStack(spacing: 8) {
@@ -607,7 +594,7 @@ struct PetChatBubble: View {
             
             Text(colorRec.reasoning)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(themeManager.secondaryTextColor)
                 .lineLimit(2)
         }
         .padding(.horizontal, 16)
@@ -623,12 +610,12 @@ struct PetChatBubble: View {
                 .frame(width: 40, height: 40)
                 .overlay(
                     Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(themeManager.tertiaryTextColor.opacity(0.3), lineWidth: 1)
                 )
             
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(themeManager.secondaryTextColor)
         }
     }
     
@@ -646,7 +633,7 @@ struct PetChatBubble: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(message.text)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(aiBubbleTextColor)
             
             VStack(spacing: 8) {
                 // 根据展开状态显示不同数量的结果
@@ -661,18 +648,18 @@ struct PetChatBubble: View {
                                     displaySize: CGSize(width: 40, height: 40),
                                     contentMode: .fill,
                                     cornerRadius: 6,
-                                    placeholderColor: Color.gray.opacity(0.2)
+                                    placeholderColor: themeManager.tertiaryTextColor.opacity(0.2)
                                 )
                                 .frame(width: 40, height: 40)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                             } else {
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.gray.opacity(0.2))
+                                    .fill(themeManager.tertiaryTextColor.opacity(0.2))
                                     .frame(width: 40, height: 40)
                                     .overlay(
                                         Image(systemName: "tshirt")
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(themeManager.secondaryTextColor)
                                     )
                             }
                             
@@ -681,20 +668,21 @@ struct PetChatBubble: View {
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .lineLimit(1)
+                                    .foregroundStyle(aiBubbleTextColor)
                                 
                                 Text("¥\(NSDecimalNumber(decimal: clothing.price).stringValue)")
                                     .font(.caption2)
-                                    .foregroundStyle(.pink)
+                                    .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                             }
                             
                             Spacer()
                             
                             Image(systemName: "chevron.right")
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
                         }
                         .padding(8)
-                        .background(Color(.secondarySystemBackground))
+                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -713,10 +701,10 @@ struct PetChatBubble: View {
                             Text(showAllResults ? "收起" : "还有 \(results.count - 3) 件...")
                                 .font(.caption)
                         }
-                        .foregroundStyle(.pink)
+                        .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 8)
-                        .background(Color.pink.opacity(0.1))
+                        .background(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -736,24 +724,24 @@ struct PetChatBubble: View {
             // 描述文本
             Text(suggestion.description)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(aiBubbleTextColor)
 
             // 风格标签
             HStack(spacing: 8) {
                 Label(suggestion.style, systemImage: "sparkles")
                     .font(.caption)
-                    .foregroundStyle(.pink)
+                    .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(Color.pink.opacity(0.1))
+                    .background(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.1))
                     .clipShape(Capsule())
 
                 Label(suggestion.occasion, systemImage: "calendar")
                     .font(.caption)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(themeManager.secondaryTextColor)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(Color.purple.opacity(0.1))
+                    .background(themeManager.secondaryTextColor.opacity(0.1))
                     .clipShape(Capsule())
             }
 
@@ -761,7 +749,7 @@ struct PetChatBubble: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("推荐单品")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(themeManager.secondaryTextColor)
 
                 ForEach(suggestion.clothings.prefix(4)) { clothing in
                     Button {
@@ -778,11 +766,11 @@ struct PetChatBubble: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 6))
                             } else {
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.gray.opacity(0.2))
+                                    .fill(themeManager.tertiaryTextColor.opacity(0.2))
                                     .frame(width: 40, height: 40)
                                     .overlay(
                                         Image(systemName: "tshirt")
-                                            .foregroundStyle(.gray)
+                                            .foregroundStyle(themeManager.tertiaryTextColor)
                                     )
                             }
 
@@ -790,20 +778,21 @@ struct PetChatBubble: View {
                                 Text(clothing.name)
                                     .font(.subheadline)
                                     .lineLimit(1)
+                                    .foregroundStyle(aiBubbleTextColor)
                                 Text(clothing.brand?.name ?? "未知品牌")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(themeManager.secondaryTextColor)
                             }
 
                             Spacer()
 
                             Image(systemName: "chevron.right")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(themeManager.tertiaryTextColor)
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.05))
+                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -825,7 +814,10 @@ struct PetChatBubble: View {
                 .padding(.vertical, 10)
                 .background(
                     LinearGradient(
-                        colors: [.pink, .purple],
+                        colors: [
+                            skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme),
+                            skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).mixed(with: themeManager.secondaryTextColor, amount: 0.3)
+                        ],
                         startPoint: .leading,
                         endPoint: .trailing
                     )

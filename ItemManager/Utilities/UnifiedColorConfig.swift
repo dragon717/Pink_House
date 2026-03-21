@@ -47,9 +47,30 @@ enum UnifiedColorConfig {
             case .fullyTransparent:
                 return Color.clear
             case .tinted(let color, let opacity):
+                // 色调模式：基础背景色 + 色调叠加
+                // 使用 overlay 混合模式来实现色调效果
                 return color.opacity(opacity)
             case .ultraThinMaterial:
                 return Color.clear // 使用材质背景
+            }
+        }
+        
+        /// 获取色调背景视图（用于需要叠加效果的场景）
+        @ViewBuilder
+        func tintedBackgroundView(baseColor: Color, cornerRadius: CGFloat = 16) -> some View {
+            switch self {
+            case .tinted(let color, let opacity):
+                ZStack {
+                    // 基础背景色
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(baseColor)
+                    // 色调叠加层
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(color.opacity(opacity))
+                }
+            default:
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(backgroundColor(colorScheme: .light))
             }
         }
     }
