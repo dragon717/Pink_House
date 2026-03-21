@@ -52,9 +52,26 @@ enum MagicThemeDesignSystem {
             }
         }()
 
-        // 分段选择器背景
-        let segmentedBackground = cardBackground.opacity(isDark ? 0.46 : 0.72)
-        let segmentedSelectedBackground = cardBackground.mixed(with: .white, amount: isDark ? 0.08 : 0.18)
+        // 分段选择器背景 - 根据色调强度变化
+        let segmentedBackground: Color = {
+            switch themeManager.cardStyle {
+            case .tinted:
+                // 色调模式下，根据 tintOpacity 调整透明度
+                return cardBackground.opacity(themeManager.tintOpacity)
+            default:
+                return cardBackground.opacity(isDark ? 0.46 : 0.72)
+            }
+        }()
+        
+        let segmentedSelectedBackground: Color = {
+            switch themeManager.cardStyle {
+            case .tinted:
+                // 色调模式下，选中背景使用卡片背景色 + 白色混合
+                return cardBackground.mixed(with: .white, amount: isDark ? 0.08 : 0.18)
+            default:
+                return cardBackground.mixed(with: .white, amount: isDark ? 0.08 : 0.18)
+            }
+        }()
 
         let bubbleStart = accent.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
         let bubbleEnd = cardAccent.mixed(with: .black, amount: isDark ? 0.08 : 0.03)

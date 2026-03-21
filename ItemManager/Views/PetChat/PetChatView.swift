@@ -386,21 +386,43 @@ struct PetChatBubble: View {
     @ViewBuilder
     private func bubbleBackground(isUser: Bool) -> some View {
         if skinTheme == .classic {
-            // 经典皮肤：使用主题色适配
+            // 经典皮肤：萌宠气泡和用户气泡都使用卡片背景色
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                .fill(isUser ? themeManager.accentTextColor : Color(.systemBackground))
+                .fill(themeManager.cardBackgroundColor)
                 .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        } else {
-            // 魔法皮肤：萌宠气泡和用户气泡使用相同的渐变配色，只是方向相反
+        } else if isUser {
+            // 用户气泡 - 魔法皮肤使用渐变主题色
+            let isDark = colorScheme == .dark
+            let bubbleStart = themeManager.cardTintColor.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
+            let bubbleEnd = themeManager.cardTintColor.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(
                     LinearGradient(
-                        colors: skinTheme.resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme),
-                        startPoint: isUser ? .topLeading : .bottomTrailing,
-                        endPoint: isUser ? .bottomTrailing : .topLeading
+                        colors: [bubbleStart, bubbleEnd],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
                 .shadow(color: themeManager.accentTextColor.opacity(0.25), radius: 6, x: 0, y: 2)
+        } else {
+            // 萌宠气泡 - 魔法皮肤使用卡片背景色 + 主题色边框
+            // 直接使用与主题预览页一致的颜色计算方式
+            let isDark = colorScheme == .dark
+            let bgColor = themeManager.cardBackgroundColor
+            RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                .fill(bgColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: bubbleCornerRadius)
+                        .stroke(
+                            LinearGradient(
+                                colors: skinTheme.resolvedAssistantStrokeColors(themeManager: themeManager, colorScheme: colorScheme),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: themeManager.accentTextColor.opacity(0.2), radius: 5, x: 0, y: 2)
         }
     }
     
@@ -916,7 +938,7 @@ struct PetChatView: View {
                 LiquidBackground()
                     .ignoresSafeArea()
 
-                // 聊天记录 - 使用overlay放置悬浮按钮
+                // 聊天记录 - 使用 overlay 放置悬浮按钮
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 16) {
@@ -936,6 +958,7 @@ struct PetChatView: View {
                         }
                         .padding(.vertical, 16)
                     }
+                    .scrollContentBackground(.hidden)
                     .onChange(of: messages.count) { _ in
                         if let lastId = messages.last?.id {
                             withAnimation {

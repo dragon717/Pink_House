@@ -39,32 +39,21 @@ struct CardBackgroundView: View {
                 )
 
             case .tinted:
-                // Acrylic/Mica: 使用主题卡片背景色 + 色调叠加
-                ZStack {
-                    // 基础层：主题卡片背景色
-                    magicCardBackgroundColor
-
-                    // 材质层
-                    if themeManager.isBlurEnabled {
-                        Rectangle()
-                            .fill(.regularMaterial)
-                    }
-
-                    // 色调层：主题强调色
-                    themeManager.cardTintColor
-                        .opacity(themeManager.tintOpacity)
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: micaBorderColors,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
+                // 色调模式：使用卡片背景色 + 色调强度透明度
+                // 与主题预览中的豆腐块实现保持一致
+                magicCardBackgroundColor
+                    .opacity(themeManager.tintOpacity)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: micaBorderColors,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))

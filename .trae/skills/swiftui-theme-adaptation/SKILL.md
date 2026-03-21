@@ -183,6 +183,34 @@ enum MagicThemeDesignSystem {
 2. 确保 `palette()` 函数中为每个字段都提供了值
 3. 对于计算型字段，先定义局部变量再使用
 
+### 问题 4：色调强度不生效（重要！）
+**症状**：修改"色调强度"滑块时，卡片背景没有实时变化
+**根本原因**：项目中存在**两种**色调实现方式，修改时只改了部分组件
+
+**两种实现方式**：
+1. **纯色调模式**（推荐）：`magicCardBackgroundColor.opacity(themeManager.tintOpacity)`
+2. **毛玻璃+色调叠加**：`.ultraThinMaterial` + 叠加色调层
+
+**排查步骤**：
+1. **先全面检查**：使用 grep 搜索所有 `tinted`、`cardStyle`、`tintOpacity` 相关代码
+2. **确定标准**：以 `ThemePreviewSection` 或 `CardBackgroundView` 为准
+3. **统一修改**：确保所有相关组件使用相同的实现方式
+4. **验证颜色来源**：
+   - ✅ 正确：`magicCardBackgroundColor` 或 `cardColors.backgroundRGBA.color`
+   - ❌ 错误：`themeManager.cardTintColor`（这是色调色，不是背景色）
+
+**相关文件清单**：
+- `CardBackgroundView.swift` - 核心组件（纯色调模式）
+- `ThemePreviewSection.swift` - 预览标准（纯色调模式）
+- `MeView.swift` - 魔法任务卡片（毛玻璃+色调）
+- `SettingsGridItem.swift` - 设置网格项（毛玻璃+色调）
+- `MagicThemeDesignSystem.swift` - 页签背景
+
+**最佳实践**：
+- 优先使用 `CardBackgroundView` 统一实现
+- 必须直接绑定 `themeManager.tintOpacity`
+- 修改前全面检查，避免增量修改导致不一致
+
 ## 暗黑模式适配要点
 
 ```swift

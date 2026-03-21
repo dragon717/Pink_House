@@ -333,7 +333,7 @@ struct ThemePreviewSection: View {
             let skinTheme = themeManager.petChatSkinTheme
 
             VStack(spacing: 8) {
-                // 助手气泡（奶茶）
+                // 助手气泡（奶茶）- 使用卡片背景色 + 主题色边框
                 HStack {
                     Text("奶茶：今天想要偏甜美，还是偏通勤呢？")
                         .font(.caption)
@@ -342,7 +342,7 @@ struct ThemePreviewSection: View {
                         .padding(.vertical, 6)
                         .background(
                             RoundedRectangle(cornerRadius: skinTheme.cornerRadius)
-                                .fill(skinTheme == .classic ? AnyShapeStyle(Color(.systemBackground)) : AnyShapeStyle(.ultraThinMaterial))
+                                .fill(themeManager.cardBackgroundColor)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: skinTheme.cornerRadius)
                                         .stroke(
@@ -351,10 +351,9 @@ struct ThemePreviewSection: View {
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
                                             ),
-                                            lineWidth: skinTheme == .classic ? 0 : 1
+                                            lineWidth: 1
                                         )
                                 )
-                                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.15 : 0.06), radius: 2, x: 0, y: 1)
                         )
                     Spacer()
                 }
@@ -364,18 +363,12 @@ struct ThemePreviewSection: View {
                     Spacer()
                     Text("主人：先给我看天气穿搭～")
                         .font(.caption)
-                        .foregroundStyle(skinTheme.resolvedUserBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme))
+                        .foregroundStyle(textColors.primary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
                             RoundedRectangle(cornerRadius: skinTheme.cornerRadius)
-                                .fill(
-                                    LinearGradient(
-                                        colors: skinTheme.resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                .fill(themeManager.cardBackgroundColor)
                         )
                 }
 

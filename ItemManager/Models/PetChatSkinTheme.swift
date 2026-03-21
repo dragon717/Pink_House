@@ -109,10 +109,10 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
 
     func resolvedUserBubbleColors(themeManager: ThemeManager, colorScheme: ColorScheme) -> [Color] {
         guard self == .magic else { return userBubbleColors }
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
         let isDark = colorScheme == .dark
-        let bubbleStart = colors.accent.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
-        let bubbleEnd = colors.cardAccent.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
+        // 用户气泡：使用 cardTintColor 生成渐变
+        let bubbleStart = themeManager.cardTintColor.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
+        let bubbleEnd = themeManager.cardTintColor.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
         return [bubbleStart, bubbleEnd]
     }
 
@@ -169,8 +169,7 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
             return Color(.systemBackground)
         }
         // 魔法皮肤使用主题卡片背景色
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
-        return colors.cardBackground
+        return themeManager.cardBackgroundColor
     }
 
     /// 萌宠气泡文字颜色 - 使用主题主文字色
