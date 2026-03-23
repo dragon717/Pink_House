@@ -51,41 +51,33 @@ class NoticeReadStatusService: ObservableObject {
     func hasReadNotice(_ notice: Notice) -> Bool {
         // 如果重置过，只检查重置时间之后的记录
         if let resetTime = localResetTime {
-            if notice.createdAt > resetTime {
+            if max(notice.createdAt, notice.updatedAt) > resetTime {
                 return false
             }
         }
-        
-        // 检查本地缓存
-        if localReadStatus.contains(notice.id.uuidString) {
+
+        if localReadStatus.contains(notice.readTrackingKey) {
             return true
         }
-        
-        // 检查 recordName（云端公告）
-        if let recordName = notice.recordName,
-           localReadStatus.contains(recordName) {
+
+        if notice.shouldUseLegacyReadFallback,
+           notice.legacyReadTrackingKeys.contains(where: { localReadStatus.contains($0) }) {
             return true
         }
-        
+
         return false
     }
     
     // MARK: - 标记公告为已读
     func markAsRead(_ notice: Notice) {
         var changed = false
-        
-        // 使用 id 和 recordName 双重标记
-        if !localReadStatus.contains(notice.id.uuidString) {
-            localReadStatus.insert(notice.id.uuidString)
+
+        let keys = [notice.readTrackingKey] + notice.legacyReadTrackingKeys
+        for key in keys where !localReadStatus.contains(key) {
+            localReadStatus.insert(key)
             changed = true
         }
-        
-        if let recordName = notice.recordName,
-           !localReadStatus.contains(recordName) {
-            localReadStatus.insert(recordName)
-            changed = true
-        }
-        
+
         if changed {
             saveToUserDefaults()
             
@@ -119,8 +111,11 @@ class NoticeReadStatusService: ObservableObject {
         
         do {
             let record = CKRecord(recordType: "NoticeReadStatus")
+            record["readKey"] = notice.readTrackingKey
             record["noticeID"] = notice.id.uuidString
             record["recordName"] = notice.recordName
+            record["version"] = notice.version
+            record["updatedAt"] = notice.updatedAt
             record["readAt"] = Date()
             record["title"] = notice.title
             
@@ -200,6 +195,9 @@ class NoticeReadStatusService: ObservableObject {
             var cloudReadStatus: Set<String> = []
             for (_, result) in results {
                 if case .success(let record) = result {
+                    if let readKey = record["readKey"] as? String {
+                        cloudReadStatus.insert(readKey)
+                    }
                     if let noticeID = record["noticeID"] as? String {
                         cloudReadStatus.insert(noticeID)
                     }

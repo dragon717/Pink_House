@@ -2,7 +2,7 @@ import Foundation
 import StoreKit
 
 // MARK: - IAP 商品定义
-// 定义所有内购商品，包括喵币充值和VIP订阅
+// 定义所有内购商品（当前仅包含喵币）
 
 enum IAPProductType: String, CaseIterable {
     // 喵币 - 消耗型项目
@@ -13,10 +13,6 @@ enum IAPProductType: String, CaseIterable {
     case meowCoin500 = "com.pinkhouse.app.meowcoin_500"    // 50元 = 500喵币（热门）
     case meowCoin1280 = "com.pinkhouse.app.mcoin_1280"  // 128元 = 1280喵币（最划算）
     case meowCoin3280 = "com.pinkhouse.app.mcoin_3280"  // 328元 = 3280喵币
-
-    // VIP 订阅 - 自动续订订阅
-    case vipMonthly = "com.pinkhouse.app.vip_monthly"
-    case vipYearly = "com.pinkhouse.app.vip_yearly"
 
     // 商品ID列表，用于请求商品信息
     static var allProductIDs: [String] {
@@ -33,14 +29,6 @@ enum IAPProductType: String, CaseIterable {
             meowCoin500.rawValue,   // 50元
             meowCoin1280.rawValue,  // 128元
             meowCoin3280.rawValue   // 328元
-        ]
-    }
-
-    // VIP订阅ID列表
-    static var subscriptionProductIDs: [String] {
-        return [
-            vipMonthly.rawValue,
-            vipYearly.rawValue
         ]
     }
 }
@@ -62,7 +50,7 @@ struct MeowCoinProduct: Identifiable, Equatable {
     // 根据ID创建商品信息
     static func from(storeProduct: Product) -> MeowCoinProduct? {
         guard let type = IAPProductType(rawValue: storeProduct.id),
-              case .meowCoin60 = type else { return nil }
+              IAPProductType.coinProductIDs.contains(type.rawValue) else { return nil }
 
         let (amount, bonus, popular, bestValue) = Self.getProductDetails(for: type)
 
@@ -105,74 +93,13 @@ struct MeowCoinProduct: Identifiable, Equatable {
     }
 }
 
-// MARK: - VIP订阅商品信息
-struct VIPSubscriptionProduct: Identifiable, Equatable {
-    let id: String
-    let period: SubscriptionPeriod
-    let price: Decimal
-    let displayPrice: String
-    let displayName: String
-    let description: String
-    let isRecommended: Bool
-
-    enum SubscriptionPeriod {
-        case monthly
-        case yearly
-
-        var displayText: String {
-            switch self {
-            case .monthly:
-                return "每月"
-            case .yearly:
-                return "每年"
-            }
-        }
-
-        var months: Int {
-            switch self {
-            case .monthly:
-                return 1
-            case .yearly:
-                return 12
-            }
-        }
-    }
-
-    static func from(storeProduct: Product) -> VIPSubscriptionProduct? {
-        guard let type = IAPProductType(rawValue: storeProduct.id) else { return nil }
-
-        let (period, name, desc, recommended) = Self.getProductDetails(for: type)
-
-        return VIPSubscriptionProduct(
-            id: storeProduct.id,
-            period: period,
-            price: storeProduct.price,
-            displayPrice: storeProduct.displayPrice,
-            displayName: name,
-            description: desc,
-            isRecommended: recommended
-        )
-    }
-
-    private static func getProductDetails(for type: IAPProductType) -> (period: SubscriptionPeriod, name: String, desc: String, recommended: Bool) {
-        switch type {
-        case .vipMonthly:
-            return (.monthly, "月度会员", "解锁所有VIP专属功能", false)
-        case .vipYearly:
-            return (.yearly, "年度会员", "立省40%，享受全年VIP特权", true)
-        default:
-            return (.monthly, "", "", false)
-        }
-    }
-}
-
 // MARK: - 购买记录
 struct IAPPurchaseRecord: Codable, Identifiable {
     let id: String                    // 交易ID
     let productID: String             // 商品ID
     let purchaseDate: Date            // 购买时间
     let coinAmount: Int?              // 获得的喵币数量（如果是喵币商品）
-    let subscriptionMonths: Int?      // 订阅月数（如果是VIP商品）
+    let subscriptionMonths: Int?      // 历史字段：旧版本 VIP 时长（月）
     let isVerified: Bool              // 是否已通过服务器验证
     let verificationDate: Date?       // 验证时间
 

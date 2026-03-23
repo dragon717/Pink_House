@@ -13,7 +13,6 @@ class IAPViewModel: ObservableObject {
 
     // MARK: - Published Properties
     @Published var meowCoinProducts: [MeowCoinProductDisplay] = []
-    @Published var vipProducts: [VIPProductDisplay] = []
     @Published var currentBalance: Int = 0
     @Published var isVIP: Bool = false
     @Published var vipExpireDate: Date?
@@ -23,8 +22,6 @@ class IAPViewModel: ObservableObject {
     @Published var successMessage: String = ""
     @Published var showErrorAlert: Bool = false
     @Published var errorMessage: String = ""
-    @Published var showRestoreSuccess: Bool = false
-    @Published var restoreMessage: String = ""
 
     // MARK: - Private Properties
     private var storeManager = StoreManager.shared
@@ -75,12 +72,6 @@ class IAPViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        storeManager.$subscriptionProducts
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] products in
-                self?.updateVIPProducts(products)
-            }
-            .store(in: &cancellables)
     }
 
     // MARK: - 加载用户数据
@@ -102,13 +93,6 @@ class IAPViewModel: ObservableObject {
         }.sorted { $0.coinAmount < $1.coinAmount }
     }
 
-    private func updateVIPProducts(_ products: [Product]) {
-        vipProducts = products.compactMap { product in
-            guard let type = IAPProductType(rawValue: product.id) else { return nil }
-            return VIPProductDisplay(from: product, type: type)
-        }.sorted { $0.months < $1.months }
-    }
-
     // MARK: - 获取商品
     func fetchProducts() async {
         await storeManager.fetchProducts()
@@ -117,18 +101,6 @@ class IAPViewModel: ObservableObject {
     // MARK: - 购买喵币
     func purchaseMeowCoin(product: MeowCoinProductDisplay) async {
         guard let storeProduct = storeManager.coinProducts.first(where: { $0.id == product.id }) else {
-            showErrorAlert = true
-            errorMessage = "商品信息已过期，请刷新重试"
-            return
-        }
-
-        let result = await storeManager.purchase(storeProduct)
-        handlePurchaseResult(result)
-    }
-
-    // MARK: - 购买VIP
-    func purchaseVIP(product: VIPProductDisplay) async {
-        guard let storeProduct = storeManager.subscriptionProducts.first(where: { $0.id == product.id }) else {
             showErrorAlert = true
             errorMessage = "商品信息已过期，请刷新重试"
             return
@@ -156,26 +128,6 @@ class IAPViewModel: ObservableObject {
         }
     }
 
-    // MARK: - 恢复购买
-    func restorePurchases() async {
-        let result = await storeManager.restorePurchases()
-
-        switch result {
-        case .success(let transactions):
-            showRestoreSuccess = true
-            restoreMessage = "成功恢复 \(transactions.count) 项购买"
-            loadUserData()
-
-        case .empty:
-            showRestoreSuccess = true
-            restoreMessage = "没有找到可恢复的购买"
-
-        case .failed(let error):
-            showErrorAlert = true
-            errorMessage = error.errorDescription ?? "恢复失败"
-        }
-    }
-
     // MARK: - 检查购买能力
     func canMakePurchases() -> Bool {
         return storeManager.canMakePurchases()
@@ -200,9 +152,6 @@ class IAPViewModel: ObservableObject {
         storeManager.clearError()
     }
 
-    func dismissRestoreSuccess() {
-        showRestoreSuccess = false
-    }
 }
 
 // MARK: - 喵币商品展示模型
@@ -297,98 +246,4 @@ struct MeowCoinProductDisplay: Identifiable {
             self.tag = nil
         }
     }
-}
-
-// MARK: - VIP商品展示模型
-struct VIPProductDisplay: Identifiable {
-    let id: String
-    let name: String
-    let description: String
-    let price: String
-    let months: Int
-    let isRecommended: Bool
-    let savingsPercent: Int?
-
-    var periodText: String {
-        if months == 1 {
-            return "月度"
-        } else if months == 12 {
-            return "年度"
-        } else {
-            return "\(months)个月"
-        }
-    }
-
-    var monthlyPrice: String {
-        // 计算月均价格
-        // 这里简化处理，实际需要解析价格
-        return price
-    }
-
-    init(from product: Product, type: IAPProductType) {
-        self.id = product.id
-        self.price = product.displayPrice
-
-        switch type {
-        case .vipMonthly:
-            self.name = "月度会员"
-            self.description = "解锁所有VIP专属功能"
-            self.months = 1
-            self.isRecommended = false
-            self.savingsPercent = nil
-        case .vipYearly:
-            self.name = "年度会员"
-            self.description = "享受全年VIP特权"
-            self.months = 12
-            self.isRecommended = true
-            self.savingsPercent = 40
-        default:
-            self.name = ""
-            self.description = ""
-            self.months = 0
-            self.isRecommended = false
-            self.savingsPercent = nil
-        }
-    }
-}
-
-// MARK: - VIP特权列表
-struct VIPBenefit: Identifiable {
-    let id = UUID()
-    let icon: String
-    let title: String
-    let description: String
-
-    static let allBenefits: [VIPBenefit] = [
-        VIPBenefit(
-            icon: "crown.fill",
-            title: "专属标识",
-            description: "获得VIP专属头像框和标识"
-        ),
-        VIPBenefit(
-            icon: "tag.fill",
-            title: "喵币折扣",
-            description: "购买喵币享受8折优惠"
-        ),
-        VIPBenefit(
-            icon: "gift.fill",
-            title: "每日奖励",
-            description: "每日登录赠送100喵币"
-        ),
-        VIPBenefit(
-            icon: "paintbrush.fill",
-            title: "专属主题",
-            description: "解锁VIP专属界面主题"
-        ),
-        VIPBenefit(
-            icon: "cloud.fill",
-            title: "云同步",
-            description: "数据自动云端备份"
-        ),
-        VIPBenefit(
-            icon: "headphones",
-            title: "优先客服",
-            description: "享受优先客服支持"
-        )
-    ]
 }

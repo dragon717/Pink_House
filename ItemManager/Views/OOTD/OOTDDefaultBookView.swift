@@ -8,6 +8,11 @@
 import SwiftUI
 import SwiftData
 
+fileprivate enum MagicStickerDefaults {
+    static let bookTitle = "默认手帐"
+    static let pageTitle = "少女魔法贴"
+}
+
 // MARK: - 通知名称扩展
 extension Notification.Name {
     static let magicStickerPageMoved = Notification.Name("magicStickerPageMoved")
@@ -29,14 +34,15 @@ struct OOTDDefaultBookView: View {
 
     // 获取默认手帐（魔法贴纸使用"默认手帐"作为默认名，不借用其他手帐）
     private var defaultBook: BookGroup? {
-        books.first { $0.title == "默认手帐" }
+        books.first { $0.title == MagicStickerDefaults.bookTitle }
     }
 
-    // 获取默认手帐的第一页
-    private var firstPage: Outfit? {
+    // 获取魔法贴纸专用书页，不复用默认手帐中的其他书页
+    private var magicStickerPage: Outfit? {
         guard let book = defaultBook else { return nil }
         return allOutfits
             .filter { $0.book?.id == book.id }
+            .filter { $0.note == MagicStickerDefaults.pageTitle }
             .sorted { $0.sortIndex < $1.sortIndex }
             .first
     }
@@ -50,7 +56,7 @@ struct OOTDDefaultBookView: View {
 
                 Group {
                     if let book = defaultBook {
-                        if let page = firstPage {
+                        if let page = magicStickerPage {
                             // 直接显示编辑界面（魔法贴纸模式：隐藏工具栏，显示贴纸库）
                             OOTDEditorView(
                                 outfit: page,
@@ -115,12 +121,12 @@ struct OOTDDefaultBookView: View {
 
     private func createDefaultBook() {
         // 创建手帐
-        let book = BookGroup(title: "默认手帐")
+        let book = BookGroup(title: MagicStickerDefaults.bookTitle)
         modelContext.insert(book)
 
         // 同时创建第一页（空白画布），让用户可以直接进入编辑器
         let firstPage = Outfit(
-            note: "OOTD",
+            note: MagicStickerDefaults.pageTitle,
             canvasType: "blank",
             book: book
         )
@@ -226,12 +232,17 @@ private struct EmptyPageView: View {
     }
 
     private func createNewPage() {
+        let maxSortIndex = (book.pages ?? [])
+            .filter { !$0.isDeleted }
+            .map(\.sortIndex)
+            .max() ?? -1
+
         let newPage = Outfit(
-            note: "OOTD",
+            note: MagicStickerDefaults.pageTitle,
             canvasType: "blank",
             book: book
         )
-        newPage.sortIndex = 0
+        newPage.sortIndex = maxSortIndex + 1
 
         modelContext.insert(newPage)
         try? modelContext.save()

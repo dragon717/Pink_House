@@ -74,6 +74,14 @@ class IAPTestManager: ObservableObject {
         // 5. 重置模拟数据
         mockBalance = 0
         mockIsVIP = false
+        saveMockData()
+
+        // 6. 重置本地宠物资产状态
+        var status = PetDataManager.shared.status
+        status.meowCoin = 0
+        status.vipStatus = VIPStatus()
+        PetDataManager.shared.saveStatus(status)
+        notifyPetStatusDidChange()
 
         print("[IAPTestManager] ✅ 已清除所有购买记录，可以重新测试首次购买")
     }
@@ -132,6 +140,7 @@ class IAPTestManager: ObservableObject {
         var status = PetDataManager.shared.status
         status.meowCoin = account.balance
         PetDataManager.shared.saveStatus(status)
+        notifyPetStatusDidChange()
 
         if shouldApplyFirstDouble {
             print("[IAPTestManager] ✅ 已添加 \(finalAmount) 喵币（首充双倍）")
@@ -158,6 +167,7 @@ class IAPTestManager: ObservableObject {
         var status = PetDataManager.shared.status
         status.meowCoin = amount
         PetDataManager.shared.saveStatus(status)
+        notifyPetStatusDidChange()
 
         print("[IAPTestManager] ✅ 余额已设置为 \(amount)")
     }
@@ -186,6 +196,7 @@ class IAPTestManager: ObservableObject {
         }
 
         PetDataManager.shared.saveStatus(status)
+        notifyPetStatusDidChange()
 
         print("[IAPTestManager] ✅ VIP已开通 \(months) 个月")
     }
@@ -206,6 +217,7 @@ class IAPTestManager: ObservableObject {
         // 注意：保留 trialUsed, trialStartDate, trialExpireDate 用于测试
         // 这样试用期标记仍然保留，不会再次触发试用期弹窗
         PetDataManager.shared.saveStatus(status)
+        notifyPetStatusDidChange()
 
         print("[IAPTestManager] ✅ VIP已取消（试用期标记已保留）")
     }
@@ -344,6 +356,13 @@ class IAPTestManager: ObservableObject {
         if let data = try? JSONEncoder().encode(mockFirstPurchaseCompletedByProduct) {
             UserDefaults.standard.set(data, forKey: "iap_first_purchase_completed_by_product")
         }
+    }
+
+    private func notifyPetStatusDidChange() {
+        NotificationCenter.default.post(
+            name: Notification.Name("PetStatusDidUpdateExternally"),
+            object: nil
+        )
     }
 }
 

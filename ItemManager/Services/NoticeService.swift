@@ -27,8 +27,7 @@ class NoticeService: ObservableObject {
         self.modelContext = context
         Task {
             await fetchNotices()
-            // 启动时自动同步云端公告
-            await syncFromCloudKit()
+            await syncIfNeeded()
         }
     }
 
@@ -44,6 +43,7 @@ class NoticeService: ObservableObject {
             let descriptor = FetchDescriptor<Notice>(
                 predicate: #Predicate { $0.isActive == true },
                 sortBy: [SortDescriptor(\.priority, order: .reverse),
+                         SortDescriptor(\.updatedAt, order: .reverse),
                          SortDescriptor(\.createdAt, order: .reverse)]
             )
             notices = try context.fetch(descriptor)
@@ -56,6 +56,7 @@ class NoticeService: ObservableObject {
     // MARK: - 从 CloudKit 同步
     func syncFromCloudKit() async {
         guard let context = modelContext else { return }
+        errorMessage = nil
 
         isSyncing = true
         defer {
@@ -67,12 +68,33 @@ class NoticeService: ObservableObject {
         }
 
         await cloudKitService.syncNotices(with: context)
+        if let syncError = cloudKitService.syncError {
+            errorMessage = syncError
+        }
+    }
+
+    func syncIfNeeded(force: Bool = false) async {
+        if isSyncing { return }
+
+        if force {
+            await syncFromCloudKit()
+            return
+        }
+
+        if let lastSyncDate = cloudKitService.lastSyncDate,
+           Date().timeIntervalSince(lastSyncDate) < NoticeConfig.syncInterval {
+            return
+        }
+
+        await syncFromCloudKit()
     }
 
     // MARK: - 创建公告
     func createNotice(
         title: String,
         content: String,
+        mediaURL: String? = nil,
+        builtinMediaName: String? = nil,
         mediaType: Notice.MediaType = .none,
         priority: Int = 0
     ) async -> Notice? {
@@ -102,6 +124,8 @@ class NoticeService: ObservableObject {
         let notice = Notice(
             title: title,
             content: content,
+            mediaURL: mediaURL,
+            builtinMediaName: builtinMediaName,
             mediaType: mediaType,
             priority: priority
         )
@@ -145,6 +169,8 @@ class NoticeService: ObservableObject {
             return
         }
 
+        errorMessage = nil
+        notice.version += 1
         notice.updatedAt = Date()
 
         do {
@@ -175,8 +201,10 @@ class NoticeService: ObservableObject {
             return
         }
 
+        errorMessage = nil
         // 软删除：标记为不活跃
         notice.isActive = false
+        notice.version += 1
         notice.updatedAt = Date()
 
         do {

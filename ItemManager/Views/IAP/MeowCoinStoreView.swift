@@ -1,5 +1,4 @@
 import SwiftUI
-import StoreKit
 
 // MARK: - 喵币商店页面
 // 用户购买喵币的主要界面
@@ -7,7 +6,6 @@ import StoreKit
 struct MeowCoinStoreView: View {
     @StateObject private var viewModel = IAPViewModel.shared
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -20,11 +18,8 @@ struct MeowCoinStoreView: View {
                         // 喵币充值选项
                         coinPurchaseSection
 
-                        // VIP会员选项
-                        vipSubscriptionSection
-
-                        // 恢复购买按钮
-                        restoreButton
+                        // VIP说明
+                        vipExchangeHintSection
 
                         // 服务协议
                         termsSection
@@ -54,13 +49,6 @@ struct MeowCoinStoreView: View {
                 }
             } message: {
                 Text(viewModel.errorMessage)
-            }
-            .alert("恢复购买", isPresented: $viewModel.showRestoreSuccess) {
-                Button("确定") {
-                    viewModel.dismissRestoreSuccess()
-                }
-            } message: {
-                Text(viewModel.restoreMessage)
             }
             .task {
                 await viewModel.fetchProducts()
@@ -159,8 +147,8 @@ struct MeowCoinStoreView: View {
         }
     }
 
-    // MARK: - VIP订阅区域
-    private var vipSubscriptionSection: some View {
+    // MARK: - VIP兑换说明
+    private var vipExchangeHintSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("VIP会员")
@@ -193,39 +181,25 @@ struct MeowCoinStoreView: View {
                     .padding(.horizontal)
             }
 
-            // VIP特权列表
-            VIPBenefitsGrid()
-                .padding(.horizontal)
+            VStack(alignment: .leading, spacing: 12) {
+                Label("VIP 不单独售卖", systemImage: "info.circle.fill")
+                    .font(.headline)
 
-            // VIP购买选项
-            if !viewModel.vipProducts.isEmpty {
-                VStack(spacing: 12) {
-                    ForEach(viewModel.vipProducts) { product in
-                        VIPProductCard(product: product) {
-                            Task {
-                                await viewModel.purchaseVIP(product: product)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
+                Text("先购买喵币，再前往会员中心兑换会员时长。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
-    // MARK: - 恢复购买按钮
-    private var restoreButton: some View {
-        Button {
-            Task {
-                await viewModel.restorePurchases()
+                Text("当前兑换价格：66 喵币 / 月")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.primary)
             }
-        } label: {
-            Text("恢复购买")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(uiColor: .secondarySystemBackground))
+            )
+            .padding(.horizontal)
         }
-        .disabled(viewModel.isLoading)
-        .padding(.top, 8)
     }
 
     // MARK: - 服务协议
@@ -420,148 +394,6 @@ struct CoinProductCard: View {
         .buttonStyle(PlainButtonStyle())
         .onAppear {
             updateFirstDoubleStatus()
-        }
-    }
-}
-
-// MARK: - VIP商品卡片
-struct VIPProductCard: View {
-    let product: VIPProductDisplay
-    let onPurchase: () -> Void
-
-    var body: some View {
-        Button(action: onPurchase) {
-            HStack(spacing: 16) {
-                // 图标
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.yellow.opacity(0.3), .orange.opacity(0.3)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 56, height: 56)
-
-                    Image(systemName: "crown.fill")
-                        .font(.title2)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.yellow, .orange],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-
-                // 信息
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(product.name)
-                            .font(.headline)
-
-                        if product.isRecommended {
-                            Text("推荐")
-                                .font(.caption2.bold())
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.red)
-                                )
-                        }
-                    }
-
-                    Text(product.description)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    if let savings = product.savingsPercent {
-                        Text("立省 \(savings)%")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                    }
-                }
-
-                Spacer()
-
-                // 价格
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(product.price)
-                        .font(.title3.bold())
-                        .foregroundStyle(.primary)
-
-                    Text(product.periodText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(uiColor: .secondarySystemBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                product.isRecommended ? Color.yellow.opacity(0.5) : Color.clear,
-                                lineWidth: 2
-                            )
-                    )
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - VIP特权网格
-struct VIPBenefitsGrid: View {
-    let benefits = VIPBenefit.allBenefits
-
-    var body: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible()),
-            GridItem(.flexible())
-        ], spacing: 16) {
-            ForEach(benefits) { benefit in
-                VIPBenefitItem(benefit: benefit)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(uiColor: .tertiarySystemBackground))
-        )
-    }
-}
-
-// MARK: - VIP特权项
-struct VIPBenefitItem: View {
-    let benefit: VIPBenefit
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: benefit.icon)
-                .font(.title2)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.yellow, .orange],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            Text(benefit.title)
-                .font(.caption.bold())
-                .foregroundStyle(.primary)
-
-            Text(benefit.description)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
         }
     }
 }

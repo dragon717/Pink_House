@@ -249,6 +249,14 @@ extension Notification.Name {
     static let homeTabChanged = Notification.Name("homeTabChanged")
     // VIP 中心打开通知（用于新手引导）
     static let vipCenterOpened = Notification.Name("vipCenterOpened")
+    // House 内进入马上来财通知（用于新手引导）
+    static let wealthDestinationOpened = Notification.Name("wealthDestinationOpened")
+    // 来财主页面已出现通知（用于新手引导）
+    static let wealthViewOpened = Notification.Name("wealthViewOpened")
+    // 来财主页面页签切换通知（用于新手引导）
+    static let wealthMainTabChanged = Notification.Name("wealthMainTabChanged")
+    // 新手引导驱动来财页签切换
+    static let wealthGuideSwitchMainTab = Notification.Name("wealthGuideSwitchMainTab")
     // 魔法任务页面 dismiss 通知（用于萌宠智能对话引导）
     static let magicTasksViewDismissed = Notification.Name("magicTasksViewDismissed")
 }

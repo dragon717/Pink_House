@@ -1,6 +1,6 @@
 import Foundation
 
-enum SmallWorldDestination {
+enum SmallWorldDestination: Equatable {
     case menu
     case ootd
     case ootdDefaultBook // OOTD直达默认手帐

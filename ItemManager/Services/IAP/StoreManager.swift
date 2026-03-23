@@ -4,7 +4,7 @@ import Combine
 
 // MARK: - StoreManager
 // StoreKit 2 支付管理类，处理所有内购相关逻辑
-// 包括商品获取、购买流程、交易验证、恢复购买等
+// 包括商品获取、购买流程、交易验证等
 
 @MainActor
 class StoreManager: ObservableObject {
@@ -12,7 +12,6 @@ class StoreManager: ObservableObject {
 
     // MARK: - Published Properties
     @Published var coinProducts: [Product] = []           // 喵币商品列表
-    @Published var subscriptionProducts: [Product] = []   // VIP订阅商品列表
     @Published var isLoading: Bool = false                // 是否正在加载
     @Published var isPurchasing: Bool = false             // 是否正在购买
     @Published var lastError: IAPError?                   // 最后一次错误
@@ -41,7 +40,7 @@ class StoreManager: ObservableObject {
     // 监听所有交易更新，包括：
     // 1. 应用启动时的未完成交易
     // 2. 购买过程中的状态更新
-    // 3. 订阅续订通知
+    // 3. 外部到账通知
     // 4. 退款通知
     private func startTransactionListener() {
         transactionListener = Task.detached { [weak self] in
@@ -77,7 +76,6 @@ class StoreManager: ObservableObject {
             let allProductIDs = IAPProductType.allProductIDs
             let products = try await Product.products(for: allProductIDs)
 
-            // 分类商品
             coinProducts = products.filter { product in
                 IAPProductType.coinProductIDs.contains(product.id)
             }.sorted { p1, p2 in
@@ -85,13 +83,7 @@ class StoreManager: ObservableObject {
                 p1.price < p2.price
             }
 
-            subscriptionProducts = products.filter { product in
-                IAPProductType.subscriptionProductIDs.contains(product.id)
-            }.sorted { p1, p2 in
-                p1.price < p2.price
-            }
-
-            print("[StoreManager] 获取到 \(coinProducts.count) 个喵币商品, \(subscriptionProducts.count) 个订阅商品")
+            print("[StoreManager] 获取到 \(coinProducts.count) 个喵币商品")
 
         } catch {
             print("[StoreManager] 获取商品失败: \(error)")
@@ -124,31 +116,26 @@ class StoreManager: ObservableObject {
         // 模拟购买延迟
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
 
-        // 使用测试管理器模拟验证
-        let result = IAPTestManager.shared.mockVerifyPayment(productID: product.id)
+        guard let productType = IAPProductType(rawValue: product.id) else {
+            return .failed(.productNotFound(product.id))
+        }
 
-        switch result {
-        case .success(let deliveredCoins, _, let isFirstDouble):
-            // 显示成功消息
-            await MainActor.run {
-                purchaseSuccess = true
-                if isFirstDouble {
-                    purchaseSuccessMessage = "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
-                } else {
-                    purchaseSuccessMessage = "成功获得 \(deliveredCoins) 喵币"
-                }
+        switch productType {
+        case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
+            let result = IAPTestManager.shared.mockVerifyPayment(productID: product.id)
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    self.purchaseSuccess = false
-                    self.purchaseSuccessMessage = ""
-                }
+            switch result {
+            case .success(let deliveredCoins, _, let isFirstDouble):
+                await showPurchaseSuccessMessage(
+                    isFirstDouble
+                    ? "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
+                    : "成功获得 \(deliveredCoins) 喵币"
+                )
+                return .success(transaction: nil, product: product)
+
+            case .failure(let error):
+                return .failed(.purchaseFailed(error))
             }
-
-            // 测试模式返回成功，transaction为nil（测试模式不处理真实Transaction）
-            return .success(transaction: nil, product: product)
-
-        case .failure(let error):
-            return .failed(.purchaseFailed(error))
         }
     }
 
@@ -176,18 +163,8 @@ class StoreManager: ObservableObject {
                     return .failed(.alreadyProcessed)
                 }
 
-                // 发送到服务器验证并发放喵币
-                let serverSuccess = await IAPServerManager.shared.verifyAndDeliver(
-                    transaction: transaction,
-                    productID: product.id
-                )
-
-                if serverSuccess {
-                    await transaction.finish()
-                    return .success(transaction: transaction, product: product)
-                } else {
-                    return .failed(.serverVerificationFailed("服务器验证失败"))
-                }
+                await processTransaction(transaction)
+                return .success(transaction: transaction, product: product)
 
             case .userCancelled:
                 print("[StoreManager] 用户取消购买")
@@ -212,43 +189,6 @@ class StoreManager: ObservableObject {
             let iapError = IAPError.purchaseFailed(error.localizedDescription)
             lastError = iapError
             return .failed(iapError)
-        }
-    }
-
-    // MARK: - 恢复购买
-    // 恢复用户的非消耗型购买和订阅
-    // 用户可以在新设备上恢复之前的购买
-    func restorePurchases() async -> IAPRestoreResult {
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            var restoredTransactions: [Transaction] = []
-
-            // 遍历当前用户的所有交易
-            for await result in Transaction.currentEntitlements {
-                do {
-                    let transaction = try checkVerified(result)
-                    restoredTransactions.append(transaction)
-
-                    // 恢复订阅状态
-                    if transaction.productType == .autoRenewable {
-                        await restoreSubscription(transaction)
-                    }
-                } catch {
-                    print("[StoreManager] 恢复交易验证失败: \(error)")
-                }
-            }
-
-            if restoredTransactions.isEmpty {
-                return .empty
-            }
-
-            return .success(restoredTransactions: restoredTransactions)
-
-        } catch {
-            print("[StoreManager] 恢复购买失败: \(error)")
-            return .failed(.purchaseFailed(error.localizedDescription))
         }
     }
 
@@ -278,9 +218,6 @@ class StoreManager: ObservableObject {
             switch productType {
             case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
                 await deliverMeowCoins(for: transaction, productType: productType)
-
-            case .vipMonthly, .vipYearly:
-                await activateVIP(for: transaction, productType: productType)
             }
         }
 
@@ -317,6 +254,7 @@ class StoreManager: ObservableObject {
             var status = PetDataManager.shared.status
             status.meowCoin = account.balance
             PetDataManager.shared.saveStatus(status)
+            Self.notifyPetStatusDidChange()
 
             // 显示成功消息
             purchaseSuccess = true
@@ -351,84 +289,6 @@ class StoreManager: ObservableObject {
         print("[StoreManager] 发放喵币: \(totalAmount) (基础: \(baseAmount), 赠送: \(bonus), 首充双倍: \(isFirstDouble))")
     }
 
-    // MARK: - 激活VIP
-    // 根据订阅类型激活VIP会员
-    private func activateVIP(for transaction: Transaction, productType: IAPProductType) async {
-        let months: Int
-        switch productType {
-        case .vipMonthly:
-            months = 1
-        case .vipYearly:
-            months = 12
-        default:
-            return
-        }
-
-        // 更新VIP状态
-        await MainActor.run {
-            var status = PetDataManager.shared.status
-
-            // 计算新的过期时间
-            let currentExpireDate = status.vipStatus.expireDate ?? Date()
-            let baseDate = currentExpireDate > Date() ? currentExpireDate : Date()
-
-            if let newExpireDate = Calendar.current.date(byAdding: .month, value: months, to: baseDate) {
-                status.vipStatus.isActive = true
-                status.vipStatus.expireDate = newExpireDate
-
-                // 生成VIP号码（如果没有）
-                if status.vipStatus.vipNumber == nil {
-                    status.vipStatus.vipNumber = generateVIPNumber()
-                }
-
-                PetDataManager.shared.saveStatus(status)
-
-                // 显示成功消息
-                purchaseSuccess = true
-                purchaseSuccessMessage = "VIP开通成功！有效期至 \(newExpireDate.formatted(date: .numeric, time: .omitted))"
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    self.purchaseSuccess = false
-                    self.purchaseSuccessMessage = ""
-                }
-            }
-        }
-
-        // 记录购买历史
-        let record = IAPPurchaseRecord(
-            id: String(transaction.id),
-            productID: transaction.productID,
-            purchaseDate: transaction.purchaseDate,
-            coinAmount: nil,
-            subscriptionMonths: months,
-            isVerified: true,
-            verificationDate: Date()
-        )
-        savePurchaseRecord(record)
-
-        print("[StoreManager] 激活VIP: \(months) 个月")
-    }
-
-    // MARK: - 恢复订阅
-    // 恢复订阅状态
-    private func restoreSubscription(_ transaction: Transaction) async {
-        guard let productType = IAPProductType(rawValue: transaction.productID),
-              productType == .vipMonthly || productType == .vipYearly else {
-            return
-        }
-
-        // 检查订阅是否仍然有效
-        if let expirationDate = transaction.expirationDate,
-           expirationDate > Date() {
-            await MainActor.run {
-                var status = PetDataManager.shared.status
-                status.vipStatus.isActive = true
-                status.vipStatus.expireDate = expirationDate
-                PetDataManager.shared.saveStatus(status)
-            }
-        }
-    }
-
     // MARK: - 获取喵币数量
     // 根据商品类型返回对应的喵币数量和赠送数量
     // 汇率 10:1（1元 = 10喵币）
@@ -450,24 +310,6 @@ class StoreManager: ObservableObject {
         default:
             return (0, 0)
         }
-    }
-
-    // MARK: - 生成VIP号码
-    // 生成一个吉利的VIP号码
-    private func generateVIPNumber() -> String {
-        let length = Int.random(in: 6...8)
-        let luckyDigits = ["6", "8", "9", "0", "8", "6"]
-        let allDigits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-
-        var result = ""
-        for _ in 0..<length {
-            if Int.random(in: 1...10) <= 7 {
-                result += luckyDigits.randomElement()!
-            } else {
-                result += allDigits.randomElement()!
-            }
-        }
-        return result
     }
 
     // MARK: - 交易处理记录
@@ -542,6 +384,7 @@ class StoreManager: ObservableObject {
         var status = PetDataManager.shared.status
         status.meowCoin = account.balance
         PetDataManager.shared.saveStatus(status)
+        Self.notifyPetStatusDidChange()
 
         return true
     }
@@ -559,5 +402,24 @@ class StoreManager: ObservableObject {
     // MARK: - 清除错误
     func clearError() {
         lastError = nil
+    }
+
+    private static func notifyPetStatusDidChange() {
+        NotificationCenter.default.post(
+            name: Notification.Name("PetStatusDidUpdateExternally"),
+            object: nil
+        )
+    }
+
+    private func showPurchaseSuccessMessage(_ message: String) async {
+        await MainActor.run {
+            purchaseSuccess = true
+            purchaseSuccessMessage = message
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                self.purchaseSuccess = false
+                self.purchaseSuccessMessage = ""
+            }
+        }
     }
 }

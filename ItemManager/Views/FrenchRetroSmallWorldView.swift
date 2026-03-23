@@ -217,7 +217,15 @@ struct FrenchRetroSmallWorldView: View {
             }
 
             // 3. 猪 (来财)
-            InteractionHotspot(rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "马上来财", labelPosition: CGPoint(x: 0.85, y: 0.72)) {
+            InteractionHotspot(
+                rect: CGRect(x: 0.72, y: 0.43, width: 0.12, height: 0.35),
+                geometry: geometry,
+                imageSize: imageSize,
+                showDebug: showDebugHotspots,
+                label: "马上来财",
+                labelPosition: CGPoint(x: 0.85, y: 0.72),
+                guideTargetKey: .wealthEntry
+            ) {
                 navigate(to: .wealth(nil))
             }
 
@@ -259,6 +267,7 @@ struct InteractionHotspot: View {
     var label: String? = nil
     var labelStyle: SmallWorldLabelStyle = .vertical(angle: FrenchRetroSmallWorldView.verticalLabelRotation)
     var labelPosition: CGPoint? = nil // 独立的标签位置 (Normalized 0-1)
+    var guideTargetKey: GuideTargetKey? = nil
     let action: () -> Void
     
     var body: some View {
@@ -267,22 +276,14 @@ struct InteractionHotspot: View {
         
         ZStack {
             // 热区本体
-            Button(action: {
-                print("[FrenchRetroSmallWorldView] 热区点击, 坐标: (\(rect.minX), \(rect.minY))")
-                action()
-            }) {
-                if showDebug {
-                    Rectangle()
-                        .fill(debugColor.opacity(0.3))
-                        .border(debugColor)
+            Group {
+                if let guideTargetKey {
+                    hotspotButton
+                    guideTargetCaptureAnchor(key: guideTargetKey, width: width, height: height)
                 } else {
-                    // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
-                    Color.black.opacity(0.001)
-                        .contentShape(Rectangle())
+                    hotspotButton
                 }
             }
-            .frame(width: max(1, rect.width * width), height: max(1, rect.height * height))
-            .position(x: (rect.minX + rect.width/2) * width, y: (rect.minY + rect.height/2) * height)
             
             // 独立控制的悬浮文字
             if let label = label {
@@ -296,6 +297,36 @@ struct InteractionHotspot: View {
         }
         // 移除外层的 frame 和 offset，改为内部绝对定位，以便热区和文字可以分离
         .frame(width: width, height: height)
+    }
+    
+    private var hotspotButton: some View {
+        let width = geometry.size.height * (imageSize.width / imageSize.height)
+        let height = geometry.size.height
+        
+        return Button(action: {
+            print("[FrenchRetroSmallWorldView] 热区点击, 坐标: (\(rect.minX), \(rect.minY))")
+            action()
+        }) {
+            if showDebug {
+                Rectangle()
+                    .fill(debugColor.opacity(0.3))
+                    .border(debugColor)
+            } else {
+                // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
+                Color.black.opacity(0.001)
+                    .contentShape(Rectangle())
+            }
+        }
+        .frame(width: max(1, rect.width * width), height: max(1, rect.height * height))
+        .position(x: (rect.minX + rect.width / 2) * width, y: (rect.minY + rect.height / 2) * height)
+    }
+
+    private func guideTargetCaptureAnchor(key: GuideTargetKey, width: CGFloat, height: CGFloat) -> some View {
+        Color.clear
+            .frame(width: max(1, rect.width * width), height: max(1, rect.height * height))
+            .captureGuideTarget(key)
+            .position(x: (rect.minX + rect.width / 2) * width, y: (rect.minY + rect.height / 2) * height)
+            .allowsHitTesting(false)
     }
 }
 
@@ -576,5 +607,3 @@ struct CalendarHotspot: View {
     }
     return PreviewWrapper()
 }
-
-

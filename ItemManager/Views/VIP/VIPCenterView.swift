@@ -7,6 +7,7 @@ struct VIPCenterView: View {
     @State private var showingPurchaseAlert = false
     @State private var alertMessage = ""
     @State private var showSkinSelection = false
+    @State private var showCoinStore = false
     
     // Redeem Logic
     @State private var showingVIPRedeemAlert = false
@@ -135,9 +136,7 @@ struct VIPCenterView: View {
                             .foregroundStyle(purchaseButtonForegroundColor)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        .captureGlobalFrame { frame in
-                            AppFirstLaunchGuideManager.shared.updateAIAnalysisExchangeButtonFrame(frame)
-                        }
+                        .captureGuideTarget(.aiAnalysisExchangeButton)
                         
                         if vipManager.isVIP {
                             /*
@@ -168,8 +167,7 @@ struct VIPCenterView: View {
                             .foregroundStyle(.gray)
                             .underline()
                             .onTapGesture {
-                                // TODO: Navigate to shop or show recharge sheet
-                                // For now, maybe just show a hint
+                                showCoinStore = true
                             }
                     }
                     .padding(.horizontal)
@@ -203,6 +201,9 @@ struct VIPCenterView: View {
         }
         .sheet(isPresented: $showSkinSelection) {
             VIPCardSkinSelectionView()
+        }
+        .sheet(isPresented: $showCoinStore) {
+            MeowCoinStoreView()
         }
         .alert("会员订阅", isPresented: $showingPurchaseAlert) {
             Button("确定", role: .cancel) { }
@@ -339,25 +340,6 @@ struct VIPCenterView: View {
             redeemResultMessage = "兑换码无效"
         }
         showingRedeemResultAlert = true
-    }
-}
-
-private extension View {
-    func captureGlobalFrame(onChange: @escaping (CGRect) -> Void) -> some View {
-        background(
-            GeometryReader { proxy in
-                let frame = proxy.frame(in: .global)
-                Color.clear
-                    .onAppear {
-                        guard frame.width > 0, frame.height > 0 else { return }
-                        onChange(frame)
-                    }
-                    .onChange(of: frame) { newValue in
-                        guard newValue.width > 0, newValue.height > 0 else { return }
-                        onChange(newValue)
-                    }
-            }
-        )
     }
 }
 

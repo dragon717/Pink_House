@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Combine
+import UIKit
 
 // MARK: - 公告弹窗视图
 // 置于 ZStack 最顶部，下方有灰色蒙版，点击蒙版关闭
@@ -366,29 +367,21 @@ class NoticePopupManager: ObservableObject {
     // 重置所有展示记录（用于测试）
     func resetShownHistory() {
         readStatusService.resetReadHistory()
+        UserDefaults.standard.removeObject(forKey: NoticePopupModifier.lastAttemptedNoticeKey)
+        NotificationCenter.default.post(name: .noticeReadHistoryDidReset, object: nil)
     }
 }
 
 // MARK: - 公告弹窗修饰符
 struct NoticePopupModifier: ViewModifier {
+    static let lastAttemptedNoticeKey = "lastAttemptedNoticeKey"
+
     @StateObject private var manager = NoticePopupManager.shared
     @StateObject private var service = NoticeService.shared
     @StateObject private var readStatusService = NoticeReadStatusService.shared
     @Environment(\.modelContext) private var modelContext
     @State private var hasSyncedReadStatus = false
-    
-    // 使用 UserDefaults 持久化 hasAttemptedShow，避免应用重启后重复显示
-    private var hasAttemptedShow: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: "noticeHasAttemptedShow")
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "noticeHasAttemptedShow")
-        }
-    }
-    
-    // 当前会话是否已经尝试过显示（用于防止同一会话内重复显示）
-    @State private var sessionAttempted = false
+    @State private var sessionAttemptedNoticeKey: String?
 
     func body(content: Content) -> some View {
         ZStack {
@@ -403,32 +396,25 @@ struct NoticePopupModifier: ViewModifier {
         .onAppear {
             print("📢 NoticePopupModifier onAppear")
             service.setup(with: modelContext)
-            // 启动时同步已读状态
             syncReadStatus()
-            // 每次视图出现时检查是否需要重置 hasAttemptedShow
-            checkAndResetAttemptState()
         }
         .onChange(of: service.notices) { _, newNotices in
-            print("📢 service.notices changed: count=\(newNotices.count), hasAttemptedShow=\(hasAttemptedShow), sessionAttempted=\(sessionAttempted), hasSyncedReadStatus=\(hasSyncedReadStatus)")
-            // 等待公告数据加载完成且已读状态同步完成后再尝试展示
-            // 条件：未尝试过显示、未在同一会话中尝试过、有公告数据、已同步已读状态
-            if !hasAttemptedShow && !sessionAttempted && !newNotices.isEmpty && hasSyncedReadStatus {
-                sessionAttempted = true
-                // 记录本次尝试的时间戳
-                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastNoticeAttemptTime")
-                print("📢 准备显示公告，延迟 0.5 秒...")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    print("📢 调用 tryShowLatestNotice()")
-                    manager.tryShowLatestNotice()
-                }
-            }
+            print("📢 service.notices changed: count=\(newNotices.count), hasSyncedReadStatus=\(hasSyncedReadStatus), isSyncing=\(service.isSyncing)")
+            attemptShowLatestNoticeIfNeeded()
         }
         .onChange(of: manager.isShowing) { _, isShowing in
-            // 当公告弹窗显示时，标记为已尝试过显示
             if isShowing {
-                print("📢 公告弹窗已显示，设置 hasAttemptedShow = true")
-                UserDefaults.standard.set(true, forKey: "noticeHasAttemptedShow")
+                print("📢 公告弹窗已显示")
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await service.syncIfNeeded(force: true)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .noticeReadHistoryDidReset)) { _ in
+            sessionAttemptedNoticeKey = nil
+            attemptShowLatestNoticeIfNeeded()
         }
     }
     
@@ -437,30 +423,36 @@ struct NoticePopupModifier: ViewModifier {
         Task {
             await readStatusService.syncFromCloud()
             hasSyncedReadStatus = true
-            // 如果公告数据已经加载，尝试显示
-            if !service.notices.isEmpty && !hasAttemptedShow && !sessionAttempted {
-                sessionAttempted = true
-                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastNoticeAttemptTime")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    manager.tryShowLatestNotice()
-                }
-            }
+            attemptShowLatestNoticeIfNeeded()
         }
     }
 
-    // 检查是否需要重置尝试状态（当重置历史记录后）
-    private func checkAndResetAttemptState() {
-        let lastResetTime = NoticePopupManager.shared.lastResetTime?.timeIntervalSince1970 ?? 0
-        let lastAttemptTime = UserDefaults.standard.double(forKey: "lastNoticeAttemptTime")
+    private func attemptShowLatestNoticeIfNeeded() {
+        guard hasSyncedReadStatus, !service.isSyncing else { return }
+        guard let latestNotice = service.notices.first else { return }
 
-        print("📢 checkAndResetAttemptState: lastResetTime=\(lastResetTime), lastAttemptTime=\(lastAttemptTime)")
+        let latestNoticeKey = latestNotice.readTrackingKey
+        if sessionAttemptedNoticeKey == latestNoticeKey {
+            return
+        }
 
-        // 如果重置时间晚于上次尝试时间，说明需要重新尝试显示
-        if lastResetTime > lastAttemptTime {
-            print("📢 检测到重置操作，重置 hasAttemptedShow")
-            UserDefaults.standard.set(false, forKey: "noticeHasAttemptedShow")
+        let lastAttemptedNoticeKey = UserDefaults.standard.string(forKey: Self.lastAttemptedNoticeKey)
+        if lastAttemptedNoticeKey == latestNoticeKey, manager.hasShownNotice(latestNotice) {
+            sessionAttemptedNoticeKey = latestNoticeKey
+            return
+        }
+
+        sessionAttemptedNoticeKey = latestNoticeKey
+        UserDefaults.standard.set(latestNoticeKey, forKey: Self.lastAttemptedNoticeKey)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            manager.tryShowNotice(latestNotice)
         }
     }
+}
+
+extension Notification.Name {
+    static let noticeReadHistoryDidReset = Notification.Name("noticeReadHistoryDidReset")
 }
 
 // MARK: - View 扩展

@@ -331,10 +331,12 @@ struct NoticeAdminView: View {
 
     // MARK: - 预览当前公告
     private func previewCurrentNotice() {
+        let builtinMediaName = selectedImageName
         let tempNotice = Notice(
             title: title,
             content: content,
-            mediaURL: selectedImageName != nil ? "builtin://\(selectedImageName!)" : nil,
+            mediaURL: builtinMediaName.map { Notice.builtinMediaURLString(for: $0) },
+            builtinMediaName: builtinMediaName,
             mediaType: selectedImageName != nil ? .image : mediaType,
             priority: priority
         )
@@ -365,10 +367,13 @@ struct NoticeAdminView: View {
 
                 // 如果有选择新的内置图片，更新 mediaURL
                 if let imageName = selectedImageName {
-                    editing.mediaURL = "builtin://\(imageName)"
+                    editing.mediaURL = Notice.builtinMediaURLString(for: imageName)
+                    editing.builtinMediaName = imageName
                     editing.mediaType = .image
                 } else if selectedImageData == nil && mediaType == .none {
                     editing.mediaURL = nil
+                    editing.cloudKitMediaURL = nil
+                    editing.builtinMediaName = nil
                     editing.mediaType = .none
                 }
 
@@ -378,28 +383,27 @@ struct NoticeAdminView: View {
                 print("📝 创建新公告...")
 
                 // 如果是内置图片，直接使用 builtin:// 前缀存储图片名称
-                var mediaURL: String?
+                let builtinMediaName = selectedImageName
+                let mediaURL: String?
                 let actualMediaType: Notice.MediaType
-                if let imageName = selectedImageName {
-                    mediaURL = "builtin://\(imageName)"
+                if let imageName = builtinMediaName {
+                    mediaURL = Notice.builtinMediaURLString(for: imageName)
                     actualMediaType = .image
                 } else {
+                    mediaURL = nil
                     actualMediaType = mediaType
                 }
 
                 let notice = await service.createNotice(
                     title: title,
                     content: content,
+                    mediaURL: mediaURL,
+                    builtinMediaName: builtinMediaName,
                     mediaType: actualMediaType,
                     priority: priority
                 )
 
                 if notice != nil {
-                    // 更新 mediaURL（如果是内置图片）
-                    if let mediaURL = mediaURL {
-                        notice?.mediaURL = mediaURL
-                        try? modelContext.save()
-                    }
                     alertMessage = "公告已发布"
                 } else if let error = service.errorMessage {
                     alertMessage = error
@@ -424,17 +428,19 @@ struct NoticeAdminView: View {
         mediaType = notice.mediaType
 
         // 处理图片
-        if notice.mediaType == .image,
-           let urlString = notice.mediaURL {
-            if urlString.hasPrefix("builtin://") {
-                // 内置图片
-                let imageName = String(urlString.dropFirst("builtin://".count))
-                selectedImageName = imageName
+        if notice.mediaType == .image {
+            if let builtinMediaName = notice.builtinMediaName ?? notice.mediaURL.flatMap({ urlString in
+                urlString.hasPrefix("builtin://") ? String(urlString.dropFirst("builtin://".count)) : nil
+            }) {
+                selectedImageName = builtinMediaName
                 selectedImageData = nil
-            } else if let url = URL(string: urlString) {
-                // 本地文件图片
+            } else if let urlString = notice.mediaURL,
+                      let url = URL(string: urlString) {
                 selectedImageName = nil
                 selectedImageData = try? Data(contentsOf: url)
+            } else {
+                selectedImageName = nil
+                selectedImageData = nil
             }
         } else {
             selectedImageName = nil

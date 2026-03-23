@@ -64,6 +64,15 @@ enum PointDirection {
     }
 }
 
+// MARK: - 引导目标锚点 Key
+
+enum GuideTargetKey: String, CaseIterable, Hashable {
+    case aiAnalysisVIPCard = "aiAnalysis.vipCard"
+    case aiAnalysisExchangeButton = "aiAnalysis.exchangeButton"
+    case wealthEntry = "wealth.entry"
+    case wealthMainTabSegment = "wealth.mainTab.segment"
+}
+
 // MARK: - 功能体验引导状态管理
 
 extension FeatureUnlockManager {
@@ -129,8 +138,16 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     // 功能体验引导相关
     @Published var isShowingFeatureExperienceGuide: Bool = false
     @Published var currentFeatureExperienceFeature: FeatureItem? = nil
-    @Published var aiAnalysisVIPCardGlobalFrame: CGRect? = nil
-    @Published var aiAnalysisExchangeButtonGlobalFrame: CGRect? = nil
+    @Published private var guideTargetFrames: [GuideTargetKey: CGRect] = [:]
+    
+    // 向后兼容：保留已使用字段名，内部改为统一存储
+    var aiAnalysisVIPCardGlobalFrame: CGRect? {
+        guideTargetFrames[.aiAnalysisVIPCard]
+    }
+    
+    var aiAnalysisExchangeButtonGlobalFrame: CGRect? {
+        guideTargetFrames[.aiAnalysisExchangeButton]
+    }
     
     // MARK: - 配置
     
@@ -253,10 +270,13 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             return
         }
         
+        let condition = FeatureUnlockManager.shared.getCondition(for: feature)
+        let isManualExperienceTask = condition.type == UnlockConditionType.manual.rawValue
         let isUnlocked = FeatureUnlockManager.shared.isUnlocked(feature)
-        print("[FeatureExperienceGuide] 功能解锁状态: \(isUnlocked)")
+        print("[FeatureExperienceGuide] 功能解锁状态: \(isUnlocked), 是否体验任务: \(isManualExperienceTask)")
         
-        guard isUnlocked else {
+        // 体验任务（manual）允许直接进入引导，用于“先体验后完成”流程
+        guard isUnlocked || isManualExperienceTask else {
             print("[FeatureExperienceGuide] 失败: 功能未解锁")
             return
         }
@@ -270,6 +290,11 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     /// 完成当前功能体验引导
     func completeFeatureExperienceGuide() {
         if let feature = currentFeatureExperienceFeature {
+            let condition = FeatureUnlockManager.shared.getCondition(for: feature)
+            if condition.type == UnlockConditionType.manual.rawValue,
+               !FeatureUnlockManager.shared.isUnlocked(feature) {
+                _ = FeatureUnlockManager.shared.unlock(feature, force: true)
+            }
             FeatureUnlockManager.shared.markFeatureExperienceGuideCompleted(for: feature)
         }
         isShowingFeatureExperienceGuide = false
@@ -286,19 +311,41 @@ final class AppFirstLaunchGuideManager: ObservableObject {
 
     // MARK: - 萌宠智能对话引导目标位置信息
 
-    func updateAIAnalysisVIPCardFrame(_ frame: CGRect) {
+    func guideTargetFrame(for key: GuideTargetKey) -> CGRect? {
+        guideTargetFrames[key]
+    }
+
+    func updateGuideTargetFrame(_ frame: CGRect, for key: GuideTargetKey) {
         guard frame.width > 0, frame.height > 0 else { return }
-        aiAnalysisVIPCardGlobalFrame = frame
+        guideTargetFrames[key] = frame
+    }
+
+    func resetGuideTargetFrames(_ keys: [GuideTargetKey]? = nil) {
+        guard let keys else {
+            guideTargetFrames.removeAll()
+            return
+        }
+        
+        for key in keys {
+            guideTargetFrames[key] = nil
+        }
+    }
+
+    func updateAIAnalysisVIPCardFrame(_ frame: CGRect) {
+        updateGuideTargetFrame(frame, for: .aiAnalysisVIPCard)
     }
 
     func updateAIAnalysisExchangeButtonFrame(_ frame: CGRect) {
-        guard frame.width > 0, frame.height > 0 else { return }
-        aiAnalysisExchangeButtonGlobalFrame = frame
+        updateGuideTargetFrame(frame, for: .aiAnalysisExchangeButton)
     }
 
     private func resetAIAnalysisGuideTargetFrames() {
-        aiAnalysisVIPCardGlobalFrame = nil
-        aiAnalysisExchangeButtonGlobalFrame = nil
+        resetGuideTargetFrames([
+            .aiAnalysisVIPCard,
+            .aiAnalysisExchangeButton,
+            .wealthEntry,
+            .wealthMainTabSegment
+        ])
     }
 
     /// 完成引导
@@ -322,6 +369,33 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         showCreateButtonHighlight = false
         UserDefaults.standard.set(false, forKey: hasSeenWelcomeKey)
         saveState()
+    }
+}
+
+// MARK: - 通用引导目标采集 Modifier
+
+struct GuideTargetCaptureModifier: ViewModifier {
+    let key: GuideTargetKey
+    
+    func body(content: Content) -> some View {
+        content.background(
+            GeometryReader { proxy in
+                let frame = proxy.frame(in: .global)
+                Color.clear
+                    .onAppear {
+                        AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(frame, for: key)
+                    }
+                    .onChange(of: frame) { _, newValue in
+                        AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(newValue, for: key)
+                    }
+            }
+        )
+    }
+}
+
+extension View {
+    func captureGuideTarget(_ key: GuideTargetKey) -> some View {
+        modifier(GuideTargetCaptureModifier(key: key))
     }
 }
 
@@ -986,6 +1060,50 @@ enum AIAnalysisGuideStep: Int, CaseIterable {
     }
 }
 
+// MARK: - 来财引导步骤
+
+enum WealthGuideStep: Int, CaseIterable {
+    case step1_clickHouseTab = 1
+    case step2_clickWealthEntry = 2
+    case step3_divination = 3
+    case step4_moneyCounting = 4
+    case step5_wealthStorage = 5
+    
+    var title: String {
+        switch self {
+        case .step1_clickHouseTab: return "先进入 House"
+        case .step2_clickWealthEntry: return "点击「马上来财」"
+        case .step3_divination: return "请签功能"
+        case .step4_moneyCounting: return "数钱功能"
+        case .step5_wealthStorage: return "安财功能"
+        }
+    }
+    
+    var message: String {
+        switch self {
+        case .step1_clickHouseTab:
+            return "先点击底部的 House 页签，我们从场景入口开始引导。"
+        case .step2_clickWealthEntry:
+            return "在 House 场景里点击「马上来财」入口，进入来财功能。"
+        case .step3_divination:
+            return "「请签」可查看今日运势与建议，适合每日打卡。"
+        case .step4_moneyCounting:
+            return "「数钱」是沉浸式数钞体验，能快速放松心情。"
+        case .step5_wealthStorage:
+            return "「安财」可管理财富展示与资产状态。"
+        }
+    }
+    
+    var showCatPaw: Bool {
+        switch self {
+        case .step1_clickHouseTab, .step2_clickWealthEntry:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 enum HighlightType {
     case circle
     case roundedRect
@@ -997,9 +1115,10 @@ struct FeatureExperienceGuideOverlay: View {
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var showingFullDescription = false
     
-    // aiAnalysis引导专用状态
+    // 跨页面引导专用状态
     @State private var aiAnalysisStep: AIAnalysisGuideStep = .step1_returnToMe
-    @State private var currentTab: String = "wardrobe"  // 当前tab，用于检测是否返回了「我」界面
+    @State private var wealthGuideStep: WealthGuideStep = .step1_clickHouseTab
+    @State private var currentTab: String = "wardrobe"
 
     var body: some View {
         ZStack {
@@ -1018,49 +1137,50 @@ struct FeatureExperienceGuideOverlay: View {
         .zIndex(1000)
         .onAppear {
             print("[FeatureExperienceGuide] onAppear, feature: \(guideManager.currentFeatureExperienceFeature?.rawValue ?? "nil")")
-            
-            // 监听tab切换通知
-            NotificationCenter.default.addObserver(
-                forName: .homeTabChanged,
-                object: nil,
-                queue: .main
-            ) { notification in
-                if let tab = notification.userInfo?["tab"] as? String {
-                    currentTab = tab
-                    print("[FeatureExperienceGuide] Tab切换到: \(tab), 当前步骤: \(aiAnalysisStep)")
-                    // 如果当前是aiAnalysis引导的第一步，且用户切换到了me tab，自动进入第二步
-                    if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
-                       aiAnalysisStep == .step1_returnToMe,
-                       tab == "me",
-                       guideManager.aiAnalysisVIPCardGlobalFrame != nil {
-                        print("[FeatureExperienceGuide] 从step1自动进入step2")
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            aiAnalysisStep = .step2_clickVIP
-                        }
-                    }
+            resetGuideStepState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .homeTabChanged)) { notification in
+            guard let tab = notification.userInfo?["tab"] as? String else { return }
+            currentTab = tab
+            print("[FeatureExperienceGuide] Tab切换到: \(tab), aiStep: \(aiAnalysisStep), wealthStep: \(wealthGuideStep)")
+
+            // aiAnalysis: step1 -> step2（返回「我」并拿到VIP卡片坐标）
+            if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
+               aiAnalysisStep == .step1_returnToMe,
+               tab == "me",
+               guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    aiAnalysisStep = .step2_clickVIP
                 }
             }
-            
-            // 监听VIP中心打开通知
-            NotificationCenter.default.addObserver(
-                forName: .vipCenterOpened,
-                object: nil,
-                queue: .main
-            ) { _ in
-                // 如果当前是aiAnalysis引导的第二步，且用户打开了VIP中心，自动进入第三步
-                if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
-                   aiAnalysisStep == .step2_clickVIP {
-                    print("[FeatureExperienceGuide] 从step2自动进入step3")
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        aiAnalysisStep = .step3_exchange
-                    }
+
+            // wealth: step1 -> step2（进入 House）
+            if guideManager.currentFeatureExperienceFeature == .wealth,
+               wealthGuideStep == .step1_clickHouseTab,
+               tab == "smallWorld" {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    wealthGuideStep = .step2_clickWealthEntry
                 }
             }
         }
-        .onDisappear {
-            // 移除通知监听
-            NotificationCenter.default.removeObserver(self, name: .homeTabChanged, object: nil)
-            NotificationCenter.default.removeObserver(self, name: .vipCenterOpened, object: nil)
+        .onReceive(NotificationCenter.default.publisher(for: .vipCenterOpened)) { _ in
+            // aiAnalysis: step2 -> step3（进入VIP中心）
+            if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
+               aiAnalysisStep == .step2_clickVIP {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    aiAnalysisStep = .step3_exchange
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .wealthDestinationOpened)) { _ in
+            advanceWealthToMainTabGuideIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .wealthViewOpened)) { _ in
+            advanceWealthToMainTabGuideIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .wealthMainTabChanged)) { notification in
+            guard let tab = notification.userInfo?["tab"] as? String else { return }
+            handleWealthMainTabChanged(tab)
         }
         .onChange(of: guideManager.aiAnalysisVIPCardGlobalFrame) { vipCardFrame in
             // step1 -> step2：只有当用户真的回到「我」页并拿到 VIP 卡片真实位置后才前进
@@ -1072,6 +1192,19 @@ struct FeatureExperienceGuideOverlay: View {
                     aiAnalysisStep = .step2_clickVIP
                 }
             }
+        }
+        .onChange(of: guideManager.guideTargetFrame(for: .wealthMainTabSegment)) { segmentFrame in
+            // wealth: step2 -> step3（已进入来财，且拿到主页签真实位置）
+            if guideManager.currentFeatureExperienceFeature == .wealth,
+               wealthGuideStep == .step2_clickWealthEntry,
+               segmentFrame != nil {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    wealthGuideStep = .step3_divination
+                }
+            }
+        }
+        .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _ in
+            resetGuideStepState()
         }
     }
 
@@ -1100,6 +1233,57 @@ struct FeatureExperienceGuideOverlay: View {
             aiAnalysisGuideContent
         default:
             genericGuideContent(for: feature)
+        }
+    }
+
+    private func resetGuideStepState() {
+        guard let feature = guideManager.currentFeatureExperienceFeature else { return }
+        showingFullDescription = false
+
+        switch feature {
+        case .aiAnalysis:
+            aiAnalysisStep = .step1_returnToMe
+        case .wealth:
+            wealthGuideStep = .step1_clickHouseTab
+            // 兜底：如果当前已经在 House / 来财页面，则直接推进到对应步骤
+            if guideManager.guideTargetFrame(for: .wealthEntry) != nil {
+                wealthGuideStep = .step2_clickWealthEntry
+            }
+            if guideManager.guideTargetFrame(for: .wealthMainTabSegment) != nil {
+                wealthGuideStep = .step3_divination
+            }
+        default:
+            break
+        }
+    }
+
+    private func advanceWealthToMainTabGuideIfNeeded() {
+        guard guideManager.currentFeatureExperienceFeature == .wealth else { return }
+        guard wealthGuideStep.rawValue < WealthGuideStep.step3_divination.rawValue else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            wealthGuideStep = .step3_divination
+        }
+    }
+
+    private func handleWealthMainTabChanged(_ tab: String) {
+        guard guideManager.currentFeatureExperienceFeature == .wealth else { return }
+
+        let targetStep: WealthGuideStep
+        switch tab {
+        case WealthMainTab.divination.rawValue:
+            targetStep = .step3_divination
+        case WealthMainTab.moneyCounting.rawValue:
+            targetStep = .step4_moneyCounting
+        case WealthMainTab.wealthStorage.rawValue:
+            targetStep = .step5_wealthStorage
+        default:
+            return
+        }
+
+        guard targetStep.rawValue > wealthGuideStep.rawValue else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            wealthGuideStep = targetStep
         }
     }
 
@@ -1751,94 +1935,184 @@ struct FeatureExperienceGuideOverlay: View {
     // MARK: - 来财求签引导
 
     private var wealthGuideContent: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button {
-                    guideManager.dismissFeatureExperienceGuide()
-                } label: {
-                    Text("跳过")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
+        GeometryReader { geometry in
+            ZStack {
+                switch wealthGuideStep {
+                case .step1_clickHouseTab:
+                    wealthStep1Content(in: geometry)
+                case .step2_clickWealthEntry:
+                    wealthStep2Content(in: geometry)
+                case .step3_divination, .step4_moneyCounting, .step5_wealthStorage:
+                    wealthMainTabContent(in: geometry, step: wealthGuideStep)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 60)
-
-            Spacer()
-
-            VStack(spacing: 16) {
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 50))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.yellow, .orange],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-
-                Text("来财求签")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("试试今日运势~")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                if showingFullDescription {
-                    Text("每日求签，看看今天的财运和穿搭运势~\n\n据说很准哦！")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(3)
-                        .padding(.top, 8)
-                }
-
-                HStack(spacing: 12) {
-                    Button {
-                        withAnimation {
-                            showingFullDescription.toggle()
-                        }
-                    } label: {
-                        Text(showingFullDescription ? "收起" : "了解更多")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                    }
-
-                    Button {
-                        guideManager.completeFeatureExperienceGuide()
-                    } label: {
-                        Text("去求签")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 20)
-                            .background(
-                                LinearGradient(
-                                    colors: [.yellow, .orange],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-            }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-            )
-            .padding(.horizontal, 20)
-            .padding(.bottom, 120)
         }
+    }
+
+    // 来财步骤1：点击 House Tab
+    private func wealthStep1Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let tabBarHeight: CGFloat = 56
+        let houseGuideXOffset: CGFloat = 20
+        let houseGuideYOffset: CGFloat = 40
+        let houseTabFrame = CGRect(
+            x: (screenBounds.width * 0.375) - 34 + houseGuideXOffset,
+            y: screenBounds.height - geometry.safeAreaInsets.bottom - tabBarHeight + houseGuideYOffset,
+            width: 68,
+            height: tabBarHeight
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: houseTabFrame,
+                highlightType: .circle,
+                cornerRadius: 28
+            )
+
+            HighlightPulseViewNoClick(
+                center: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
+                radius: 34
+            )
+
+            if wealthGuideStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
+                    delay: 0.5
+                )
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                Spacer()
+                wealthGuideBubble(step: wealthGuideStep)
+                    .padding(.bottom, 120)
+            }
+        }
+    }
+
+    // 来财步骤2：点击「马上来财」入口
+    private func wealthStep2Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackEntryFrame = CGRect(
+            x: (screenBounds.width * 0.52) - 36,
+            y: (screenBounds.height * 0.47) - 28,
+            width: 72,
+            height: 56
+        )
+        let wealthEntryFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .wealthEntry),
+            in: geometry,
+            fallback: fallbackEntryFrame
+        )
+        let pawPosition = CGPoint(
+            x: min(wealthEntryFrame.maxX + 22, screenBounds.width - 28),
+            y: min(wealthEntryFrame.midY + 8, screenBounds.height - 28)
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: wealthEntryFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 16
+            )
+
+            RoundedRectHighlightView(
+                frame: wealthEntryFrame,
+                cornerRadius: 16
+            )
+            .allowsHitTesting(false)
+
+            if wealthGuideStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: pawPosition,
+                    delay: 0.5
+                )
+                .opacity(0.45)
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                Spacer()
+                wealthGuideBubble(step: wealthGuideStep)
+                    .padding(.bottom, 120)
+            }
+        }
+    }
+
+    // 来财步骤3/4/5：讲解「请签/数钱/安财」主页签
+    private func wealthMainTabContent(in geometry: GeometryProxy, step: WealthGuideStep) -> some View {
+        let screenBounds = geometry.size
+        let fallbackSegmentFrame = CGRect(
+            x: (screenBounds.width - 190) / 2,
+            y: max(geometry.safeAreaInsets.top + 8, 58),
+            width: 190,
+            height: 34
+        )
+        let segmentFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .wealthMainTabSegment),
+            in: geometry,
+            fallback: fallbackSegmentFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: segmentFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 10
+            )
+
+            RoundedRectHighlightView(
+                frame: segmentFrame,
+                cornerRadius: 10
+            )
+            .allowsHitTesting(false)
+
+            VStack {
+                Spacer()
+                wealthGuideBubble(
+                    step: step,
+                    onNext: {
+                        switch step {
+                        case .step3_divination:
+                            switchWealthGuideTab(to: .moneyCounting, nextStep: .step4_moneyCounting)
+                        case .step4_moneyCounting:
+                            switchWealthGuideTab(to: .wealthStorage, nextStep: .step5_wealthStorage)
+                        default:
+                            break
+                        }
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    private func switchWealthGuideTab(to tab: WealthMainTab, nextStep: WealthGuideStep) {
+        NotificationCenter.default.post(
+            name: .wealthGuideSwitchMainTab,
+            object: nil,
+            userInfo: ["tab": tab.rawValue]
+        )
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            wealthGuideStep = nextStep
+        }
+    }
+
+    private func wealthGuideBubble(
+        step: WealthGuideStep,
+        onNext: (() -> Void)? = nil
+    ) -> some View {
+        WealthGuideBubbleView(
+            step: step,
+            onSkip: {
+                guideManager.dismissFeatureExperienceGuide()
+            },
+            onNext: onNext,
+            onComplete: {
+                guideManager.completeFeatureExperienceGuide()
+            }
+        )
     }
 
     // MARK: - 萌宠智能对话引导（三步骤）
@@ -1924,7 +2198,7 @@ struct FeatureExperienceGuideOverlay: View {
             height: VIPManager.shared.isVIP ? 180 : 100
         )
         let vipCardFrame = aiGuideTargetFrame(
-            globalFrame: guideManager.aiAnalysisVIPCardGlobalFrame,
+            globalFrame: guideManager.guideTargetFrame(for: .aiAnalysisVIPCard),
             in: geometry,
             fallback: fallbackVIPFrame
         )
@@ -1973,7 +2247,7 @@ struct FeatureExperienceGuideOverlay: View {
             height: 56
         )
         let exchangeButtonFrame = aiGuideTargetFrame(
-            globalFrame: guideManager.aiAnalysisExchangeButtonGlobalFrame,
+            globalFrame: guideManager.guideTargetFrame(for: .aiAnalysisExchangeButton),
             in: geometry,
             fallback: fallbackExchangeFrame
         )
@@ -2156,6 +2430,116 @@ struct AIAnalysisGuideBubbleView: View {
                         onComplete()
                     } label: {
                         Text("知道了")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [magicPalette.accent, magicPalette.accent.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.top, 8)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(magicPalette.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(magicPalette.quickOptionStroke, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 320)
+        .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - 来财引导气泡视图
+
+struct WealthGuideBubbleView: View {
+    let step: WealthGuideStep
+    let onSkip: () -> Void
+    let onNext: (() -> Void)?
+    let onComplete: () -> Void
+
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var actionTitle: String? {
+        switch step {
+        case .step3_divination:
+            return "下一步：数钱"
+        case .step4_moneyCounting:
+            return "下一步：安财"
+        case .step5_wealthStorage:
+            return "知道了"
+        default:
+            return nil
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button {
+                    onSkip()
+                } label: {
+                    Text("跳过")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+
+            VStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    ForEach(WealthGuideStep.allCases, id: \.rawValue) { s in
+                        Circle()
+                            .fill(s.rawValue <= step.rawValue ? magicPalette.accent : Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+
+                Text(step.title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                Text(step.message)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 8)
+
+                if let actionTitle {
+                    Button {
+                        if step == .step5_wealthStorage {
+                            onComplete()
+                        } else {
+                            onNext?()
+                        }
+                    } label: {
+                        Text(actionTitle)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)

@@ -1371,6 +1371,11 @@ struct MainTabView: View {
                 navigateToFeatureWithGuide(feature)
             }
         }
+        .onChange(of: smallWorldDestination) { _, newDestination in
+            if case .wealth = newDestination {
+                NotificationCenter.default.post(name: .wealthDestinationOpened, object: nil)
+            }
+        }
     }
 
     private func navigateToFeatureWithGuide(_ feature: FeatureItem) {
@@ -1386,6 +1391,7 @@ struct MainTabView: View {
                     object: nil,
                     userInfo: ["feature": "dataBackup"]
                 )
+                startFeatureGuideAfterNavigation(feature)
             }
         case .cloudSync:
             // 跳转到设置页面的iCloud同步功能
@@ -1398,6 +1404,7 @@ struct MainTabView: View {
                     object: nil,
                     userInfo: ["feature": "cloudSync"]
                 )
+                startFeatureGuideAfterNavigation(feature)
             }
         case .themeCustomize:
             // 跳转到设置页面的主题功能
@@ -1410,6 +1417,7 @@ struct MainTabView: View {
                     object: nil,
                     userInfo: ["feature": "themeCustomize"]
                 )
+                startFeatureGuideAfterNavigation(feature)
             }
         case .ootd:
             // 跳转到衣橱页面，然后显示OOTD
@@ -1417,24 +1425,60 @@ struct MainTabView: View {
                 selectedTab = 0
                 homeTabSelection = .wardrobe
             }
+            startFeatureGuideAfterNavigation(feature)
         case .wealth:
-            // 跳转到萌宠页面
-            withAnimation {
-                selectedTab = 3
-            }
+            // 不自动跳转到萌宠对话，按引导第一步由用户手动点击 House 页签
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .wealth)
         case .batchImport:
             // 跳转到衣橱页面的批量导入
             withAnimation {
                 selectedTab = 0
                 homeTabSelection = .wardrobe
             }
+            startFeatureGuideAfterNavigation(feature)
+        case .filterClassic:
+            // 筛选偏好位于梦幻衣橱设置中，复用 batchImport 导航入口
+            withAnimation {
+                selectedTab = 2
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(
+                    name: .navigateToSettings,
+                    object: nil,
+                    userInfo: ["feature": "batchImport"]
+                )
+                startFeatureGuideAfterNavigation(feature)
+            }
+        case .spaceBook:
+            // 空间手帐与OOTD体验链路相关，先进入衣橱页再引导说明
+            withAnimation {
+                selectedTab = 0
+                homeTabSelection = .wardrobe
+            }
+            startFeatureGuideAfterNavigation(feature)
+        case .batchEdit:
+            // 批量编辑从衣橱列表进入，先回到衣橱页
+            withAnimation {
+                selectedTab = 0
+                homeTabSelection = .wardrobe
+            }
+            startFeatureGuideAfterNavigation(feature)
         case .aiAnalysis:
             // 萌宠智能对话引导：从当前页面开始，引导用户返回到「我」界面
             // 引导流程由 FirstUseGuideOverlay 中的 aiAnalysisGuideContent 处理
             // 直接启动首次使用引导
             AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .aiAnalysis)
         default:
-            break
+            // 兜底：只要在体验引导列表里，就启动引导
+            if FeatureUnlockManager.experienceGuidedFeatures.contains(feature) {
+                startFeatureGuideAfterNavigation(feature)
+            }
+        }
+    }
+
+    private func startFeatureGuideAfterNavigation(_ feature: FeatureItem, delay: TimeInterval = 0.45) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: feature)
         }
     }
 }

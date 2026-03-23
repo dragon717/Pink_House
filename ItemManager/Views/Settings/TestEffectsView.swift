@@ -426,160 +426,30 @@ struct NoticeTestView: View {
     @State private var showSyncAlert = false
     @State private var syncMessage = ""
     @State private var showReadStatusAlert = false
+    @State private var currentUserID: String?
+    @State private var isAdmin = false
+    @State private var isCheckingAdmin = false
+    @State private var lastOperationMessage = "准备就绪"
+    @State private var hasInitializedNoticeService = false
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // 环境信息
-                VStack(spacing: 8) {
-                    Text("当前环境")
-                        .font(.caption)
-                        .foregroundStyle(themeManager.secondaryTextColor)
+            VStack(spacing: 20) {
+                noticeOverviewCard
+                    .padding(.top, 20)
 
-                    HStack {
-                        Image(systemName: "cloud.fill")
-                            .foregroundStyle(themeManager.accentTextColor)
-                        #if DEBUG
-                        Text("Development (调试版)")
-                            .font(.caption)
-                            .foregroundStyle(themeManager.accentTextColor)
-                        #else
-                        Text("Production (发布版)")
-                            .font(.caption)
-                            .foregroundStyle(themeManager.accentTextColor)
-                        #endif
-                    }
+                latestNoticeCard
 
-                    Text("📢 已读状态: \(readStatusService.isSyncing ? "同步中..." : "已同步")")
-                        .font(.caption2)
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                }
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(themeManager.cardBackgroundColor.opacity(0.5))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
-                )
-                .cornerRadius(12)
-                .padding(.horizontal)
-                .padding(.top, 20)
-
-                Text("公告管理功能测试")
-                    .foregroundStyle(themeManager.secondaryTextColor)
-
-                // 同步状态
-                if service.isSyncing || cloudKitService.isSyncing {
-                    HStack {
-                        ProgressView()
-                            .padding(.trailing, 8)
-                        Text("同步中...")
-                            .foregroundStyle(themeManager.secondaryTextColor)
-                    }
-                    .padding(.horizontal)
-                }
-
-                // 获取 iCloud ID（配置用）
-                Button {
-                    Task {
-                        await cloudKitService.getCurrentUserID()
-                    }
-                } label: {
-                    LabActionCard(
-                        icon: "person.badge.key",
-                        title: "获取我的 iCloud ID",
-                        subtitle: "配置管理员权限时使用",
-                        color: themeManager.accentTextColor
-                    )
-                }
-                .padding(.horizontal)
-
-                // 管理公告
-                Button {
-                    showNoticeAdmin = true
-                } label: {
-                    LabActionCard(
-                        icon: "gear",
-                        title: "管理公告",
-                        subtitle: "添加、编辑、删除公告（需管理员权限）",
-                        color: themeManager.accentTextColor
-                    )
-                }
-                .padding(.horizontal)
-
-                // 手动同步公告
-                Button {
-                    Task {
-                        await service.manualSync()
-                        syncMessage = service.errorMessage ?? "同步完成"
-                        showSyncAlert = true
-                    }
-                } label: {
-                    LabActionCard(
-                        icon: "arrow.clockwise.icloud",
-                        title: "手动同步公告",
-                        subtitle: "从云端拉取最新公告",
-                        color: themeManager.accentTextColor
-                    )
-                }
-                .disabled(service.isSyncing)
-                .padding(.horizontal)
-
-                // 同步已读状态
-                Button {
-                    Task {
-                        await readStatusService.syncFromCloud()
-                        showReadStatusAlert = true
-                    }
-                } label: {
-                    LabActionCard(
-                        icon: "arrow.down.icloud",
-                        title: "同步已读状态",
-                        subtitle: "从 iCloud 同步已读状态",
-                        color: themeManager.accentTextColor
-                    )
-                }
-                .disabled(readStatusService.isSyncing)
-                .padding(.horizontal)
-
-                // 预览公告
-                Button {
-                    showNoticePreview = true
-                } label: {
-                    LabActionCard(
-                        icon: "eye",
-                        title: "预览公告弹窗",
-                        subtitle: "查看公告展示效果",
-                        color: themeManager.accentTextColor
-                    )
-                }
-                .padding(.horizontal)
-
-                // 重置记录
-                Button {
-                    showResetAlert = true
-                } label: {
-                    LabActionCard(
-                        icon: "arrow.counterclockwise",
-                        title: "重置公告展示记录",
-                        subtitle: "清除已展示过的记录",
-                        color: themeManager.tertiaryTextColor
-                    )
-                }
-                .padding(.horizontal)
-
-                // 显示当前公告数量
-                if !service.notices.isEmpty {
-                    Text("当前有 \(service.notices.count) 条公告")
-                        .font(.caption)
-                        .foregroundStyle(themeManager.secondaryTextColor)
-                        .padding(.top, 8)
-                }
+                actionSection
 
                 Spacer(minLength: 100)
             }
         }
-        .sheet(isPresented: $showNoticeAdmin) {
+        .sheet(isPresented: $showNoticeAdmin, onDismiss: {
+            Task {
+                await refreshNoticeDiagnostics(forceSync: true)
+            }
+        }) {
             NoticeAdminView()
         }
         .overlay {
@@ -601,13 +471,375 @@ struct NoticeTestView: View {
             Button("取消", role: .cancel) {}
             Button("重置", role: .destructive) {
                 NoticePopupManager.shared.resetShownHistory()
+                lastOperationMessage = "已重置公告展示记录"
             }
         } message: {
             Text("这将重置所有公告的展示记录，公告将可以再次展示。确定要继续吗？")
         }
         .onAppear {
-            service.setup(with: modelContext)
+            Task {
+                await refreshNoticeDiagnostics(forceSync: false)
+            }
         }
+        .refreshable {
+            await refreshNoticeDiagnostics(forceSync: true)
+        }
+    }
+
+    private var noticeOverviewCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("公告调试面板")
+                        .font(.headline)
+                        .foregroundStyle(themeManager.primaryTextColor)
+
+                    Text("复用原实验室页面，集中看环境、同步、权限和最新公告。")
+                        .font(.caption)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                }
+
+                Spacer()
+
+                if service.isSyncing || cloudKitService.isSyncing || readStatusService.isSyncing || isCheckingAdmin {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            HStack(spacing: 12) {
+                debugBadge(title: "环境", value: environmentLabel, accent: themeManager.accentTextColor)
+                debugBadge(title: "权限", value: isCheckingAdmin ? "检查中" : (isAdmin ? "管理员" : "普通用户"), accent: isAdmin ? .green : .orange)
+                debugBadge(title: "公告", value: "\(service.notices.count) 条", accent: .blue)
+            }
+
+            VStack(spacing: 10) {
+                debugInfoRow(
+                    icon: "person.crop.circle.badge.checkmark",
+                    title: "当前 iCloud ID",
+                    value: currentUserID ?? "未读取"
+                )
+                debugInfoRow(
+                    icon: "arrow.clockwise.icloud",
+                    title: "公告同步",
+                    value: syncStatusText
+                )
+                debugInfoRow(
+                    icon: "checkmark.circle",
+                    title: "已读状态",
+                    value: readStatusService.isSyncing ? "同步中" : "已同步"
+                )
+                debugInfoRow(
+                    icon: "text.bubble",
+                    title: "最近反馈",
+                    value: latestStatusText
+                )
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(themeManager.cardBackgroundColor.opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private var latestNoticeCard: some View {
+        if let latestNotice = service.notices.first {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("最新公告")
+                            .font(.headline)
+                            .foregroundStyle(themeManager.primaryTextColor)
+
+                        Text(latestNotice.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(themeManager.primaryTextColor)
+                            .lineLimit(2)
+                    }
+
+                    Spacer()
+
+                    Text(readStatusService.hasReadNotice(latestNotice) ? "已读" : "未读")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(readStatusService.hasReadNotice(latestNotice) ? .green : .orange))
+                }
+
+                VStack(spacing: 10) {
+                    debugInfoRow(icon: "number", title: "优先级 / 版本", value: "P\(latestNotice.priority) / v\(latestNotice.version)")
+                    debugInfoRow(icon: "clock", title: "更新时间", value: formattedDate(latestNotice.updatedAt))
+                    debugInfoRow(icon: "photo", title: "媒体", value: latestNoticeMediaText(for: latestNotice))
+                    debugInfoRow(icon: "key", title: "追踪键", value: latestNotice.readTrackingKey)
+                }
+
+                Text(latestNotice.content)
+                    .font(.caption)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+                    .lineLimit(4)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(themeManager.cardBackgroundColor.opacity(0.5))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+            )
+            .padding(.horizontal)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("最新公告")
+                    .font(.headline)
+                    .foregroundStyle(themeManager.primaryTextColor)
+
+                Text("当前没有可用公告。你可以先用“管理公告”发布一条，再回到这里验证同步和弹窗。")
+                    .font(.caption)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(themeManager.cardBackgroundColor.opacity(0.5))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(themeManager.accentTextColor.opacity(0.2), lineWidth: 1)
+            )
+            .padding(.horizontal)
+        }
+    }
+
+    private var actionSection: some View {
+        VStack(spacing: 12) {
+            Button {
+                Task {
+                    currentUserID = await cloudKitService.getCurrentUserID()
+                    lastOperationMessage = currentUserID == nil ? "读取 iCloud ID 失败" : "已读取当前 iCloud ID"
+                    await refreshAdminStatus()
+                }
+            } label: {
+                LabActionCard(
+                    icon: "person.badge.key",
+                    title: "获取我的 iCloud ID",
+                    subtitle: "读取当前账号，并顺手检查管理员权限",
+                    color: themeManager.accentTextColor,
+                    tag: currentUserID == nil ? nil : "已读取",
+                    tagColor: .green
+                )
+            }
+            .padding(.horizontal)
+
+            Button {
+                showNoticeAdmin = true
+            } label: {
+                LabActionCard(
+                    icon: "gear",
+                    title: "管理公告",
+                    subtitle: "继续复用原管理页，发布、编辑、删除都从这里进",
+                    color: themeManager.accentTextColor,
+                    tag: isAdmin ? "可发布" : "只读",
+                    tagColor: isAdmin ? .green : .orange
+                )
+            }
+            .padding(.horizontal)
+
+            Button {
+                Task {
+                    await refreshNoticeDiagnostics(forceSync: true)
+                    syncMessage = latestStatusText
+                    showSyncAlert = true
+                }
+            } label: {
+                LabActionCard(
+                    icon: "arrow.clockwise.icloud",
+                    title: "手动同步公告",
+                    subtitle: "拉最新公告并刷新本地缓存",
+                    color: themeManager.accentTextColor,
+                    tag: service.isSyncing ? "同步中" : formattedDate(cloudKitService.lastSyncDate),
+                    tagColor: .blue
+                )
+            }
+            .disabled(service.isSyncing)
+            .padding(.horizontal)
+
+            Button {
+                Task {
+                    await readStatusService.syncFromCloud()
+                    lastOperationMessage = "已读状态已从 iCloud 同步完成"
+                    showReadStatusAlert = true
+                }
+            } label: {
+                LabActionCard(
+                    icon: "arrow.down.icloud",
+                    title: "同步已读状态",
+                    subtitle: "核对弹窗为什么出现/不出现",
+                    color: themeManager.accentTextColor,
+                    tag: readStatusService.isSyncing ? "同步中" : formattedDate(readStatusService.lastSyncDate),
+                    tagColor: .purple
+                )
+            }
+            .disabled(readStatusService.isSyncing)
+            .padding(.horizontal)
+
+            Button {
+                showNoticePreview = true
+            } label: {
+                LabActionCard(
+                    icon: "eye",
+                    title: "预览公告弹窗",
+                    subtitle: "直接预览当前排序第一条公告的展示效果",
+                    color: themeManager.accentTextColor,
+                    tag: service.notices.isEmpty ? "空" : "最新",
+                    tagColor: service.notices.isEmpty ? .orange : .green
+                )
+            }
+            .disabled(service.notices.isEmpty)
+            .padding(.horizontal)
+
+            Button {
+                showResetAlert = true
+            } label: {
+                LabActionCard(
+                    icon: "arrow.counterclockwise",
+                    title: "重置公告展示记录",
+                    subtitle: "清除已展示记录，验证修改后重新弹窗",
+                    color: themeManager.tertiaryTextColor,
+                    tag: "重置",
+                    tagColor: .red
+                )
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private var environmentLabel: String {
+        #if DEBUG
+        return "Development"
+        #else
+        return "Production"
+        #endif
+    }
+
+    private var syncStatusText: String {
+        if service.isSyncing || cloudKitService.isSyncing {
+            return "同步中"
+        }
+
+        if let error = service.errorMessage, !error.isEmpty {
+            return error
+        }
+
+        if let error = cloudKitService.syncError, !error.isEmpty {
+            return error
+        }
+
+        return cloudKitService.lastSyncDate.map(formattedDate) ?? "尚未同步"
+    }
+
+    private var latestStatusText: String {
+        if let error = service.errorMessage, !error.isEmpty {
+            return error
+        }
+
+        if let error = cloudKitService.syncError, !error.isEmpty {
+            return error
+        }
+
+        return lastOperationMessage
+    }
+
+    private func latestNoticeMediaText(for notice: Notice) -> String {
+        switch notice.mediaType {
+        case .none:
+            return "无媒体"
+        case .image:
+            return notice.builtinMediaName ?? notice.mediaURL ?? "图片"
+        case .video:
+            return notice.mediaURL ?? "视频"
+        }
+    }
+
+    private func formattedDate(_ date: Date?) -> String {
+        guard let date else { return "未记录" }
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    @ViewBuilder
+    private func debugBadge(title: String, value: String, accent: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(themeManager.secondaryTextColor)
+            Text(value)
+                .font(.caption.bold())
+                .foregroundStyle(accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(accent.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func debugInfoRow(icon: String, title: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(themeManager.accentTextColor)
+                .frame(width: 14, height: 14)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(themeManager.secondaryTextColor)
+
+                Text(value)
+                    .font(.caption)
+                    .foregroundStyle(themeManager.primaryTextColor)
+                    .textSelection(.enabled)
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func refreshAdminStatus() async {
+        isCheckingAdmin = true
+        let hasPermission = await service.isAdmin()
+        await MainActor.run {
+            isAdmin = hasPermission
+            isCheckingAdmin = false
+        }
+    }
+
+    private func refreshNoticeDiagnostics(forceSync: Bool) async {
+        if !hasInitializedNoticeService {
+            service.setup(with: modelContext)
+            hasInitializedNoticeService = true
+        }
+        await refreshAdminStatus()
+
+        if forceSync {
+            if currentUserID == nil {
+                currentUserID = await cloudKitService.getCurrentUserID()
+            }
+            await service.manualSync()
+        }
+
+        await service.fetchNotices()
+        lastOperationMessage = service.errorMessage ?? cloudKitService.syncError ?? (forceSync ? "公告同步完成" : "公告状态已刷新")
     }
 }
 

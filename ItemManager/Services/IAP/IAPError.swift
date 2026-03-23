@@ -32,7 +32,6 @@ enum IAPError: Error, LocalizedError, Equatable {
     // 用户状态错误
     case notAuthenticated                  // 用户未登录
     case accountRestricted                 // 账户受限
-    case subscriptionExpired               // 订阅已过期
 
     // 系统错误
     case storeKitError(StoreKitError)      // StoreKit 原生错误
@@ -78,8 +77,6 @@ enum IAPError: Error, LocalizedError, Equatable {
             return "请先登录"
         case .accountRestricted:
             return "账户受限"
-        case .subscriptionExpired:
-            return "订阅已过期"
         case .storeKitError(let error):
             return error.localizedDescription
         case .unknown:
@@ -128,8 +125,6 @@ enum IAPError: Error, LocalizedError, Equatable {
             return "用户未登录，无法完成购买"
         case .accountRestricted:
             return "账户受限，无法购买"
-        case .subscriptionExpired:
-            return "订阅已过期"
         case .storeKitError(let error):
             return "StoreKit错误: \(error)"
         case .unknown(let error):
@@ -221,8 +216,6 @@ enum IAPError: Error, LocalizedError, Equatable {
             return true
         case (.accountRestricted, .accountRestricted):
             return true
-        case (.subscriptionExpired, .subscriptionExpired):
-            return true
         case (.storeKitError(let a), .storeKitError(let b)):
             return a.localizedDescription == b.localizedDescription
         case (.systemError(let a), .systemError(let b)):
@@ -239,13 +232,6 @@ enum IAPPurchaseResult {
     case pending
     case cancelled
     case failed(IAPError)
-}
-
-// MARK: - 恢复购买结果
-enum IAPRestoreResult {
-    case success(restoredTransactions: [Transaction])
-    case failed(IAPError)
-    case empty  // 没有可恢复的交易
 }
 
 // MARK: - 交易状态

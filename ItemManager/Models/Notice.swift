@@ -16,6 +16,7 @@ class Notice {
     var content: String = ""
     var mediaURL: String? = nil  // 图片或视频URL (本地沙盒路径)
     var cloudKitMediaURL: String? = nil  // CloudKit 媒体资源 URL
+    var builtinMediaName: String? = nil  // 内置图片资源名称
     var mediaType: MediaType = MediaType.none
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
@@ -40,6 +41,7 @@ class Notice {
         content: String = "",
         mediaURL: String? = nil,
         cloudKitMediaURL: String? = nil,
+        builtinMediaName: String? = nil,
         mediaType: MediaType = .none,
         priority: Int = 0,
         isActive: Bool = true,
@@ -51,6 +53,7 @@ class Notice {
         self.content = content
         self.mediaURL = mediaURL
         self.cloudKitMediaURL = cloudKitMediaURL
+        self.builtinMediaName = builtinMediaName
         self.mediaType = mediaType
         self.createdAt = Date()
         self.updatedAt = Date()
@@ -67,6 +70,28 @@ extension Notice {
     // CloudKit Record Type 名称
     static let recordType = "Notice"
     static let mediaAssetType = "NoticeMedia"
+    static let builtinMediaNameField = "builtinMediaName"
+
+    var stableIdentifier: String {
+        recordName ?? id.uuidString
+    }
+
+    var readTrackingKey: String {
+        let updatedTimestamp = Int(updatedAt.timeIntervalSince1970)
+        return "\(stableIdentifier)#v\(version)#u\(updatedTimestamp)"
+    }
+
+    var legacyReadTrackingKeys: [String] {
+        [id.uuidString, recordName].compactMap { $0 }
+    }
+
+    var shouldUseLegacyReadFallback: Bool {
+        version <= 1 && abs(updatedAt.timeIntervalSince(createdAt)) < 1
+    }
+
+    static func builtinMediaURLString(for imageName: String) -> String {
+        "builtin://\(imageName)"
+    }
 
     // 从 CloudKit Record 创建 Notice
     convenience init?(from record: CKRecord) {
@@ -82,7 +107,9 @@ extension Notice {
         let isActive = record["isActive"] as? Bool ?? true
         let createdAt = record["createdAt"] as? Date ?? record.creationDate ?? Date()
         let updatedAt = record["updatedAt"] as? Date ?? record.modificationDate ?? Date()
+        let version = record["version"] as? Int ?? 1
         let creatorID = record.creatorUserRecordID?.recordName
+        let builtinMediaName = record[Notice.builtinMediaNameField] as? String
 
         // 获取媒体 URL
         var cloudKitMediaURL: String?
@@ -91,12 +118,20 @@ extension Notice {
             cloudKitMediaURL = fileURL.absoluteString
         }
 
+        let resolvedMediaURL: String?
+        if let builtinMediaName {
+            resolvedMediaURL = Notice.builtinMediaURLString(for: builtinMediaName)
+        } else {
+            resolvedMediaURL = cloudKitMediaURL
+        }
+
         self.init(
             id: id,
             title: title,
             content: content,
-            mediaURL: nil,  // 本地路径需要下载后设置
+            mediaURL: resolvedMediaURL,
             cloudKitMediaURL: cloudKitMediaURL,
+            builtinMediaName: builtinMediaName,
             mediaType: mediaType,
             priority: priority,
             isActive: isActive,
@@ -106,6 +141,7 @@ extension Notice {
 
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.version = version
     }
 
     // 转换为 CloudKit Record
@@ -125,14 +161,18 @@ extension Notice {
         record["priority"] = priority
         record["isActive"] = isActive
         record["createdAt"] = createdAt
-        record["updatedAt"] = Date()
+        record["updatedAt"] = updatedAt
         record["version"] = version
+        record[Notice.builtinMediaNameField] = builtinMediaName
 
         // 如果有本地媒体文件，创建 Asset
         if let mediaURL = mediaURL,
+           !mediaURL.hasPrefix("builtin://"),
            let url = URL(string: mediaURL),
            FileManager.default.fileExists(atPath: url.path) {
             record["mediaAsset"] = CKAsset(fileURL: url)
+        } else {
+            record["mediaAsset"] = nil
         }
 
         return record

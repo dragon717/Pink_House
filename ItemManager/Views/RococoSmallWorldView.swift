@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct RococoSmallWorldView: View {
     @Binding var selectedTab: Int
@@ -329,13 +330,21 @@ struct RococoSmallWorldView: View {
                     roomContent(imageName: imageName, hotspots: hotspots)
                 }
             } else {
-                // 修复：使用 GeometryReader 获取图片实际显示尺寸，确保热区坐标计算正确
                 GeometryReader { imageGeo in
+                    let imageFrame = displayedImageFrame(for: imageName, in: imageGeo.size)
+
                     Image(imageName)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
+                        .frame(width: imageGeo.size.width, height: imageGeo.size.height)
                         .overlay(
-                            roomContent(imageName: imageName, hotspots: hotspots, containerSize: imageGeo.size)
+                            roomContent(
+                                imageName: imageName,
+                                hotspots: hotspots,
+                                containerSize: imageGeo.size,
+                                imageFrame: imageFrame
+                            ),
+                            alignment: .topLeading
                         )
                 }
             }
@@ -345,54 +354,49 @@ struct RococoSmallWorldView: View {
     }
     
     @ViewBuilder
-    private func roomContent(imageName: String, hotspots: [HotspotData], containerSize: CGSize? = nil) -> some View {
-        // 如果提供了 containerSize，直接使用；否则使用 GeometryReader 获取
-        if let size = containerSize {
-            roomHotspotsContent(imageName: imageName, hotspots: hotspots, size: size)
+    private func roomContent(
+        imageName: String,
+        hotspots: [HotspotData],
+        containerSize: CGSize? = nil,
+        imageFrame: CGRect? = nil
+    ) -> some View {
+        if let containerSize, let imageFrame {
+            roomHotspotsContent(
+                imageName: imageName,
+                hotspots: hotspots,
+                containerSize: containerSize,
+                imageFrame: imageFrame
+            )
         } else {
             GeometryReader { geo in
-                roomHotspotsContent(imageName: imageName, hotspots: hotspots, size: geo.size)
+                roomHotspotsContent(
+                    imageName: imageName,
+                    hotspots: hotspots,
+                    containerSize: geo.size,
+                    imageFrame: displayedImageFrame(for: imageName, in: geo.size)
+                )
             }
         }
     }
     
-    // 提取热区内容到单独的方法，避免代码重复
     @ViewBuilder
-    private func roomHotspotsContent(imageName: String, hotspots: [HotspotData], size: CGSize) -> some View {
+    private func roomHotspotsContent(
+        imageName: String,
+        hotspots: [HotspotData],
+        containerSize: CGSize,
+        imageFrame: CGRect
+    ) -> some View {
         ZStack(alignment: .topLeading) {
             ForEach(hotspots) { hotspot in
                 ZStack {
-                    Button(action: {
-                        print("[RococoSmallWorldView] 热区点击: \(hotspot.name), 坐标: (\(hotspot.rect.minX), \(hotspot.rect.minY)), 尺寸: \(size)")
-                        hotspot.action()
-                    }) {
-                        if showDebugHotspots {
-                            ZStack {
-                                Rectangle()
-                                    .fill(hotspot.color.opacity(0.3))
-                                    .border(hotspot.color, width: 2)
-                                Text(hotspot.name)
-                                    .font(.caption)
-                                    .foregroundStyle(.white)
-                                    .padding(4)
-                                    .background(.black.opacity(0.6))
-                                    .cornerRadius(4)
-                            }
-                            .contentShape(Rectangle())
+                    Group {
+                        if isWealthDestination(hotspot.destination) {
+                            wealthHotspotButton(hotspot: hotspot, imageFrame: imageFrame)
+                            wealthEntryCaptureAnchor(hotspot: hotspot, imageFrame: imageFrame)
                         } else {
-                            // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
-                            Color.black.opacity(0.001)
-                                .contentShape(Rectangle())
+                            hotspotButton(hotspot: hotspot, imageFrame: imageFrame)
                         }
                     }
-                    .frame(
-                        width: max(1, hotspot.rect.width * size.width),
-                        height: max(1, hotspot.rect.height * size.height)
-                    )
-                    .position(
-                        x: (hotspot.rect.minX + hotspot.rect.width/2) * size.width,
-                        y: (hotspot.rect.minY + hotspot.rect.height/2) * size.height
-                    )
                     
                     if let label = hotspot.label {
                         let labelPos = hotspot.labelPosition ?? CGPoint(x: hotspot.rect.midX, y: hotspot.rect.midY)
@@ -400,25 +404,162 @@ struct RococoSmallWorldView: View {
                         FloatingTextLabel(text: label, style: hotspot.labelStyle)
                             .allowsHitTesting(false)
                             .position(
-                                x: labelPos.x * size.width,
-                                y: labelPos.y * size.height
+                                x: imageFrame.minX + labelPos.x * imageFrame.width,
+                                y: imageFrame.minY + labelPos.y * imageFrame.height
                             )
                     }
                 }
-                .frame(width: size.width, height: size.height)
+                .frame(width: containerSize.width, height: containerSize.height)
             }
             
-            // 萌宠功能已解锁时才显示悬浮小猫
             if FeatureUnlockManager.shared.isUnlocked(.pet) {
-                // 使用固定尺寸创建 GeometryProxy 的替代方案
                 SmallWorldPetOverlay(
                     viewModel: petViewModel,
                     roomIndex: imageName.contains("rococo_1") ? 0 : 1,
-                    containerSize: size
+                    containerSize: imageFrame.size
                 )
+                .frame(width: imageFrame.width, height: imageFrame.height)
+                .offset(x: imageFrame.minX, y: imageFrame.minY)
                 .allowsHitTesting(petViewModel.isDebugMode)
             }
         }
+        .frame(width: containerSize.width, height: containerSize.height, alignment: .topLeading)
+    }
+
+    private func hotspotButton(hotspot: HotspotData, imageFrame: CGRect) -> some View {
+        Button(action: {
+            print("[RococoSmallWorldView] 热区点击: \(hotspot.name), 坐标: (\(hotspot.rect.minX), \(hotspot.rect.minY)), 尺寸: \(imageFrame.size)")
+            hotspot.action()
+        }) {
+            if showDebugHotspots {
+                ZStack {
+                    Rectangle()
+                        .fill(hotspot.color.opacity(0.3))
+                        .border(hotspot.color, width: 2)
+                    Text(hotspot.name)
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(.black.opacity(0.6))
+                        .cornerRadius(4)
+                }
+                .contentShape(Rectangle())
+            } else {
+                // 修复：使用极低的透明度而非 clear，确保首次加载时按钮可点击
+                Color.black.opacity(0.001)
+                    .contentShape(Rectangle())
+            }
+        }
+        .frame(
+            width: max(1, hotspot.rect.width * imageFrame.width),
+            height: max(1, hotspot.rect.height * imageFrame.height)
+        )
+        .position(
+            x: imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width,
+            y: imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
+        )
+    }
+
+    private func wealthHotspotButton(hotspot: HotspotData, imageFrame: CGRect) -> some View {
+        let baseWidth = max(1, hotspot.rect.width * imageFrame.width)
+        let baseHeight = max(1, hotspot.rect.height * imageFrame.height)
+        let expandedWidth = baseWidth + 16
+        let expandedHeight = baseHeight + 16
+
+        return Button(action: {
+            print("[RococoSmallWorldView] 来财热区点击: \(hotspot.name), 原始尺寸: \(baseWidth)x\(baseHeight), 扩展尺寸: \(expandedWidth)x\(expandedHeight)")
+            hotspot.action()
+        }) {
+            if showDebugHotspots {
+                ZStack {
+                    Rectangle()
+                        .fill(hotspot.color.opacity(0.3))
+                        .border(hotspot.color, width: 2)
+                    Text("\(hotspot.name)\n扩展点击")
+                        .font(.caption2)
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(4)
+                        .background(.black.opacity(0.6))
+                        .cornerRadius(4)
+                }
+                .contentShape(Rectangle())
+            } else {
+                Color.black.opacity(0.001)
+                    .contentShape(Rectangle())
+            }
+        }
+        .frame(width: expandedWidth, height: expandedHeight)
+        .position(
+            x: imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width,
+            y: imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
+        )
+    }
+
+    private func wealthEntryCaptureAnchor(hotspot: HotspotData, imageFrame: CGRect) -> some View {
+        let baseWidth = max(1, hotspot.rect.width * imageFrame.width)
+        let baseHeight = max(1, hotspot.rect.height * imageFrame.height)
+        let expandedWidth = baseWidth + 16
+        let expandedHeight = baseHeight + 16
+
+        return Color.clear
+            .frame(
+                width: expandedWidth,
+                height: expandedHeight
+            )
+            .captureGuideTarget(.wealthEntry)
+            .position(
+                x: imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width,
+                y: imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
+            )
+            .allowsHitTesting(false)
+    }
+
+    private func displayedImageFrame(for imageName: String, in containerSize: CGSize) -> CGRect {
+        guard containerSize.width > 0, containerSize.height > 0 else { return .zero }
+
+        let imageSize = roomImageSize(for: imageName)
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return CGRect(origin: .zero, size: containerSize)
+        }
+
+        let imageAspectRatio = imageSize.width / imageSize.height
+        let containerAspectRatio = containerSize.width / containerSize.height
+
+        if containerAspectRatio > imageAspectRatio {
+            let height = containerSize.height
+            let width = height * imageAspectRatio
+            return CGRect(
+                x: (containerSize.width - width) / 2,
+                y: 0,
+                width: width,
+                height: height
+            )
+        } else {
+            let width = containerSize.width
+            let height = width / imageAspectRatio
+            return CGRect(
+                x: 0,
+                y: (containerSize.height - height) / 2,
+                width: width,
+                height: height
+            )
+        }
+    }
+
+    private func roomImageSize(for imageName: String) -> CGSize {
+        guard let image = UIImage(named: imageName), image.size.width > 0, image.size.height > 0 else {
+            return CGSize(width: 1, height: 1)
+        }
+        return image.size
+    }
+
+    private func isWealthDestination(_ destination: SmallWorldDestination?) -> Bool {
+        guard let destination else { return false }
+        if case .wealth = destination {
+            return true
+        }
+        return false
     }
 }
 

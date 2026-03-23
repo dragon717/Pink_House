@@ -363,21 +363,7 @@ struct OOTDEditorView: View {
     // MARK: - Helper Methods
     
     private func addToOutfit(_ cutout: CutoutItem) {
-        // 使用相对坐标（0-1范围），0.5, 0.5 是画布中心
-        let item = OutfitItem(
-            cutout: cutout,
-            x: 0.5,
-            y: 0.5,
-            rotation: 0,
-            scale: 1.0,
-            zIndex: outfit.items?.count ?? 0,
-            coordinateVersion: 2  // 新数据使用版本 2（相对坐标）
-        )
-        if outfit.items == nil {
-            outfit.items = []
-        }
-        outfit.items?.append(item)
-        saveSnapshot()
+        _ = addCutoutsToOutfit([cutout])
     }
     
     private func saveSnapshot() {
@@ -430,29 +416,40 @@ struct OOTDEditorView: View {
     }
     
     private func batchAddCutouts(_ cutouts: [CutoutItem]) {
+        _ = addCutoutsToOutfit(cutouts)
+    }
+
+    @discardableResult
+    private func addCutoutsToOutfit(_ cutouts: [CutoutItem]) -> Bool {
+        guard !cutouts.isEmpty else { return true }
+
         // 检查是否超过限制
         if (outfit.items?.count ?? 0) + cutouts.count > 20 {
             showingLimitAlert = true
-            return
+            return false
         }
-        
-        // 批量添加
+
         if outfit.items == nil {
             outfit.items = []
         }
+
+        let baseIndex = outfit.items?.count ?? 0
         for (index, cutout) in cutouts.enumerated() {
+            let offset = Double(index) * 0.05
             let item = OutfitItem(
                 cutout: cutout,
-                x: Double(index * 20),
-                y: Double(index * 20),
+                x: min(0.8, 0.5 + offset),
+                y: min(0.8, 0.5 + offset),
                 rotation: 0,
                 scale: 1.0,
-                zIndex: outfit.items?.count ?? 0
+                zIndex: baseIndex + index,
+                coordinateVersion: 2
             )
             outfit.items?.append(item)
         }
-        
+
         saveSnapshot()
+        return true
     }
     
     // MARK: - 翻页导航
@@ -522,29 +519,7 @@ struct OOTDEditorView: View {
                             onSelect: { cutout in addToOutfit(cutout) },
                             onAddPhoto: { showingActionSheet = true },
                             onBatchAdd: { cutouts in
-                                if (outfit.items?.count ?? 0) + cutouts.count > 20 {
-                                    showingLimitAlert = true
-                                    return false
-                                }
-                                if outfit.items == nil {
-                                    outfit.items = []
-                                }
-                                for (index, cutout) in cutouts.enumerated() {
-                                    // 使用相对坐标（0-1范围），批量添加时稍微错开位置
-                                    let offset = Double(index) * 0.05
-                                    let item = OutfitItem(
-                                        cutout: cutout,
-                                        x: 0.5 + offset,
-                                        y: 0.5 + offset,
-                                        rotation: 0,
-                                        scale: 1.0,
-                                        zIndex: outfit.items?.count ?? 0,
-                                        coordinateVersion: 2  // 新数据使用版本 2（相对坐标）
-                                    )
-                                    outfit.items?.append(item)
-                                }
-                                saveSnapshot()
-                                return true
+                                addCutoutsToOutfit(cutouts)
                             }
                         )
                         .frame(width: sidebarWidth)
@@ -582,29 +557,7 @@ struct OOTDEditorView: View {
                                 onSelect: { cutout in addToOutfit(cutout) },
                                 onAddPhoto: { showingActionSheet = true },
                                 onBatchAdd: { cutouts in
-                                    if (outfit.items?.count ?? 0) + cutouts.count > 20 {
-                                        showingLimitAlert = true
-                                        return false
-                                    }
-                                    if outfit.items == nil {
-                                        outfit.items = []
-                                    }
-                                    for (index, cutout) in cutouts.enumerated() {
-                                        // 使用相对坐标（0-1范围），批量添加时稍微错开位置
-                                        let offset = Double(index) * 0.05
-                                        let item = OutfitItem(
-                                            cutout: cutout,
-                                            x: 0.5 + offset,
-                                            y: 0.5 + offset,
-                                            rotation: 0,
-                                            scale: 1.0,
-                                            zIndex: outfit.items?.count ?? 0,
-                                            coordinateVersion: 2  // 新数据使用版本 2（相对坐标）
-                                        )
-                                        outfit.items?.append(item)
-                                    }
-                                    saveSnapshot()
-                                    return true
+                                    addCutoutsToOutfit(cutouts)
                                 }
                             )
                             .frame(height: isListExpanded ? geometry.size.height * 0.8 : 200)
@@ -702,5 +655,4 @@ struct OOTDEditorView: View {
         }
     }
 }
-
 

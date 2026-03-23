@@ -101,6 +101,12 @@ struct WealthView: View {
                             soundManager.stopAllSounds()
                             hapticManager.stopHaptics()
                         }
+                        
+                        NotificationCenter.default.post(
+                            name: .wealthMainTabChanged,
+                            object: nil,
+                            userInfo: ["tab": newValue.rawValue]
+                        )
                     }
                 }
             }
@@ -134,6 +140,13 @@ struct WealthView: View {
                 if let initialTab = initialTab {
                     selectedMainTab = initialTab
                 }
+                
+                NotificationCenter.default.post(name: .wealthViewOpened, object: nil)
+                NotificationCenter.default.post(
+                    name: .wealthMainTabChanged,
+                    object: nil,
+                    userInfo: ["tab": selectedMainTab.rawValue]
+                )
 
                 // 通知媒体状态管理器切换到财富页面
                 print("💰 WealthView.onAppear: 准备切换到财富页面")
@@ -173,6 +186,14 @@ struct WealthView: View {
             .onChange(of: viewModel.selectedCurrency) { _, newValue in
                 handleCurrencyChange(newValue)
             }
+            .onReceive(NotificationCenter.default.publisher(for: .wealthGuideSwitchMainTab)) { notification in
+                if let tabRaw = notification.userInfo?["tab"] as? String,
+                   let tab = WealthMainTab(rawValue: tabRaw) {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        selectedMainTab = tab
+                    }
+                }
+            }
             .onChange(of: allClothings) { _, _ in
                 updateAmount()
             }
@@ -208,6 +229,7 @@ struct WealthView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 180)
+            .captureGuideTarget(.wealthMainTabSegment)
         }
     }
     

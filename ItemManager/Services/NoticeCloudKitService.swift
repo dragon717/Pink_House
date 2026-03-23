@@ -57,6 +57,7 @@ class NoticeCloudKitService: ObservableObject {
     // MARK: - 拉取云端公告
     func fetchCloudNotices() async -> [Notice] {
         isSyncing = true
+        syncError = nil
         defer { isSyncing = false }
 
         do {
@@ -74,15 +75,11 @@ class NoticeCloudKitService: ObservableObject {
             print("📢 当前运行环境: Production (发布版)")
             #endif
 
-            // 只获取最近30天的活跃公告
-            let cutoffDate = Date().addingTimeInterval(-NoticeConfig.maxNoticeAge)
-            let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-                NSPredicate(format: "isActive == true"),
-                NSPredicate(format: "createdAt > %@", cutoffDate as NSDate)
-            ])
+            let predicate = NSPredicate(value: true)
             let query = CKQuery(recordType: Notice.recordType, predicate: predicate)
             query.sortDescriptors = [
                 NSSortDescriptor(key: "priority", ascending: false),
+                NSSortDescriptor(key: "updatedAt", ascending: false),
                 NSSortDescriptor(key: "createdAt", ascending: false)
             ]
 
@@ -173,6 +170,7 @@ class NoticeCloudKitService: ObservableObject {
         }
 
         isSyncing = true
+        syncError = nil
         defer { isSyncing = false }
 
         do {
@@ -206,18 +204,13 @@ class NoticeCloudKitService: ObservableObject {
         }
 
         isSyncing = true
+        syncError = nil
         defer { isSyncing = false }
 
         do {
             let recordID = CKRecord.ID(recordName: recordName)
             let record = try await database.record(for: recordID)
-
-            // 更新字段
-            record["title"] = notice.title
-            record["content"] = notice.content
-            record["priority"] = notice.priority
-            record["isActive"] = notice.isActive
-            record["updatedAt"] = Date()
+            applyNotice(notice, to: record)
 
             try await database.save(record)
             print("✅ 公告更新成功: \(notice.title)")
@@ -243,15 +236,14 @@ class NoticeCloudKitService: ObservableObject {
         }
 
         isSyncing = true
+        syncError = nil
         defer { isSyncing = false }
 
         do {
             let recordID = CKRecord.ID(recordName: recordName)
             let record = try await database.record(for: recordID)
 
-            // 软删除：标记为不活跃
-            record["isActive"] = false
-            record["updatedAt"] = Date()
+            applyNotice(notice, to: record)
 
             try await database.save(record)
             print("✅ 公告已停用: \(notice.title)")
@@ -328,11 +320,39 @@ class NoticeCloudKitService: ObservableObject {
     private func updateLocalNotice(_ local: Notice, from cloud: Notice) {
         local.title = cloud.title
         local.content = cloud.content
+        local.mediaURL = cloud.mediaURL
+        local.cloudKitMediaURL = cloud.cloudKitMediaURL
+        local.builtinMediaName = cloud.builtinMediaName
+        local.mediaType = cloud.mediaType
         local.priority = cloud.priority
         local.isActive = cloud.isActive
+        local.createdAt = cloud.createdAt
         local.updatedAt = cloud.updatedAt
+        local.version = cloud.version
+        local.recordName = cloud.recordName
         local.creatorID = cloud.creatorID
-        // 注意：不更新 mediaURL，因为使用本地资源
+    }
+
+    private func applyNotice(_ notice: Notice, to record: CKRecord) {
+        record["id"] = notice.id.uuidString
+        record["title"] = notice.title
+        record["content"] = notice.content
+        record["mediaType"] = notice.mediaType.rawValue
+        record["priority"] = notice.priority
+        record["isActive"] = notice.isActive
+        record["createdAt"] = notice.createdAt
+        record["updatedAt"] = notice.updatedAt
+        record["version"] = notice.version
+        record[Notice.builtinMediaNameField] = notice.builtinMediaName
+
+        if let mediaURL = notice.mediaURL,
+           !mediaURL.hasPrefix("builtin://"),
+           let url = URL(string: mediaURL),
+           FileManager.default.fileExists(atPath: url.path) {
+            record["mediaAsset"] = CKAsset(fileURL: url)
+        } else {
+            record["mediaAsset"] = nil
+        }
     }
 }
 

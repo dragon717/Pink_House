@@ -535,10 +535,9 @@ final class FeatureUnlockManager: ObservableObject {
                 return .insufficientResource("喵币", condition.requiredValue, currentCoins)
             }
             
-            // 扣除喵币
-            var status = PetDataManager.shared.status
-            status.meowCoin -= condition.requiredValue
-            PetDataManager.shared.saveStatus(status)
+            guard StoreManager.spendMeowCoins(condition.requiredValue) else {
+                return .insufficientResource("喵币", condition.requiredValue, currentCoins)
+            }
         }
         
         performUnlock(feature, by: condition.type)

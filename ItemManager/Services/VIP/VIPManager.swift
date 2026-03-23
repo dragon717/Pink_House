@@ -36,7 +36,7 @@ class VIPManager: ObservableObject {
         reloadStatus()
     }
     
-    // Purchase or Renew VIP
+    // Exchange or extend VIP
     func purchaseVIP(months: Int = 1) -> (success: Bool, message: String) {
         var status = PetDataManager.shared.status
         
@@ -55,7 +55,7 @@ class VIPManager: ObservableObject {
             // Extend existing
             newExpireDate = Calendar.current.date(byAdding: .month, value: months, to: currentExpire) ?? Date()
         } else {
-            // New subscription
+            // New VIP activation
             newExpireDate = Calendar.current.date(byAdding: .month, value: months, to: Date()) ?? Date()
         }
         
