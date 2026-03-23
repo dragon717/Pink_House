@@ -212,6 +212,22 @@ struct ModernTabView: View {
                 tabNavigationManager.navigateToSmallWorld = nil
             }
         }
+        .onChange(of: selectedTab) { newTab in
+            // 发送Tab切换通知，用于新手引导
+            let tabName: String
+            switch newTab {
+            case 0: tabName = "wardrobe"
+            case 1: tabName = "smallWorld"
+            case 2: tabName = "me"
+            case 3: tabName = "petChat"
+            default: tabName = "unknown"
+            }
+            NotificationCenter.default.post(
+                name: .homeTabChanged,
+                object: nil,
+                userInfo: ["tab": tabName]
+            )
+        }
     }
     
     private var isSimulationActive: Bool {
@@ -521,6 +537,22 @@ struct LegacyTabView: View {
                 }
                 tabNavigationManager.navigateToSmallWorld = nil
             }
+        }
+        .onChange(of: selectedTab) { newTab in
+            // 发送Tab切换通知，用于新手引导
+            let tabName: String
+            switch newTab {
+            case 0: tabName = "wardrobe"
+            case 1: tabName = "smallWorld"
+            case 2: tabName = "me"
+            case 3: tabName = "petChat"
+            default: tabName = "unknown"
+            }
+            NotificationCenter.default.post(
+                name: .homeTabChanged,
+                object: nil,
+                userInfo: ["tab": tabName]
+            )
         }
     }
 
@@ -1237,7 +1269,7 @@ struct MainTabView: View {
                 }
                 .noticePopup()
                 .withMagicTaskCompletions()
-                .withNewbieGuide()
+                .withAppFirstLaunchGuide()
             } else {
                 // iOS 18-25 使用自定义红色背景底部导航栏
                 LegacyTabView(
@@ -1259,7 +1291,7 @@ struct MainTabView: View {
                 }
                 .noticePopup()
                 .withMagicTaskCompletions()
-                .withNewbieGuide()
+                .withAppFirstLaunchGuide()
             }
         }
         // 监听解锁后的跳转通知
@@ -1281,12 +1313,15 @@ struct MainTabView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSettings)) { notification in
+            print("[PetChatGuide] MainTabView 收到 navigateToSettings 通知")
             // 跳转到设置页面
             withAnimation {
                 selectedTab = 2 // 切换到"我"Tab
+                print("[PetChatGuide] 已切换到 Tab 2 (我)")
             }
             // 如果有具体功能参数，延迟后发送到 MeView 处理导航
             if let feature = notification.userInfo?["feature"] as? String {
+                print("[PetChatGuide] 有具体功能参数: \(feature)")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     NotificationCenter.default.post(
                         name: .navigateToSettingsFeature,
@@ -1393,6 +1428,11 @@ struct MainTabView: View {
                 selectedTab = 0
                 homeTabSelection = .wardrobe
             }
+        case .aiAnalysis:
+            // 萌宠智能对话引导：从当前页面开始，引导用户返回到「我」界面
+            // 引导流程由 FirstUseGuideOverlay 中的 aiAnalysisGuideContent 处理
+            // 直接启动首次使用引导
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .aiAnalysis)
         default:
             break
         }

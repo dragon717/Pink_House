@@ -65,7 +65,7 @@ struct SystemSettingsView: View {
                 .adaptiveRow()
                 
                 // 新手引导重置
-                NewbieGuideResetRow()
+                AppFirstLaunchGuideResetRow()
                     .adaptiveRow(showDivider: false)
             }
             

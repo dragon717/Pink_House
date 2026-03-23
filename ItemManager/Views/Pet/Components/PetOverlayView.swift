@@ -17,7 +17,7 @@ struct PetOverlayView: View {
     @StateObject private var visionManager = VisionManager.shared
     @StateObject private var gestureHandler = PetGestureHandler()
     @StateObject private var aiAnalysisService = PetAIAnalysisService.shared
-    @StateObject private var guideManager = NewbieGuideManager.shared
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     
     // MARK: - 状态管理（精简后的核心状态）
     

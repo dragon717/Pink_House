@@ -7,7 +7,7 @@ struct WardrobeNavigationStyleSelectionView: View {
         AdaptiveSettingsView(title: "选择样式") {
             AdaptiveSection(
                 header: "衣橱顶部导航",
-                footer: "经典样式保持现有布局；时尚样式会将排序/筛选放在左侧，顶部标签切换居中，视图/更多/创建放在右侧。"
+                footer: "经典导航栏保持现有布局；时尚导航栏会将排序/筛选放在左侧，顶部标签切换居中，视图/更多/创建放在右侧。"
             ) {
                 Picker("样式", selection: $wardrobeNavigationStyle) {
                     ForEach(WardrobeNavigationStyle.allCases) { style in

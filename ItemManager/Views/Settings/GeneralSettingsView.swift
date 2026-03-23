@@ -524,7 +524,7 @@ struct GeneralSettingsView: View {
         }
         
         // 新手引导重置
-        NewbieGuideResetRow()
+        AppFirstLaunchGuideResetRow()
     }
 }
 
@@ -536,8 +536,8 @@ extension UIImage: Identifiable {
 
 // MARK: - 新手引导重置行
 
-struct NewbieGuideResetRow: View {
-    @ObservedObject private var guideManager = NewbieGuideManager.shared
+struct AppFirstLaunchGuideResetRow: View {
+    @ObservedObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var showingResetConfirmation = false
     @State private var showingRestartGuide = false
     

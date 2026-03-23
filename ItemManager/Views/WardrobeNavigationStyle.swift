@@ -9,9 +9,9 @@ enum WardrobeNavigationStyle: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .classic:
-            return "经典样式"
+            return "经典导航栏"
         case .fashion:
-            return "时尚样式"
+            return "时尚导航栏"
         }
     }
     

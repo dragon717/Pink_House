@@ -245,6 +245,12 @@ extension Notification.Name {
     static let petChatSearchStateChanged = Notification.Name("petChatSearchStateChanged")
     // 自动展开萌宠对话搜索栏通知
     static let autoExpandPetChatSearch = Notification.Name("autoExpandPetChatSearch")
+    // 首页 Tab 切换通知（用于新手引导）
+    static let homeTabChanged = Notification.Name("homeTabChanged")
+    // VIP 中心打开通知（用于新手引导）
+    static let vipCenterOpened = Notification.Name("vipCenterOpened")
+    // 魔法任务页面 dismiss 通知（用于萌宠智能对话引导）
+    static let magicTasksViewDismissed = Notification.Name("magicTasksViewDismissed")
 }
 
 // MARK: - View Modifier

@@ -112,7 +112,7 @@ struct MainContentView: View {
     @State private var showSplash = true
     @State private var showMigrationOverlay = false
     @State private var showDailyCheckIn = false
-    @StateObject private var guideManager = NewbieGuideManager.shared
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     
     var body: some View {
         ZStack {

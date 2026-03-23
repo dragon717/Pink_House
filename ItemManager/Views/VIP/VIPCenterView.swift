@@ -40,6 +40,19 @@ struct VIPCenterView: View {
         vipManager.cardStyle == .monicaPink ? .black.opacity(0.6) : .gray
     }
     
+    // 将复杂的渐变颜色计算提取为计算属性，避免body中类型检查超时
+    private var purchaseButtonGradientColors: [Color] {
+        if vipManager.cardStyle == .monicaPink {
+            return [Color(hex: "FF69B4"), Color(hex: "FFC0CB")]
+        } else {
+            return [Color(hex: "FFD700"), Color(hex: "B8860B")]
+        }
+    }
+    
+    private var purchaseButtonForegroundColor: Color {
+        vipManager.cardStyle == .monicaPink ? .white : .black
+    }
+    
     var body: some View {
         ZStack {
             // Background - Unified Style
@@ -91,7 +104,7 @@ struct VIPCenterView: View {
                             .foregroundStyle(privilegeTitleColor)
                         
                         privilegeRow(icon: "brain.head.profile", title: "智能对话", desc: "解锁基于语言大模型 的超强 AI 对话能力，萌宠变身贴心管家。")
-                        privilegeRow(icon: "mic.fill", title: "语音交互", desc: "支持自然语言语音对话，无需打字。")
+                        // privilegeRow(icon: "mic.fill", title: "语音交互", desc: "支持自然语言语音对话，无需打字。") // todo 暂时相关功能还没整合到萌宠对话
                         privilegeRow(icon: "crown.fill", title: "尊贵身份", desc: getCardDescription())
                     }
                     .padding()
@@ -105,7 +118,7 @@ struct VIPCenterView: View {
                             handlePurchase()
                         } label: {
                             HStack {
-                                Text(vipManager.isVIP ? "续费会员" : "立即开通")
+                                Text("兑换会员时长")
                                     .fontWeight(.bold)
                                 Spacer()
                                 Text("\(VIPManager.monthlyPrice) 喵币 / 月")
@@ -114,18 +127,17 @@ struct VIPCenterView: View {
                             .padding()
                             .background(
                                 LinearGradient(
-                                    colors: vipManager.cardStyle == .monicaPink
-                                        ? [Color(hex: "FF69B4"), Color(hex: "FFC0CB")]
-                                        : [Color(hex: "FFD700"), Color(hex: "B8860B")],
+                                    colors: purchaseButtonGradientColors,
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
-                            .foregroundStyle(vipManager.cardStyle == .monicaPink ? .white : .black)
+                            .foregroundStyle(purchaseButtonForegroundColor)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        // 萌宠对话引导充值按钮高亮锚点
-                        .petChatGuideAnchor(.rechargeButton)
+                        .captureGlobalFrame { frame in
+                            AppFirstLaunchGuideManager.shared.updateAIAnalysisExchangeButtonFrame(frame)
+                        }
                         
                         if vipManager.isVIP {
                             /*
@@ -183,8 +195,6 @@ struct VIPCenterView: View {
                     } label: {
                         Label("使用兑换码", systemImage: "gift")
                     }
-                    // 萌宠对话引导兑换按钮高亮锚点
-                    .petChatGuideAnchor(.redeemButton)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .foregroundStyle(.white)
@@ -232,6 +242,9 @@ struct VIPCenterView: View {
             }
         }
         .onAppear {
+            // 发送VIP中心打开通知，用于新手引导
+            NotificationCenter.default.post(name: .vipCenterOpened, object: nil)
+            
             // 每次进入VIP界面时检查是否需要显示试用期弹窗
             // 使用延迟确保视图已完全加载
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -326,6 +339,25 @@ struct VIPCenterView: View {
             redeemResultMessage = "兑换码无效"
         }
         showingRedeemResultAlert = true
+    }
+}
+
+private extension View {
+    func captureGlobalFrame(onChange: @escaping (CGRect) -> Void) -> some View {
+        background(
+            GeometryReader { proxy in
+                let frame = proxy.frame(in: .global)
+                Color.clear
+                    .onAppear {
+                        guard frame.width > 0, frame.height > 0 else { return }
+                        onChange(frame)
+                    }
+                    .onChange(of: frame) { newValue in
+                        guard newValue.width > 0, newValue.height > 0 else { return }
+                        onChange(newValue)
+                    }
+            }
+        )
     }
 }
 

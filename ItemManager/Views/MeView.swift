@@ -91,8 +91,6 @@ struct MeView: View {
                     // 1. VIP 卡片 (大卡片 1x2)
                     vipSection
                         .padding(.horizontal)
-                        // 萌宠对话引导VIP卡片高亮锚点
-                        .petChatGuideAnchor(.vipCard)
 
                     // 2. 魔法任务入口
                     NavigationLink(destination: MagicTasksView(), isActive: $showMagicTasks) {
@@ -344,6 +342,9 @@ struct MeView: View {
             }
             .frame(height: 180) // 保持高度一致
             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            .captureGlobalFrame { frame in
+                AppFirstLaunchGuideManager.shared.updateAIAnalysisVIPCardFrame(frame)
+            }
         } else {
             NavigationLink(destination: VIPCenterView()) {
                 HStack {
@@ -379,6 +380,9 @@ struct MeView: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
+            .captureGlobalFrame { frame in
+                AppFirstLaunchGuideManager.shared.updateAIAnalysisVIPCardFrame(frame)
+            }
         }
     }
     
@@ -413,6 +417,25 @@ struct MeView: View {
             importMessage = "选择文件失败: \(error.localizedDescription)"
             showingImportAlert = true
         }
+    }
+}
+
+private extension View {
+    func captureGlobalFrame(onChange: @escaping (CGRect) -> Void) -> some View {
+        background(
+            GeometryReader { proxy in
+                let frame = proxy.frame(in: .global)
+                Color.clear
+                    .onAppear {
+                        guard frame.width > 0, frame.height > 0 else { return }
+                        onChange(frame)
+                    }
+                    .onChange(of: frame) { newValue in
+                        guard newValue.width > 0, newValue.height > 0 else { return }
+                        onChange(newValue)
+                    }
+            }
+        )
     }
 }
 

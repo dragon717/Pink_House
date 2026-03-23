@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - 魔法任务视图
 struct MagicTasksView: View {
     @StateObject private var manager = FeatureUnlockManager.shared
-    @StateObject private var guideManager = NewbieGuideManager.shared
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) private var dismiss
 
@@ -380,7 +380,7 @@ struct MagicTaskDetailView: View {
                     // 体验型任务：始终显示两个按钮
                     if isExperienceTask {
                         // 新手引导按钮
-                        if FeatureUnlockManager.guidedFeatures.contains(feature) {
+                        if FeatureUnlockManager.experienceGuidedFeatures.contains(feature) {
                             Section {
                                 Button {
                                     dismiss()
@@ -451,7 +451,7 @@ struct MagicTaskDetailView: View {
                     // 解锁型任务：根据解锁状态显示不同按钮
                     else if isUnlocked {
                         // 已解锁：显示"新手引导"和"进入功能"
-                        if FeatureUnlockManager.guidedFeatures.contains(feature) {
+                        if FeatureUnlockManager.experienceGuidedFeatures.contains(feature) {
                             Section {
                                 Button {
                                     dismiss()
