@@ -230,6 +230,7 @@ struct ImportMenuButton: View {
                     .foregroundStyle(.primary.opacity(0.7))
             }
         }
+        .captureGuideTarget(.spatialCanvasImportMenu)
         .buttonStyle(PlainButtonStyle())
         .pressEvents {
             withAnimation(.easeInOut(duration: 0.1)) {

@@ -202,6 +202,11 @@ struct HomeView: View {
             .sheet(isPresented: $showingBatchImportSheet) {
                 BatchImportView()
             }
+            .onChange(of: showingBatchImportSheet) { _, newValue in
+                if newValue {
+                    NotificationCenter.default.post(name: .wardrobeBatchImportOpened, object: nil)
+                }
+            }
             .toolbar {
                 if wardrobeNavigationStyle == .classic {
                     ToolbarItem(placement: .topBarLeading) {
@@ -257,6 +262,18 @@ struct HomeView: View {
                         continueFromDraft: continueFromDraft
                     )
                 }
+            }
+            .onChange(of: showingAddSheet) { _, newValue in
+                if newValue {
+                    NotificationCenter.default.post(name: .wardrobeManualCreateOpened, object: nil)
+                }
+            }
+            .onChange(of: isSelectionMode) { _, newValue in
+                NotificationCenter.default.post(
+                    name: .wardrobeSelectionModeChanged,
+                    object: nil,
+                    userInfo: ["isSelectionMode": newValue]
+                )
             }
             .sheet(isPresented: $showingDepositNotificationSheet) {
                 NavigationStack {
@@ -412,6 +429,7 @@ struct HomeView: View {
                 .font(.system(size: 18))
                 .foregroundStyle(magicPalette.accent)
         }
+        .captureGuideTarget(.wardrobeDoneSelectionButton)
     }
 
     private var doneSortButton: some View {
@@ -495,6 +513,7 @@ struct HomeView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
         }
+        .captureGuideTarget(.wardrobeMoreMenuButton)
     }
 
     private var sortButton: some View {
@@ -1026,10 +1045,14 @@ struct HomeView: View {
                 continueFromDraft = false
                 showingAddSheet = true 
             } label: { 
-                Label("手动创建", systemImage: "square.and.pencil") 
+                Label("手动创建", systemImage: "square.and.pencil")
+                    .captureGuideTarget(.wardrobeManualCreateEntry)
             }
             
-            Button { showingBatchImportSheet = true } label: { Label("批量导入", systemImage: "square.and.arrow.down.on.square") }
+            Button { showingBatchImportSheet = true } label: {
+                Label("批量导入", systemImage: "square.and.arrow.down.on.square")
+                    .captureGuideTarget(.wardrobeBatchImportEntry)
+            }
             
             // 从社区导入：跟随联网功能显示/隐藏
             if networkManager.canShowNetworkUI() {
@@ -1040,6 +1063,12 @@ struct HomeView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
         }
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                NotificationCenter.default.post(name: .wardrobeAddMenuOpened, object: nil)
+            }
+        )
+        .captureGuideTarget(.wardrobeAddButton)
         .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {
             Button("好的", role: .cancel) { }
         }

@@ -141,9 +141,23 @@ struct WardrobeView: View {
     @ViewBuilder
     private func clothingItemView(clothing: Clothing) -> some View {
         if viewLayout == .grid6 {
-            ClothingThumbnail(clothing: clothing)
+            guideSelectionAnchor(for: clothing) {
+                ClothingThumbnail(clothing: clothing)
+            }
         } else {
-            ClothingCard(clothing: clothing)
+            guideSelectionAnchor(for: clothing) {
+                ClothingCard(clothing: clothing)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func guideSelectionAnchor<Content: View>(for clothing: Clothing, @ViewBuilder content: () -> Content) -> some View {
+        if clothing.id == filteredClothings.first?.id {
+            content()
+                .captureGuideTarget(.wardrobeSelectionCard)
+        } else {
+            content()
         }
     }
     
@@ -203,493 +217,506 @@ struct WardrobeView: View {
     }
     
     var body: some View {
+        let base = AnyView(baseWardrobeView)
+        let withStateChanges = AnyView(applyStateChangeHandlers(to: base))
+        let withBottomBar = AnyView(applyBottomSelectionBar(to: withStateChanges))
+        let withSheets = AnyView(applySheets(to: withBottomBar))
+        return AnyView(applyAlerts(to: withSheets))
+    }
+
+    private var baseWardrobeView: some View {
         Group {
             switch viewLayout {
             case .listBrief, .listDetailed:
                 listView
-
             case .grid2, .grid3, .grid6:
-                ScrollViewReader { proxy in
-                    ZStack {
-                        ScrollView {
-                            VStack(spacing: 8) {
-                                statsSection
-                                    .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-                                
-                                LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
-                                ForEach((isEditing || (isSelectionMode && sortOption == .custom)) ? editableClothings : filteredClothings) { clothing in
-                    if isSelectionMode {
-                        // 选择模式：显示卡片和选择覆盖层，支持点击选择
-                        ZStack(alignment: .topTrailing) {
-                            clothingItemView(clothing: clothing)
-                            
-                            // Selection Indicator
-                            Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
-                                .font(.title3)
-                                .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
-                                .background(Circle().fill(.white).padding(2))
-                                .shadow(radius: 1)
-                                .padding(8)
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            toggleSelection(clothing.id)
-                        }
-                        .onAppear { visibleItemIDs.insert(clothing.id) }
-                        .onDisappear { visibleItemIDs.remove(clothing.id) }
-                        // 在选择模式下，如果是自定义排序或开启了排序按钮，允许拖拽
-                        .onDrag {
-                            guard sortOption == .custom || isEditing else { return NSItemProvider() }
-                            self.draggingItem = clothing
-                            return NSItemProvider(object: clothing.id.uuidString as NSString)
-                        }
-                        .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: sortOption == .custom || isEditing, selectedItemIDs: selectedItemIDs))
-                        
-                    } else if isEditing {
-                        // 编辑模式：仅显示卡片，支持拖拽
-                        ZStack(alignment: .topTrailing) {
-                            clothingItemView(clothing: clothing)
-                        }
-                        .contentShape(Rectangle())
-                        .onAppear { visibleItemIDs.insert(clothing.id) }
-                        .onDisappear { visibleItemIDs.remove(clothing.id) }
-                        .onDrag {
-                            self.draggingItem = clothing
-                            return NSItemProvider(object: clothing.id.uuidString as NSString)
-                        }
-                        .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true, selectedItemIDs: selectedItemIDs))
-                        
-                    } else {
-                                        // 正常模式：使用 NavigationLink 包裹卡片，支持长按菜单
-                                        NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                            ZStack(alignment: .topTrailing) {
-                                                clothingItemView(clothing: clothing)
-                                            }
-                                        }
-                                        .buttonStyle(.plain)
-                                        .contextMenu {
-                                            Button {
-                                                isSelectionMode = true
-                                                selectedItemIDs.insert(clothing.id)
-                                            } label: {
-                                                Label("选择", systemImage: "checkmark.circle")
-                                            }
-                                            
-                                            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
-                                                Label("查看详情", systemImage: "info.circle")
-                                            }
-                                            
-                                            Divider()
-                                            
-                                            Button {
-                                                itemToCopy = clothing
-                                                showingCopyAlert = true
-                                            } label: {
-                                                Label("复制", systemImage: "doc.on.doc")
-                                            }
-                                            
-                                            Button(role: .destructive) {
-                                                itemToDelete = clothing
-                                                showingDeleteSingleAlert = true
-                                            } label: {
-                                                Label("删除", systemImage: "trash")
-                                            }
-                                        }
-                                        .onAppear { visibleItemIDs.insert(clothing.id) }
-                                        .onDisappear { visibleItemIDs.remove(clothing.id) }
-                                    }
-                                }
-                            }
-                            .animation(isEditing ? .default : nil, value: editableClothings)
-                            .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
-                            .padding(.bottom, 100)
-                            }
-                            // 移除顶部padding，避免时尚样式下出现大块空白
-                        }
-                        .onDrop(of: [UTType.text], isTargeted: nil) { _ in
-                            self.draggingItem = nil
-                            return true
-                        }
-                        
-                        // Auto-scroll Drop Zones
-                        if isEditing {
-                            VStack {
-                                Color.clear.frame(height: 80)
-                                    .contentShape(Rectangle())
-                                    .onDrop(of: [UTType.text], delegate: ScrollDropDelegate(
-                                        onEnter: { startAutoScroll(up: true, proxy: proxy) },
-                                        onExit: { stopAutoScroll() }
-                                    ))
-                                Spacer()
-                                Color.clear.frame(height: 80)
-                                    .contentShape(Rectangle())
-                                    .onDrop(of: [UTType.text], delegate: ScrollDropDelegate(
-                                        onEnter: { startAutoScroll(up: false, proxy: proxy) },
-                                        onExit: { stopAutoScroll() }
-                                    ))
-                            }
-                            .allowsHitTesting(true)
-                        }
-                    }
-                }
+                gridWardrobeView
             }
         }
         .toolbar {
         }
-        // 应用容器就近配色，支持魔法配色和客制化配色
         .containerAdaptiveColors(background: .ultraThinMaterial)
-        .onChange(of: isEditing) { oldValue, newValue in
-            if newValue {
-                // Start editing
-                if editableClothings.isEmpty {
-                    editableClothings = filteredClothings
-                }
-            } else {
-                // Save order
-                saveOrder()
-                
-                // Only clear if we are NOT in selection mode with custom sort (because selection mode needs it for drag)
-                // 也要考虑如果 selection mode 下开启了 isEditing，也不能清除
-                if !(isSelectionMode && (sortOption == .custom || isEditing)) {
-                    editableClothings = []
+    }
+
+    private func applyStateChangeHandlers<Content: View>(to content: Content) -> some View {
+        content
+            .onChange(of: isEditing) { _, newValue in
+                if newValue {
+                    if editableClothings.isEmpty {
+                        editableClothings = filteredClothings
+                    }
+                } else {
+                    saveOrder()
+                    if !(isSelectionMode && (sortOption == .custom || isEditing)) {
+                        editableClothings = []
+                    }
                 }
             }
-        }
-        .onChange(of: isSelectionMode) { oldValue, newValue in
-            if newValue {
-                // Entered selection mode
-                
-                // 如果是自定义排序模式，或者在选择模式下开启了排序按钮，初始化 editableClothings 以支持拖拽
-                if (sortOption == .custom || isEditing) && editableClothings.isEmpty {
-                    editableClothings = filteredClothings
-                }
-            } else {
-                // Exited selection mode
-                selectedItemIDs.removeAll()
-                
-                // 如果是自定义排序模式，保存排序结果并清理
-                if sortOption == .custom || isEditing {
-                    // Only clear if we are NOT in isEditing mode
-                    if !isEditing {
+            .onChange(of: isSelectionMode) { _, newValue in
+                if newValue {
+                    if (sortOption == .custom || isEditing) && editableClothings.isEmpty {
+                        editableClothings = filteredClothings
+                    }
+                } else {
+                    selectedItemIDs.removeAll()
+                    if (sortOption == .custom || isEditing) && !isEditing {
                         saveOrder()
                         editableClothings = []
                     }
                 }
             }
-        }
-        .safeAreaInset(edge: .bottom) {
+            .onChange(of: selectedItemIDs) { _, newValue in
+                NotificationCenter.default.post(
+                    name: .wardrobeSelectionChanged,
+                    object: nil,
+                    userInfo: ["selectedCount": newValue.count]
+                )
+            }
+    }
+
+    private func applyBottomSelectionBar<Content: View>(to content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom) {
             if isSelectionMode {
-                VStack(spacing: 0) {
+                selectionModeBottomBar
+            }
+        }
+    }
+
+    private var selectionModeBottomBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack {
+                Button(role: .destructive) {
+                    showingDeleteAlert = true
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "trash")
+                        Text("删除")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .disabled(selectedItemIDs.isEmpty)
+
+                Divider()
+                    .frame(height: 20)
+
+                Button {
+                    showingBatchCopyAlert = true
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                        Text("复制")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .disabled(selectedItemIDs.isEmpty)
+
+                Divider()
+                    .frame(height: 20)
+
+                Menu {
+                    Button {
+                        tempSelectedTags = []
+                        showingTagSelection = true
+                    } label: {
+                        Label("添加标签", systemImage: "tag")
+                    }
+
+                    Button {
+                        tempSelectedBrand = nil
+                        showingBrandSelection = true
+                    } label: {
+                        Label("归类品牌", systemImage: "bag")
+                    }
+
                     Divider()
-                    HStack {
-                        // Delete
-                        Button(role: .destructive) {
-                            showingDeleteAlert = true
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                Text("删除")
-                                    .font(.caption)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .disabled(selectedItemIDs.isEmpty)
 
-                        Divider()
-                            .frame(height: 20)
-
-                        // Copy
-                        Button {
-                            showingBatchCopyAlert = true
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "doc.on.doc")
-                                Text("复制")
-                                    .font(.caption)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .disabled(selectedItemIDs.isEmpty)
-
-                        Divider()
-                            .frame(height: 20)
-
-                        // More Actions Menu
-                        Menu {
-                            Button {
-                                tempSelectedTags = []
-                                showingTagSelection = true
-                            } label: {
-                                Label("添加标签", systemImage: "tag")
-                            }
-                            
-                            Button {
-                                tempSelectedBrand = nil
-                                showingBrandSelection = true
-                            } label: {
-                                Label("归类品牌", systemImage: "bag")
-                            }
-                            
-                            Divider()
-                            
-                            Button {
-                                tempSelectedColors = []
-                                showingColorSelection = true
-                            } label: {
-                                Label("染上颜色", systemImage: "paintbrush")
-                            }
-                            
-                            Button {
-                                tempSelectedSizes = []
-                                showingSizeSelection = true
-                            } label: {
-                                Label("变换尺码", systemImage: "ruler")
-                            }
-                            
-                            Button {
-                                tempSelectedLengths = []
-                                showingLengthSelection = true
-                            } label: {
-                                Label("设置衣长", systemImage: "lines.measurement.vertical")
-                            }
-                            
-                            Button {
-                                tempSelectedAccessories = []
-                                showingAccessorySelection = true
-                            } label: {
-                                Label("搭配小物", systemImage: "sparkles")
-                            }
-                            
-                            Button {
-                                tempSelectedStatus = nil
-                                showingStatusSelection = true
-                            } label: {
-                                Label("改变状态", systemImage: "arrow.2.circlepath")
-                            }
-                            
-                            Divider()
-                            
-                            Button {
-                                showingMergeToAccessorySheet = true
-                            } label: {
-                                Label("合并为小物到裙装", systemImage: "arrow.down.square")
-                            }
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: "ellipsis.circle")
-                                Text("更多")
-                                    .font(.caption)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .disabled(selectedItemIDs.isEmpty)
-
-                        Divider()
-                            .frame(height: 20)
-
-                        // Select All
-                        Button {
-                            toggleSelectAll()
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: isAllSelectedInView ? "xmark.circle" : "checkmark.circle")
-                                Text(isAllSelectedInView ? "取消全选" : "全选")
-                                    .font(.caption)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .disabled(filteredClothings.isEmpty)
+                    Button {
+                        tempSelectedColors = []
+                        showingColorSelection = true
+                    } label: {
+                        Label("染上颜色", systemImage: "paintbrush")
                     }
-                    .padding()
-                    // iOS 18 及以下需要额外底部padding避开TabBar，iOS 19+ 不需要
-                    .padding(.bottom, {
-                        let version = UIDevice.current.systemVersion
-                        let majorVersion = Int(version.split(separator: ".").first ?? "0") ?? 0
-                        return majorVersion <= 18 ? 60 : 0
-                    }())
-                    .background(.regularMaterial)
+
+                    Button {
+                        tempSelectedSizes = []
+                        showingSizeSelection = true
+                    } label: {
+                        Label("变换尺码", systemImage: "ruler")
+                    }
+
+                    Button {
+                        tempSelectedLengths = []
+                        showingLengthSelection = true
+                    } label: {
+                        Label("设置衣长", systemImage: "lines.measurement.vertical")
+                    }
+
+                    Button {
+                        tempSelectedAccessories = []
+                        showingAccessorySelection = true
+                    } label: {
+                        Label("搭配小物", systemImage: "sparkles")
+                    }
+
+                    Button {
+                        tempSelectedStatus = nil
+                        showingStatusSelection = true
+                    } label: {
+                        Label("改变状态", systemImage: "arrow.2.circlepath")
+                    }
+
+                    Divider()
+
+                    Button {
+                        showingMergeToAccessorySheet = true
+                    } label: {
+                        Label("合并为小物到裙装", systemImage: "arrow.down.square")
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "ellipsis.circle")
+                        Text("更多")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .disabled(selectedItemIDs.isEmpty)
+
+                Divider()
+                    .frame(height: 20)
+
+                Button {
+                    toggleSelectAll()
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: isAllSelectedInView ? "xmark.circle" : "checkmark.circle")
+                        Text(isAllSelectedInView ? "取消全选" : "全选")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .disabled(filteredClothings.isEmpty)
+            }
+            .padding()
+            .padding(.bottom, {
+                let version = UIDevice.current.systemVersion
+                let majorVersion = Int(version.split(separator: ".").first ?? "0") ?? 0
+                return majorVersion <= 18 ? 60 : 0
+            }())
+            .background(.regularMaterial)
+        }
+    }
+
+    private func applySheets<Content: View>(to content: Content) -> some View {
+        content
+            .sheet(isPresented: $showingTagSelection) {
+                TagSelectionView(selectedTags: $tempSelectedTags)
+                    .onDisappear {
+                        if !tempSelectedTags.isEmpty {
+                            showingAddTagsConfirmation = true
+                        }
+                    }
+            }
+            .sheet(isPresented: $showingBrandSelection) {
+                BrandSelectionView(selectedBrand: $tempSelectedBrand)
+                    .onDisappear {
+                        if tempSelectedBrand != nil {
+                            showingSetBrandConfirmation = true
+                        }
+                    }
+            }
+            .sheet(isPresented: $showingColorSelection) {
+                BatchStringSelectionView(
+                    title: "染上颜色",
+                    options: SuggestionManager.shared.getAllColors(),
+                    selectedItems: $tempSelectedColors
+                )
+                .onDisappear {
+                    if !tempSelectedColors.isEmpty {
+                        batchSetColors(tempSelectedColors)
+                    }
                 }
             }
-        }
-        .sheet(isPresented: $showingTagSelection) {
-            TagSelectionView(selectedTags: $tempSelectedTags)
+            .sheet(isPresented: $showingSizeSelection) {
+                BatchStringSelectionView(
+                    title: "变换尺码",
+                    options: SuggestionManager.shared.getAllSizes(),
+                    selectedItems: $tempSelectedSizes
+                )
                 .onDisappear {
+                    if !tempSelectedSizes.isEmpty {
+                        batchSetSizes(tempSelectedSizes)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingLengthSelection) {
+                BatchStringSelectionView(
+                    title: "设置衣长",
+                    options: SuggestionManager.shared.getAllLengths(),
+                    selectedItems: $tempSelectedLengths
+                )
+                .onDisappear {
+                    if !tempSelectedLengths.isEmpty {
+                        batchSetLengths(tempSelectedLengths)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAccessorySelection) {
+                BatchStringSelectionView(
+                    title: "搭配小物",
+                    options: SuggestionManager.shared.getAllAccessories(),
+                    selectedItems: $tempSelectedAccessories
+                )
+                .onDisappear {
+                    if !tempSelectedAccessories.isEmpty {
+                        batchSetAccessories(tempSelectedAccessories)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingStatusSelection) {
+                BatchStatusSelectionView(selectedStatus: $tempSelectedStatus)
+                    .onDisappear {
+                        if let status = tempSelectedStatus {
+                            batchSetStatus(status)
+                        }
+                    }
+            }
+            .sheet(isPresented: $showingMergeToAccessorySheet) {
+                MergeToAccessorySheet(
+                    selectedItemIDs: selectedItemIDs,
+                    allClothings: clothings,
+                    onSelect: { targetClothing in
+                        targetClothingForMerge = targetClothing
+                        showingMergeConfirmation = true
+                    }
+                )
+            }
+    }
+
+    private func applyAlerts<Content: View>(to content: Content) -> some View {
+        content
+            .alert("确认删除", isPresented: $showingDeleteAlert) {
+                Button("取消", role: .cancel) { }
+                Button("删除 \(selectedItemIDs.count) 项", role: .destructive) {
+                    deleteSelectedItems()
+                }
+            }
+            .alert("确认批量复制", isPresented: $showingBatchCopyAlert) {
+                Button("取消", role: .cancel) { }
+                Button("复制 \(selectedItemIDs.count) 项") {
+                    batchCopySelectedItems()
+                }
+            } message: {
+                Text("确定要复制选中的 \(selectedItemIDs.count) 件物品吗？")
+            }
+            .alert("确认添加标签", isPresented: $showingAddTagsConfirmation) {
+                Button("取消", role: .cancel) {
+                    tempSelectedTags = []
+                }
+                Button("确认添加") {
                     if !tempSelectedTags.isEmpty {
-                        showingAddTagsConfirmation = true
+                        addTagsToSelectedItems(tempSelectedTags)
                     }
                 }
-        }
-        .sheet(isPresented: $showingBrandSelection) {
-            BrandSelectionView(selectedBrand: $tempSelectedBrand)
-                .onDisappear {
-                    if tempSelectedBrand != nil {
-                        showingSetBrandConfirmation = true
+            } message: {
+                Text("确定要为选中的 \(selectedItemIDs.count) 件物品添加 \(tempSelectedTags.count) 个标签吗？")
+            }
+            .alert("确认归类品牌", isPresented: $showingSetBrandConfirmation) {
+                Button("取消", role: .cancel) {
+                    tempSelectedBrand = nil
+                }
+                Button("确认修改") {
+                    if let brand = tempSelectedBrand {
+                        setBrandForSelectedItems(brand)
                     }
                 }
-        }
-        .sheet(isPresented: $showingColorSelection) {
-            BatchStringSelectionView(
-                title: "染上颜色",
-                options: SuggestionManager.shared.getAllColors(),
-                selectedItems: $tempSelectedColors
-            )
-            .onDisappear {
-                if !tempSelectedColors.isEmpty {
-                    batchSetColors(tempSelectedColors)
-                }
-            }
-        }
-        .sheet(isPresented: $showingSizeSelection) {
-            BatchStringSelectionView(
-                title: "变换尺码",
-                options: SuggestionManager.shared.getAllSizes(),
-                selectedItems: $tempSelectedSizes
-            )
-            .onDisappear {
-                if !tempSelectedSizes.isEmpty {
-                    batchSetSizes(tempSelectedSizes)
-                }
-            }
-        }
-        .sheet(isPresented: $showingLengthSelection) {
-            BatchStringSelectionView(
-                title: "设置衣长",
-                options: SuggestionManager.shared.getAllLengths(),
-                selectedItems: $tempSelectedLengths
-            )
-            .onDisappear {
-                if !tempSelectedLengths.isEmpty {
-                    batchSetLengths(tempSelectedLengths)
-                }
-            }
-        }
-        .sheet(isPresented: $showingAccessorySelection) {
-            BatchStringSelectionView(
-                title: "搭配小物",
-                options: SuggestionManager.shared.getAllAccessories(),
-                selectedItems: $tempSelectedAccessories
-            )
-            .onDisappear {
-                if !tempSelectedAccessories.isEmpty {
-                    batchSetAccessories(tempSelectedAccessories)
-                }
-            }
-        }
-        .sheet(isPresented: $showingStatusSelection) {
-            BatchStatusSelectionView(selectedStatus: $tempSelectedStatus)
-                .onDisappear {
-                    if let status = tempSelectedStatus {
-                        batchSetStatus(status)
-                    }
-                }
-        }
-        .alert("确认删除", isPresented: $showingDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除 \(selectedItemIDs.count) 项", role: .destructive) {
-                deleteSelectedItems()
-            }
-        }
-        .alert("确认批量复制", isPresented: $showingBatchCopyAlert) {
-            Button("取消", role: .cancel) { }
-            Button("复制 \(selectedItemIDs.count) 项") {
-                batchCopySelectedItems()
-            }
-        } message: {
-            Text("确定要复制选中的 \(selectedItemIDs.count) 件物品吗？")
-        }
-        .alert("确认添加标签", isPresented: $showingAddTagsConfirmation) {
-            Button("取消", role: .cancel) {
-                tempSelectedTags = []
-            }
-            Button("确认添加") {
-                if !tempSelectedTags.isEmpty {
-                    addTagsToSelectedItems(tempSelectedTags)
-                }
-            }
-        } message: {
-            Text("确定要为选中的 \(selectedItemIDs.count) 件物品添加 \(tempSelectedTags.count) 个标签吗？")
-        }
-        .alert("确认归类品牌", isPresented: $showingSetBrandConfirmation) {
-            Button("取消", role: .cancel) {
-                tempSelectedBrand = nil
-            }
-            Button("确认修改") {
+            } message: {
                 if let brand = tempSelectedBrand {
-                    setBrandForSelectedItems(brand)
+                    Text("确定要将选中的 \(selectedItemIDs.count) 件物品归类到品牌“\(brand.name)”吗？")
                 }
             }
-        } message: {
-            if let brand = tempSelectedBrand {
-                Text("确定要将选中的 \(selectedItemIDs.count) 件物品归类到品牌“\(brand.name)”吗？")
-            }
-        }
-        .alert("确认删除", isPresented: $showingDeleteSingleAlert) {
-            Button("取消", role: .cancel) {
-                itemToDelete = nil
-            }
-            Button("删除", role: .destructive) {
+            .alert("确认删除", isPresented: $showingDeleteSingleAlert) {
+                Button("取消", role: .cancel) {
+                    itemToDelete = nil
+                }
+                Button("删除", role: .destructive) {
+                    if let item = itemToDelete {
+                        deleteItem(item)
+                    }
+                }
+            } message: {
                 if let item = itemToDelete {
-                    deleteItem(item)
+                    Text("确定要删除“\(item.name)”吗？此操作无法撤销。")
                 }
             }
-        } message: {
-            if let item = itemToDelete {
-                Text("确定要删除“\(item.name)”吗？此操作无法撤销。")
-            }
-        }
-        .alert("确认复制", isPresented: $showingCopyAlert) {
-            Button("取消", role: .cancel) {
-                itemToCopy = nil
-            }
-            Button("复制") {
+            .alert("确认复制", isPresented: $showingCopyAlert) {
+                Button("取消", role: .cancel) {
+                    itemToCopy = nil
+                }
+                Button("复制") {
+                    if let item = itemToCopy {
+                        copyItem(item)
+                    }
+                }
+            } message: {
                 if let item = itemToCopy {
-                    copyItem(item)
+                    Text("确定要复制「\(item.name)」吗？")
                 }
             }
-        } message: {
-            if let item = itemToCopy {
-                Text("确定要复制「\(item.name)」吗？")
-            }
-        }
-        // 合并为小物到裙装 - 选择目标裙装
-        .sheet(isPresented: $showingMergeToAccessorySheet) {
-            MergeToAccessorySheet(
-                selectedItemIDs: selectedItemIDs,
-                allClothings: clothings,
-                onSelect: { targetClothing in
-                    targetClothingForMerge = targetClothing
-                    showingMergeConfirmation = true
+            .alert("确认合并", isPresented: $showingMergeConfirmation) {
+                Button("取消", role: .cancel) {
+                    targetClothingForMerge = nil
                 }
-            )
-        }
-        // 合并确认弹窗
-        .alert("确认合并", isPresented: $showingMergeConfirmation) {
-            Button("取消", role: .cancel) {
-                targetClothingForMerge = nil
-            }
-            Button("确认合并") {
+                Button("确认合并") {
+                    if let target = targetClothingForMerge {
+                        performMergeToAccessory(targetClothing: target)
+                    }
+                }
+            } message: {
                 if let target = targetClothingForMerge {
-                    performMergeToAccessory(targetClothing: target)
+                    Text("确定要将选中的 \(selectedItemIDs.count) 件裙装作为小物合并到「\(target.name)」中吗？")
                 }
             }
-        } message: {
-            if let target = targetClothingForMerge {
-                Text("确定要将选中的 \(selectedItemIDs.count) 件裙装作为小物合并到「\(target.name)」中吗？")
+            .alert("合并完成", isPresented: $showingDeleteAfterMergeConfirmation) {
+                Button("保留原裙装") {
+                    selectedItemIDs.removeAll()
+                    targetClothingForMerge = nil
+                }
+                Button("删除原裙装", role: .destructive) {
+                    deleteSelectedItems()
+                    targetClothingForMerge = nil
+                }
+            } message: {
+                Text("已成功合并 \(mergedItemCount) 个小物。是否删除原选中的裙装？")
+            }
+    }
+
+    private var displayedClothings: [Clothing] {
+        (isEditing || (isSelectionMode && sortOption == .custom)) ? editableClothings : filteredClothings
+    }
+
+    private var gridWardrobeView: some View {
+        ScrollViewReader { proxy in
+            ZStack {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        statsSection
+                            .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+
+                        LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
+                            ForEach(displayedClothings) { clothing in
+                                wardrobeGridCell(for: clothing)
+                            }
+                        }
+                        .animation(isEditing ? .default : nil, value: editableClothings)
+                        .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
+                        .padding(.bottom, 100)
+                    }
+                }
+                .onDrop(of: [UTType.text], isTargeted: nil) { _ in
+                    self.draggingItem = nil
+                    return true
+                }
+
+                if isEditing {
+                    VStack {
+                        Color.clear.frame(height: 80)
+                            .contentShape(Rectangle())
+                            .onDrop(of: [UTType.text], delegate: ScrollDropDelegate(
+                                onEnter: { startAutoScroll(up: true, proxy: proxy) },
+                                onExit: { stopAutoScroll() }
+                            ))
+                        Spacer()
+                        Color.clear.frame(height: 80)
+                            .contentShape(Rectangle())
+                            .onDrop(of: [UTType.text], delegate: ScrollDropDelegate(
+                                onEnter: { startAutoScroll(up: false, proxy: proxy) },
+                                onExit: { stopAutoScroll() }
+                            ))
+                    }
+                    .allowsHitTesting(true)
+                }
             }
         }
-        // 合并后是否删除原裙装
-        .alert("合并完成", isPresented: $showingDeleteAfterMergeConfirmation) {
-            Button("保留原裙装") {
-                // 清空选择但保持选择模式
-                selectedItemIDs.removeAll()
-                targetClothingForMerge = nil
+    }
+
+    @ViewBuilder
+    private func wardrobeGridCell(for clothing: Clothing) -> some View {
+        if isSelectionMode {
+            ZStack(alignment: .topTrailing) {
+                clothingItemView(clothing: clothing)
+
+                Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(selectedItemIDs.contains(clothing.id) ? .pink : .secondary)
+                    .background(Circle().fill(.white).padding(2))
+                    .shadow(radius: 1)
+                    .padding(8)
             }
-            Button("删除原裙装", role: .destructive) {
-                deleteSelectedItems()
-                targetClothingForMerge = nil
+            .contentShape(Rectangle())
+            .onTapGesture {
+                toggleSelection(clothing.id)
             }
-        } message: {
-            Text("已成功合并 \(mergedItemCount) 个小物。是否删除原选中的裙装？")
+            .onAppear { visibleItemIDs.insert(clothing.id) }
+            .onDisappear { visibleItemIDs.remove(clothing.id) }
+            .onDrag {
+                guard sortOption == .custom || isEditing else { return NSItemProvider() }
+                self.draggingItem = clothing
+                return NSItemProvider(object: clothing.id.uuidString as NSString)
+            }
+            .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: sortOption == .custom || isEditing, selectedItemIDs: selectedItemIDs))
+        } else if isEditing {
+            ZStack(alignment: .topTrailing) {
+                clothingItemView(clothing: clothing)
+            }
+            .contentShape(Rectangle())
+            .onAppear { visibleItemIDs.insert(clothing.id) }
+            .onDisappear { visibleItemIDs.remove(clothing.id) }
+            .onDrag {
+                self.draggingItem = clothing
+                return NSItemProvider(object: clothing.id.uuidString as NSString)
+            }
+            .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: true, selectedItemIDs: selectedItemIDs))
+        } else {
+            NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                ZStack(alignment: .topTrailing) {
+                    clothingItemView(clothing: clothing)
+                }
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button {
+                    isSelectionMode = true
+                    selectedItemIDs.insert(clothing.id)
+                } label: {
+                    Label("选择", systemImage: "checkmark.circle")
+                }
+
+                NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
+                    Label("查看详情", systemImage: "info.circle")
+                }
+
+                Divider()
+
+                Button {
+                    itemToCopy = clothing
+                    showingCopyAlert = true
+                } label: {
+                    Label("复制", systemImage: "doc.on.doc")
+                }
+
+                Button(role: .destructive) {
+                    itemToDelete = clothing
+                    showingDeleteSingleAlert = true
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            }
+            .onAppear { visibleItemIDs.insert(clothing.id) }
+            .onDisappear { visibleItemIDs.remove(clothing.id) }
         }
     }
     
@@ -1421,6 +1448,7 @@ struct WardrobeStatsView: View {
                     .foregroundStyle(palette.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .captureGuideTarget(.wardrobeOotdEntry)
 
                 // 详细统计按钮 - 使用主题次要色
                 NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {

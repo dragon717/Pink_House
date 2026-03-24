@@ -205,7 +205,7 @@ struct FrenchRetroSmallWorldView: View {
     private func hotspotContent(geometry: GeometryProxy) -> some View {
         ZStack(alignment: .topLeading) {
             // 1. OOTD (穿搭手帐) - 最左侧
-            InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange, label: "穿搭手帐", labelStyle: .horizontal(angle: -28), labelPosition: CGPoint(x: 0.17, y: 0.86)) {
+            InteractionHotspot(rect: CGRect(x: 0.08, y: 0.1, width: 0.12, height: 0.8), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, debugColor: .orange, label: "穿搭手帐", labelStyle: .horizontal(angle: -28), labelPosition: CGPoint(x: 0.17, y: 0.86), guideTargetKey: .ootdEntry) {
                 navigate(to: .ootd)
             }
 
@@ -231,7 +231,7 @@ struct FrenchRetroSmallWorldView: View {
 
             // 4. 墙上的日历 (梦裙日历)
             if shouldShowCalendar {
-                CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "梦裙日历", labelPosition: CGPoint(x: 0.77, y: 0.27)) {
+                CalendarHotspot(rect: CGRect(x: 0.61, y: 0.155, width: 0.15, height: 0.23), geometry: geometry, imageSize: imageSize, showDebug: showDebugHotspots, label: "梦裙日历", labelPosition: CGPoint(x: 0.77, y: 0.27), guideTargetKey: .calendarEntry) {
                     navigate(to: .calendar)
                 }
             }
@@ -341,6 +341,7 @@ struct CalendarHotspot: View {
     var label: String? = nil
     var labelStyle: SmallWorldLabelStyle = .vertical(angle: FrenchRetroSmallWorldView.verticalLabelRotation)
     var labelPosition: CGPoint? = nil // 独立的标签位置 (Normalized 0-1)
+    var guideTargetKey: GuideTargetKey? = nil
     let action: () -> Void
     
     // 监听数据变化
@@ -380,6 +381,12 @@ struct CalendarHotspot: View {
                         Color.black.opacity(0.001)
                             .contentShape(Rectangle())
                     }
+                }
+                if let guideTargetKey {
+                    Color.clear
+                        .frame(width: hotspotWidth, height: hotspotHeight)
+                        .captureGuideTarget(guideTargetKey)
+                        .allowsHitTesting(false)
                 }
             }
             .frame(width: hotspotWidth, height: hotspotHeight)

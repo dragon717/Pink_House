@@ -307,7 +307,8 @@ struct SmallWorldMenuOverlay: View {
                             isLowMemoryDevice: isLowMemoryDevice,
                             iconSize: sizes.iconSize,
                             fontSize: sizes.fontSize,
-                            circleSize: sizes.circleSize
+                            circleSize: sizes.circleSize,
+                            guideTargetKey: items[index].destination == .ootdDefaultBook ? .favoriteMenuMagicStickerEntry : nil
                         ) {
                             onItemSelected(items[index])
                         }
@@ -330,7 +331,8 @@ struct SmallWorldMenuOverlay: View {
                             isLowMemoryDevice: isLowMemoryDevice,
                             iconSize: sizes.iconSize,
                             fontSize: sizes.fontSize,
-                            circleSize: sizes.circleSize
+                            circleSize: sizes.circleSize,
+                            guideTargetKey: items[index].destination == .ootdDefaultBook ? .favoriteMenuMagicStickerEntry : nil
                         ) {
                             onItemSelected(items[index])
                         }
@@ -353,7 +355,8 @@ struct SmallWorldMenuOverlay: View {
                             isLowMemoryDevice: isLowMemoryDevice,
                             iconSize: sizes.iconSize,
                             fontSize: sizes.fontSize,
-                            circleSize: sizes.circleSize
+                            circleSize: sizes.circleSize,
+                            guideTargetKey: items[index].destination == .ootdDefaultBook ? .favoriteMenuMagicStickerEntry : nil
                         ) {
                             onItemSelected(items[index])
                         }
@@ -417,6 +420,7 @@ struct SmallWorldMenuOverlay: View {
         let iconSize: CGFloat
         let fontSize: CGFloat
         let circleSize: CGFloat
+        var guideTargetKey: GuideTargetKey? = nil
         let action: () -> Void
 
         var body: some View {
@@ -449,6 +453,7 @@ struct SmallWorldMenuOverlay: View {
                         .shadow(color: .black.opacity(isLowMemoryDevice ? 0 : 0.1), radius: isLowMemoryDevice ? 0 : 2, x: 0, y: 1)
                 }
             }
+            .modifier(OptionalGuideTargetModifier(key: guideTargetKey))
             .buttonStyle(ScaleButtonStyle())
         }
     }
@@ -525,6 +530,7 @@ struct SmallWorldMenuOverlay: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             showMenu = true
         }
+        NotificationCenter.default.post(name: .smallWorldQuickMenuOpened, object: nil)
 
         isPressing = false
         pressProgress = 0.0
@@ -562,6 +568,19 @@ struct SmallWorldMenuOverlay: View {
                     smallWorldDestination = dest
                 }
             }
+        }
+    }
+}
+
+private struct OptionalGuideTargetModifier: ViewModifier {
+    let key: GuideTargetKey?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let key {
+            content.captureGuideTarget(key)
+        } else {
+            content
         }
     }
 }

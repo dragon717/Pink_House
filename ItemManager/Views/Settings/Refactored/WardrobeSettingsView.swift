@@ -35,6 +35,7 @@ struct WardrobeSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .adaptiveRow(showDivider: false)
+                .captureGuideTarget(.wardrobeInterfaceStyleSection)
             }
             
             // MARK: - 筛选模式
@@ -46,6 +47,7 @@ struct WardrobeSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .adaptiveRow(showDivider: false)
+                .captureGuideTarget(.wardrobeFilterModeSection)
             }
             
             // MARK: - 外观个性化
@@ -55,8 +57,10 @@ struct WardrobeSettingsView: View {
             AdaptiveSection(header: "隐私显示", footer: "关闭后，衣柜列表将不再显示对应的价格信息。") {
                 Toggle("在列表中显示入库价格", isOn: $showPrice)
                     .adaptiveRow()
+                    .captureGuideTarget(.wardrobePrivacyShowPriceSection)
                 Toggle("在列表中显示原价", isOn: $showOriginalPrice)
                     .adaptiveRow(showDivider: false)
+                    .captureGuideTarget(.wardrobePrivacyShowOriginalPriceSection)
             }
             
             // MARK: - 业务提醒
@@ -73,18 +77,24 @@ struct WardrobeSettingsView: View {
                     Label("标签管理", systemImage: "tag")
                 }
                 .adaptiveRow()
+                .captureGuideTarget(.wardrobeTagManagementEntry)
                 
                 NavigationLink(destination: BrandManagementView()) {
                     Label("品牌管理", systemImage: "crown")
                 }
                 .adaptiveRow()
+                .captureGuideTarget(.wardrobeBrandManagementEntry)
                 
                 // 属性字段管理直接在这里展开
                 NavigationLink(destination: FieldSortSettingsView()) {
                     Label("属性字段排序与显示", systemImage: "list.bullet.indent")
                 }
                 .adaptiveRow(showDivider: false)
+                .captureGuideTarget(.wardrobeFieldManagementEntry)
             }
+        }
+        .onAppear {
+            NotificationCenter.default.post(name: .wardrobeSettingsOpened, object: nil)
         }
         // Image Picker Logic
         .onChange(of: selectedItem) { _, newItem in
@@ -113,6 +123,7 @@ struct WardrobeSettingsView: View {
             }
             .pickerStyle(.segmented)
             .adaptiveRow()
+            .captureGuideTarget(.wardrobeAppAppearanceSection)
             
             if theme.backgroundStyle == .color {
                 ColorPicker("背景颜色", selection: Binding(

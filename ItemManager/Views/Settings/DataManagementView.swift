@@ -137,6 +137,9 @@ struct DataManagementView: View {
             } message: {
                 Text(message ?? "")
             }
+            .onAppear {
+                NotificationCenter.default.post(name: .dataBackupManagementOpened, object: nil)
+            }
             
             // Loading Indicator
             if isLoading {

@@ -117,6 +117,9 @@ struct OOTDDefaultBookView: View {
                 }
             }
         }
+        .onAppear {
+            NotificationCenter.default.post(name: .ootdDefaultBookOpened, object: nil)
+        }
     }
 
     private func createDefaultBook() {

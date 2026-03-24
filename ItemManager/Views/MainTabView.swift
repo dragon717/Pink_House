@@ -1379,6 +1379,8 @@ struct MainTabView: View {
     }
 
     private func navigateToFeatureWithGuide(_ feature: FeatureItem) {
+        let isUnlocked = FeatureUnlockManager.shared.isUnlocked(feature)
+
         switch feature {
         case .dataBackup:
             // 跳转到设置页面的备份功能
@@ -1407,50 +1409,71 @@ struct MainTabView: View {
                 startFeatureGuideAfterNavigation(feature)
             }
         case .themeCustomize:
-            // 跳转到设置页面的主题功能
+            // 从魔法任务详情页开始，先引导真实返回到「我」页，再找主题配色豆腐块
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .themeCustomize)
+        case .localFileBackupRestore:
+            // 从魔法任务详情页开始，先引导返回「我」，再下滑到系统与更多并进入本地文件备份与恢复
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .localFileBackupRestore)
+        case .exportCSV:
+            // 从魔法任务详情页开始，先引导返回「我」，再下滑到系统与更多并点击导出 CSV
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .exportCSV)
+        case .cloudFileBackupRestore:
+            // 从魔法任务详情页开始，先引导返回「我」，再进入账户与同步完成云端备份体验
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .cloudFileBackupRestore)
+        case .widgetCustomize:
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .widgetCustomize)
+        case .ootd:
             withAnimation {
-                selectedTab = 2
+                if isUnlocked {
+                    selectedTab = 1
+                    smallWorldDestination = .menu
+                } else {
+                    selectedTab = 0
+                    homeTabSelection = .wardrobe
+                }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(
-                    name: .navigateToSettings,
-                    object: nil,
-                    userInfo: ["feature": "themeCustomize"]
-                )
+            startFeatureGuideAfterNavigation(feature)
+        case .ootdDefaultBook:
+            if isUnlocked {
+                AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .ootdDefaultBook)
+            } else {
+                withAnimation {
+                    selectedTab = 0
+                    homeTabSelection = .wardrobe
+                }
                 startFeatureGuideAfterNavigation(feature)
             }
-        case .ootd:
-            // 跳转到衣橱页面，然后显示OOTD
+        case .calendar:
             withAnimation {
-                selectedTab = 0
-                homeTabSelection = .wardrobe
+                if isUnlocked {
+                    selectedTab = 1
+                    smallWorldDestination = .menu
+                } else {
+                    selectedTab = 0
+                    homeTabSelection = .wardrobe
+                }
             }
             startFeatureGuideAfterNavigation(feature)
         case .wealth:
             // 不自动跳转到萌宠对话，按引导第一步由用户手动点击 House 页签
             AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .wealth)
         case .batchImport:
-            // 跳转到衣橱页面的批量导入
             withAnimation {
                 selectedTab = 0
                 homeTabSelection = .wardrobe
             }
             startFeatureGuideAfterNavigation(feature)
         case .filterClassic:
-            // 筛选偏好位于梦幻衣橱设置中，复用 batchImport 导航入口
-            withAnimation {
-                selectedTab = 2
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(
-                    name: .navigateToSettings,
-                    object: nil,
-                    userInfo: ["feature": "batchImport"]
-                )
-                startFeatureGuideAfterNavigation(feature)
-            }
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .filterClassic)
+        case .privacyDisplay:
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .privacyDisplay)
+        case .tagBrandFieldDisplay:
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .tagBrandFieldDisplay)
         case .spaceBook:
-            // 空间手帐与OOTD体验链路相关，先进入衣橱页再引导说明
+            if isUnlocked {
+                // 空间手账引导要求先从「平面」切到「空间」，这里确保步骤2稳定可见
+                UserDefaults.standard.set("平面", forKey: "bookShelfViewMode")
+            }
             withAnimation {
                 selectedTab = 0
                 homeTabSelection = .wardrobe

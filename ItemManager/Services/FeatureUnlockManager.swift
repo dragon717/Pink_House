@@ -110,8 +110,13 @@ enum FeatureItem: String, CaseIterable, Identifiable {
 
     // 筛选功能
     case filterClassic = "filterClassic"  // 经典筛选/多维筛选
+    case privacyDisplay = "privacyDisplay" // 隐私显示
+    case tagBrandFieldDisplay = "tagBrandFieldDisplay" // 标签和品牌管理以及属性字段的显示
     case spaceBook = "spaceBook"  // 空间手帐
     case batchEdit = "batchEdit"  // 批量编辑
+    case localFileBackupRestore = "localFileBackupRestore" // 本地文件的备份与恢复
+    case exportCSV = "exportCSV" // 导出表格
+    case cloudFileBackupRestore = "cloudFileBackupRestore" // 云端的文件备份与恢复
 
     // 联网功能
     case networkCommunity = "networkCommunity"
@@ -146,11 +151,21 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .magicTasks:
             return "魔法任务"
         case .filterClassic:
-            return "筛选偏好"
+            return "个性化偏好"
+        case .privacyDisplay:
+            return "隐私显示"
+        case .tagBrandFieldDisplay:
+            return "标签和品牌管理以及属性字段的显示"
         case .spaceBook:
             return "空间手帐"
         case .batchEdit:
             return "批量编辑"
+        case .localFileBackupRestore:
+            return "本地文件的备份与恢复"
+        case .exportCSV:
+            return "导出表格"
+        case .cloudFileBackupRestore:
+            return "云端的文件备份与恢复"
         }
     }
     
@@ -180,10 +195,20 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return "sparkles"
         case .filterClassic:
             return "line.3.horizontal.decrease.circle.fill"
+        case .privacyDisplay:
+            return "eye.slash.circle.fill"
+        case .tagBrandFieldDisplay:
+            return "tag.circle.fill"
         case .spaceBook:
             return "cube.transparent.fill"
         case .batchEdit:
             return "square.and.pencil"
+        case .localFileBackupRestore:
+            return "externaldrive.badge.checkmark"
+        case .exportCSV:
+            return "tablecells"
+        case .cloudFileBackupRestore:
+            return "icloud.and.arrow.up.and.arrow.down"
         }
     }
     
@@ -229,11 +254,21 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             // 魔法任务：在VIP界面兑换码输入 "vip魔法任务" 解锁
             return .redeemCode("vip魔法任务", description: "仍在认真开发和内测中，敬请期待～")
         case .filterClassic:
-            return .manual(description: "体验筛选偏好功能")
+            return .manual(description: "体验个性化偏好功能")
+        case .privacyDisplay:
+            return .manual(description: "体验隐私显示功能")
+        case .tagBrandFieldDisplay:
+            return .manual(description: "体验标签管理、品牌管理与属性字段显示")
         case .spaceBook:
-            return .manual(description: "体验空间手帐功能")
+            return .manual(description: "创建一个穿搭手账以及手账书页")
         case .batchEdit:
             return .manual(description: "体验批量编辑功能")
+        case .localFileBackupRestore:
+            return .manual(description: "体验本地文件的备份与恢复入口")
+        case .exportCSV:
+            return .manual(description: "体验导出到 CSV 功能")
+        case .cloudFileBackupRestore:
+            return .manual(description: "体验云端的文件备份与恢复与 iCloud 同步")
         }
     }
     
@@ -244,7 +279,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return true // 萌宠、世界书、拼豆工坊、裙装股市默认隐藏
         case .networkCommunity, .magicTasks:
             return false  // 联网社区和魔法任务默认显示
-        case .filterClassic, .spaceBook, .batchEdit:
+        case .filterClassic, .privacyDisplay, .tagBrandFieldDisplay, .spaceBook, .batchEdit, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore:
             return false  // 这些功能默认显示，作为魔法任务可获取鱼币
         default:
             return false
@@ -272,10 +307,53 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     /// 是否是设置中的子功能
     var isSettingsFeature: Bool {
         switch self {
-        case .dataBackup, .cloudSync, .batchImport, .themeCustomize, .widgetCustomize, .aiAnalysis:
+        case .dataBackup, .cloudSync, .batchImport, .themeCustomize, .widgetCustomize, .aiAnalysis, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore:
             return true
         default:
             return false
+        }
+    }
+
+    /// 体验任务引导步数（用于鱼币奖励分档）
+    var experienceGuideStepCount: Int? {
+        switch self {
+        case .filterClassic:
+            return 5
+        case .privacyDisplay:
+            return 4
+        case .tagBrandFieldDisplay:
+            return 6
+        case .spaceBook:
+            return 7
+        case .batchEdit:
+            return 4
+        case .localFileBackupRestore:
+            return 4
+        case .exportCSV:
+            return 4
+        case .cloudFileBackupRestore:
+            return 5
+        default:
+            return nil
+        }
+    }
+
+    /// 体验任务鱼币奖励：按引导步数分档
+    var experienceFishCoinReward: Int? {
+        guard let stepCount = experienceGuideStepCount else { return nil }
+        switch stepCount {
+        case ...2:
+            return 66
+        case 3...4:
+            return 88
+        case 5:
+            return 100
+        case 6:
+            return 200
+        case 7:
+            return 300
+        default:
+            return 500
         }
     }
 }

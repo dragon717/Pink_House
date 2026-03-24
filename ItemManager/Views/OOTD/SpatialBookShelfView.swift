@@ -131,6 +131,9 @@ struct SpatialBookShelfView: View {
                 editableBooks = newValue
             }
         }
+        .onAppear {
+            NotificationCenter.default.post(name: .spatialBookShelfOpened, object: nil)
+        }
         .toolbar {
             if selectedBook == nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -169,6 +172,7 @@ struct SpatialBookShelfView: View {
                             Image(systemName: "ellipsis.circle")
                                 .foregroundStyle(.primary)
                         }
+                        .captureGuideTarget(.spaceBookShelfMoreMenuButton)
                     }
                 }
             }
@@ -183,6 +187,14 @@ struct SpatialBookShelfView: View {
                     sortIndex: maxSortIndex + 1
                 )
                 modelContext.insert(book)
+
+                if AppFirstLaunchGuideManager.shared.currentFeatureExperienceFeature == .spaceBook {
+                    withAnimation {
+                        selectedBook = book
+                        onSelectionChange?(true)
+                    }
+                    NotificationCenter.default.post(name: .spaceBookDetailOpened, object: nil)
+                }
             }
         }
         .alert("删除手帐", isPresented: $showingDeleteBookAlert) {

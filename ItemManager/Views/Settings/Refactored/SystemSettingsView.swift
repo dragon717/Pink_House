@@ -71,9 +71,16 @@ struct SystemSettingsView: View {
             
             // MARK: - 数据备份与恢复
             AdaptiveSection(header: "本地备份与恢复") {
+                NavigationLink(destination: DataManagementView()) {
+                    Label("文件的备份与恢复", systemImage: "folder.badge.gearshape")
+                }
+                .adaptiveRow()
+                .captureGuideTarget(.localFileBackupRestoreEntry)
+
                 Button(action: prepareCSVExport) {
                     Label("导出 CSV (Export CSV)", systemImage: "tablecells")
                 }
+                .captureGuideTarget(.exportCSVEntry)
                 .adaptiveRow()
                 
                 Button(action: prepareBackup) {
@@ -133,6 +140,9 @@ struct SystemSettingsView: View {
         } message: {
             Text("语言更改将在下次启动应用时生效。")
         }
+        .onAppear {
+            NotificationCenter.default.post(name: .systemSettingsOpened, object: nil)
+        }
         // Loading Overlay
         .overlay {
             if isLoading {
@@ -155,6 +165,7 @@ struct SystemSettingsView: View {
     // MARK: - Data Actions (Copied from DataManagementView)
     
     private func prepareCSVExport() {
+        NotificationCenter.default.post(name: .exportCSVTriggered, object: nil)
         isLoading = true
         loadingMessage = "正在生成 CSV..."
         let container = modelContext.container

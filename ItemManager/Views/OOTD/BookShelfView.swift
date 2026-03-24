@@ -154,6 +154,7 @@ struct BookShelfView: View {
                 performMigration()
                 // 初始化时同步选中状态
                 isBookSelected = selectedBook != nil
+                NotificationCenter.default.post(name: .ootdShelfOpened, object: nil)
             }
             .onChange(of: selectedBook) { _, newValue in
                 // 同步选中状态到外部

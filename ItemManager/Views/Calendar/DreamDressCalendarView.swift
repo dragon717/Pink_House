@@ -99,6 +99,9 @@ struct DreamDressCalendarView: View {
                     themeManager.setCustomTheme(from: appThemeManager, colorScheme: colorScheme)
                 }
             }
+            .onAppear {
+                NotificationCenter.default.post(name: .dreamDressCalendarOpened, object: nil)
+            }
             .onChange(of: allClothings) { _, _ in
                 Task { await updateData() }
             }

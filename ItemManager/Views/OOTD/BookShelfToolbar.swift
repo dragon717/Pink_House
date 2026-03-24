@@ -29,6 +29,7 @@ struct BookShelfToolbar: ToolbarContent {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 160)
+                .captureGuideTarget(.spaceBookModeTabs)
             }
         }
         

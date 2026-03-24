@@ -44,6 +44,7 @@ struct ObjectCaptureScannerView: View {
             }
         }
         .onAppear {
+            NotificationCenter.default.post(name: .objectCaptureScannerOpened, object: nil)
             checkLowPowerMode()
             setupSession()
         }

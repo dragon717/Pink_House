@@ -110,6 +110,9 @@ struct SpaceBookDetailView: View {
         mainContent
             .id(refreshTrigger)
             .navigationTitle(isBatchEditing ? "已选择 \(selectedPages.count) 项" : book.title)
+            .onAppear {
+                NotificationCenter.default.post(name: .spaceBookDetailOpened, object: nil)
+            }
             .toolbar {
                 if isBatchEditing {
                     batchEditingToolbarContent
@@ -134,6 +137,7 @@ struct SpaceBookDetailView: View {
                     let newPage = SpaceOutfit(note: newPageNote, book: book)
                     newPage.sortIndex = (sortedPages.last?.sortIndex ?? 0) + 1
                     modelContext.insert(newPage)
+                    NotificationCenter.default.post(name: .spaceBookPageCreated, object: newPage.id)
                     
                     // 立即保存到磁盘
                     do {
@@ -424,6 +428,7 @@ struct SpaceBookDetailView: View {
         NavigationLink(value: page) {
             SpaceOutfitCard(page: page, width: itemWidth, height: itemHeight)
         }
+        .captureGuideTarget(sortedPages.first?.id == page.id ? .spaceBookFirstPageCard : nil)
         .contextMenu {
             pageContextMenu(for: page)
         }

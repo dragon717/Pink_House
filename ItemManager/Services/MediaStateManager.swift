@@ -263,6 +263,28 @@ extension Notification.Name {
     static let widgetSettingsOpened = Notification.Name("widgetSettingsOpened")
     // 魔法任务页面 dismiss 通知（用于萌宠智能对话引导）
     static let magicTasksViewDismissed = Notification.Name("magicTasksViewDismissed")
+    static let wardrobeAddMenuOpened = Notification.Name("wardrobeAddMenuOpened")
+    static let wardrobeManualCreateOpened = Notification.Name("wardrobeManualCreateOpened")
+    static let wardrobeBatchImportOpened = Notification.Name("wardrobeBatchImportOpened")
+    static let wardrobeSelectionModeChanged = Notification.Name("wardrobeSelectionModeChanged")
+    static let wardrobeSelectionChanged = Notification.Name("wardrobeSelectionChanged")
+    static let wardrobeSettingsOpened = Notification.Name("wardrobeSettingsOpened")
+    static let systemSettingsOpened = Notification.Name("systemSettingsOpened")
+    static let dataBackupManagementOpened = Notification.Name("dataBackupManagementOpened")
+    static let exportCSVTriggered = Notification.Name("exportCSVTriggered")
+    static let cloudSyncSheetOpened = Notification.Name("cloudSyncSheetOpened")
+    static let magicColorSettingsOpened = Notification.Name("magicColorSettingsOpened")
+    static let magicColorModeChanged = Notification.Name("magicColorModeChanged")
+    static let batchImportViewOpened = Notification.Name("batchImportViewOpened")
+    static let dreamDressCalendarOpened = Notification.Name("dreamDressCalendarOpened")
+    static let ootdShelfOpened = Notification.Name("ootdShelfOpened")
+    static let ootdDefaultBookOpened = Notification.Name("ootdDefaultBookOpened")
+    static let smallWorldQuickMenuOpened = Notification.Name("smallWorldQuickMenuOpened")
+    static let spatialBookShelfOpened = Notification.Name("spatialBookShelfOpened")
+    static let spaceBookDetailOpened = Notification.Name("spaceBookDetailOpened")
+    static let spaceBookPageCreated = Notification.Name("spaceBookPageCreated")
+    static let spatialCanvasEditorOpened = Notification.Name("spatialCanvasEditorOpened")
+    static let objectCaptureScannerOpened = Notification.Name("objectCaptureScannerOpened")
 }
 
 // MARK: - View Modifier

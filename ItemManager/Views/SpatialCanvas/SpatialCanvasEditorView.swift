@@ -158,6 +158,7 @@ struct SpatialCanvasEditorView: View {
                         }
                     }
                 )
+                .captureGuideTarget(.spatialCanvasToolbar)
                 .padding(.leading, 8)
                 .padding(.bottom, 8)
             }
@@ -224,6 +225,7 @@ struct SpatialCanvasEditorView: View {
             }
         }
         .onAppear {
+            NotificationCenter.default.post(name: .spatialCanvasEditorOpened, object: nil)
             loadExistingData()
 
             // 延迟显示
@@ -1532,7 +1534,6 @@ struct ModelCard: View {
 }
 
 // MARK: - 占位视图组件
-
 
 
 

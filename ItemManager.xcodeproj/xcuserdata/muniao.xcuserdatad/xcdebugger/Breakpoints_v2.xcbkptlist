@@ -16,7 +16,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1005"
             endingLineNumber = "1005"
-            landmarkName = "setBrandForSelectedItems(_:)"
+            landmarkName = "batchSetStatus(_:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

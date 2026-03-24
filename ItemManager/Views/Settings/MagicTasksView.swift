@@ -371,6 +371,11 @@ struct MagicTaskDetailView: View {
                     let isExperienceTask = condition.type == UnlockConditionType.manual.rawValue
                     let isUnlocked = manager.isUnlocked(feature)
                     let hasDestination = feature.destination != nil || feature.isSettingsFeature
+                    let experienceGuideStepCount = feature.experienceGuideStepCount
+                    let experienceFishCoinReward = feature.experienceFishCoinReward
+                    let canShowGuide = FeatureUnlockManager.experienceGuidedFeatures.contains(feature) && (
+                        isExperienceTask || isUnlocked || manager.canStartPreUnlockGuide(for: feature)
+                    )
 
                     // 任务状态
                     Section("任务状态") {
@@ -381,12 +386,32 @@ struct MagicTaskDetailView: View {
                             Text(isUnlocked ? "已完成" : "未完成")
                                 .foregroundColor(isUnlocked ? themeManager.accentTextColor : themeManager.secondaryTextColor)
                         }
+
+                        if isExperienceTask,
+                           let reward = experienceFishCoinReward,
+                           let stepCount = experienceGuideStepCount {
+                            HStack {
+                                Text("任务奖励")
+                                    .foregroundColor(themeManager.primaryTextColor)
+                                Spacer()
+                                Text("鱼币 +\(reward)")
+                                    .foregroundColor(themeManager.accentTextColor)
+                            }
+
+                            HStack {
+                                Text("引导步数")
+                                    .foregroundColor(themeManager.primaryTextColor)
+                                Spacer()
+                                Text("\(stepCount) 步")
+                                    .foregroundColor(themeManager.secondaryTextColor)
+                            }
+                        }
                     }
 
                     // 体验型任务：始终显示两个按钮
                     if isExperienceTask {
                         // 新手引导按钮
-                        if FeatureUnlockManager.experienceGuidedFeatures.contains(feature) {
+                        if canShowGuide {
                             Section {
                                 Button {
                                     dismiss()
@@ -457,7 +482,7 @@ struct MagicTaskDetailView: View {
                     // 解锁型任务：根据解锁状态显示不同按钮
                     else if isUnlocked {
                         // 已解锁：显示"新手引导"和"进入功能"
-                        if FeatureUnlockManager.experienceGuidedFeatures.contains(feature) {
+                        if canShowGuide {
                             Section {
                                 Button {
                                     dismiss()
@@ -524,7 +549,31 @@ struct MagicTaskDetailView: View {
                             }
                         }
                     } else {
-                        // 未解锁：显示"了解任务"和"前往体验"
+                        // 未解锁：若支持则显示新手引导，否则显示"了解任务"和"前往体验"
+                        if canShowGuide {
+                            Section {
+                                Button {
+                                    dismiss()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        NotificationCenter.default.post(
+                                            name: .showFirstUseGuide,
+                                            object: nil,
+                                            userInfo: ["feature": feature.rawValue]
+                                        )
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "sparkles")
+                                        Text("新手引导")
+                                            .fontWeight(.medium)
+                                        Spacer()
+                                    }
+                                }
+                                .tint(.pink)
+                            }
+                        }
+
                         Section {
                             Button {
                                 // 展示任务说明/进度信息

@@ -123,6 +123,7 @@ struct MagicColorSettingsView: View {
                 Text(condition.description)
             }
             .onAppear {
+                NotificationCenter.default.post(name: .magicColorSettingsOpened, object: nil)
                 // 优先使用外部指定的初始页签
                 if let tab = initTab {
                     selectedTab = tab
@@ -163,6 +164,7 @@ struct MagicColorSettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .captureGuideTarget(.themeColorModeTabs)
             .onChange(of: selectedTab) { _, newValue in
                 if newValue == .magic && !unlockManager.isUnlocked(.themeCustomize) {
                     // 未解锁时弹窗提示，并切回客制化页签
@@ -171,6 +173,11 @@ struct MagicColorSettingsView: View {
                     showUnlockAlert = true
                 } else {
                     themeManager.switchColorSchemeMode(to: newValue)
+                    NotificationCenter.default.post(
+                        name: .magicColorModeChanged,
+                        object: nil,
+                        userInfo: ["mode": newValue.rawValue]
+                    )
                 }
             }
         }

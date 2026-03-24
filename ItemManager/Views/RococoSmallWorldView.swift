@@ -395,6 +395,9 @@ struct RococoSmallWorldView: View {
                             wealthEntryCaptureAnchor(hotspot: hotspot, imageFrame: imageFrame)
                         } else {
                             hotspotButton(hotspot: hotspot, imageFrame: imageFrame)
+                            if let key = guideTargetKey(for: hotspot.destination) {
+                                genericCaptureAnchor(hotspot: hotspot, imageFrame: imageFrame, key: key)
+                            }
                         }
                     }
                     
@@ -513,6 +516,31 @@ struct RococoSmallWorldView: View {
                 y: imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
             )
             .allowsHitTesting(false)
+    }
+
+    private func genericCaptureAnchor(hotspot: HotspotData, imageFrame: CGRect, key: GuideTargetKey) -> some View {
+        Color.clear
+            .frame(
+                width: max(1, hotspot.rect.width * imageFrame.width),
+                height: max(1, hotspot.rect.height * imageFrame.height)
+            )
+            .captureGuideTarget(key)
+            .position(
+                x: imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width,
+                y: imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
+            )
+            .allowsHitTesting(false)
+    }
+
+    private func guideTargetKey(for destination: SmallWorldDestination?) -> GuideTargetKey? {
+        switch destination {
+        case .ootd:
+            return .ootdEntry
+        case .calendar:
+            return .calendarEntry
+        default:
+            return nil
+        }
     }
 
     private func displayedImageFrame(for imageName: String, in containerSize: CGSize) -> CGRect {

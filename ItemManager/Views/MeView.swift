@@ -133,6 +133,7 @@ struct MeView: View {
                         ) {
                             showingCloudSyncSheet = true
                         }
+                        .captureGuideTarget(.accountSyncEntry)
                         
                         // 梦幻衣橱
                         NavigationLink(destination: WardrobeSettingsView()) {
@@ -144,6 +145,7 @@ struct MeView: View {
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .captureGuideTarget(.wardrobeSettingsEntry)
                         
                         // House
                         NavigationLink(destination: SmallWorldSettingsView()) {
@@ -198,6 +200,7 @@ struct MeView: View {
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .captureGuideTarget(.themeCustomizeEntry)
                         
                         // 常用菜单设置
                         NavigationLink(destination: FavoriteMenuSettingsView()) {
@@ -235,6 +238,7 @@ struct MeView: View {
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .captureGuideTarget(.systemSettingsEntry)
                         
                         // 开发测试 (仅 Debug 或通过兑换码开启)
                         if shouldShowLabEntry {
@@ -266,6 +270,10 @@ struct MeView: View {
                     WidgetSettingsView()
                 case "batchImport":
                     WardrobeSettingsView()
+                case "dataBackup", "localFileBackupRestore", "exportCSV":
+                    SystemSettingsView()
+                case "cloudSync", "cloudFileBackupRestore":
+                    EmptyView()
                 default:
                     EmptyView()
                 }
@@ -301,7 +309,11 @@ struct MeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .navigateToSettingsFeature)) { notification in
                 if let feature = notification.userInfo?["feature"] as? String {
-                    navigationDestination = feature
+                    if feature == "cloudSync" || feature == "cloudFileBackupRestore" {
+                        showingCloudSyncSheet = true
+                    } else {
+                        navigationDestination = feature
+                    }
                 }
             }
             .overlay {
@@ -320,6 +332,15 @@ struct MeView: View {
                 EmptyView()
             }
             NavigationLink(destination: WardrobeSettingsView(), tag: "batchImport", selection: $navigationDestination) {
+                EmptyView()
+            }
+            NavigationLink(destination: SystemSettingsView(), tag: "dataBackup", selection: $navigationDestination) {
+                EmptyView()
+            }
+            NavigationLink(destination: SystemSettingsView(), tag: "localFileBackupRestore", selection: $navigationDestination) {
+                EmptyView()
+            }
+            NavigationLink(destination: SystemSettingsView(), tag: "exportCSV", selection: $navigationDestination) {
                 EmptyView()
             }
         }
@@ -502,6 +523,9 @@ struct CloudSyncSheetView: View {
                 UserProfileEditView(authManager: authManager)
             }
         }
+        .onAppear {
+            NotificationCenter.default.post(name: .cloudSyncSheetOpened, object: nil)
+        }
         .environment(\.modelContext, modelContext) // Inject context
     }
 }
@@ -616,6 +640,7 @@ struct EnhancedUserInfoView: View {
                     .frame(height: 44)
                     .padding(.vertical, 4)
                     .environment(\.locale, Locale(identifier: "zh_CN"))
+                    .captureGuideTarget(.cloudAppleSignInButton)
                 }
                 
                 if let errorMessage = authManager.errorMessage {
@@ -797,6 +822,7 @@ struct CloudSyncControlsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .captureGuideTarget(.iCloudRealtimeSyncSection)
             .onAppear {
                 checkiCloudAccountStatus()
             }
@@ -860,6 +886,7 @@ struct CloudSyncControlsView: View {
                     .disabled(cloudManager.isSyncing || migrationManager.isMigrating)
                 }
             }
+            .captureGuideTarget(.cloudFileBackupSection)
         }
         .padding(.vertical, 8)
         .alert("需要重启应用", isPresented: $showingRestartAlert) {

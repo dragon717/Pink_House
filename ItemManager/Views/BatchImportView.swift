@@ -163,6 +163,9 @@ struct BatchImportView: View {
             .onChange(of: selectedItems) { _, newItems in
                 loadImages(from: newItems)
             }
+            .onAppear {
+                NotificationCenter.default.post(name: .batchImportViewOpened, object: nil)
+            }
         }
     }
     
