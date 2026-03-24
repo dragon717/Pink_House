@@ -54,7 +54,7 @@ struct WealthView: View {
             if clothing.isDepositPlan {
                 return partialResult + (clothing.totalDeposit * Decimal(clothing.stock))
             } else {
-                return partialResult + ((clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock))
+                return partialResult + clothing.inventoryTotalPrice
             }
         }
     }

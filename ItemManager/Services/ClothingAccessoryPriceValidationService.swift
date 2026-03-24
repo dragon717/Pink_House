@@ -1,0 +1,53 @@
+//
+//  ClothingAccessoryPriceValidationService.swift
+//  ItemManager
+//
+//  开屏时校验自定义小物总价，避免旧数据或历史逻辑导致 accessoriesPrice 漂移
+//
+
+import Foundation
+import SwiftData
+
+@MainActor
+final class ClothingAccessoryPriceValidationService {
+    static let shared = ClothingAccessoryPriceValidationService()
+
+    private init() {}
+
+    func validateIfNeeded(modelContainer: ModelContainer) async {
+        print("[AccessoryPriceValidation] 开始校验自定义小物总价...")
+
+        let context = modelContainer.mainContext
+
+        do {
+            let descriptor = FetchDescriptor<Clothing>(
+                predicate: #Predicate<Clothing> { $0.deletedAt == nil }
+            )
+            let clothings = try context.fetch(descriptor)
+
+            var fixedCount = 0
+
+            for clothing in clothings {
+                guard let accessoryItems = clothing.accessoryItems, !accessoryItems.isEmpty else {
+                    continue
+                }
+
+                let recalculatedTotal = accessoryItems.reduce(Decimal(0)) { $0 + $1.price }
+                guard clothing.accessoriesPrice != recalculatedTotal else { continue }
+
+                clothing.accessoriesPrice = recalculatedTotal
+                fixedCount += 1
+                print("[AccessoryPriceValidation] 已修正 \(clothing.name) 的小物总价为 \(NSDecimalNumber(decimal: recalculatedTotal).stringValue)")
+            }
+
+            if fixedCount > 0 {
+                try context.save()
+                print("[AccessoryPriceValidation] 校验完成，已修正 \(fixedCount) 条数据")
+            } else {
+                print("[AccessoryPriceValidation] 无需修正")
+            }
+        } catch {
+            print("[AccessoryPriceValidation] 校验失败: \(error)")
+        }
+    }
+}

@@ -31,11 +31,11 @@ class WardrobeContextManager {
 
         // 1. 基础统计
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
 
         // 2. 最贵单品 (包含小物)
-        let mostExpensiveItem = clothings.max(by: { ($0.price + $0.accessoriesPrice) < ($1.price + $1.accessoriesPrice) })
-        let mostExpensivePrice = mostExpensiveItem.map { $0.price + $0.accessoriesPrice } ?? 0
+        let mostExpensiveItem = clothings.max(by: { $0.inventoryTotalPrice < $1.inventoryTotalPrice })
+        let mostExpensivePrice = mostExpensiveItem.map(\.inventoryTotalPrice) ?? 0
 
         // 3. 心愿尾款统计
         let depositPlans = clothings.filter { $0.isDepositPlan }
@@ -441,8 +441,8 @@ class WardrobeContextManager {
         价格：¥\(NSDecimalNumber(decimal: clothing.price).stringValue)
         """
         
-        if clothing.accessoriesPrice > 0 {
-            detail += "\n小物总价：¥\(NSDecimalNumber(decimal: clothing.accessoriesPrice).stringValue)"
+        if clothing.resolvedAccessoriesPrice > 0 {
+            detail += "\n小物总价：¥\(NSDecimalNumber(decimal: clothing.resolvedAccessoriesPrice).stringValue)"
         }
         
         if !clothing.types.isEmpty {

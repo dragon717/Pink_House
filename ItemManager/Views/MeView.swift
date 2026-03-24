@@ -212,6 +212,7 @@ struct MeView: View {
                         
                         // 小组件
                         WidgetSettingsCard()
+                            .captureGuideTarget(.widgetCustomizeEntry)
                         
                         // 回收站
                         NavigationLink(destination: RecycleBinView()) {

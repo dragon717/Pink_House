@@ -10,6 +10,7 @@ description: "魔法任务引导（含跨页面高亮）实现技能。Invoke wh
 - 魔法任务某个“新手引导”步骤被自动跳过
 - 高亮框与真实 UI 控件位置/大小不一致
 - 引导跨页面（例如「我」页 -> VIP 中心）需要持续定位目标控件
+- House 场景热区（如“马上来财”）出现“可穿透但难点中”
 - 需要最小改动修复引导流程，不想重构整套系统
 
 ---
@@ -20,7 +21,8 @@ description: "魔法任务引导（含跨页面高亮）实现技能。Invoke wh
 2. **高亮锚点真实化**：优先采集真实控件 frame，而非硬编码 `CGRect`。  
 3. **坐标转换标准化**：统一使用 global -> overlay local 转换。  
 4. **兜底可用性**：保留 fallback frame，保证引导不“黑屏失效”。  
-5. **临时状态清理**：开始/结束/取消引导时清空目标 frame。  
+5. **点击命中优先级**：先保证“能点中”，再追求像素级视觉精准。  
+6. **临时状态清理**：开始/结束/取消引导时清空目标 frame。  
 
 ---
 
@@ -34,7 +36,7 @@ description: "魔法任务引导（含跨页面高亮）实现技能。Invoke wh
 
 ### Step 2：接入目标控件 frame 采集
 
-- 在目标页面给关键控件挂 `captureGlobalFrame`
+- 在目标页面给关键控件挂 `captureGuideTarget`（旧代码可继续用 `captureGlobalFrame`）
 - 只在 `width/height > 0` 时更新 frame
 - 把 frame 存进引导 manager（按业务语义命名）
 
@@ -46,12 +48,21 @@ description: "魔法任务引导（含跨页面高亮）实现技能。Invoke wh
   - `localY = global.minY - overlayGlobalOrigin.y`
 - 高亮与挖空使用同一 frame，避免视觉错位
 
-### Step 4：做视觉微调参数
+### Step 4：热区场景专用处理（House/小热点）
+
+- 对小热区使用“交互层 + 采集层”双层：
+  - 交互层：真实点击按钮（可做适度命中区扩展）
+  - 采集层：`Color.clear` + `.allowsHitTesting(false)`，只负责 frame 采集
+- 若扩展了点击命中区，**必须同步扩展采集区**，否则用户会看到“高亮与可点区不一致”。
+- 若用户说“点不进去”，优先检查命中框尺寸，再检查遮罩穿透。
+
+### Step 5：做视觉微调参数
 
 - 为每个步骤预留 `offset`（如 `dy = +10`）
 - 用小常量调焦点，不改业务布局
+- 圈和猫爪共用同一锚点偏移，避免“一个准一个不准”
 
-### Step 5：回归验证
+### Step 6：回归验证
 
 - 未解锁/已解锁两种卡片尺寸
 - 小屏/大屏
@@ -119,6 +130,24 @@ if currentStep == .step1,
 }
 ```
 
+### 4) 小热区“双层”模板（命中 + 采集）
+
+```swift
+// 交互层（可适度扩点击范围）
+Button(action: onTap) {
+    Color.black.opacity(0.001).contentShape(Rectangle())
+}
+.frame(width: expandedWidth, height: expandedHeight)
+.position(x: targetX, y: targetY)
+
+// 采集层（不拦截点击）
+Color.clear
+    .frame(width: expandedWidth, height: expandedHeight)
+    .captureGuideTarget(.wealthEntry)
+    .position(x: targetX, y: targetY)
+    .allowsHitTesting(false)
+```
+
 ---
 
 ## 常见坑位
@@ -128,6 +157,8 @@ if currentStep == .step1,
 3. 忘记坐标系转换，导致偏移。  
 4. 未重置上一次 frame，导致“幽灵高亮”。  
 5. 高亮层拦截点击，业务按钮点不到。  
+6. 热区很小但未扩命中区，表现为“偶尔点中、第一下难进”。  
+7. 给 `some View` 函数新增局部变量后忘记 `return`，导致编译报 opaque return type。  
 
 ---
 
@@ -141,6 +172,12 @@ if currentStep == .step1,
 - `GuideTargetCaptureModifier(key:)`
 - `GuideOverlayResolver`：统一做坐标转换 + fallback
 
+### 方案 A+（当前建议）
+
+- `GuideTargetKey` 统一命名（如 `aiAnalysisVIPCard`, `wealthEntry`, `wealthMainTabSegment`）
+- `GuideTargetCaptureModifier` 统一采集
+- `GuideTargetStore` 统一清理（start/complete/dismiss 全覆盖）
+
 ### 方案 B（再下一步）
 
 - `GuideStepDefinition` 配置化
@@ -151,5 +188,26 @@ if currentStep == .step1,
 ## 关联文档
 
 - `docs/MAGIC_TASK_GUIDE_BEST_PRACTICES.md`
+- `docs/MAGIC_TASK_GUIDE_TEST_MATRIX.md`
 - `docs/HOTSPOT_INTERACTION_FIX_SUMMARY.md`
 
+---
+
+## Wealth 专项速查（新增）
+
+### 目标流程（必须）
+
+`House tab -> 马上来财 -> 请签 -> 数钱 -> 安财`
+
+### 关键通知（建议）
+
+- `.homeTabChanged`
+- `.wealthDestinationOpened`
+- `.wealthViewOpened`
+- `.wealthMainTabChanged`
+- `.wealthGuideSwitchMainTab`
+
+### 风险最高的两个点
+
+1. 启动时自动跳到萌宠页（应去掉，保留用户点击 House）。
+2. 热区高亮很准但命中太小（应先提升命中率，再做视觉微调）。

@@ -148,6 +148,23 @@ final class Clothing {
     }
     
     // Computed Properties for Total Calculation
+    // 自定义小物总价：若存在明细，则以明细实时汇总为准；否则回退到存储字段
+    var resolvedAccessoriesPrice: Decimal {
+        let items = accessoryItems ?? []
+        guard !items.isEmpty else { return accessoriesPrice }
+        return items.reduce(Decimal(0)) { $0 + $1.price }
+    }
+
+    // 单套总价（含自定义小物）
+    var unitTotalPrice: Decimal {
+        price + resolvedAccessoriesPrice
+    }
+
+    // 全部持有总价：裙装价格按库存累加，自定义小物总价只计算一次
+    var inventoryTotalPrice: Decimal {
+        (price * Decimal(stock)) + resolvedAccessoriesPrice
+    }
+
     // 总定金 = (裙装定金 + 小物定金总和) * 库存数量
     var totalDeposit: Decimal {
         let accDeposit = accessoryItems?.reduce(Decimal(0)) { $0 + $1.deposit } ?? 0

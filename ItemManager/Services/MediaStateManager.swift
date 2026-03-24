@@ -257,6 +257,10 @@ extension Notification.Name {
     static let wealthMainTabChanged = Notification.Name("wealthMainTabChanged")
     // 新手引导驱动来财页签切换
     static let wealthGuideSwitchMainTab = Notification.Name("wealthGuideSwitchMainTab")
+    // 请求关闭魔法任务页面
+    static let dismissMagicTasksView = Notification.Name("dismissMagicTasksView")
+    // 小组件设置页打开通知（用于新手引导）
+    static let widgetSettingsOpened = Notification.Name("widgetSettingsOpened")
     // 魔法任务页面 dismiss 通知（用于萌宠智能对话引导）
     static let magicTasksViewDismissed = Notification.Name("magicTasksViewDismissed")
 }

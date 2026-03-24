@@ -55,4 +55,17 @@ final class ClothingAccessoryTests: XCTestCase {
             XCTAssertEqual(acc.price, 100.0)
         }
     }
+
+    func testResolvedAccessoriesPricePrefersAccessoryItemsSum() throws {
+        let clothing = Clothing(name: "Berry JSK", price: 500.0, accessoriesPrice: 10.0, stock: 2)
+        let acc1 = AccessoryItem(name: "KC", price: 80.0, sortIndex: 0)
+        let acc2 = AccessoryItem(name: "袜子", price: 20.0, sortIndex: 1)
+
+        clothing.accessoryItems = [acc1, acc2]
+        context.insert(clothing)
+
+        XCTAssertEqual(clothing.resolvedAccessoriesPrice, 100.0)
+        XCTAssertEqual(clothing.unitTotalPrice, 600.0)
+        XCTAssertEqual(clothing.inventoryTotalPrice, 1100.0)
+    }
 }

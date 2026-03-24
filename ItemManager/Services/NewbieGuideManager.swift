@@ -71,6 +71,7 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     case aiAnalysisExchangeButton = "aiAnalysis.exchangeButton"
     case wealthEntry = "wealth.entry"
     case wealthMainTabSegment = "wealth.mainTab.segment"
+    case widgetCustomizeEntry = "widgetCustomize.entry"
 }
 
 // MARK: - 功能体验引导状态管理
@@ -82,6 +83,7 @@ extension FeatureUnlockManager {
         .cloudSync,       // iCloud同步
         .batchImport,     // 批量导入
         .themeCustomize,  // 魔法配色
+        .widgetCustomize, // 小组件定制
         .filterClassic,   // 筛选偏好
         .spaceBook,       // 空间手帐
         .batchEdit,       // 批量编辑
@@ -139,6 +141,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     @Published var isShowingFeatureExperienceGuide: Bool = false
     @Published var currentFeatureExperienceFeature: FeatureItem? = nil
     @Published private var guideTargetFrames: [GuideTargetKey: CGRect] = [:]
+    @Published private(set) var lastKnownHomeTab: String = "wardrobe"
     
     // 向后兼容：保留已使用字段名，内部改为统一存储
     var aiAnalysisVIPCardGlobalFrame: CGRect? {
@@ -147,6 +150,10 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     
     var aiAnalysisExchangeButtonGlobalFrame: CGRect? {
         guideTargetFrames[.aiAnalysisExchangeButton]
+    }
+
+    var widgetCustomizeEntryGlobalFrame: CGRect? {
+        guideTargetFrames[.widgetCustomizeEntry]
     }
     
     // MARK: - 配置
@@ -191,6 +198,14 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     
     private init() {
         loadState()
+        NotificationCenter.default.addObserver(
+            forName: .homeTabChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let tab = notification.userInfo?["tab"] as? String else { return }
+            self?.lastKnownHomeTab = tab
+        }
     }
     
     // MARK: - 状态管理
@@ -282,7 +297,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         }
 
         print("[FeatureExperienceGuide] 启动引导成功: \(feature.rawValue)")
-        resetAIAnalysisGuideTargetFrames()
+        resetFeatureGuideTargetFrames()
         currentFeatureExperienceFeature = feature
         isShowingFeatureExperienceGuide = true
     }
@@ -299,14 +314,14 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         }
         isShowingFeatureExperienceGuide = false
         currentFeatureExperienceFeature = nil
-        resetAIAnalysisGuideTargetFrames()
+        resetFeatureGuideTargetFrames()
     }
 
     /// 关闭功能体验引导（不标记为完成）
     func dismissFeatureExperienceGuide() {
         isShowingFeatureExperienceGuide = false
         currentFeatureExperienceFeature = nil
-        resetAIAnalysisGuideTargetFrames()
+        resetFeatureGuideTargetFrames()
     }
 
     // MARK: - 萌宠智能对话引导目标位置信息
@@ -339,12 +354,13 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         updateGuideTargetFrame(frame, for: .aiAnalysisExchangeButton)
     }
 
-    private func resetAIAnalysisGuideTargetFrames() {
+    private func resetFeatureGuideTargetFrames() {
         resetGuideTargetFrames([
             .aiAnalysisVIPCard,
             .aiAnalysisExchangeButton,
             .wealthEntry,
-            .wealthMainTabSegment
+            .wealthMainTabSegment,
+            .widgetCustomizeEntry
         ])
     }
 
@@ -1060,6 +1076,46 @@ enum AIAnalysisGuideStep: Int, CaseIterable {
     }
 }
 
+// MARK: - 小组件定制引导步骤
+
+enum WidgetCustomizeGuideStep: Int, CaseIterable {
+    case step1_returnToMe = 1
+    case step2_scrollToWidget = 2
+    case step3_clickWidgetEntry = 3
+    case step4_widgetExplanation = 4
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_scrollToWidget: return "下滑找到小组件"
+        case .step3_clickWidgetEntry: return "点击小组件豆腐块"
+        case .step4_widgetExplanation: return "认识小组件设置"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe:
+            return "先返回到「我」界面，我们带你找到小组件入口。"
+        case .step2_scrollToWidget:
+            return "请继续向下滑动，在下方的设置豆腐块区域里找到「小组件」入口。"
+        case .step3_clickWidgetEntry:
+            return "点击「小组件」豆腐块，进入小组件背景和教程页面。"
+        case .step4_widgetExplanation:
+            return "这里可以分别设置小、中、大组件背景，也能查看桌面添加教程。看完后就可以去主屏幕添加你的小组件啦。"
+        }
+    }
+
+    var showCatPaw: Bool {
+        switch self {
+        case .step1_returnToMe, .step3_clickWidgetEntry:
+            return true
+        case .step2_scrollToWidget, .step4_widgetExplanation:
+            return false
+        }
+    }
+}
+
 // MARK: - 来财引导步骤
 
 enum WealthGuideStep: Int, CaseIterable {
@@ -1117,6 +1173,7 @@ struct FeatureExperienceGuideOverlay: View {
     
     // 跨页面引导专用状态
     @State private var aiAnalysisStep: AIAnalysisGuideStep = .step1_returnToMe
+    @State private var widgetCustomizeStep: WidgetCustomizeGuideStep = .step1_returnToMe
     @State private var wealthGuideStep: WealthGuideStep = .step1_clickHouseTab
     @State private var currentTab: String = "wardrobe"
 
@@ -1137,6 +1194,7 @@ struct FeatureExperienceGuideOverlay: View {
         .zIndex(1000)
         .onAppear {
             print("[FeatureExperienceGuide] onAppear, feature: \(guideManager.currentFeatureExperienceFeature?.rawValue ?? "nil")")
+            currentTab = guideManager.lastKnownHomeTab
             resetGuideStepState()
         }
         .onReceive(NotificationCenter.default.publisher(for: .homeTabChanged)) { notification in
@@ -1152,6 +1210,12 @@ struct FeatureExperienceGuideOverlay: View {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     aiAnalysisStep = .step2_clickVIP
                 }
+            }
+
+            if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
+               widgetCustomizeStep == .step1_returnToMe,
+               tab == "me" {
+                advanceWidgetGuideFromReturnStep()
             }
 
             // wealth: step1 -> step2（进入 House）
@@ -1172,6 +1236,20 @@ struct FeatureExperienceGuideOverlay: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .widgetSettingsOpened)) { _ in
+            if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
+               widgetCustomizeStep.rawValue < WidgetCustomizeGuideStep.step4_widgetExplanation.rawValue {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    widgetCustomizeStep = .step4_widgetExplanation
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .magicTasksViewDismissed)) { _ in
+            if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
+               widgetCustomizeStep == .step1_returnToMe {
+                advanceWidgetGuideFromReturnStep()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .wealthDestinationOpened)) { _ in
             advanceWealthToMainTabGuideIfNeeded()
         }
@@ -1182,7 +1260,7 @@ struct FeatureExperienceGuideOverlay: View {
             guard let tab = notification.userInfo?["tab"] as? String else { return }
             handleWealthMainTabChanged(tab)
         }
-        .onChange(of: guideManager.aiAnalysisVIPCardGlobalFrame) { vipCardFrame in
+        .onChange(of: guideManager.aiAnalysisVIPCardGlobalFrame) { _, vipCardFrame in
             // step1 -> step2：只有当用户真的回到「我」页并拿到 VIP 卡片真实位置后才前进
             if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
                aiAnalysisStep == .step1_returnToMe,
@@ -1193,7 +1271,16 @@ struct FeatureExperienceGuideOverlay: View {
                 }
             }
         }
-        .onChange(of: guideManager.guideTargetFrame(for: .wealthMainTabSegment)) { segmentFrame in
+        .onChange(of: guideManager.widgetCustomizeEntryGlobalFrame) { _, widgetEntryFrame in
+            if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
+               widgetCustomizeStep.rawValue <= WidgetCustomizeGuideStep.step2_scrollToWidget.rawValue,
+               widgetEntryFrame != nil {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    widgetCustomizeStep = .step3_clickWidgetEntry
+                }
+            }
+        }
+        .onChange(of: guideManager.guideTargetFrame(for: .wealthMainTabSegment)) { _, segmentFrame in
             // wealth: step2 -> step3（已进入来财，且拿到主页签真实位置）
             if guideManager.currentFeatureExperienceFeature == .wealth,
                wealthGuideStep == .step2_clickWealthEntry,
@@ -1203,7 +1290,7 @@ struct FeatureExperienceGuideOverlay: View {
                 }
             }
         }
-        .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _ in
+        .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
             resetGuideStepState()
         }
     }
@@ -1219,6 +1306,8 @@ struct FeatureExperienceGuideOverlay: View {
             batchImportGuideContent
         case .themeCustomize:
             themeGuideContent
+        case .widgetCustomize:
+            widgetCustomizeGuideContent
         case .filterClassic:
             filterClassicGuideContent
         case .spaceBook:
@@ -1243,6 +1332,12 @@ struct FeatureExperienceGuideOverlay: View {
         switch feature {
         case .aiAnalysis:
             aiAnalysisStep = .step1_returnToMe
+            if guideManager.lastKnownHomeTab == "me",
+               guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
+                aiAnalysisStep = .step2_clickVIP
+            }
+        case .widgetCustomize:
+            widgetCustomizeStep = .step1_returnToMe
         case .wealth:
             wealthGuideStep = .step1_clickHouseTab
             // 兜底：如果当前已经在 House / 来财页面，则直接推进到对应步骤
@@ -1263,6 +1358,39 @@ struct FeatureExperienceGuideOverlay: View {
 
         withAnimation(.easeInOut(duration: 0.3)) {
             wealthGuideStep = .step3_divination
+        }
+    }
+
+    private func advanceWidgetGuideFromReturnStep() {
+        guard guideManager.currentFeatureExperienceFeature == .widgetCustomize else { return }
+        guard widgetCustomizeStep == .step1_returnToMe else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            widgetCustomizeStep = .step2_scrollToWidget
+        }
+
+        if guideManager.guideTargetFrame(for: .widgetCustomizeEntry) != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                guard guideManager.currentFeatureExperienceFeature == .widgetCustomize,
+                      widgetCustomizeStep == .step2_scrollToWidget else { return }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    widgetCustomizeStep = .step3_clickWidgetEntry
+                }
+            }
+        }
+    }
+
+    private func handleWidgetGuideReturnAction() {
+        guard guideManager.currentFeatureExperienceFeature == .widgetCustomize else { return }
+        guard widgetCustomizeStep == .step1_returnToMe else { return }
+
+        NotificationCenter.default.post(name: .dismissMagicTasksView, object: nil)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard guideManager.currentFeatureExperienceFeature == .widgetCustomize,
+                  widgetCustomizeStep == .step1_returnToMe,
+                  guideManager.lastKnownHomeTab == "me" else { return }
+            advanceWidgetGuideFromReturnStep()
         }
     }
 
@@ -2115,6 +2243,183 @@ struct FeatureExperienceGuideOverlay: View {
         )
     }
 
+    // MARK: - 小组件定制引导（三步骤）
+
+    private var widgetCustomizeGuideContent: some View {
+        GeometryReader { geometry in
+            ZStack {
+                switch widgetCustomizeStep {
+                case .step1_returnToMe:
+                    widgetStep1Content(in: geometry)
+                case .step2_scrollToWidget:
+                    widgetStep2Content
+                case .step3_clickWidgetEntry:
+                    widgetStep3Content(in: geometry)
+                case .step4_widgetExplanation:
+                    widgetStep4Content
+                }
+            }
+        }
+    }
+
+    private func widgetStep1Content(in geometry: GeometryProxy) -> some View {
+        let backButtonFrame = CGRect(
+            x: 16,
+            y: 8,
+            width: 44,
+            height: 44
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: backButtonFrame,
+                highlightType: .circle,
+                cornerRadius: 22
+            )
+
+            HighlightPulseViewNoClick(
+                center: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
+                radius: 28
+            )
+
+            if widgetCustomizeStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
+                    delay: 0.5
+                )
+            }
+
+            if guideManager.lastKnownHomeTab == "me" {
+                Button {
+                    handleWidgetGuideReturnAction()
+                } label: {
+                    Circle()
+                        .fill(Color.white.opacity(0.001))
+                        .frame(width: 72, height: 72)
+                }
+                .position(x: backButtonFrame.midX, y: backButtonFrame.midY)
+            }
+
+            VStack {
+                Spacer()
+
+                widgetCustomizeBubble(
+                    step: widgetCustomizeStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    private var widgetStep2Content: some View {
+        ZStack {
+            WidgetScrollHintView()
+            .allowsHitTesting(false)
+
+            VStack {
+                Spacer()
+
+                widgetCustomizeBubble(
+                    step: widgetCustomizeStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    private func widgetStep3Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackWidgetFrame = CGRect(
+            x: 16,
+            y: screenBounds.height * 0.58,
+            width: (screenBounds.width - 48) / 2,
+            height: 92
+        )
+        let widgetEntryFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .widgetCustomizeEntry),
+            in: geometry,
+            fallback: fallbackWidgetFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: widgetEntryFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 16
+            )
+
+            RoundedRectHighlightView(
+                frame: widgetEntryFrame,
+                cornerRadius: 16
+            )
+            .allowsHitTesting(false)
+
+            if widgetCustomizeStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: widgetEntryFrame.midX, y: widgetEntryFrame.midY),
+                    delay: 0.5
+                )
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                widgetCustomizeBubble(
+                    step: widgetCustomizeStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.top, 110)
+
+                Spacer()
+            }
+        }
+    }
+
+    private var widgetStep4Content: some View {
+        VStack {
+            Spacer()
+
+            widgetCustomizeBubble(
+                step: widgetCustomizeStep,
+                onSkip: {
+                    guideManager.dismissFeatureExperienceGuide()
+                },
+                onComplete: {
+                    guideManager.completeFeatureExperienceGuide()
+                }
+            )
+            .padding(.bottom, 120)
+        }
+    }
+
+    private func widgetCustomizeBubble(
+        step: WidgetCustomizeGuideStep,
+        onSkip: @escaping () -> Void,
+        onComplete: @escaping () -> Void
+    ) -> some View {
+        WidgetCustomizeGuideBubbleView(
+            step: step,
+            onSkip: onSkip,
+            onComplete: onComplete
+        )
+    }
+
     // MARK: - 萌宠智能对话引导（三步骤）
 
     private var aiAnalysisGuideContent: some View {
@@ -2138,7 +2443,6 @@ struct FeatureExperienceGuideOverlay: View {
 
     // 步骤1：返回「我」界面
     private func step1Content(in geometry: GeometryProxy) -> some View {
-        let screenBounds = geometry.size
         // 返回按钮位置（左上角导航栏区域）
         let backButtonFrame = CGRect(
             x: 16,
@@ -2426,6 +2730,150 @@ struct AIAnalysisGuideBubbleView: View {
                 
                 // 完成按钮（仅在最后一步显示）
                 if step == .step3_exchange {
+                    Button {
+                        onComplete()
+                    } label: {
+                        Text("知道了")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [magicPalette.accent, magicPalette.accent.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.top, 8)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(magicPalette.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(magicPalette.quickOptionStroke, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 320)
+        .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - 小组件定制引导气泡视图
+
+struct WidgetScrollHintView: View {
+    @State private var animateHint = false
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Spacer()
+
+            VStack(spacing: 10) {
+                Text("请向下滑动")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.white)
+
+                Text("小组件入口在更下方的豆腐块区域")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+            )
+
+            VStack(spacing: 8) {
+                Image(systemName: "hand.draw.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white)
+                    .offset(y: animateHint ? 18 : -4)
+
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.white.opacity(0.98))
+                    .scaleEffect(animateHint ? 1.08 : 0.94)
+                    .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 8)
+                    .offset(y: animateHint ? 14 : 0)
+            }
+            .opacity(0.98)
+
+            Spacer()
+        }
+        .padding(.bottom, 180)
+        .onAppear {
+            guard !animateHint else { return }
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                animateHint = true
+            }
+        }
+    }
+}
+
+struct WidgetCustomizeGuideBubbleView: View {
+    let step: WidgetCustomizeGuideStep
+    let onSkip: () -> Void
+    let onComplete: () -> Void
+
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button {
+                    onSkip()
+                } label: {
+                    Text("跳过")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+
+            VStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    ForEach(WidgetCustomizeGuideStep.allCases, id: \.rawValue) { current in
+                        Circle()
+                            .fill(current.rawValue <= step.rawValue ? magicPalette.accent : Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+
+                Text(step.title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                Text(step.message)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 8)
+
+                if step == .step4_widgetExplanation {
                     Button {
                         onComplete()
                     } label: {

@@ -1061,9 +1061,8 @@ struct WardrobeView: View {
         }
         targetClothing.accessoryItems?.append(contentsOf: newAccessoryItems)
         
-        // 更新目标裙装的自定义小物总价
-        let totalAccessoryPrice = newAccessoryItems.reduce(Decimal(0)) { $0 + $1.price }
-        targetClothing.accessoriesPrice += totalAccessoryPrice
+        // 重新计算目标裙装的自定义小物总价，避免历史值累加漂移
+        targetClothing.accessoriesPrice = targetClothing.resolvedAccessoriesPrice
         
         // 保存更改
         do {
@@ -1332,7 +1331,7 @@ struct WardrobeStatsView: View {
     }
 
     var totalValue: Decimal {
-        clothings.reduce(0) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
+        clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
     }
 
     // 将Decimal格式化为整数（个位精度）的字符串

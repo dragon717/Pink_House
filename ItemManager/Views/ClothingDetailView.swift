@@ -266,7 +266,7 @@ struct ClothingDetailView: View {
         
         // Calculate total price if currently 0
         if clothing.price == 0 {
-            clothing.price = clothing.deposit + clothing.balance + clothing.accessoriesPrice
+            clothing.price = clothing.deposit + clothing.balance
         }
         
         clothing.isDepositPlan = false
@@ -704,8 +704,7 @@ struct ClothingDetailView: View {
                     .unifiedSecondary()
                 Spacer()
                 
-                let totalUnit = clothing.price + clothing.accessoriesPrice
-                let totalAll = totalUnit * Decimal(clothing.stock)
+                let totalAll = clothing.inventoryTotalPrice
                 
                 Text("¥\(totalAll.formatted(.number.precision(.fractionLength(0))))")
                     .font(.title3)
@@ -717,7 +716,7 @@ struct ClothingDetailView: View {
             .cornerRadius(12)
             
             if clothing.stock > 1 {
-                Text("包含 \(clothing.stock) 件库存，单套价值 ¥\((clothing.price + clothing.accessoriesPrice).formatted(.number.precision(.fractionLength(0))))")
+                Text("包含 \(clothing.stock) 件库存，单套价值 ¥\(clothing.unitTotalPrice.formatted(.number.precision(.fractionLength(0))))")
                     .font(.caption)
                     .unifiedTertiary()
                     .padding(.horizontal, 4)

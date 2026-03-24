@@ -202,6 +202,7 @@ struct WidgetSettingsView: View {
             }
         }
         .onAppear {
+            NotificationCenter.default.post(name: .widgetSettingsOpened, object: nil)
             loadCurrentStatus()
         }
         .alert("提示", isPresented: $showingAlert) {

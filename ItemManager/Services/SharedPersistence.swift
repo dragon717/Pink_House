@@ -190,7 +190,7 @@ class SharedContainer {
             // 2. Calculate Stats
             let totalCount = clothings.reduce(0) { $0 + $1.stock }
             let totalStyleCount = clothings.count
-            let totalPrice = clothings.reduce(0) { $0 + ($1.price * Decimal($1.stock)) }
+            let totalPrice = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
             
             // Calculate Deposit and Balance for active plans
             // Note: App default view filters by current year. Widget should match this to be less confusing.
@@ -220,7 +220,7 @@ class SharedContainer {
                 ClothingWidgetDataDTO(
                     id: clothing.id,
                     name: clothing.name,
-                    price: clothing.price,
+                    price: clothing.unitTotalPrice,
                     stock: clothing.stock,
                     imagePath: clothing.imagePaths.first
                 )

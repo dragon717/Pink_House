@@ -118,6 +118,12 @@ struct MagicTasksView: View {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .dismissMagicTasksView)) { _ in
+                dismiss()
+            }
+            .onDisappear {
+                NotificationCenter.default.post(name: .magicTasksViewDismissed, object: nil)
+            }
         }
     }
 }

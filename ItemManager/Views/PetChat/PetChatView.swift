@@ -526,7 +526,7 @@ struct PetChatBubble: View {
                                 .foregroundStyle(themeManager.secondaryTextColor)
                         }
                         
-                        Text("¥\(NSDecimalNumber(decimal: clothing.price + clothing.accessoriesPrice).stringValue)")
+                        Text("¥\(NSDecimalNumber(decimal: clothing.unitTotalPrice).stringValue)")
                             .font(.caption)
                             .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
                     }
@@ -1559,8 +1559,8 @@ struct PetChatView: View {
         
         // 计算统计数据
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
-        let mostExpensiveItem = clothings.max(by: { ($0.price + $0.accessoriesPrice) < ($1.price + $1.accessoriesPrice) })
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let mostExpensiveItem = clothings.max(by: { $0.inventoryTotalPrice < $1.inventoryTotalPrice })
         let depositPlans = clothings.filter { $0.isDepositPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
@@ -1682,7 +1682,7 @@ struct PetChatView: View {
         
         // 计算完整的衣橱统计数据
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
         let depositPlans = clothings.filter { $0.isDepositPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
@@ -2614,8 +2614,8 @@ struct PetChatViewLegacy: View {
         isThinking = true
 
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
-        let mostExpensiveItem = clothings.max(by: { ($0.price + $0.accessoriesPrice) < ($1.price + $1.accessoriesPrice) })
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let mostExpensiveItem = clothings.max(by: { $0.inventoryTotalPrice < $1.inventoryTotalPrice })
         let depositPlans = clothings.filter { $0.isDepositPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
@@ -2731,7 +2731,7 @@ struct PetChatViewLegacy: View {
         
         // 计算完整的衣橱统计数据
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
-        let totalValue = clothings.reduce(Decimal(0)) { $0 + (($1.price + $1.accessoriesPrice) * Decimal($1.stock)) }
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
         let depositPlans = clothings.filter { $0.isDepositPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }

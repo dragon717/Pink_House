@@ -128,9 +128,9 @@ final class PetConversationMemoryStore {
         guard !clothings.isEmpty else { return }
         let selected = Array(clothings.prefix(3))
         let details = selected.map { item in
-            "\(item.name)(¥\(priceText(item.price + item.accessoriesPrice)))"
+            "\(item.name)(¥\(priceText(item.unitTotalPrice)))"
         }.joined(separator: "、")
-        let total = selected.reduce(Decimal(0)) { $0 + $1.price + $1.accessoriesPrice }
+        let total = selected.reduce(Decimal(0)) { $0 + $1.unitTotalPrice }
         let snapshot = "最近搭配：\(details)；合计¥\(priceText(total))"
         append([PetMemoryEntry(kind: .outfitSnapshot, content: snapshot)], for: role)
     }

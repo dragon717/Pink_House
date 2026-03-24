@@ -187,7 +187,7 @@ struct ClothingCard: View, Equatable {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                         } else {
-                            let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                            let totalWithAccessories = clothing.inventoryTotalPrice
                             Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(palette.primary)
@@ -461,7 +461,7 @@ struct ClothingRow: View {
                                 .bold()
                                 .foregroundStyle(palette.accent)
                         } else {
-                            let totalWithAccessories = (clothing.price + clothing.accessoriesPrice) * Decimal(clothing.stock)
+                            let totalWithAccessories = clothing.inventoryTotalPrice
                             
                             Text("合计: ¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
                                 .font(.subheadline)
@@ -578,11 +578,8 @@ struct ClothingRowBrief: View {
                                 .foregroundStyle(palette.accent)
                         }
                     } else {
-                        if let price = safeGetProperty({ clothing.price }),
-                           let accessoriesPrice = safeGetProperty({ clothing.accessoriesPrice }),
-                           let stock = safeGetProperty({ clothing.stock }) {
-                            let totalWithAccessories = (price + accessoriesPrice) * Decimal(stock)
-                            Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(0)))")
+                        if let inventoryTotalPrice = safeGetProperty({ clothing.inventoryTotalPrice }) {
+                            Text("¥\(inventoryTotalPrice, format: .number.precision(.fractionLength(0)))")
                                 .font(.subheadline)
                                 .bold()
                                 .foregroundStyle(palette.primary)

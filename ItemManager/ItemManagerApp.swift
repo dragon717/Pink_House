@@ -192,6 +192,11 @@ struct MainContentView: View {
                 // 0.9 OOTD 坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
                 await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
 
+                // 0.95 校验自定义小物总价，确保开屏后的总价统计包含正确的小物金额
+                await ClothingAccessoryPriceValidationService.shared.validateIfNeeded(
+                    modelContainer: SharedPersistence.shared.sharedModelContainer
+                )
+
                 // 0.10 并行预加载每日打卡数据（问候语 + 穿搭色）
                 // 使用 TaskGroup 实现并行加载，减少开屏等待时间
                 await withTaskGroup(of: Void.self) { group in
