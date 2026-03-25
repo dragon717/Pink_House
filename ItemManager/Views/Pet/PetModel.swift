@@ -481,6 +481,7 @@ struct PetStatus: Codable {
     var hygiene: Double = 100.0 // 清洁度 0-100
     var energy: Double = 100.0 // 精力 0-100
     var mood: Double = 100.0 // 心情 0-100
+    var intimacy: Double = 0.0 // 亲密度 0-100（对话/互动成长）
     var lastUpdateTime: Date = Date()
     
     // 货币系统
@@ -516,7 +517,7 @@ struct PetStatus: Codable {
     // MARK: - Codable Implementation for Backward Compatibility
     enum CodingKeys: String, CodingKey {
         case petName, petNames, selectedPetId, ownedPetIds
-        case hunger, hygiene, energy, mood, lastUpdateTime
+        case hunger, hygiene, energy, mood, intimacy, lastUpdateTime
         case meowCoin, fishCoin, boneCoin
         case dailyFishCoinEarned, lastDailyResetDate
         case inventory
@@ -533,6 +534,7 @@ struct PetStatus: Codable {
         hygiene = try container.decodeIfPresent(Double.self, forKey: .hygiene) ?? 100.0
         energy = try container.decodeIfPresent(Double.self, forKey: .energy) ?? 100.0
         mood = try container.decodeIfPresent(Double.self, forKey: .mood) ?? 100.0
+        intimacy = try container.decodeIfPresent(Double.self, forKey: .intimacy) ?? 0.0
         lastUpdateTime = try container.decodeIfPresent(Date.self, forKey: .lastUpdateTime) ?? Date()
         
         // Currency & Inventory
@@ -585,6 +587,7 @@ struct PetStatus: Codable {
         try container.encode(hygiene, forKey: .hygiene)
         try container.encode(energy, forKey: .energy)
         try container.encode(mood, forKey: .mood)
+        try container.encode(intimacy, forKey: .intimacy)
         try container.encode(lastUpdateTime, forKey: .lastUpdateTime)
         try container.encode(meowCoin, forKey: .meowCoin)
         try container.encode(fishCoin, forKey: .fishCoin)

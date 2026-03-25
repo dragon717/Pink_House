@@ -1,0 +1,366 @@
+import SwiftUI
+
+extension FeatureExperienceGuideOverlay {
+    var wealthGuideContent: some View {
+        GeometryReader { geometry in
+            ZStack {
+                switch wealthGuideStep {
+                case .step1_clickHouseTab:
+                    wealthStep1Content(in: geometry)
+                case .step2_clickWealthEntry:
+                    wealthStep2Content(in: geometry)
+                case .step3_divination, .step4_moneyCounting, .step5_wealthStorage:
+                    wealthMainTabContent(in: geometry, step: wealthGuideStep)
+                }
+            }
+        }
+    }
+
+    func wealthStep1Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let tabBarHeight: CGFloat = 56
+        let houseGuideXOffset: CGFloat = 20
+        let houseGuideYOffset: CGFloat = 40
+        let houseTabFrame = CGRect(
+            x: (screenBounds.width * 0.375) - 34 + houseGuideXOffset,
+            y: screenBounds.height - geometry.safeAreaInsets.bottom - tabBarHeight + houseGuideYOffset,
+            width: 68,
+            height: tabBarHeight
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: houseTabFrame,
+                highlightType: .circle,
+                cornerRadius: 28
+            )
+
+            HighlightPulseViewNoClick(
+                center: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
+                radius: 34
+            )
+
+            if wealthGuideStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
+                    delay: 0.5
+                )
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                Spacer()
+                wealthGuideBubble(step: wealthGuideStep)
+                    .padding(.bottom, 120)
+            }
+        }
+    }
+
+    func wealthStep2Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackEntryFrame = CGRect(
+            x: (screenBounds.width * 0.52) - 36,
+            y: (screenBounds.height * 0.47) - 28,
+            width: 72,
+            height: 56
+        )
+        let wealthEntryFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .wealthEntry),
+            in: geometry,
+            fallback: fallbackEntryFrame
+        )
+        let pawPosition = CGPoint(
+            x: min(wealthEntryFrame.maxX + 22, screenBounds.width - 28),
+            y: min(wealthEntryFrame.midY + 8, screenBounds.height - 28)
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: wealthEntryFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 16
+            )
+
+            RoundedRectHighlightView(
+                frame: wealthEntryFrame,
+                cornerRadius: 16
+            )
+            .allowsHitTesting(false)
+
+            if wealthGuideStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: pawPosition,
+                    delay: 0.5
+                )
+                .opacity(0.45)
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                Spacer()
+                wealthGuideBubble(step: wealthGuideStep)
+                    .padding(.bottom, 120)
+            }
+        }
+    }
+
+    func wealthMainTabContent(in geometry: GeometryProxy, step: WealthGuideStep) -> some View {
+        let screenBounds = geometry.size
+        let fallbackSegmentFrame = CGRect(
+            x: (screenBounds.width - 190) / 2,
+            y: max(geometry.safeAreaInsets.top + 8, 58),
+            width: 190,
+            height: 34
+        )
+        let segmentFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .wealthMainTabSegment),
+            in: geometry,
+            fallback: fallbackSegmentFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: segmentFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 10
+            )
+
+            RoundedRectHighlightView(
+                frame: segmentFrame,
+                cornerRadius: 10
+            )
+            .allowsHitTesting(false)
+
+            VStack {
+                Spacer()
+                wealthGuideBubble(
+                    step: step,
+                    onNext: {
+                        switch step {
+                        case .step3_divination:
+                            switchWealthGuideTab(to: .moneyCounting, nextStep: .step4_moneyCounting)
+                        case .step4_moneyCounting:
+                            switchWealthGuideTab(to: .wealthStorage, nextStep: .step5_wealthStorage)
+                        default:
+                            break
+                        }
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    func switchWealthGuideTab(to tab: WealthMainTab, nextStep: WealthGuideStep) {
+        NotificationCenter.default.post(
+            name: .wealthGuideSwitchMainTab,
+            object: nil,
+            userInfo: ["tab": tab.rawValue]
+        )
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            wealthGuideStep = nextStep
+        }
+    }
+
+    func wealthGuideBubble(
+        step: WealthGuideStep,
+        onNext: (() -> Void)? = nil
+    ) -> some View {
+        WealthGuideBubbleView(
+            step: step,
+            onSkip: {
+                guideManager.dismissFeatureExperienceGuide()
+            },
+            onNext: onNext,
+            onComplete: {
+                guideManager.completeFeatureExperienceGuide()
+            }
+        )
+    }
+
+    var aiAnalysisGuideContent: some View {
+        GeometryReader { geometry in
+            ZStack {
+                switch aiAnalysisStep {
+                case .step1_returnToMe:
+                    step1Content(in: geometry)
+                case .step2_clickVIP:
+                    step2Content(in: geometry)
+                case .step3_exchange:
+                    step3Content(in: geometry)
+                }
+            }
+        }
+    }
+
+    func step1Content(in geometry: GeometryProxy) -> some View {
+        let backButtonFrame = CGRect(
+            x: 16,
+            y: 8,
+            width: 44,
+            height: 44
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: backButtonFrame,
+                highlightType: .circle,
+                cornerRadius: 22
+            )
+
+            HighlightPulseViewNoClick(
+                center: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
+                radius: 28
+            )
+
+            if aiAnalysisStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
+                    delay: 0.5
+                )
+            }
+
+            VStack {
+                Spacer()
+
+                aiAnalysisBubble(
+                    step: aiAnalysisStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    func step2Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackVIPFrame = CGRect(
+            x: 16,
+            y: screenBounds.height * 0.16,
+            width: screenBounds.width - 32,
+            height: VIPManager.shared.isVIP ? 180 : 100
+        )
+        let vipCardFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .aiAnalysisVIPCard),
+            in: geometry,
+            fallback: fallbackVIPFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: vipCardFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 20
+            )
+
+            RoundedRectHighlightView(
+                frame: vipCardFrame,
+                cornerRadius: 20
+            )
+            .allowsHitTesting(false)
+
+            VStack {
+                Spacer()
+
+                aiAnalysisBubble(
+                    step: aiAnalysisStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    func step3Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackExchangeFrame = CGRect(
+            x: 20,
+            y: screenBounds.height * 0.44,
+            width: screenBounds.width - 40,
+            height: 56
+        )
+        let exchangeButtonFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .aiAnalysisExchangeButton),
+            in: geometry,
+            fallback: fallbackExchangeFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: exchangeButtonFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 12
+            )
+
+            RoundedRectHighlightView(
+                frame: exchangeButtonFrame,
+                cornerRadius: 12
+            )
+            .allowsHitTesting(false)
+
+            if aiAnalysisStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: exchangeButtonFrame.midX, y: exchangeButtonFrame.midY),
+                    delay: 0.5
+                )
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                aiAnalysisBubble(
+                    step: aiAnalysisStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.top, 100)
+
+                Spacer()
+            }
+        }
+    }
+
+    func aiGuideTargetFrame(
+        globalFrame: CGRect?,
+        in geometry: GeometryProxy,
+        fallback: CGRect
+    ) -> CGRect {
+        guard let globalFrame, globalFrame.width > 0, globalFrame.height > 0 else {
+            return fallback
+        }
+
+        let overlayGlobalOrigin = geometry.frame(in: .global).origin
+        return CGRect(
+            x: globalFrame.minX - overlayGlobalOrigin.x,
+            y: globalFrame.minY - overlayGlobalOrigin.y,
+            width: globalFrame.width,
+            height: globalFrame.height
+        )
+    }
+
+    func aiAnalysisBubble(
+        step: AIAnalysisGuideStep,
+        onSkip: @escaping () -> Void,
+        onComplete: @escaping () -> Void
+    ) -> some View {
+        AIAnalysisGuideBubbleView(
+            step: step,
+            onSkip: onSkip,
+            onComplete: onComplete
+        )
+    }
+}

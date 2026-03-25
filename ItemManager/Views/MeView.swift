@@ -357,14 +357,14 @@ struct MeView: View {
                     isVIP: true,
                     cardStyle: vipManager.cardStyle
                 )
+                .captureGuideTarget(.aiAnalysisVIPCard)
                 // 隐形链接
                 NavigationLink(destination: VIPCenterView()) {
                     Color.clear
                 }
             }
-            .frame(height: 180) // 保持高度一致
+            .frame(height: 220) // 与 VIPCardView 真实容器高度保持一致，避免引导高亮取框偏小
             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-            .captureGuideTarget(.aiAnalysisVIPCard)
         } else {
             NavigationLink(destination: VIPCenterView()) {
                 HStack {

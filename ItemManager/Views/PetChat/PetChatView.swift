@@ -52,9 +52,16 @@ private func wardrobeContextBudget(for intent: PetChatIntent) -> Int {
         return 10
     case .wardrobeStats, .search, .depositPlan, .lastOutfitPrice:
         return 8
-    case .colorMatch, .moodSupport, .generalChat:
+    case .currencyOverview, .petStatusOverview, .secondPetAdoption, .switchPetCompanion, .meowCoinTopUp, .moodSupport, .generalChat:
         return 6
     }
+}
+
+private func intimacyHearts(for intimacy: Double) -> String {
+    let value = max(0, min(100, intimacy))
+    let filled = Int((value / 20).rounded(.down))
+    let empty = max(0, 5 - filled)
+    return String(repeating: "♥️", count: filled) + String(repeating: "♡", count: empty)
 }
 
 // MARK: - 消息类型枚举
@@ -1122,9 +1129,9 @@ struct PetChatView: View {
                 }
 
                 Button {
-                    handleColorMatch()
+                    handlePetStatusOverview()
                 } label: {
-                    Label("今日搭配色", systemImage: "paintpalette.fill")
+                    Label("查看萌宠状态", systemImage: "heart.text.square.fill")
                 }
                 
                 Button {
@@ -1140,7 +1147,7 @@ struct PetChatView: View {
                 }
                 
                 Button {
-                    navigateToWealthCounting()
+                    promptWealthCountingNavigation()
                 } label: {
                     Label("去来财数钞票", systemImage: "yensign.circle.fill")
                 }
@@ -1163,10 +1170,9 @@ struct PetChatView: View {
 
             Section("其他") {
                 Button {
-                    // 随机推荐
-                    handleColorMatch()
+                    handleOutfitSuggestion("帮我来一套今天能直接穿的裙装搭配")
                 } label: {
-                    Label("随机推荐", systemImage: "sparkles")
+                    Label("随机穿搭推荐", systemImage: "sparkles")
                 }
 
                 Button {
@@ -1325,12 +1331,31 @@ struct PetChatView: View {
         let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
         let greetingSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
         let petDisplayName = PetDataManager.shared.status.displayName // 使用用户起的宠物名字
+        let onboardingWidgets = onboardingWidgetsForCurrentPetState()
         let welcomeMessage = PetChatMessage(
             text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petDisplayName)，有什么可以帮你的吗？",
             isUser: false,
-            widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
+            widgets: onboardingWidgets
         )
         messages.append(welcomeMessage)
+    }
+
+    private func onboardingWidgetsForCurrentPetState() -> [PetWidgetData] {
+        let status = PetDataManager.shared.status
+        if status.ownedPetIds.isEmpty {
+            return [
+                PetWidgetData(
+                    type: .quickOptions,
+                    title: "先领养一个伙伴吧（容器交互首版）",
+                    options: [
+                        PetWidgetOption(title: "A. 领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
+                        PetWidgetOption(title: "B. 领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
+                        PetWidgetOption(title: "C. 先看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
+                    ]
+                )
+            ]
+        }
+        return PetWidgetSuggestionBuilder.onboardingWidgets()
     }
     
     // 发送消息
@@ -1354,24 +1379,242 @@ struct PetChatView: View {
             return
         }
 
-        switch PetChatIntentRouter.detect(from: text) {
+        let decision = PetChatIntentRouter.decide(from: text)
+        if decision.shouldDisambiguate {
+            presentIntentDisambiguation(decision, rawText: text)
+            return
+        }
+
+        routeIntent(decision.primaryIntent, rawText: text)
+    }
+
+    private func routeIntent(_ intent: PetChatIntent, rawText: String) {
+        switch intent {
         case .wardrobeStats:
             handleWardrobeStatistics()
         case .outfitSuggestion:
-            handleOutfitSuggestion(text)
+            handleOutfitSuggestion(rawText)
         case .lastOutfitPrice:
             handleLastOutfitPriceQuery()
         case .weatherGuidance:
             handleWeatherOutfitGuidance()
-        case .colorMatch:
-            handleColorMatch()
         case .search:
-            handleSearch(text)
+            handleSearch(rawText)
         case .depositPlan:
             handleDepositPlanQuery()
+        case .currencyOverview:
+            handleCurrencyOverview()
+        case .petStatusOverview:
+            handlePetStatusOverview()
+        case .secondPetAdoption:
+            handleSecondPetAdoptionIntent()
+        case .switchPetCompanion:
+            handleSwitchPetIntent()
+        case .meowCoinTopUp:
+            handleMeowCoinTopUpIntent()
         case .moodSupport, .generalChat:
-            handleAIChat(text)
+            handleAIChat(rawText)
         }
+    }
+
+    private func presentIntentDisambiguation(_ decision: PetChatIntentRouter.IntentDecision, rawText: String) {
+        var options = decision.candidates.prefix(3).enumerated().map { index, candidate in
+            let letter = ["A", "B", "C"][index]
+            return PetWidgetOption(
+                title: "\(letter). \(candidate.intent.guideTitle)",
+                command: candidate.intent.guideCommand,
+                icon: candidate.intent.guideIcon
+            )
+        }
+
+        if options.count < 3 {
+            options.append(
+                PetWidgetOption(
+                    title: "C. 都不是，我换个说法",
+                    command: "ask:我换个说法",
+                    icon: "arrow.triangle.2.circlepath"
+                )
+            )
+        }
+
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "我听到你可能想做这几件事：",
+            subtitle: rawText,
+            options: options
+        )
+
+        let message = PetChatMessage(
+            text: "我先帮你分流好啦，点一个我就马上办～",
+            isUser: false,
+            isAIGenerated: true,
+            widgets: [widget]
+        )
+        messages.append(message)
+    }
+
+    private func handleCurrencyOverview() {
+        let status = PetDataManager.shared.status
+        let widget = PetWidgetData(
+            type: .weatherCard,
+            title: "当前货币余额",
+            subtitle: "妖币=喵币，骨头币给毛毛使用",
+            metrics: [
+                PetWidgetMetric(name: "喵币", value: "\(status.meowCoin)"),
+                PetWidgetMetric(name: "鱼币", value: "\(status.fishCoin)"),
+                PetWidgetMetric(name: "骨头币", value: "\(status.boneCoin)")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "给你把钱包摊开看啦～",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handlePetStatusOverview() {
+        let status = PetDataManager.shared.status
+        let widget = PetWidgetData(
+            type: .weatherCard,
+            title: "\(status.displayName)的状态面板（4+1）",
+            subtitle: "亲密度使用桃心进度展示",
+            metrics: [
+                PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100"),
+                PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100"),
+                PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100"),
+                PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100"),
+                PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "这是最新状态，要不要我顺手帮它做个恢复动作？",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleSecondPetAdoptionIntent() {
+        var status = PetDataManager.shared.status
+        let owned = Set(status.ownedPetIds)
+
+        if owned.count >= PetCharacter.allCases.count {
+            messages.append(PetChatMessage(text: "你已经是双宝家庭啦，要不要我帮你切换宠物管家？", isUser: false, isAIGenerated: true))
+            handleSwitchPetIntent()
+            return
+        }
+
+        guard let target = PetCharacter.allCases.first(where: { !owned.contains($0.id) }) else {
+            messages.append(PetChatMessage(text: "我暂时没找到可领养的新伙伴喔。", isUser: false, isAIGenerated: true))
+            return
+        }
+
+        let cost = 60
+        guard status.meowCoin >= cost else {
+            let lack = cost - status.meowCoin
+            let widget = PetWidgetData(
+                type: .quickOptions,
+                title: "领养二胎需要 60 喵币",
+                options: [
+                    PetWidgetOption(title: "A. 我想充值喵币", command: "pet_topup", icon: "plus.circle.fill"),
+                    PetWidgetOption(title: "B. 先看看余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                    PetWidgetOption(title: "C. 先不领养", command: "mood_support", icon: "pause.circle.fill")
+                ]
+            )
+            messages.append(
+                PetChatMessage(
+                    text: "还差 \(lack) 喵币就能领养\(target.displayName)啦～",
+                    isUser: false,
+                    isAIGenerated: true,
+                    widgets: [widget]
+                )
+            )
+            return
+        }
+
+        status.meowCoin -= cost
+        status.ownedPetIds.append(target.id)
+        status.selectedPetId = target.id
+        if status.petNames[target.id] == nil {
+            status.petNames[target.id] = target.displayName
+        }
+        status.intimacy = min(100, status.intimacy + 8)
+        PetDataManager.shared.saveStatus(status)
+
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "领养成功：\(target.displayName)",
+            options: [
+                PetWidgetOption(title: "A. 看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "B. 我想再切换宠物", command: "pet_switch", icon: "arrow.triangle.2.circlepath"),
+                PetWidgetOption(title: "C. 先聊聊今天穿搭", command: "weather_guidance", icon: "cloud.sun.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "领养完成！已切换到\(target.displayName)，并扣除 60 喵币。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleSwitchPetIntent() {
+        let status = PetDataManager.shared.status
+        let ownedPets = PetCharacter.allCases.filter { status.ownedPetIds.contains($0.id) }
+        guard ownedPets.count >= 2 else {
+            messages.append(PetChatMessage(text: "你现在只有一只宠物，想养二胎的话我可以直接帮你办理。", isUser: false, isAIGenerated: true))
+            return
+        }
+
+        let options = ownedPets.prefix(3).enumerated().map { index, pet in
+            let letter = ["A", "B", "C"][index]
+            return PetWidgetOption(
+                title: "\(letter). 切换到\(pet.displayName)",
+                command: "switch_pet:\(pet.id)",
+                icon: "pawprint.fill"
+            )
+        }
+
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "选择你要切换的萌宠管家：",
+            options: options
+        )
+        messages.append(
+            PetChatMessage(
+                text: "来，点一下就切换。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleMeowCoinTopUpIntent() {
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "你是想充值喵币吗？",
+            options: [
+                PetWidgetOption(title: "A. 打开喵币充值", command: "open_meow_store", icon: "cart.fill"),
+                PetWidgetOption(title: "B. 先看三种货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "C. 先不充，继续聊", command: "mood_support", icon: "face.smiling.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "没问题，我先给你准备充值入口。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
     }
 
     private func handleThemeConversationIntent(_ text: String) -> Bool {
@@ -1407,8 +1650,60 @@ struct PetChatView: View {
             searchText = "帮我找"
         case "mood_support":
             handleAIChat("我有点累，想被温柔安慰一下，也想听听今天适合什么穿搭。")
+        case "pet_currency_panel":
+            handleCurrencyOverview()
+        case "pet_status_panel":
+            handlePetStatusOverview()
+        case "pet_second_adopt":
+            handleSecondPetAdoptionIntent()
+        case "pet_switch":
+            handleSwitchPetIntent()
+        case "pet_topup":
+            handleMeowCoinTopUpIntent()
+        case "open_meow_store":
+            messages.append(PetChatMessage(text: "充值入口我先帮你记下啦～你可以从「我」页进入喵币商店。", isUser: false, isAIGenerated: true))
+        case "open_money_counting":
+            navigateToWealthCounting()
         default:
-            if option.command.hasPrefix("ask:") {
+            if option.command.hasPrefix("switch_pet:") {
+                let rawId = String(option.command.dropFirst("switch_pet:".count))
+                if let pet = PetCharacter(rawValue: rawId) {
+                    var status = PetDataManager.shared.status
+                    guard status.ownedPetIds.contains(pet.id) else {
+                        messages.append(PetChatMessage(text: "这只小伙伴还没领养，先领养再切换哦～", isUser: false, isAIGenerated: true))
+                        return
+                    }
+                    status.selectedPetId = pet.id
+                    status.intimacy = min(100, status.intimacy + 2)
+                    PetDataManager.shared.saveStatus(status)
+                    messages.append(PetChatMessage(text: "已切换到\(pet.displayName)管家模式，继续陪你～", isUser: false, isAIGenerated: true))
+                }
+            } else if option.command.hasPrefix("adopt_pet:") {
+                let rawId = String(option.command.dropFirst("adopt_pet:".count))
+                if let pet = PetCharacter(rawValue: rawId) {
+                    var status = PetDataManager.shared.status
+                    if status.ownedPetIds.contains(pet.id) {
+                        status.selectedPetId = pet.id
+                        PetDataManager.shared.saveStatus(status)
+                        messages.append(PetChatMessage(text: "\(pet.displayName)已经在家里啦，已帮你切过去～", isUser: false, isAIGenerated: true))
+                        return
+                    }
+                    let cost = pet == .maomao ? 60 : 0
+                    guard status.meowCoin >= cost else {
+                        messages.append(PetChatMessage(text: "领养\(pet.displayName)需要 \(cost) 喵币，你当前余额不够喔。", isUser: false, isAIGenerated: true))
+                        return
+                    }
+                    status.meowCoin -= cost
+                    status.ownedPetIds.append(pet.id)
+                    status.selectedPetId = pet.id
+                    if status.petNames[pet.id] == nil {
+                        status.petNames[pet.id] = pet.displayName
+                    }
+                    status.intimacy = min(100, status.intimacy + 5)
+                    PetDataManager.shared.saveStatus(status)
+                    messages.append(PetChatMessage(text: "领养成功！欢迎\(pet.displayName)加入小队～", isUser: false, isAIGenerated: true))
+                }
+            } else if option.command.hasPrefix("ask:") {
                 let query = String(option.command.dropFirst(4))
                 if !query.isEmpty {
                     let userMessage = PetChatMessage(text: query, isUser: true, isUserAuthored: false)
@@ -1776,6 +2071,26 @@ struct PetChatView: View {
         
         return nil
     }
+
+    private func promptWealthCountingNavigation() {
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "要跳转到「来财」数钱页吗？",
+            options: [
+                PetWidgetOption(title: "A. 现在去数钞票", command: "open_money_counting", icon: "yensign.circle.fill"),
+                PetWidgetOption(title: "B. 先留在聊天里", command: "mood_support", icon: "bubble.left.and.bubble.right.fill"),
+                PetWidgetOption(title: "C. 先看看我的货币", command: "pet_currency_panel", icon: "wallet.pass.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "这个场景需要跳转，我先征求你确认～",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
     
     private func navigateToWealthCounting() {
         let message = PetChatMessage(
@@ -1792,7 +2107,7 @@ struct PetChatView: View {
         isThinking = true
 
         Task {
-            let detectedIntent = PetChatIntentRouter.detect(from: text)
+            let detectedIntent = PetChatIntentRouter.decide(from: text).primaryIntent
             let wardrobeContext = WardrobeContextManager.shared.buildWardrobeContextBlockIfNeeded(
                 query: text,
                 clothings: clothings,
@@ -2209,9 +2524,9 @@ struct PetChatViewLegacy: View {
                     }
 
                     Button {
-                        handleColorMatch()
+                        handlePetStatusOverview()
                     } label: {
-                        Label("今日搭配色", systemImage: "paintpalette")
+                        Label("查看萌宠状态", systemImage: "heart.text.square.fill")
                     }
                     
                     Button {
@@ -2227,7 +2542,7 @@ struct PetChatViewLegacy: View {
                     }
                     
                     Button {
-                        navigateToWealthCounting()
+                        promptWealthCountingNavigation()
                     } label: {
                         Label("去来财数钞票", systemImage: "yensign.circle.fill")
                     }
@@ -2387,12 +2702,31 @@ struct PetChatViewLegacy: View {
         let currentCharacter = PetDataManager.shared.getCurrentPetCharacter()
         let greetingSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
         let petDisplayName = PetDataManager.shared.status.displayName // 使用用户起的宠物名字
+        let onboardingWidgets = onboardingWidgetsForCurrentPetState()
         let welcomeMessage = PetChatMessage(
             text: "\(greeting)\(greetingSuffix) 我是你的专属衣橱管家\(petDisplayName)，有什么可以帮你的吗？",
             isUser: false,
-            widgets: PetWidgetSuggestionBuilder.onboardingWidgets()
+            widgets: onboardingWidgets
         )
         messages.append(welcomeMessage)
+    }
+
+    private func onboardingWidgetsForCurrentPetState() -> [PetWidgetData] {
+        let status = PetDataManager.shared.status
+        if status.ownedPetIds.isEmpty {
+            return [
+                PetWidgetData(
+                    type: .quickOptions,
+                    title: "先领养一个伙伴吧（容器交互首版）",
+                    options: [
+                        PetWidgetOption(title: "A. 领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
+                        PetWidgetOption(title: "B. 领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
+                        PetWidgetOption(title: "C. 先看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
+                    ]
+                )
+            ]
+        }
+        return PetWidgetSuggestionBuilder.onboardingWidgets()
     }
     
     private func sendMessage() {
@@ -2545,24 +2879,242 @@ struct PetChatViewLegacy: View {
             return
         }
 
-        switch PetChatIntentRouter.detect(from: text) {
+        let decision = PetChatIntentRouter.decide(from: text)
+        if decision.shouldDisambiguate {
+            presentIntentDisambiguation(decision, rawText: text)
+            return
+        }
+
+        routeIntent(decision.primaryIntent, rawText: text)
+    }
+
+    private func routeIntent(_ intent: PetChatIntent, rawText: String) {
+        switch intent {
         case .wardrobeStats:
             handleWardrobeStatistics()
         case .outfitSuggestion:
-            handleOutfitSuggestion(text)
+            handleOutfitSuggestion(rawText)
         case .lastOutfitPrice:
             handleLastOutfitPriceQuery()
         case .weatherGuidance:
             handleWeatherOutfitGuidance()
-        case .colorMatch:
-            handleColorMatch()
         case .search:
-            handleSearch(text)
+            handleSearch(rawText)
         case .depositPlan:
             handleDepositPlanQuery()
+        case .currencyOverview:
+            handleCurrencyOverview()
+        case .petStatusOverview:
+            handlePetStatusOverview()
+        case .secondPetAdoption:
+            handleSecondPetAdoptionIntent()
+        case .switchPetCompanion:
+            handleSwitchPetIntent()
+        case .meowCoinTopUp:
+            handleMeowCoinTopUpIntent()
         case .moodSupport, .generalChat:
-            handleAIChat(text)
+            handleAIChat(rawText)
         }
+    }
+
+    private func presentIntentDisambiguation(_ decision: PetChatIntentRouter.IntentDecision, rawText: String) {
+        var options = decision.candidates.prefix(3).enumerated().map { index, candidate in
+            let letter = ["A", "B", "C"][index]
+            return PetWidgetOption(
+                title: "\(letter). \(candidate.intent.guideTitle)",
+                command: candidate.intent.guideCommand,
+                icon: candidate.intent.guideIcon
+            )
+        }
+
+        if options.count < 3 {
+            options.append(
+                PetWidgetOption(
+                    title: "C. 都不是，我换个说法",
+                    command: "ask:我换个说法",
+                    icon: "arrow.triangle.2.circlepath"
+                )
+            )
+        }
+
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "我听到你可能想做这几件事：",
+            subtitle: rawText,
+            options: options
+        )
+
+        let message = PetChatMessage(
+            text: "我先帮你分流好啦，点一个我就马上办～",
+            isUser: false,
+            isAIGenerated: true,
+            widgets: [widget]
+        )
+        messages.append(message)
+    }
+
+    private func handleCurrencyOverview() {
+        let status = PetDataManager.shared.status
+        let widget = PetWidgetData(
+            type: .weatherCard,
+            title: "当前货币余额",
+            subtitle: "妖币=喵币，骨头币给毛毛使用",
+            metrics: [
+                PetWidgetMetric(name: "喵币", value: "\(status.meowCoin)"),
+                PetWidgetMetric(name: "鱼币", value: "\(status.fishCoin)"),
+                PetWidgetMetric(name: "骨头币", value: "\(status.boneCoin)")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "给你把钱包摊开看啦～",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handlePetStatusOverview() {
+        let status = PetDataManager.shared.status
+        let widget = PetWidgetData(
+            type: .weatherCard,
+            title: "\(status.displayName)的状态面板（4+1）",
+            subtitle: "亲密度使用桃心进度展示",
+            metrics: [
+                PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100"),
+                PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100"),
+                PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100"),
+                PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100"),
+                PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "这是最新状态，要不要我顺手帮它做个恢复动作？",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleSecondPetAdoptionIntent() {
+        var status = PetDataManager.shared.status
+        let owned = Set(status.ownedPetIds)
+
+        if owned.count >= PetCharacter.allCases.count {
+            messages.append(PetChatMessage(text: "你已经是双宝家庭啦，要不要我帮你切换宠物管家？", isUser: false, isAIGenerated: true))
+            handleSwitchPetIntent()
+            return
+        }
+
+        guard let target = PetCharacter.allCases.first(where: { !owned.contains($0.id) }) else {
+            messages.append(PetChatMessage(text: "我暂时没找到可领养的新伙伴喔。", isUser: false, isAIGenerated: true))
+            return
+        }
+
+        let cost = 60
+        guard status.meowCoin >= cost else {
+            let lack = cost - status.meowCoin
+            let widget = PetWidgetData(
+                type: .quickOptions,
+                title: "领养二胎需要 60 喵币",
+                options: [
+                    PetWidgetOption(title: "A. 我想充值喵币", command: "pet_topup", icon: "plus.circle.fill"),
+                    PetWidgetOption(title: "B. 先看看余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                    PetWidgetOption(title: "C. 先不领养", command: "mood_support", icon: "pause.circle.fill")
+                ]
+            )
+            messages.append(
+                PetChatMessage(
+                    text: "还差 \(lack) 喵币就能领养\(target.displayName)啦～",
+                    isUser: false,
+                    isAIGenerated: true,
+                    widgets: [widget]
+                )
+            )
+            return
+        }
+
+        status.meowCoin -= cost
+        status.ownedPetIds.append(target.id)
+        status.selectedPetId = target.id
+        if status.petNames[target.id] == nil {
+            status.petNames[target.id] = target.displayName
+        }
+        status.intimacy = min(100, status.intimacy + 8)
+        PetDataManager.shared.saveStatus(status)
+
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "领养成功：\(target.displayName)",
+            options: [
+                PetWidgetOption(title: "A. 看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "B. 我想再切换宠物", command: "pet_switch", icon: "arrow.triangle.2.circlepath"),
+                PetWidgetOption(title: "C. 先聊聊今天穿搭", command: "weather_guidance", icon: "cloud.sun.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "领养完成！已切换到\(target.displayName)，并扣除 60 喵币。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleSwitchPetIntent() {
+        let status = PetDataManager.shared.status
+        let ownedPets = PetCharacter.allCases.filter { status.ownedPetIds.contains($0.id) }
+        guard ownedPets.count >= 2 else {
+            messages.append(PetChatMessage(text: "你现在只有一只宠物，想养二胎的话我可以直接帮你办理。", isUser: false, isAIGenerated: true))
+            return
+        }
+
+        let options = ownedPets.prefix(3).enumerated().map { index, pet in
+            let letter = ["A", "B", "C"][index]
+            return PetWidgetOption(
+                title: "\(letter). 切换到\(pet.displayName)",
+                command: "switch_pet:\(pet.id)",
+                icon: "pawprint.fill"
+            )
+        }
+
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "选择你要切换的萌宠管家：",
+            options: options
+        )
+        messages.append(
+            PetChatMessage(
+                text: "来，点一下就切换。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleMeowCoinTopUpIntent() {
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "你是想充值喵币吗？",
+            options: [
+                PetWidgetOption(title: "A. 打开喵币充值", command: "open_meow_store", icon: "cart.fill"),
+                PetWidgetOption(title: "B. 先看三种货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "C. 先不充，继续聊", command: "mood_support", icon: "face.smiling.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "没问题，我先给你准备充值入口。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
     }
 
     private func handleThemeConversationIntent(_ text: String) -> Bool {
@@ -2598,8 +3150,60 @@ struct PetChatViewLegacy: View {
             inputText = "帮我找"
         case "mood_support":
             handleAIChat("我有点累，想被温柔安慰一下，也想听听今天适合什么穿搭。")
+        case "pet_currency_panel":
+            handleCurrencyOverview()
+        case "pet_status_panel":
+            handlePetStatusOverview()
+        case "pet_second_adopt":
+            handleSecondPetAdoptionIntent()
+        case "pet_switch":
+            handleSwitchPetIntent()
+        case "pet_topup":
+            handleMeowCoinTopUpIntent()
+        case "open_meow_store":
+            messages.append(PetChatMessage(text: "充值入口我先帮你记下啦～你可以从「我」页进入喵币商店。", isUser: false, isAIGenerated: true))
+        case "open_money_counting":
+            navigateToWealthCounting()
         default:
-            if option.command.hasPrefix("ask:") {
+            if option.command.hasPrefix("switch_pet:") {
+                let rawId = String(option.command.dropFirst("switch_pet:".count))
+                if let pet = PetCharacter(rawValue: rawId) {
+                    var status = PetDataManager.shared.status
+                    guard status.ownedPetIds.contains(pet.id) else {
+                        messages.append(PetChatMessage(text: "这只小伙伴还没领养，先领养再切换哦～", isUser: false, isAIGenerated: true))
+                        return
+                    }
+                    status.selectedPetId = pet.id
+                    status.intimacy = min(100, status.intimacy + 2)
+                    PetDataManager.shared.saveStatus(status)
+                    messages.append(PetChatMessage(text: "已切换到\(pet.displayName)管家模式，继续陪你～", isUser: false, isAIGenerated: true))
+                }
+            } else if option.command.hasPrefix("adopt_pet:") {
+                let rawId = String(option.command.dropFirst("adopt_pet:".count))
+                if let pet = PetCharacter(rawValue: rawId) {
+                    var status = PetDataManager.shared.status
+                    if status.ownedPetIds.contains(pet.id) {
+                        status.selectedPetId = pet.id
+                        PetDataManager.shared.saveStatus(status)
+                        messages.append(PetChatMessage(text: "\(pet.displayName)已经在家里啦，已帮你切过去～", isUser: false, isAIGenerated: true))
+                        return
+                    }
+                    let cost = pet == .maomao ? 60 : 0
+                    guard status.meowCoin >= cost else {
+                        messages.append(PetChatMessage(text: "领养\(pet.displayName)需要 \(cost) 喵币，你当前余额不够喔。", isUser: false, isAIGenerated: true))
+                        return
+                    }
+                    status.meowCoin -= cost
+                    status.ownedPetIds.append(pet.id)
+                    status.selectedPetId = pet.id
+                    if status.petNames[pet.id] == nil {
+                        status.petNames[pet.id] = pet.displayName
+                    }
+                    status.intimacy = min(100, status.intimacy + 5)
+                    PetDataManager.shared.saveStatus(status)
+                    messages.append(PetChatMessage(text: "领养成功！欢迎\(pet.displayName)加入小队～", isUser: false, isAIGenerated: true))
+                }
+            } else if option.command.hasPrefix("ask:") {
                 let query = String(option.command.dropFirst(4))
                 if !query.isEmpty {
                     let userMessage = PetChatMessage(text: query, isUser: true, isUserAuthored: false)
@@ -2825,6 +3429,26 @@ struct PetChatViewLegacy: View {
         
         return nil
     }
+
+    private func promptWealthCountingNavigation() {
+        let widget = PetWidgetData(
+            type: .quickOptions,
+            title: "要跳转到「来财」数钱页吗？",
+            options: [
+                PetWidgetOption(title: "A. 现在去数钞票", command: "open_money_counting", icon: "yensign.circle.fill"),
+                PetWidgetOption(title: "B. 先留在聊天里", command: "mood_support", icon: "bubble.left.and.bubble.right.fill"),
+                PetWidgetOption(title: "C. 先看看我的货币", command: "pet_currency_panel", icon: "wallet.pass.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "这个场景需要跳转，我先征求你确认～",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
     
     private func navigateToWealthCounting() {
         let message = PetChatMessage(
@@ -2840,7 +3464,7 @@ struct PetChatViewLegacy: View {
         isThinking = true
 
         Task {
-            let detectedIntent = PetChatIntentRouter.detect(from: text)
+            let detectedIntent = PetChatIntentRouter.decide(from: text).primaryIntent
             let wardrobeContext = WardrobeContextManager.shared.buildWardrobeContextBlockIfNeeded(
                 query: text,
                 clothings: clothings,
