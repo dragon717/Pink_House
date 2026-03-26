@@ -24,10 +24,24 @@ struct AdaptiveSettingsView<Content: View>: View {
                     .padding()
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                Color.clear
+                    .frame(height: legacyCustomTabBarAvoidanceInset(safeAreaBottom: proxy.safeAreaInsets.bottom))
+            }
             .background(LiquidBackground())
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+
+    private func legacyCustomTabBarAvoidanceInset(safeAreaBottom: CGFloat) -> CGFloat {
+        if #available(iOS 26.0, *) {
+            return 0
+        }
+
+        let customTabBarHeight: CGFloat = 56
+        let customTabBarBottomOffset: CGFloat = safeAreaBottom > 0 ? 2 : 4
+        return customTabBarHeight + customTabBarBottomOffset + 12
     }
 }
 

@@ -186,6 +186,9 @@ final class MagicTaskCompletionManager: ObservableObject {
 
 // MARK: - 魔法任务完成卡片视图
 struct MagicTaskCompletionCard: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
     let completion: MagicTaskCompletion
     let index: Int // 在堆叠中的索引，0表示最上面
     let totalCount: Int
@@ -195,6 +198,20 @@ struct MagicTaskCompletionCard: View {
     @State private var isPressed = false
     @State private var showGlow = false
     @State private var iconScale: CGFloat = 0.8
+
+    private var primaryAccent: Color {
+        completion.isUnlockable ? .orange : themeManager.accentTextColor
+    }
+
+    private var secondaryAccent: Color {
+        if completion.isUnlockable {
+            return .yellow
+        }
+        return themeManager.accentTextColor.mixed(
+            with: colorScheme == .dark ? .white : .black,
+            amount: colorScheme == .dark ? 0.22 : 0.18
+        )
+    }
     
     // 堆叠效果参数
     private var stackOffset: CGFloat {
@@ -224,8 +241,8 @@ struct MagicTaskCompletionCard: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    (completion.isUnlockable ? Color.orange : Color.pink).opacity(0.4),
-                                    (completion.isUnlockable ? Color.orange : Color.pink).opacity(0.0)
+                                    primaryAccent.opacity(0.4),
+                                    primaryAccent.opacity(0.0)
                                 ],
                                 center: .center,
                                 startRadius: 5,
@@ -239,12 +256,9 @@ struct MagicTaskCompletionCard: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: completion.isUnlockable ? [
-                                    Color.orange.opacity(0.3),
-                                    Color.yellow.opacity(0.2)
-                                ] : [
-                                    Color.pink.opacity(0.3),
-                                    Color.purple.opacity(0.2)
+                                colors: [
+                                    primaryAccent.opacity(0.3),
+                                    secondaryAccent.opacity(0.2)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -257,7 +271,7 @@ struct MagicTaskCompletionCard: View {
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: completion.isUnlockable ? [.orange, .yellow] : [.pink, .purple],
+                                colors: [primaryAccent, secondaryAccent],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -269,11 +283,11 @@ struct MagicTaskCompletionCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(completion.isUnlockable ? "🔓 可解锁" : "✨ 任务完成！")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(completion.isUnlockable ? .orange : .pink)
+                        .foregroundColor(primaryAccent)
                     
                     Text(completion.feature.displayName)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(themeManager.primaryTextColor)
                         .lineLimit(1)
                 }
                 
@@ -285,9 +299,9 @@ struct MagicTaskCompletionCard: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                         .padding(8)
-                        .background(Circle().fill(Color.gray.opacity(0.1)))
+                        .background(Circle().fill(primaryAccent.opacity(0.12)))
                 }
                 .buttonStyle(PlainButtonStyle())
             }
@@ -307,12 +321,9 @@ struct MagicTaskCompletionCard: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
-                            colors: completion.isUnlockable ? [
-                                Color.orange.opacity(0.3 - Double(index) * 0.05),
-                                Color.yellow.opacity(0.2 - Double(index) * 0.03)
-                            ] : [
-                                Color.pink.opacity(0.3 - Double(index) * 0.05),
-                                Color.purple.opacity(0.2 - Double(index) * 0.03)
+                            colors: [
+                                primaryAccent.opacity(0.3 - Double(index) * 0.05),
+                                secondaryAccent.opacity(0.2 - Double(index) * 0.03)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -348,6 +359,8 @@ struct MagicTaskCompletionCard: View {
 
 // MARK: - 魔法任务完成堆叠视图
 struct MagicTaskCompletionStackView: View {
+    @Environment(ThemeManager.self) private var themeManager
+
     @StateObject private var manager = MagicTaskCompletionManager.shared
     @State private var selectedNotification: UnlockNotification?
     @State private var showBigCard = false
@@ -395,7 +408,7 @@ struct MagicTaskCompletionStackView: View {
                 HStack {
                     Text("魔法任务完成")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(themeManager.primaryTextColor)
                     
                     Spacer()
                     
@@ -403,10 +416,10 @@ struct MagicTaskCompletionStackView: View {
                     if manager.unreadCount > 0 {
                         Text("\(manager.unreadCount) 个新任务")
                             .font(.caption)
-                            .foregroundColor(.pink)
+                            .foregroundColor(themeManager.accentTextColor)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
-                            .background(Color.pink.opacity(0.1))
+                            .background(themeManager.accentTextColor.opacity(0.12))
                             .cornerRadius(8)
                     }
                     
@@ -416,7 +429,7 @@ struct MagicTaskCompletionStackView: View {
                             manager.markAllAsRead()
                         }
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(themeManager.accentTextColor)
                     }
                     
                     // 清除已读按钮
@@ -523,25 +536,7 @@ struct MagicTaskCompletionStackView: View {
                     
                     // 延迟后跳转到对应功能
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        if let destination = feature.destination {
-                            NotificationCenter.default.post(
-                                name: .navigateToSmallWorldDestination,
-                                object: nil,
-                                userInfo: ["destination": destination]
-                            )
-                        } else if feature == .aiAnalysis {
-                            // 萌宠智能对话跳转到萌宠对话Tab
-                            NotificationCenter.default.post(
-                                name: .navigateToPetChat,
-                                object: nil
-                            )
-                        } else if feature.isSettingsFeature {
-                            NotificationCenter.default.post(
-                                name: .navigateToSettings,
-                                object: nil,
-                                userInfo: ["feature": feature.rawValue]
-                            )
-                        }
+                        feature.postNavigationFromMagicTask()
                     }
                 },
                 onDismiss: {

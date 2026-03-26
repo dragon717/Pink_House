@@ -1,6 +1,55 @@
 import SwiftUI
 
+#if !WIDGET_EXTENSION
 extension FeatureExperienceGuideOverlay {
+    enum WardrobeGuideStep2Target {
+        case manualCreate
+        case batchImport
+        case either
+    }
+
+    func wardrobeGuideAccent(for feature: FeatureItem) -> Color {
+        switch feature {
+        case .ootd:
+            return .orange
+        case .ootdDefaultBook:
+            return .pink
+        case .calendar:
+            return .purple
+        case .spaceBook:
+            return .blue
+        case .batchImport:
+            return .green
+        default:
+            return .green
+        }
+    }
+
+    func preUnlockWardrobeGuideContentIfNeeded(for feature: FeatureItem) -> AnyView? {
+        guard usesPreUnlockWardrobeGuide(for: feature) else { return nil }
+        return AnyView(wardrobeGuideContent(accent: wardrobeGuideAccent(for: feature)))
+    }
+
+    func wardrobeGuideStep2Target(for feature: FeatureItem) -> WardrobeGuideStep2Target? {
+        if feature == .batchImport {
+            return FeatureUnlockManager.shared.isUnlocked(feature) ? .batchImport : .manualCreate
+        }
+        return usesPreUnlockWardrobeGuide(for: feature) ? .either : nil
+    }
+
+    func isPreUnlockWardrobeGuideReusableFeature(_ feature: FeatureItem) -> Bool {
+        [.ootd, .ootdDefaultBook, .calendar, .batchImport, .spaceBook].contains(feature)
+    }
+
+    func returnGuideBackButtonFrame(in geometry: GeometryProxy) -> CGRect {
+        CGRect(
+            x: 16,
+            y: max(geometry.safeAreaInsets.top + 8, 58),
+            width: 44,
+            height: 44
+        )
+    }
+
     @ViewBuilder
     func guideContent(for feature: FeatureItem) -> some View {
         switch feature {
@@ -12,6 +61,8 @@ extension FeatureExperienceGuideOverlay {
             batchImportGuideContent
         case .themeCustomize:
             themeGuideContent
+        case .customColorPersonalization:
+            customColorPersonalizationGuideContent
         case .localFileBackupRestore:
             localFileBackupRestoreGuideContent
         case .exportCSV:
@@ -49,18 +100,32 @@ extension FeatureExperienceGuideOverlay {
         guard let feature = guideManager.currentFeatureExperienceFeature else { return }
         showingFullDescription = false
         themeScrollStepStartedAt = nil
+        customColorScrollStepStartedAt = nil
+        isSpaceBookCreationPromptVisible = false
+        hasSpaceBooksForGuide = false
+        hasSpaceBookPagesForGuide = false
+        didOpenBatchEditMoreMenu = false
 
         switch feature {
         case .aiAnalysis:
-            aiAnalysisStep = .step1_returnToMe
-            if guideManager.lastKnownHomeTab == "me",
-               guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
-                aiAnalysisStep = .step2_clickVIP
+            if FeatureUnlockManager.shared.isUnlocked(feature) {
+                aiAnalysisStep = .postUnlockStep1ClickPetChatTab
+                if guideManager.lastKnownHomeTab == "petChat" {
+                    aiAnalysisStep = .postUnlockStep2ClickSearchBar
+                }
+            } else {
+                aiAnalysisStep = .preUnlockStep1ReturnToMe
+                if guideManager.lastKnownHomeTab == "me",
+                   guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
+                    aiAnalysisStep = .preUnlockStep2ClickVIP
+                }
             }
         case .widgetCustomize:
             widgetCustomizeStep = .step1_returnToMe
         case .themeCustomize:
             themeCustomizeGuideStep = .step1_returnToMe
+        case .customColorPersonalization:
+            customColorPersonalizationGuideStep = .step1_returnToMe
         case .localFileBackupRestore:
             localFileBackupRestoreGuideStep = .step1_returnToMe
         case .exportCSV:
@@ -156,6 +221,20 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
+    func advanceCustomColorPersonalizationGuideFromReturnStep() {
+        guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization else { return }
+        guard customColorPersonalizationGuideStep == .step1_returnToMe else { return }
+
+        customColorScrollStepStartedAt = Date()
+        withAnimation(.easeInOut(duration: 0.3)) {
+            customColorPersonalizationGuideStep = .step2_scrollToThemeEntry
+        }
+
+        if guideManager.guideTargetFrame(for: .themeCustomizeEntry) != nil {
+            advanceCustomColorGuideToClickStepWithMinimumDwell()
+        }
+    }
+
     func advanceLocalFileBackupRestoreGuideFromReturnStep() {
         guard guideManager.currentFeatureExperienceFeature == .localFileBackupRestore else { return }
         guard localFileBackupRestoreGuideStep == .step1_returnToMe else { return }
@@ -226,6 +305,27 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
+    func advanceCustomColorGuideToClickStepWithMinimumDwell(minimumDwell: TimeInterval = 2.0) {
+        guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization else { return }
+        guard customColorPersonalizationGuideStep == .step2_scrollToThemeEntry else { return }
+
+        let start = customColorScrollStepStartedAt ?? Date()
+        if customColorScrollStepStartedAt == nil {
+            customColorScrollStepStartedAt = start
+        }
+
+        let elapsed = Date().timeIntervalSince(start)
+        let remaining = max(0, minimumDwell - elapsed)
+        DispatchQueue.main.asyncAfter(deadline: .now() + remaining) {
+            guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                  customColorPersonalizationGuideStep == .step2_scrollToThemeEntry else { return }
+            withAnimation(.easeInOut(duration: 0.3)) {
+                customColorPersonalizationGuideStep = .step3_clickThemeEntry
+            }
+            customColorScrollStepStartedAt = nil
+        }
+    }
+
     func isGuideTargetVisibleOnScreen(_ frame: CGRect) -> Bool {
         let visibleBounds = UIScreen.main.bounds.insetBy(dx: 0, dy: 120)
         return frame.width > 1 &&
@@ -237,7 +337,14 @@ extension FeatureExperienceGuideOverlay {
     func advanceWardrobeAddGuideToChooseOptionIfNeeded() {
         guard wardrobeAddGuideStep == .step1_clickAddButton else { return }
         guard let feature = guideManager.currentFeatureExperienceFeature else { return }
-        guard feature == .batchImport || usesPreUnlockWardrobeGuide(for: feature) else { return }
+        guard wardrobeGuideStep2Target(for: feature) != nil else { return }
+
+        guideManager.resetGuideTargetFrames([
+            .wardrobeManualCreateEntry,
+            .wardrobeBatchImportEntry,
+            .wardrobeShortcutManualCreateAction,
+            .wardrobeShortcutBatchImportAction
+        ])
 
         withAnimation(.easeInOut(duration: 0.25)) {
             wardrobeAddGuideStep = .step2_chooseTargetOption
@@ -322,60 +429,45 @@ extension FeatureExperienceGuideOverlay {
     }
 
     func usesPreUnlockWardrobeGuide(for feature: FeatureItem) -> Bool {
-        !FeatureUnlockManager.shared.isUnlocked(feature) &&
-        [.ootd, .ootdDefaultBook, .calendar, .batchImport, .spaceBook].contains(feature)
+        isPreUnlockWardrobeGuideReusableFeature(feature) &&
+        !FeatureUnlockManager.shared.isUnlocked(feature)
     }
 
     func acceptsManualCreateGuideCompletion(for feature: FeatureItem) -> Bool {
-        switch feature {
-        case .batchImport:
-            return !FeatureUnlockManager.shared.isUnlocked(feature)
-        case .ootd, .ootdDefaultBook, .calendar, .spaceBook:
-            return usesPreUnlockWardrobeGuide(for: feature)
-        default:
-            return false
-        }
+        guard let target = wardrobeGuideStep2Target(for: feature) else { return false }
+        return target == .manualCreate || target == .either
     }
 
     func acceptsBatchImportGuideCompletion(for feature: FeatureItem) -> Bool {
-        switch feature {
-        case .batchImport:
-            return FeatureUnlockManager.shared.isUnlocked(feature)
-        case .ootd, .ootdDefaultBook, .calendar, .spaceBook:
-            return usesPreUnlockWardrobeGuide(for: feature)
-        default:
-            return false
-        }
+        guard let target = wardrobeGuideStep2Target(for: feature) else { return false }
+        return target == .batchImport || target == .either
     }
 
     var currentWardrobeGuideStep1Message: String {
-        guard let feature = guideManager.currentFeatureExperienceFeature else { return "先点击衣橱右上角的 + 号，展开创建菜单。" }
-        switch feature {
-        case .ootd:
-            return "先点击衣橱右上角的 + 号，展开创建菜单。"
-        case .ootdDefaultBook:
-            return "先点击衣橱右上角的 + 号，展开创建菜单。"
-        case .calendar:
-            return "先点击衣橱右上角的 + 号，展开创建菜单。"
-        case .spaceBook:
-            return "先点击衣橱右上角的 + 号，展开创建菜单。"
-        case .batchImport:
-            if FeatureUnlockManager.shared.isUnlocked(feature) {
-                return "先点击右上角 + 号，展开菜单。"
-            } else {
-                return "解锁前先点击右上角 + 号，展开菜单。"
-            }
-        default:
+        guard let feature = guideManager.currentFeatureExperienceFeature else {
             return "先点击衣橱右上角的 + 号，展开创建菜单。"
         }
+        guard feature == .batchImport else {
+            return "先点击衣橱右上角的 + 号，展开创建菜单。"
+        }
+        return FeatureUnlockManager.shared.isUnlocked(feature)
+            ? "先点击右上角 + 号，展开菜单。"
+            : "解锁前先点击右上角 + 号，展开菜单。"
     }
 
     var currentWardrobeGuideStep2Title: String {
         guard let feature = guideManager.currentFeatureExperienceFeature else { return "选择创建方式" }
-        if feature == .batchImport {
-            return FeatureUnlockManager.shared.isUnlocked(feature) ? "点击「批量导入」" : "点击「手动创建」"
+        guard let target = wardrobeGuideStep2Target(for: feature) else {
+            return "选择创建方式"
         }
-        return "选择创建方式"
+        switch target {
+        case .manualCreate:
+            return "点击「手动创建」"
+        case .batchImport:
+            return "点击「批量导入」"
+        case .either:
+            return "选择创建方式"
+        }
     }
 
     var currentWardrobeGuideStep2Message: String {
@@ -413,7 +505,7 @@ extension FeatureExperienceGuideOverlay {
         accent: Color,
         onReturn: @escaping () -> Void
     ) -> some View {
-        let backButtonFrame = CGRect(x: 16, y: 8, width: 44, height: 44)
+        let backButtonFrame = returnGuideBackButtonFrame(in: geometry)
 
         return ZStack {
             HollowMaskView(
@@ -440,6 +532,7 @@ extension FeatureExperienceGuideOverlay {
                         .fill(Color.white.opacity(0.001))
                         .frame(width: 72, height: 72)
                 }
+                .captureGuideInteractionRegion("feature.return.hotspot")
                 .position(x: backButtonFrame.midX, y: backButtonFrame.midY)
             }
 
@@ -631,6 +724,7 @@ extension FeatureExperienceGuideOverlay {
         totalSteps: Int,
         accent: Color,
         actionTitle: String?,
+        actionGuideTarget: GuideTargetKey? = nil,
         onSkip: @escaping () -> Void,
         onAction: (() -> Void)?
     ) -> some View {
@@ -641,8 +735,10 @@ extension FeatureExperienceGuideOverlay {
             totalSteps: totalSteps,
             accent: accent,
             actionTitle: actionTitle,
+            actionGuideTarget: actionGuideTarget,
             onSkip: onSkip,
             onAction: onAction
         )
     }
 }
+#endif

@@ -1,5 +1,6 @@
 import SwiftUI
 
+#if !WIDGET_EXTENSION
 extension FeatureExperienceGuideOverlay {
     var wealthGuideContent: some View {
         GeometryReader { geometry in
@@ -19,13 +20,26 @@ extension FeatureExperienceGuideOverlay {
     func wealthStep1Content(in geometry: GeometryProxy) -> some View {
         let screenBounds = geometry.size
         let tabBarHeight: CGFloat = 56
-        let houseGuideXOffset: CGFloat = 20
-        let houseGuideYOffset: CGFloat = 40
-        let houseTabFrame = CGRect(
-            x: (screenBounds.width * 0.375) - 34 + houseGuideXOffset,
-            y: screenBounds.height - geometry.safeAreaInsets.bottom - tabBarHeight + houseGuideYOffset,
+        let fallbackHouseTabFrame = CGRect(
+            x: (screenBounds.width * 0.375) - 34,
+            y: screenBounds.height - geometry.safeAreaInsets.bottom - tabBarHeight,
             width: 68,
             height: tabBarHeight
+        )
+        let capturedHouseTabFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .homeHouseTab),
+            in: geometry,
+            fallback: fallbackHouseTabFrame
+        )
+        let houseTabFrame = CGRect(
+            x: capturedHouseTabFrame.midX - 34,
+            y: capturedHouseTabFrame.midY - (tabBarHeight / 2),
+            width: 68,
+            height: tabBarHeight
+        )
+        let houseTabPawPosition = CGPoint(
+            x: min(max(houseTabFrame.midX, 24), screenBounds.width - 24),
+            y: min(max(houseTabFrame.midY, 24), screenBounds.height - 24)
         )
 
         return ZStack {
@@ -42,7 +56,7 @@ extension FeatureExperienceGuideOverlay {
 
             if wealthGuideStep.showCatPaw {
                 CatPawTapAnimation(
-                    position: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
+                    position: houseTabPawPosition,
                     delay: 0.5
                 )
                 .allowsHitTesting(false)
@@ -69,10 +83,6 @@ extension FeatureExperienceGuideOverlay {
             in: geometry,
             fallback: fallbackEntryFrame
         )
-        let pawPosition = CGPoint(
-            x: min(wealthEntryFrame.maxX + 22, screenBounds.width - 28),
-            y: min(wealthEntryFrame.midY + 8, screenBounds.height - 28)
-        )
 
         return ZStack {
             HollowMaskView(
@@ -89,7 +99,7 @@ extension FeatureExperienceGuideOverlay {
 
             if wealthGuideStep.showCatPaw {
                 CatPawTapAnimation(
-                    position: pawPosition,
+                    position: CGPoint(x: wealthEntryFrame.midX, y: wealthEntryFrame.midY),
                     delay: 0.5
                 )
                 .opacity(0.45)
@@ -183,24 +193,25 @@ extension FeatureExperienceGuideOverlay {
         GeometryReader { geometry in
             ZStack {
                 switch aiAnalysisStep {
-                case .step1_returnToMe:
-                    step1Content(in: geometry)
-                case .step2_clickVIP:
-                    step2Content(in: geometry)
-                case .step3_exchange:
-                    step3Content(in: geometry)
+                case .preUnlockStep1ReturnToMe:
+                    preUnlockStep1Content(in: geometry)
+                case .preUnlockStep2ClickVIP:
+                    preUnlockStep2Content(in: geometry)
+                case .preUnlockStep3Exchange:
+                    preUnlockStep3Content(in: geometry)
+                case .postUnlockStep1ClickPetChatTab:
+                    postUnlockStep1Content(in: geometry)
+                case .postUnlockStep2ClickSearchBar:
+                    postUnlockStep2Content(in: geometry)
+                case .postUnlockStep3FeatureIntro:
+                    postUnlockStep3Content
                 }
             }
         }
     }
 
-    func step1Content(in geometry: GeometryProxy) -> some View {
-        let backButtonFrame = CGRect(
-            x: 16,
-            y: 8,
-            width: 44,
-            height: 44
-        )
+    func preUnlockStep1Content(in geometry: GeometryProxy) -> some View {
+        let backButtonFrame = returnGuideBackButtonFrame(in: geometry)
 
         return ZStack {
             HollowMaskView(
@@ -238,7 +249,7 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
-    func step2Content(in geometry: GeometryProxy) -> some View {
+    func preUnlockStep2Content(in geometry: GeometryProxy) -> some View {
         let screenBounds = geometry.size
         let fallbackVIPFrame = CGRect(
             x: 16,
@@ -282,7 +293,7 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
-    func step3Content(in geometry: GeometryProxy) -> some View {
+    func preUnlockStep3Content(in geometry: GeometryProxy) -> some View {
         let screenBounds = geometry.size
         let fallbackExchangeFrame = CGRect(
             x: 20,
@@ -334,6 +345,141 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
+    func postUnlockStep1Content(in geometry: GeometryProxy) -> some View {
+        let tabGuideYOffset: CGFloat = -18
+        let fallbackTabFrame = petChatTabFallbackFrame(in: geometry)
+        let rawTabFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .homePetChatTab),
+            in: geometry,
+            fallback: fallbackTabFrame
+        )
+        let tabFrame = CGRect(
+            x: rawTabFrame.midX - 34,
+            y: rawTabFrame.midY - 28 + tabGuideYOffset,
+            width: 68,
+            height: 56
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: tabFrame,
+                highlightType: .circle,
+                cornerRadius: 28
+            )
+
+            HighlightPulseViewNoClick(
+                center: CGPoint(x: tabFrame.midX, y: tabFrame.midY),
+                radius: 34
+            )
+            .allowsHitTesting(false)
+
+            if aiAnalysisStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: tabFrame.midX, y: tabFrame.midY),
+                    delay: 0.5
+                )
+                .opacity(0.45)
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                aiAnalysisBubble(
+                    step: aiAnalysisStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.top, 88)
+
+                Spacer()
+            }
+        }
+    }
+
+    func postUnlockStep2Content(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackSearchBarFrame = CGRect(
+            x: 16,
+            y: max(geometry.safeAreaInsets.top + 56, 94),
+            width: screenBounds.width - 32,
+            height: 44
+        )
+        let searchBarFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .petChatSearchBar),
+            in: geometry,
+            fallback: fallbackSearchBarFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: searchBarFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 14
+            )
+
+            RoundedRectHighlightView(
+                frame: searchBarFrame,
+                cornerRadius: 14
+            )
+            .allowsHitTesting(false)
+
+            if aiAnalysisStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: searchBarFrame.midX, y: searchBarFrame.midY),
+                    delay: 0.5
+                )
+                .opacity(0.45)
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                Spacer()
+
+                aiAnalysisBubble(
+                    step: aiAnalysisStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    var postUnlockStep3Content: some View {
+        VStack {
+            Spacer()
+
+            aiAnalysisBubble(
+                step: aiAnalysisStep,
+                onSkip: {
+                    guideManager.dismissFeatureExperienceGuide()
+                },
+                onComplete: {
+                    guideManager.completeFeatureExperienceGuide()
+                }
+            )
+            .padding(.bottom, 120)
+        }
+    }
+
+    func petChatTabFallbackFrame(in geometry: GeometryProxy) -> CGRect {
+        let screenBounds = geometry.size
+        let tabBarHeight: CGFloat = 56
+        return CGRect(
+            x: (screenBounds.width * 0.875) - 34,
+            y: screenBounds.height - geometry.safeAreaInsets.bottom - tabBarHeight,
+            width: 68,
+            height: tabBarHeight
+        )
+    }
+
     func aiGuideTargetFrame(
         globalFrame: CGRect?,
         in geometry: GeometryProxy,
@@ -364,3 +510,4 @@ extension FeatureExperienceGuideOverlay {
         )
     }
 }
+#endif

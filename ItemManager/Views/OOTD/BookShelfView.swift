@@ -23,6 +23,20 @@ struct BookShelfView: View {
         var id: Self { self }
     }
     @AppStorage("bookShelfViewMode") var viewMode: ViewMode = .planar
+
+    private var guardedViewModeBinding: Binding<ViewMode> {
+        Binding(
+            get: { viewMode },
+            set: { newValue in
+                if newValue == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
+                    viewMode = .planar
+                    ToastManager.shared.showWarning("请先完成「空间手帐」任务，再进入「空间」页签")
+                    return
+                }
+                viewMode = newValue
+            }
+        )
+    }
     
     @State var showingNewBookAlert = false
     @State var newBookName = ""
@@ -68,7 +82,7 @@ struct BookShelfView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             BookShelfContentView(
-                viewMode: $viewMode,
+                viewMode: guardedViewModeBinding,
                 selectedBook: $selectedBook,
                 isSpatialBookSelected: $isSpatialBookSelected,
                 openingBook: $openingBook,
@@ -95,7 +109,7 @@ struct BookShelfView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 BookShelfToolbar(
-                    viewMode: $viewMode,
+                    viewMode: guardedViewModeBinding,
                     selectedBook: $selectedBook,
                     isSpatialBookSelected: $isSpatialBookSelected,
                     newBookName: $newBookName,
@@ -151,6 +165,9 @@ struct BookShelfView: View {
                 }
             }
             .onAppear {
+                if viewMode == .spatial && !FeatureUnlockManager.shared.isUnlocked(.spaceBook) {
+                    viewMode = .planar
+                }
                 performMigration()
                 // 初始化时同步选中状态
                 isBookSelected = selectedBook != nil

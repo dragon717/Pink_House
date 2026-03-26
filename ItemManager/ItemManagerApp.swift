@@ -112,15 +112,26 @@ struct MainContentView: View {
     @State private var showSplash = true
     @State private var showMigrationOverlay = false
     @State private var showDailyCheckIn = false
+    @State private var didStartLaunchFlow = false
+    @State private var hasCompletedLaunchPresentation = false
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     
     var body: some View {
         ZStack {
             MainTabView()
                 .zIndex(0)
+
+            GlobalGuideOverlaySceneInstaller()
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .zIndex(0.5)
             
             if showSplash {
-                SplashScreenView()
+                SplashScreenView {
+                    Task { @MainActor in
+                        completeLaunchPresentationIfNeeded(trigger: "user_tap")
+                    }
+                }
                     .transition(.opacity)
                     .zIndex(1)
             }
@@ -147,6 +158,9 @@ struct MainContentView: View {
             DailyCheckInView()
         }
         .onAppear {
+            guard !didStartLaunchFlow else { return }
+            didStartLaunchFlow = true
+            
             if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetDataManager.appGroupIdentifier) {
                 print("App Group Container URL: \(url.path)")
             } else {
@@ -158,82 +172,17 @@ struct MainContentView: View {
             print("iCloud 同步状态: \(migrationManager.isCloudSyncEnabled ? "已启用" : "未启用")")
             print("迁移完成状态: \(migrationManager.isMigrationCompleted ? "已完成" : "未完成")")
             
-            // Initialization Buffer & Peak Shaving
+            print("🚀 [LaunchFlow] 启动初始化任务")
+            
             Task {
-                // 0. Preload Spatial Assets (iOS 26+ only)
-                // 仅在支持的系统上预加载，避免旧设备浪费资源
-                if #available(iOS 26.0, *) {
-                    await MainActor.run {
-                        SpatialAssetManager.shared.preload(imageName: "small_world_bg_normal", extension: "png")
-                        SpatialAssetManager.shared.preload(imageName: "small_world_bg_sun", extension: "png")
-                    }
-                }
-                
-                // 0.5 Migrate 3D models from Clothing to Model3D
-                await Model3DMigrationService.shared.migrateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
-                
-                // 0.6 Validate Model3D references integrity
-                await Model3DValidationService.shared.validateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
-                
-                // 0.7 裙装股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
-                do {
-                    try await GRDBManager.shared.initialize()
-                    await SyncEngine.shared.configure()
-                    print("✅ 裙装股市功能已启用（GRDB 版本）")
-                } catch {
-                    print("❌ 裙装股市初始化失败: \(error)")
-                }
-                
-                // 0.8 刷新魔法任务进度（在开屏期间完成）
+                await runStartupInitialization()
+            }
+            
+            // 开屏展示时长与初始化解耦，避免某个 await 卡住导致无法进入主界面
+            Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
                 await MainActor.run {
-                    FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
-                }
-
-                // 0.9 OOTD 坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
-                await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
-
-                // 0.95 校验自定义小物总价，确保开屏后的总价统计包含正确的小物金额
-                await ClothingAccessoryPriceValidationService.shared.validateIfNeeded(
-                    modelContainer: SharedPersistence.shared.sharedModelContainer
-                )
-
-                // 0.10 并行预加载每日打卡数据（问候语 + 穿搭色）
-                // 使用 TaskGroup 实现并行加载，减少开屏等待时间
-                await withTaskGroup(of: Void.self) { group in
-                    // 预加载今日问候语
-                    group.addTask {
-                        _ = await DailyGreetingManager.shared.getCurrentGreeting()
-                    }
-                    
-                    // 预加载今日穿搭色
-                    group.addTask {
-                        await DailyCheckInManager.shared.preloadTodayOutfitColor()
-                    }
-                }
-                
-                // 0.11 预加载本周穿搭色（可选优化，低内存设备建议注释掉）
-                // await DailyCheckInManager.shared.preloadWeekOutfitColors()
-
-                // 1. Minimum splash duration (aesthetic + buffer)
-                try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-                
-                // 2. Perform heavy initialization tasks
-                // Optimized syncWidgetData (now async to offload image processing)
-                await SharedPersistence.shared.syncWidgetData()
-                
-                // 3. Dismiss Splash
-                withAnimation(.easeOut(duration: 0.5)) {
-                    showSplash = false
-                }
-                
-                // 4. 启动新手引导（开屏结束后）
-                try? await Task.sleep(nanoseconds: 300_000_000) // 等待 0.3 秒确保动画完成
-                await MainActor.run {
-                    guideManager.startGuide()
-                    // 检查是否需要显示每日打卡（仅在未显示新手引导时）
-                    if !guideManager.isShowingGuide {
-                        checkAndShowDailyCheckIn()
-                    }
+                    completeLaunchPresentationIfNeeded(trigger: "auto_timeout")
                 }
             }
         }
@@ -246,6 +195,85 @@ struct MainContentView: View {
                 }
             } else if newPhase == .active {
                 // 从后台回到前台时检查是否需要打卡
+                checkAndShowDailyCheckIn()
+            }
+        }
+    }
+    
+    // MARK: - 启动初始化（不阻塞开屏消失）
+    @MainActor
+    private func runStartupInitialization() async {
+        // 0. Preload Spatial Assets (iOS 26+ only)
+        // 仅在支持的系统上预加载，避免旧设备浪费资源
+        if #available(iOS 26.0, *) {
+            SpatialAssetManager.shared.preload(imageName: "small_world_bg_normal", extension: "png")
+            SpatialAssetManager.shared.preload(imageName: "small_world_bg_sun", extension: "png")
+        }
+        
+        // 0.5 Migrate 3D models from Clothing to Model3D
+        await Model3DMigrationService.shared.migrateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
+        
+        // 0.6 Validate Model3D references integrity
+        await Model3DValidationService.shared.validateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
+        
+        // 0.7 裙装股市功能 - 使用 GRDB 版本（完全独立于 SwiftData）
+        do {
+            try await GRDBManager.shared.initialize()
+            await SyncEngine.shared.configure()
+            print("✅ 裙装股市功能已启用（GRDB 版本）")
+        } catch {
+            print("❌ 裙装股市初始化失败: \(error)")
+        }
+        
+        // 0.8 刷新魔法任务进度（在开屏期间完成）
+        FeatureUnlockManager.shared.refreshMagicTaskProgress(modelContext: modelContext)
+
+        // 0.9 OOTD 坐标版本迁移（将老数据的绝对坐标转换为相对坐标）
+        await OOTDCoordinateMigrationService.shared.migrateIfNeeded(modelContext: modelContext)
+
+        // 0.95 校验自定义小物总价，确保开屏后的总价统计包含正确的小物金额
+        await ClothingAccessoryPriceValidationService.shared.validateIfNeeded(
+            modelContainer: SharedPersistence.shared.sharedModelContainer
+        )
+
+        // 0.10 并行预加载每日打卡数据（问候语 + 穿搭色）
+        // 使用 TaskGroup 实现并行加载，减少开屏等待时间
+        await withTaskGroup(of: Void.self) { group in
+            // 预加载今日问候语
+            group.addTask {
+                _ = await DailyGreetingManager.shared.getCurrentGreeting()
+            }
+            
+            // 预加载今日穿搭色
+            group.addTask {
+                await DailyCheckInManager.shared.preloadTodayOutfitColor()
+            }
+        }
+        
+        // 0.11 预加载本周穿搭色（可选优化，低内存设备建议注释掉）
+        // await DailyCheckInManager.shared.preloadWeekOutfitColors()
+
+        // 2. Perform heavy initialization tasks
+        // Optimized syncWidgetData (now async to offload image processing)
+        await SharedPersistence.shared.syncWidgetData()
+        print("✅ [LaunchFlow] 初始化任务完成")
+    }
+    
+    @MainActor
+    private func completeLaunchPresentationIfNeeded(trigger: String) {
+        guard !hasCompletedLaunchPresentation else { return }
+        hasCompletedLaunchPresentation = true
+        
+        print("🚀 [LaunchFlow] 结束开屏，触发源: \(trigger)")
+        withAnimation(.easeOut(duration: 0.5)) {
+            showSplash = false
+        }
+        
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000) // 等待 0.3 秒确保动画完成
+            guideManager.startGuide()
+            // 检查是否需要显示每日打卡（仅在未显示新手引导时）
+            if !guideManager.isShowingGuide {
                 checkAndShowDailyCheckIn()
             }
         }

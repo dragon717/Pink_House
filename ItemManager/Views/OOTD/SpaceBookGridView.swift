@@ -40,6 +40,7 @@ struct SpaceBookGridView: View {
                                 SpaceBookView(book: book, namespace: namespace)
                             }
                         }
+                        .captureGuideTarget(books.first?.id == book.id ? .spaceBookFirstBookCard : nil)
                         .buttonStyle(BouncingButtonStyle())
                         .contextMenu {
                             Button {

@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import Combine
 
 struct GuideCatVideoPlayer: View {
     let videoName: String
@@ -95,6 +97,7 @@ struct WelcomeBubbleView: View {
                 .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
         )
         .frame(maxWidth: 320)
+        .captureGuideInteractionRegion("guide.text.bubble")
     }
 }
 
@@ -181,6 +184,7 @@ struct PointingBubbleView: View {
                 .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
         )
         .frame(maxWidth: 320)
+        .captureGuideInteractionRegion("guide.text.bubble")
     }
 }
 
@@ -250,6 +254,7 @@ struct SkipGuideConfirmationView: View {
                     )
             )
             .padding(.horizontal, 40)
+            .captureGuideInteractionRegion("guide.text.bubble")
         }
     }
 }
@@ -413,5 +418,152 @@ struct AppFirstLaunchGuideModifier: ViewModifier {
                 FeatureExperienceGuideOverlay()
             }
         }
+    }
+}
+
+struct GlobalGuideOverlaySceneInstaller: UIViewRepresentable {
+    func makeUIView(context: Context) -> GuideOverlaySceneProbeView {
+        let view = GuideOverlaySceneProbeView()
+        view.onSceneChange = { scene in
+            Task { @MainActor in
+                GuideTopOverlayWindowManager.shared.attach(to: scene)
+            }
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: GuideOverlaySceneProbeView, context: Context) {
+        Task { @MainActor in
+            GuideTopOverlayWindowManager.shared.attach(to: uiView.window?.windowScene)
+        }
+    }
+
+    static func dismantleUIView(_ uiView: GuideOverlaySceneProbeView, coordinator: ()) {
+        Task { @MainActor in
+            GuideTopOverlayWindowManager.shared.detach()
+        }
+    }
+}
+
+final class GuideOverlaySceneProbeView: UIView {
+    var onSceneChange: ((UIWindowScene?) -> Void)?
+    private weak var lastScene: UIWindowScene?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        notifySceneIfNeeded()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        notifySceneIfNeeded()
+    }
+
+    private func notifySceneIfNeeded() {
+        let scene = window?.windowScene
+        guard scene !== lastScene else { return }
+        lastScene = scene
+        onSceneChange?(scene)
+    }
+}
+
+@MainActor
+final class GuideTopOverlayWindowManager {
+    static let shared = GuideTopOverlayWindowManager()
+
+    private let guideManager = AppFirstLaunchGuideManager.shared
+    private var cancellables = Set<AnyCancellable>()
+    private weak var currentScene: UIWindowScene?
+    private var overlayWindow: GuidePassThroughWindow?
+
+    private init() {
+        guideManager.$isShowingGuide
+            .combineLatest(guideManager.$isShowingFeatureExperienceGuide)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isShowingGuide, isShowingFeatureGuide in
+                Task { @MainActor in
+                    self?.setWindowVisible(isShowingGuide || isShowingFeatureGuide)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    func attach(to scene: UIWindowScene?) {
+        let targetScene = scene ?? UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }
+
+        guard let targetScene else { return }
+
+        if currentScene !== targetScene || overlayWindow == nil {
+            configureWindow(for: targetScene)
+        }
+
+        setWindowVisible(guideManager.isShowingGuide || guideManager.isShowingFeatureExperienceGuide)
+    }
+
+    func detach() {
+        overlayWindow?.isHidden = true
+        overlayWindow = nil
+        currentScene = nil
+    }
+
+    private func configureWindow(for scene: UIWindowScene) {
+        let rootView = GlobalGuideTopOverlayView()
+            .environment(ThemeManager.shared)
+
+        let hostingController = UIHostingController(rootView: rootView)
+        hostingController.view.backgroundColor = .clear
+        hostingController.view.isOpaque = false
+
+        let window = GuidePassThroughWindow(windowScene: scene)
+        window.rootViewController = hostingController
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.windowLevel = .alert + 1
+        window.isHidden = true
+
+        overlayWindow = window
+        currentScene = scene
+    }
+
+    private func setWindowVisible(_ isVisible: Bool) {
+        guard let window = overlayWindow else { return }
+        window.isHidden = !isVisible
+    }
+}
+
+private struct GlobalGuideTopOverlayView: View {
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
+
+    var body: some View {
+        ZStack {
+            if guideManager.isShowingGuide {
+                AppFirstLaunchGuideOverlay()
+            }
+
+            if guideManager.isShowingFeatureExperienceGuide {
+                FeatureExperienceGuideOverlay()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.clear)
+        .ignoresSafeArea()
+    }
+}
+
+private final class GuidePassThroughWindow: UIWindow {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard let hitView = super.hitTest(point, with: event) else {
+            return nil
+        }
+
+        let guideManager = AppFirstLaunchGuideManager.shared
+
+        if guideManager.hasGuideInteractiveRegions() {
+            return guideManager.isPointInGuideInteractiveRegions(point, hitSlop: 0) ? hitView : nil
+        }
+
+        return nil
     }
 }

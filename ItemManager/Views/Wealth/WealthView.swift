@@ -322,32 +322,36 @@ struct WealthStorageContainerView: View {
     @State private var selectedStorageTab: StorageTab = .gold
     
     var body: some View {
-        VStack(spacing: 0) {
-            // 子页签选择器
-            Picker("贵金属", selection: $selectedStorageTab) {
-                ForEach(StorageTab.allCases) { tab in
-                    Text(tab.rawValue).tag(tab)
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                // 子页签选择器
+                Picker("贵金属", selection: $selectedStorageTab) {
+                    ForEach(StorageTab.allCases) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.top, 8)
-            
-            // 内容区域
-            TabView(selection: $selectedStorageTab) {
-                // 黄金
-                GoldStorageView(viewModel: viewModel, isActive: selectedStorageTab == .gold)
-                    .tag(StorageTab.gold)
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 8)
                 
-                // 白银
-                SilverStorageView(viewModel: viewModel, isActive: selectedStorageTab == .silver)
-                    .tag(StorageTab.silver)
-                
-                // 虚拟币
-                VirtualCurrencyView(viewModel: viewModel, isActive: selectedStorageTab == .virtual)
-                    .tag(StorageTab.virtual)
+                // 内容区域
+                TabView(selection: $selectedStorageTab) {
+                    // 黄金
+                    GoldStorageView(viewModel: viewModel, isActive: selectedStorageTab == .gold)
+                        .tag(StorageTab.gold)
+                    
+                    // 白银
+                    SilverStorageView(viewModel: viewModel, isActive: selectedStorageTab == .silver)
+                        .tag(StorageTab.silver)
+                    
+                    // 虚拟币
+                    VirtualCurrencyView(viewModel: viewModel, isActive: selectedStorageTab == .virtual)
+                        .tag(StorageTab.virtual)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .padding(.bottom, legacyCustomTabBarAvoidanceInset(safeAreaBottom: proxy.safeAreaInsets.bottom))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .onChange(of: selectedStorageTab) { _, newValue in
             switch newValue {
@@ -360,6 +364,18 @@ struct WealthStorageContainerView: View {
                 break
             }
         }
+    }
+    
+    private func legacyCustomTabBarAvoidanceInset(safeAreaBottom: CGFloat) -> CGFloat {
+        if #available(iOS 26.0, *) {
+            return 0
+        }
+        
+        let customTabBarHeight: CGFloat = 56
+        let customTabBarBottomOffset: CGFloat = safeAreaBottom > 0 ? 2 : 4
+        let overlapWithSafeArea = max(0, customTabBarHeight + customTabBarBottomOffset - safeAreaBottom)
+        
+        return overlapWithSafeArea + 8
     }
 }
 

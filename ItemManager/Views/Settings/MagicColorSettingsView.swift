@@ -387,6 +387,7 @@ struct CustomColorTabContent: View {
                 ) {
                     onPersonalizationTap()
                 }
+                .captureGuideTarget(.themeCustomPersonalizationEntry)
             }
         }
     }
@@ -477,5 +478,12 @@ struct PetChatSkinSection: View {
 struct MagicColorSettingsViewWithMagicTab: View {
     var body: some View {
         MagicColorSettingsView(initialTab: .magic)
+    }
+}
+
+// MARK: - 客制化配色页面包装（用于从魔法任务跳转，自动切换到客制化配色标签）
+struct MagicColorSettingsViewWithCustomTab: View {
+    var body: some View {
+        MagicColorSettingsView(initialTab: .custom)
     }
 }

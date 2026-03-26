@@ -1,47 +1,122 @@
 import Foundation
 
 enum AIAnalysisGuideStep: Int, CaseIterable {
-    case step1_returnToMe = 1
-    case step2_clickVIP = 2
-    case step3_exchange = 3
+    case preUnlockStep1ReturnToMe = 1
+    case preUnlockStep2ClickVIP = 2
+    case preUnlockStep3Exchange = 3
+    case postUnlockStep1ClickPetChatTab = 4
+    case postUnlockStep2ClickSearchBar = 5
+    case postUnlockStep3FeatureIntro = 6
+
+    enum Flow {
+        case preUnlock
+        case postUnlock
+    }
+
+    static var preUnlockCases: [AIAnalysisGuideStep] {
+        [.preUnlockStep1ReturnToMe, .preUnlockStep2ClickVIP, .preUnlockStep3Exchange]
+    }
+
+    static var postUnlockCases: [AIAnalysisGuideStep] {
+        [.postUnlockStep1ClickPetChatTab, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro]
+    }
+
+    var flow: Flow {
+        switch self {
+        case .preUnlockStep1ReturnToMe, .preUnlockStep2ClickVIP, .preUnlockStep3Exchange:
+            return .preUnlock
+        case .postUnlockStep1ClickPetChatTab, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro:
+            return .postUnlock
+        }
+    }
+
+    var stepsInFlow: [AIAnalysisGuideStep] {
+        switch flow {
+        case .preUnlock:
+            return Self.preUnlockCases
+        case .postUnlock:
+            return Self.postUnlockCases
+        }
+    }
+
+    var currentStepInFlow: Int {
+        (stepsInFlow.firstIndex(of: self) ?? 0) + 1
+    }
+
+    var totalStepsInFlow: Int {
+        stepsInFlow.count
+    }
 
     var title: String {
         switch self {
-        case .step1_returnToMe: return "返回「我」界面"
-        case .step2_clickVIP: return "点击VIP卡片"
-        case .step3_exchange: return "兑换会员时长"
+        case .preUnlockStep1ReturnToMe: return "返回「我」界面"
+        case .preUnlockStep2ClickVIP: return "点击VIP卡片"
+        case .preUnlockStep3Exchange: return "兑换会员时长"
+        case .postUnlockStep1ClickPetChatTab: return "点击「萌宠对话」Tab"
+        case .postUnlockStep2ClickSearchBar: return "展开并认识输入区"
+        case .postUnlockStep3FeatureIntro: return "萌宠智能对话怎么玩"
         }
     }
 
     var message: String {
         switch self {
-        case .step1_returnToMe: return "首先，请返回到「我」界面，我们将引导你开通VIP会员"
-        case .step2_clickVIP: return "点击VIP会员卡片，进入会员中心"
-        case .step3_exchange: return "点击「兑换会员时长」，使用喵币兑换VIP天数"
+        case .preUnlockStep1ReturnToMe:
+            return "首先，请返回到「我」界面，我们将引导你开通 VIP 会员。"
+        case .preUnlockStep2ClickVIP:
+            return "点击 VIP 会员卡片，进入会员中心。"
+        case .preUnlockStep3Exchange:
+            return "点击「兑换会员时长」，使用喵币兑换 VIP 天数，解锁萌宠智能对话。"
+        case .postUnlockStep1ClickPetChatTab:
+            return "先点击底部「萌宠对话」Tab，进入智能对话页。"
+        case .postUnlockStep2ClickSearchBar:
+            return "先点击顶部搜索栏展开输入区。展开后会介绍底部菜单和输入框。"
+        case .postUnlockStep3FeatureIntro:
+            return "这里可以用底部菜单快速触发常用功能，也可以在输入框直接提问：情感陪伴、穿搭建议、衣橱统计都能聊。"
         }
     }
 
     var bubblePosition: BubblePosition {
         switch self {
-        case .step1_returnToMe: return .bottom
-        case .step2_clickVIP: return .bottom
-        case .step3_exchange: return .top
+        case .preUnlockStep1ReturnToMe, .preUnlockStep2ClickVIP, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro:
+            return .bottom
+        case .preUnlockStep3Exchange, .postUnlockStep1ClickPetChatTab:
+            return .top
         }
     }
 
     var highlightType: HighlightType {
         switch self {
-        case .step1_returnToMe: return .circle
-        case .step2_clickVIP: return .roundedRect
-        case .step3_exchange: return .roundedRect
+        case .preUnlockStep1ReturnToMe, .postUnlockStep1ClickPetChatTab:
+            return .circle
+        case .preUnlockStep2ClickVIP, .preUnlockStep3Exchange, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro:
+            return .roundedRect
         }
     }
 
     var showCatPaw: Bool {
         switch self {
-        case .step1_returnToMe: return true
-        case .step2_clickVIP: return false
-        case .step3_exchange: return true
+        case .preUnlockStep2ClickVIP, .postUnlockStep3FeatureIntro:
+            return false
+        case .preUnlockStep1ReturnToMe, .preUnlockStep3Exchange, .postUnlockStep1ClickPetChatTab, .postUnlockStep2ClickSearchBar:
+            return true
+        }
+    }
+
+    var showsCompletionButton: Bool {
+        switch self {
+        case .preUnlockStep3Exchange, .postUnlockStep3FeatureIntro:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var completionButtonTitle: String {
+        switch self {
+        case .postUnlockStep3FeatureIntro:
+            return "开始体验"
+        default:
+            return "知道了"
         }
     }
 }
@@ -97,11 +172,21 @@ enum ThemeCustomizeGuideStep: Int, CaseIterable {
     case step5_magicThemeExplanation = 5
 }
 
+enum CustomColorPersonalizationGuideStep: Int, CaseIterable {
+    case step1_returnToMe = 1
+    case step2_scrollToThemeEntry = 2
+    case step3_clickThemeEntry = 3
+    case step4_switchToCustomTab = 4
+    case step5_personalizationExplanation = 5
+}
+
 enum LocalFileBackupRestoreGuideStep: Int, CaseIterable {
     case step1_returnToMe = 1
     case step2_scrollToSystemSettings = 2
     case step3_clickSystemSettings = 3
-    case step4_clickBackupRestoreEntry = 4
+    case step4_introBackupData = 4
+    case step5_introRestoreData = 5
+    case step6_firstBackup = 6
 }
 
 enum ExportCSVGuideStep: Int, CaseIterable {

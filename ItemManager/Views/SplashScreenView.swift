@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct SplashScreenView: View {
+    var onTapEnter: (() -> Void)? = nil
+    
     var body: some View {
         ZStack {
             // Background color (optional, matches the app theme or white)
@@ -12,6 +14,10 @@ struct SplashScreenView: View {
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .ignoresSafeArea()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTapEnter?()
         }
     }
 }

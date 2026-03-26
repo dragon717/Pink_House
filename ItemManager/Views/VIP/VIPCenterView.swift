@@ -285,6 +285,7 @@ struct VIPCenterView: View {
     }
     
     private func handlePurchase() {
+        NotificationCenter.default.post(name: .vipExchangeAttempted, object: nil)
         let result = vipManager.purchaseVIP()
         alertMessage = result.message
         showingPurchaseAlert = true

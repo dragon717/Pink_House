@@ -71,12 +71,6 @@ struct SystemSettingsView: View {
             
             // MARK: - 数据备份与恢复
             AdaptiveSection(header: "本地备份与恢复") {
-                NavigationLink(destination: DataManagementView()) {
-                    Label("文件的备份与恢复", systemImage: "folder.badge.gearshape")
-                }
-                .adaptiveRow()
-                .captureGuideTarget(.localFileBackupRestoreEntry)
-
                 Button(action: prepareCSVExport) {
                     Label("导出 CSV (Export CSV)", systemImage: "tablecells")
                 }
@@ -86,12 +80,17 @@ struct SystemSettingsView: View {
                 Button(action: prepareBackup) {
                     Label("备份数据 (Backup Data)", systemImage: "externaldrive.badge.plus")
                 }
+                .captureGuideTarget(.localBackupDataAction)
                 .adaptiveRow()
                 
-                Button(action: { showingRestoreImporter = true }) {
+                Button(action: {
+                    NotificationCenter.default.post(name: .localRestoreTriggered, object: nil)
+                    showingRestoreImporter = true
+                }) {
                     Label("恢复数据 (Restore Data)", systemImage: "arrow.clockwise.icloud")
                 }
                 .foregroundColor(.red)
+                .captureGuideTarget(.localRestoreDataAction)
                 .adaptiveRow(showDivider: false)
             }
             
@@ -189,6 +188,7 @@ struct SystemSettingsView: View {
     }
     
     private func prepareBackup() {
+        NotificationCenter.default.post(name: .localBackupTriggered, object: nil)
         isLoading = true
         loadingMessage = "正在打包数据..."
         let container = modelContext.container

@@ -1,5 +1,6 @@
 import SwiftUI
 
+#if !WIDGET_EXTENSION
 extension FeatureExperienceGuideOverlay {
     var backupGuideContent: some View {
         VStack(spacing: 0) {
@@ -178,7 +179,7 @@ extension FeatureExperienceGuideOverlay {
     }
 
     var batchImportGuideContent: some View {
-        wardrobeGuideContent(accent: .green)
+        wardrobeGuideContent(accent: wardrobeGuideAccent(for: .batchImport))
     }
 
     var filterClassicGuideContent: some View {
@@ -215,12 +216,7 @@ extension FeatureExperienceGuideOverlay {
     }
 
     func widgetStep1Content(in geometry: GeometryProxy) -> some View {
-        let backButtonFrame = CGRect(
-            x: 16,
-            y: 8,
-            width: 44,
-            height: 44
-        )
+        let backButtonFrame = returnGuideBackButtonFrame(in: geometry)
 
         return ZStack {
             HollowMaskView(
@@ -249,6 +245,7 @@ extension FeatureExperienceGuideOverlay {
                         .fill(Color.white.opacity(0.001))
                         .frame(width: 72, height: 72)
                 }
+                .captureGuideInteractionRegion("feature.widget.return.hotspot")
                 .position(x: backButtonFrame.midX, y: backButtonFrame.midY)
             }
 
@@ -372,3 +369,4 @@ extension FeatureExperienceGuideOverlay {
         )
     }
 }
+#endif

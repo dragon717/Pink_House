@@ -160,6 +160,9 @@ struct ModernTabView: View {
         .toolbarBackground(.hidden, for: .tabBar)
         .tint(magicPalette.accent)
         .environment(\.isSimulationActive, isSimulationActive)
+        .overlay(alignment: .bottomTrailing) {
+            modernPetChatTabGuideAnchor
+        }
         .overlay {
             RewardBubbleView()
             // 悬浮宠物默认显示，不再依赖解锁状态
@@ -235,6 +238,26 @@ struct ModernTabView: View {
             return true
         }
         return false
+    }
+
+    private var modernPetChatTabGuideAnchor: some View {
+        GeometryReader { proxy in
+            let screenBounds = proxy.size
+            let tabBarHeight: CGFloat = 56
+            let frame = CGRect(
+                x: (screenBounds.width * 0.875) - 34,
+                y: screenBounds.height - proxy.safeAreaInsets.bottom - tabBarHeight,
+                width: 68,
+                height: tabBarHeight
+            )
+
+            Color.clear
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+                .captureGuideTarget(.homePetChatTab)
+                .allowsHitTesting(false)
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -675,6 +698,7 @@ struct LegacyTabView: View {
                     .foregroundColor(isSelected ? magicPalette.accent : magicPalette.secondaryText)
             }
             .frame(maxWidth: .infinity)
+            .captureGuideTarget(index == 1 ? .homeHouseTab : (index == 3 ? .homePetChatTab : nil))
         }
     }
 
@@ -1269,7 +1293,6 @@ struct MainTabView: View {
                 }
                 .noticePopup()
                 .withMagicTaskCompletions()
-                .withAppFirstLaunchGuide()
             } else {
                 // iOS 18-25 使用自定义红色背景底部导航栏
                 LegacyTabView(
@@ -1291,7 +1314,6 @@ struct MainTabView: View {
                 }
                 .noticePopup()
                 .withMagicTaskCompletions()
-                .withAppFirstLaunchGuide()
             }
         }
         // 监听解锁后的跳转通知
@@ -1411,8 +1433,11 @@ struct MainTabView: View {
         case .themeCustomize:
             // 从魔法任务详情页开始，先引导真实返回到「我」页，再找主题配色豆腐块
             AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .themeCustomize)
+        case .customColorPersonalization:
+            // 从魔法任务详情页开始，先引导返回「我」，再进入主题配色里的客制化与个性化路径
+            AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .customColorPersonalization)
         case .localFileBackupRestore:
-            // 从魔法任务详情页开始，先引导返回「我」，再下滑到系统与更多并进入本地文件备份与恢复
+            // 从魔法任务详情页开始：先返回「我」并进入系统与更多，再依次讲解备份/恢复，最后引导首次备份
             AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .localFileBackupRestore)
         case .exportCSV:
             // 从魔法任务详情页开始，先引导返回「我」，再下滑到系统与更多并点击导出 CSV

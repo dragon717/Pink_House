@@ -938,6 +938,24 @@ struct PetChatView: View {
         return "和\(petName)对话、搜索裙子..."
     }
 
+    private var guideSearchBarCaptureAnchor: some View {
+        GeometryReader { proxy in
+            let searchFrame = CGRect(
+                x: 16,
+                y: max(proxy.safeAreaInsets.top + 56, 94),
+                width: proxy.size.width - 32,
+                height: 44
+            )
+
+            Color.clear
+                .frame(width: searchFrame.width, height: searchFrame.height)
+                .position(x: searchFrame.midX, y: searchFrame.midY)
+                .captureGuideTarget(.petChatSearchBar)
+                .allowsHitTesting(false)
+        }
+        .allowsHitTesting(false)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -1023,6 +1041,9 @@ struct PetChatView: View {
                             .zIndex(100)
                     }
                 }
+            }
+            .overlay(alignment: .top) {
+                guideSearchBarCaptureAnchor
             }
             .onAppear {
                 if messages.isEmpty {

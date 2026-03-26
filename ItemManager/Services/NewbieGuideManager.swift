@@ -22,6 +22,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     @Published var isShowingFeatureExperienceGuide: Bool = false
     @Published var currentFeatureExperienceFeature: FeatureItem? = nil
     @Published private var guideTargetFrames: [GuideTargetKey: CGRect] = [:]
+    @Published private var guideInteractiveRegions: [String: CGRect] = [:]
     @Published private(set) var lastKnownHomeTab: String = "wardrobe"
     
     // 向后兼容：保留已使用字段名，内部改为统一存储
@@ -180,6 +181,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
 
         print("[FeatureExperienceGuide] 启动引导成功: \(feature.rawValue)")
         resetFeatureGuideTargetFrames()
+        resetGuideInteractiveRegions()
         currentFeatureExperienceFeature = feature
         isShowingFeatureExperienceGuide = true
     }
@@ -211,6 +213,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         isShowingFeatureExperienceGuide = false
         currentFeatureExperienceFeature = nil
         resetFeatureGuideTargetFrames()
+        resetGuideInteractiveRegions()
     }
 
     /// 关闭功能体验引导（不标记为完成）
@@ -218,6 +221,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         isShowingFeatureExperienceGuide = false
         currentFeatureExperienceFeature = nil
         resetFeatureGuideTargetFrames()
+        resetGuideInteractiveRegions()
     }
 
     // MARK: - 萌宠智能对话引导目标位置信息
@@ -229,6 +233,29 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     func updateGuideTargetFrame(_ frame: CGRect, for key: GuideTargetKey) {
         guard frame.width > 0, frame.height > 0 else { return }
         guideTargetFrames[key] = frame
+    }
+
+    func updateGuideInteractiveRegion(_ frame: CGRect, for id: String) {
+        guard frame.width > 0, frame.height > 0 else { return }
+        guideInteractiveRegions[id] = frame
+    }
+
+    func clearGuideInteractiveRegion(for id: String) {
+        guideInteractiveRegions[id] = nil
+    }
+
+    func resetGuideInteractiveRegions() {
+        guideInteractiveRegions.removeAll()
+    }
+
+    func hasGuideInteractiveRegions() -> Bool {
+        !guideInteractiveRegions.isEmpty
+    }
+
+    func isPointInGuideInteractiveRegions(_ point: CGPoint, hitSlop: CGFloat = 12) -> Bool {
+        guideInteractiveRegions.values.contains { region in
+            region.insetBy(dx: -hitSlop, dy: -hitSlop).contains(point)
+        }
     }
 
     func resetGuideTargetFrames(_ keys: [GuideTargetKey]? = nil) {
@@ -254,6 +281,9 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         resetGuideTargetFrames([
             .aiAnalysisVIPCard,
             .aiAnalysisExchangeButton,
+            .homeHouseTab,
+            .homePetChatTab,
+            .petChatSearchBar,
             .wealthEntry,
             .wealthMainTabSegment,
             .accountSyncEntry,
@@ -261,10 +291,12 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             .cloudFileBackupSection,
             .iCloudRealtimeSyncSection,
             .systemSettingsEntry,
-            .localFileBackupRestoreEntry,
+            .localBackupDataAction,
+            .localRestoreDataAction,
             .exportCSVEntry,
             .widgetCustomizeEntry,
             .themeCustomizeEntry,
+            .themeCustomPersonalizationEntry,
             .wardrobeSettingsEntry,
             .wardrobeInterfaceStyleSection,
             .wardrobeFilterModeSection,
@@ -278,7 +310,11 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             .wardrobeAddButton,
             .wardrobeManualCreateEntry,
             .wardrobeBatchImportEntry,
+            .wardrobeShortcutManualCreateAction,
+            .wardrobeShortcutBatchImportAction,
             .wardrobeMoreMenuButton,
+            .wardrobeEditMenuEntry,
+            .wardrobeBatchEditToolbar,
             .wardrobeSelectionCard,
             .wardrobeDoneSelectionButton,
             .ootdEntry,
@@ -287,6 +323,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             .themeColorModeTabs,
             .spaceBookModeTabs,
             .spaceBookShelfMoreMenuButton,
+            .spaceBookFirstBookCard,
             .spaceBookDetailMoreMenuButton,
             .spaceBookFirstPageCard,
             .spatialCanvasToolbar,
@@ -302,6 +339,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         isRunningAnimation = false
         showPointingVideo = false
         showCreateButtonHighlight = false
+        resetGuideInteractiveRegions()
         saveState()
     }
 
@@ -313,6 +351,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         isRunningAnimation = false
         showPointingVideo = false
         showCreateButtonHighlight = false
+        resetGuideInteractiveRegions()
         UserDefaults.standard.set(false, forKey: hasSeenWelcomeKey)
         saveState()
     }
@@ -328,7 +367,7 @@ struct FeatureExperienceGuideOverlay: View {
     @Environment(\.colorScheme) var colorScheme
     
     // 跨页面引导专用状态
-    @State var aiAnalysisStep: AIAnalysisGuideStep = .step1_returnToMe
+    @State var aiAnalysisStep: AIAnalysisGuideStep = .preUnlockStep1ReturnToMe
     @State var widgetCustomizeStep: WidgetCustomizeGuideStep = .step1_returnToMe
     @State var wardrobeAddGuideStep: WardrobeAddGuideStep = .step1_clickAddButton
     @State var themeCustomizeGuideStep: ThemeCustomizeGuideStep = .step1_returnToMe
@@ -336,6 +375,8 @@ struct FeatureExperienceGuideOverlay: View {
     @State var exportCSVGuideStep: ExportCSVGuideStep = .step1_returnToMe
     @State var cloudFileBackupRestoreGuideStep: CloudFileBackupRestoreGuideStep = .step1_returnToMe
     @State var themeScrollStepStartedAt: Date? = nil
+    @State var customColorScrollStepStartedAt: Date? = nil
+    @State var customColorPersonalizationGuideStep: CustomColorPersonalizationGuideStep = .step1_returnToMe
     @State var personalPreferenceGuideStep: PersonalPreferenceGuideStep = .step1_returnToMe
     @State var privacyDisplayGuideStep: PrivacyDisplayGuideStep = .step1_returnToMe
     @State var tagBrandFieldGuideStep: TagBrandFieldGuideStep = .step1_returnToMe
@@ -343,9 +384,13 @@ struct FeatureExperienceGuideOverlay: View {
     @State var calendarGuideStep: CalendarGuideStep = .step1_clickCalendarEntry
     @State var magicStickerGuideStep: MagicStickerGuideStep = .step1_longPressHouseTab
     @State var batchEditGuideStep: BatchEditGuideStep = .step1_clickMoreMenu
+    @State var didOpenBatchEditMoreMenu: Bool = false
     @State var spaceBookGuideStep: SpaceBookGuideStep = .step1_clickWardrobeOotdEntry
     @State var wealthGuideStep: WealthGuideStep = .step1_clickHouseTab
     @State var currentTab: String = "wardrobe"
+    @State var isSpaceBookCreationPromptVisible: Bool = false
+    @State var hasSpaceBooksForGuide: Bool = false
+    @State var hasSpaceBookPagesForGuide: Bool = false
 
     var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -401,11 +446,19 @@ struct FeatureExperienceGuideOverlay: View {
                 print("[FeatureExperienceGuide] Tab切换到: \(tab), aiStep: \(aiAnalysisStep), wealthStep: \(wealthGuideStep)")
 
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
-                   aiAnalysisStep == .step1_returnToMe,
+                   aiAnalysisStep == .preUnlockStep1ReturnToMe,
                    tab == "me",
                    guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        aiAnalysisStep = .step2_clickVIP
+                        aiAnalysisStep = .preUnlockStep2ClickVIP
+                    }
+                }
+
+                if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
+                   aiAnalysisStep == .postUnlockStep1ClickPetChatTab,
+                   tab == "petChat" {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        aiAnalysisStep = .postUnlockStep2ClickSearchBar
                     }
                 }
 
@@ -418,6 +471,11 @@ struct FeatureExperienceGuideOverlay: View {
                    themeCustomizeGuideStep == .step1_returnToMe,
                    tab == "me" {
                     advanceThemeGuideFromReturnStep()
+                }
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                   customColorPersonalizationGuideStep == .step1_returnToMe,
+                   tab == "me" {
+                    advanceCustomColorPersonalizationGuideFromReturnStep()
                 }
                 if guideManager.currentFeatureExperienceFeature == .localFileBackupRestore,
                    localFileBackupRestoreGuideStep == .step1_returnToMe,
@@ -452,6 +510,10 @@ struct FeatureExperienceGuideOverlay: View {
                    themeCustomizeGuideStep == .step1_returnToMe {
                     advanceThemeGuideFromReturnStep()
                 }
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                   customColorPersonalizationGuideStep == .step1_returnToMe {
+                    advanceCustomColorPersonalizationGuideFromReturnStep()
+                }
                 if guideManager.currentFeatureExperienceFeature == .localFileBackupRestore,
                    localFileBackupRestoreGuideStep == .step1_returnToMe {
                     advanceLocalFileBackupRestoreGuideFromReturnStep()
@@ -483,6 +545,18 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .petChatSearchStateChanged)) { notification in
+                guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+                let isSearching = notification.userInfo?["isSearching"] as? Bool ?? false
+                guard isSearching else { return }
+
+                if aiAnalysisStep == .postUnlockStep2ClickSearchBar ||
+                    (aiAnalysisStep == .postUnlockStep1ClickPetChatTab && currentTab == "petChat") {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        aiAnalysisStep = .postUnlockStep3FeatureIntro
+                    }
+                }
+            }
     }
 
     private func bindSettingsGuideEvents<Content: View>(_ content: Content) -> some View {
@@ -497,10 +571,16 @@ struct FeatureExperienceGuideOverlay: View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .vipCenterOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
-                   aiAnalysisStep == .step2_clickVIP {
+                   aiAnalysisStep == .preUnlockStep2ClickVIP {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        aiAnalysisStep = .step3_exchange
+                        aiAnalysisStep = .preUnlockStep3Exchange
                     }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .vipExchangeAttempted)) { _ in
+                if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
+                   aiAnalysisStep == .preUnlockStep3Exchange {
+                    guideManager.completeFeatureExperienceGuide()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .widgetSettingsOpened)) { _ in
@@ -518,6 +598,21 @@ struct FeatureExperienceGuideOverlay: View {
                         themeCustomizeGuideStep = .step4_switchToMagicTab
                     }
                 }
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                   customColorPersonalizationGuideStep.rawValue < CustomColorPersonalizationGuideStep.step4_switchToCustomTab.rawValue {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        customColorPersonalizationGuideStep = .step4_switchToCustomTab
+                    }
+                    if themeManager.colorSchemeMode == .custom {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                                  customColorPersonalizationGuideStep == .step4_switchToCustomTab else { return }
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                customColorPersonalizationGuideStep = .step5_personalizationExplanation
+                            }
+                        }
+                    }
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .magicColorModeChanged)) { notification in
                 guard let mode = notification.userInfo?["mode"] as? String else { return }
@@ -526,6 +621,13 @@ struct FeatureExperienceGuideOverlay: View {
                    mode == ColorSchemeMode.magic.rawValue {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         themeCustomizeGuideStep = .step5_magicThemeExplanation
+                    }
+                }
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                   customColorPersonalizationGuideStep == .step4_switchToCustomTab,
+                   mode == ColorSchemeMode.custom.rawValue {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        customColorPersonalizationGuideStep = .step5_personalizationExplanation
                     }
                 }
             }
@@ -561,7 +663,7 @@ struct FeatureExperienceGuideOverlay: View {
                 if guideManager.currentFeatureExperienceFeature == .localFileBackupRestore,
                    localFileBackupRestoreGuideStep == .step3_clickSystemSettings {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        localFileBackupRestoreGuideStep = .step4_clickBackupRestoreEntry
+                        localFileBackupRestoreGuideStep = .step4_introBackupData
                     }
                 }
                 if guideManager.currentFeatureExperienceFeature == .exportCSV,
@@ -573,7 +675,15 @@ struct FeatureExperienceGuideOverlay: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .dataBackupManagementOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .localFileBackupRestore,
-                   localFileBackupRestoreGuideStep.rawValue >= LocalFileBackupRestoreGuideStep.step3_clickSystemSettings.rawValue {
+                   localFileBackupRestoreGuideStep == .step3_clickSystemSettings {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        localFileBackupRestoreGuideStep = .step4_introBackupData
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .localBackupTriggered)) { _ in
+                if guideManager.currentFeatureExperienceFeature == .localFileBackupRestore,
+                   localFileBackupRestoreGuideStep.rawValue >= LocalFileBackupRestoreGuideStep.step6_firstBackup.rawValue {
                     guideManager.completeFeatureExperienceGuide()
                 }
             }
@@ -608,16 +718,24 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindWardrobeGuideEvents<Content: View>(_ content: Content) -> some View {
         content
+            .onReceive(NotificationCenter.default.publisher(for: .wardrobeMoreMenuOpened)) { _ in
+                if guideManager.currentFeatureExperienceFeature == .batchEdit,
+                   batchEditGuideStep == .step1_clickMoreMenu {
+                    didOpenBatchEditMoreMenu = true
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .wardrobeAddMenuOpened)) { _ in
                 advanceWardrobeAddGuideToChooseOptionIfNeeded()
             }
             .onReceive(NotificationCenter.default.publisher(for: .wardrobeManualCreateOpened)) { _ in
+                advanceWardrobeAddGuideToChooseOptionIfNeeded()
                 guard let feature = guideManager.currentFeatureExperienceFeature else { return }
                 if acceptsManualCreateGuideCompletion(for: feature) {
                     guideManager.completeFeatureExperienceGuide()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .wardrobeBatchImportOpened)) { _ in
+                advanceWardrobeAddGuideToChooseOptionIfNeeded()
                 guard let feature = guideManager.currentFeatureExperienceFeature else { return }
                 if acceptsBatchImportGuideCompletion(for: feature) {
                     guideManager.completeFeatureExperienceGuide()
@@ -628,6 +746,7 @@ struct FeatureExperienceGuideOverlay: View {
                 if guideManager.currentFeatureExperienceFeature == .batchEdit,
                    batchEditGuideStep == .step1_clickMoreMenu,
                    isSelectionMode {
+                    didOpenBatchEditMoreMenu = false
                     withAnimation(.easeInOut(duration: 0.3)) {
                         batchEditGuideStep = .step2_selectOneCard
                     }
@@ -650,6 +769,12 @@ struct FeatureExperienceGuideOverlay: View {
     }
 
     private func bindHouseGuideEvents<Content: View>(_ content: Content) -> some View {
+        let houseEntryBound = bindHouseEntryGuideEvents(content)
+        let spaceBookStateBound = bindSpaceBookStateGuideEvents(houseEntryBound)
+        return bindSpaceBookEditorGuideEvents(spaceBookStateBound)
+    }
+
+    private func bindHouseEntryGuideEvents<Content: View>(_ content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .ootdShelfOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .ootd,
@@ -689,6 +814,10 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
+    }
+
+    private func bindSpaceBookStateGuideEvents<Content: View>(_ content: Content) -> some View {
+        content
             .onReceive(NotificationCenter.default.publisher(for: .spatialBookShelfOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .spaceBook,
                    spaceBookGuideStep == .step2_switchToSpaceTab {
@@ -701,7 +830,7 @@ struct FeatureExperienceGuideOverlay: View {
                 if guideManager.currentFeatureExperienceFeature == .spaceBook,
                    spaceBookGuideStep == .step3_createSpaceBook {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step4_createFirstPage
+                        spaceBookGuideStep = hasSpaceBookPagesForGuide ? .step5_open3DEditor : .step4_createFirstPage
                     }
                 }
             }
@@ -713,9 +842,34 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .spaceBookCreationPromptVisibilityChanged)) { notification in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                let isVisible = notification.userInfo?["isVisible"] as? Bool ?? false
+                isSpaceBookCreationPromptVisible = isVisible
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .spaceBookShelfDataStateChanged)) { notification in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                let hasBooks = notification.userInfo?["hasBooks"] as? Bool ?? false
+                hasSpaceBooksForGuide = hasBooks
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .spaceBookDetailDataStateChanged)) { notification in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                let hasPages = notification.userInfo?["hasPages"] as? Bool ?? false
+                hasSpaceBookPagesForGuide = hasPages
+            }
+    }
+
+    private func bindSpaceBookEditorGuideEvents<Content: View>(_ content: Content) -> some View {
+        content
             .onReceive(NotificationCenter.default.publisher(for: .spatialCanvasEditorOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .spaceBook,
                    spaceBookGuideStep == .step5_open3DEditor {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        spaceBookGuideStep = .step6_openScanner
+                    }
+                } else if guideManager.currentFeatureExperienceFeature == .spaceBook,
+                          spaceBookGuideStep == .step4_createFirstPage,
+                          hasSpaceBookPagesForGuide {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         spaceBookGuideStep = .step6_openScanner
                     }
@@ -749,11 +903,11 @@ struct FeatureExperienceGuideOverlay: View {
         content
             .onChange(of: guideManager.aiAnalysisVIPCardGlobalFrame) { _, vipCardFrame in
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
-                   aiAnalysisStep == .step1_returnToMe,
+                   aiAnalysisStep == .preUnlockStep1ReturnToMe,
                    vipCardFrame != nil {
                     print("[FeatureExperienceGuide] 检测到VIP卡片位置，step1进入step2")
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        aiAnalysisStep = .step2_clickVIP
+                        aiAnalysisStep = .preUnlockStep2ClickVIP
                     }
                 }
             }
@@ -812,12 +966,21 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
-            .onChange(of: guideManager.guideTargetFrame(for: .localFileBackupRestoreEntry)) { _, frame in
+            .onChange(of: guideManager.guideTargetFrame(for: .localBackupDataAction)) { _, frame in
                 if guideManager.currentFeatureExperienceFeature == .localFileBackupRestore,
                    localFileBackupRestoreGuideStep == .step3_clickSystemSettings,
                    frame != nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        localFileBackupRestoreGuideStep = .step4_clickBackupRestoreEntry
+                        localFileBackupRestoreGuideStep = .step4_introBackupData
+                    }
+                }
+            }
+            .onChange(of: guideManager.guideTargetFrame(for: .localRestoreDataAction)) { _, frame in
+                if guideManager.currentFeatureExperienceFeature == .localFileBackupRestore,
+                   localFileBackupRestoreGuideStep == .step3_clickSystemSettings,
+                   frame != nil {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        localFileBackupRestoreGuideStep = .step4_introBackupData
                     }
                 }
             }
@@ -836,6 +999,11 @@ struct FeatureExperienceGuideOverlay: View {
                    frame != nil {
                     advanceThemeGuideToClickStepWithMinimumDwell()
                 }
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                   customColorPersonalizationGuideStep == .step2_scrollToThemeEntry,
+                   frame != nil {
+                    advanceCustomColorGuideToClickStepWithMinimumDwell()
+                }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .wardrobeTagManagementEntry)) { _, frame in
                 if guideManager.currentFeatureExperienceFeature == .tagBrandFieldDisplay,
@@ -852,80 +1020,128 @@ struct FeatureExperienceGuideOverlay: View {
     // MARK: - 空间手帐引导
 
     var spaceBookGuideContent: some View {
-        AnyView(
-            Group {
-                if usesPreUnlockWardrobeGuide(for: .spaceBook) {
-                    wardrobeGuideContent(accent: .blue)
-                } else {
-                    GeometryReader { geometry in
-                        switch spaceBookGuideStep {
-                        case .step1_clickWardrobeOotdEntry:
-                            let targetFrame = wardrobeOotdEntryGuideFrame(in: geometry)
-                            highlightedRectGuideContent(
-                                frame: targetFrame,
-                                cornerRadius: 18,
-                                title: "点击统计卡片里的「穿搭手帐」",
-                                message: "先点这个入口进入穿搭手帐，我们再去空间页签创建空间手帐。",
-                                currentStep: 1,
-                                totalSteps: 7,
-                                accent: .blue,
-                                actionTitle: nil,
-                                onAction: nil
-                            )
-                        case .step2_switchToSpaceTab:
-                            let fallbackFrame = CGRect(x: (geometry.size.width - 160) / 2, y: max(geometry.safeAreaInsets.top + 8, 12), width: 160, height: 32)
-                            let targetFrame = aiGuideTargetFrame(
-                                globalFrame: guideManager.guideTargetFrame(for: .spaceBookModeTabs),
-                                in: geometry,
-                                fallback: fallbackFrame
-                            )
-                            highlightedRectGuideContent(
-                                frame: targetFrame,
-                                cornerRadius: 12,
-                                title: "切到「空间」页签",
-                                message: "上方这里可以在「平面 / 空间」之间切换。请切到「空间」，下一步就去右上角「更多」新建空间手帐。",
-                                currentStep: 2,
-                                totalSteps: 7,
-                                accent: .blue,
-                                actionTitle: nil,
-                                onAction: nil
-                            )
-                        case .step3_createSpaceBook:
-                            let fallbackFrame = CGRect(x: geometry.size.width - 64, y: max(geometry.safeAreaInsets.top + 8, 12), width: 36, height: 36)
-                            let targetFrame = aiGuideTargetFrame(
-                                globalFrame: guideManager.guideTargetFrame(for: .spaceBookShelfMoreMenuButton),
-                                in: geometry,
-                                fallback: fallbackFrame
-                            )
-                            highlightedRectGuideContent(
-                                frame: targetFrame,
-                                cornerRadius: 18,
-                                title: "点右上角「更多」新建空间手帐",
-                                message: "在菜单里选择「新建空间手帐」。输入名称后点创建，会直接进入这本新手帐。",
-                                currentStep: 3,
-                                totalSteps: 7,
-                                accent: .blue,
-                                actionTitle: nil,
-                                onAction: nil
-                            )
+        if let preUnlockGuide = preUnlockWardrobeGuideContentIfNeeded(for: .spaceBook) {
+            return preUnlockGuide
+        }
+
+        return AnyView(
+            GeometryReader { geometry in
+                switch spaceBookGuideStep {
+                case .step1_clickWardrobeOotdEntry:
+                    let targetFrame = wardrobeOotdEntryGuideFrame(in: geometry)
+                    highlightedRectGuideContent(
+                        frame: targetFrame,
+                        cornerRadius: 18,
+                        title: "点击统计卡片里的「穿搭手帐」",
+                        message: "先点这个入口进入穿搭手帐，我们再去空间页签创建空间手帐。",
+                        currentStep: 1,
+                        totalSteps: 7,
+                        accent: .blue,
+                        actionTitle: nil,
+                        onAction: nil
+                    )
+                case .step2_switchToSpaceTab:
+                    let fallbackFrame = CGRect(x: (geometry.size.width - 160) / 2, y: max(geometry.safeAreaInsets.top + 8, 12), width: 160, height: 32)
+                    let targetFrame = aiGuideTargetFrame(
+                        globalFrame: guideManager.guideTargetFrame(for: .spaceBookModeTabs),
+                        in: geometry,
+                        fallback: fallbackFrame
+                    )
+                    highlightedRectGuideContent(
+                        frame: targetFrame,
+                        cornerRadius: 12,
+                        title: "切到「空间」页签",
+                        message: "上方这里可以在「平面 / 空间」之间切换。请切到「空间」，下一步就去右上角「更多」新建空间手帐。",
+                        currentStep: 2,
+                        totalSteps: 7,
+                        accent: .blue,
+                        actionTitle: nil,
+                        onAction: nil
+                    )
+                case .step3_createSpaceBook:
+                            if hasSpaceBooksForGuide {
+                                let fallbackFrame = CGRect(
+                                    x: 24,
+                                    y: max(geometry.safeAreaInsets.top + 100, geometry.size.height * 0.22),
+                                    width: min(180, geometry.size.width - 48),
+                                    height: 220
+                                )
+                                let targetFrame = aiGuideTargetFrame(
+                                    globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstBookCard),
+                                    in: geometry,
+                                    fallback: fallbackFrame
+                                )
+                                highlightedRectGuideContent(
+                                    frame: targetFrame,
+                                    cornerRadius: 20,
+                                    title: "直接点第一本空间手帐",
+                                    message: "你已经有空间手帐了，不用新建。先点进第一本，我们继续下一步。",
+                                    currentStep: 3,
+                                    totalSteps: 7,
+                                    accent: .blue,
+                                    actionTitle: nil,
+                                    onAction: nil
+                                )
+                            } else {
+                                VStack {
+                                    featureStepBubble(
+                                        title: isSpaceBookCreationPromptVisible ? "输入名称后点创建" : "点右上角「更多」新建空间手帐",
+                                        message: isSpaceBookCreationPromptVisible
+                                            ? "已打开新建弹窗，输入空间手帐名称并点击创建，即可进入下一步。"
+                                            : "请点右上角「更多」，选择「新建空间手帐」。输入名称并点击创建。",
+                                        currentStep: 3,
+                                        totalSteps: 7,
+                                        accent: .blue,
+                                        actionTitle: nil,
+                                        onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                        onAction: nil
+                                    )
+                                    .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
+                                    Spacer()
+                                }
+                            }
                         case .step4_createFirstPage:
-                            let fallbackFrame = CGRect(x: geometry.size.width - 64, y: max(geometry.safeAreaInsets.top + 8, 12), width: 36, height: 36)
-                            let targetFrame = aiGuideTargetFrame(
-                                globalFrame: guideManager.guideTargetFrame(for: .spaceBookDetailMoreMenuButton),
-                                in: geometry,
-                                fallback: fallbackFrame
-                            )
-                            highlightedRectGuideContent(
-                                frame: targetFrame,
-                                cornerRadius: 18,
-                                title: "输入首张名字后点创建",
-                                message: "进入新手帐后，继续点右上角「更多」，选「新建空间搭配」。输入首张名字并点创建。",
-                                currentStep: 4,
-                                totalSteps: 7,
-                                accent: .blue,
-                                actionTitle: nil,
-                                onAction: nil
-                            )
+                            if hasSpaceBookPagesForGuide {
+                                let fallbackFrame = CGRect(
+                                    x: 24,
+                                    y: geometry.size.height * 0.22,
+                                    width: (geometry.size.width - 64) / 2,
+                                    height: 180
+                                )
+                                let targetFrame = aiGuideTargetFrame(
+                                    globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstPageCard),
+                                    in: geometry,
+                                    fallback: fallbackFrame
+                                )
+                                highlightedRectGuideContent(
+                                    frame: targetFrame,
+                                    cornerRadius: 12,
+                                    title: "直接点第一张空间书页",
+                                    message: "当前手帐里已经有书页了，不用新建，直接点第一张进入 3D 编辑。",
+                                    currentStep: 4,
+                                    totalSteps: 7,
+                                    accent: .blue,
+                                    actionTitle: nil,
+                                    onAction: nil
+                                )
+                            } else {
+                                VStack {
+                                    featureStepBubble(
+                                        title: "输入首张名字后点创建",
+                                        message: isSpaceBookCreationPromptVisible
+                                            ? "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。"
+                                            : "进入新手帐后，点右上角「更多」并选择「新建空间搭配」，输入首张名字后点击创建。",
+                                        currentStep: 4,
+                                        totalSteps: 7,
+                                        accent: .blue,
+                                        actionTitle: nil,
+                                        onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                        onAction: nil
+                                    )
+                                    .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
+                                    Spacer()
+                                }
+                            }
                         case .step5_open3DEditor:
                             let fallbackFrame = CGRect(x: 24, y: geometry.size.height * 0.22, width: (geometry.size.width - 64) / 2, height: 180)
                             let targetFrame = aiGuideTargetFrame(
@@ -936,8 +1152,8 @@ struct FeatureExperienceGuideOverlay: View {
                             highlightedRectGuideContent(
                                 frame: targetFrame,
                                 cornerRadius: 12,
-                                title: "进入刚创建的空间书页",
-                                message: "首张空间书页创建后，点击它进入 3D 编辑界面。",
+                                title: "进入空间书页",
+                                message: "点击书页进入 3D 编辑界面。若是刚创建的首张书页，也是在这里进入。",
                                 currentStep: 5,
                                 totalSteps: 7,
                                 accent: .blue,
@@ -962,20 +1178,18 @@ struct FeatureExperienceGuideOverlay: View {
                                 actionTitle: nil,
                                 onAction: nil
                             )
-                        case .step7_scannerHowTo:
-                            bottomBubbleGuideContent(
-                                title: "开始空间扫描（最后一步）",
-                                message: "请在光线充足的地方开始检测；让镜头尽量包住需要扫描的物体，先完成稳定定位，再围绕物体做后续 360° 扫描。做到这一步就完成本次引导啦。",
-                                currentStep: 7,
-                                totalSteps: 7,
-                                accent: .blue,
-                                actionTitle: "知道了，完成引导",
-                                onAction: {
-                                    guideManager.completeFeatureExperienceGuide()
-                                }
-                            )
+                case .step7_scannerHowTo:
+                    bottomBubbleGuideContent(
+                        title: "开始空间扫描（最后一步）",
+                        message: "请在光线充足的地方开始检测；让镜头尽量包住需要扫描的物体，先完成稳定定位，再围绕物体做后续 360° 扫描。做到这一步就完成本次引导啦。",
+                        currentStep: 7,
+                        totalSteps: 7,
+                        accent: .blue,
+                        actionTitle: "知道了，完成引导",
+                        onAction: {
+                            guideManager.completeFeatureExperienceGuide()
                         }
-                    }
+                    )
                 }
             }
         )
@@ -990,15 +1204,10 @@ struct FeatureExperienceGuideOverlay: View {
     // MARK: - OOTD手帐引导
 
     var ootdGuideContent: some View {
-        AnyView(
-            Group {
-                if usesPreUnlockWardrobeGuide(for: .ootd) {
-                    wardrobeGuideContent(accent: .orange)
-                } else {
-                    ootdUnlockedGuideContent
-                }
-            }
-        )
+        if let preUnlockGuide = preUnlockWardrobeGuideContentIfNeeded(for: .ootd) {
+            return preUnlockGuide
+        }
+        return AnyView(ootdUnlockedGuideContent)
     }
 
     // MARK: - 新增批量引导内容
@@ -1019,13 +1228,92 @@ struct FeatureExperienceGuideOverlay: View {
         )
     }
 
+    func wardrobeAddButtonGuideFrame(in geometry: GeometryProxy) -> CGRect {
+        let fallbackFrame = CGRect(
+            x: geometry.size.width - 54,
+            y: max(geometry.safeAreaInsets.top + 8, 12),
+            width: 36,
+            height: 36
+        )
+
+        if let moreMenuGlobalFrame = guideManager.guideTargetFrame(for: .wardrobeMoreMenuButton),
+           moreMenuGlobalFrame.width > 0, moreMenuGlobalFrame.height > 0 {
+            let moreMenuLocalFrame = aiGuideTargetFrame(
+                globalFrame: moreMenuGlobalFrame,
+                in: geometry,
+                fallback: fallbackFrame
+            )
+            let inferredFromMoreMenu = CGRect(
+                x: min(geometry.size.width - moreMenuLocalFrame.width - 8, moreMenuLocalFrame.maxX + 8),
+                y: moreMenuLocalFrame.minY,
+                width: moreMenuLocalFrame.width,
+                height: moreMenuLocalFrame.height
+            )
+            return normalizedWardrobeAddButtonFrame(inferredFromMoreMenu, in: geometry)
+        }
+
+        let capturedFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .wardrobeAddButton),
+            in: geometry,
+            fallback: fallbackFrame
+        )
+
+        return normalizedWardrobeAddButtonFrame(capturedFrame, in: geometry)
+    }
+
+    func normalizedWardrobeAddButtonFrame(
+        _ frame: CGRect,
+        in geometry: GeometryProxy
+    ) -> CGRect {
+        let minimumSide: CGFloat = 34
+        let maximumSide: CGFloat = 46
+
+        var normalized = frame
+
+        // iOS 新导航样式下，右上角按钮可能被系统组合进同一胶囊。
+        // 引导要稳定对准最右侧的「+」按钮，而不是整个胶囊组。
+        let looksLikeGroupedCapsule = frame.width > frame.height * 1.45 && frame.width > 52
+        if looksLikeGroupedCapsule {
+            let targetSide = min(max(frame.height - 8, minimumSide), maximumSide)
+            normalized = CGRect(
+                x: frame.maxX - targetSide - 6,
+                y: frame.midY - targetSide / 2,
+                width: targetSide,
+                height: targetSide
+            )
+        }
+
+        if normalized.width < minimumSide || normalized.height < minimumSide {
+            let side = min(max(max(normalized.width, normalized.height) + 14, minimumSide), maximumSide)
+            normalized = CGRect(
+                x: normalized.midX - side / 2,
+                y: normalized.midY - side / 2,
+                width: side,
+                height: side
+            )
+        }
+
+        let minX: CGFloat = 8
+        let maxX = max(minX, geometry.size.width - normalized.width - 8)
+        let minY = max(geometry.safeAreaInsets.top + 4, 10)
+        let maxY = max(minY, geometry.size.height * 0.34)
+
+        return CGRect(
+            x: min(max(normalized.minX, minX), maxX),
+            y: min(max(normalized.minY, minY), maxY),
+            width: normalized.width,
+            height: normalized.height
+        )
+    }
+
     func wardrobeMenuAreaFrameFromAddButton(
         in geometry: GeometryProxy,
         addFrame: CGRect
     ) -> CGRect {
         let screenBounds = geometry.size
+        let hasDraftContinueEntry = hasValidWardrobeDraftForGuide()
         let menuWidth = min(max(screenBounds.width * 0.58, 208), 292)
-        let menuHeight: CGFloat = 118
+        let menuHeight: CGFloat = hasDraftContinueEntry ? 167 : 118
         let x = min(max(addFrame.maxX - menuWidth - 8, 12), screenBounds.width - menuWidth - 12)
         let y = max(geometry.safeAreaInsets.top + 10, addFrame.maxY + 16)
         return CGRect(x: x, y: y, width: menuWidth, height: menuHeight)
@@ -1036,15 +1324,38 @@ struct FeatureExperienceGuideOverlay: View {
         addFrame: CGRect,
         preferBatchImport: Bool
     ) -> CGRect {
+        let hasDraftContinueEntry = hasValidWardrobeDraftForGuide()
         let menuFrame = wardrobeMenuAreaFrameFromAddButton(in: geometry, addFrame: addFrame)
-        let rowHeight = (menuFrame.height - 20) / 2
-        let rowIndex: CGFloat = preferBatchImport ? 1 : 0
+        let totalRows: CGFloat = hasDraftContinueEntry ? 3 : 2
+        let rowHeight = (menuFrame.height - 20) / totalRows
+        let baseRowIndex: CGFloat = preferBatchImport ? 1 : 0
+        let rowIndex: CGFloat = baseRowIndex + (hasDraftContinueEntry ? 1 : 0)
         return CGRect(
             x: menuFrame.minX + 14,
             y: menuFrame.minY + 8 + rowHeight * rowIndex,
             width: menuFrame.width - 28,
             height: rowHeight - 6
         )
+    }
+
+    func hasValidWardrobeDraftForGuide() -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: "ClothingEditDraft") else { return false }
+        return (try? JSONDecoder().decode(ClothingEditDraft.self, from: data)) != nil
+    }
+
+    func isCloseToExpectedWardrobeMenuOptionFrame(
+        _ frame: CGRect,
+        expected: CGRect
+    ) -> Bool {
+        let verticalTolerance = max(40, expected.height * 1.05)
+        let horizontalTolerance = max(70, expected.width * 0.45)
+        let widthRatio = frame.width / max(expected.width, 1)
+        let heightRatio = frame.height / max(expected.height, 1)
+
+        return abs(frame.midY - expected.midY) <= verticalTolerance &&
+            abs(frame.midX - expected.midX) <= horizontalTolerance &&
+            widthRatio >= 0.45 && widthRatio <= 1.8 &&
+            heightRatio >= 0.45 && heightRatio <= 1.8
     }
 
     func isReasonableWardrobeMenuCaptureFrame(
@@ -1055,6 +1366,8 @@ struct FeatureExperienceGuideOverlay: View {
         guard frame.width >= 80, frame.height >= 24 else { return false }
         guard frame.minY < geometry.size.height * 0.45 else { return false }
         guard abs(frame.midX - addFrame.midX) < geometry.size.width * 0.46 else { return false }
+        guard frame.maxX > geometry.size.width * 0.45 else { return false }
+        guard frame.width <= geometry.size.width * 0.78 else { return false }
         return true
     }
 
@@ -1062,44 +1375,138 @@ struct FeatureExperienceGuideOverlay: View {
         in geometry: GeometryProxy,
         addFrame: CGRect
     ) -> CGRect {
-        let screenBounds = geometry.size
         let menuAreaFallback = wardrobeMenuAreaFrameFromAddButton(in: geometry, addFrame: addFrame)
 
-        guard let feature = guideManager.currentFeatureExperienceFeature else {
+        guard let feature = guideManager.currentFeatureExperienceFeature,
+              let target = wardrobeGuideStep2Target(for: feature) else {
             return menuAreaFallback
         }
 
-        if feature == .batchImport {
-            let preferBatchImport = FeatureUnlockManager.shared.isUnlocked(feature)
-            let targetKey: GuideTargetKey = preferBatchImport ? .wardrobeBatchImportEntry : .wardrobeManualCreateEntry
-            if let capturedFrame = localGuideTargetFrame(for: targetKey, in: geometry),
-               isReasonableWardrobeMenuCaptureFrame(capturedFrame, in: geometry, addFrame: addFrame) {
-                return capturedFrame.insetBy(dx: -4, dy: -3)
+        let manualExpected = wardrobeMenuOptionFrameFromAddButton(
+            in: geometry,
+            addFrame: addFrame,
+            preferBatchImport: false
+        )
+        let batchExpected = wardrobeMenuOptionFrameFromAddButton(
+            in: geometry,
+            addFrame: addFrame,
+            preferBatchImport: true
+        )
+
+        let manualCaptured = localGuideTargetFrame(for: .wardrobeManualCreateEntry, in: geometry)
+        let batchCaptured = localGuideTargetFrame(for: .wardrobeBatchImportEntry, in: geometry)
+
+        let manualFrame = manualCaptured.flatMap {
+            isReasonableWardrobeMenuCaptureFrame($0, in: geometry, addFrame: addFrame) &&
+            isCloseToExpectedWardrobeMenuOptionFrame($0, expected: manualExpected) ? $0 : nil
+        }
+        let batchFrame = batchCaptured.flatMap {
+            isReasonableWardrobeMenuCaptureFrame($0, in: geometry, addFrame: addFrame) &&
+            isCloseToExpectedWardrobeMenuOptionFrame($0, expected: batchExpected) ? $0 : nil
+        }
+
+        switch target {
+        case .batchImport:
+            if let batchFrame, let manualFrame {
+                let chosen = batchFrame.midY >= manualFrame.midY ? batchFrame : manualFrame
+                return chosen.insetBy(dx: -6, dy: -4)
+            }
+            if let batchFrame {
+                return batchFrame.insetBy(dx: -6, dy: -4)
+            }
+            if let manualFrame,
+               isCloseToExpectedWardrobeMenuOptionFrame(manualFrame, expected: batchExpected) {
+                return manualFrame.insetBy(dx: -6, dy: -4)
             }
             return wardrobeMenuOptionFrameFromAddButton(
                 in: geometry,
                 addFrame: addFrame,
-                preferBatchImport: preferBatchImport
+                preferBatchImport: true
             )
-        }
 
-        let manualFrame = localGuideTargetFrame(for: .wardrobeManualCreateEntry, in: geometry)
-        let batchFrame = localGuideTargetFrame(for: .wardrobeBatchImportEntry, in: geometry)
+        case .manualCreate:
+            if let manualFrame, let batchFrame {
+                let chosen = manualFrame.midY <= batchFrame.midY ? manualFrame : batchFrame
+                return chosen.insetBy(dx: -6, dy: -4)
+            }
+            if let manualFrame {
+                return manualFrame.insetBy(dx: -6, dy: -4)
+            }
+            if let batchFrame,
+               isCloseToExpectedWardrobeMenuOptionFrame(batchFrame, expected: manualExpected) {
+                return batchFrame.insetBy(dx: -6, dy: -4)
+            }
+            return wardrobeMenuOptionFrameFromAddButton(
+                in: geometry,
+                addFrame: addFrame,
+                preferBatchImport: false
+            )
 
-        if let manualFrame, let batchFrame,
-           isReasonableWardrobeMenuCaptureFrame(manualFrame, in: geometry, addFrame: addFrame),
-           isReasonableWardrobeMenuCaptureFrame(batchFrame, in: geometry, addFrame: addFrame) {
-            return manualFrame.union(batchFrame).insetBy(dx: -4, dy: -4)
+        case .either:
+            if let manualFrame, let batchFrame {
+                return manualFrame.union(batchFrame).insetBy(dx: -4, dy: -4)
+            }
+            if let manualFrame {
+                return manualFrame
+            }
+            if let batchFrame {
+                return batchFrame
+            }
+            return menuAreaFallback
         }
-        if let manualFrame,
-           isReasonableWardrobeMenuCaptureFrame(manualFrame, in: geometry, addFrame: addFrame) {
-            return manualFrame
+    }
+
+    func wardrobeShortcutActionFallbackFrame(in geometry: GeometryProxy) -> CGRect {
+        let buttonWidth = min(288, geometry.size.width - 48)
+        let buttonHeight: CGFloat = 52
+        return CGRect(
+            x: (geometry.size.width - buttonWidth) / 2,
+            y: geometry.size.height - 182,
+            width: buttonWidth,
+            height: buttonHeight
+        )
+    }
+
+    func batchEditMenuAreaFrameFromMoreButton(
+        in geometry: GeometryProxy,
+        moreButtonFrame: CGRect
+    ) -> CGRect {
+        let screenBounds = geometry.size
+        let menuWidth = min(max(screenBounds.width * 0.52, 216), 300)
+        let menuHeight: CGFloat = 172
+        let x = min(max(moreButtonFrame.maxX - menuWidth + 4, 12), screenBounds.width - menuWidth - 12)
+        let y = max(geometry.safeAreaInsets.top + 2, moreButtonFrame.maxY)
+        return CGRect(x: x, y: y, width: menuWidth, height: menuHeight)
+    }
+
+    func batchEditMenuEditEntryFallbackFrame(
+        in geometry: GeometryProxy,
+        moreButtonFrame: CGRect
+    ) -> CGRect {
+        let menuFrame = batchEditMenuAreaFrameFromMoreButton(in: geometry, moreButtonFrame: moreButtonFrame)
+        let rowHeight = (menuFrame.height - 22) / 3
+        return CGRect(
+            x: menuFrame.minX + 14,
+            y: menuFrame.minY + 8 + rowHeight,
+            width: menuFrame.width - 28,
+            height: rowHeight - 6
+        )
+    }
+
+    func batchEditMenuEditEntryGuideFrame(
+        in geometry: GeometryProxy,
+        moreButtonFrame: CGRect
+    ) -> CGRect {
+        let fallbackFrame = batchEditMenuEditEntryFallbackFrame(in: geometry, moreButtonFrame: moreButtonFrame)
+        guard let capturedFrame = localGuideTargetFrame(for: .wardrobeEditMenuEntry, in: geometry),
+              capturedFrame.width >= 90,
+              capturedFrame.height >= 28,
+              capturedFrame.minY < geometry.size.height * 0.46,
+              abs(capturedFrame.midX - fallbackFrame.midX) <= geometry.size.width * 0.42,
+              abs(capturedFrame.midY - fallbackFrame.midY) <= max(64, fallbackFrame.height * 1.5) else {
+            return fallbackFrame
         }
-        if let batchFrame,
-           isReasonableWardrobeMenuCaptureFrame(batchFrame, in: geometry, addFrame: addFrame) {
-            return batchFrame
-        }
-        return menuAreaFallback
+        return capturedFrame.insetBy(dx: -6, dy: -4)
     }
 
     func wardrobeOotdEntryGuideFrame(in geometry: GeometryProxy) -> CGRect {
@@ -1127,8 +1534,8 @@ struct FeatureExperienceGuideOverlay: View {
     func ootdEntryMirrorFallbackFrame(in geometry: GeometryProxy) -> CGRect {
         let containerSize = geometry.size
         // fallback 直接贴近当前 House 画面里的镜子区域：
-        // 稍微上移，并放大一圈，减少真实热区采集前的等待感和错位感
-        let hotspot = CGRect(x: 0.355, y: 0.305, width: 0.072, height: 0.118)
+        // 再往下挪一点，避免高亮偏到镜子上沿之外
+        let hotspot = CGRect(x: 0.355, y: 0.24, width: 0.072, height: 0.1)
         return CGRect(
             x: containerSize.width * hotspot.minX,
             y: containerSize.height * hotspot.minY,
@@ -1169,7 +1576,7 @@ struct FeatureExperienceGuideOverlay: View {
         let screenBounds = geometry.size
         let rococoFallback = CGRect(
             x: screenBounds.width * 0.40,
-            y: screenBounds.height * 0.66,
+            y: screenBounds.height * 0.75,
             width: max(96, screenBounds.width * 0.16),
             height: max(108, screenBounds.height * 0.12)
         )
@@ -1191,20 +1598,9 @@ struct FeatureExperienceGuideOverlay: View {
 
     func wardrobeGuideContent(accent: Color) -> some View {
         GeometryReader { geometry in
-            let screenBounds = geometry.size
-            let addButtonFallbackFrame = CGRect(
-                x: screenBounds.width - 54,
-                y: max(geometry.safeAreaInsets.top + 8, 12),
-                width: 36,
-                height: 36
-            )
-            let addFrame = aiGuideTargetFrame(
-                globalFrame: guideManager.guideTargetFrame(for: .wardrobeAddButton),
-                in: geometry,
-                fallback: addButtonFallbackFrame
-            )
+            let addFrame = wardrobeAddButtonGuideFrame(in: geometry)
 
-            let step1GuideFrame = addFrame.offsetBy(dx: 0, dy: -12)
+            let step1GuideFrame = addFrame.offsetBy(dx: 0, dy: 32)
 
             switch wardrobeAddGuideStep {
             case .step1_clickAddButton:
@@ -1221,7 +1617,10 @@ struct FeatureExperienceGuideOverlay: View {
                     )
 
                     CatPawTapAnimation(
-                        position: CGPoint(x: step1GuideFrame.midX, y: step1GuideFrame.midY - 12),
+                        position: CGPoint(
+                            x: step1GuideFrame.midX,
+                            y: step1GuideFrame.midY
+                        ),
                         delay: 0.5
                     )
 
@@ -1243,26 +1642,93 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             case .step2_chooseTargetOption:
-                let optionFrame = wardrobeGuideStep2Frame(in: geometry, addFrame: addFrame)
+                if let feature = guideManager.currentFeatureExperienceFeature,
+                   feature == .batchImport,
+                   let target = wardrobeGuideStep2Target(for: feature),
+                   target != .either {
+                    let shortcutTitle = target == .batchImport ? "点击「批量导入」" : "点击「手动创建」"
+                    let actionTitle = target == .batchImport ? "打开「批量导入」" : "打开「手动创建」"
+                    let actionMessage = target == .batchImport
+                        ? "点击下方按钮，直接进入「批量导入」流程。"
+                        : "点击下方按钮，直接进入「手动创建」流程。"
+                    let shortcutKey: GuideTargetKey = target == .batchImport
+                        ? .wardrobeShortcutBatchImportAction
+                        : .wardrobeShortcutManualCreateAction
 
-                highlightedRectGuideContent(
-                    frame: optionFrame,
-                    cornerRadius: 14,
-                    title: currentWardrobeGuideStep2Title,
-                    message: currentWardrobeGuideStep2Message,
-                    currentStep: 2,
-                    totalSteps: 2,
-                    accent: accent,
-                    actionTitle: nil,
-                    onAction: nil
-                )
-                .overlay {
-                    CatPawTapAnimation(
-                        position: CGPoint(x: optionFrame.maxX - 4, y: optionFrame.midY - 6),
-                        delay: 0.5
+                    let shortcutFrame = aiGuideTargetFrame(
+                        globalFrame: guideManager.guideTargetFrame(for: shortcutKey),
+                        in: geometry,
+                        fallback: wardrobeShortcutActionFallbackFrame(in: geometry)
                     )
-                    .opacity(0.4)
-                    .allowsHitTesting(false)
+
+                    ZStack {
+                        HollowMaskView(
+                            highlightFrame: shortcutFrame,
+                            highlightType: .roundedRect,
+                            cornerRadius: 12
+                        )
+
+                        RoundedRectHighlightView(
+                            frame: shortcutFrame,
+                            cornerRadius: 12
+                        )
+
+                        CatPawTapAnimation(
+                            position: CGPoint(
+                                x: shortcutFrame.midX,
+                                y: shortcutFrame.midY
+                            ),
+                            delay: 0.5
+                        )
+                        .opacity(0.4)
+                        .allowsHitTesting(false)
+
+                        VStack {
+                            Spacer()
+                            featureStepBubble(
+                                title: shortcutTitle,
+                                message: actionMessage,
+                                currentStep: 2,
+                                totalSteps: 2,
+                                accent: accent,
+                                actionTitle: actionTitle,
+                                actionGuideTarget: shortcutKey,
+                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                onAction: {
+                                    NotificationCenter.default.post(
+                                        name: target == .batchImport ? .guideRequestWardrobeBatchImport : .guideRequestWardrobeManualCreate,
+                                        object: nil
+                                    )
+                                }
+                            )
+                            .padding(.bottom, 120)
+                        }
+                    }
+                } else {
+                    let optionFrame = wardrobeGuideStep2Frame(in: geometry, addFrame: addFrame)
+
+                    highlightedRectGuideContent(
+                        frame: optionFrame,
+                        cornerRadius: 14,
+                        title: currentWardrobeGuideStep2Title,
+                        message: currentWardrobeGuideStep2Message,
+                        currentStep: 2,
+                        totalSteps: 2,
+                        accent: accent,
+                        actionTitle: nil,
+                        onAction: nil
+                    )
+                    .overlay {
+                        CatPawTapAnimation(
+                            position: CGPoint(
+                                x: optionFrame.midX,
+                                y: optionFrame.midY
+                            ),
+                            delay: 0.5
+                        )
+                        .opacity(0.4)
+                        .allowsHitTesting(false)
+                    }
                 }
             }
         }
@@ -1358,6 +1824,110 @@ struct FeatureExperienceGuideOverlay: View {
         }
     }
 
+    var customColorPersonalizationGuideContent: some View {
+        GeometryReader { geometry in
+            switch customColorPersonalizationGuideStep {
+            case .step1_returnToMe:
+                return AnyView(returnToMeGuideContent(
+                    in: geometry,
+                    title: "返回「我」界面",
+                    message: "先从魔法任务页返回到「我」，再去找主题配色豆腐块。",
+                    currentStep: 1,
+                    totalSteps: 5,
+                    accent: .purple,
+                    onReturn: handleReturnToMeGuideAction
+                ))
+            case .step2_scrollToThemeEntry:
+                return AnyView(
+                    ZStack {
+                        WidgetScrollHintView(
+                            title: "请向下滑动",
+                            subtitle: "主题配色入口在更下方的豆腐块区域"
+                        )
+                        .allowsHitTesting(false)
+
+                        VStack {
+                            Spacer()
+                            featureStepBubble(
+                                title: "下滑找到主题配色",
+                                message: "请继续向下滑动，在设置豆腐块区域找到「主题配色」入口。",
+                                currentStep: 2,
+                                totalSteps: 5,
+                                accent: .purple,
+                                actionTitle: nil,
+                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                onAction: nil
+                            )
+                            .padding(.bottom, 120)
+                        }
+                    }
+                )
+            case .step3_clickThemeEntry:
+                let fallbackFrame = CGRect(x: 16, y: geometry.size.height * 0.42, width: (geometry.size.width - 48) / 2, height: 92)
+                let targetFrame = aiGuideTargetFrame(
+                    globalFrame: guideManager.guideTargetFrame(for: .themeCustomizeEntry),
+                    in: geometry,
+                    fallback: fallbackFrame
+                )
+                return AnyView(highlightedRectGuideContent(
+                    frame: targetFrame,
+                    cornerRadius: 16,
+                    title: "点击主题配色豆腐块",
+                    message: "在「我」页找到「主题配色」豆腐块，点进去进入主题页。",
+                    currentStep: 3,
+                    totalSteps: 5,
+                    accent: .purple,
+                    actionTitle: nil,
+                    onAction: nil
+                ))
+            case .step4_switchToCustomTab:
+                let fallbackFrame = CGRect(x: (geometry.size.width - 240) / 2, y: max(geometry.safeAreaInsets.top + 64, 84), width: 240, height: 32)
+                let targetFrame = aiGuideTargetFrame(
+                    globalFrame: guideManager.guideTargetFrame(for: .themeColorModeTabs),
+                    in: geometry,
+                    fallback: fallbackFrame
+                )
+                return AnyView(highlightedRectGuideContent(
+                    frame: targetFrame,
+                    cornerRadius: 12,
+                    title: "切换到客制化配色页签",
+                    message: "请切到「客制化配色」，我们下一步会看「个性化」入口和我的主题方案。",
+                    currentStep: 4,
+                    totalSteps: 5,
+                    accent: .purple,
+                    actionTitle: nil,
+                    onAction: nil
+                ))
+            case .step5_personalizationExplanation:
+                let fallbackFrame = CGRect(
+                    x: 16,
+                    y: max(geometry.safeAreaInsets.top + 330, geometry.size.height * 0.56),
+                    width: (geometry.size.width - 48) / 2,
+                    height: 112
+                )
+                let targetFrame = aiGuideTargetFrame(
+                    globalFrame: guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry),
+                    in: geometry,
+                    fallback: fallbackFrame
+                )
+                return AnyView(highlightedRectGuideContent(
+                    frame: targetFrame,
+                    cornerRadius: 14,
+                    title: "认识个性化入口",
+                    message: "这里是「个性化」豆腐块。点击后会展开「我的主题方案」，你可以继续自定义字体配色和卡片样式，打造自己的专属主题。",
+                    currentStep: 5,
+                    totalSteps: 5,
+                    accent: .purple,
+                    actionTitle: "知道了",
+                    onAction: {
+                        guideManager.completeFeatureExperienceGuide()
+                    },
+                    bubbleOnTop: true
+                ))
+            }
+        }
+    }
+
     var localFileBackupRestoreGuideContent: some View {
         GeometryReader { geometry in
             switch localFileBackupRestoreGuideStep {
@@ -1367,7 +1937,7 @@ struct FeatureExperienceGuideOverlay: View {
                     title: "返回「我」界面",
                     message: "先从魔法任务页返回到「我」，我们去找本地文件备份入口。",
                     currentStep: 1,
-                    totalSteps: 4,
+                    totalSteps: 6,
                     accent: .indigo,
                     onReturn: handleLocalFileBackupRestoreGuideReturnAction
                 ))
@@ -1386,7 +1956,7 @@ struct FeatureExperienceGuideOverlay: View {
                                 title: "下滑找到系统与更多",
                                 message: "继续向下滑动，在设置豆腐块区域找到「系统与更多」。",
                                 currentStep: 2,
-                                totalSteps: 4,
+                                totalSteps: 6,
                                 accent: .indigo,
                                 actionTitle: nil,
                                 onSkip: { guideManager.dismissFeatureExperienceGuide() },
@@ -1409,33 +1979,82 @@ struct FeatureExperienceGuideOverlay: View {
                     title: "点击系统与更多",
                     message: "点开「系统与更多」，进入系统设置页。",
                     currentStep: 3,
-                    totalSteps: 4,
+                    totalSteps: 6,
                     accent: .indigo,
                     actionTitle: nil,
-                    onAction: nil
+                    onAction: nil,
+                    bubbleOnTop: true
                 ))
-            case .step4_clickBackupRestoreEntry:
+            case .step4_introBackupData:
                 let fallbackFrame = CGRect(
                     x: 16,
-                    y: max(geometry.safeAreaInsets.top + 250, 280),
+                    y: max(geometry.safeAreaInsets.top + 330, geometry.size.height * 0.43),
                     width: geometry.size.width - 32,
-                    height: 54
+                    height: 52
                 )
-                let targetFrame = aiGuideTargetFrame(
-                    globalFrame: guideManager.guideTargetFrame(for: .localFileBackupRestoreEntry),
-                    in: geometry,
-                    fallback: fallbackFrame
-                )
+                let backupFrame = localGuideTargetFrame(for: .localBackupDataAction, in: geometry)
+                let targetFrame = backupFrame?.insetBy(dx: -4, dy: -4) ?? fallbackFrame
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "点击文件的备份与恢复",
-                    message: "在「系统与更多」里点击「文件的备份与恢复」，就能进入本地文件备份与恢复页面。",
+                    title: "先认识「备份数据」",
+                    message: "备份是最重要的一步：它会把当前数据打包保存，防止误删、换机或重装时丢失记录。建议养成定期备份习惯。",
                     currentStep: 4,
-                    totalSteps: 4,
+                    totalSteps: 6,
+                    accent: .indigo,
+                    actionTitle: "下一步：看恢复",
+                    onAction: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            localFileBackupRestoreGuideStep = .step5_introRestoreData
+                        }
+                    },
+                    bubbleOnTop: true
+                ))
+            case .step5_introRestoreData:
+                let fallbackFrame = CGRect(
+                    x: 16,
+                    y: max(geometry.safeAreaInsets.top + 390, geometry.size.height * 0.5),
+                    width: geometry.size.width - 32,
+                    height: 52
+                )
+                let restoreFrame = localGuideTargetFrame(for: .localRestoreDataAction, in: geometry)
+                let targetFrame = restoreFrame?.insetBy(dx: -4, dy: -4) ?? fallbackFrame
+                return AnyView(highlightedRectGuideContent(
+                    frame: targetFrame,
+                    cornerRadius: 14,
+                    title: "再认识「恢复数据」",
+                    message: "恢复可以把已备份的数据找回来，支持跨设备/跨平台迁移后继续使用。先有备份，恢复才有意义。",
+                    currentStep: 5,
+                    totalSteps: 6,
+                    accent: .indigo,
+                    actionTitle: "下一步：首次备份",
+                    onAction: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            localFileBackupRestoreGuideStep = .step6_firstBackup
+                        }
+                    },
+                    bubbleOnTop: true
+                ))
+            case .step6_firstBackup:
+                let fallbackFrame = CGRect(
+                    x: 16,
+                    y: max(geometry.safeAreaInsets.top + 330, geometry.size.height * 0.43),
+                    width: geometry.size.width - 32,
+                    height: 52
+                )
+                let backupFrame = localGuideTargetFrame(for: .localBackupDataAction, in: geometry)
+                let targetFrame = backupFrame?.insetBy(dx: -4, dy: -4) ?? fallbackFrame
+                return AnyView(highlightedRectGuideContent(
+                    frame: targetFrame,
+                    cornerRadius: 14,
+                    title: "现在做一次首次备份",
+                    message: "请点击「备份数据」完成首次备份。备份可能需要一点时间；若你现在不方便，也可以点左上角「跳过」，下次再备份。",
+                    currentStep: 6,
+                    totalSteps: 6,
                     accent: .indigo,
                     actionTitle: nil,
-                    onAction: nil
+                    onAction: nil,
+                    bubbleOnTop: true
                 ))
             }
         }
@@ -1495,7 +2114,8 @@ struct FeatureExperienceGuideOverlay: View {
                     totalSteps: 4,
                     accent: .teal,
                     actionTitle: nil,
-                    onAction: nil
+                    onAction: nil,
+                    bubbleOnTop: true
                 ))
             case .step4_clickExportCSV:
                 let fallbackFrame = CGRect(
@@ -1608,7 +2228,8 @@ struct FeatureExperienceGuideOverlay: View {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             cloudFileBackupRestoreGuideStep = .step5_realtimeSyncDelayExplanation
                         }
-                    }
+                    },
+                    bubbleOnTop: true
                 ))
             case .step5_realtimeSyncDelayExplanation:
                 let fallbackFrame = CGRect(
@@ -1633,7 +2254,8 @@ struct FeatureExperienceGuideOverlay: View {
                     actionTitle: "知道了",
                     onAction: {
                         guideManager.completeFeatureExperienceGuide()
-                    }
+                    },
+                    bubbleOnTop: true
                 ))
             }
         }
@@ -1809,7 +2431,8 @@ struct FeatureExperienceGuideOverlay: View {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             privacyDisplayGuideStep = .step4_showOriginalPrice
                         }
-                    }
+                    },
+                    bubbleOnTop: true
                 ))
             case .step4_showOriginalPrice:
                 let fallbackFrame = CGRect(
@@ -1834,7 +2457,8 @@ struct FeatureExperienceGuideOverlay: View {
                     actionTitle: "知道了",
                     onAction: {
                         guideManager.completeFeatureExperienceGuide()
-                    }
+                    },
+                    bubbleOnTop: true
                 ))
             }
         }
@@ -1897,87 +2521,165 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 )
             case .step4_tagManagement:
-                let fallbackFrame = CGRect(
-                    x: 16,
-                    y: max(geometry.safeAreaInsets.top + 464, 500),
-                    width: geometry.size.width - 32,
-                    height: 52
-                )
-                let targetFrame = aiGuideTargetFrame(
-                    globalFrame: guideManager.guideTargetFrame(for: .wardrobeTagManagementEntry),
-                    in: geometry,
-                    fallback: fallbackFrame
-                )
-                return AnyView(highlightedRectGuideContent(
-                    frame: targetFrame,
-                    cornerRadius: 14,
-                    title: "标签管理",
-                    message: "这里管理你所有标签（例如风格、场景、季节等）。把标签体系整理好后，衣橱筛选会更快、更准，也更方便复用。",
-                    currentStep: 4,
-                    totalSteps: 6,
-                    accent: .pink,
-                    actionTitle: "下一步：品牌管理",
-                    onAction: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            tagBrandFieldGuideStep = .step5_brandManagement
+                if let globalFrame = guideManager.guideTargetFrame(for: .wardrobeTagManagementEntry),
+                   isGuideTargetVisibleOnScreen(globalFrame) {
+                    let targetFrame = aiGuideTargetFrame(
+                        globalFrame: globalFrame,
+                        in: geometry,
+                        fallback: CGRect(
+                            x: 16,
+                            y: max(geometry.safeAreaInsets.top + 464, 500),
+                            width: geometry.size.width - 32,
+                            height: 52
+                        )
+                    )
+                    return AnyView(highlightedRectGuideContent(
+                        frame: targetFrame,
+                        cornerRadius: 14,
+                        title: "标签管理",
+                        message: "这里管理你所有标签（例如风格、场景、季节等）。把标签体系整理好后，衣橱筛选会更快、更准，也更方便复用。",
+                        currentStep: 4,
+                        totalSteps: 6,
+                        accent: .pink,
+                        actionTitle: "下一步：品牌管理",
+                        onAction: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                tagBrandFieldGuideStep = .step5_brandManagement
+                            }
+                        },
+                        bubbleOnTop: true
+                    ))
+                }
+                return AnyView(
+                    ZStack {
+                        WidgetScrollHintView(
+                            title: "请继续向下滑动",
+                            subtitle: "先找到「标签管理」后再继续"
+                        )
+                        .allowsHitTesting(false)
+
+                        VStack {
+                            Spacer()
+                            featureStepBubble(
+                                title: "继续下滑找到标签管理",
+                                message: "当前还没进入「标签管理」区域，请继续往下滑动。",
+                                currentStep: 4,
+                                totalSteps: 6,
+                                accent: .pink,
+                                actionTitle: nil,
+                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                onAction: nil
+                            )
+                            .padding(.bottom, 120)
                         }
-                    },
-                    bubbleOnTop: true
-                ))
+                    }
+                )
             case .step5_brandManagement:
-                let fallbackFrame = CGRect(
-                    x: 16,
-                    y: max(geometry.safeAreaInsets.top + 520, 556),
-                    width: geometry.size.width - 32,
-                    height: 52
-                )
-                let targetFrame = aiGuideTargetFrame(
-                    globalFrame: guideManager.guideTargetFrame(for: .wardrobeBrandManagementEntry),
-                    in: geometry,
-                    fallback: fallbackFrame
-                )
-                return AnyView(highlightedRectGuideContent(
-                    frame: targetFrame,
-                    cornerRadius: 14,
-                    title: "品牌管理",
-                    message: "这里统一维护品牌名称，避免同品牌出现多个写法。品牌数据干净后，统计、筛选和搜索都会更稳定。",
-                    currentStep: 5,
-                    totalSteps: 6,
-                    accent: .pink,
-                    actionTitle: "下一步：属性字段管理",
-                    onAction: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            tagBrandFieldGuideStep = .step6_fieldManagement
+                if let globalFrame = guideManager.guideTargetFrame(for: .wardrobeBrandManagementEntry),
+                   isGuideTargetVisibleOnScreen(globalFrame) {
+                    let targetFrame = aiGuideTargetFrame(
+                        globalFrame: globalFrame,
+                        in: geometry,
+                        fallback: CGRect(
+                            x: 16,
+                            y: max(geometry.safeAreaInsets.top + 520, 556),
+                            width: geometry.size.width - 32,
+                            height: 52
+                        )
+                    )
+                    return AnyView(highlightedRectGuideContent(
+                        frame: targetFrame,
+                        cornerRadius: 14,
+                        title: "品牌管理",
+                        message: "这里统一维护品牌名称，避免同品牌出现多个写法。品牌数据干净后，统计、筛选和搜索都会更稳定。",
+                        currentStep: 5,
+                        totalSteps: 6,
+                        accent: .pink,
+                        actionTitle: "下一步：属性字段管理",
+                        onAction: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                tagBrandFieldGuideStep = .step6_fieldManagement
+                            }
+                        },
+                        bubbleOnTop: true
+                    ))
+                }
+                return AnyView(
+                    ZStack {
+                        WidgetScrollHintView(
+                            title: "请继续向下滑动",
+                            subtitle: "先找到「品牌管理」后再继续"
+                        )
+                        .allowsHitTesting(false)
+
+                        VStack {
+                            Spacer()
+                            featureStepBubble(
+                                title: "继续下滑找到品牌管理",
+                                message: "请继续往下滑动，看到「品牌管理」后再继续下一步。",
+                                currentStep: 5,
+                                totalSteps: 6,
+                                accent: .pink,
+                                actionTitle: nil,
+                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                onAction: nil
+                            )
+                            .padding(.bottom, 120)
                         }
-                    },
-                    bubbleOnTop: true
-                ))
+                    }
+                )
             case .step6_fieldManagement:
-                let fallbackFrame = CGRect(
-                    x: 16,
-                    y: max(geometry.safeAreaInsets.top + 576, 612),
-                    width: geometry.size.width - 32,
-                    height: 52
+                if let globalFrame = guideManager.guideTargetFrame(for: .wardrobeFieldManagementEntry),
+                   isGuideTargetVisibleOnScreen(globalFrame) {
+                    let targetFrame = aiGuideTargetFrame(
+                        globalFrame: globalFrame,
+                        in: geometry,
+                        fallback: CGRect(
+                            x: 16,
+                            y: max(geometry.safeAreaInsets.top + 576, 612),
+                            width: geometry.size.width - 32,
+                            height: 52
+                        )
+                    )
+                    return AnyView(highlightedRectGuideContent(
+                        frame: targetFrame,
+                        cornerRadius: 14,
+                        title: "属性字段管理",
+                        message: "这里可以控制属性字段的显示与排序。把常用字段放前面、低频字段放后面，日常录入和查看都会更顺手。",
+                        currentStep: 6,
+                        totalSteps: 6,
+                        accent: .pink,
+                        actionTitle: "知道了",
+                        onAction: {
+                            guideManager.completeFeatureExperienceGuide()
+                        },
+                        bubbleOnTop: true
+                    ))
+                }
+                return AnyView(
+                    ZStack {
+                        WidgetScrollHintView(
+                            title: "请继续向下滑动",
+                            subtitle: "先找到「属性字段管理」后再完成"
+                        )
+                        .allowsHitTesting(false)
+
+                        VStack {
+                            Spacer()
+                            featureStepBubble(
+                                title: "继续下滑找到属性字段管理",
+                                message: "请继续往下滑动，看到「属性字段排序与显示」后完成本次引导。",
+                                currentStep: 6,
+                                totalSteps: 6,
+                                accent: .pink,
+                                actionTitle: nil,
+                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                onAction: nil
+                            )
+                            .padding(.bottom, 120)
+                        }
+                    }
                 )
-                let targetFrame = aiGuideTargetFrame(
-                    globalFrame: guideManager.guideTargetFrame(for: .wardrobeFieldManagementEntry),
-                    in: geometry,
-                    fallback: fallbackFrame
-                )
-                return AnyView(highlightedRectGuideContent(
-                    frame: targetFrame,
-                    cornerRadius: 14,
-                    title: "属性字段管理",
-                    message: "这里可以控制属性字段的显示与排序。把常用字段放前面、低频字段放后面，日常录入和查看都会更顺手。",
-                    currentStep: 6,
-                    totalSteps: 6,
-                    accent: .pink,
-                    actionTitle: "知道了",
-                    onAction: {
-                        guideManager.completeFeatureExperienceGuide()
-                    },
-                    bubbleOnTop: true
-                ))
             }
         }
     }
@@ -2016,8 +2718,8 @@ struct FeatureExperienceGuideOverlay: View {
     }
 
     var calendarGuideContent: some View {
-        if usesPreUnlockWardrobeGuide(for: .calendar) {
-            return AnyView(wardrobeGuideContent(accent: .purple))
+        if let preUnlockGuide = preUnlockWardrobeGuideContentIfNeeded(for: .calendar) {
+            return preUnlockGuide
         }
 
         return AnyView(
@@ -2055,8 +2757,8 @@ struct FeatureExperienceGuideOverlay: View {
     }
 
     var magicStickerGuideContent: some View {
-        if usesPreUnlockWardrobeGuide(for: .ootdDefaultBook) {
-            return AnyView(wardrobeGuideContent(accent: .pink))
+        if let preUnlockGuide = preUnlockWardrobeGuideContentIfNeeded(for: .ootdDefaultBook) {
+            return preUnlockGuide
         }
 
         return AnyView(
@@ -2065,8 +2767,8 @@ struct FeatureExperienceGuideOverlay: View {
                 case .step1_longPressHouseTab:
                     let tabBarHeight: CGFloat = 56
                     let houseTabFrame = CGRect(
-                        x: (geometry.size.width * 0.375) - 34 + 20,
-                        y: geometry.size.height - geometry.safeAreaInsets.bottom - tabBarHeight + 40,
+                        x: (geometry.size.width * 0.375) - 34,
+                        y: geometry.size.height - geometry.safeAreaInsets.bottom - tabBarHeight,
                         width: 68,
                         height: tabBarHeight
                     )
@@ -2148,17 +2850,44 @@ struct FeatureExperienceGuideOverlay: View {
                     in: geometry,
                     fallback: fallbackFrame
                 )
+                // 右上角“更多”按钮在新导航样式下会偏上；
+                // 统一下移高亮与猫爪，确保两者持续对齐真实菜单入口
+                let step1GuideYOffset: CGFloat = 26
+                let adjustedFrame = CGRect(
+                    x: max(8, targetFrame.minX - 10),
+                    y: max(geometry.safeAreaInsets.top + 12, targetFrame.minY + step1GuideYOffset),
+                    width: targetFrame.width,
+                    height: targetFrame.height
+                )
+                // 菜单定位必须基于原始「更多」按钮坐标；
+                // 不要复用 step1 的下移高亮坐标，否则会把「编辑」行 fallback 算到下方。
+                let menuEditFrame = batchEditMenuEditEntryGuideFrame(in: geometry, moreButtonFrame: targetFrame)
+                let shouldHighlightEditEntry = didOpenBatchEditMoreMenu ||
+                    guideManager.guideTargetFrame(for: .wardrobeEditMenuEntry) != nil
+                let step1Frame = shouldHighlightEditEntry ? menuEditFrame : adjustedFrame
+                let step1CornerRadius: CGFloat = shouldHighlightEditEntry ? 14 : 18
+                let step1Title = shouldHighlightEditEntry ? "点击「编辑」" : "点击右上角更多按钮"
+                let step1Message = shouldHighlightEditEntry
+                    ? "菜单已经弹出啦，点击「编辑」进入批量编辑模式。"
+                    : "先点右上角「更多」，再在弹出菜单里选择「编辑」。进入编辑态后，我们继续下一步。"
                 return AnyView(highlightedRectGuideContent(
-                    frame: targetFrame,
-                    cornerRadius: 18,
-                    title: "点击右上角更多按钮",
-                    message: "先点右上角「更多」，再在弹出菜单里选择「编辑」。进入编辑态后，我们继续下一步。",
+                    frame: step1Frame,
+                    cornerRadius: step1CornerRadius,
+                    title: step1Title,
+                    message: step1Message,
                     currentStep: 1,
                     totalSteps: 4,
                     accent: .green,
                     actionTitle: nil,
                     onAction: nil
-                ))
+                )
+                .overlay {
+                    CatPawTapAnimation(
+                        position: CGPoint(x: step1Frame.midX, y: step1Frame.midY),
+                        delay: 0.5
+                    )
+                    .allowsHitTesting(false)
+                })
             case .step2_selectOneCard:
                 let fallbackFrame = CGRect(x: 16, y: geometry.size.height * 0.28, width: (geometry.size.width - 48) / 2, height: 160)
                 let targetFrame = aiGuideTargetFrame(
@@ -2178,7 +2907,21 @@ struct FeatureExperienceGuideOverlay: View {
                     onAction: nil
                 ))
             case .step3_toolbarExplanation:
-                return AnyView(bottomBubbleGuideContent(
+                let fallbackFrame = CGRect(
+                    x: 12,
+                    y: geometry.size.height - geometry.safeAreaInsets.bottom - 180,
+                    width: geometry.size.width - 24,
+                    height: 100
+                )
+                let toolbarFrame = aiGuideTargetFrame(
+                    globalFrame: guideManager.guideTargetFrame(for: .wardrobeBatchEditToolbar),
+                    in: geometry,
+                    fallback: fallbackFrame
+                ).insetBy(dx: -4, dy: -6)
+
+                return AnyView(highlightedRectGuideContent(
+                    frame: toolbarFrame,
+                    cornerRadius: 16,
                     title: "认识批量编辑工具条",
                     message: "底部这排就是批量编辑常用操作：删除、复制、更多、全选。更多里还能继续做标签、品牌、颜色、尺码、状态等批量处理。",
                     currentStep: 3,
@@ -2189,8 +2932,17 @@ struct FeatureExperienceGuideOverlay: View {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             batchEditGuideStep = .step4_finishSelection
                         }
-                    }
-                ))
+                    },
+                    bubbleOnTop: true
+                )
+                .overlay {
+                    CatPawTapAnimation(
+                        position: CGPoint(x: toolbarFrame.midX, y: toolbarFrame.midY),
+                        delay: 0.5
+                    )
+                    .opacity(0.4)
+                    .allowsHitTesting(false)
+                })
             case .step4_finishSelection:
                 let fallbackFrame = CGRect(x: geometry.size.width - 64, y: max(geometry.safeAreaInsets.top + 8, 12), width: 36, height: 36)
                 let targetFrame = aiGuideTargetFrame(

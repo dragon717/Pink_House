@@ -7,6 +7,7 @@ struct GenericFeatureGuideBubbleView: View {
     let totalSteps: Int
     let accent: Color
     let actionTitle: String?
+    let actionGuideTarget: GuideTargetKey?
     let onSkip: () -> Void
     let onAction: (() -> Void)?
 
@@ -83,6 +84,7 @@ struct GenericFeatureGuideBubbleView: View {
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+                    .captureGuideTarget(actionGuideTarget)
                     .padding(.top, 8)
                 }
             }
@@ -100,6 +102,7 @@ struct GenericFeatureGuideBubbleView: View {
         )
         .frame(maxWidth: 320)
         .padding(.horizontal, 20)
+        .captureGuideInteractionRegion("guide.text.bubble")
     }
 }
 
@@ -141,7 +144,7 @@ struct AIAnalysisGuideBubbleView: View {
 
             VStack(spacing: 12) {
                 HStack(spacing: 4) {
-                    ForEach(AIAnalysisGuideStep.allCases, id: \.rawValue) { currentStep in
+                    ForEach(step.stepsInFlow, id: \.rawValue) { currentStep in
                         Circle()
                             .fill(currentStep.rawValue <= step.rawValue ? magicPalette.accent : magicPalette.tertiaryText.opacity(0.35))
                             .frame(width: 8, height: 8)
@@ -159,11 +162,11 @@ struct AIAnalysisGuideBubbleView: View {
                     .lineSpacing(4)
                     .padding(.horizontal, 8)
 
-                if step == .step3_exchange {
+                if step.showsCompletionButton {
                     Button {
                         onComplete()
                     } label: {
-                        Text("知道了")
+                        Text(step.completionButtonTitle)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(magicPalette.bubbleUserTextColor)
                             .frame(maxWidth: .infinity)
@@ -194,6 +197,7 @@ struct AIAnalysisGuideBubbleView: View {
         )
         .frame(maxWidth: 320)
         .padding(.horizontal, 20)
+        .captureGuideInteractionRegion("guide.text.bubble")
     }
 }
 
@@ -356,6 +360,7 @@ struct WidgetCustomizeGuideBubbleView: View {
         )
         .frame(maxWidth: 320)
         .padding(.horizontal, 20)
+        .captureGuideInteractionRegion("guide.text.bubble")
     }
 }
 
@@ -468,5 +473,6 @@ struct WealthGuideBubbleView: View {
         )
         .frame(maxWidth: 320)
         .padding(.horizontal, 20)
+        .captureGuideInteractionRegion("guide.text.bubble")
     }
 }

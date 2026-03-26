@@ -275,6 +275,15 @@ struct HomeView: View {
                     userInfo: ["isSelectionMode": newValue]
                 )
             }
+            .onReceive(NotificationCenter.default.publisher(for: .guideRequestWardrobeManualCreate)) { _ in
+                guard selectedTab == .wardrobe else { return }
+                continueFromDraft = false
+                showingAddSheet = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .guideRequestWardrobeBatchImport)) { _ in
+                guard selectedTab == .wardrobe else { return }
+                showingBatchImportSheet = true
+            }
             .sheet(isPresented: $showingDepositNotificationSheet) {
                 NavigationStack {
                     DepositNotificationView()
@@ -494,6 +503,7 @@ struct HomeView: View {
                     } label: {
                         Label("编辑", systemImage: "pencil.circle")
                     }
+                    .captureGuideTarget(.wardrobeEditMenuEntry)
                 }
                 
                 // 自定义排序编辑（仅在非编辑模式且排序为自定义时显示入口）
@@ -512,8 +522,16 @@ struct HomeView: View {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
+                .captureGuideTarget(.wardrobeMoreMenuButton)
+                .onTapGesture {
+                    NotificationCenter.default.post(name: .wardrobeMoreMenuOpened, object: nil)
+                }
         }
-        .captureGuideTarget(.wardrobeMoreMenuButton)
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                NotificationCenter.default.post(name: .wardrobeMoreMenuOpened, object: nil)
+            }
+        )
     }
 
     private var sortButton: some View {
@@ -1026,12 +1044,17 @@ struct HomeView: View {
     
     // 标记是否从草稿继续
     @State private var continueFromDraft = false
+
+    private func notifyWardrobeAddMenuOpened() {
+        NotificationCenter.default.post(name: .wardrobeAddMenuOpened, object: nil)
+    }
     
     private var addButton: some View {
         Menu {
             // 如果有草稿，显示"从上次未保存继续"选项
             if draftManager.hasDraft() {
                 Button { 
+                    notifyWardrobeAddMenuOpened()
                     continueFromDraft = true
                     showingAddSheet = true 
                 } label: { 
@@ -1042,33 +1065,45 @@ struct HomeView: View {
             }
             
             Button { 
+                notifyWardrobeAddMenuOpened()
                 continueFromDraft = false
                 showingAddSheet = true 
             } label: { 
                 Label("手动创建", systemImage: "square.and.pencil")
-                    .captureGuideTarget(.wardrobeManualCreateEntry)
             }
+            .captureGuideTarget(.wardrobeManualCreateEntry)
             
-            Button { showingBatchImportSheet = true } label: {
+            Button {
+                notifyWardrobeAddMenuOpened()
+                showingBatchImportSheet = true
+            } label: {
                 Label("批量导入", systemImage: "square.and.arrow.down.on.square")
-                    .captureGuideTarget(.wardrobeBatchImportEntry)
             }
+            .captureGuideTarget(.wardrobeBatchImportEntry)
             
             // 从社区导入：跟随联网功能显示/隐藏
             if networkManager.canShowNetworkUI() {
-                Button { showingCommunityImportAlert = true } label: { Label("从社区导入", systemImage: "icloud.and.arrow.down") }
+                Button {
+                    notifyWardrobeAddMenuOpened()
+                    showingCommunityImportAlert = true
+                } label: {
+                    Label("从社区导入", systemImage: "icloud.and.arrow.down")
+                }
             }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
+                .captureGuideTarget(.wardrobeAddButton)
+                .onTapGesture {
+                    notifyWardrobeAddMenuOpened()
+                }
         }
         .simultaneousGesture(
             TapGesture().onEnded {
-                NotificationCenter.default.post(name: .wardrobeAddMenuOpened, object: nil)
+                notifyWardrobeAddMenuOpened()
             }
         )
-        .captureGuideTarget(.wardrobeAddButton)
         .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {
             Button("好的", role: .cancel) { }
         }

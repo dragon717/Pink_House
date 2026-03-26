@@ -26,6 +26,9 @@ struct RewardBubbleView: View {
                                         }
                                     }
                                 }
+                                .onNavigateToMagicTasks {
+                                    navigateToMagicTasks()
+                                }
                                 .transition(.move(edge: .top).combined(with: .opacity))
                             }
                         }
@@ -46,6 +49,9 @@ struct RewardBubbleView: View {
                         // 只显示最新的 3 个
                         ForEach(Array(rewards.prefix(3).enumerated()), id: \.element.id) { index, reward in
                             RewardBubble(amount: reward.amount, message: reward.message, onClose: nil)
+                                .onNavigateToMagicTasks {
+                                    navigateToMagicTasks()
+                                }
                                 .scaleEffect(scale(for: index))
                                 .offset(y: offset(for: index))
                                 .zIndex(Double(rewards.count - index)) // 确保最新的在最上面
@@ -56,6 +62,8 @@ struct RewardBubbleView: View {
                                         withAnimation(.spring()) {
                                             isExpanded = true
                                         }
+                                    } else {
+                                        navigateToMagicTasks()
                                     }
                                 }
                         }
@@ -98,12 +106,28 @@ struct RewardBubbleView: View {
     private func opacity(for index: Int) -> Double {
         return 1.0 - Double(index) * 0.15
     }
+    
+    private func navigateToMagicTasks() {
+        withAnimation(.spring()) {
+            isExpanded = false
+            rewards.removeAll()
+        }
+        NotificationCenter.default.post(name: .navigateToMagicTasks, object: nil)
+    }
 }
 
 struct RewardBubble: View {
     let amount: Int
     let message: String
     var onClose: (() -> Void)? = nil
+    private var onNavigateToMagicTasks: (() -> Void)? = nil
+    
+    init(amount: Int, message: String, onClose: (() -> Void)? = nil) {
+        self.amount = amount
+        self.message = message
+        self.onClose = onClose
+        self.onNavigateToMagicTasks = nil
+    }
     
     var body: some View {
         HStack(spacing: 12) {
@@ -127,6 +151,21 @@ struct RewardBubble: View {
                 Text(message)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
+                
+                if let onNavigateToMagicTasks {
+                    Button {
+                        onNavigateToMagicTasks()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                            Text("前往魔法任务获得更多")
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.pink)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
+                }
             }
             
             Spacer()
@@ -157,6 +196,12 @@ struct RewardBubble: View {
                 )
         }
         .frame(maxWidth: 300)
+    }
+    
+    func onNavigateToMagicTasks(_ action: @escaping () -> Void) -> RewardBubble {
+        var bubble = self
+        bubble.onNavigateToMagicTasks = action
+        return bubble
     }
 }
 

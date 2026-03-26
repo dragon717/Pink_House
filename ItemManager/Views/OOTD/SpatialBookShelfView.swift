@@ -47,71 +47,103 @@ struct SpatialBookShelfView: View {
     @State private var draggingItem: SpaceBookGroup?
 
     var body: some View {
+        applyPresentationModifiers(
+            to: applyLifecycleAndToolbar(
+                to: applyChangeHandlers(to: rootContent)
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
         ZStack {
-            // Background
-            LiquidBackground()
-                .ignoresSafeArea()
+            backgroundView
+            bookshelfMainContent
+            openingBookOverlay
+        }
+    }
 
-            if let selectedBook = selectedBook {
-                // Split Layout (Detail Mode)
-                let _ = print("[DEBUG] Detail mode - selectedBook: \(selectedBook.title), books count: \(books.count)")
-                HStack(spacing: 0) {
-                    // Sidebar: List of Books (可手动隐藏)
-                    if isSidebarVisible {
-                        SpaceBookSidebarView(
-                            books: isEditing ? editableBooks : books,
-                            selectedBook: selectedBook,
-                            onSelect: { book in
-                                print("[DEBUG] onSelect called with book: \(book.title)")
-                                if !isEditing {
-                                    self.selectedBook = book
-                                }
-                            },
-                            isEditing: isEditing
-                        )
-                        .transition(.move(edge: .leading))
-                    }
+    private var backgroundView: some View {
+        LiquidBackground()
+            .ignoresSafeArea()
+    }
 
-                    // Content: Book Detail
-                    SpaceBookDetailView(
-                        book: selectedBook,
-                        isSidebarVisible: $isSidebarVisible
-                    )
-                        .id(selectedBook.id) // Force refresh
-                        .transition(.opacity)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarLeading) {
-                                Button {
-                                    withAnimation {
-                                        self.selectedBook = nil
-                                    }
-                                } label: {
-                                    Image(systemName: "chevron.left")
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(.primary)
-                                }
-                            }
-                        }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            } else {
-                // Grid Layout (Bookshelf Mode)
-                bookGridContent
+    @ViewBuilder
+    private var bookshelfMainContent: some View {
+        if let selectedBook {
+            detailModeContent(for: selectedBook)
+        } else {
+            bookGridContent
+        }
+    }
+
+    private func detailModeContent(for selectedBook: SpaceBookGroup) -> some View {
+        HStack(spacing: 0) {
+            if isSidebarVisible {
+                sidebarView(for: selectedBook)
             }
+            detailContentView(for: selectedBook)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
 
-            // Animation Overlay
-            if let book = openingBook {
-                SpaceBookOpeningAnimationView(book: book) {
-                    withAnimation {
-                        selectedBook = book
-                        openingBook = nil
-                        onSelectionChange?(true)
-                    }
+    private func sidebarView(for selectedBook: SpaceBookGroup) -> some View {
+        SpaceBookSidebarView(
+            books: isEditing ? editableBooks : books,
+            selectedBook: selectedBook,
+            onSelect: { book in
+                print("[DEBUG] onSelect called with book: \(book.title)")
+                if !isEditing {
+                    self.selectedBook = book
                 }
-                .zIndex(100)
+            },
+            isEditing: isEditing
+        )
+        .transition(.move(edge: .leading))
+    }
+
+    private func detailContentView(for selectedBook: SpaceBookGroup) -> some View {
+        SpaceBookDetailView(
+            book: selectedBook,
+            isSidebarVisible: $isSidebarVisible
+        )
+        .id(selectedBook.id)
+        .transition(.opacity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .toolbar { detailBackToolbar }
+    }
+
+    @ToolbarContentBuilder
+    private var detailBackToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button {
+                withAnimation {
+                    self.selectedBook = nil
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
             }
         }
+    }
+
+    @ViewBuilder
+    private var openingBookOverlay: some View {
+        if let book = openingBook {
+            SpaceBookOpeningAnimationView(book: book) {
+                withAnimation {
+                    selectedBook = book
+                    openingBook = nil
+                    onSelectionChange?(true)
+                }
+            }
+            .zIndex(100)
+        }
+    }
+
+    private func applyChangeHandlers<Content: View>(to content: Content) -> some View {
+        content
         .onChange(of: selectedBook) { _, newValue in
             onSelectionChange?(newValue != nil)
         }
@@ -131,53 +163,30 @@ struct SpatialBookShelfView: View {
                 editableBooks = newValue
             }
         }
-        .onAppear {
-            NotificationCenter.default.post(name: .spatialBookShelfOpened, object: nil)
+        .onChange(of: books.count) { _, _ in
+            publishSpaceBookShelfGuideDataState()
         }
-        .toolbar {
-            if selectedBook == nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        // Custom Sort Edit Button
-                        Button {
-                            withAnimation {
-                                isEditing.toggle()
-                            }
-                        } label: {
-                            if isEditing {
-                                Image(systemName: "checkmark.circle")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.pink)
-                            } else {
-                                Image(systemName: "list.number")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.primary)
-                            }
-                        }
-
-                        Menu {
-                            Button {
-                                newBookName = ""
-                                showingNewBookAlert = true
-                            } label: {
-                                Label("新建空间手帐", systemImage: "plus.rectangle.on.folder")
-                            }
-
-                            Divider()
-
-                            NavigationLink(destination: RecycleBinView(initialTab: 2)) {
-                                Label("垃圾篓", systemImage: "trash")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(.primary)
-                        }
-                        .captureGuideTarget(.spaceBookShelfMoreMenuButton)
-                    }
-                }
-            }
+        .onChange(of: showingNewBookAlert) { _, isVisible in
+            postSpaceBookCreationPromptVisibilityChanged(isVisible: isVisible)
         }
-        .alert("新建空间手帐", isPresented: $showingNewBookAlert) {
+    }
+
+    private func applyLifecycleAndToolbar<Content: View>(to content: Content) -> some View {
+        content
+            .onAppear(perform: handleViewAppear)
+            .onDisappear(perform: handleViewDisappear)
+            .toolbar { bookshelfToolbar }
+    }
+
+    private func applyPresentationModifiers<Content: View>(to content: Content) -> some View {
+        let withNewBookAlert = applyNewBookAlert(to: content)
+        let withDeleteBookAlert = applyDeleteBookAlert(to: withNewBookAlert)
+        let withRenameBookAlert = applyRenameBookAlert(to: withDeleteBookAlert)
+        return applyCoverPicker(to: withRenameBookAlert)
+    }
+
+    private func applyNewBookAlert<Content: View>(to content: Content) -> some View {
+        content.alert("新建空间手帐", isPresented: $showingNewBookAlert) {
             TextField("名称", text: $newBookName)
             Button("取消", role: .cancel) {}
             Button("创建") {
@@ -197,7 +206,10 @@ struct SpatialBookShelfView: View {
                 }
             }
         }
-        .alert("删除手帐", isPresented: $showingDeleteBookAlert) {
+    }
+
+    private func applyDeleteBookAlert<Content: View>(to content: Content) -> some View {
+        content.alert("删除手帐", isPresented: $showingDeleteBookAlert) {
             Button("取消", role: .cancel) { bookToDelete = nil }
             Button("删除", role: .destructive) {
                 if let book = bookToDelete {
@@ -211,7 +223,10 @@ struct SpatialBookShelfView: View {
         } message: {
             Text("确定要将「\(bookToDelete?.title ?? "此手帐")」移入回收站吗？")
         }
-        .alert("重命名手帐", isPresented: $showingRenameBookAlert) {
+    }
+
+    private func applyRenameBookAlert<Content: View>(to content: Content) -> some View {
+        content.alert("重命名手帐", isPresented: $showingRenameBookAlert) {
             TextField("名称", text: $renameBookName)
             Button("取消", role: .cancel) { bookToRename = nil }
             Button("保存") {
@@ -222,16 +237,58 @@ struct SpatialBookShelfView: View {
                 bookToRename = nil
             }
         }
-        .photosPicker(isPresented: $showingCoverPicker, selection: $selectedCoverItem, matching: .images)
-        .onChange(of: selectedCoverItem) { _, newItem in
-            if let newItem, let book = selectedBookForCover {
-                updateCover(for: book, with: newItem)
+    }
+
+    private func applyCoverPicker<Content: View>(to content: Content) -> some View {
+        content
+            .photosPicker(isPresented: $showingCoverPicker, selection: $selectedCoverItem, matching: .images)
+            .onChange(of: selectedCoverItem) { _, newItem in
+                if let newItem, let book = selectedBookForCover {
+                    updateCover(for: book, with: newItem)
+                }
             }
-        }
-        .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     // MARK: - Book Grid Content
+
+    @ToolbarContentBuilder
+    private var bookshelfToolbar: some ToolbarContent {
+        if selectedBook == nil {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 16) {
+                    Button {
+                        withAnimation {
+                            isEditing.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isEditing ? "checkmark.circle" : "list.number")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(isEditing ? .pink : .primary)
+                    }
+
+                    Menu {
+                        Button {
+                            newBookName = ""
+                            showingNewBookAlert = true
+                        } label: {
+                            Label("新建空间手帐", systemImage: "plus.rectangle.on.folder")
+                        }
+
+                        Divider()
+
+                        NavigationLink(destination: RecycleBinView(initialTab: 2)) {
+                            Label("垃圾篓", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(.primary)
+                    }
+                    .captureGuideTarget(.spaceBookShelfMoreMenuButton)
+                }
+            }
+        }
+    }
 
     @ViewBuilder
     private var bookGridContent: some View {
@@ -332,6 +389,36 @@ struct SpatialBookShelfView: View {
         } catch {
             print("SpatialBookShelfView: Failed to save deletion: \(error)")
         }
+    }
+
+    private func handleViewAppear() {
+        publishSpaceBookShelfGuideDataState()
+        NotificationCenter.default.post(name: .spatialBookShelfOpened, object: nil)
+    }
+
+    private func handleViewDisappear() {
+        postSpaceBookCreationPromptVisibilityChanged(isVisible: false)
+        NotificationCenter.default.post(
+            name: .spaceBookShelfDataStateChanged,
+            object: nil,
+            userInfo: ["hasBooks": false]
+        )
+    }
+
+    private func postSpaceBookCreationPromptVisibilityChanged(isVisible: Bool) {
+        NotificationCenter.default.post(
+            name: .spaceBookCreationPromptVisibilityChanged,
+            object: nil,
+            userInfo: ["isVisible": isVisible]
+        )
+    }
+
+    private func publishSpaceBookShelfGuideDataState() {
+        NotificationCenter.default.post(
+            name: .spaceBookShelfDataStateChanged,
+            object: nil,
+            userInfo: ["hasBooks": !books.isEmpty]
+        )
     }
 }
 

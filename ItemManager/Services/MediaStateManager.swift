@@ -249,6 +249,8 @@ extension Notification.Name {
     static let homeTabChanged = Notification.Name("homeTabChanged")
     // VIP 中心打开通知（用于新手引导）
     static let vipCenterOpened = Notification.Name("vipCenterOpened")
+    // VIP 兑换按钮点击通知（用于新手引导，点击即算完成尝试）
+    static let vipExchangeAttempted = Notification.Name("vipExchangeAttempted")
     // House 内进入马上来财通知（用于新手引导）
     static let wealthDestinationOpened = Notification.Name("wealthDestinationOpened")
     // 来财主页面已出现通知（用于新手引导）
@@ -264,14 +266,19 @@ extension Notification.Name {
     // 魔法任务页面 dismiss 通知（用于萌宠智能对话引导）
     static let magicTasksViewDismissed = Notification.Name("magicTasksViewDismissed")
     static let wardrobeAddMenuOpened = Notification.Name("wardrobeAddMenuOpened")
+    static let wardrobeMoreMenuOpened = Notification.Name("wardrobeMoreMenuOpened")
     static let wardrobeManualCreateOpened = Notification.Name("wardrobeManualCreateOpened")
     static let wardrobeBatchImportOpened = Notification.Name("wardrobeBatchImportOpened")
+    static let guideRequestWardrobeManualCreate = Notification.Name("guideRequestWardrobeManualCreate")
+    static let guideRequestWardrobeBatchImport = Notification.Name("guideRequestWardrobeBatchImport")
     static let wardrobeSelectionModeChanged = Notification.Name("wardrobeSelectionModeChanged")
     static let wardrobeSelectionChanged = Notification.Name("wardrobeSelectionChanged")
     static let wardrobeSettingsOpened = Notification.Name("wardrobeSettingsOpened")
     static let systemSettingsOpened = Notification.Name("systemSettingsOpened")
     static let dataBackupManagementOpened = Notification.Name("dataBackupManagementOpened")
     static let exportCSVTriggered = Notification.Name("exportCSVTriggered")
+    static let localBackupTriggered = Notification.Name("localBackupTriggered")
+    static let localRestoreTriggered = Notification.Name("localRestoreTriggered")
     static let cloudSyncSheetOpened = Notification.Name("cloudSyncSheetOpened")
     static let magicColorSettingsOpened = Notification.Name("magicColorSettingsOpened")
     static let magicColorModeChanged = Notification.Name("magicColorModeChanged")
@@ -283,6 +290,9 @@ extension Notification.Name {
     static let spatialBookShelfOpened = Notification.Name("spatialBookShelfOpened")
     static let spaceBookDetailOpened = Notification.Name("spaceBookDetailOpened")
     static let spaceBookPageCreated = Notification.Name("spaceBookPageCreated")
+    static let spaceBookCreationPromptVisibilityChanged = Notification.Name("spaceBookCreationPromptVisibilityChanged")
+    static let spaceBookShelfDataStateChanged = Notification.Name("spaceBookShelfDataStateChanged")
+    static let spaceBookDetailDataStateChanged = Notification.Name("spaceBookDetailDataStateChanged")
     static let spatialCanvasEditorOpened = Notification.Name("spatialCanvasEditorOpened")
     static let objectCaptureScannerOpened = Notification.Name("objectCaptureScannerOpened")
 }

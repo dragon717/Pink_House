@@ -58,6 +58,9 @@ enum PointDirection {
 enum GuideTargetKey: String, CaseIterable, Hashable {
     case aiAnalysisVIPCard = "aiAnalysis.vipCard"
     case aiAnalysisExchangeButton = "aiAnalysis.exchangeButton"
+    case homePetChatTab = "home.petChatTab"
+    case petChatSearchBar = "petChat.searchBar"
+    case homeHouseTab = "home.houseTab"
     case wealthEntry = "wealth.entry"
     case wealthMainTabSegment = "wealth.mainTab.segment"
     case accountSyncEntry = "accountSync.entry"
@@ -65,10 +68,12 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     case cloudFileBackupSection = "cloud.fileBackup.section"
     case iCloudRealtimeSyncSection = "cloud.realtimeSync.section"
     case systemSettingsEntry = "systemSettings.entry"
-    case localFileBackupRestoreEntry = "localFileBackupRestore.entry"
+    case localBackupDataAction = "localBackupData.action"
+    case localRestoreDataAction = "localRestoreData.action"
     case exportCSVEntry = "exportCSV.entry"
     case widgetCustomizeEntry = "widgetCustomize.entry"
     case themeCustomizeEntry = "themeCustomize.entry"
+    case themeCustomPersonalizationEntry = "themeCustom.personalizationEntry"
     case wardrobeSettingsEntry = "wardrobeSettings.entry"
     case wardrobeInterfaceStyleSection = "wardrobe.interfaceStyle.section"
     case wardrobeFilterModeSection = "wardrobe.filterMode.section"
@@ -82,7 +87,11 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     case wardrobeAddButton = "wardrobe.addButton"
     case wardrobeManualCreateEntry = "wardrobe.manualCreateEntry"
     case wardrobeBatchImportEntry = "wardrobe.batchImportEntry"
+    case wardrobeShortcutManualCreateAction = "wardrobe.shortcut.manualCreateAction"
+    case wardrobeShortcutBatchImportAction = "wardrobe.shortcut.batchImportAction"
     case wardrobeMoreMenuButton = "wardrobe.moreMenuButton"
+    case wardrobeEditMenuEntry = "wardrobe.editMenuEntry"
+    case wardrobeBatchEditToolbar = "wardrobe.batchEditToolbar"
     case wardrobeSelectionCard = "wardrobe.selectionCard"
     case wardrobeDoneSelectionButton = "wardrobe.doneSelectionButton"
     case ootdEntry = "ootd.entry"
@@ -91,6 +100,7 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     case themeColorModeTabs = "themeColorMode.tabs"
     case spaceBookModeTabs = "spaceBook.modeTabs"
     case spaceBookShelfMoreMenuButton = "spaceBook.shelfMoreMenuButton"
+    case spaceBookFirstBookCard = "spaceBook.firstBookCard"
     case spaceBookDetailMoreMenuButton = "spaceBook.detailMoreMenuButton"
     case spaceBookFirstPageCard = "spaceBook.firstPageCard"
     case spatialCanvasToolbar = "spatialCanvas.toolbar"
@@ -112,6 +122,7 @@ extension FeatureUnlockManager {
         .localFileBackupRestore,
         .exportCSV,
         .cloudFileBackupRestore,
+        .customColorPersonalization,
         .ootd,
         .ootdDefaultBook,
         .calendar,
@@ -120,6 +131,7 @@ extension FeatureUnlockManager {
     ]
 
     static let preUnlockGuidedFeatures: Set<FeatureItem> = [
+        .aiAnalysis,
         .ootd,
         .ootdDefaultBook,
         .calendar,

@@ -85,9 +85,8 @@ struct MeView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 32) {
+        ScrollView {
+            VStack(spacing: 32) {
                     // 1. VIP 卡片 (大卡片 1x2)
                     vipSection
                         .padding(.horizontal)
@@ -255,70 +254,71 @@ struct MeView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 20)
+            }
+            .padding(.top, 10)
+        }
+        .background {
+            LiquidBackground()
+        }
+        .navigationTitle("我")
+        .navigationDestination(for: String.self) { destination in
+            switch destination {
+            case "themeCustomize":
+                MagicColorSettingsView()
+            case "customColorPersonalization":
+                MagicColorSettingsViewWithCustomTab()
+            case "widgetCustomize":
+                WidgetSettingsView()
+            case "batchImport":
+                WardrobeSettingsView()
+            case "dataBackup", "localFileBackupRestore", "exportCSV":
+                SystemSettingsView()
+            case "cloudSync", "cloudFileBackupRestore":
+                EmptyView()
+            default:
+                EmptyView()
+            }
+        }
+        .sheet(isPresented: $showingCloudSyncSheet) {
+            CloudSyncSheetView(
+                authManager: authManager,
+                cloudManager: cloudManager,
+                modelContext: modelContext
+            )
+            .presentationDetents([.fraction(0.9)])
+        }
+        // 文件导入逻辑
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: false
+        ) { result in
+            handleFileImport(result)
+        }
+        .alert("导入结果", isPresented: $showingImportAlert) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text(importMessage)
+        }
+        .onAppear {
+            if authManager.isAuthenticated {
+                cloudManager.fetchLatestBackupMetadata()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showMagicTasks)) { _ in
+            showMagicTasks = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSettingsFeature)) { notification in
+            if let feature = notification.userInfo?["feature"] as? String {
+                if feature == "cloudSync" || feature == "cloudFileBackupRestore" {
+                    showingCloudSyncSheet = true
+                } else {
+                    navigationDestination = feature
                 }
-                .padding(.top, 10)
             }
-            .background {
-                LiquidBackground()
-            }
-            .navigationTitle("我")
-            .navigationDestination(for: String.self) { destination in
-                switch destination {
-                case "themeCustomize":
-                    MagicColorSettingsView()
-                case "widgetCustomize":
-                    WidgetSettingsView()
-                case "batchImport":
-                    WardrobeSettingsView()
-                case "dataBackup", "localFileBackupRestore", "exportCSV":
-                    SystemSettingsView()
-                case "cloudSync", "cloudFileBackupRestore":
-                    EmptyView()
-                default:
-                    EmptyView()
-                }
-            }
-            .sheet(isPresented: $showingCloudSyncSheet) {
-                CloudSyncSheetView(
-                    authManager: authManager,
-                    cloudManager: cloudManager,
-                    modelContext: modelContext
-                )
-                .presentationDetents([.fraction(0.9)])
-            }
-            // 文件导入逻辑
-            .fileImporter(
-                isPresented: $isImporting,
-                allowedContentTypes: [.data],
-                allowsMultipleSelection: false
-            ) { result in
-                handleFileImport(result)
-            }
-            .alert("导入结果", isPresented: $showingImportAlert) {
-                Button("确定", role: .cancel) { }
-            } message: {
-                Text(importMessage)
-            }
-            .onAppear {
-                if authManager.isAuthenticated {
-                    cloudManager.fetchLatestBackupMetadata()
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showMagicTasks)) { _ in
-                showMagicTasks = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .navigateToSettingsFeature)) { notification in
-                if let feature = notification.userInfo?["feature"] as? String {
-                    if feature == "cloudSync" || feature == "cloudFileBackupRestore" {
-                        showingCloudSyncSheet = true
-                    } else {
-                        navigationDestination = feature
-                    }
-                }
-            }
-            .overlay {
-                hiddenNavigationLinks
-            }
+        }
+        .overlay {
+            hiddenNavigationLinks
         }
     }
 
@@ -326,6 +326,9 @@ struct MeView: View {
     private var hiddenNavigationLinks: some View {
         Group {
             NavigationLink(destination: MagicColorSettingsViewWithMagicTab(), tag: "themeCustomize", selection: $navigationDestination) {
+                EmptyView()
+            }
+            NavigationLink(destination: MagicColorSettingsViewWithCustomTab(), tag: "customColorPersonalization", selection: $navigationDestination) {
                 EmptyView()
             }
             NavigationLink(destination: WidgetSettingsView(), tag: "widgetCustomize", selection: $navigationDestination) {

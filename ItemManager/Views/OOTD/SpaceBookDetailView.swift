@@ -111,7 +111,30 @@ struct SpaceBookDetailView: View {
             .id(refreshTrigger)
             .navigationTitle(isBatchEditing ? "已选择 \(selectedPages.count) 项" : book.title)
             .onAppear {
+                publishSpaceBookDetailGuideDataState()
                 NotificationCenter.default.post(name: .spaceBookDetailOpened, object: nil)
+            }
+            .onChange(of: sortedPages.count) { _, _ in
+                publishSpaceBookDetailGuideDataState()
+            }
+            .onChange(of: showingNewPageAlert) { _, isVisible in
+                NotificationCenter.default.post(
+                    name: .spaceBookCreationPromptVisibilityChanged,
+                    object: nil,
+                    userInfo: ["isVisible": isVisible]
+                )
+            }
+            .onDisappear {
+                NotificationCenter.default.post(
+                    name: .spaceBookCreationPromptVisibilityChanged,
+                    object: nil,
+                    userInfo: ["isVisible": false]
+                )
+                NotificationCenter.default.post(
+                    name: .spaceBookDetailDataStateChanged,
+                    object: nil,
+                    userInfo: ["hasPages": false]
+                )
             }
             .toolbar {
                 if isBatchEditing {
@@ -487,6 +510,14 @@ struct SpaceBookDetailView: View {
         } label: {
             Label("删除", systemImage: "trash")
         }
+    }
+
+    private func publishSpaceBookDetailGuideDataState() {
+        NotificationCenter.default.post(
+            name: .spaceBookDetailDataStateChanged,
+            object: nil,
+            userInfo: ["hasPages": !sortedPages.isEmpty]
+        )
     }
     
     private func sharePage(_ page: SpaceOutfit) {

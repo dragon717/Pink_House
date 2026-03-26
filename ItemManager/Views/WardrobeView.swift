@@ -408,6 +408,7 @@ struct WardrobeView: View {
             }())
             .background(.regularMaterial)
         }
+        .captureGuideTarget(.wardrobeBatchEditToolbar)
     }
 
     private func applySheets<Content: View>(to content: Content) -> some View {

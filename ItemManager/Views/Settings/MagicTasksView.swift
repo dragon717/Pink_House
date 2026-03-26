@@ -441,30 +441,7 @@ struct MagicTaskDetailView: View {
                                 Button {
                                     dismiss()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        if let destination = feature.destination {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToSmallWorldDestination,
-                                                object: nil,
-                                                userInfo: ["destination": destination]
-                                            )
-                                        } else if feature == .batchImport {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToHomeTab,
-                                                object: nil,
-                                                userInfo: ["homeTab": "wardrobe"]
-                                            )
-                                        } else if feature == .aiAnalysis {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToPetChat,
-                                                object: nil
-                                            )
-                                        } else {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToSettings,
-                                                object: nil,
-                                                userInfo: ["feature": feature.rawValue]
-                                            )
-                                        }
+                                        feature.postNavigationFromMagicTask()
                                     }
                                 } label: {
                                     HStack {
@@ -511,30 +488,7 @@ struct MagicTaskDetailView: View {
                                 Button {
                                     dismiss()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        if let destination = feature.destination {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToSmallWorldDestination,
-                                                object: nil,
-                                                userInfo: ["destination": destination]
-                                            )
-                                        } else if feature == .batchImport {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToHomeTab,
-                                                object: nil,
-                                                userInfo: ["homeTab": "wardrobe"]
-                                            )
-                                        } else if feature == .aiAnalysis {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToPetChat,
-                                                object: nil
-                                            )
-                                        } else {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToSettings,
-                                                object: nil,
-                                                userInfo: ["feature": feature.rawValue]
-                                            )
-                                        }
+                                        feature.postNavigationFromMagicTask()
                                     }
                                 } label: {
                                     HStack {
@@ -594,30 +548,7 @@ struct MagicTaskDetailView: View {
                                 Button {
                                     dismiss()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        if let destination = feature.destination {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToSmallWorldDestination,
-                                                object: nil,
-                                                userInfo: ["destination": destination]
-                                            )
-                                        } else if feature == .batchImport {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToHomeTab,
-                                                object: nil,
-                                                userInfo: ["homeTab": "wardrobe"]
-                                            )
-                                        } else if feature == .aiAnalysis {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToPetChat,
-                                                object: nil
-                                            )
-                                        } else {
-                                            NotificationCenter.default.post(
-                                                name: .navigateToSettings,
-                                                object: nil,
-                                                userInfo: ["feature": feature.rawValue]
-                                            )
-                                        }
+                                        feature.postNavigationFromMagicTask()
                                     }
                                 } label: {
                                     HStack {

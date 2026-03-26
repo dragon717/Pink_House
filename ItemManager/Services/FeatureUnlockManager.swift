@@ -107,11 +107,12 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     case themeCustomize = "themeCustomize"
     case widgetCustomize = "widgetCustomize"
     case aiAnalysis = "aiAnalysis"
+    case customColorPersonalization = "customColorPersonalization"
 
     // 筛选功能
     case filterClassic = "filterClassic"  // 经典筛选/多维筛选
     case privacyDisplay = "privacyDisplay" // 隐私显示
-    case tagBrandFieldDisplay = "tagBrandFieldDisplay" // 标签和品牌管理以及属性字段的显示
+    case tagBrandFieldDisplay = "tagBrandFieldDisplay" // 标签/品牌/裙装属性管理
     case spaceBook = "spaceBook"  // 空间手帐
     case batchEdit = "batchEdit"  // 批量编辑
     case localFileBackupRestore = "localFileBackupRestore" // 本地文件的备份与恢复
@@ -146,6 +147,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .widgetCustomize: return "小组件定制"
         case .aiAnalysis:
             return "萌宠智能对话"
+        case .customColorPersonalization:
+            return "客制化配色和个性化"
         case .networkCommunity:
             return "联网社区"
         case .magicTasks:
@@ -155,7 +158,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .privacyDisplay:
             return "隐私显示"
         case .tagBrandFieldDisplay:
-            return "标签和品牌管理以及属性字段的显示"
+            return "标签/品牌/裙装属性管理"
         case .spaceBook:
             return "空间手帐"
         case .batchEdit:
@@ -189,6 +192,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .widgetCustomize: return "rectangle.grid.2x2.fill"
         case .aiAnalysis:
             return "bubble.left.and.bubble.right.fill"
+        case .customColorPersonalization:
+            return "paintpalette"
         case .networkCommunity:
             return "network"
         case .magicTasks:
@@ -247,6 +252,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return .loginDays(7)
         case .aiAnalysis:
             return .vip()
+        case .customColorPersonalization:
+            return .manual(description: "体验客制化配色和个性化功能")
         case .networkCommunity:
             // 联网设置：在VIP界面兑换码输入 "vip联网" 解锁
             return .redeemCode("vip联网", description: "仍在认真开发和内测中，敬请期待～")
@@ -258,13 +265,13 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .privacyDisplay:
             return .manual(description: "体验隐私显示功能")
         case .tagBrandFieldDisplay:
-            return .manual(description: "体验标签管理、品牌管理与属性字段显示")
+            return .manual(description: "体验标签、品牌与裙装属性管理")
         case .spaceBook:
             return .manual(description: "创建一个穿搭手账以及手账书页")
         case .batchEdit:
             return .manual(description: "体验批量编辑功能")
         case .localFileBackupRestore:
-            return .manual(description: "体验本地文件的备份与恢复入口")
+            return .manual(description: "体验本地文件的备份与恢复")
         case .exportCSV:
             return .manual(description: "体验导出到 CSV 功能")
         case .cloudFileBackupRestore:
@@ -279,7 +286,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return true // 萌宠、世界书、拼豆工坊、裙装股市默认隐藏
         case .networkCommunity, .magicTasks:
             return false  // 联网社区和魔法任务默认显示
-        case .filterClassic, .privacyDisplay, .tagBrandFieldDisplay, .spaceBook, .batchEdit, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore:
+        case .filterClassic, .privacyDisplay, .tagBrandFieldDisplay, .spaceBook, .batchEdit, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore, .customColorPersonalization:
             return false  // 这些功能默认显示，作为魔法任务可获取鱼币
         default:
             return false
@@ -307,7 +314,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     /// 是否是设置中的子功能
     var isSettingsFeature: Bool {
         switch self {
-        case .dataBackup, .cloudSync, .batchImport, .themeCustomize, .widgetCustomize, .aiAnalysis, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore:
+        case .dataBackup, .cloudSync, .batchImport, .themeCustomize, .widgetCustomize, .aiAnalysis, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore, .customColorPersonalization:
             return true
         default:
             return false
@@ -333,6 +340,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return 4
         case .cloudFileBackupRestore:
             return 5
+        case .customColorPersonalization:
+            return 5
         default:
             return nil
         }
@@ -354,6 +363,37 @@ enum FeatureItem: String, CaseIterable, Identifiable {
             return 300
         default:
             return 500
+        }
+    }
+}
+
+// MARK: - 统一功能跳转路由（魔法任务/完成提示复用）
+extension FeatureItem {
+    /// 发送跳转通知：保持“任务完成卡片”与“魔法任务详情页”前往行为一致。
+    func postNavigationFromMagicTask() {
+        if let destination = destination {
+            NotificationCenter.default.post(
+                name: .navigateToSmallWorldDestination,
+                object: nil,
+                userInfo: ["destination": destination]
+            )
+        } else if self == .batchImport {
+            NotificationCenter.default.post(
+                name: .navigateToHomeTab,
+                object: nil,
+                userInfo: ["homeTab": "wardrobe"]
+            )
+        } else if self == .aiAnalysis {
+            NotificationCenter.default.post(
+                name: .navigateToPetChat,
+                object: nil
+            )
+        } else if isSettingsFeature {
+            NotificationCenter.default.post(
+                name: .navigateToSettings,
+                object: nil,
+                userInfo: ["feature": rawValue]
+            )
         }
     }
 }

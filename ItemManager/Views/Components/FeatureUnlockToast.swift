@@ -56,6 +56,9 @@ struct UnlockNotification: Identifiable {
 
 // MARK: - 解锁完成提示弹窗
 struct FeatureUnlockToast: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
     let notification: UnlockNotification
     let onTap: () -> Void
     let onDismiss: () -> Void
@@ -64,6 +67,23 @@ struct FeatureUnlockToast: View {
     @State private var iconScale = 0.5
     @State private var iconRotation = 0.0
     @State private var glowOpacity = 0.0
+
+    private var primaryAccent: Color {
+        themeManager.accentTextColor
+    }
+
+    private var secondaryAccent: Color {
+        themeManager.accentTextColor.mixed(
+            with: colorScheme == .dark ? .white : .black,
+            amount: colorScheme == .dark ? 0.22 : 0.18
+        )
+    }
+
+    private var secondaryButtonFill: Color {
+        themeManager.cardBackgroundColor
+            .mixed(with: primaryAccent, amount: colorScheme == .dark ? 0.16 : 0.10)
+            .opacity(colorScheme == .dark ? 0.72 : 0.92)
+    }
     
     var body: some View {
         VStack(spacing: 16) {
@@ -74,8 +94,8 @@ struct FeatureUnlockToast: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                Color.pink.opacity(0.6),
-                                Color.pink.opacity(0.0)
+                                primaryAccent.opacity(0.6),
+                                primaryAccent.opacity(0.0)
                             ],
                             center: .center,
                             startRadius: 20,
@@ -89,7 +109,7 @@ struct FeatureUnlockToast: View {
                 Circle()
                     .stroke(
                         AngularGradient(
-                            colors: [.pink, .purple, .pink],
+                            colors: [primaryAccent, secondaryAccent, primaryAccent],
                             center: .center
                         ),
                         lineWidth: 3
@@ -102,7 +122,7 @@ struct FeatureUnlockToast: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [.pink.opacity(0.3), .purple.opacity(0.3)],
+                                colors: [primaryAccent.opacity(0.3), secondaryAccent.opacity(0.3)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -113,7 +133,7 @@ struct FeatureUnlockToast: View {
                         .font(.system(size: 40, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.pink, .purple],
+                                colors: [primaryAccent, secondaryAccent],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -146,15 +166,15 @@ struct FeatureUnlockToast: View {
                 Text("✨ 任务完成！")
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(themeManager.primaryTextColor)
                 
                 Text("解锁了 \(notification.feature.displayName)")
                     .font(.headline)
-                    .foregroundColor(.pink)
+                    .foregroundColor(primaryAccent)
                 
                 Text("点击进入查看")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(themeManager.secondaryTextColor)
                     .padding(.top, 4)
             }
             
@@ -166,12 +186,16 @@ struct FeatureUnlockToast: View {
                     Text("稍后再看")
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.secondaryTextColor)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
                         .background(
                             Capsule()
-                                .fill(Color.gray.opacity(0.15))
+                                .fill(secondaryButtonFill)
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(primaryAccent.opacity(0.16), lineWidth: 1)
                         )
                 }
                 
@@ -192,7 +216,7 @@ struct FeatureUnlockToast: View {
                         Capsule()
                             .fill(
                                 LinearGradient(
-                                    colors: [.pink, .purple],
+                                    colors: [primaryAccent, secondaryAccent],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -212,7 +236,7 @@ struct FeatureUnlockToast: View {
             RoundedRectangle(cornerRadius: 24)
                 .stroke(
                     LinearGradient(
-                        colors: [.pink.opacity(0.3), .purple.opacity(0.3)],
+                        colors: [primaryAccent.opacity(0.3), secondaryAccent.opacity(0.3)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -539,27 +563,7 @@ struct GlobalUnlockNotificationOverlay: View {
                     
                     // 延迟一点后跳转，让sheet先关闭
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        if let destination = feature.destination {
-                            // 发送通知让MainTabView处理跳转
-                            NotificationCenter.default.post(
-                                name: .navigateToSmallWorldDestination,
-                                object: nil,
-                                userInfo: ["destination": destination]
-                            )
-                        } else if feature == .aiAnalysis {
-                            // 萌宠智能对话跳转到萌宠对话页面
-                            NotificationCenter.default.post(
-                                name: .navigateToPetChat,
-                                object: nil
-                            )
-                        } else if feature.isSettingsFeature {
-                            // 设置功能，跳转到设置页面
-                            NotificationCenter.default.post(
-                                name: .navigateToSettings,
-                                object: nil,
-                                userInfo: ["feature": feature.rawValue]
-                            )
-                        }
+                        feature.postNavigationFromMagicTask()
                     }
                 }
             }

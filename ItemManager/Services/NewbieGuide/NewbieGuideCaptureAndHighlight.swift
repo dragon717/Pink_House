@@ -19,6 +19,31 @@ struct GuideTargetCaptureModifier: ViewModifier {
     }
 }
 
+struct GuideInteractionRegionCaptureModifier: ViewModifier {
+    let id: String
+    @State private var regionUUID = UUID().uuidString
+
+    private var regionKey: String { "\(id)#\(regionUUID)" }
+
+    func body(content: Content) -> some View {
+        content.background(
+            GeometryReader { proxy in
+                let frame = proxy.frame(in: .global)
+                Color.clear
+                    .onAppear {
+                        AppFirstLaunchGuideManager.shared.updateGuideInteractiveRegion(frame, for: regionKey)
+                    }
+                    .onChange(of: frame) { _, newValue in
+                        AppFirstLaunchGuideManager.shared.updateGuideInteractiveRegion(newValue, for: regionKey)
+                    }
+                    .onDisappear {
+                        AppFirstLaunchGuideManager.shared.clearGuideInteractiveRegion(for: regionKey)
+                    }
+            }
+        )
+    }
+}
+
 extension View {
     func captureGuideTarget(_ key: GuideTargetKey) -> some View {
         modifier(GuideTargetCaptureModifier(key: key))
@@ -31,6 +56,10 @@ extension View {
         } else {
             self
         }
+    }
+
+    func captureGuideInteractionRegion(_ id: String) -> some View {
+        modifier(GuideInteractionRegionCaptureModifier(id: id))
     }
 }
 
