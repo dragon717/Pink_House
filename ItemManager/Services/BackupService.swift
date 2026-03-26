@@ -197,14 +197,34 @@ class BackupService {
             let clothingDTOs: [ClothingDTO] = try self.processByIDs(context: context, descriptor: clothingDescriptor, entityName: "Clothings") { c in
                 // 备份所有数据，包括已删除的，以支持回收站同步和跨设备恢复
                 // No need to track cutoutIDToClothingID here anymore since we use direct ID on CutoutItem
-                // for cutout in c.cutouts {
+                // for cutout in c.cutouts {/Applications/Codex.app
                 //    cutoutIDToClothingID[cutout.id] = c.id
                 // }
                 
                 let safeImagePaths = c.imagePaths.map { ($0 as NSString).lastPathComponent }
+                let safeSizeChartImagePath: String? = {
+                    guard let rawPath = c.sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !rawPath.isEmpty else {
+                        return nil
+                    }
+                    return (rawPath as NSString).lastPathComponent
+                }()
+                let safePriceChartImagePath: String? = {
+                    guard let rawPath = c.priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !rawPath.isEmpty else {
+                        return nil
+                    }
+                    return (rawPath as NSString).lastPathComponent
+                }()
                 
                 for path in safeImagePaths {
                     standardImagesToBackup.insert(path)
+                }
+                if let sizeChartPath = safeSizeChartImagePath {
+                    standardImagesToBackup.insert(sizeChartPath)
+                }
+                if let priceChartPath = safePriceChartImagePath {
+                    standardImagesToBackup.insert(priceChartPath)
                 }
                 
                 var brandUUID: UUID? = nil
@@ -241,6 +261,8 @@ class BackupService {
                     condition: c.condition,
                     accessories: c.accessories,
                     imagePaths: safeImagePaths,
+                    sizeChartImagePath: safeSizeChartImagePath,
+                    priceChartImagePath: safePriceChartImagePath,
                     isShared: c.isShared,
                     price: c.price,
                     deposit: c.deposit,
@@ -1442,6 +1464,16 @@ class BackupService {
                 for path in duplicate.imagePaths where !existingPaths.contains(path) {
                     keeper.imagePaths.append(path)
                 }
+                if (keeper.sizeChartImagePath?.isEmpty ?? true),
+                   let duplicateSizeChartPath = duplicate.sizeChartImagePath,
+                   !duplicateSizeChartPath.isEmpty {
+                    keeper.sizeChartImagePath = duplicateSizeChartPath
+                }
+                if (keeper.priceChartImagePath?.isEmpty ?? true),
+                   let duplicatePriceChartPath = duplicate.priceChartImagePath,
+                   !duplicatePriceChartPath.isEmpty {
+                    keeper.priceChartImagePath = duplicatePriceChartPath
+                }
                 // Use higher stock value
                 keeper.stock = max(keeper.stock, duplicate.stock)
                 // Use higher prices if duplicate has them
@@ -1527,6 +1559,13 @@ class BackupService {
                 mergedImagePaths.append(path)
             }
             clothingBack.imagePaths = mergedImagePaths
+
+            if let sizeChartPath = dto.sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                clothingBack.sizeChartImagePath = sizeChartPath.isEmpty ? nil : (sizeChartPath as NSString).lastPathComponent
+            }
+            if let priceChartPath = dto.priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                clothingBack.priceChartImagePath = priceChartPath.isEmpty ? nil : (priceChartPath as NSString).lastPathComponent
+            }
             
             clothingBack.isShared = dto.isShared ?? false
 

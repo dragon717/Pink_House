@@ -387,6 +387,8 @@ struct ClothingDTO: Codable {
     let condition: String
     let accessories: String
     let imagePaths: [String]
+    let sizeChartImagePath: String? // v1.9+ 尺码表图片路径，老版本备份可能不存在
+    let priceChartImagePath: String? // v1.9+ 价格表图片路径，老版本备份可能不存在
     let isShared: Bool? // v1.2+ 共享到广场标记，老版本备份可能不存在
     let price: Decimal
     let deposit: Decimal

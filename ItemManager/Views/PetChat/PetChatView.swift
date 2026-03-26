@@ -64,6 +64,473 @@ private func intimacyHearts(for intimacy: Double) -> String {
     return String(repeating: "♥️", count: filled) + String(repeating: "♡", count: empty)
 }
 
+private enum PetStatusPanelKind: CaseIterable {
+    case all
+    case hunger
+    case hydration
+    case hygiene
+    case mood
+    case intimacy
+
+    var title: String {
+        switch self {
+        case .all: return "全部状态"
+        case .hunger: return "饱食"
+        case .hydration: return "饮水"
+        case .hygiene: return "清洁"
+        case .mood: return "心情"
+        case .intimacy: return "亲密度"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .all: return "rectangle.stack.fill"
+        case .hunger: return "fork.knife.circle.fill"
+        case .hydration: return "drop.circle.fill"
+        case .hygiene: return "sparkles"
+        case .mood: return "face.smiling.fill"
+        case .intimacy: return "heart.fill"
+        }
+    }
+
+    var command: String {
+        switch self {
+        case .all: return "pet_status_all"
+        case .hunger: return "pet_status_hunger"
+        case .hydration: return "pet_status_hydration"
+        case .hygiene: return "pet_status_hygiene"
+        case .mood: return "pet_status_mood"
+        case .intimacy: return "pet_status_intimacy"
+        }
+    }
+}
+
+private enum PetCurrencyPanelKind: CaseIterable {
+    case all
+    case meowCoin
+    case fishCoin
+    case boneCoin
+
+    var title: String {
+        switch self {
+        case .all: return "全部货币"
+        case .meowCoin: return "喵币"
+        case .fishCoin: return "鱼币"
+        case .boneCoin: return "骨头币"
+        }
+    }
+
+    var command: String {
+        switch self {
+        case .all: return "pet_currency_all"
+        case .meowCoin: return "pet_currency_meow"
+        case .fishCoin: return "pet_currency_fish"
+        case .boneCoin: return "pet_currency_bone"
+        }
+    }
+
+    var currencies: [PetCurrency] {
+        switch self {
+        case .all: return [.meowCoin, .fishCoin, .boneCoin]
+        case .meowCoin: return [.meowCoin]
+        case .fishCoin: return [.fishCoin]
+        case .boneCoin: return [.boneCoin]
+        }
+    }
+}
+
+private enum PetEmbeddedPanelIntent {
+    case currency(PetCurrencyPanelKind)
+    case inventory
+    case shop
+    case moneyCounter
+    case divination
+    case status(PetStatusPanelKind)
+}
+
+private func normalizedPetChatIntentText(_ text: String) -> String {
+    text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func containsAnyKeyword(_ text: String, keywords: [String]) -> Bool {
+    keywords.contains { text.contains($0) }
+}
+
+private func isCurrencyInquiry(_ text: String) -> Bool {
+    containsAnyKeyword(text, keywords: [
+        "查看", "看看", "看", "显示", "余额", "财务", "货币", "钱包", "资产", "多少", "剩多少", "还有多少", "存款", "查查"
+    ])
+}
+
+private func isAddressingPet(in text: String, petName: String) -> Bool {
+    let normalized = normalizedPetChatIntentText(text)
+    let markers = [petName.lowercased(), "萌宠", "宠物", "宝宝", "崽崽", "小家伙", "管家"]
+    return markers.contains { !$0.isEmpty && normalized.contains($0) }
+}
+
+private func detectEmbeddedPanelIntent(from text: String, petName: String) -> PetEmbeddedPanelIntent? {
+    let normalized = normalizedPetChatIntentText(text)
+    guard !normalized.isEmpty else { return nil }
+
+    if containsAnyKeyword(normalized, keywords: ["所有的财务情况", "所有财务情况", "所有的货币", "所有货币", "全部货币", "全部财务", "货币总览", "财务总览"])
+        || (isCurrencyInquiry(normalized) && containsAnyKeyword(normalized, keywords: ["全部", "所有"]) && containsAnyKeyword(normalized, keywords: ["货币", "财务", "余额", "钱包"])) {
+        return .currency(.all)
+    }
+
+    if isCurrencyInquiry(normalized) && containsAnyKeyword(normalized, keywords: ["喵币", "妖币"]) {
+        return .currency(.meowCoin)
+    }
+
+    if isCurrencyInquiry(normalized) && normalized.contains("鱼币") {
+        return .currency(.fishCoin)
+    }
+
+    if isCurrencyInquiry(normalized) && normalized.contains("骨头币") {
+        return .currency(.boneCoin)
+    }
+
+    if containsAnyKeyword(normalized, keywords: ["数钱", "数钞票", "点钱", "裙装总价值", "总价值"]) {
+        return .moneyCounter
+    }
+
+    if containsAnyKeyword(normalized, keywords: ["求签", "请签", "抽签", "签文", "今日运势", "今日一签"]) {
+        return .divination
+    }
+
+    if containsAnyKeyword(normalized, keywords: ["背包", "道具", "库存", "猫粮还有", "罐头还有", "仓库"]) {
+        return .inventory
+    }
+
+    if containsAnyKeyword(normalized, keywords: ["商店", "小卖部", "买点", "补货", "购买道具", "卖点"]) {
+        return .shop
+    }
+
+    let petAddressed = isAddressingPet(in: normalized, petName: petName)
+    let explicitAllStatus = containsAnyKeyword(normalized, keywords: ["全部状态", "萌宠现状", "宠物现状", "状态总览", "状态面板"])
+        || (containsAnyKeyword(normalized, keywords: ["展示", "显示"]) && normalized.contains("状态") && normalized.contains("全部"))
+
+    if explicitAllStatus {
+        return .status(.all)
+    }
+
+    guard petAddressed else { return nil }
+
+    if containsAnyKeyword(normalized, keywords: ["饿了", "饥饿", "饱食", "吃饱", "肚子饿"]) {
+        return .status(.hunger)
+    }
+    if containsAnyKeyword(normalized, keywords: ["渴了", "口渴", "饮水", "想喝水", "没水了"]) {
+        return .status(.hydration)
+    }
+    if containsAnyKeyword(normalized, keywords: ["脏了", "清洁", "洗澡", "脏兮兮", "该洗洗"]) {
+        return .status(.hygiene)
+    }
+    if containsAnyKeyword(normalized, keywords: ["心情", "不开心", "开心吗", "emo", "郁闷", "高兴"]) {
+        return .status(.mood)
+    }
+    if containsAnyKeyword(normalized, keywords: ["亲密度", "关系值", "喜欢我吗", "亲近", "桃心"]) {
+        return .status(.intimacy)
+    }
+
+    return nil
+}
+
+private func metricForStatus(_ status: PetStatus, kind: PetStatusPanelKind) -> PetWidgetMetric {
+    switch kind {
+    case .all:
+        return PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
+    case .hunger:
+        return PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100")
+    case .hydration:
+        return PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100")
+    case .hygiene:
+        return PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100")
+    case .mood:
+        return PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100")
+    case .intimacy:
+        return PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
+    }
+}
+
+private func statusMetrics(for status: PetStatus, kind: PetStatusPanelKind) -> [PetWidgetMetric] {
+    switch kind {
+    case .all:
+        return [
+            PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100"),
+            PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100"),
+            PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100"),
+            PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100"),
+            PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
+        ]
+    default:
+        return [metricForStatus(status, kind: kind)]
+    }
+}
+
+private func statusSubtitle(for status: PetStatus, kind: PetStatusPanelKind) -> String {
+    switch kind {
+    case .all:
+        return "这里是\(status.displayName)现在的 4+1 状态，总览和动画条都放在一个气泡里。"
+    case .hunger:
+        return "\(status.displayName)现在的饱食度在这里，想喂点东西的话我可以直接打开背包。"
+    case .hydration:
+        return "\(status.displayName)的饮水状态在这里，要不要马上喂它喝一点？"
+    case .hygiene:
+        return "\(status.displayName)的清洁状态在这里，要不要顺手给它洗香香？"
+    case .mood:
+        return "\(status.displayName)现在的心情我帮你单独展开了。"
+    case .intimacy:
+        return "亲密度用桃心进度来展示，你们的关系正在慢慢变深。"
+    }
+}
+
+private func statusOptions(for kind: PetStatusPanelKind) -> [PetWidgetOption] {
+    switch kind {
+    case .all:
+        return [
+            PetWidgetOption(title: "A. 打开萌宠背包", command: "pet_inventory_panel", icon: "shippingbox.fill"),
+            PetWidgetOption(title: "B. 打开萌宠商店", command: "pet_shop_panel", icon: "cart.fill"),
+            PetWidgetOption(title: "C. 数数我的裙装总价值", command: "pet_money_counter", icon: "yensign.circle.fill")
+        ]
+    case .hunger, .hydration:
+        return [
+            PetWidgetOption(title: "A. 我来喂它", command: "pet_inventory_panel", icon: "fork.knife.circle.fill"),
+            PetWidgetOption(title: "B. 先去补点货", command: "pet_shop_panel", icon: "cart.fill")
+        ]
+    case .hygiene:
+        return [
+            PetWidgetOption(title: "A. 帮它清洁一下", command: "pet_clean_now", icon: "sparkles"),
+            PetWidgetOption(title: "B. 先看看全部状态", command: "pet_status_all", icon: "rectangle.stack.fill")
+        ]
+    case .mood:
+        return [
+            PetWidgetOption(title: "A. 打开背包陪它玩", command: "pet_inventory_panel", icon: "gamecontroller.fill"),
+            PetWidgetOption(title: "B. 先聊聊天安慰它", command: "mood_support", icon: "bubble.left.and.bubble.right.fill")
+        ]
+    case .intimacy:
+        return [
+            PetWidgetOption(title: "A. 看看全部状态", command: "pet_status_all", icon: "rectangle.stack.fill"),
+            PetWidgetOption(title: "B. 切换一下宠物管家", command: "pet_switch", icon: "arrow.triangle.2.circlepath")
+        ]
+    }
+}
+
+private func makeStatusPanelWidget(status: PetStatus, kind: PetStatusPanelKind, feedback: String? = nil) -> PetWidgetData {
+    PetWidgetData(
+        type: .statusPanel,
+        title: kind == .all ? "\(status.displayName)的状态面板（4+1）" : "\(status.displayName)的\(kind.title)",
+        subtitle: feedback ?? statusSubtitle(for: status, kind: kind),
+        options: statusOptions(for: kind),
+        metrics: statusMetrics(for: status, kind: kind)
+    )
+}
+
+private func currencyAmount(for type: PetCurrency, status: PetStatus) -> Int {
+    switch type {
+    case .meowCoin: return status.meowCoin
+    case .fishCoin: return status.fishCoin
+    case .boneCoin: return status.boneCoin
+    }
+}
+
+private func currencySubtitle(for status: PetStatus, kind: PetCurrencyPanelKind) -> String {
+    switch kind {
+    case .all:
+        return "这里是\(status.displayName)当前全部货币，妖币就是喵币。"
+    case .meowCoin:
+        return "这里只展开喵币，适合看领养二胎和充值相关余额。"
+    case .fishCoin:
+        return "这里只展开鱼币，方便看日常道具和工作收益。"
+    case .boneCoin:
+        return "这里只展开骨头币，这是毛毛偏爱的币种。"
+    }
+}
+
+private func currencyMetrics(for status: PetStatus, kind: PetCurrencyPanelKind) -> [PetWidgetMetric] {
+    kind.currencies.map { currency in
+        PetWidgetMetric(name: currency.rawValue, value: "\(currencyAmount(for: currency, status: status))")
+    }
+}
+
+private func makeCurrencyPanelWidget(status: PetStatus, kind: PetCurrencyPanelKind, feedback: String? = nil) -> PetWidgetData {
+    PetWidgetData(
+        type: .currencyPanel,
+        title: kind == .all ? "当前货币余额" : "当前\(kind.title)",
+        subtitle: feedback ?? currencySubtitle(for: status, kind: kind),
+        metrics: currencyMetrics(for: status, kind: kind)
+    )
+}
+
+private func inventoryOptions(status: PetStatus, limit: Int = 8) -> [PetWidgetOption] {
+    status.inventory
+        .filter { $0.value > 0 }
+        .compactMap { entry -> PetWidgetOption? in
+            guard let item = PetConfigManager.shared.getItem(byId: entry.key) else { return nil }
+            return PetWidgetOption(
+                title: "\(item.name) x\(entry.value)",
+                command: "use_item:\(item.id)",
+                icon: item.icon
+            )
+        }
+        .sorted { $0.title < $1.title }
+        .prefix(limit)
+        .map { $0 }
+}
+
+private func makeInventoryPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
+    let options = inventoryOptions(status: status)
+    return PetWidgetData(
+        type: .inventoryPanel,
+        title: "\(status.displayName)的背包",
+        subtitle: feedback ?? (options.isEmpty ? "现在没有库存道具。" : "点一下就能使用，也可以拖到投喂区。"),
+        options: options
+    )
+}
+
+private func shopOptions(limit: Int = 8) -> [PetWidgetOption] {
+    PetConfigManager.shared.items
+        .sorted { $0.sortIndex < $1.sortIndex }
+        .prefix(limit)
+        .map { item in
+            let currencyName = item.petCurrency.rawValue
+            return PetWidgetOption(
+                title: "\(item.name) · \(item.price)\(currencyName)",
+                command: "buy_item:\(item.id)",
+                icon: item.icon
+            )
+        }
+}
+
+private func makeShopPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
+    let subtitle = feedback ?? "当前余额：喵币\(status.meowCoin) / 鱼币\(status.fishCoin) / 骨头币\(status.boneCoin)"
+    return PetWidgetData(
+        type: .shopPanel,
+        title: "萌宠道具商店",
+        subtitle: subtitle,
+        options: shopOptions()
+    )
+}
+
+private func makeMoneyCounterWidget(totalValue: Decimal) -> PetWidgetData {
+        let total = NSDecimalNumber(decimal: totalValue).intValue
+        return PetWidgetData(
+            type: .moneyCounter,
+        title: "裙装总价值数钱台",
+        subtitle: "不跳页，直接在气泡里数完这一笔。",
+        options: [
+            PetWidgetOption(title: "A. 看看全部状态", command: "pet_status_all", icon: "heart.text.square.fill"),
+            PetWidgetOption(title: "B. 打开萌宠背包", command: "pet_inventory_panel", icon: "shippingbox.fill")
+        ],
+        metrics: [
+            PetWidgetMetric(name: "裙装总价值", value: "¥\(total)")
+        ]
+    )
+}
+
+private func makeDivinationWidget() -> PetWidgetData {
+    PetWidgetData(
+        type: .divinationPanel,
+        title: "今日求签",
+        subtitle: "就在这里摇一支签，不跳转页面。",
+        options: [
+            PetWidgetOption(title: "A. 再求一签", command: "pet_divination_panel", icon: "wand.and.stars"),
+            PetWidgetOption(title: "B. 去数数钞票", command: "pet_money_counter", icon: "yensign.circle.fill")
+        ]
+    )
+}
+
+private func purchasePetItemResult(itemId: String) -> String {
+    guard let item = PetConfigManager.shared.getItem(byId: itemId) else {
+        return "这个商品我暂时没找到，稍后再试试吧。"
+    }
+
+    var status = PetDataManager.shared.status
+    switch item.petCurrency {
+    case .fishCoin:
+        guard status.fishCoin >= item.price else { return "鱼币不够，先攒一点再来买\(item.name)吧。" }
+        status.fishCoin -= item.price
+    case .meowCoin:
+        guard status.meowCoin >= item.price else { return "喵币不够，先充一点再来买\(item.name)吧。" }
+        status.meowCoin -= item.price
+    case .boneCoin:
+        guard status.boneCoin >= item.price else { return "骨头币不够，这个是给毛毛用的币种喔。" }
+        status.boneCoin -= item.price
+    }
+
+    status.inventory[item.id, default: 0] += 1
+    status.intimacy = min(100, status.intimacy + 1)
+    PetDataManager.shared.saveStatus(status)
+    return "买好啦，\(item.name)已经放进\(status.displayName)的背包里。"
+}
+
+private func consumePetItemResult(itemId: String) -> String {
+    guard let item = PetConfigManager.shared.getItem(byId: itemId) else {
+        return "这个道具我暂时没识别出来。"
+    }
+
+    var status = PetDataManager.shared.status
+    guard let count = status.inventory[item.id], count > 0 else {
+        return "\(item.name)已经用完了，要不要我帮你去商店补货？"
+    }
+
+    if item.id == "renameCard" {
+        return "改名项圈先留着吧，这个需要走专门的改名流程。"
+    }
+
+    status.inventory[item.id] = count - 1
+
+    if item.id == "energyPill" {
+        let oldEnergy = status.energy
+        status.energy = min(100, status.energy + item.recoveryValue)
+        status.mood = min(100, status.mood + 5)
+        status.intimacy = min(100, status.intimacy + 1)
+        PetDataManager.shared.saveStatus(status)
+        let recovered = Int(status.energy - oldEnergy)
+        return recovered > 0 ? "\(status.displayName)精神回来啦，精力恢复了 \(recovered) 点。" : "\(status.displayName)现在精力已经满满的啦。"
+    }
+
+    if item.isToy {
+        let energyCost = Double(item.energyCost ?? 0)
+        guard status.energy >= energyCost else {
+            status.inventory[item.id] = count
+            return "\(status.displayName)现在太累了，不想玩\(item.name)。"
+        }
+        status.energy = max(0, status.energy - energyCost)
+        status.mood = min(100, status.mood + item.recoveryValue)
+        status.intimacy = min(100, status.intimacy + 2)
+        PetDataManager.shared.saveStatus(status)
+        return "\(status.displayName)玩得很开心，心情明显变好了。"
+    }
+
+    let moodRecovery = item.recoveryValue * 0.2
+    status.mood = min(100, status.mood + moodRecovery)
+    if item.isDrink {
+        status.energy = min(100, status.energy + item.recoveryValue)
+    } else {
+        status.hunger = min(100, status.hunger + item.recoveryValue)
+    }
+    status.intimacy = min(100, status.intimacy + 1.5)
+    PetDataManager.shared.saveStatus(status)
+
+    if item.isDrink {
+        return "\(status.displayName)喝下\(item.name)啦，饮水状态回升了一些。"
+    }
+    return "\(status.displayName)吃掉了\(item.name)，饱食度恢复了一些。"
+}
+
+private func cleanPetStatusNow() -> String {
+    var status = PetDataManager.shared.status
+    let oldValue = status.hygiene
+    guard oldValue < 100 else {
+        return "\(status.displayName)已经香香的啦，不用再洗啦。"
+    }
+    status.hygiene = 100
+    status.mood = min(100, status.mood + 10)
+    status.intimacy = min(100, status.intimacy + 1)
+    PetDataManager.shared.saveStatus(status)
+    return "\(status.displayName)已经洗香香啦，清洁度补满了。"
+}
+
 // MARK: - 消息类型枚举
 enum PetChatMessageType {
     case text           // 普通文本
@@ -230,7 +697,7 @@ struct PetChatBubble: View {
     let onCardTap: (Clothing) -> Void
     let onSearchResultTap: (Clothing) -> Void
     let onOutfitTap: (OutfitSuggestionData) -> Void
-    let onWidgetAction: (PetWidgetOption) -> Void
+    let onWidgetAction: (PetWidgetOption, UUID) -> Void
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -305,7 +772,9 @@ struct PetChatBubble: View {
                 }
 
                 if let widgets = message.widgets, !widgets.isEmpty {
-                    PetGenerativeWidgetHost(widgets: widgets, onAction: onWidgetAction)
+                    PetGenerativeWidgetHost(widgets: widgets) { option in
+                        onWidgetAction(option, message.id)
+                    }
                         .frame(maxWidth: 320, alignment: message.isUser ? .trailing : .leading)
                 }
                 
@@ -366,7 +835,7 @@ struct PetChatBubble: View {
             size: 40
         )
     }
-    
+
     // 格式化时间戳为 HH:mm:ss
     private func formatTimestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -1154,6 +1623,18 @@ struct PetChatView: View {
                 } label: {
                     Label("查看萌宠状态", systemImage: "heart.text.square.fill")
                 }
+
+                Button {
+                    handleInventoryPanel()
+                } label: {
+                    Label("打开萌宠背包", systemImage: "shippingbox.fill")
+                }
+
+                Button {
+                    handleShopPanel()
+                } label: {
+                    Label("打开萌宠商店", systemImage: "cart.fill")
+                }
                 
                 Button {
                     handleWeatherOutfitGuidance()
@@ -1168,9 +1649,15 @@ struct PetChatView: View {
                 }
                 
                 Button {
-                    promptWealthCountingNavigation()
+                    handleMoneyCounterPanel()
                 } label: {
                     Label("去来财数钞票", systemImage: "yensign.circle.fill")
+                }
+
+                Button {
+                    handleDivinationPanel()
+                } label: {
+                    Label("今日求签", systemImage: "wand.and.stars")
                 }
             }
 
@@ -1197,16 +1684,7 @@ struct PetChatView: View {
                 }
 
                 Button {
-                    // 今日运势
-                    let fortunes = [
-                        "今天很适合穿粉色系的小裙子哦~",
-                        "主人今天运气不错，适合买新裙子！",
-                        "今天适合整理衣橱，给裙子们拍拍照吧~",
-                        "主人今天会遇到心仪的裙子哦，多逛逛吧~"
-                    ]
-                    let randomFortune = fortunes.randomElement()!
-                    let message = PetChatMessage(text: randomFortune, isUser: false)
-                    messages.append(message)
+                    handleDivinationPanel()
                 } label: {
                     Label("今日运势", systemImage: "star.fill")
                 }
@@ -1396,6 +1874,10 @@ struct PetChatView: View {
     
     // 处理用户意图
     private func processUserIntent(_ text: String) {
+        if handleEmbeddedPanelIntent(text) {
+            return
+        }
+
         if handleThemeConversationIntent(text) {
             return
         }
@@ -1475,20 +1957,15 @@ struct PetChatView: View {
     }
 
     private func handleCurrencyOverview() {
+        handleCurrencyPanel(.all)
+    }
+
+    private func handleCurrencyPanel(_ kind: PetCurrencyPanelKind) {
         let status = PetDataManager.shared.status
-        let widget = PetWidgetData(
-            type: .weatherCard,
-            title: "当前货币余额",
-            subtitle: "妖币=喵币，骨头币给毛毛使用",
-            metrics: [
-                PetWidgetMetric(name: "喵币", value: "\(status.meowCoin)"),
-                PetWidgetMetric(name: "鱼币", value: "\(status.fishCoin)"),
-                PetWidgetMetric(name: "骨头币", value: "\(status.boneCoin)")
-            ]
-        )
+        let widget = makeCurrencyPanelWidget(status: status, kind: kind)
         messages.append(
             PetChatMessage(
-                text: "给你把钱包摊开看啦～",
+                text: kind == .all ? "给你把钱包摊开看啦～" : "我把\(kind.title)单独展开给你看啦。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -1497,27 +1974,152 @@ struct PetChatView: View {
     }
 
     private func handlePetStatusOverview() {
+        handlePetStatusPanel(.all)
+    }
+
+    private func handlePetStatusPanel(_ kind: PetStatusPanelKind) {
         let status = PetDataManager.shared.status
-        let widget = PetWidgetData(
-            type: .weatherCard,
-            title: "\(status.displayName)的状态面板（4+1）",
-            subtitle: "亲密度使用桃心进度展示",
-            metrics: [
-                PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100"),
-                PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100"),
-                PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100"),
-                PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100"),
-                PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
-            ]
-        )
+        let widget = makeStatusPanelWidget(status: status, kind: kind)
         messages.append(
             PetChatMessage(
-                text: "这是最新状态，要不要我顺手帮它做个恢复动作？",
+                text: kind == .all ? "这是\(status.displayName)现在的全部状态。" : "我把\(status.displayName)的\(kind.title)单独展开给你看啦。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
             )
         )
+    }
+
+    private func handleInventoryPanel() {
+        let status = PetDataManager.shared.status
+        let widget = makeInventoryPanelWidget(status: status)
+        messages.append(
+            PetChatMessage(
+                text: "背包我给你摊开啦，点一下或者直接拖过去都行。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleShopPanel() {
+        let status = PetDataManager.shared.status
+        let widget = makeShopPanelWidget(status: status)
+        messages.append(
+            PetChatMessage(
+                text: "商店也塞进气泡里了，想买什么就直接点。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleMoneyCounterPanel() {
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let widget = makeMoneyCounterWidget(totalValue: totalValue)
+        messages.append(
+            PetChatMessage(
+                text: "来，我们就在这里把裙装家当数一遍。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleEmbeddedPanelIntent(_ text: String) -> Bool {
+        guard let intent = detectEmbeddedPanelIntent(from: text, petName: PetDataManager.shared.status.displayName) else {
+            return false
+        }
+
+        switch intent {
+        case .currency(let kind):
+            handleCurrencyPanel(kind)
+        case .inventory:
+            handleInventoryPanel()
+        case .shop:
+            handleShopPanel()
+        case .moneyCounter:
+            handleMoneyCounterPanel()
+        case .divination:
+            handleDivinationPanel()
+        case .status(let kind):
+            handlePetStatusPanel(kind)
+        }
+        return true
+    }
+
+    private func handleDivinationPanel() {
+        let widget = makeDivinationWidget()
+        messages.append(
+            PetChatMessage(
+                text: "把求签台搬进来啦，直接在这里摇签。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func replaceWidgets(in messageID: UUID, with widgets: [PetWidgetData]) {
+        guard let index = messages.firstIndex(where: { $0.id == messageID }) else { return }
+        messages[index].widgets = widgets
+    }
+
+    private func refreshPanel(for command: String, messageID: UUID, feedback: String? = nil) {
+        let status = PetDataManager.shared.status
+        if command.hasPrefix("use_item:") || command == "pet_inventory_panel" || command.hasPrefix("inventory:") {
+            replaceWidgets(in: messageID, with: [makeInventoryPanelWidget(status: status, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_panel" || command == "pet_currency_all" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .all, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_meow" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .meowCoin, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_fish" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .fishCoin, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_bone" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .boneCoin, feedback: feedback)])
+            return
+        }
+        if command.hasPrefix("buy_item:") || command == "pet_shop_panel" || command.hasPrefix("shop:") {
+            replaceWidgets(in: messageID, with: [makeShopPanelWidget(status: status, feedback: feedback)])
+            return
+        }
+        if command == "pet_money_counter" || command == "open_money_counting" {
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue)])
+            return
+        }
+        if command == "pet_divination_panel" {
+            replaceWidgets(in: messageID, with: [makeDivinationWidget()])
+            return
+        }
+
+        switch command {
+        case "pet_status_panel", "pet_status_all":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .all, feedback: feedback)])
+        case "pet_status_hunger":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hunger, feedback: feedback)])
+        case "pet_status_hydration":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hydration, feedback: feedback)])
+        case "pet_status_hygiene", "pet_clean_now":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hygiene, feedback: feedback)])
+        case "pet_status_mood":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .mood, feedback: feedback)])
+        case "pet_status_intimacy":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .intimacy, feedback: feedback)])
+        default:
+            break
+        }
     }
 
     private func handleSecondPetAdoptionIntent() {
@@ -1661,7 +2263,7 @@ struct PetChatView: View {
         }
     }
 
-    private func handleWidgetAction(_ option: PetWidgetOption) {
+    private func handleWidgetAction(_ option: PetWidgetOption, messageID: UUID) {
         switch option.command {
         case "outfit_suggest":
             handleOutfitSuggestion("帮我搭配一套")
@@ -1672,20 +2274,63 @@ struct PetChatView: View {
         case "mood_support":
             handleAIChat("我有点累，想被温柔安慰一下，也想听听今天适合什么穿搭。")
         case "pet_currency_panel":
-            handleCurrencyOverview()
+            refreshPanel(for: "pet_currency_panel", messageID: messageID)
+        case "pet_currency_all":
+            refreshPanel(for: "pet_currency_all", messageID: messageID)
+        case "pet_currency_meow":
+            refreshPanel(for: "pet_currency_meow", messageID: messageID)
+        case "pet_currency_fish":
+            refreshPanel(for: "pet_currency_fish", messageID: messageID)
+        case "pet_currency_bone":
+            refreshPanel(for: "pet_currency_bone", messageID: messageID)
         case "pet_status_panel":
-            handlePetStatusOverview()
+            refreshPanel(for: "pet_status_panel", messageID: messageID)
+        case "pet_status_all":
+            refreshPanel(for: "pet_status_all", messageID: messageID)
+        case "pet_status_hunger":
+            refreshPanel(for: "pet_status_hunger", messageID: messageID)
+        case "pet_status_hydration":
+            refreshPanel(for: "pet_status_hydration", messageID: messageID)
+        case "pet_status_hygiene":
+            refreshPanel(for: "pet_status_hygiene", messageID: messageID)
+        case "pet_status_mood":
+            refreshPanel(for: "pet_status_mood", messageID: messageID)
+        case "pet_status_intimacy":
+            refreshPanel(for: "pet_status_intimacy", messageID: messageID)
+        case "pet_inventory_panel":
+            refreshPanel(for: "pet_inventory_panel", messageID: messageID)
+        case "pet_shop_panel":
+            refreshPanel(for: "pet_shop_panel", messageID: messageID)
+        case "pet_money_counter":
+            refreshPanel(for: "pet_money_counter", messageID: messageID)
+        case "pet_divination_panel":
+            refreshPanel(for: "pet_divination_panel", messageID: messageID)
         case "pet_second_adopt":
             handleSecondPetAdoptionIntent()
         case "pet_switch":
             handleSwitchPetIntent()
         case "pet_topup":
             handleMeowCoinTopUpIntent()
+        case "pet_clean_now":
+            refreshPanel(for: "pet_clean_now", messageID: messageID, feedback: cleanPetStatusNow())
         case "open_meow_store":
             messages.append(PetChatMessage(text: "充值入口我先帮你记下啦～你可以从「我」页进入喵币商店。", isUser: false, isAIGenerated: true))
         case "open_money_counting":
-            navigateToWealthCounting()
+            refreshPanel(for: "open_money_counting", messageID: messageID)
         default:
+            if option.command.hasPrefix("use_item:") {
+                let rawId = String(option.command.dropFirst("use_item:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+            } else if option.command.hasPrefix("buy_item:") {
+                let rawId = String(option.command.dropFirst("buy_item:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+            } else if option.command.hasPrefix("inventory:") {
+                let rawId = String(option.command.dropFirst("inventory:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+            } else if option.command.hasPrefix("shop:") {
+                let rawId = String(option.command.dropFirst("shop:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+            } else
             if option.command.hasPrefix("switch_pet:") {
                 let rawId = String(option.command.dropFirst("switch_pet:".count))
                 if let pet = PetCharacter(rawValue: rawId) {
@@ -2549,6 +3194,18 @@ struct PetChatViewLegacy: View {
                     } label: {
                         Label("查看萌宠状态", systemImage: "heart.text.square.fill")
                     }
+
+                    Button {
+                        handleInventoryPanel()
+                    } label: {
+                        Label("打开萌宠背包", systemImage: "shippingbox.fill")
+                    }
+
+                    Button {
+                        handleShopPanel()
+                    } label: {
+                        Label("打开萌宠商店", systemImage: "cart.fill")
+                    }
                     
                     Button {
                         handleWeatherOutfitGuidance()
@@ -2563,9 +3220,15 @@ struct PetChatViewLegacy: View {
                     }
                     
                     Button {
-                        promptWealthCountingNavigation()
+                        handleMoneyCounterPanel()
                     } label: {
                         Label("去来财数钞票", systemImage: "yensign.circle.fill")
+                    }
+
+                    Button {
+                        handleDivinationPanel()
+                    } label: {
+                        Label("今日求签", systemImage: "wand.and.stars")
                     }
 
                     Button {
@@ -2896,6 +3559,10 @@ struct PetChatViewLegacy: View {
     }
 
     private func processUserIntent(_ text: String) {
+        if handleEmbeddedPanelIntent(text) {
+            return
+        }
+
         if handleThemeConversationIntent(text) {
             return
         }
@@ -2975,20 +3642,15 @@ struct PetChatViewLegacy: View {
     }
 
     private func handleCurrencyOverview() {
+        handleCurrencyPanel(.all)
+    }
+
+    private func handleCurrencyPanel(_ kind: PetCurrencyPanelKind) {
         let status = PetDataManager.shared.status
-        let widget = PetWidgetData(
-            type: .weatherCard,
-            title: "当前货币余额",
-            subtitle: "妖币=喵币，骨头币给毛毛使用",
-            metrics: [
-                PetWidgetMetric(name: "喵币", value: "\(status.meowCoin)"),
-                PetWidgetMetric(name: "鱼币", value: "\(status.fishCoin)"),
-                PetWidgetMetric(name: "骨头币", value: "\(status.boneCoin)")
-            ]
-        )
+        let widget = makeCurrencyPanelWidget(status: status, kind: kind)
         messages.append(
             PetChatMessage(
-                text: "给你把钱包摊开看啦～",
+                text: kind == .all ? "给你把钱包摊开看啦～" : "我把\(kind.title)单独展开给你看啦。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2997,27 +3659,152 @@ struct PetChatViewLegacy: View {
     }
 
     private func handlePetStatusOverview() {
+        handlePetStatusPanel(.all)
+    }
+
+    private func handlePetStatusPanel(_ kind: PetStatusPanelKind) {
         let status = PetDataManager.shared.status
-        let widget = PetWidgetData(
-            type: .weatherCard,
-            title: "\(status.displayName)的状态面板（4+1）",
-            subtitle: "亲密度使用桃心进度展示",
-            metrics: [
-                PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100"),
-                PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100"),
-                PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100"),
-                PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100"),
-                PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
-            ]
-        )
+        let widget = makeStatusPanelWidget(status: status, kind: kind)
         messages.append(
             PetChatMessage(
-                text: "这是最新状态，要不要我顺手帮它做个恢复动作？",
+                text: kind == .all ? "这是\(status.displayName)现在的全部状态。" : "我把\(status.displayName)的\(kind.title)单独展开给你看啦。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
             )
         )
+    }
+
+    private func handleInventoryPanel() {
+        let status = PetDataManager.shared.status
+        let widget = makeInventoryPanelWidget(status: status)
+        messages.append(
+            PetChatMessage(
+                text: "背包我给你摊开啦，点一下或者直接拖过去都行。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleShopPanel() {
+        let status = PetDataManager.shared.status
+        let widget = makeShopPanelWidget(status: status)
+        messages.append(
+            PetChatMessage(
+                text: "商店也塞进气泡里了，想买什么就直接点。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleMoneyCounterPanel() {
+        let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+        let widget = makeMoneyCounterWidget(totalValue: totalValue)
+        messages.append(
+            PetChatMessage(
+                text: "来，我们就在这里把裙装家当数一遍。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func handleEmbeddedPanelIntent(_ text: String) -> Bool {
+        guard let intent = detectEmbeddedPanelIntent(from: text, petName: PetDataManager.shared.status.displayName) else {
+            return false
+        }
+
+        switch intent {
+        case .currency(let kind):
+            handleCurrencyPanel(kind)
+        case .inventory:
+            handleInventoryPanel()
+        case .shop:
+            handleShopPanel()
+        case .moneyCounter:
+            handleMoneyCounterPanel()
+        case .divination:
+            handleDivinationPanel()
+        case .status(let kind):
+            handlePetStatusPanel(kind)
+        }
+        return true
+    }
+
+    private func handleDivinationPanel() {
+        let widget = makeDivinationWidget()
+        messages.append(
+            PetChatMessage(
+                text: "把求签台搬进来啦，直接在这里摇签。",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [widget]
+            )
+        )
+    }
+
+    private func replaceWidgets(in messageID: UUID, with widgets: [PetWidgetData]) {
+        guard let index = messages.firstIndex(where: { $0.id == messageID }) else { return }
+        messages[index].widgets = widgets
+    }
+
+    private func refreshPanel(for command: String, messageID: UUID, feedback: String? = nil) {
+        let status = PetDataManager.shared.status
+        if command.hasPrefix("use_item:") || command == "pet_inventory_panel" || command.hasPrefix("inventory:") {
+            replaceWidgets(in: messageID, with: [makeInventoryPanelWidget(status: status, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_panel" || command == "pet_currency_all" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .all, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_meow" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .meowCoin, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_fish" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .fishCoin, feedback: feedback)])
+            return
+        }
+        if command == "pet_currency_bone" {
+            replaceWidgets(in: messageID, with: [makeCurrencyPanelWidget(status: status, kind: .boneCoin, feedback: feedback)])
+            return
+        }
+        if command.hasPrefix("buy_item:") || command == "pet_shop_panel" || command.hasPrefix("shop:") {
+            replaceWidgets(in: messageID, with: [makeShopPanelWidget(status: status, feedback: feedback)])
+            return
+        }
+        if command == "pet_money_counter" || command == "open_money_counting" {
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue)])
+            return
+        }
+        if command == "pet_divination_panel" {
+            replaceWidgets(in: messageID, with: [makeDivinationWidget()])
+            return
+        }
+
+        switch command {
+        case "pet_status_panel", "pet_status_all":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .all, feedback: feedback)])
+        case "pet_status_hunger":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hunger, feedback: feedback)])
+        case "pet_status_hydration":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hydration, feedback: feedback)])
+        case "pet_status_hygiene", "pet_clean_now":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hygiene, feedback: feedback)])
+        case "pet_status_mood":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .mood, feedback: feedback)])
+        case "pet_status_intimacy":
+            replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .intimacy, feedback: feedback)])
+        default:
+            break
+        }
     }
 
     private func handleSecondPetAdoptionIntent() {
@@ -3161,7 +3948,7 @@ struct PetChatViewLegacy: View {
         }
     }
 
-    private func legacyHandleWidgetAction(_ option: PetWidgetOption) {
+    private func legacyHandleWidgetAction(_ option: PetWidgetOption, messageID: UUID) {
         switch option.command {
         case "outfit_suggest":
             handleOutfitSuggestion("帮我搭配一套")
@@ -3172,20 +3959,63 @@ struct PetChatViewLegacy: View {
         case "mood_support":
             handleAIChat("我有点累，想被温柔安慰一下，也想听听今天适合什么穿搭。")
         case "pet_currency_panel":
-            handleCurrencyOverview()
+            refreshPanel(for: "pet_currency_panel", messageID: messageID)
+        case "pet_currency_all":
+            refreshPanel(for: "pet_currency_all", messageID: messageID)
+        case "pet_currency_meow":
+            refreshPanel(for: "pet_currency_meow", messageID: messageID)
+        case "pet_currency_fish":
+            refreshPanel(for: "pet_currency_fish", messageID: messageID)
+        case "pet_currency_bone":
+            refreshPanel(for: "pet_currency_bone", messageID: messageID)
         case "pet_status_panel":
-            handlePetStatusOverview()
+            refreshPanel(for: "pet_status_panel", messageID: messageID)
+        case "pet_status_all":
+            refreshPanel(for: "pet_status_all", messageID: messageID)
+        case "pet_status_hunger":
+            refreshPanel(for: "pet_status_hunger", messageID: messageID)
+        case "pet_status_hydration":
+            refreshPanel(for: "pet_status_hydration", messageID: messageID)
+        case "pet_status_hygiene":
+            refreshPanel(for: "pet_status_hygiene", messageID: messageID)
+        case "pet_status_mood":
+            refreshPanel(for: "pet_status_mood", messageID: messageID)
+        case "pet_status_intimacy":
+            refreshPanel(for: "pet_status_intimacy", messageID: messageID)
+        case "pet_inventory_panel":
+            refreshPanel(for: "pet_inventory_panel", messageID: messageID)
+        case "pet_shop_panel":
+            refreshPanel(for: "pet_shop_panel", messageID: messageID)
+        case "pet_money_counter":
+            refreshPanel(for: "pet_money_counter", messageID: messageID)
+        case "pet_divination_panel":
+            refreshPanel(for: "pet_divination_panel", messageID: messageID)
         case "pet_second_adopt":
             handleSecondPetAdoptionIntent()
         case "pet_switch":
             handleSwitchPetIntent()
         case "pet_topup":
             handleMeowCoinTopUpIntent()
+        case "pet_clean_now":
+            refreshPanel(for: "pet_clean_now", messageID: messageID, feedback: cleanPetStatusNow())
         case "open_meow_store":
             messages.append(PetChatMessage(text: "充值入口我先帮你记下啦～你可以从「我」页进入喵币商店。", isUser: false, isAIGenerated: true))
         case "open_money_counting":
-            navigateToWealthCounting()
+            refreshPanel(for: "open_money_counting", messageID: messageID)
         default:
+            if option.command.hasPrefix("use_item:") {
+                let rawId = String(option.command.dropFirst("use_item:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+            } else if option.command.hasPrefix("buy_item:") {
+                let rawId = String(option.command.dropFirst("buy_item:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+            } else if option.command.hasPrefix("inventory:") {
+                let rawId = String(option.command.dropFirst("inventory:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+            } else if option.command.hasPrefix("shop:") {
+                let rawId = String(option.command.dropFirst("shop:".count))
+                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+            } else
             if option.command.hasPrefix("switch_pet:") {
                 let rawId = String(option.command.dropFirst("switch_pet:".count))
                 if let pet = PetCharacter(rawValue: rawId) {

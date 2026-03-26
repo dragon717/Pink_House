@@ -235,7 +235,22 @@ class ImageManager {
             var usedFileNames: Set<String> = []
             for clothing in allClothing {
                 for path in clothing.imagePaths {
-                    usedFileNames.insert(path)
+                    let fileName = (path as NSString).lastPathComponent
+                    if !fileName.isEmpty {
+                        usedFileNames.insert(fileName)
+                    }
+                }
+                
+                if let sizeChartPath = clothing.sizeChartImagePath?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !sizeChartPath.isEmpty {
+                    usedFileNames.insert((sizeChartPath as NSString).lastPathComponent)
+                }
+                
+                if let priceChartPath = clothing.priceChartImagePath?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !priceChartPath.isEmpty {
+                    usedFileNames.insert((priceChartPath as NSString).lastPathComponent)
                 }
             }
             

@@ -92,7 +92,7 @@ struct VIPTrialPopupView: View {
                     // 特权列表
                     VStack(alignment: .leading, spacing: 16) {
                         PrivilegeRow(icon: "brain.head.profile", text: "解锁 AI 智能对话")
-                        PrivilegeRow(icon: "mic.fill", text: "语音交互无限制")
+                        // PrivilegeRow(icon: "mic.fill", text: "语音交互无限制")
                         PrivilegeRow(icon: "sparkles", text: "专属 VIP 身份标识")
                     }
                     .padding(.horizontal, 20)

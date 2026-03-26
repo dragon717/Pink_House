@@ -5,6 +5,12 @@ enum PetWidgetType: String, Codable {
     case insightCard = "insight_card"
     case weatherCard = "weather_card"
     case container = "container"
+    case statusPanel = "status_panel"
+    case currencyPanel = "currency_panel"
+    case inventoryPanel = "inventory_panel"
+    case shopPanel = "shop_panel"
+    case moneyCounter = "money_counter"
+    case divinationPanel = "divination_panel"
     case unknown
 
     init(from decoder: Decoder) throws {

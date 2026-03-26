@@ -26,6 +26,7 @@ struct ClothingBasicInfoView: View {
     
     // 表图字段
     @Binding var sizeChartImagePath: String?
+    var deleteChartFileImmediately: Bool = true
     
     // UI State
     @Binding var showingBrandSelection: Bool
@@ -139,7 +140,12 @@ struct ClothingBasicInfoView: View {
                 case .sizes:
                     HStack(spacing: 8) {
                         AutoCompleteTextField(title: "", placeholder: "例如: S,M,L", text: $sizes, field: .size)
-                        ChartImagePicker(imagePath: $sizeChartImagePath, placeholder: "添加表图", editMode: true)
+                        ChartImagePicker(
+                            imagePath: $sizeChartImagePath,
+                            placeholder: "添加表图",
+                            editMode: true,
+                            deleteFileImmediately: deleteChartFileImmediately
+                        )
                     }
                 case .length:
                     AutoCompleteTextField(title: "", placeholder: "例如: 90cm", text: $length, field: .size)
@@ -232,6 +238,7 @@ struct ClothingPriceView: View {
     
     // 价格表图片
     @Binding var priceChartImagePath: String?
+    var deleteChartFileImmediately: Bool = true
     
     // 回调闭包用于显示 Toast
     var onShowToast: ((String, ToastType) -> Void)?
@@ -263,7 +270,12 @@ struct ClothingPriceView: View {
                 Text("价格信息")
                     .font(.headline)
                 Spacer()
-                ChartImagePicker(imagePath: $priceChartImagePath, placeholder: "添加表图", editMode: true)
+                ChartImagePicker(
+                    imagePath: $priceChartImagePath,
+                    placeholder: "添加表图",
+                    editMode: true,
+                    deleteFileImmediately: deleteChartFileImmediately
+                )
             }
             
             // 原价和总价

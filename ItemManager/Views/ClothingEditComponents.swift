@@ -16,6 +16,7 @@ struct AccessoryItemData: Identifiable, Equatable, Codable {
     var price: Double
     var deposit: Double
     var balance: Double
+    var imagePaths: [String]? = nil
 }
 
 // MARK: - Reusable Components

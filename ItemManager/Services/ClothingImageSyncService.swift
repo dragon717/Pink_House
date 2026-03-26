@@ -146,6 +146,124 @@ final class ClothingImageSyncService: ObservableObject {
         return id
     }
     
+    private func normalizedImageName(_ rawPath: String?) -> String? {
+        guard let rawPath else { return nil }
+        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let fileName = (trimmed as NSString).lastPathComponent
+        return fileName.isEmpty ? nil : fileName
+    }
+    
+    private func imageNames(for clothing: Clothing) -> [String] {
+        var result: [String] = []
+        var seen: Set<String> = []
+        
+        for rawPath in clothing.imagePaths {
+            if let fileName = normalizedImageName(rawPath), seen.insert(fileName).inserted {
+                result.append(fileName)
+            }
+        }
+        
+        if let sizeChartImageName = normalizedImageName(clothing.sizeChartImagePath),
+           seen.insert(sizeChartImageName).inserted {
+            result.append(sizeChartImageName)
+        }
+        
+        if let priceChartImageName = normalizedImageName(clothing.priceChartImagePath),
+           seen.insert(priceChartImageName).inserted {
+            result.append(priceChartImageName)
+        }
+        
+        return result
+    }
+    
+    private func collectAllValidImageNames(from clothings: [Clothing]) -> Set<String> {
+        var names: Set<String> = []
+        
+        for clothing in clothings {
+            for imageName in imageNames(for: clothing) {
+                names.insert(imageName)
+            }
+        }
+        
+        return names
+    }
+    
+    private func ensureSyncRecordsExist(context: ModelContext) throws {
+        let clothings = try context.fetch(FetchDescriptor<Clothing>())
+        let validImageNames = collectAllValidImageNames(from: clothings)
+        guard !validImageNames.isEmpty else { return }
+        
+        var imageOwnerMap: [String: UUID] = [:]
+        for clothing in clothings {
+            for imageName in imageNames(for: clothing) where imageOwnerMap[imageName] == nil {
+                imageOwnerMap[imageName] = clothing.id
+            }
+        }
+        
+        let existingRecords = try context.fetch(FetchDescriptor<ClothingImageSyncRecord>())
+        var existingByName: [String: ClothingImageSyncRecord] = [:]
+        for record in existingRecords {
+            existingByName[record.imageFileName] = record
+        }
+        
+        let storedImages = try context.fetch(FetchDescriptor<StoredImage>())
+        var hashByFileName: [String: String] = [:]
+        for storedImage in storedImages where hashByFileName[storedImage.fileName] == nil {
+            hashByFileName[storedImage.fileName] = storedImage.imageHash
+        }
+        
+        let fileManager = FileManager.default
+        var hasChanges = false
+        
+        for (imageName, clothingID) in imageOwnerMap {
+            let fileURL = ImageManager.shared.imagesDirectory.appendingPathComponent(imageName)
+            guard fileManager.fileExists(atPath: fileURL.path) else { continue }
+            
+            let hash: String
+            if let storedHash = hashByFileName[imageName], !storedHash.isEmpty {
+                hash = storedHash
+            } else if let imageData = try? Data(contentsOf: fileURL),
+                      let computedHash = calculateHash(data: imageData) {
+                hash = computedHash
+            } else {
+                continue
+            }
+            
+            if let existingRecord = existingByName[imageName] {
+                var didUpdate = false
+                
+                if existingRecord.imageHash != hash {
+                    existingRecord.imageHash = hash
+                    existingRecord.syncStatus = "pending"
+                    didUpdate = true
+                }
+                
+                if existingRecord.clothingID != clothingID {
+                    existingRecord.clothingID = clothingID
+                    didUpdate = true
+                }
+                
+                if didUpdate {
+                    existingRecord.updatedAt = Date()
+                    hasChanges = true
+                }
+            } else {
+                let newRecord = ClothingImageSyncRecord(
+                    clothingID: clothingID,
+                    imageFileName: imageName,
+                    imageHash: hash
+                )
+                context.insert(newRecord)
+                hasChanges = true
+            }
+        }
+        
+        if hasChanges {
+            try context.save()
+        }
+    }
+    
     // MARK: - 图片同步入口
     
     /// 同步裙装的所有图片到 CloudKit
@@ -158,7 +276,7 @@ final class ClothingImageSyncService: ObservableObject {
             return
         }
         
-        let imagePaths = clothing.imagePaths
+        let imagePaths = imageNames(for: clothing)
         guard !imagePaths.isEmpty else { return }
         
         await MainActor.run {
@@ -409,6 +527,12 @@ final class ClothingImageSyncService: ObservableObject {
         
         let context = ModelContext(SharedContainer.sharedModelContainer)
         
+        do {
+            try ensureSyncRecordsExist(context: context)
+        } catch {
+            AppLogger.error("构建待同步记录失败: \(error)")
+        }
+        
         let descriptor = FetchDescriptor<ClothingImageSyncRecord>(
             predicate: #Predicate { $0.syncStatus == "pending" || $0.syncStatus == "failed" }
         )
@@ -490,7 +614,7 @@ final class ClothingImageSyncService: ObservableObject {
         
         do {
             let allClothings = try context.fetch(clothingDescriptor)
-            let validImageNames = Set(allClothings.flatMap { $0.imagePaths })
+            let validImageNames = collectAllValidImageNames(from: allClothings)
             
             // 获取所有同步记录
             let syncDescriptor = FetchDescriptor<ClothingImageSyncRecord>()

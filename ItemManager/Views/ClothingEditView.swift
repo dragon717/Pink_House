@@ -330,6 +330,7 @@ struct ClothingEditView: View {
             condition: $condition,
             accessories: $accessories,
             sizeChartImagePath: $sizeChartImagePath,
+            deleteChartFileImmediately: !isEditing,
             showingBrandSelection: $showingBrandSelection,
             showingGenericSelection: $showingGenericSelection,
             activeSelectionField: $activeSelectionField
@@ -355,7 +356,70 @@ struct ClothingEditView: View {
             stock: $stock,
             accessoryList: $accessoryList,
             priceChartImagePath: $priceChartImagePath,
+            deleteChartFileImmediately: !isEditing,
             onShowToast: handleShowToast
+        )
+    }
+
+    private var selectedTagIDs: [UUID] {
+        selectedTags.map(\.id)
+    }
+
+    private struct DraftObservationKey: Equatable {
+        let name: String
+        let brandName: String
+        let types: String
+        let colors: String
+        let sizes: String
+        let length: String
+        let condition: String
+        let accessories: String
+        let isShared: Bool
+        let originalPrice: Double
+        let priceTotal: Double
+        let deposit: Double
+        let balance: Double
+        let accessoriesPrice: Double
+        let stock: Int
+        let purchaseDate: Date
+        let depositDate: Date
+        let isDepositPlan: Bool
+        let finalPaymentDate: Date
+        let finalPaymentEndDate: Date
+        let note: String
+        let accessoryList: [AccessoryItemData]
+        let selectedTagIDs: [UUID]
+        let sizeChartImagePath: String?
+        let priceChartImagePath: String?
+    }
+
+    private var draftObservationKey: DraftObservationKey {
+        DraftObservationKey(
+            name: name,
+            brandName: brandName,
+            types: types,
+            colors: colors,
+            sizes: sizes,
+            length: length,
+            condition: condition,
+            accessories: accessories,
+            isShared: isShared,
+            originalPrice: originalPrice,
+            priceTotal: priceTotal,
+            deposit: deposit,
+            balance: balance,
+            accessoriesPrice: accessoriesPrice,
+            stock: stock,
+            purchaseDate: purchaseDate,
+            depositDate: depositDate,
+            isDepositPlan: isDepositPlan,
+            finalPaymentDate: finalPaymentDate,
+            finalPaymentEndDate: finalPaymentEndDate,
+            note: note,
+            accessoryList: accessoryList,
+            selectedTagIDs: selectedTagIDs,
+            sizeChartImagePath: sizeChartImagePath,
+            priceChartImagePath: priceChartImagePath
         )
     }
     
@@ -518,7 +582,16 @@ struct ClothingEditView: View {
                 // Load accessory items
                 if let items = c.accessoryItems {
                     accessoryList = items.sorted(by: { $0.sortIndex < $1.sortIndex })
-                        .map { AccessoryItemData(id: UUID(), name: $0.name, price: NSDecimalNumber(decimal: $0.price).doubleValue, deposit: NSDecimalNumber(decimal: $0.deposit).doubleValue, balance: NSDecimalNumber(decimal: $0.balance).doubleValue) }
+                        .map {
+                            AccessoryItemData(
+                                id: UUID(),
+                                name: $0.name,
+                                price: NSDecimalNumber(decimal: $0.price).doubleValue,
+                                deposit: NSDecimalNumber(decimal: $0.deposit).doubleValue,
+                                balance: NSDecimalNumber(decimal: $0.balance).doubleValue,
+                                imagePaths: $0.imagePaths
+                            )
+                        }
                 }
                 
                 stock = c.stock
@@ -568,28 +641,28 @@ struct ClothingEditView: View {
                 saveCurrentStateAsDraft()
             }
         }
-        .onChange(of: name) { _, _ in updateCurrentDraft() }
-        .onChange(of: brandName) { _, _ in updateCurrentDraft() }
-        .onChange(of: types) { _, _ in updateCurrentDraft() }
-        .onChange(of: colors) { _, _ in updateCurrentDraft() }
-        .onChange(of: sizes) { _, _ in updateCurrentDraft() }
-        .onChange(of: length) { _, _ in updateCurrentDraft() }
-        .onChange(of: condition) { _, _ in updateCurrentDraft() }
-        .onChange(of: accessories) { _, _ in updateCurrentDraft() }
+        .onChange(of: draftObservationKey) { oldValue, newValue in
+            updateCurrentDraft()
+            let chartChanged =
+                oldValue.sizeChartImagePath != newValue.sizeChartImagePath ||
+                oldValue.priceChartImagePath != newValue.priceChartImagePath
+            if !isEditing && chartChanged { saveCurrentStateAsDraft() }
+        }
         // 监听应用进入后台通知，设置标记避免重复保存
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             print("ClothingEditView: App did enter background")
             didEnterBackground = true
         }
         .onDisappear {
-            print("ClothingEditView: onDisappear, isSaving: \(isSaving), isEditing: \(isEditing), didEnterBackground: \(didEnterBackground)")
+            print("ClothingEditView: onDisappear")
             // 如果不是保存操作且不是编辑模式且没有进入过后台，保存草稿
             // 如果已经进入过后台，DraftManager会在后台通知中保存草稿，这里不需要重复保存
-            if !isSaving && !isEditing && !didEnterBackground {
+            let shouldSaveDraft = !isSaving && !isEditing && !didEnterBackground
+            if shouldSaveDraft {
                 print("ClothingEditView: Saving draft on disappear")
                 saveCurrentStateAsDraft()
             } else {
-                print("ClothingEditView: Not saving draft on disappear (isSaving: \(isSaving), isEditing: \(isEditing), didEnterBackground: \(didEnterBackground))")
+                print("ClothingEditView: Not saving draft on disappear")
             }
         }
         .onChange(of: deposit) { oldValue, newValue in
@@ -787,9 +860,11 @@ struct ClothingEditView: View {
         let hasNote = !note.trimmingCharacters(in: .whitespaces).isEmpty
         let hasAccessories = !accessoryList.isEmpty
         let hasTags = !selectedTags.isEmpty
+        let hasSizeChart = !(sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let hasPriceChart = !(priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         
-        let result = hasName || hasImages || hasBrand || hasTypes || hasColors || hasSizes || hasPrice || hasNote || hasAccessories || hasTags
-        print("ClothingEditView: hasMeaningfulData = \(result) (name: \(hasName), images: \(hasImages), brand: \(hasBrand), types: \(hasTypes), colors: \(hasColors), sizes: \(hasSizes), price: \(hasPrice), note: \(hasNote), accessories: \(hasAccessories), tags: \(hasTags))")
+        let result = hasName || hasImages || hasBrand || hasTypes || hasColors || hasSizes || hasPrice || hasNote || hasAccessories || hasTags || hasSizeChart || hasPriceChart
+        print("ClothingEditView: hasMeaningfulData = \(result) (name: \(hasName), images: \(hasImages), brand: \(hasBrand), types: \(hasTypes), colors: \(hasColors), sizes: \(hasSizes), price: \(hasPrice), note: \(hasNote), accessories: \(hasAccessories), tags: \(hasTags), sizeChart: \(hasSizeChart), priceChart: \(hasPriceChart))")
         return result
     }
     
@@ -953,6 +1028,8 @@ struct ClothingEditView: View {
         if let c = clothing {
             // Update
             AppLogger.info("Updating clothing: \(c.id)")
+            let oldSizeChartPath = c.sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let oldPriceChartPath = c.priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
             c.name = name
             c.brand = finalBrand
             c.types = finalTypes
@@ -1007,7 +1084,14 @@ struct ClothingEditView: View {
             }
             // Create new items
             let newItems = accessoryList.enumerated().map { index, data in
-                AccessoryItem(name: data.name, price: Decimal(data.price), deposit: Decimal(data.deposit), balance: Decimal(data.balance), sortIndex: index)
+                AccessoryItem(
+                    name: data.name,
+                    price: Decimal(data.price),
+                    deposit: Decimal(data.deposit),
+                    balance: Decimal(data.balance),
+                    sortIndex: index,
+                    imagePaths: data.imagePaths
+                )
             }
             c.accessoryItems = newItems
             
@@ -1022,8 +1106,17 @@ struct ClothingEditView: View {
             c.updatedAt = Date()
             
             // 保存表图字段
-            c.sizeChartImagePath = sizeChartImagePath
-            c.priceChartImagePath = priceChartImagePath
+            let newSizeChartPath = sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let newPriceChartPath = priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+            c.sizeChartImagePath = (newSizeChartPath?.isEmpty == true) ? nil : newSizeChartPath
+            c.priceChartImagePath = (newPriceChartPath?.isEmpty == true) ? nil : newPriceChartPath
+
+            if let oldSizeChartPath, !oldSizeChartPath.isEmpty, oldSizeChartPath != c.sizeChartImagePath {
+                ImageManager.shared.deleteImage(fileName: oldSizeChartPath, context: modelContext)
+            }
+            if let oldPriceChartPath, !oldPriceChartPath.isEmpty, oldPriceChartPath != c.priceChartImagePath {
+                ImageManager.shared.deleteImage(fileName: oldPriceChartPath, context: modelContext)
+            }
             
             // Update notification
             NotificationManager.shared.scheduleNotification(for: c)
@@ -1056,11 +1149,20 @@ struct ClothingEditView: View {
             )
             
             // 保存表图字段
-            newClothing.sizeChartImagePath = sizeChartImagePath
-            newClothing.priceChartImagePath = priceChartImagePath
+            let newSizeChartPath = sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let newPriceChartPath = priceChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
+            newClothing.sizeChartImagePath = (newSizeChartPath?.isEmpty == true) ? nil : newSizeChartPath
+            newClothing.priceChartImagePath = (newPriceChartPath?.isEmpty == true) ? nil : newPriceChartPath
             
             let newItems = accessoryList.enumerated().map { index, data in
-                AccessoryItem(name: data.name, price: Decimal(data.price), deposit: Decimal(data.deposit), balance: Decimal(data.balance), sortIndex: index)
+                AccessoryItem(
+                    name: data.name,
+                    price: Decimal(data.price),
+                    deposit: Decimal(data.deposit),
+                    balance: Decimal(data.balance),
+                    sortIndex: index,
+                    imagePaths: data.imagePaths
+                )
             }
             newClothing.accessoryItems = newItems
             

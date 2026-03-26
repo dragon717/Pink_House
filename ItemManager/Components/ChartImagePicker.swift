@@ -13,6 +13,7 @@ struct ChartImagePicker: View {
     @Binding var imagePath: String?
     let placeholder: String
     var editMode: Bool = false
+    var deleteFileImmediately: Bool = true
 
     @Environment(\.modelContext) private var modelContext
 
@@ -129,15 +130,24 @@ struct ChartImagePicker: View {
     }
 
     private func saveImage(_ image: UIImage) {
+        let previousPath = imagePath
         if let fileName = ImageManager.shared.saveChartImage(image, context: modelContext) {
             imagePath = fileName
+            if deleteFileImmediately,
+               let previousPath,
+               !previousPath.isEmpty,
+               previousPath != fileName {
+                ImageManager.shared.deleteImage(fileName: previousPath, context: modelContext)
+            }
             Task { await loadThumbnail() }
         }
     }
 
     private func deleteImage() {
         if let path = imagePath {
-            ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+            if deleteFileImmediately {
+                ImageManager.shared.deleteImage(fileName: path, context: modelContext)
+            }
             imagePath = nil
             loadedThumbnail = nil
         }
