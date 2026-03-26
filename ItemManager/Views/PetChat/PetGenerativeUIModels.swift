@@ -1,5 +1,10 @@
 import Foundation
 
+enum PetMoneyCounterMetricKey {
+    static let currency = "money_counter_currency"
+    static let amount = "money_counter_amount"
+}
+
 enum PetWidgetType: String, Codable {
     case quickOptions = "quick_options"
     case insightCard = "insight_card"

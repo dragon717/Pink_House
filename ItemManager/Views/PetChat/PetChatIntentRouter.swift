@@ -176,6 +176,7 @@ enum PetChatIntentRouter {
     private static let statusKeywords = ["状态", "饱食", "饮水", "清洁", "心情", "亲密度", "桃心", "它现在怎么样"]
     private static let secondPetKeywords = ["二胎", "再养一只", "领养第二只", "再来一只", "再养个"]
     private static let switchPetKeywords = ["切换", "换一只", "换奶茶", "换毛毛", "换宠物"]
+    private static let switchVerbPrefixes = ["我要", "我想要", "我要换", "我想换", "我要切", "我想切", "换成", "切到", "切换到", "换到", "用", "给我", "来个"]
     private static let topUpKeywords = ["充值", "充币", "充点喵币", "买币", "氪金", "加点喵币"]
     private static let multiIntentJoiners = ["顺便", "同时", "然后", "再", "和", "并且", "还想"]
 
@@ -226,6 +227,38 @@ enum PetChatIntentRouter {
         )
     }
 
+    static func detectSwitchTarget(from text: String, status: PetStatus) -> PetCharacter? {
+        let normalized = normalizeAlias(text)
+        guard !normalized.isEmpty else { return nil }
+
+        var customAliasHit: PetCharacter?
+
+        for pet in PetCharacter.allCases {
+            let defaultAliases = Set([
+                normalizeAlias(pet.displayName),
+                normalizeAlias(pet.rawValue)
+            ])
+
+            var aliases = defaultAliases
+            if let customAlias = cleanedCustomAlias(status.petNames[pet.id]) {
+                aliases.insert(customAlias)
+            }
+
+            for alias in aliases where !alias.isEmpty {
+                if isDirectSwitchExpression(text: normalized, alias: alias) {
+                    return pet
+                }
+
+                let isCustomAlias = !defaultAliases.contains(alias)
+                if isCustomAlias && normalized.contains(alias) {
+                    customAliasHit = pet
+                }
+            }
+        }
+
+        return customAliasHit
+    }
+
     private static func needsDisambiguation(normalized: String, topCandidates: [IntentCandidate]) -> Bool {
         guard topCandidates.count >= 2 else { return false }
         let first = topCandidates[0]
@@ -253,5 +286,29 @@ enum PetChatIntentRouter {
 
     private static func containsAny(_ keywords: [String], in text: String) -> Bool {
         keywords.contains { text.contains($0) }
+    }
+
+    private static func cleanedCustomAlias(_ alias: String?) -> String? {
+        guard let alias else { return nil }
+        let cleaned = normalizeAlias(alias.replacingOccurrences(of: "\"", with: ""))
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    private static func normalizeAlias(_ text: String) -> String {
+        text
+            .lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .joined()
+    }
+
+    private static func isDirectSwitchExpression(text: String, alias: String) -> Bool {
+        guard !alias.isEmpty else { return false }
+        if switchPetKeywords.contains(where: { text.contains($0) }) && text.contains(alias) {
+            return true
+        }
+        return switchVerbPrefixes.contains { prefix in
+            text.contains(prefix + alias)
+        }
     }
 }

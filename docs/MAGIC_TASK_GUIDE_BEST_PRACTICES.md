@@ -68,14 +68,14 @@
   - 用户回到 `me` tab；
   - 且已采集到 VIP 卡片真实 frame。  
 - 解锁前 step2 -> step3 由 VIP 中心打开事件推进（`.vipCenterOpened`）。  
-- **解锁后链路** step1（点击萌宠对话 Tab）-> step2（点击搜索栏）由真实 `homeTabChanged(tab=petChat)` 推进。  
-- 解锁后 step2 -> step3（能力讲解）由搜索栏展开事件推进（`.petChatSearchStateChanged`）。  
+- **解锁后链路** step1（点击萌宠对话 Tab）-> step2（点击对话窗口内嵌引导选项）由真实 `homeTabChanged(tab=petChat)` 推进。  
+- 解锁后 step2 -> step3（能力讲解）由内嵌引导选项点击事件推进（`.petChatGuideOptionTapped`）。  
 
 ### 2.2 高亮从“硬编码”改为“真实控件坐标”
 
 - 在 `MeView` 捕获 VIP 卡片全局 frame。  
 - 在 `VIPCenterView` 捕获“兑换会员时长”按钮全局 frame。  
-- 在首页底部导航捕获「萌宠对话」Tab 区域，在萌宠对话页捕获顶部搜索栏区域。  
+- 在首页底部导航捕获「萌宠对话」Tab 区域，在萌宠对话页捕获对话内嵌引导选项按钮区域。  
 - Overlay 内把全局 frame 转成本地 frame 后绘制挖空与高亮。  
 
 ### 2.3 兼容策略

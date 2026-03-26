@@ -144,6 +144,26 @@ final class PetGenerativeUITests: XCTestCase {
         XCTAssertEqual(PetChatIntentRouter.detect(from: "刚刚搭配的三件衣服价格多少"), .lastOutfitPrice)
     }
 
+    func testIntentRouterDetectsDirectSwitchTargetByDefaultName() {
+        var status = PetStatus()
+        status.ownedPetIds = [PetCharacter.naicha.id, PetCharacter.maomao.id]
+        status.selectedPetId = PetCharacter.naicha.id
+
+        XCTAssertEqual(PetChatIntentRouter.detectSwitchTarget(from: "我要毛毛", status: status), .maomao)
+        XCTAssertEqual(PetChatIntentRouter.detectSwitchTarget(from: "切换到奶茶", status: status), .naicha)
+    }
+
+    func testIntentRouterDetectsDirectSwitchTargetByCustomName() {
+        var status = PetStatus()
+        status.ownedPetIds = [PetCharacter.naicha.id, PetCharacter.maomao.id]
+        status.selectedPetId = PetCharacter.naicha.id
+        status.petNames[PetCharacter.naicha.id] = "可可"
+        status.petNames[PetCharacter.maomao.id] = "团子"
+
+        XCTAssertEqual(PetChatIntentRouter.detectSwitchTarget(from: "团子今天在吗", status: status), .maomao)
+        XCTAssertNil(PetChatIntentRouter.detectSwitchTarget(from: "今天天气怎么样", status: status))
+    }
+
     func testRecentAssistantRepliesHelperFiltersUserMessages() {
         let messages = [
             ChatMessage(text: "你好", isUser: true),

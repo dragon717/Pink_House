@@ -9,1366 +9,6 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 
-// MARK: - 超时包装函数（使用 PetAIService 中的 TimeoutError）
-func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-        // 添加主任务
-        group.addTask {
-            try await operation()
-        }
-
-        // 添加超时任务
-        group.addTask {
-            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            throw TimeoutError()
-        }
-
-        // 等待第一个完成的任务
-        let result = try await group.next()!
-        group.cancelAll()
-        return result
-    }
-}
-
-private func activePetPersonaProfile(petName: String) -> PetPersonaProfile {
-    guard let petId = PetDataManager.shared.status.selectedPetId,
-          let character = PetCharacter(rawValue: petId) else {
-        return PetPersonaRegistry.profile(for: .kitten, petName: petName)
-    }
-    return PetPersonaRegistry.profile(for: character.aiRole, petName: petName)
-}
-
-private func activePetRole() -> PetRole {
-    guard let petId = PetDataManager.shared.status.selectedPetId,
-          let character = PetCharacter(rawValue: petId) else {
-        return .kitten
-    }
-    return character.aiRole
-}
-
-private func wardrobeContextBudget(for intent: PetChatIntent) -> Int {
-    switch intent {
-    case .outfitSuggestion, .weatherGuidance:
-        return 10
-    case .wardrobeStats, .search, .depositPlan, .lastOutfitPrice:
-        return 8
-    case .currencyOverview, .petStatusOverview, .secondPetAdoption, .switchPetCompanion, .meowCoinTopUp, .moodSupport, .generalChat:
-        return 6
-    }
-}
-
-private func intimacyHearts(for intimacy: Double) -> String {
-    let value = max(0, min(100, intimacy))
-    let filled = Int((value / 20).rounded(.down))
-    let empty = max(0, 5 - filled)
-    return String(repeating: "♥️", count: filled) + String(repeating: "♡", count: empty)
-}
-
-private enum PetStatusPanelKind: CaseIterable {
-    case all
-    case hunger
-    case hydration
-    case hygiene
-    case mood
-    case intimacy
-
-    var title: String {
-        switch self {
-        case .all: return "全部状态"
-        case .hunger: return "饱食"
-        case .hydration: return "饮水"
-        case .hygiene: return "清洁"
-        case .mood: return "心情"
-        case .intimacy: return "亲密度"
-        }
-    }
-
-    var iconName: String {
-        switch self {
-        case .all: return "rectangle.stack.fill"
-        case .hunger: return "fork.knife.circle.fill"
-        case .hydration: return "drop.circle.fill"
-        case .hygiene: return "sparkles"
-        case .mood: return "face.smiling.fill"
-        case .intimacy: return "heart.fill"
-        }
-    }
-
-    var command: String {
-        switch self {
-        case .all: return "pet_status_all"
-        case .hunger: return "pet_status_hunger"
-        case .hydration: return "pet_status_hydration"
-        case .hygiene: return "pet_status_hygiene"
-        case .mood: return "pet_status_mood"
-        case .intimacy: return "pet_status_intimacy"
-        }
-    }
-}
-
-private enum PetCurrencyPanelKind: CaseIterable {
-    case all
-    case meowCoin
-    case fishCoin
-    case boneCoin
-
-    var title: String {
-        switch self {
-        case .all: return "全部货币"
-        case .meowCoin: return "喵币"
-        case .fishCoin: return "鱼币"
-        case .boneCoin: return "骨头币"
-        }
-    }
-
-    var command: String {
-        switch self {
-        case .all: return "pet_currency_all"
-        case .meowCoin: return "pet_currency_meow"
-        case .fishCoin: return "pet_currency_fish"
-        case .boneCoin: return "pet_currency_bone"
-        }
-    }
-
-    var currencies: [PetCurrency] {
-        switch self {
-        case .all: return [.meowCoin, .fishCoin, .boneCoin]
-        case .meowCoin: return [.meowCoin]
-        case .fishCoin: return [.fishCoin]
-        case .boneCoin: return [.boneCoin]
-        }
-    }
-}
-
-private enum PetEmbeddedPanelIntent {
-    case currency(PetCurrencyPanelKind)
-    case inventory
-    case shop
-    case moneyCounter
-    case divination
-    case status(PetStatusPanelKind)
-}
-
-private func normalizedPetChatIntentText(_ text: String) -> String {
-    text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-}
-
-private func containsAnyKeyword(_ text: String, keywords: [String]) -> Bool {
-    keywords.contains { text.contains($0) }
-}
-
-private func isCurrencyInquiry(_ text: String) -> Bool {
-    containsAnyKeyword(text, keywords: [
-        "查看", "看看", "看", "显示", "余额", "财务", "货币", "钱包", "资产", "多少", "剩多少", "还有多少", "存款", "查查"
-    ])
-}
-
-private func isAddressingPet(in text: String, petName: String) -> Bool {
-    let normalized = normalizedPetChatIntentText(text)
-    let markers = [petName.lowercased(), "萌宠", "宠物", "宝宝", "崽崽", "小家伙", "管家"]
-    return markers.contains { !$0.isEmpty && normalized.contains($0) }
-}
-
-private func detectEmbeddedPanelIntent(from text: String, petName: String) -> PetEmbeddedPanelIntent? {
-    let normalized = normalizedPetChatIntentText(text)
-    guard !normalized.isEmpty else { return nil }
-
-    if containsAnyKeyword(normalized, keywords: ["所有的财务情况", "所有财务情况", "所有的货币", "所有货币", "全部货币", "全部财务", "货币总览", "财务总览"])
-        || (isCurrencyInquiry(normalized) && containsAnyKeyword(normalized, keywords: ["全部", "所有"]) && containsAnyKeyword(normalized, keywords: ["货币", "财务", "余额", "钱包"])) {
-        return .currency(.all)
-    }
-
-    if isCurrencyInquiry(normalized) && containsAnyKeyword(normalized, keywords: ["喵币", "妖币"]) {
-        return .currency(.meowCoin)
-    }
-
-    if isCurrencyInquiry(normalized) && normalized.contains("鱼币") {
-        return .currency(.fishCoin)
-    }
-
-    if isCurrencyInquiry(normalized) && normalized.contains("骨头币") {
-        return .currency(.boneCoin)
-    }
-
-    if containsAnyKeyword(normalized, keywords: ["数钱", "数钞票", "点钱", "裙装总价值", "总价值"]) {
-        return .moneyCounter
-    }
-
-    if containsAnyKeyword(normalized, keywords: ["求签", "请签", "抽签", "签文", "今日运势", "今日一签"]) {
-        return .divination
-    }
-
-    if containsAnyKeyword(normalized, keywords: ["背包", "道具", "库存", "猫粮还有", "罐头还有", "仓库"]) {
-        return .inventory
-    }
-
-    if containsAnyKeyword(normalized, keywords: ["商店", "小卖部", "买点", "补货", "购买道具", "卖点"]) {
-        return .shop
-    }
-
-    let petAddressed = isAddressingPet(in: normalized, petName: petName)
-    let explicitAllStatus = containsAnyKeyword(normalized, keywords: ["全部状态", "萌宠现状", "宠物现状", "状态总览", "状态面板"])
-        || (containsAnyKeyword(normalized, keywords: ["展示", "显示"]) && normalized.contains("状态") && normalized.contains("全部"))
-
-    if explicitAllStatus {
-        return .status(.all)
-    }
-
-    guard petAddressed else { return nil }
-
-    if containsAnyKeyword(normalized, keywords: ["饿了", "饥饿", "饱食", "吃饱", "肚子饿"]) {
-        return .status(.hunger)
-    }
-    if containsAnyKeyword(normalized, keywords: ["渴了", "口渴", "饮水", "想喝水", "没水了"]) {
-        return .status(.hydration)
-    }
-    if containsAnyKeyword(normalized, keywords: ["脏了", "清洁", "洗澡", "脏兮兮", "该洗洗"]) {
-        return .status(.hygiene)
-    }
-    if containsAnyKeyword(normalized, keywords: ["心情", "不开心", "开心吗", "emo", "郁闷", "高兴"]) {
-        return .status(.mood)
-    }
-    if containsAnyKeyword(normalized, keywords: ["亲密度", "关系值", "喜欢我吗", "亲近", "桃心"]) {
-        return .status(.intimacy)
-    }
-
-    return nil
-}
-
-private func metricForStatus(_ status: PetStatus, kind: PetStatusPanelKind) -> PetWidgetMetric {
-    switch kind {
-    case .all:
-        return PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
-    case .hunger:
-        return PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100")
-    case .hydration:
-        return PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100")
-    case .hygiene:
-        return PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100")
-    case .mood:
-        return PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100")
-    case .intimacy:
-        return PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
-    }
-}
-
-private func statusMetrics(for status: PetStatus, kind: PetStatusPanelKind) -> [PetWidgetMetric] {
-    switch kind {
-    case .all:
-        return [
-            PetWidgetMetric(name: "饱食", value: "\(Int(status.hunger))/100"),
-            PetWidgetMetric(name: "饮水", value: "\(Int(status.energy))/100"),
-            PetWidgetMetric(name: "清洁", value: "\(Int(status.hygiene))/100"),
-            PetWidgetMetric(name: "心情", value: "\(Int(status.mood))/100"),
-            PetWidgetMetric(name: "亲密度", value: intimacyHearts(for: status.intimacy))
-        ]
-    default:
-        return [metricForStatus(status, kind: kind)]
-    }
-}
-
-private func statusSubtitle(for status: PetStatus, kind: PetStatusPanelKind) -> String {
-    switch kind {
-    case .all:
-        return "这里是\(status.displayName)现在的 4+1 状态，总览和动画条都放在一个气泡里。"
-    case .hunger:
-        return "\(status.displayName)现在的饱食度在这里，想喂点东西的话我可以直接打开背包。"
-    case .hydration:
-        return "\(status.displayName)的饮水状态在这里，要不要马上喂它喝一点？"
-    case .hygiene:
-        return "\(status.displayName)的清洁状态在这里，要不要顺手给它洗香香？"
-    case .mood:
-        return "\(status.displayName)现在的心情我帮你单独展开了。"
-    case .intimacy:
-        return "亲密度用桃心进度来展示，你们的关系正在慢慢变深。"
-    }
-}
-
-private func statusOptions(for kind: PetStatusPanelKind) -> [PetWidgetOption] {
-    switch kind {
-    case .all:
-        return [
-            PetWidgetOption(title: "A. 打开萌宠背包", command: "pet_inventory_panel", icon: "shippingbox.fill"),
-            PetWidgetOption(title: "B. 打开萌宠商店", command: "pet_shop_panel", icon: "cart.fill"),
-            PetWidgetOption(title: "C. 数数我的裙装总价值", command: "pet_money_counter", icon: "yensign.circle.fill")
-        ]
-    case .hunger, .hydration:
-        return [
-            PetWidgetOption(title: "A. 我来喂它", command: "pet_inventory_panel", icon: "fork.knife.circle.fill"),
-            PetWidgetOption(title: "B. 先去补点货", command: "pet_shop_panel", icon: "cart.fill")
-        ]
-    case .hygiene:
-        return [
-            PetWidgetOption(title: "A. 帮它清洁一下", command: "pet_clean_now", icon: "sparkles"),
-            PetWidgetOption(title: "B. 先看看全部状态", command: "pet_status_all", icon: "rectangle.stack.fill")
-        ]
-    case .mood:
-        return [
-            PetWidgetOption(title: "A. 打开背包陪它玩", command: "pet_inventory_panel", icon: "gamecontroller.fill"),
-            PetWidgetOption(title: "B. 先聊聊天安慰它", command: "mood_support", icon: "bubble.left.and.bubble.right.fill")
-        ]
-    case .intimacy:
-        return [
-            PetWidgetOption(title: "A. 看看全部状态", command: "pet_status_all", icon: "rectangle.stack.fill"),
-            PetWidgetOption(title: "B. 切换一下宠物管家", command: "pet_switch", icon: "arrow.triangle.2.circlepath")
-        ]
-    }
-}
-
-private func makeStatusPanelWidget(status: PetStatus, kind: PetStatusPanelKind, feedback: String? = nil) -> PetWidgetData {
-    PetWidgetData(
-        type: .statusPanel,
-        title: kind == .all ? "\(status.displayName)的状态面板（4+1）" : "\(status.displayName)的\(kind.title)",
-        subtitle: feedback ?? statusSubtitle(for: status, kind: kind),
-        options: statusOptions(for: kind),
-        metrics: statusMetrics(for: status, kind: kind)
-    )
-}
-
-private func currencyAmount(for type: PetCurrency, status: PetStatus) -> Int {
-    switch type {
-    case .meowCoin: return status.meowCoin
-    case .fishCoin: return status.fishCoin
-    case .boneCoin: return status.boneCoin
-    }
-}
-
-private func currencySubtitle(for status: PetStatus, kind: PetCurrencyPanelKind) -> String {
-    switch kind {
-    case .all:
-        return "这里是\(status.displayName)当前全部货币，妖币就是喵币。"
-    case .meowCoin:
-        return "这里只展开喵币，适合看领养二胎和充值相关余额。"
-    case .fishCoin:
-        return "这里只展开鱼币，方便看日常道具和工作收益。"
-    case .boneCoin:
-        return "这里只展开骨头币，这是毛毛偏爱的币种。"
-    }
-}
-
-private func currencyMetrics(for status: PetStatus, kind: PetCurrencyPanelKind) -> [PetWidgetMetric] {
-    kind.currencies.map { currency in
-        PetWidgetMetric(name: currency.rawValue, value: "\(currencyAmount(for: currency, status: status))")
-    }
-}
-
-private func makeCurrencyPanelWidget(status: PetStatus, kind: PetCurrencyPanelKind, feedback: String? = nil) -> PetWidgetData {
-    PetWidgetData(
-        type: .currencyPanel,
-        title: kind == .all ? "当前货币余额" : "当前\(kind.title)",
-        subtitle: feedback ?? currencySubtitle(for: status, kind: kind),
-        metrics: currencyMetrics(for: status, kind: kind)
-    )
-}
-
-private func inventoryOptions(status: PetStatus, limit: Int = 8) -> [PetWidgetOption] {
-    status.inventory
-        .filter { $0.value > 0 }
-        .compactMap { entry -> PetWidgetOption? in
-            guard let item = PetConfigManager.shared.getItem(byId: entry.key) else { return nil }
-            return PetWidgetOption(
-                title: "\(item.name) x\(entry.value)",
-                command: "use_item:\(item.id)",
-                icon: item.icon
-            )
-        }
-        .sorted { $0.title < $1.title }
-        .prefix(limit)
-        .map { $0 }
-}
-
-private func makeInventoryPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
-    let options = inventoryOptions(status: status)
-    return PetWidgetData(
-        type: .inventoryPanel,
-        title: "\(status.displayName)的背包",
-        subtitle: feedback ?? (options.isEmpty ? "现在没有库存道具。" : "点一下就能使用，也可以拖到投喂区。"),
-        options: options
-    )
-}
-
-private func shopOptions(limit: Int = 8) -> [PetWidgetOption] {
-    PetConfigManager.shared.items
-        .sorted { $0.sortIndex < $1.sortIndex }
-        .prefix(limit)
-        .map { item in
-            let currencyName = item.petCurrency.rawValue
-            return PetWidgetOption(
-                title: "\(item.name) · \(item.price)\(currencyName)",
-                command: "buy_item:\(item.id)",
-                icon: item.icon
-            )
-        }
-}
-
-private func makeShopPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
-    let subtitle = feedback ?? "当前余额：喵币\(status.meowCoin) / 鱼币\(status.fishCoin) / 骨头币\(status.boneCoin)"
-    return PetWidgetData(
-        type: .shopPanel,
-        title: "萌宠道具商店",
-        subtitle: subtitle,
-        options: shopOptions()
-    )
-}
-
-private func makeMoneyCounterWidget(totalValue: Decimal) -> PetWidgetData {
-        let total = NSDecimalNumber(decimal: totalValue).intValue
-        return PetWidgetData(
-            type: .moneyCounter,
-        title: "裙装总价值数钱台",
-        subtitle: "不跳页，直接在气泡里数完这一笔。",
-        options: [
-            PetWidgetOption(title: "A. 看看全部状态", command: "pet_status_all", icon: "heart.text.square.fill"),
-            PetWidgetOption(title: "B. 打开萌宠背包", command: "pet_inventory_panel", icon: "shippingbox.fill")
-        ],
-        metrics: [
-            PetWidgetMetric(name: "裙装总价值", value: "¥\(total)")
-        ]
-    )
-}
-
-private func makeDivinationWidget() -> PetWidgetData {
-    PetWidgetData(
-        type: .divinationPanel,
-        title: "今日求签",
-        subtitle: "就在这里摇一支签，不跳转页面。",
-        options: [
-            PetWidgetOption(title: "A. 再求一签", command: "pet_divination_panel", icon: "wand.and.stars"),
-            PetWidgetOption(title: "B. 去数数钞票", command: "pet_money_counter", icon: "yensign.circle.fill")
-        ]
-    )
-}
-
-private func purchasePetItemResult(itemId: String) -> String {
-    guard let item = PetConfigManager.shared.getItem(byId: itemId) else {
-        return "这个商品我暂时没找到，稍后再试试吧。"
-    }
-
-    var status = PetDataManager.shared.status
-    switch item.petCurrency {
-    case .fishCoin:
-        guard status.fishCoin >= item.price else { return "鱼币不够，先攒一点再来买\(item.name)吧。" }
-        status.fishCoin -= item.price
-    case .meowCoin:
-        guard status.meowCoin >= item.price else { return "喵币不够，先充一点再来买\(item.name)吧。" }
-        status.meowCoin -= item.price
-    case .boneCoin:
-        guard status.boneCoin >= item.price else { return "骨头币不够，这个是给毛毛用的币种喔。" }
-        status.boneCoin -= item.price
-    }
-
-    status.inventory[item.id, default: 0] += 1
-    status.intimacy = min(100, status.intimacy + 1)
-    PetDataManager.shared.saveStatus(status)
-    return "买好啦，\(item.name)已经放进\(status.displayName)的背包里。"
-}
-
-private func consumePetItemResult(itemId: String) -> String {
-    guard let item = PetConfigManager.shared.getItem(byId: itemId) else {
-        return "这个道具我暂时没识别出来。"
-    }
-
-    var status = PetDataManager.shared.status
-    guard let count = status.inventory[item.id], count > 0 else {
-        return "\(item.name)已经用完了，要不要我帮你去商店补货？"
-    }
-
-    if item.id == "renameCard" {
-        return "改名项圈先留着吧，这个需要走专门的改名流程。"
-    }
-
-    status.inventory[item.id] = count - 1
-
-    if item.id == "energyPill" {
-        let oldEnergy = status.energy
-        status.energy = min(100, status.energy + item.recoveryValue)
-        status.mood = min(100, status.mood + 5)
-        status.intimacy = min(100, status.intimacy + 1)
-        PetDataManager.shared.saveStatus(status)
-        let recovered = Int(status.energy - oldEnergy)
-        return recovered > 0 ? "\(status.displayName)精神回来啦，精力恢复了 \(recovered) 点。" : "\(status.displayName)现在精力已经满满的啦。"
-    }
-
-    if item.isToy {
-        let energyCost = Double(item.energyCost ?? 0)
-        guard status.energy >= energyCost else {
-            status.inventory[item.id] = count
-            return "\(status.displayName)现在太累了，不想玩\(item.name)。"
-        }
-        status.energy = max(0, status.energy - energyCost)
-        status.mood = min(100, status.mood + item.recoveryValue)
-        status.intimacy = min(100, status.intimacy + 2)
-        PetDataManager.shared.saveStatus(status)
-        return "\(status.displayName)玩得很开心，心情明显变好了。"
-    }
-
-    let moodRecovery = item.recoveryValue * 0.2
-    status.mood = min(100, status.mood + moodRecovery)
-    if item.isDrink {
-        status.energy = min(100, status.energy + item.recoveryValue)
-    } else {
-        status.hunger = min(100, status.hunger + item.recoveryValue)
-    }
-    status.intimacy = min(100, status.intimacy + 1.5)
-    PetDataManager.shared.saveStatus(status)
-
-    if item.isDrink {
-        return "\(status.displayName)喝下\(item.name)啦，饮水状态回升了一些。"
-    }
-    return "\(status.displayName)吃掉了\(item.name)，饱食度恢复了一些。"
-}
-
-private func cleanPetStatusNow() -> String {
-    var status = PetDataManager.shared.status
-    let oldValue = status.hygiene
-    guard oldValue < 100 else {
-        return "\(status.displayName)已经香香的啦，不用再洗啦。"
-    }
-    status.hygiene = 100
-    status.mood = min(100, status.mood + 10)
-    status.intimacy = min(100, status.intimacy + 1)
-    PetDataManager.shared.saveStatus(status)
-    return "\(status.displayName)已经洗香香啦，清洁度补满了。"
-}
-
-// MARK: - 消息类型枚举
-enum PetChatMessageType {
-    case text           // 普通文本
-    case wardrobeCard   // 衣橱卡片
-    case statistics     // 统计数据
-    case colorMatch     // 搭配色推荐
-    case searchResults  // 搜索结果
-    case thinking       // AI思考中
-    case outfitSuggestion // 搭配建议（新增）
-}
-
-// MARK: - 搭配建议数据
-struct OutfitSuggestionData {
-    let clothings: [Clothing]  // 推荐的裙装列表（不再直接创建 Outfit）
-    let description: String
-    let style: String
-    let occasion: String
-    let layoutInfos: [LayoutInfo]?  // 可选的布局信息
-}
-
-// MARK: - 萌宠对话消息模型
-struct PetChatMessage: Identifiable {
-    let id = UUID()
-    let text: String
-    let isUser: Bool
-    let isUserAuthored: Bool      // 仅用户亲自输入的消息才用于“可复用历史”
-    let type: PetChatMessageType
-    let timestamp: Date
-    var clothing: Clothing?           // 关联的衣橱卡片
-    var searchResults: [Clothing]?    // 搜索结果
-    var statistics: WardrobeStats?    // 统计数据
-    var colorRecommendation: ColorRecommendation?  // 搭配色推荐
-    var imageName: String?            // 表情图片名称 (如 happy_cat, sleepy_cat)
-    var isAIGenerated: Bool           // 是否AI生成
-    var outfitSuggestion: OutfitSuggestionData? // 搭配建议（新增）
-    var widgets: [PetWidgetData]?     // 生成式UI组件
-
-    init(text: String, isUser: Bool, type: PetChatMessageType = .text,
-         isUserAuthored: Bool? = nil,
-         clothing: Clothing? = nil, searchResults: [Clothing]? = nil,
-         statistics: WardrobeStats? = nil, colorRecommendation: ColorRecommendation? = nil,
-         imageName: String? = nil, isAIGenerated: Bool = false,
-         timestamp: Date = Date(),
-         outfitSuggestion: OutfitSuggestionData? = nil,
-         widgets: [PetWidgetData]? = nil) {
-        self.text = text
-        self.isUser = isUser
-        self.isUserAuthored = isUserAuthored ?? isUser
-        self.type = type
-        self.timestamp = timestamp
-        self.clothing = clothing
-        self.searchResults = searchResults
-        self.statistics = statistics
-        self.colorRecommendation = colorRecommendation
-        self.imageName = imageName
-        self.isAIGenerated = isAIGenerated
-        self.outfitSuggestion = outfitSuggestion
-        self.widgets = widgets
-    }
-}
-
-// MARK: - 衣橱统计数据
-struct WardrobeStats {
-    let totalCount: Int
-    let totalValue: Decimal
-    let mostExpensiveItem: Clothing?
-    let depositPlanCount: Int
-    let totalDeposit: Decimal
-    let totalBalance: Decimal
-}
-
-// MARK: - 搭配色推荐
-struct ColorRecommendation {
-    let primaryColor: String
-    let secondaryColor: String
-    let accentColor: String
-    let description: String
-    let reasoning: String
-}
-
-// MARK: - AI思考动画视图
-struct AIThinkingAnimation: View {
-    @State private var dotScales: [CGFloat] = [0.5, 0.5, 0.5]
-    @State private var isAnimating = false
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(Color.pink.opacity(0.8))
-                    .frame(width: 8, height: 8)
-                    .scaleEffect(dotScales[index])
-                    .animation(
-                        Animation.easeInOut(duration: 0.6)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.15),
-                        value: dotScales[index]
-                    )
-            }
-        }
-        .onAppear {
-            for i in 0..<3 {
-                dotScales[i] = 1.0
-            }
-        }
-    }
-}
-
-// MARK: - 现代AI思考指示器
-struct ModernAIThinkingView: View {
-    @State private var rotation: Double = 0
-    @State private var pulseScale: CGFloat = 1.0
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // 旋转的圆环动画
-            ZStack {
-                Circle()
-                    .stroke(Color.pink.opacity(0.2), lineWidth: 3)
-                    .frame(width: 24, height: 24)
-                
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.pink, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 24, height: 24)
-                    .rotationEffect(.degrees(rotation))
-            }
-            
-            Text("思考中")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            
-            AIThinkingAnimation()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-        )
-        .onAppear {
-            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
-            withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
-                pulseScale = 1.05
-            }
-        }
-    }
-}
-
-// MARK: - 萌宠对话气泡
-struct PetChatBubble: View {
-    let message: PetChatMessage
-    let petName: String
-    let onCardTap: (Clothing) -> Void
-    let onSearchResultTap: (Clothing) -> Void
-    let onOutfitTap: (OutfitSuggestionData) -> Void
-    let onWidgetAction: (PetWidgetOption, UUID) -> Void
-
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var showAllResults = false
-    @State private var showingReportButton = false
-    
-    // 获取当前宠物角色
-    private var currentPetCharacter: PetCharacter {
-        guard let petId = PetDataManager.shared.status.selectedPetId,
-              let character = PetCharacter(rawValue: petId) else {
-            return .naicha // 默认返回奶茶
-        }
-        return character
-    }
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            if !message.isUser {
-                // AI头像 - 使用萌宠肖像
-                petAvatarView
-            } else {
-                Spacer()
-            }
-            
-            // 消息内容
-            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
-                // AI生成标识
-                if !message.isUser && message.isAIGenerated {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.caption2)
-                        Text("AI 生成")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.8))
-                    .padding(.leading, 4)
-                }
-                
-                switch message.type {
-                case .text, .thinking:
-                    textBubble
-                case .wardrobeCard:
-                    if let clothing = message.clothing {
-                        wardrobeCardBubble(clothing)
-                    } else {
-                        textBubble
-                    }
-                case .statistics:
-                    if let stats = message.statistics {
-                        statisticsBubble(stats)
-                    } else {
-                        textBubble
-                    }
-                case .colorMatch:
-                    if let colorRec = message.colorRecommendation {
-                        colorMatchBubble(colorRec)
-                    } else {
-                        textBubble
-                    }
-                case .searchResults:
-                    if let results = message.searchResults {
-                        searchResultsBubble(results)
-                    } else {
-                        textBubble
-                    }
-                case .outfitSuggestion:
-                    if let suggestion = message.outfitSuggestion {
-                        outfitSuggestionBubble(suggestion)
-                    } else {
-                        textBubble
-                    }
-                }
-
-                if let widgets = message.widgets, !widgets.isEmpty {
-                    PetGenerativeWidgetHost(widgets: widgets) { option in
-                        onWidgetAction(option, message.id)
-                    }
-                        .frame(maxWidth: 320, alignment: message.isUser ? .trailing : .leading)
-                }
-                
-                // 时间戳和举报按钮
-                HStack(spacing: 12) {
-                    Text(formatTimestamp(message.timestamp))
-                        .font(.caption2)
-                        .foregroundStyle(.gray.opacity(0.8))
-                    
-                    // 举报按钮 (长按后显示)
-                    if !message.isUser && message.isAIGenerated && showingReportButton {
-                        Button(action: {
-                            showingReportButton = false
-                        }) {
-                            HStack(spacing: 2) {
-                                Image(systemName: "exclamationmark.bubble")
-                                    .font(.caption2)
-                                Text("举报")
-                                    .font(.caption2)
-                            }
-                            .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                        }
-                        .transition(.opacity.combined(with: .scale))
-                    }
-                }
-                .padding(.leading, message.isUser ? 0 : 4)
-            }
-            
-            if message.isUser {
-                // 用户头像 - 使用 UserAvatarView
-                userAvatarView
-            } else {
-                Spacer()
-            }
-        }
-        .padding(.horizontal, 12)
-    }
-    
-    // 萌宠头像视图 - 根据当前选中的宠物显示对应happy表情图片
-    private var petAvatarView: some View {
-        Image(currentPetCharacter.happyImageName)
-            .resizable()
-            .scaledToFill()
-            .frame(width: 40, height: 40)
-            .clipShape(Circle())
-            .overlay(
-                Circle()
-                    .stroke(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.3), lineWidth: 2)
-            )
-    }
-    
-    // 用户头像视图 - 使用账户与同步界面的 UserAvatarView
-    private var userAvatarView: some View {
-        UserAvatarView(
-            givenName: AuthenticationManager.shared.givenName,
-            familyName: AuthenticationManager.shared.familyName,
-            customAvatarPath: AuthenticationManager.shared.customAvatarPath,
-            size: 40
-        )
-    }
-
-    // 格式化时间戳为 HH:mm:ss
-    private func formatTimestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
-    }
-
-    private var skinTheme: PetChatSkinTheme {
-        themeManager.petChatSkinTheme
-    }
-
-    private var bubbleCornerRadius: CGFloat {
-        skinTheme.cornerRadius
-    }
-
-    private var aiBubbleTextColor: Color {
-        skinTheme.resolvedAssistantBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    private var userBubbleTextColor: Color {
-        skinTheme.resolvedUserBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme)
-    }
-
-    @ViewBuilder
-    private func bubbleBackground(isUser: Bool) -> some View {
-        if skinTheme == .classic {
-            // 经典皮肤：萌宠气泡和用户气泡都使用卡片背景色
-            RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                .fill(themeManager.cardBackgroundColor)
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        } else if isUser {
-            // 用户气泡 - 魔法皮肤使用渐变主题色
-            let isDark = colorScheme == .dark
-            let bubbleStart = themeManager.cardTintColor.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
-            let bubbleEnd = themeManager.cardTintColor.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
-            RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                .fill(
-                    LinearGradient(
-                        colors: [bubbleStart, bubbleEnd],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: themeManager.accentTextColor.opacity(0.25), radius: 6, x: 0, y: 2)
-        } else {
-            // 萌宠气泡 - 魔法皮肤使用卡片背景色 + 主题色边框
-            // 直接使用与主题预览页一致的颜色计算方式
-            let isDark = colorScheme == .dark
-            let bgColor = themeManager.cardBackgroundColor
-            RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                .fill(bgColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                        .stroke(
-                            LinearGradient(
-                                colors: skinTheme.resolvedAssistantStrokeColors(themeManager: themeManager, colorScheme: colorScheme),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-                .shadow(color: themeManager.accentTextColor.opacity(0.2), radius: 5, x: 0, y: 2)
-        }
-    }
-    
-    // 文本气泡
-    private var textBubble: some View {
-        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
-            // 表情图片 (仅AI消息且存在图片时显示)
-            if !message.isUser, let imageName = message.imageName {
-                if let image = UIImage(named: imageName) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: 200)
-                        .cornerRadius(12)
-                        .overlay(alignment: .bottomTrailing) {
-                            // 印章效果
-                            PetStampView()
-                                .scaleEffect(0.5)
-                                .padding(4)
-                        }
-                } else {
-                    // 图片不存在时显示占位符
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .frame(width: 150, height: 150)
-                            .cornerRadius(12)
-                        
-                        VStack {
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundColor(.gray)
-                            Text(imageName)
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-            }
-            
-            // 文本内容
-            Text(message.text)
-                .font(.subheadline)
-                .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(bubbleBackground(isUser: message.isUser))
-        }
-        .frame(maxWidth: 280, alignment: message.isUser ? .trailing : .leading)
-        .onLongPressGesture {
-            if !message.isUser && message.isAIGenerated {
-                withAnimation {
-                    showingReportButton = true
-                }
-            }
-        }
-    }
-    
-    // 衣橱卡片气泡
-    private func wardrobeCardBubble(_ clothing: Clothing) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(message.text)
-                .font(.subheadline)
-                .foregroundStyle(aiBubbleTextColor)
-            
-            Button {
-                onCardTap(clothing)
-            } label: {
-                HStack(spacing: 12) {
-                    // 图片
-                    if let firstImagePath = clothing.imagePaths.first {
-                        AsyncLocalImageView(
-                            fileName: firstImagePath,
-                            displaySize: CGSize(width: 60, height: 60),
-                            contentMode: .fill,
-                            cornerRadius: 8,
-                            placeholderColor: themeManager.tertiaryTextColor.opacity(0.2)
-                        )
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(themeManager.tertiaryTextColor.opacity(0.2))
-                            .frame(width: 60, height: 60)
-                            .overlay(
-                                Image(systemName: "tshirt")
-                                    .foregroundStyle(themeManager.secondaryTextColor)
-                            )
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(clothing.name)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-                            .foregroundStyle(aiBubbleTextColor)
-                        
-                        if let brand = clothing.brand {
-                            Text(brand.name)
-                                .font(.caption)
-                                .foregroundStyle(themeManager.secondaryTextColor)
-                        }
-                        
-                        Text("¥\(NSDecimalNumber(decimal: clothing.unitTotalPrice).stringValue)")
-                            .font(.caption)
-                            .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(themeManager.tertiaryTextColor)
-                }
-                .padding(12)
-                .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
-    }
-    
-    // 统计数据气泡
-    private func statisticsBubble(_ stats: WardrobeStats) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(message.text)
-                .font(.subheadline)
-                .foregroundStyle(aiBubbleTextColor)
-            
-            VStack(spacing: 10) {
-                statRow(icon: "hanger", title: "总件数", value: "\(stats.totalCount) 件")
-                statRow(icon: "yensign.circle", title: "总价值", value: "¥\(NSDecimalNumber(decimal: stats.totalValue).stringValue)")
-                
-                if let mostExpensive = stats.mostExpensiveItem {
-                    statRow(icon: "crown", title: "最贵单品", value: mostExpensive.name)
-                }
-                
-                if stats.depositPlanCount > 0 {
-                    statRow(icon: "tag", title: "心愿尾款", value: "\(stats.depositPlanCount) 款")
-                    statRow(icon: "creditcard", title: "待付尾款", value: "¥\(NSDecimalNumber(decimal: stats.totalBalance).stringValue)")
-                }
-            }
-            .padding(12)
-            .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
-    }
-    
-    private func statRow(icon: String, title: String, value: String) -> some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                .frame(width: 20)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(themeManager.secondaryTextColor)
-            
-            Spacer()
-            
-            Text(value)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(aiBubbleTextColor)
-                .lineLimit(1)
-        }
-    }
-    
-    // 搭配色推荐气泡
-    private func colorMatchBubble(_ colorRec: ColorRecommendation) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(message.text)
-                .font(.subheadline)
-                .foregroundStyle(aiBubbleTextColor)
-            
-            // 色卡展示
-            HStack(spacing: 8) {
-                colorCircle(colorRec.primaryColor, label: "主色")
-                colorCircle(colorRec.secondaryColor, label: "辅色")
-                colorCircle(colorRec.accentColor, label: "点缀")
-            }
-            
-            Text(colorRec.reasoning)
-                .font(.caption)
-                .foregroundStyle(themeManager.secondaryTextColor)
-                .lineLimit(2)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
-    }
-    
-    private func colorCircle(_ colorName: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Circle()
-                .fill(colorFromName(colorName))
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Circle()
-                        .stroke(themeManager.tertiaryTextColor.opacity(0.3), lineWidth: 1)
-                )
-            
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(themeManager.secondaryTextColor)
-        }
-    }
-    
-    private func colorFromName(_ name: String) -> Color {
-        let colorMap: [String: Color] = [
-            "粉色": .pink, "红色": .red, "橙色": .orange, "黄色": .yellow,
-            "绿色": .green, "蓝色": .blue, "紫色": .purple, "黑色": .black,
-            "白色": .white, "灰色": .gray, "棕色": .brown, "米色": Color(red: 0.96, green: 0.91, blue: 0.84)
-        ]
-        return colorMap[name] ?? .pink
-    }
-    
-    // 搜索结果气泡
-    private func searchResultsBubble(_ results: [Clothing]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(message.text)
-                .font(.subheadline)
-                .foregroundStyle(aiBubbleTextColor)
-            
-            VStack(spacing: 8) {
-                // 根据展开状态显示不同数量的结果
-                ForEach(showAllResults ? results : Array(results.prefix(3))) { clothing in
-                    Button {
-                        onSearchResultTap(clothing)
-                    } label: {
-                        HStack(spacing: 10) {
-                            if let firstImagePath = clothing.imagePaths.first {
-                                AsyncLocalImageView(
-                                    fileName: firstImagePath,
-                                    displaySize: CGSize(width: 40, height: 40),
-                                    contentMode: .fill,
-                                    cornerRadius: 6,
-                                    placeholderColor: themeManager.tertiaryTextColor.opacity(0.2)
-                                )
-                                .frame(width: 40, height: 40)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            } else {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(themeManager.tertiaryTextColor.opacity(0.2))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Image(systemName: "tshirt")
-                                            .font(.caption)
-                                            .foregroundStyle(themeManager.secondaryTextColor)
-                                    )
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(clothing.name)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .lineLimit(1)
-                                    .foregroundStyle(aiBubbleTextColor)
-                                
-                                Text("¥\(NSDecimalNumber(decimal: clothing.price).stringValue)")
-                                    .font(.caption2)
-                                    .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption2)
-                                .foregroundStyle(themeManager.tertiaryTextColor)
-                        }
-                        .padding(8)
-                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
-                // 展开/收起按钮
-                if results.count > 3 {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showAllResults.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: showAllResults ? "chevron.up" : "chevron.down")
-                                .font(.caption2)
-                            Text(showAllResults ? "收起" : "还有 \(results.count - 3) 件...")
-                                .font(.caption)
-                        }
-                        .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 8)
-                        .background(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.top, 4)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
-    }
-
-    // MARK: - 搭配建议气泡
-    private func outfitSuggestionBubble(_ suggestion: OutfitSuggestionData) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 描述文本
-            Text(suggestion.description)
-                .font(.subheadline)
-                .foregroundStyle(aiBubbleTextColor)
-
-            // 风格标签
-            HStack(spacing: 8) {
-                Label(suggestion.style, systemImage: "sparkles")
-                    .font(.caption)
-                    .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.1))
-                    .clipShape(Capsule())
-
-                Label(suggestion.occasion, systemImage: "calendar")
-                    .font(.caption)
-                    .foregroundStyle(themeManager.secondaryTextColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(themeManager.secondaryTextColor.opacity(0.1))
-                    .clipShape(Capsule())
-            }
-
-            // 推荐的裙装列表（可点击跳转详情）
-            VStack(alignment: .leading, spacing: 8) {
-                Text("推荐单品")
-                    .font(.caption)
-                    .foregroundStyle(themeManager.secondaryTextColor)
-
-                ForEach(suggestion.clothings.prefix(4)) { clothing in
-                    Button {
-                        onCardTap(clothing)
-                    } label: {
-                        HStack(spacing: 8) {
-                            // 裙装缩略图
-                            if let firstPath = clothing.imagePaths.first,
-                               let image = ImageManager.shared.loadImage(fileName: firstPath) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            } else {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(themeManager.tertiaryTextColor.opacity(0.2))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Image(systemName: "tshirt")
-                                            .foregroundStyle(themeManager.tertiaryTextColor)
-                                    )
-                            }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(clothing.name)
-                                    .font(.subheadline)
-                                    .lineLimit(1)
-                                    .foregroundStyle(aiBubbleTextColor)
-                                Text(clothing.brand?.name ?? "未知品牌")
-                                    .font(.caption)
-                                    .foregroundStyle(themeManager.secondaryTextColor)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(themeManager.tertiaryTextColor)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-
-            // 魔法贴纸按钮
-            Button {
-                onOutfitTap(suggestion)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "wand.and.stars")
-                    Text("魔法贴纸")
-                }
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme),
-                            skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).mixed(with: themeManager.secondaryTextColor, amount: 0.3)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
-    }
-
-    // 搭配物品预览
-    private func outfitItemsPreview(_ outfit: Outfit) -> some View {
-        let items = outfit.items ?? []
-        return HStack(spacing: 8) {
-            ForEach(items.prefix(4), id: \.id) { item in
-                if let cutout = item.cutout,
-                   let image = ImageManager.shared.loadImage(fileName: cutout.imagePath) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.1))
-                        .frame(width: 60, height: 60)
-                        .overlay(
-                            Image(systemName: "tshirt")
-                                .foregroundStyle(.gray)
-                        )
-                }
-            }
-
-            if items.count > 4 {
-                Text("+\(items.count - 4)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 40, height: 40)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-}
-
 // MARK: - 萌宠对话主视图
 @available(iOS 18.0, *)
 struct PetChatView: View {
@@ -1379,6 +19,7 @@ struct PetChatView: View {
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
 
     @StateObject private var petAI = PetAIService.shared
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var messages: [PetChatMessage] = []
     @State private var inputText = ""
     @State private var isThinking = false
@@ -1388,6 +29,9 @@ struct PetChatView: View {
     @State private var isSearchPresented = false
     @State private var hasEnteredOnce = false
     @State private var showingHistorySearch = false
+    @State private var showingMeowCoinStore = false
+    @State private var showingCurrencyExchangeSheet = false
+    @State private var preferredExchangeDirection: PetCurrencyExchangeDirection = .fishToBone
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
@@ -1397,6 +41,8 @@ struct PetChatView: View {
     @State private var showingSaveSuccessToast = false
     @State private var isSavingOutfit = false
     @State private var showingThemeSwitchOverlay = false
+    @State private var activeFeedAnimation: PetFeedAnimationPayload?
+    @State private var feedAnimationNonce: Int = 0
 
     // 每日问候管理器
     @StateObject private var greetingManager = DailyGreetingManager.shared
@@ -1492,6 +138,13 @@ struct PetChatView: View {
                     reuseHistoryQuery(query)
                 }
             }
+            .sheet(isPresented: $showingMeowCoinStore) {
+                MeowCoinStoreView()
+            }
+            .sheet(isPresented: $showingCurrencyExchangeSheet) {
+                PetCurrencyExchangeSheet(preferredDirection: preferredExchangeDirection)
+                    .presentationDetents([.medium])
+            }
             // 保存成功提示覆盖层
             .overlay {
                 ZStack {
@@ -1509,6 +162,12 @@ struct PetChatView: View {
                             ))
                             .zIndex(100)
                     }
+
+                    if let payload = activeFeedAnimation {
+                        PetFeedAnimationOverlay(payload: payload)
+                            .transition(.opacity)
+                            .zIndex(110)
+                    }
                 }
             }
             .overlay(alignment: .top) {
@@ -1518,6 +177,7 @@ struct PetChatView: View {
                 if messages.isEmpty {
                     loadInitialGreeting()
                 }
+                ensureGuideEmbeddedOptionMessageIfNeeded()
                 // 配置 AI 服务
                 configureAIService()
                 // 首次进入萌宠对话页面时，自动展开搜索栏
@@ -1537,6 +197,9 @@ struct PetChatView: View {
                         isSearchPresented = true
                     }
                 }
+            }
+            .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
+                ensureGuideEmbeddedOptionMessageIfNeeded()
             }
             .onChange(of: isSearchPresented) { oldValue, newValue in
                 // 当 iOS26 搜索栏展开/收起时，通知常用菜单禁用/启用长按交互
@@ -1845,16 +508,44 @@ struct PetChatView: View {
             return [
                 PetWidgetData(
                     type: .quickOptions,
-                    title: "先领养一个伙伴吧（容器交互首版）",
+                    title: "先领养一个小伙伴吧",
                     options: [
-                        PetWidgetOption(title: "A. 领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
-                        PetWidgetOption(title: "B. 领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
-                        PetWidgetOption(title: "C. 先看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
+                        PetWidgetOption(title: "领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
+                        PetWidgetOption(title: "领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
+                        PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
                     ]
                 )
             ]
         }
         return PetWidgetSuggestionBuilder.onboardingWidgets()
+    }
+
+    private func ensureGuideEmbeddedOptionMessageIfNeeded() {
+        guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+
+        let hasGuideOption = messages.contains { message in
+            (message.widgets ?? []).contains { widget in
+                widget.options.contains { $0.command == "weather_guidance" }
+            }
+        }
+        guard !hasGuideOption else { return }
+
+        let guideWidget = PetWidgetData(
+            type: .quickOptions,
+            title: "先点对话里的引导选项",
+            subtitle: "这个按钮嵌在聊天窗口里，点一下就能开始体验。",
+            options: [
+                PetWidgetOption(title: "看天气穿搭（引导）", command: "weather_guidance", icon: "cloud.sun.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "先试试这颗嵌入在对话窗口里的引导按钮吧～",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [guideWidget]
+            )
+        )
     }
     
     // 发送消息
@@ -1874,6 +565,14 @@ struct PetChatView: View {
     
     // 处理用户意图
     private func processUserIntent(_ text: String) {
+        if handleDirectPetSwitchMention(text) {
+            return
+        }
+
+        if handleDirectFeedIntent(text) {
+            return
+        }
+
         if handleEmbeddedPanelIntent(text) {
             return
         }
@@ -1889,6 +588,67 @@ struct PetChatView: View {
         }
 
         routeIntent(decision.primaryIntent, rawText: text)
+    }
+
+    private func handleDirectFeedIntent(_ text: String) -> Bool {
+        guard let intent = detectDirectFeedIntent(from: text) else {
+            return false
+        }
+
+        let currentStatus = PetDataManager.shared.status
+        guard let targetItem = resolveDirectFeedItem(intent: intent, status: currentStatus) else {
+            messages.append(PetChatMessage(text: "我现在没找到能直接投喂的食物，先打开商店补点货吧。", isUser: false, isAIGenerated: true))
+            return true
+        }
+
+        let inStock = currentStatus.inventory[targetItem.id, default: 0] > 0
+        let result: PetItemCommandResult = inStock
+            ? consumePetItemResult(itemId: targetItem.id)
+            : purchasePetItemResult(itemId: targetItem.id, autoFeedWhenPossible: true)
+
+        if let animation = result.feedAnimation {
+            triggerFeedAnimation(animation)
+        }
+        messages.append(PetChatMessage(text: result.feedback, isUser: false, isAIGenerated: true))
+        return true
+    }
+
+    private func triggerFeedAnimation(_ payload: PetFeedAnimationPayload) {
+        feedAnimationNonce += 1
+        let currentNonce = feedAnimationNonce
+        withAnimation(.easeOut(duration: 0.18)) {
+            activeFeedAnimation = payload
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.35) {
+            guard currentNonce == feedAnimationNonce else { return }
+            withAnimation(.easeIn(duration: 0.2)) {
+                activeFeedAnimation = nil
+            }
+        }
+    }
+
+    private func handleDirectPetSwitchMention(_ text: String) -> Bool {
+        var status = PetDataManager.shared.status
+        guard let target = PetChatIntentRouter.detectSwitchTarget(from: text, status: status) else {
+            return false
+        }
+
+        let targetName = displayName(for: target, in: status)
+        guard status.ownedPetIds.contains(target.id) else {
+            messages.append(PetChatMessage(text: "\(targetName)还没领养，先领养再切换哦～", isUser: false, isAIGenerated: true))
+            return true
+        }
+
+        if status.selectedPetId == target.id {
+            messages.append(PetChatMessage(text: "现在已经是\(targetName)在陪你啦～", isUser: false, isAIGenerated: true))
+            return true
+        }
+
+        status.selectedPetId = target.id
+        status.intimacy = min(100, status.intimacy + 2)
+        PetDataManager.shared.saveStatus(status)
+        messages.append(PetChatMessage(text: "好哒，已切换到\(targetName)管家模式～", isUser: false, isAIGenerated: true))
+        return true
     }
 
     private func routeIntent(_ intent: PetChatIntent, rawText: String) {
@@ -1921,10 +681,9 @@ struct PetChatView: View {
     }
 
     private func presentIntentDisambiguation(_ decision: PetChatIntentRouter.IntentDecision, rawText: String) {
-        var options = decision.candidates.prefix(3).enumerated().map { index, candidate in
-            let letter = ["A", "B", "C"][index]
+        var options = decision.candidates.prefix(3).map { candidate in
             return PetWidgetOption(
-                title: "\(letter). \(candidate.intent.guideTitle)",
+                title: candidate.intent.guideTitle,
                 command: candidate.intent.guideCommand,
                 icon: candidate.intent.guideIcon
             )
@@ -1933,7 +692,7 @@ struct PetChatView: View {
         if options.count < 3 {
             options.append(
                 PetWidgetOption(
-                    title: "C. 都不是，我换个说法",
+                    title: "都不是，我换个问法",
                     command: "ask:我换个说法",
                     icon: "arrow.triangle.2.circlepath"
                 )
@@ -1948,7 +707,7 @@ struct PetChatView: View {
         )
 
         let message = PetChatMessage(
-            text: "我先帮你分流好啦，点一个我就马上办～",
+            text: "我猜到你想做这些，点一个我马上办～",
             isUser: false,
             isAIGenerated: true,
             widgets: [widget]
@@ -1965,7 +724,7 @@ struct PetChatView: View {
         let widget = makeCurrencyPanelWidget(status: status, kind: kind)
         messages.append(
             PetChatMessage(
-                text: kind == .all ? "给你把钱包摊开看啦～" : "我把\(kind.title)单独展开给你看啦。",
+                text: kind == .all ? "给你把钱包摊开看啦～" : "我把\(kind.title)单独拎出来给你看啦。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -1978,11 +737,20 @@ struct PetChatView: View {
     }
 
     private func handlePetStatusPanel(_ kind: PetStatusPanelKind) {
+        handlePetStatusPanel(kind, sourceText: nil)
+    }
+
+    private func handlePetStatusPanel(_ kind: PetStatusPanelKind, sourceText: String?) {
         let status = PetDataManager.shared.status
-        let widget = makeStatusPanelWidget(status: status, kind: kind)
+        let contextualReply = contextualStatusReply(for: kind, status: status, sourceText: sourceText)
+        let widget = makeStatusPanelWidget(
+            status: status,
+            kind: kind,
+            feedback: contextualReply.subtitle
+        )
         messages.append(
             PetChatMessage(
-                text: kind == .all ? "这是\(status.displayName)现在的全部状态。" : "我把\(status.displayName)的\(kind.title)单独展开给你看啦。",
+                text: contextualReply.message,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2008,7 +776,7 @@ struct PetChatView: View {
         let widget = makeShopPanelWidget(status: status)
         messages.append(
             PetChatMessage(
-                text: "商店也塞进气泡里了，想买什么就直接点。",
+                text: "商店我也给你带来啦，想买什么直接点就好～",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2016,12 +784,12 @@ struct PetChatView: View {
         )
     }
 
-    private func handleMoneyCounterPanel() {
+    private func handleMoneyCounterPanel(currency: CurrencyType = .rmb) {
         let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
-        let widget = makeMoneyCounterWidget(totalValue: totalValue)
+        let widget = makeMoneyCounterWidget(totalValue: totalValue, currency: currency)
         messages.append(
             PetChatMessage(
-                text: "来，我们就在这里把裙装家当数一遍。",
+                text: "来，我们就在这儿盘盘今天的小金库～",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2041,12 +809,12 @@ struct PetChatView: View {
             handleInventoryPanel()
         case .shop:
             handleShopPanel()
-        case .moneyCounter:
-            handleMoneyCounterPanel()
+        case .moneyCounter(let currency):
+            handleMoneyCounterPanel(currency: currency)
         case .divination:
             handleDivinationPanel()
         case .status(let kind):
-            handlePetStatusPanel(kind)
+            handlePetStatusPanel(kind, sourceText: text)
         }
         return true
     }
@@ -2055,7 +823,7 @@ struct PetChatView: View {
         let widget = makeDivinationWidget()
         messages.append(
             PetChatMessage(
-                text: "把求签台搬进来啦，直接在这里摇签。",
+                text: "请签求好运～我把签筒抱来啦！",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2096,7 +864,17 @@ struct PetChatView: View {
         }
         if command == "pet_money_counter" || command == "open_money_counting" {
             let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
-            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue)])
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .rmb)])
+            return
+        }
+        if command == "pet_money_counter_jpy" {
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .jpy)])
+            return
+        }
+        if command == "pet_money_counter_usd" {
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .usd)])
             return
         }
         if command == "pet_divination_panel" {
@@ -2142,11 +920,11 @@ struct PetChatView: View {
             let lack = cost - status.meowCoin
             let widget = PetWidgetData(
                 type: .quickOptions,
-                title: "领养二胎需要 60 喵币",
+                title: "领养二宝需要 60 喵币",
                 options: [
-                    PetWidgetOption(title: "A. 我想充值喵币", command: "pet_topup", icon: "plus.circle.fill"),
-                    PetWidgetOption(title: "B. 先看看余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
-                    PetWidgetOption(title: "C. 先不领养", command: "mood_support", icon: "pause.circle.fill")
+                    PetWidgetOption(title: "我想充值喵币", command: "pet_topup", icon: "plus.circle.fill"),
+                    PetWidgetOption(title: "看看余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                    PetWidgetOption(title: "先不领养", command: "mood_support", icon: "pause.circle.fill")
                 ]
             )
             messages.append(
@@ -2173,14 +951,14 @@ struct PetChatView: View {
             type: .quickOptions,
             title: "领养成功：\(target.displayName)",
             options: [
-                PetWidgetOption(title: "A. 看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
-                PetWidgetOption(title: "B. 我想再切换宠物", command: "pet_switch", icon: "arrow.triangle.2.circlepath"),
-                PetWidgetOption(title: "C. 先聊聊今天穿搭", command: "weather_guidance", icon: "cloud.sun.fill")
+                PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "我想再切换宠物", command: "pet_switch", icon: "arrow.triangle.2.circlepath"),
+                PetWidgetOption(title: "先聊聊今天穿搭", command: "weather_guidance", icon: "cloud.sun.fill")
             ]
         )
         messages.append(
             PetChatMessage(
-                text: "领养完成！已切换到\(target.displayName)，并扣除 60 喵币。",
+                text: "领养完成！\(target.displayName)来陪你啦，已经扣除 60 喵币。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2192,14 +970,13 @@ struct PetChatView: View {
         let status = PetDataManager.shared.status
         let ownedPets = PetCharacter.allCases.filter { status.ownedPetIds.contains($0.id) }
         guard ownedPets.count >= 2 else {
-            messages.append(PetChatMessage(text: "你现在只有一只宠物，想养二胎的话我可以直接帮你办理。", isUser: false, isAIGenerated: true))
+            messages.append(PetChatMessage(text: "你现在只有一只宠物，想养二宝的话我可以直接帮你办理。", isUser: false, isAIGenerated: true))
             return
         }
 
-        let options = ownedPets.prefix(3).enumerated().map { index, pet in
-            let letter = ["A", "B", "C"][index]
+        let options = ownedPets.prefix(3).map { pet in
             return PetWidgetOption(
-                title: "\(letter). 切换到\(pet.displayName)",
+                title: "切换到\(pet.displayName)",
                 command: "switch_pet:\(pet.id)",
                 icon: "pawprint.fill"
             )
@@ -2225,14 +1002,14 @@ struct PetChatView: View {
             type: .quickOptions,
             title: "你是想充值喵币吗？",
             options: [
-                PetWidgetOption(title: "A. 打开喵币充值", command: "open_meow_store", icon: "cart.fill"),
-                PetWidgetOption(title: "B. 先看三种货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
-                PetWidgetOption(title: "C. 先不充，继续聊", command: "mood_support", icon: "face.smiling.fill")
+                PetWidgetOption(title: "打开喵币充值", command: "open_meow_store", icon: "cart.fill"),
+                PetWidgetOption(title: "看看三种货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "先不充，继续聊", command: "mood_support", icon: "face.smiling.fill")
             ]
         )
         messages.append(
             PetChatMessage(
-                text: "没问题，我先给你准备充值入口。",
+                text: "没问题，我这就带你去充喵币～",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -2283,6 +1060,19 @@ struct PetChatView: View {
             refreshPanel(for: "pet_currency_fish", messageID: messageID)
         case "pet_currency_bone":
             refreshPanel(for: "pet_currency_bone", messageID: messageID)
+        case "pet_currency_action_meow":
+#if DEBUG
+            _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 100)
+            messages.append(PetChatMessage(text: "🛠️ Debug：已添加 100 喵币", isUser: false, isAIGenerated: true))
+#else
+            showingMeowCoinStore = true
+#endif
+        case "pet_currency_action_fish":
+            preferredExchangeDirection = .fishToBone
+            showingCurrencyExchangeSheet = true
+        case "pet_currency_action_bone":
+            preferredExchangeDirection = .boneToFish
+            showingCurrencyExchangeSheet = true
         case "pet_status_panel":
             refreshPanel(for: "pet_status_panel", messageID: messageID)
         case "pet_status_all":
@@ -2314,22 +1104,43 @@ struct PetChatView: View {
         case "pet_clean_now":
             refreshPanel(for: "pet_clean_now", messageID: messageID, feedback: cleanPetStatusNow())
         case "open_meow_store":
-            messages.append(PetChatMessage(text: "充值入口我先帮你记下啦～你可以从「我」页进入喵币商店。", isUser: false, isAIGenerated: true))
+#if DEBUG
+            _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 100)
+            messages.append(PetChatMessage(text: "🛠️ Debug：已添加 100 喵币", isUser: false, isAIGenerated: true))
+#else
+            showingMeowCoinStore = true
+#endif
         case "open_money_counting":
             refreshPanel(for: "open_money_counting", messageID: messageID)
         default:
             if option.command.hasPrefix("use_item:") {
                 let rawId = String(option.command.dropFirst("use_item:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+                let result = consumePetItemResult(itemId: rawId)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("buy_item:") {
                 let rawId = String(option.command.dropFirst("buy_item:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+                let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("inventory:") {
                 let rawId = String(option.command.dropFirst("inventory:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+                let result = consumePetItemResult(itemId: rawId)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("shop:") {
                 let rawId = String(option.command.dropFirst("shop:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+                let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else
             if option.command.hasPrefix("switch_pet:") {
                 let rawId = String(option.command.dropFirst("switch_pet:".count))
@@ -2743,9 +1554,9 @@ struct PetChatView: View {
             type: .quickOptions,
             title: "要跳转到「来财」数钱页吗？",
             options: [
-                PetWidgetOption(title: "A. 现在去数钞票", command: "open_money_counting", icon: "yensign.circle.fill"),
-                PetWidgetOption(title: "B. 先留在聊天里", command: "mood_support", icon: "bubble.left.and.bubble.right.fill"),
-                PetWidgetOption(title: "C. 先看看我的货币", command: "pet_currency_panel", icon: "wallet.pass.fill")
+                PetWidgetOption(title: "现在去数钞票", command: "open_money_counting", icon: "yensign.circle.fill"),
+                PetWidgetOption(title: "先留在聊天里", command: "mood_support", icon: "bubble.left.and.bubble.right.fill"),
+                PetWidgetOption(title: "先看看我的货币", command: "pet_currency_panel", icon: "wallet.pass.fill")
             ]
         )
         messages.append(
@@ -2966,66 +1777,6 @@ struct PetChatView: View {
     }
 }
 
-// MARK: - 印章视图 (参考萌宠日记)
-struct PetStampView: View {
-    var body: some View {
-        ZStack {
-            // 外圈圆环
-            Circle()
-                .stroke(Color(hex: "FF69B4").opacity(0.6), lineWidth: 3)
-                .frame(width: 60, height: 60)
-            
-            // 内部双圆环装饰
-            Circle()
-                .stroke(Color(hex: "FF69B4").opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3]))
-                .frame(width: 52, height: 52)
-            
-            // 猫爪
-            Image(systemName: "pawprint.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(Color(hex: "FF69B4").opacity(0.5))
-                .rotationEffect(.degrees(10))
-            
-            // 文字装饰
-            Text("REVIEWED")
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color(hex: "FF69B4"))
-                .offset(y: 22)
-                .rotationEffect(.degrees(-10))
-        }
-        .compositingGroup()
-        .opacity(0.8)
-    }
-}
-
-// MARK: - 快捷操作按钮
-struct QuickActionButton: View {
-    let icon: String
-    let title: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption)
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
-            }
-            .foregroundStyle(color)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(color.opacity(0.15))
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
 // MARK: - iOS 18以下版本
 struct PetChatViewLegacy: View {
     @Binding var searchText: String
@@ -3035,6 +1786,7 @@ struct PetChatViewLegacy: View {
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
     
     @StateObject private var petAI = PetAIService.shared
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var messages: [PetChatMessage] = []
     @State private var inputText = ""
     @State private var isThinking = false
@@ -3042,6 +1794,9 @@ struct PetChatViewLegacy: View {
     @State private var navigateToDetail = false
     @State private var hasEnteredOnce = false
     @State private var showingHistorySearch = false
+    @State private var showingMeowCoinStore = false
+    @State private var showingCurrencyExchangeSheet = false
+    @State private var preferredExchangeDirection: PetCurrencyExchangeDirection = .fishToBone
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
@@ -3051,6 +1806,8 @@ struct PetChatViewLegacy: View {
     @State private var showingSaveSuccessToast = false
     @State private var isSavingOutfit = false
     @State private var showingThemeSwitchOverlay = false
+    @State private var activeFeedAnimation: PetFeedAnimationPayload?
+    @State private var feedAnimationNonce: Int = 0
 
     @StateObject private var greetingManager = DailyGreetingManager.shared
     
@@ -3112,6 +1869,13 @@ struct PetChatViewLegacy: View {
                     reuseHistoryQuery(query)
                 }
             }
+            .sheet(isPresented: $showingMeowCoinStore) {
+                MeowCoinStoreView()
+            }
+            .sheet(isPresented: $showingCurrencyExchangeSheet) {
+                PetCurrencyExchangeSheet(preferredDirection: preferredExchangeDirection)
+                    .presentationDetents([.medium])
+            }
             // 保存成功提示覆盖层
             .overlay {
                 ZStack {
@@ -3129,12 +1893,19 @@ struct PetChatViewLegacy: View {
                             ))
                             .zIndex(100)
                     }
+
+                    if let payload = activeFeedAnimation {
+                        PetFeedAnimationOverlay(payload: payload)
+                            .transition(.opacity)
+                            .zIndex(110)
+                    }
                 }
             }
             .onAppear {
                 if messages.isEmpty {
                     loadInitialGreeting()
                 }
+                ensureGuideEmbeddedOptionMessageIfNeeded()
                 configureAIService()
                 // 首次进入萌宠对话页面时，自动展开搜索栏
                 if !hasEnteredOnce {
@@ -3142,6 +1913,9 @@ struct PetChatViewLegacy: View {
                     // iOS 18 以下版本不支持 isPresented，使用 searchText 触发搜索模式
                     searchText = " "
                 }
+            }
+            .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
+                ensureGuideEmbeddedOptionMessageIfNeeded()
             }
             .onChange(of: messages.count) { _, _ in
                 PetChatTranscriptStore.save(messages: messages)
@@ -3401,16 +2175,44 @@ struct PetChatViewLegacy: View {
             return [
                 PetWidgetData(
                     type: .quickOptions,
-                    title: "先领养一个伙伴吧（容器交互首版）",
+                    title: "先领养一个小伙伴吧",
                     options: [
-                        PetWidgetOption(title: "A. 领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
-                        PetWidgetOption(title: "B. 领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
-                        PetWidgetOption(title: "C. 先看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
+                        PetWidgetOption(title: "领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
+                        PetWidgetOption(title: "领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
+                        PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
                     ]
                 )
             ]
         }
         return PetWidgetSuggestionBuilder.onboardingWidgets()
+    }
+
+    private func ensureGuideEmbeddedOptionMessageIfNeeded() {
+        guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+
+        let hasGuideOption = messages.contains { message in
+            (message.widgets ?? []).contains { widget in
+                widget.options.contains { $0.command == "weather_guidance" }
+            }
+        }
+        guard !hasGuideOption else { return }
+
+        let guideWidget = PetWidgetData(
+            type: .quickOptions,
+            title: "先点对话里的引导选项",
+            subtitle: "这个按钮嵌在聊天窗口里，点一下就能开始体验。",
+            options: [
+                PetWidgetOption(title: "看天气穿搭（引导）", command: "weather_guidance", icon: "cloud.sun.fill")
+            ]
+        )
+        messages.append(
+            PetChatMessage(
+                text: "先试试这颗嵌入在对话窗口里的引导按钮吧～",
+                isUser: false,
+                isAIGenerated: true,
+                widgets: [guideWidget]
+            )
+        )
     }
     
     private func sendMessage() {
@@ -3559,6 +2361,14 @@ struct PetChatViewLegacy: View {
     }
 
     private func processUserIntent(_ text: String) {
+        if handleDirectPetSwitchMention(text) {
+            return
+        }
+
+        if handleDirectFeedIntent(text) {
+            return
+        }
+
         if handleEmbeddedPanelIntent(text) {
             return
         }
@@ -3574,6 +2384,67 @@ struct PetChatViewLegacy: View {
         }
 
         routeIntent(decision.primaryIntent, rawText: text)
+    }
+
+    private func handleDirectFeedIntent(_ text: String) -> Bool {
+        guard let intent = detectDirectFeedIntent(from: text) else {
+            return false
+        }
+
+        let currentStatus = PetDataManager.shared.status
+        guard let targetItem = resolveDirectFeedItem(intent: intent, status: currentStatus) else {
+            messages.append(PetChatMessage(text: "我现在没找到能直接投喂的食物，先打开商店补点货吧。", isUser: false, isAIGenerated: true))
+            return true
+        }
+
+        let inStock = currentStatus.inventory[targetItem.id, default: 0] > 0
+        let result: PetItemCommandResult = inStock
+            ? consumePetItemResult(itemId: targetItem.id)
+            : purchasePetItemResult(itemId: targetItem.id, autoFeedWhenPossible: true)
+
+        if let animation = result.feedAnimation {
+            triggerFeedAnimation(animation)
+        }
+        messages.append(PetChatMessage(text: result.feedback, isUser: false, isAIGenerated: true))
+        return true
+    }
+
+    private func triggerFeedAnimation(_ payload: PetFeedAnimationPayload) {
+        feedAnimationNonce += 1
+        let currentNonce = feedAnimationNonce
+        withAnimation(.easeOut(duration: 0.18)) {
+            activeFeedAnimation = payload
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.35) {
+            guard currentNonce == feedAnimationNonce else { return }
+            withAnimation(.easeIn(duration: 0.2)) {
+                activeFeedAnimation = nil
+            }
+        }
+    }
+
+    private func handleDirectPetSwitchMention(_ text: String) -> Bool {
+        var status = PetDataManager.shared.status
+        guard let target = PetChatIntentRouter.detectSwitchTarget(from: text, status: status) else {
+            return false
+        }
+
+        let targetName = displayName(for: target, in: status)
+        guard status.ownedPetIds.contains(target.id) else {
+            messages.append(PetChatMessage(text: "\(targetName)还没领养，先领养再切换哦～", isUser: false, isAIGenerated: true))
+            return true
+        }
+
+        if status.selectedPetId == target.id {
+            messages.append(PetChatMessage(text: "现在已经是\(targetName)在陪你啦～", isUser: false, isAIGenerated: true))
+            return true
+        }
+
+        status.selectedPetId = target.id
+        status.intimacy = min(100, status.intimacy + 2)
+        PetDataManager.shared.saveStatus(status)
+        messages.append(PetChatMessage(text: "好哒，已切换到\(targetName)管家模式～", isUser: false, isAIGenerated: true))
+        return true
     }
 
     private func routeIntent(_ intent: PetChatIntent, rawText: String) {
@@ -3606,10 +2477,9 @@ struct PetChatViewLegacy: View {
     }
 
     private func presentIntentDisambiguation(_ decision: PetChatIntentRouter.IntentDecision, rawText: String) {
-        var options = decision.candidates.prefix(3).enumerated().map { index, candidate in
-            let letter = ["A", "B", "C"][index]
+        var options = decision.candidates.prefix(3).map { candidate in
             return PetWidgetOption(
-                title: "\(letter). \(candidate.intent.guideTitle)",
+                title: candidate.intent.guideTitle,
                 command: candidate.intent.guideCommand,
                 icon: candidate.intent.guideIcon
             )
@@ -3618,7 +2488,7 @@ struct PetChatViewLegacy: View {
         if options.count < 3 {
             options.append(
                 PetWidgetOption(
-                    title: "C. 都不是，我换个说法",
+                    title: "都不是，我换个问法",
                     command: "ask:我换个说法",
                     icon: "arrow.triangle.2.circlepath"
                 )
@@ -3633,7 +2503,7 @@ struct PetChatViewLegacy: View {
         )
 
         let message = PetChatMessage(
-            text: "我先帮你分流好啦，点一个我就马上办～",
+            text: "我猜到你想做这些，点一个我马上办～",
             isUser: false,
             isAIGenerated: true,
             widgets: [widget]
@@ -3650,7 +2520,7 @@ struct PetChatViewLegacy: View {
         let widget = makeCurrencyPanelWidget(status: status, kind: kind)
         messages.append(
             PetChatMessage(
-                text: kind == .all ? "给你把钱包摊开看啦～" : "我把\(kind.title)单独展开给你看啦。",
+                text: kind == .all ? "给你把钱包摊开看啦～" : "我把\(kind.title)单独拎出来给你看啦。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -3663,11 +2533,20 @@ struct PetChatViewLegacy: View {
     }
 
     private func handlePetStatusPanel(_ kind: PetStatusPanelKind) {
+        handlePetStatusPanel(kind, sourceText: nil)
+    }
+
+    private func handlePetStatusPanel(_ kind: PetStatusPanelKind, sourceText: String?) {
         let status = PetDataManager.shared.status
-        let widget = makeStatusPanelWidget(status: status, kind: kind)
+        let contextualReply = contextualStatusReply(for: kind, status: status, sourceText: sourceText)
+        let widget = makeStatusPanelWidget(
+            status: status,
+            kind: kind,
+            feedback: contextualReply.subtitle
+        )
         messages.append(
             PetChatMessage(
-                text: kind == .all ? "这是\(status.displayName)现在的全部状态。" : "我把\(status.displayName)的\(kind.title)单独展开给你看啦。",
+                text: contextualReply.message,
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -3693,7 +2572,7 @@ struct PetChatViewLegacy: View {
         let widget = makeShopPanelWidget(status: status)
         messages.append(
             PetChatMessage(
-                text: "商店也塞进气泡里了，想买什么就直接点。",
+                text: "商店我也给你带来啦，想买什么直接点就好～",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -3701,12 +2580,12 @@ struct PetChatViewLegacy: View {
         )
     }
 
-    private func handleMoneyCounterPanel() {
+    private func handleMoneyCounterPanel(currency: CurrencyType = .rmb) {
         let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
-        let widget = makeMoneyCounterWidget(totalValue: totalValue)
+        let widget = makeMoneyCounterWidget(totalValue: totalValue, currency: currency)
         messages.append(
             PetChatMessage(
-                text: "来，我们就在这里把裙装家当数一遍。",
+                text: "来，我们就在这儿盘盘今天的小金库～",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -3726,12 +2605,12 @@ struct PetChatViewLegacy: View {
             handleInventoryPanel()
         case .shop:
             handleShopPanel()
-        case .moneyCounter:
-            handleMoneyCounterPanel()
+        case .moneyCounter(let currency):
+            handleMoneyCounterPanel(currency: currency)
         case .divination:
             handleDivinationPanel()
         case .status(let kind):
-            handlePetStatusPanel(kind)
+            handlePetStatusPanel(kind, sourceText: text)
         }
         return true
     }
@@ -3740,7 +2619,7 @@ struct PetChatViewLegacy: View {
         let widget = makeDivinationWidget()
         messages.append(
             PetChatMessage(
-                text: "把求签台搬进来啦，直接在这里摇签。",
+                text: "请签求好运～我把签筒抱来啦！",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -3781,7 +2660,17 @@ struct PetChatViewLegacy: View {
         }
         if command == "pet_money_counter" || command == "open_money_counting" {
             let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
-            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue)])
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .rmb)])
+            return
+        }
+        if command == "pet_money_counter_jpy" {
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .jpy)])
+            return
+        }
+        if command == "pet_money_counter_usd" {
+            let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
+            replaceWidgets(in: messageID, with: [makeMoneyCounterWidget(totalValue: totalValue, currency: .usd)])
             return
         }
         if command == "pet_divination_panel" {
@@ -3827,11 +2716,11 @@ struct PetChatViewLegacy: View {
             let lack = cost - status.meowCoin
             let widget = PetWidgetData(
                 type: .quickOptions,
-                title: "领养二胎需要 60 喵币",
+                title: "领养二宝需要 60 喵币",
                 options: [
-                    PetWidgetOption(title: "A. 我想充值喵币", command: "pet_topup", icon: "plus.circle.fill"),
-                    PetWidgetOption(title: "B. 先看看余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
-                    PetWidgetOption(title: "C. 先不领养", command: "mood_support", icon: "pause.circle.fill")
+                    PetWidgetOption(title: "我想充值喵币", command: "pet_topup", icon: "plus.circle.fill"),
+                    PetWidgetOption(title: "看看余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                    PetWidgetOption(title: "先不领养", command: "mood_support", icon: "pause.circle.fill")
                 ]
             )
             messages.append(
@@ -3858,14 +2747,14 @@ struct PetChatViewLegacy: View {
             type: .quickOptions,
             title: "领养成功：\(target.displayName)",
             options: [
-                PetWidgetOption(title: "A. 看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
-                PetWidgetOption(title: "B. 我想再切换宠物", command: "pet_switch", icon: "arrow.triangle.2.circlepath"),
-                PetWidgetOption(title: "C. 先聊聊今天穿搭", command: "weather_guidance", icon: "cloud.sun.fill")
+                PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "我想再切换宠物", command: "pet_switch", icon: "arrow.triangle.2.circlepath"),
+                PetWidgetOption(title: "先聊聊今天穿搭", command: "weather_guidance", icon: "cloud.sun.fill")
             ]
         )
         messages.append(
             PetChatMessage(
-                text: "领养完成！已切换到\(target.displayName)，并扣除 60 喵币。",
+                text: "领养完成！\(target.displayName)来陪你啦，已经扣除 60 喵币。",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -3877,14 +2766,13 @@ struct PetChatViewLegacy: View {
         let status = PetDataManager.shared.status
         let ownedPets = PetCharacter.allCases.filter { status.ownedPetIds.contains($0.id) }
         guard ownedPets.count >= 2 else {
-            messages.append(PetChatMessage(text: "你现在只有一只宠物，想养二胎的话我可以直接帮你办理。", isUser: false, isAIGenerated: true))
+            messages.append(PetChatMessage(text: "你现在只有一只宠物，想养二宝的话我可以直接帮你办理。", isUser: false, isAIGenerated: true))
             return
         }
 
-        let options = ownedPets.prefix(3).enumerated().map { index, pet in
-            let letter = ["A", "B", "C"][index]
+        let options = ownedPets.prefix(3).map { pet in
             return PetWidgetOption(
-                title: "\(letter). 切换到\(pet.displayName)",
+                title: "切换到\(pet.displayName)",
                 command: "switch_pet:\(pet.id)",
                 icon: "pawprint.fill"
             )
@@ -3910,14 +2798,14 @@ struct PetChatViewLegacy: View {
             type: .quickOptions,
             title: "你是想充值喵币吗？",
             options: [
-                PetWidgetOption(title: "A. 打开喵币充值", command: "open_meow_store", icon: "cart.fill"),
-                PetWidgetOption(title: "B. 先看三种货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
-                PetWidgetOption(title: "C. 先不充，继续聊", command: "mood_support", icon: "face.smiling.fill")
+                PetWidgetOption(title: "打开喵币充值", command: "open_meow_store", icon: "cart.fill"),
+                PetWidgetOption(title: "看看三种货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill"),
+                PetWidgetOption(title: "先不充，继续聊", command: "mood_support", icon: "face.smiling.fill")
             ]
         )
         messages.append(
             PetChatMessage(
-                text: "没问题，我先给你准备充值入口。",
+                text: "没问题，我这就带你去充喵币～",
                 isUser: false,
                 isAIGenerated: true,
                 widgets: [widget]
@@ -3968,6 +2856,19 @@ struct PetChatViewLegacy: View {
             refreshPanel(for: "pet_currency_fish", messageID: messageID)
         case "pet_currency_bone":
             refreshPanel(for: "pet_currency_bone", messageID: messageID)
+        case "pet_currency_action_meow":
+#if DEBUG
+            _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 100)
+            messages.append(PetChatMessage(text: "🛠️ Debug：已添加 100 喵币", isUser: false, isAIGenerated: true))
+#else
+            showingMeowCoinStore = true
+#endif
+        case "pet_currency_action_fish":
+            preferredExchangeDirection = .fishToBone
+            showingCurrencyExchangeSheet = true
+        case "pet_currency_action_bone":
+            preferredExchangeDirection = .boneToFish
+            showingCurrencyExchangeSheet = true
         case "pet_status_panel":
             refreshPanel(for: "pet_status_panel", messageID: messageID)
         case "pet_status_all":
@@ -3999,22 +2900,43 @@ struct PetChatViewLegacy: View {
         case "pet_clean_now":
             refreshPanel(for: "pet_clean_now", messageID: messageID, feedback: cleanPetStatusNow())
         case "open_meow_store":
-            messages.append(PetChatMessage(text: "充值入口我先帮你记下啦～你可以从「我」页进入喵币商店。", isUser: false, isAIGenerated: true))
+#if DEBUG
+            _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 100)
+            messages.append(PetChatMessage(text: "🛠️ Debug：已添加 100 喵币", isUser: false, isAIGenerated: true))
+#else
+            showingMeowCoinStore = true
+#endif
         case "open_money_counting":
             refreshPanel(for: "open_money_counting", messageID: messageID)
         default:
             if option.command.hasPrefix("use_item:") {
                 let rawId = String(option.command.dropFirst("use_item:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+                let result = consumePetItemResult(itemId: rawId)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("buy_item:") {
                 let rawId = String(option.command.dropFirst("buy_item:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+                let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("inventory:") {
                 let rawId = String(option.command.dropFirst("inventory:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: consumePetItemResult(itemId: rawId))
+                let result = consumePetItemResult(itemId: rawId)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("shop:") {
                 let rawId = String(option.command.dropFirst("shop:".count))
-                refreshPanel(for: option.command, messageID: messageID, feedback: purchasePetItemResult(itemId: rawId))
+                let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
+                if let animation = result.feedAnimation {
+                    triggerFeedAnimation(animation)
+                }
+                refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else
             if option.command.hasPrefix("switch_pet:") {
                 let rawId = String(option.command.dropFirst("switch_pet:".count))
@@ -4286,9 +3208,9 @@ struct PetChatViewLegacy: View {
             type: .quickOptions,
             title: "要跳转到「来财」数钱页吗？",
             options: [
-                PetWidgetOption(title: "A. 现在去数钞票", command: "open_money_counting", icon: "yensign.circle.fill"),
-                PetWidgetOption(title: "B. 先留在聊天里", command: "mood_support", icon: "bubble.left.and.bubble.right.fill"),
-                PetWidgetOption(title: "C. 先看看我的货币", command: "pet_currency_panel", icon: "wallet.pass.fill")
+                PetWidgetOption(title: "现在去数钞票", command: "open_money_counting", icon: "yensign.circle.fill"),
+                PetWidgetOption(title: "先留在聊天里", command: "mood_support", icon: "bubble.left.and.bubble.right.fill"),
+                PetWidgetOption(title: "先看看我的货币", command: "pet_currency_panel", icon: "wallet.pass.fill")
             ]
         )
         messages.append(
@@ -4504,127 +3426,6 @@ struct PetChatViewLegacy: View {
                     )
                     messages.append(message)
                 }
-            }
-        }
-    }
-}
-
-// MARK: - 搭配保存成功提示视图
-struct OutfitSaveSuccessToast: View {
-    let message: String
-    @State private var iconScale: CGFloat = 0.5
-    @State private var showGlow = false
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            // 动画图标区域
-            ZStack {
-                // 外发光效果
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color.pink.opacity(0.5),
-                                Color.pink.opacity(0.0)
-                            ],
-                            center: .center,
-                            startRadius: 10,
-                            endRadius: 60
-                        )
-                    )
-                    .frame(width: 120, height: 120)
-                    .opacity(showGlow ? 1 : 0)
-                
-                // 旋转光环
-                Circle()
-                    .stroke(
-                        AngularGradient(
-                            colors: [.pink, .purple, .pink],
-                            center: .center
-                        ),
-                        lineWidth: 2
-                    )
-                    .frame(width: 70, height: 70)
-                
-                // 图标容器
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.pink.opacity(0.3), .purple.opacity(0.3)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 60, height: 60)
-                    
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.pink, .purple],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .scaleEffect(iconScale)
-                }
-                
-                // 星星装饰
-                ForEach(0..<6) { i in
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(.yellow)
-                        .offset(
-                            x: cos(Double(i) * .pi / 3) * 50,
-                            y: sin(Double(i) * .pi / 3) * 50
-                        )
-                        .scaleEffect(iconScale)
-                }
-            }
-            .frame(height: 100)
-            
-            // 文字内容
-            VStack(spacing: 8) {
-                Text("✨ 保存成功！")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundColor(.pink)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding(.horizontal, 32)
-        .padding(.vertical, 24)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(
-                    LinearGradient(
-                        colors: [.pink.opacity(0.3), .purple.opacity(0.3)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .padding(.horizontal, 40)
-        .onAppear {
-            // 图标缩放动画
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.5)) {
-                iconScale = 1.0
-            }
-            
-            // 发光淡入
-            withAnimation(.easeIn(duration: 0.5)) {
-                showGlow = true
             }
         }
     }

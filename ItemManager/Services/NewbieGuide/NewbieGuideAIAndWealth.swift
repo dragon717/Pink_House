@@ -401,34 +401,34 @@ extension FeatureExperienceGuideOverlay {
 
     func postUnlockStep2Content(in geometry: GeometryProxy) -> some View {
         let screenBounds = geometry.size
-        let fallbackSearchBarFrame = CGRect(
-            x: 16,
-            y: max(geometry.safeAreaInsets.top + 56, 94),
-            width: screenBounds.width - 32,
-            height: 44
+        let fallbackGuideOptionFrame = CGRect(
+            x: 24,
+            y: max(geometry.safeAreaInsets.top + 190, screenBounds.height * 0.42),
+            width: screenBounds.width - 48,
+            height: 48
         )
-        let searchBarFrame = aiGuideTargetFrame(
-            globalFrame: guideManager.guideTargetFrame(for: .petChatSearchBar),
+        let guideOptionFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .petChatGuideOptionButton),
             in: geometry,
-            fallback: fallbackSearchBarFrame
+            fallback: fallbackGuideOptionFrame
         )
 
         return ZStack {
             HollowMaskView(
-                highlightFrame: searchBarFrame,
+                highlightFrame: guideOptionFrame,
                 highlightType: .roundedRect,
                 cornerRadius: 14
             )
 
             RoundedRectHighlightView(
-                frame: searchBarFrame,
+                frame: guideOptionFrame,
                 cornerRadius: 14
             )
             .allowsHitTesting(false)
 
             if aiAnalysisStep.showCatPaw {
                 CatPawTapAnimation(
-                    position: CGPoint(x: searchBarFrame.midX, y: searchBarFrame.midY),
+                    position: CGPoint(x: guideOptionFrame.midX, y: guideOptionFrame.midY),
                     delay: 0.5
                 )
                 .opacity(0.45)

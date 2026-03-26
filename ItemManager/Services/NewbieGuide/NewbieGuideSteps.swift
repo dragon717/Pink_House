@@ -53,7 +53,7 @@ enum AIAnalysisGuideStep: Int, CaseIterable {
         case .preUnlockStep2ClickVIP: return "点击VIP卡片"
         case .preUnlockStep3Exchange: return "兑换会员时长"
         case .postUnlockStep1ClickPetChatTab: return "点击「萌宠对话」Tab"
-        case .postUnlockStep2ClickSearchBar: return "展开并认识输入区"
+        case .postUnlockStep2ClickSearchBar: return "点击对话内引导选项"
         case .postUnlockStep3FeatureIntro: return "萌宠智能对话怎么玩"
         }
     }
@@ -69,9 +69,9 @@ enum AIAnalysisGuideStep: Int, CaseIterable {
         case .postUnlockStep1ClickPetChatTab:
             return "先点击底部「萌宠对话」Tab，进入智能对话页。"
         case .postUnlockStep2ClickSearchBar:
-            return "先点击顶部搜索栏展开输入区。展开后会介绍底部菜单和输入框。"
+            return "点击对话窗口里的「看天气穿搭」引导按钮，它是嵌入在聊天气泡里的选项。"
         case .postUnlockStep3FeatureIntro:
-            return "这里可以用底部菜单快速触发常用功能，也可以在输入框直接提问：情感陪伴、穿搭建议、衣橱统计都能聊。"
+            return "这里可以直接点对话内选项，也可以在输入区提问：情感陪伴、穿搭建议、衣橱统计都能聊。"
         }
     }
 

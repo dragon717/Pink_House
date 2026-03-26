@@ -60,6 +60,7 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     case aiAnalysisExchangeButton = "aiAnalysis.exchangeButton"
     case homePetChatTab = "home.petChatTab"
     case petChatSearchBar = "petChat.searchBar"
+    case petChatGuideOptionButton = "petChat.guideOptionButton"
     case homeHouseTab = "home.houseTab"
     case wealthEntry = "wealth.entry"
     case wealthMainTabSegment = "wealth.mainTab.segment"

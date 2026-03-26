@@ -46,9 +46,19 @@ enum PetWidgetRegistry {
 private struct PetQuickOptionsWidget: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
 
     let widget: PetWidgetData
     let onAction: (PetWidgetOption) -> Void
+
+    private func guideTarget(for option: PetWidgetOption) -> GuideTargetKey? {
+        guard guideManager.isShowingFeatureExperienceGuide,
+              guideManager.currentFeatureExperienceFeature == .aiAnalysis,
+              option.command == "weather_guidance" else {
+            return nil
+        }
+        return .petChatGuideOptionButton
+    }
 
     var body: some View {
         let skin = themeManager.petChatSkinTheme
@@ -65,6 +75,9 @@ private struct PetQuickOptionsWidget: View {
 
             ForEach(widget.options) { option in
                 Button {
+                    if guideTarget(for: option) != nil {
+                        NotificationCenter.default.post(name: .petChatGuideOptionTapped, object: nil)
+                    }
                     onAction(option)
                 } label: {
                     HStack(spacing: 8) {
@@ -88,6 +101,7 @@ private struct PetQuickOptionsWidget: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .buttonStyle(.plain)
+                .captureGuideTarget(guideTarget(for: option))
             }
         }
         .padding(.top, 2)
@@ -342,7 +356,7 @@ private struct PetCurrencyPanelWidget: View {
             HStack(spacing: 8) {
                 ForEach(displayCurrencies, id: \.self) { currency in
                     CurrencyView(type: currency, amount: amount(for: currency)) {
-                        onAction(commandOption(for: currency))
+                        onAction(actionCommandOption(for: currency))
                     }
                 }
             }
@@ -350,7 +364,7 @@ private struct PetCurrencyPanelWidget: View {
                 HStack(spacing: 8) {
                     ForEach(displayCurrencies, id: \.self) { currency in
                         CurrencyView(type: currency, amount: amount(for: currency)) {
-                            onAction(commandOption(for: currency))
+                            onAction(actionCommandOption(for: currency))
                         }
                     }
                 }
@@ -400,14 +414,14 @@ private struct PetCurrencyPanelWidget: View {
         }
     }
 
-    private func commandOption(for currency: PetCurrency) -> PetWidgetOption {
+    private func actionCommandOption(for currency: PetCurrency) -> PetWidgetOption {
         switch currency {
         case .meowCoin:
-            return PetWidgetOption(title: "喵币", command: "pet_currency_meow")
+            return PetWidgetOption(title: "喵币充值", command: "pet_currency_action_meow")
         case .fishCoin:
-            return PetWidgetOption(title: "鱼币", command: "pet_currency_fish")
+            return PetWidgetOption(title: "鱼币兑换", command: "pet_currency_action_fish")
         case .boneCoin:
-            return PetWidgetOption(title: "骨头币", command: "pet_currency_bone")
+            return PetWidgetOption(title: "骨头币兑换", command: "pet_currency_action_bone")
         }
     }
 }
@@ -492,15 +506,27 @@ private struct PetInventoryPanelWidget: View {
     private var currencyRow: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
-                CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {}
-                CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {}
-                CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {}
+                CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {
+                    onAction(currencyActionOption(for: .meowCoin))
+                }
+                CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {
+                    onAction(currencyActionOption(for: .fishCoin))
+                }
+                CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {
+                    onAction(currencyActionOption(for: .boneCoin))
+                }
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {}
-                    CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {}
-                    CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {}
+                    CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {
+                        onAction(currencyActionOption(for: .meowCoin))
+                    }
+                    CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {
+                        onAction(currencyActionOption(for: .fishCoin))
+                    }
+                    CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {
+                        onAction(currencyActionOption(for: .boneCoin))
+                    }
                 }
                 .padding(.horizontal, 2)
             }
@@ -512,6 +538,17 @@ private struct PetInventoryPanelWidget: View {
             .replacingOccurrences(of: "use_item:", with: "")
             .replacingOccurrences(of: "inventory:", with: "")
         return PetConfigManager.shared.getItem(byId: itemId)
+    }
+
+    private func currencyActionOption(for currency: PetCurrency) -> PetWidgetOption {
+        switch currency {
+        case .meowCoin:
+            return PetWidgetOption(title: "喵币充值", command: "pet_currency_action_meow")
+        case .fishCoin:
+            return PetWidgetOption(title: "鱼币兑换", command: "pet_currency_action_fish")
+        case .boneCoin:
+            return PetWidgetOption(title: "骨头币兑换", command: "pet_currency_action_bone")
+        }
     }
 }
 
@@ -592,15 +629,27 @@ private struct PetShopPanelWidget: View {
     private var currencyRow: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
-                CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {}
-                CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {}
-                CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {}
+                CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {
+                    onAction(currencyActionOption(for: .meowCoin))
+                }
+                CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {
+                    onAction(currencyActionOption(for: .fishCoin))
+                }
+                CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {
+                    onAction(currencyActionOption(for: .boneCoin))
+                }
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {}
-                    CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {}
-                    CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {}
+                    CurrencyView(type: .meowCoin, amount: petDataManager.status.meowCoin) {
+                        onAction(currencyActionOption(for: .meowCoin))
+                    }
+                    CurrencyView(type: .fishCoin, amount: petDataManager.status.fishCoin) {
+                        onAction(currencyActionOption(for: .fishCoin))
+                    }
+                    CurrencyView(type: .boneCoin, amount: petDataManager.status.boneCoin) {
+                        onAction(currencyActionOption(for: .boneCoin))
+                    }
                 }
                 .padding(.horizontal, 2)
             }
@@ -612,6 +661,17 @@ private struct PetShopPanelWidget: View {
             .replacingOccurrences(of: "buy_item:", with: "")
             .replacingOccurrences(of: "shop:", with: "")
         return PetConfigManager.shared.getItem(byId: itemId)
+    }
+
+    private func currencyActionOption(for currency: PetCurrency) -> PetWidgetOption {
+        switch currency {
+        case .meowCoin:
+            return PetWidgetOption(title: "喵币充值", command: "pet_currency_action_meow")
+        case .fishCoin:
+            return PetWidgetOption(title: "鱼币兑换", command: "pet_currency_action_fish")
+        case .boneCoin:
+            return PetWidgetOption(title: "骨头币兑换", command: "pet_currency_action_bone")
+        }
     }
 }
 
@@ -635,24 +695,90 @@ private struct PetMoneyCounterWidget: View {
         var opacity: Double = 1
     }
 
+    private var selectedCurrency: CurrencyType {
+        guard let raw = widget.metrics.first(where: { $0.name == PetMoneyCounterMetricKey.currency })?.value,
+              let parsed = CurrencyType(rawValue: raw) else {
+            return .rmb
+        }
+        switch parsed {
+        case .rmb, .jpy, .usd:
+            return parsed
+        case .gold, .silver:
+            return .rmb
+        }
+    }
+
+    private var currencySymbol: String {
+        switch selectedCurrency {
+        case .rmb: return "¥"
+        case .jpy: return "¥"
+        case .usd: return "$"
+        case .gold: return "Gold "
+        case .silver: return "Silver "
+        }
+    }
+
     private var totalAmount: Int {
-        let rawValue = widget.metrics.first?.value ?? ""
+        let rawValue = widget.metrics.first(where: { $0.name == PetMoneyCounterMetricKey.amount })?.value
+            ?? widget.metrics.first?.value
+            ?? ""
         let digits = rawValue.filter { $0.isWholeNumber }
         return Int(digits) ?? 0
     }
 
-    private var denomination: Denomination {
+    private var denominationValue: Int {
         let amount = max(1, totalAmount)
-        if amount >= 10_000 {
-            return Denomination(value: 1000, color: .red, name: "1000")
+        let values: [Int]
+        switch selectedCurrency {
+        case .rmb:
+            values = [100, 50, 20, 10, 5, 1]
+        case .jpy:
+            values = [10000, 5000, 1000]
+        case .usd:
+            values = [100, 50, 20, 10, 5, 2, 1]
+        case .gold, .silver:
+            values = [100]
         }
-        if amount >= 1_000 {
-            return Denomination(value: 100, color: .red, name: "100")
+        return values.first(where: { amount >= $0 }) ?? (values.last ?? 1)
+    }
+
+    private var denominationColor: Color {
+        switch selectedCurrency {
+        case .rmb:
+            switch denominationValue {
+            case 100: return Color(red: 0.9, green: 0.3, blue: 0.3)
+            case 50: return Color(red: 0.3, green: 0.7, blue: 0.5)
+            case 20: return Color(red: 0.6, green: 0.4, blue: 0.2)
+            case 10: return Color(red: 0.3, green: 0.5, blue: 0.8)
+            case 5: return Color(red: 0.6, green: 0.3, blue: 0.7)
+            case 1: return Color(red: 0.7, green: 0.7, blue: 0.3)
+            default: return .gray
+            }
+        case .jpy:
+            switch denominationValue {
+            case 10000: return Color(red: 0.5, green: 0.3, blue: 0.2)
+            case 5000: return Color(red: 0.5, green: 0.2, blue: 0.6)
+            case 1000: return Color(red: 0.2, green: 0.4, blue: 0.7)
+            default: return .gray
+            }
+        case .usd:
+            switch denominationValue {
+            case 100: return Color(red: 0.1, green: 0.4, blue: 0.2)
+            case 50: return Color(red: 0.2, green: 0.3, blue: 0.5)
+            case 20: return Color(red: 0.4, green: 0.2, blue: 0.2)
+            case 10: return Color(red: 0.2, green: 0.3, blue: 0.2)
+            case 5: return Color(red: 0.3, green: 0.2, blue: 0.4)
+            case 2: return Color(red: 0.3, green: 0.4, blue: 0.6)
+            case 1: return Color(red: 0.2, green: 0.5, blue: 0.3)
+            default: return .gray
+            }
+        case .gold, .silver:
+            return .gray
         }
-        if amount >= 100 {
-            return Denomination(value: 20, color: .green, name: "20")
-        }
-        return Denomination(value: 10, color: .blue, name: "10")
+    }
+
+    private var denomination: Denomination {
+        Denomination(value: denominationValue, color: denominationColor, name: "\(denominationValue)")
     }
 
     private var totalBills: Int {
@@ -668,29 +794,23 @@ private struct PetMoneyCounterWidget: View {
                     Text("剩余金额")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Text("¥\(remainingBills * denomination.value)")
+                    Text("\(currencySymbol)\(remainingBills * denomination.value)")
                         .font(.title3)
                         .fontWeight(.bold)
                         .monospacedDigit()
                 }
                 Spacer()
-                Text("已数：¥\(extractedBills * denomination.value)")
+                Text("已数：\(currencySymbol)\(extractedBills * denomination.value)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             ZStack {
                 RoundedRectangle(cornerRadius: 18)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.black.opacity(0.78), Color.black.opacity(0.58)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.clear)
                     .overlay(
                         RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
                     )
 
                 if remainingBills == 0 {
@@ -726,7 +846,7 @@ private struct PetMoneyCounterWidget: View {
             }
         }
         .padding(12)
-        .background(.regularMaterial)
+        .background(Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -754,7 +874,7 @@ private struct PetMoneyCounterWidget: View {
                 let absoluteIndex = max(0, remainingBills - index)
                 let randomOffset = pileOffset(for: absoluteIndex)
                 let randomRotation = pileRotation(for: absoluteIndex)
-                BanknoteView(denomination: denomination, currency: .rmb, showShadow: true)
+                BanknoteView(denomination: denomination, currency: selectedCurrency, showShadow: true)
                     .scaleEffect(1.0)
                     .scaleEffect(1 - CGFloat(index) * 0.03)
                     .rotationEffect(.degrees(randomRotation * messinessScale))
@@ -769,7 +889,7 @@ private struct PetMoneyCounterWidget: View {
             let topIndex = max(0, remainingBills)
             let topRandomOffset = pileOffset(for: topIndex)
             let topRandomRotation = pileRotation(for: topIndex)
-            BanknoteView(denomination: denomination, currency: .rmb, showShadow: true)
+            BanknoteView(denomination: denomination, currency: selectedCurrency, showShadow: true)
                 .scaleEffect(1.0)
                 .rotationEffect(.degrees(topRandomRotation * messinessScale + (isDragging ? Double(topBillOffset.width / 10) : 0)))
                 .offset(
@@ -800,7 +920,7 @@ private struct PetMoneyCounterWidget: View {
                 .zIndex(10)
 
             ForEach(flyingBills) { bill in
-                BanknoteView(denomination: denomination, currency: .rmb, showShadow: false)
+                BanknoteView(denomination: denomination, currency: selectedCurrency, showShadow: false)
                     .scaleEffect(1.0)
                     .offset(bill.offset)
                     .rotationEffect(.degrees(bill.rotation))
@@ -856,38 +976,87 @@ private struct PetDivinationPanelWidget: View {
     let onAction: (PetWidgetOption) -> Void
 
     @State private var currentFortune: Fortune?
-    @State private var phase: DivinationPhase = .idle
-    @State private var revealFortune = false
+    @State private var videoState: VideoState = .initial
+    @State private var showFortuneText = false
 
-    private enum DivinationPhase: Equatable {
-        case idle
-        case shaking
+    private enum VideoState: Equatable {
+        case initial
+        case playing
         case finished
     }
 
     private let fortunes: [Fortune] = [
-        Fortune(level: .supreme, text: "上上签", description: "财运亨通，福星高照", detail: "今日很适合做让你开心的小决定，也容易遇到顺手的好消息。"),
-        Fortune(level: .good, text: "上签", description: "稳稳前行，小有惊喜", detail: "今天适合慢慢推进手头的事，越是耐心越容易收获好结果。"),
-        Fortune(level: .good, text: "上签", description: "贵人照拂，心想渐成", detail: "保持你现在的节奏，会有人或机会在关键处推你一把。")
+        Fortune(level: .supreme, text: "上上签", description: "财运亨通，福星高照", detail: "今日财运极佳，适合投资理财，可能会有意外之财降临。"),
+        Fortune(level: .supreme, text: "上上签", description: "财源广进，日进斗金", detail: "财神眷顾，正财偏财皆旺，把握机会必有所获。"),
+        Fortune(level: .supreme, text: "上上签", description: "富贵吉祥，万事顺遂", detail: "财星高照，事业财运双丰收，好运连连。"),
+        Fortune(level: .good, text: "上签", description: "财运平稳，小有收获", detail: "今日财运不错，适合稳健理财，会有小惊喜。"),
+        Fortune(level: .good, text: "上签", description: "积少成多，稳步前行", detail: "财运渐入佳境，坚持储蓄必有回报。"),
+        Fortune(level: .good, text: "上签", description: "贵人相助，财运可期", detail: "有望得到贵人提携，财运有所提升。")
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PetPanelHeader(title: widget.title, subtitle: widget.subtitle)
 
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.clear)
-                .frame(height: phase == .finished && revealFortune ? 320 : 250)
-                .overlay {
+            GeometryReader { geometry in
+                let containerSize = calculateContainerSize(for: geometry.size)
+
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+
                     ZStack {
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(red: 0.32, green: 0.12, blue: 0.12), Color(red: 0.55, green: 0.22, blue: 0.22)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                        if videoState == .initial {
+                            Image("divination_first_frame")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: containerSize, height: containerSize)
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                                .transition(.opacity)
+                        }
+
+                        if videoState == .playing {
+                            DivinationVideoPlayer(
+                                videoName: "请签",
+                                onFinished: {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        videoState = .finished
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                                            showFortuneText = true
+                                        }
+                                    }
+                                }
                             )
+                            .frame(width: containerSize, height: containerSize)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            .transition(.opacity)
+                        }
+
+                        if videoState == .finished {
+                            Image("divination_last_frame")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: containerSize, height: containerSize)
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                                .transition(.opacity)
+
+                            RoundedRectangle(cornerRadius: 18)
+                                .fill(.ultraThinMaterial.opacity(0.3))
+                                .frame(width: containerSize, height: containerSize)
+
+                            if showFortuneText {
+                                VerticalFortuneText(
+                                    fortune: currentFortune ?? fortunes[0],
+                                    containerSize: containerSize
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .scale.combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                            }
+                        }
+
                         RoundedRectangle(cornerRadius: 18)
                             .stroke(
                                 LinearGradient(
@@ -898,42 +1067,51 @@ private struct PetDivinationPanelWidget: View {
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
-                                lineWidth: 2
+                                lineWidth: 3
                             )
+                            .frame(width: containerSize, height: containerSize)
 
-                        VStack(spacing: 12) {
-                            if phase == .idle {
-                                fortuneFrame(name: "divination_first_frame")
-                                divinationButton(title: "开始求签", icon: "wand.and.stars") {
-                                    startDivination()
-                                }
-                            } else if phase == .shaking {
-                                fortuneFrame(name: "divination_first_frame")
-                                    .rotationEffect(.degrees(revealFortune ? 4 : -4))
-                                    .animation(.easeInOut(duration: 0.12).repeatCount(6, autoreverses: true), value: revealFortune)
-                                Text("摇签中…")
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.82))
-                            } else if let currentFortune {
-                                VStack(spacing: 10) {
-                                    fortuneFrame(name: "divination_last_frame")
-                                    if revealFortune {
-                                        FortuneStickView(fortune: currentFortune)
-                                            .scaleEffect(0.85)
-                                        FortuneInterpretationView(fortune: currentFortune)
-                                            .padding(.horizontal, -12)
-                                    }
-                                    divinationButton(title: "再求一签", icon: "arrow.counterclockwise") {
-                                        startDivination()
-                                    }
-                                }
-                            }
-                        }
-                        .padding(14)
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color(red: 0.9, green: 0.75, blue: 0.4).opacity(0.3), lineWidth: 8)
+                            .frame(width: containerSize + 6, height: containerSize + 6)
+                            .blur(radius: 4)
                     }
+                    .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 8)
+                    .offset(y: -8)
+
+                    Spacer(minLength: 0)
+
+                    ZStack {
+                        if videoState == .finished && showFortuneText, let currentFortune {
+                            FortuneInterpretationView(fortune: currentFortune)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
+                    }
+                    .frame(height: 100)
+
+                    ZStack {
+                        if videoState == .initial {
+                            divinationButton(title: "请签求好运", icon: "wand.and.stars") {
+                                startDivination()
+                            }
+                            .transition(.opacity)
+                        } else if videoState == .finished && showFortuneText {
+                            divinationButton(title: "再请一签", icon: "arrow.counterclockwise") {
+                                replayDivination()
+                            }
+                            .transition(.opacity)
+                        }
+                    }
+                    .frame(height: 80)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .animation(.easeInOut(duration: 0.25), value: phase)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(height: 440)
+            .animation(.easeInOut(duration: 0.25), value: videoState)
+            .animation(.easeInOut(duration: 0.25), value: showFortuneText)
 
             if !widget.options.isEmpty {
                 PetQuickOptionsWidget(
@@ -953,36 +1131,27 @@ private struct PetDivinationPanelWidget: View {
 
     private func startDivination() {
         currentFortune = fortunes.randomElement()
-        revealFortune = false
-        phase = .shaking
-        withAnimation(.easeInOut(duration: 0.12)) {
-            revealFortune = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            phase = .finished
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) {
-                revealFortune = true
-            }
+
+        let notificationGenerator = UINotificationFeedbackGenerator()
+        notificationGenerator.notificationOccurred(.success)
+
+        showFortuneText = false
+        withAnimation(.easeInOut(duration: 0.3)) {
+            videoState = .playing
         }
     }
 
-    private func fortuneFrame(name: String) -> some View {
-        Group {
-            if UIImage(named: name) != nil {
-                Image(name)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color(red: 0.9, green: 0.75, blue: 0.4), lineWidth: 2)
-                )
-            }
+    private func replayDivination() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showFortuneText = false
+            videoState = .playing
         }
-        .frame(height: phase == .finished ? 140 : 180)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        currentFortune = fortunes.randomElement()
+    }
+
+    private func calculateContainerSize(for size: CGSize) -> CGFloat {
+        let widthBased = size.width * 0.78
+        return min(max(widthBased, 220), 280)
     }
 
     private func divinationButton(title: String, icon: String, action: @escaping () -> Void) -> some View {

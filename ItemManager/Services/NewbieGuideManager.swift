@@ -284,6 +284,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             .homeHouseTab,
             .homePetChatTab,
             .petChatSearchBar,
+            .petChatGuideOptionButton,
             .wealthEntry,
             .wealthMainTabSegment,
             .accountSyncEntry,
@@ -545,10 +546,8 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .petChatSearchStateChanged)) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: .petChatGuideOptionTapped)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
-                let isSearching = notification.userInfo?["isSearching"] as? Bool ?? false
-                guard isSearching else { return }
 
                 if aiAnalysisStep == .postUnlockStep2ClickSearchBar ||
                     (aiAnalysisStep == .postUnlockStep1ClickPetChatTab && currentTab == "petChat") {

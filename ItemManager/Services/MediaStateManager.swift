@@ -245,6 +245,8 @@ extension Notification.Name {
     static let petChatSearchStateChanged = Notification.Name("petChatSearchStateChanged")
     // 自动展开萌宠对话搜索栏通知
     static let autoExpandPetChatSearch = Notification.Name("autoExpandPetChatSearch")
+    // 萌宠对话内嵌引导选项点击通知（用于 AI 引导）
+    static let petChatGuideOptionTapped = Notification.Name("petChatGuideOptionTapped")
     // 首页 Tab 切换通知（用于新手引导）
     static let homeTabChanged = Notification.Name("homeTabChanged")
     // VIP 中心打开通知（用于新手引导）
