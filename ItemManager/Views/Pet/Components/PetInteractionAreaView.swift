@@ -31,7 +31,7 @@ struct PetInteractionAreaView: View {
     }
     
     private var dropTargetTopLimit: CGFloat {
-        max(60, videoHeight * 0.35)
+        max(44, min(72, videoHeight * 0.2))
     }
     
     var body: some View {
@@ -59,7 +59,7 @@ struct PetInteractionAreaView: View {
             }
             .frame(height: videoHeight) // 动态高度
             .clipShape(RoundedRectangle(cornerRadius: 20))
-            // 接收拖拽区域 (作为 Overlay 确保尺寸一致)
+            // 触摸交互区域
             .overlay(
                 Color.clear
                     .contentShape(Rectangle())
@@ -75,11 +75,13 @@ struct PetInteractionAreaView: View {
                                 viewModel.stopTouching()
                             }
                     )
+            )
+            // 顶部投喂拖拽区域（仅顶部接收）
+            .overlay(alignment: .top) {
+                Color.clear
+                    .frame(height: dropTargetTopLimit)
+                    .contentShape(Rectangle())
                     .dropDestination(for: String.self) { items, location in
-                        guard location.y <= dropTargetTopLimit else {
-                            viewModel.onDragEnded()
-                            return false
-                        }
                         print("DEBUG: Drop at \(location)")
                         guard let itemString = items.first else { return false }
                         
@@ -137,7 +139,7 @@ struct PetInteractionAreaView: View {
                             }
                         }
                     }
-            )
+            }
             
             // 进度条显示 (在视频右下角)
             if shouldShowProgressBar && videoDuration > 0 {

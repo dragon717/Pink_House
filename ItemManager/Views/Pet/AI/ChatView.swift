@@ -56,6 +56,7 @@ struct ChatView: View {
     // 初始化时传入 Service
     init(service: PetAIService) {
         self.petAI = service
+        self._initialHistoryMessageIDs = State(initialValue: Set(service.uiMessages.map(\.id)))
     }
     
     private var visibleMessages: [ChatMessage] {
@@ -268,10 +269,6 @@ struct ChatView: View {
             petAI.resetToLatest()
         }
         .onAppear {
-            if initialHistoryMessageIDs.isEmpty {
-                initialHistoryMessageIDs = Set(petAI.uiMessages.map(\.id))
-            }
-            
             // 首次使用时显示 AI 免责声明
             if !hasShownAIDisclaimer {
                 showingDisclaimer = true

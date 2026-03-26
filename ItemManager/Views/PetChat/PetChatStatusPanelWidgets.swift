@@ -103,3 +103,19 @@ func makeStatusPanelWidget(status: PetStatus, kind: PetStatusPanelKind, feedback
         metrics: petChatStatusMetrics(for: status, kind: kind)
     )
 }
+
+func petChatStatusExpressionImageName(status: PetStatus, kind: PetStatusPanelKind) -> String? {
+    guard kind == .mood || kind == .all else { return nil }
+
+    let character = PetCharacter(rawValue: status.selectedPetId ?? "") ?? .naicha
+    switch status.mood {
+    case 80...:
+        return character.happyImageName
+    case 55..<80:
+        return character.curiousImageName
+    case 30..<55:
+        return character.thinkingImageName
+    default:
+        return character.sleepyImageName
+    }
+}

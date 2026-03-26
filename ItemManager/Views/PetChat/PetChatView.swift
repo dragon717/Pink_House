@@ -752,6 +752,7 @@ struct PetChatView: View {
             PetChatMessage(
                 text: contextualReply.message,
                 isUser: false,
+                imageName: petChatStatusExpressionImageName(status: status, kind: kind),
                 isAIGenerated: true,
                 widgets: [widget]
             )
@@ -836,6 +837,11 @@ struct PetChatView: View {
         messages[index].widgets = widgets
     }
 
+    private func updateMessageImage(in messageID: UUID, imageName: String?) {
+        guard let index = messages.firstIndex(where: { $0.id == messageID }) else { return }
+        messages[index].imageName = imageName
+    }
+
     private func refreshPanel(for command: String, messageID: UUID, feedback: String? = nil) {
         let status = PetDataManager.shared.status
         if command.hasPrefix("use_item:") || command == "pet_inventory_panel" || command.hasPrefix("inventory:") {
@@ -885,16 +891,22 @@ struct PetChatView: View {
         switch command {
         case "pet_status_panel", "pet_status_all":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .all, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .all))
         case "pet_status_hunger":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hunger, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .hunger))
         case "pet_status_hydration":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hydration, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .hydration))
         case "pet_status_hygiene", "pet_clean_now":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hygiene, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .hygiene))
         case "pet_status_mood":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .mood, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .mood))
         case "pet_status_intimacy":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .intimacy, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .intimacy))
         default:
             break
         }
@@ -2546,6 +2558,7 @@ struct PetChatViewLegacy: View {
             PetChatMessage(
                 text: contextualReply.message,
                 isUser: false,
+                imageName: petChatStatusExpressionImageName(status: status, kind: kind),
                 isAIGenerated: true,
                 widgets: [widget]
             )
@@ -2630,6 +2643,11 @@ struct PetChatViewLegacy: View {
         messages[index].widgets = widgets
     }
 
+    private func updateMessageImage(in messageID: UUID, imageName: String?) {
+        guard let index = messages.firstIndex(where: { $0.id == messageID }) else { return }
+        messages[index].imageName = imageName
+    }
+
     private func refreshPanel(for command: String, messageID: UUID, feedback: String? = nil) {
         let status = PetDataManager.shared.status
         if command.hasPrefix("use_item:") || command == "pet_inventory_panel" || command.hasPrefix("inventory:") {
@@ -2679,16 +2697,22 @@ struct PetChatViewLegacy: View {
         switch command {
         case "pet_status_panel", "pet_status_all":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .all, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .all))
         case "pet_status_hunger":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hunger, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .hunger))
         case "pet_status_hydration":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hydration, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .hydration))
         case "pet_status_hygiene", "pet_clean_now":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .hygiene, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .hygiene))
         case "pet_status_mood":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .mood, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .mood))
         case "pet_status_intimacy":
             replaceWidgets(in: messageID, with: [makeStatusPanelWidget(status: status, kind: .intimacy, feedback: feedback)])
+            updateMessageImage(in: messageID, imageName: petChatStatusExpressionImageName(status: status, kind: .intimacy))
         default:
             break
         }

@@ -578,6 +578,7 @@ struct ShopView: View {
                 .padding(20)
                 .padding(.bottom, panelState == .expanded || isLandscape ? 50 : 20)
             }
+            .scrollDisabled(!(panelState == .expanded || isLandscape))
         }
     }
     

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+@testable import ItemManager
 
 /// 测试数据生成器
 @MainActor
@@ -52,7 +53,7 @@ final class SkirtMarketTestDataGenerator {
     
     /// 生成测试商品数据
     private func generateTestItems() async {
-        guard let context = SkirtMarketPersistence.shared.mainContext else {
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else {
             print("❌ 无法获取上下文")
             return
         }
@@ -115,7 +116,7 @@ final class SkirtMarketTestDataGenerator {
     
     /// 生成测试股市指标
     private func generateTestMetrics() async {
-        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else { return }
         
         let calendar = Calendar.current
         let now = Date()
@@ -166,7 +167,7 @@ final class SkirtMarketTestDataGenerator {
     
     /// 生成测试任务
     private func generateTestTasks() async {
-        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else { return }
         
         let platforms: [PlatformType] = [.xianyu, .xiaohongshu, .taobao, .weidian]
         let creatorNodeId = TaskDispatcher.shared.currentNodeId
@@ -210,7 +211,7 @@ final class SkirtMarketTestDataGenerator {
     
     /// 生成测试大盘指数
     private func generateTestIndex() async {
-        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else { return }
         
         let calendar = Calendar.current
         let now = Date()
@@ -252,7 +253,7 @@ final class SkirtMarketTestDataGenerator {
     func clearTestData() async {
         print("🧹 清理测试数据...")
         
-        guard let context = SkirtMarketPersistence.shared.mainContext else { return }
+        guard let context = SkirtMarketPersistenceV2.shared.mainContext else { return }
         
         // 分别清理每种实体类型
         await clearEntity(LolitaItem.self, context: context)

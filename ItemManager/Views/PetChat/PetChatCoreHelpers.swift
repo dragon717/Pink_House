@@ -305,8 +305,8 @@ func makeCurrencyPanelWidget(status: PetStatus, kind: PetCurrencyPanelKind, feed
     )
 }
 
-private func inventoryOptions(status: PetStatus, limit: Int = 8) -> [PetWidgetOption] {
-    status.inventory
+private func inventoryOptions(status: PetStatus, limit: Int? = nil) -> [PetWidgetOption] {
+    let allItems = status.inventory
         .filter { $0.value > 0 }
         .compactMap { entry -> PetWidgetOption? in
             guard let item = PetConfigManager.shared.getItem(byId: entry.key) else { return nil }
@@ -317,8 +317,11 @@ private func inventoryOptions(status: PetStatus, limit: Int = 8) -> [PetWidgetOp
             )
         }
         .sorted { $0.title < $1.title }
-        .prefix(limit)
-        .map { $0 }
+    
+    if let limit {
+        return Array(allItems.prefix(limit))
+    }
+    return allItems
 }
 
 func makeInventoryPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
@@ -331,26 +334,31 @@ func makeInventoryPanelWidget(status: PetStatus, feedback: String? = nil) -> Pet
     )
 }
 
-private func shopOptions(limit: Int = 8) -> [PetWidgetOption] {
-    PetConfigManager.shared.items
+private func shopOptions(limit: Int? = nil) -> [PetWidgetOption] {
+    let sortedItems = PetConfigManager.shared.items
         .sorted { $0.sortIndex < $1.sortIndex }
-        .prefix(limit)
-        .map { item in
-            let currencyName = item.petCurrency.rawValue
-            return PetWidgetOption(
-                title: "\(item.name) · \(item.price)\(currencyName)",
-                command: "buy_item:\(item.id)",
-                icon: item.icon
-            )
-        }
+    
+    let visibleItems: [PetItemDefinition]
+    if let limit {
+        visibleItems = Array(sortedItems.prefix(limit))
+    } else {
+        visibleItems = sortedItems
+    }
+    
+    return visibleItems.map { item in
+        let currencyName = item.petCurrency.rawValue
+        return PetWidgetOption(
+            title: "\(item.name) · \(item.price)\(currencyName)",
+            command: "buy_item:\(item.id)",
+            icon: item.icon
+        )
+    }
 }
 
 func makeShopPanelWidget(status: PetStatus, feedback: String? = nil) -> PetWidgetData {
-    let subtitle = feedback ?? "当前余额：喵币\(status.meowCoin) / 鱼币\(status.fishCoin) / 骨头币\(status.boneCoin)"
     return PetWidgetData(
         type: .shopPanel,
         title: "萌宠道具商店",
-        subtitle: subtitle,
         options: shopOptions()
     )
 }

@@ -109,7 +109,8 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         
         // 7.1 验证 CutoutItem 图片的 StoredImage 记录是否正确恢复
         let restoredCutout = cutouts.first!
-        let storedImageDescriptor = FetchDescriptor<StoredImage>(predicate: #Predicate { $0.fileName == restoredCutout.imagePath })
+        let restoredCutoutImagePath = restoredCutout.imagePath
+        let storedImageDescriptor = FetchDescriptor<StoredImage>(predicate: #Predicate { $0.fileName == restoredCutoutImagePath })
         let storedImages = try context.fetch(storedImageDescriptor)
         XCTAssertEqual(storedImages.count, 1, "CutoutItem 图片应该有对应的 StoredImage 记录")
         XCTAssertGreaterThanOrEqual(storedImages.first!.refCount, 1, "StoredImage 的 refCount 应该至少为 1")

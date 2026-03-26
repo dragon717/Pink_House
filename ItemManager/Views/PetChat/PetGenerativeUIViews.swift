@@ -475,8 +475,8 @@ private struct PetInventoryPanelWidget: View {
                     subtitle: "去商店补一点猫粮、罐头或者玩具吧。"
                 )
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
+                ScrollView(.vertical, showsIndicators: true) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 14)], spacing: 14) {
                         ForEach(widget.options) { option in
                             if let item = item(for: option.command) {
                                 Button {
@@ -490,9 +490,10 @@ private struct PetInventoryPanelWidget: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 2)
                     .padding(.vertical, 6)
                 }
+                .frame(maxHeight: 280)
             }
         }
     }
@@ -601,8 +602,8 @@ private struct PetShopPanelWidget: View {
                     subtitle: "等会儿再来看看有没有新道具。"
                 )
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
+                ScrollView(.vertical, showsIndicators: true) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 14)], spacing: 14) {
                         ForEach(widget.options) { option in
                             if let item = item(for: option.command) {
                                 ShopItemView(item: item) {
@@ -613,9 +614,10 @@ private struct PetShopPanelWidget: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 2)
                     .padding(.vertical, 6)
                 }
+                .frame(maxHeight: 280)
             }
         }
     }
@@ -623,7 +625,7 @@ private struct PetShopPanelWidget: View {
     private var shopDropZone: some View {
         HStack(spacing: 6) {
             Image(systemName: "cart.circle.fill")
-            Text("拖拽到这里快速购买")
+            Text("拖拽到这里快速投喂")
                 .font(.caption2)
         }
         .foregroundStyle(.secondary)
