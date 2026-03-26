@@ -510,8 +510,8 @@ struct PetChatView: View {
                     type: .quickOptions,
                     title: "先领养一个小伙伴吧",
                     options: [
-                        PetWidgetOption(title: "领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
-                        PetWidgetOption(title: "领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
+                        PetWidgetOption(title: "领养奶茶（免费）", command: "adopt_pet:naicha", icon: PetCharacter.naicha.quickOptionIconName),
+                        PetWidgetOption(title: "领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: PetCharacter.maomao.quickOptionIconName),
                         PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
                     ]
                 )
@@ -978,7 +978,7 @@ struct PetChatView: View {
             return PetWidgetOption(
                 title: "切换到\(pet.displayName)",
                 command: "switch_pet:\(pet.id)",
-                icon: "pawprint.fill"
+                icon: pet.quickOptionIconName
             )
         }
 
@@ -1181,10 +1181,8 @@ struct PetChatView: View {
                     messages.append(PetChatMessage(text: "领养成功！欢迎\(pet.displayName)加入小队～", isUser: false, isAIGenerated: true))
                 }
             } else if option.command.hasPrefix("ask:") {
-                let query = String(option.command.dropFirst(4))
+                let query = String(option.command.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !query.isEmpty {
-                    let userMessage = PetChatMessage(text: query, isUser: true, isUserAuthored: false)
-                    messages.append(userMessage)
                     processUserIntent(query)
                 }
             }
@@ -2177,8 +2175,8 @@ struct PetChatViewLegacy: View {
                     type: .quickOptions,
                     title: "先领养一个小伙伴吧",
                     options: [
-                        PetWidgetOption(title: "领养奶茶（免费）", command: "adopt_pet:naicha", icon: "pawprint.fill"),
-                        PetWidgetOption(title: "领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: "pawprint.circle.fill"),
+                        PetWidgetOption(title: "领养奶茶（免费）", command: "adopt_pet:naicha", icon: PetCharacter.naicha.quickOptionIconName),
+                        PetWidgetOption(title: "领养毛毛（60喵币）", command: "adopt_pet:maomao", icon: PetCharacter.maomao.quickOptionIconName),
                         PetWidgetOption(title: "看看货币余额", command: "pet_currency_panel", icon: "wallet.pass.fill")
                     ]
                 )
@@ -2774,7 +2772,7 @@ struct PetChatViewLegacy: View {
             return PetWidgetOption(
                 title: "切换到\(pet.displayName)",
                 command: "switch_pet:\(pet.id)",
-                icon: "pawprint.fill"
+                icon: pet.quickOptionIconName
             )
         }
 
@@ -2977,10 +2975,8 @@ struct PetChatViewLegacy: View {
                     messages.append(PetChatMessage(text: "领养成功！欢迎\(pet.displayName)加入小队～", isUser: false, isAIGenerated: true))
                 }
             } else if option.command.hasPrefix("ask:") {
-                let query = String(option.command.dropFirst(4))
+                let query = String(option.command.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !query.isEmpty {
-                    let userMessage = PetChatMessage(text: query, isUser: true, isUserAuthored: false)
-                    messages.append(userMessage)
                     processUserIntent(query)
                 }
             }

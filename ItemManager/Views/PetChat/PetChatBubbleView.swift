@@ -76,8 +76,8 @@ struct PetChatBubble: View {
                     }
                 }
 
-                if let widgets = message.widgets, !widgets.isEmpty {
-                    PetGenerativeWidgetHost(widgets: widgets) { option in
+                if !standaloneWidgets.isEmpty {
+                    PetGenerativeWidgetHost(widgets: standaloneWidgets) { option in
                         onWidgetAction(option, message.id)
                     }
                     .frame(maxWidth: 320, alignment: message.isUser ? .trailing : .leading)
@@ -116,7 +116,7 @@ struct PetChatBubble: View {
     }
     
     private var petAvatarView: some View {
-        Image(currentPetCharacter.happyImageName)
+        Image(defaultPetExpressionImageName)
             .resizable()
             .scaledToFill()
             .frame(width: 40, height: 40)
@@ -158,27 +158,73 @@ struct PetChatBubble: View {
         skinTheme.resolvedUserBubbleTextColor(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var embeddedQuickOptionWidgets: [PetWidgetData] {
+        guard !message.isUser,
+              (message.type == .text || message.type == .thinking),
+              let widgets = message.widgets,
+              !widgets.isEmpty,
+              widgets.allSatisfy({ $0.type == .quickOptions }) else {
+            return []
+        }
+        return widgets
+    }
+
+    private var standaloneWidgets: [PetWidgetData] {
+        guard let widgets = message.widgets, !widgets.isEmpty else { return [] }
+        return embeddedQuickOptionWidgets.isEmpty ? widgets : []
+    }
+
+    private var defaultPetExpressionImageName: String {
+        if UIImage(named: currentPetCharacter.quickOptionIconName) != nil {
+            return currentPetCharacter.quickOptionIconName
+        }
+        return currentPetCharacter.happyImageName
+    }
+
+    private func fallbackEmotionImageName(for imageName: String) -> String? {
+        if imageName.hasSuffix("_cat") || imageName == "cat" {
+            return UIImage(named: "cat") != nil ? "cat" : "happy_cat"
+        }
+        if imageName.hasSuffix("_dog") || imageName == "dog" {
+            return UIImage(named: "dog") != nil ? "dog" : "happy_dog"
+        }
+        return defaultPetExpressionImageName
+    }
+
+    private func resolvedBubbleImageName(from rawName: String) -> String {
+        if UIImage(named: rawName) != nil {
+            return rawName
+        }
+        if let fallback = fallbackEmotionImageName(for: rawName), UIImage(named: fallback) != nil {
+            return fallback
+        }
+        return rawName
+    }
+
     @ViewBuilder
     private func bubbleBackground(isUser: Bool) -> some View {
         if skinTheme == .classic {
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
-                .fill(themeManager.cardBackgroundColor)
+                .fill(skinTheme.resolvedAssistantBubbleBackground(themeManager: themeManager, colorScheme: colorScheme))
                 .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
         } else if isUser {
-            let isDark = colorScheme == .dark
-            let bubbleStart = themeManager.cardTintColor.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
-            let bubbleEnd = themeManager.cardTintColor.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
+            let bubbleColors = skinTheme.resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme)
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(
                     LinearGradient(
-                        colors: [bubbleStart, bubbleEnd],
+                        colors: bubbleColors,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .shadow(color: themeManager.accentTextColor.opacity(0.25), radius: 6, x: 0, y: 2)
+                .shadow(
+                    color: skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.25),
+                    radius: 6,
+                    x: 0,
+                    y: 2
+                )
         } else {
-            let bgColor = themeManager.cardBackgroundColor
+            let bgColor = skinTheme.resolvedAssistantBubbleBackground(themeManager: themeManager, colorScheme: colorScheme)
             RoundedRectangle(cornerRadius: bubbleCornerRadius)
                 .fill(bgColor)
                 .overlay(
@@ -192,14 +238,20 @@ struct PetChatBubble: View {
                             lineWidth: 1
                         )
                 )
-                .shadow(color: themeManager.accentTextColor.opacity(0.2), radius: 5, x: 0, y: 2)
+                .shadow(
+                    color: skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.2),
+                    radius: 5,
+                    x: 0,
+                    y: 2
+                )
         }
     }
     
     private var textBubble: some View {
         VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
             if !message.isUser, let imageName = message.imageName {
-                if let image = UIImage(named: imageName) {
+                let resolvedImageName = resolvedBubbleImageName(from: imageName)
+                if let image = UIImage(named: resolvedImageName) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
@@ -229,14 +281,23 @@ struct PetChatBubble: View {
                 }
             }
             
-            Text(message.text)
-                .font(.subheadline)
-                .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(bubbleBackground(isUser: message.isUser))
+            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
+                Text(message.text)
+                    .font(.subheadline)
+                    .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
+
+                if !embeddedQuickOptionWidgets.isEmpty {
+                    PetGenerativeWidgetHost(widgets: embeddedQuickOptionWidgets) { option in
+                        onWidgetAction(option, message.id)
+                    }
+                    .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(bubbleBackground(isUser: message.isUser))
         }
-        .frame(maxWidth: 280, alignment: message.isUser ? .trailing : .leading)
+        .frame(maxWidth: embeddedQuickOptionWidgets.isEmpty ? 280 : 320, alignment: message.isUser ? .trailing : .leading)
         .onLongPressGesture {
             if !message.isUser && message.isAIGenerated {
                 withAnimation {

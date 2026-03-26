@@ -30,6 +30,10 @@ struct PetInteractionAreaView: View {
         }
     }
     
+    private var dropTargetTopLimit: CGFloat {
+        max(60, videoHeight * 0.35)
+    }
+    
     var body: some View {
         ZStack {
             Group {
@@ -72,6 +76,10 @@ struct PetInteractionAreaView: View {
                             }
                     )
                     .dropDestination(for: String.self) { items, location in
+                        guard location.y <= dropTargetTopLimit else {
+                            viewModel.onDragEnded()
+                            return false
+                        }
                         print("DEBUG: Drop at \(location)")
                         guard let itemString = items.first else { return false }
                         

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PetGenerativeWidgetHost: View {
     let widgets: [PetWidgetData]
@@ -60,6 +61,19 @@ private struct PetQuickOptionsWidget: View {
         return .petChatGuideOptionButton
     }
 
+    @ViewBuilder
+    private func optionIconView(_ icon: String) -> some View {
+        if UIImage(named: icon) != nil {
+            Image(icon)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 14, height: 14)
+        } else {
+            Image(systemName: icon)
+                .font(.caption)
+        }
+    }
+
     var body: some View {
         let skin = themeManager.petChatSkinTheme
         let optionFill = skin.resolvedQuickOptionFill(themeManager: themeManager, colorScheme: colorScheme)
@@ -82,8 +96,7 @@ private struct PetQuickOptionsWidget: View {
                 } label: {
                     HStack(spacing: 8) {
                         if let icon = option.icon, !icon.isEmpty {
-                            Image(systemName: icon)
-                                .font(.caption)
+                            optionIconView(icon)
                         }
                         Text(option.title)
                             .font(.caption)

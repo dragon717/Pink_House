@@ -647,10 +647,12 @@ class PetViewModel: ObservableObject {
             videoName = PetVideoPaths.listening // 暂时用聆听替代委屈
         case "angry_cat", "angry_dog":
             videoName = PetVideoPaths.angry
-        case "sleepy_cat":
+        case "sleepy_cat", "sleepy_dog":
             videoName = PetVideoPaths.sleeping
-        case "curious_cat":
+        case "curious_cat", "curious_dog", "thinking_cat", "thinking_dog":
              videoName = PetVideoPaths.attention
+        case "cat", "dog":
+            videoName = PetVideoPaths.enjoy
         default:
             // 尝试直接匹配
             videoName = action

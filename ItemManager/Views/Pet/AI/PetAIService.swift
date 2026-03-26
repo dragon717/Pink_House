@@ -90,7 +90,7 @@ class PetAIService: ObservableObject {
         if memoryInGB >= 4 { return 50 }
         return 30
     }
-    private let historyPageSize = 20
+    private let historyPageSize = 10
     private let maxPersistedMessages = 1200
     private var isHistoryExpanded = false
 
@@ -179,15 +179,17 @@ class PetAIService: ObservableObject {
     }
     
     // 加载更多历史记录 (分页)
-    func loadMoreHistory() {
+    @discardableResult
+    func loadMoreHistory(pageSize: Int? = nil) -> Int {
         isHistoryExpanded = true
+        let perPage = max(1, pageSize ?? historyPageSize)
         let currentCount = uiMessages.count
         let totalCount = allMessages.count
         
-        guard currentCount < totalCount else { return }
+        guard currentCount < totalCount else { return 0 }
         
         let remaining = totalCount - currentCount
-        let loadCount = min(historyPageSize, remaining)
+        let loadCount = min(perPage, remaining)
         
         let endIndex = totalCount - currentCount
         let startIndex = endIndex - loadCount
@@ -196,6 +198,24 @@ class PetAIService: ObservableObject {
         
         // 插入到开头
         self.uiMessages.insert(contentsOf: newMessages, at: 0)
+        return loadCount
+    }
+
+    // 进入分页历史模式（仅加载最新若干条，后续上滑再分页补齐）
+    func activatePagedHistoryMode(initialVisibleCount: Int = 10) {
+        isHistoryExpanded = true
+        let count = allMessages.count
+        guard count > 0 else {
+            uiMessages = []
+            return
+        }
+        let visibleCount = min(max(1, initialVisibleCount), count)
+        let startIndex = count - visibleCount
+        uiMessages = Array(allMessages[startIndex..<count])
+    }
+    
+    var hasMoreHistoryToLoad: Bool {
+        uiMessages.count < allMessages.count
     }
     
     // 重置 UI 显示为最新窗口（默认 30 条，用于退出页面时释放内存）

@@ -80,6 +80,41 @@ struct MessageBubble: View {
     var onReport: (() -> Void)? = nil
     
     @State private var showingReportButton = false
+
+    private var currentPetCharacter: PetCharacter {
+        guard let petId = PetDataManager.shared.status.selectedPetId,
+              let character = PetCharacter(rawValue: petId) else {
+            return .naicha
+        }
+        return character
+    }
+
+    private var defaultPetExpressionImageName: String {
+        if UIImage(named: currentPetCharacter.quickOptionIconName) != nil {
+            return currentPetCharacter.quickOptionIconName
+        }
+        return currentPetCharacter.happyImageName
+    }
+
+    private func fallbackEmotionImageName(for imageName: String) -> String? {
+        if imageName.hasSuffix("_cat") || imageName == "cat" {
+            return UIImage(named: "cat") != nil ? "cat" : "happy_cat"
+        }
+        if imageName.hasSuffix("_dog") || imageName == "dog" {
+            return UIImage(named: "dog") != nil ? "dog" : "happy_dog"
+        }
+        return defaultPetExpressionImageName
+    }
+
+    private func resolvedBubbleImageName(from rawName: String) -> String {
+        if UIImage(named: rawName) != nil {
+            return rawName
+        }
+        if let fallback = fallbackEmotionImageName(for: rawName), UIImage(named: fallback) != nil {
+            return fallback
+        }
+        return rawName
+    }
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -162,8 +197,9 @@ struct MessageBubble: View {
                     VStack(alignment: .leading, spacing: 8) {
                         // 1. 图片内容 (如果有)
                         if let imageName = message.imageName {
+                            let resolvedImageName = resolvedBubbleImageName(from: imageName)
                             // 尝试加载图片，如果 Assets 中没有，显示占位符
-                            if let image = UIImage(named: imageName) {
+                            if let image = UIImage(named: resolvedImageName) {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFit()

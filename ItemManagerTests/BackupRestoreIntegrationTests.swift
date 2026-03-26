@@ -44,6 +44,11 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         clothing.brand = brand
         clothing.tags = [tag]
         clothing.imagePaths = ["test_image.jpg"]
+        clothing.note = "这是用于备份恢复验证的备注"
+        let expectedUpdatedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let expectedLastModified = Date(timeIntervalSince1970: 1_700_000_123)
+        clothing.updatedAt = expectedUpdatedAt
+        clothing.lastModified = expectedLastModified
         
         // Add Accessory Items
         let acc1 = AccessoryItem(name: "Test Acc 1", price: 100.0, deposit: 30.0, balance: 70.0, sortIndex: 0)
@@ -89,6 +94,9 @@ final class BackupRestoreIntegrationTests: XCTestCase {
         XCTAssertEqual(clothings.count, 1)
         let restoredClothing = clothings.first!
         XCTAssertEqual(restoredClothing.name, "Integration Test Skirt")
+        XCTAssertEqual(restoredClothing.note, "这是用于备份恢复验证的备注")
+        XCTAssertEqual(restoredClothing.updatedAt, expectedUpdatedAt)
+        XCTAssertEqual(restoredClothing.lastModified, expectedLastModified)
         
         // 6. 验证关系恢复
         XCTAssertEqual(restoredClothing.brand?.name, "Test Brand")

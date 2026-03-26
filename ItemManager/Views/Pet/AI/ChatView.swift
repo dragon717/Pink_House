@@ -22,9 +22,13 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var isSending = false
     
-    // Pagination State
-    @State private var isLoadingHistory = false
-    @State private var previousTopMessageId: UUID?
+    // 历史记录解锁状态（上滑触发）
+    @State private var isHistoryUnlocked = false
+    @State private var historyUnlockProgress: CGFloat = 0
+    @State private var showingHistoryUnlockHint = false
+    @State private var initialHistoryMessageIDs = Set<UUID>()
+    @State private var isLoadingHistoryPage = false
+    @State private var previousTopVisibleMessageId: UUID?
     
     // Edit Mode State
     @State private var isEditing = false
@@ -46,9 +50,23 @@ struct ChatView: View {
     @State private var showingDisclaimer = false
     @State private var showingHistorySearch = false
     
+    private let historyUnlockThreshold: CGFloat = 120
+    private let historyPageSize: Int = 10
+    
     // 初始化时传入 Service
     init(service: PetAIService) {
         self.petAI = service
+    }
+    
+    private var visibleMessages: [ChatMessage] {
+        if isHistoryUnlocked {
+            return petAI.uiMessages
+        }
+        return petAI.uiMessages.filter { !initialHistoryMessageIDs.contains($0.id) }
+    }
+    
+    private var hasLockedHistory: Bool {
+        !isHistoryUnlocked && !initialHistoryMessageIDs.isEmpty
     }
     
     var body: some View {
@@ -57,16 +75,28 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 20) {
-                        // Loading Trigger (Pagination)
-                        if !petAI.uiMessages.isEmpty {
-                            Color.clear
-                                .frame(height: 20)
-                                .onAppear {
-                                    loadMore()
+                        if isHistoryUnlocked {
+                            if isLoadingHistoryPage {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .scaleEffect(0.85)
+                                    Text("加载历史中...")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
+                                .padding(.top, 4)
+                            }
+                            
+                            if petAI.hasMoreHistoryToLoad {
+                                Color.clear
+                                    .frame(height: 1)
+                                    .onAppear {
+                                        loadMoreHistoryIfNeeded()
+                                    }
+                            }
                         }
                         
-                        ForEach(petAI.uiMessages) { msg in
+                        ForEach(visibleMessages) { msg in
                             HStack {
                                 if isEditing {
                                     Image(systemName: selectedMessageIds.contains(msg.id) ? "checkmark.circle.fill" : "circle")
@@ -101,18 +131,26 @@ struct ChatView: View {
                             }
                             .padding(.horizontal)
                         }
+                        
+                        if visibleMessages.isEmpty {
+                            Color.clear.frame(height: 1)
+                        }
                     }
                     .padding(.vertical)
                 }
+                .simultaneousGesture(historyUnlockGesture(using: proxy))
+                .overlay(alignment: .top) {
+                    if hasLockedHistory && (showingHistoryUnlockHint || historyUnlockProgress > 0) {
+                        historyUnlockIndicator
+                            .padding(.top, 8)
+                    }
+                }
                 .onChange(of: petAI.uiMessages) { _ in
-                    if isLoadingHistory, let oldId = previousTopMessageId {
-                        // Maintain scroll position (keep old top message visible at top)
-                        proxy.scrollTo(oldId, anchor: .top)
-                        
-                        // Reset state
-                        isLoadingHistory = false
-                        previousTopMessageId = nil
-                    } else if !isEditing, let lastId = petAI.uiMessages.last?.id {
+                    if isLoadingHistoryPage, let oldTopId = previousTopVisibleMessageId {
+                        proxy.scrollTo(oldTopId, anchor: .top)
+                        isLoadingHistoryPage = false
+                        previousTopVisibleMessageId = nil
+                    } else if !isEditing, let lastId = visibleMessages.last?.id {
                         // Auto-scroll to bottom for new messages
                         withAnimation {
                             proxy.scrollTo(lastId, anchor: .bottom)
@@ -230,6 +268,10 @@ struct ChatView: View {
             petAI.resetToLatest()
         }
         .onAppear {
+            if initialHistoryMessageIDs.isEmpty {
+                initialHistoryMessageIDs = Set(petAI.uiMessages.map(\.id))
+            }
+            
             // 首次使用时显示 AI 免责声明
             if !hasShownAIDisclaimer {
                 showingDisclaimer = true
@@ -302,23 +344,90 @@ struct ChatView: View {
         }
     }
     
-    private func loadMore() {
-        guard !isLoadingHistory else { return }
+    private var historyUnlockIndicator: some View {
+        let progress = min(max(historyUnlockProgress, 0), 1)
         
-        if let firstId = petAI.uiMessages.first?.id {
-            previousTopMessageId = firstId
-            isLoadingHistory = true
-            
-            // Give UI a moment
-            DispatchQueue.main.async {
-                petAI.loadMoreHistory()
+        return HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .stroke(Color.pink.opacity(0.2), lineWidth: 3)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(Color.pink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
                 
-                // If no change (end of history), reset state
-                if let newFirstId = petAI.uiMessages.first?.id, newFirstId == firstId {
-                    isLoadingHistory = false
-                    previousTopMessageId = nil
+                Text("\(Int(progress * 100))%")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.pink)
+            }
+            .frame(width: 34, height: 34)
+            
+            Text(progress >= 1 ? "松手打开历史记录" : "继续上滑查看历史记录")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.92))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
+    }
+    
+    private func historyUnlockGesture(using proxy: ScrollViewProxy) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard hasLockedHistory else { return }
+                
+                let upwardDistance = max(0, -value.translation.height)
+                let progress = min(upwardDistance / historyUnlockThreshold, 1)
+                
+                historyUnlockProgress = progress
+                showingHistoryUnlockHint = upwardDistance > 8
+            }
+            .onEnded { _ in
+                guard hasLockedHistory else { return }
+                
+                let shouldUnlock = historyUnlockProgress >= 1
+                if shouldUnlock {
+                    unlockHistory(using: proxy)
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        historyUnlockProgress = 0
+                        showingHistoryUnlockHint = false
+                    }
                 }
             }
+    }
+    
+    private func unlockHistory(using proxy: ScrollViewProxy) {
+        isHistoryUnlocked = true
+        showingHistoryUnlockHint = false
+        historyUnlockProgress = 0
+        petAI.activatePagedHistoryMode(initialVisibleCount: historyPageSize)
+        initialHistoryMessageIDs.removeAll(keepingCapacity: false)
+        
+        DispatchQueue.main.async {
+            if let lastId = petAI.uiMessages.last?.id {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo(lastId, anchor: .bottom)
+                }
+            }
+        }
+    }
+    
+    private func loadMoreHistoryIfNeeded() {
+        guard isHistoryUnlocked else { return }
+        guard !isLoadingHistoryPage else { return }
+        guard petAI.hasMoreHistoryToLoad else { return }
+        guard let currentTopId = visibleMessages.first?.id else { return }
+        
+        previousTopVisibleMessageId = currentTopId
+        isLoadingHistoryPage = true
+        
+        let loadedCount = petAI.loadMoreHistory(pageSize: historyPageSize)
+        if loadedCount == 0 {
+            isLoadingHistoryPage = false
+            previousTopVisibleMessageId = nil
         }
     }
 

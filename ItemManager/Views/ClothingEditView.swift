@@ -1103,7 +1103,9 @@ struct ClothingEditView: View {
             c.note = note
             c.stock = stock
             c.tags = selectedTags
-            c.updatedAt = Date()
+            let now = Date()
+            c.updatedAt = now
+            c.lastModified = now
             
             // 保存表图字段
             let newSizeChartPath = sizeChartImagePath?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1167,6 +1169,9 @@ struct ClothingEditView: View {
             newClothing.accessoryItems = newItems
             
             newClothing.tags = selectedTags
+            let now = Date()
+            newClothing.updatedAt = now
+            newClothing.lastModified = now
             modelContext.insert(newClothing)
             
             // Schedule notification

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
     case classic
@@ -69,6 +70,37 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
 
     // MARK: - 魔法配色适配方法
 
+    /// 为指定外观模式生成魔法配色卡片背景，避免依赖 UITraitCollection.current 导致亮暗色取值不稳定
+    private static func magicCardBackground(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
+        let isDarkMode = colorScheme == .dark
+        let bgColor = themeManager.backgroundColor
+        let isDarkBackground = bgColor.isDark
+
+        let uiColor = UIColor(bgColor)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return isDarkMode ? Color(white: 0.2) : Color(white: 0.95)
+        }
+
+        if isDarkMode {
+            let newSaturation = max(saturation * 0.6, 0.1)
+            let newBrightness = min(brightness * 1.3, 0.35)
+            return Color(hue: Double(hue), saturation: Double(newSaturation), brightness: Double(newBrightness))
+        }
+
+        if isDarkBackground {
+            return Color(white: 0.95)
+        }
+
+        let newSaturation = max(saturation * 0.4, 0.05)
+        let newBrightness = min(brightness * 1.15, 0.98)
+        return Color(hue: Double(hue), saturation: Double(newSaturation), brightness: Double(newBrightness))
+    }
+
     /// 获取当前主题预设 - 支持魔法配色和客制化配色两种模式（与 ThemePreviewSection 逻辑一致）
     private static func currentThemePreset(themeManager: ThemeManager, colorScheme: ColorScheme) -> ThemePreset {
         let isDark = colorScheme == .dark
@@ -77,7 +109,7 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
             // 魔法配色：使用自适应调色板生成主题，使用 cardTintColor 作为强调色
             return ThemePreset.fromAdaptivePalette(
                 themeManager.adaptivePalette,
-                cardBackground: themeManager.cardBackgroundColor,
+                cardBackground: magicCardBackground(themeManager: themeManager, colorScheme: colorScheme),
                 isDarkMode: isDark,
                 accentColor: themeManager.cardTintColor
             )
@@ -107,13 +139,25 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
         )
     }
 
-    func resolvedUserBubbleColors(themeManager: ThemeManager, colorScheme: ColorScheme) -> [Color] {
-        guard self == .magic else { return userBubbleColors }
+    private static func themedUserBubbleColors(themeManager: ThemeManager, colorScheme: ColorScheme) -> [Color] {
+        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
         let isDark = colorScheme == .dark
-        // 用户气泡：使用 cardTintColor 生成渐变
-        let bubbleStart = themeManager.cardTintColor.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
-        let bubbleEnd = themeManager.cardTintColor.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
+        let bubbleStart = colors.accent.mixed(with: .white, amount: isDark ? 0.10 : 0.06)
+        let bubbleEnd = colors.accent.mixed(with: .black, amount: isDark ? 0.08 : 0.03)
         return [bubbleStart, bubbleEnd]
+    }
+
+    private static func adaptiveUserBubbleTextColor(for bubbleColors: [Color]) -> Color {
+        guard !bubbleColors.isEmpty else { return .white }
+        let averageLuminance = bubbleColors.map(\.luminance).reduce(0, +) / CGFloat(bubbleColors.count)
+        return averageLuminance > 0.62 ? Color.black.opacity(0.86) : .white
+    }
+
+    func resolvedUserBubbleColors(themeManager: ThemeManager, colorScheme: ColorScheme) -> [Color] {
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            return Self.themedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme)
+        }
+        return userBubbleColors
     }
 
     func resolvedAssistantStrokeColors(themeManager: ThemeManager, colorScheme: ColorScheme) -> [Color] {
@@ -138,70 +182,70 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
     }
 
     func resolvedQuickOptionFill(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else { return themeManager.accentTextColor.opacity(0.12) }
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
-        return colors.accent.opacity(colorScheme == .dark ? 0.20 : 0.12)
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+            return colors.accent.opacity(colorScheme == .dark ? 0.20 : 0.12)
+        }
+        return themeManager.accentTextColor.opacity(0.12)
     }
 
     func resolvedQuickOptionStroke(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else { return themeManager.accentTextColor.opacity(0.24) }
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
-        return colors.accent.opacity(colorScheme == .dark ? 0.45 : 0.28)
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+            return colors.accent.opacity(colorScheme == .dark ? 0.45 : 0.28)
+        }
+        return themeManager.accentTextColor.opacity(0.24)
     }
 
     /// 用户气泡文字颜色 - 根据主题自适应，确保在渐变背景上有足够对比度
     func resolvedUserBubbleTextColor(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else { return .white }
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            let bubbleColors = resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme)
+            return Self.adaptiveUserBubbleTextColor(for: bubbleColors)
+        }
         return .white
     }
 
     /// 快捷选项文字颜色
     func resolvedQuickOptionTextColor(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else { return themeManager.accentTextColor.mixed(with: .black, amount: 0.15) }
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
-        return colors.accent.mixed(with: .black, amount: colorScheme == .dark ? 0.0 : 0.08)
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+            return colors.accent.mixed(with: .black, amount: colorScheme == .dark ? 0.0 : 0.08)
+        }
+        return themeManager.accentTextColor.mixed(with: .black, amount: 0.15)
     }
 
     /// 萌宠气泡背景颜色 - 使用卡片背景色适配魔法配色
     func resolvedAssistantBubbleBackground(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else {
-            // 经典皮肤使用系统背景色
-            return Color(.systemBackground)
-        }
-        // 魔法皮肤使用主题卡片背景色
-        return themeManager.cardBackgroundColor
+        // 使用按 colorScheme 计算后的主题卡片背景，避免亮暗模式切换时颜色不一致
+        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+        return colors.cardBackground
     }
 
     /// 萌宠气泡文字颜色 - 使用主题主文字色
     func resolvedAssistantBubbleTextColor(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else {
-            // 经典皮肤使用系统主文字色
-            return .primary
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+            return colors.primary
         }
-        // 魔法皮肤使用主题主文字色
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
-        return colors.primary
+        return .primary
     }
 
     /// 萌宠气泡内卡片背景色 - 用于衣橱卡片、统计卡片等
     func resolvedAssistantCardBackground(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else {
-            // 经典皮肤使用系统次要背景色
-            return Color(.secondarySystemBackground)
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+            return colors.cardAccent.opacity(colorScheme == .dark ? 0.3 : 0.2)
         }
-        // 魔法皮肤使用主题卡片强调色
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
-        return colors.cardAccent.opacity(colorScheme == .dark ? 0.3 : 0.2)
+        return Color(.secondarySystemBackground)
     }
 
     /// 萌宠气泡内强调色 - 用于价格、图标等
     func resolvedAssistantAccentColor(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
-        guard self == .magic else {
-            // 经典皮肤使用粉色
-            return .pink
+        if self == .magic || themeManager.colorSchemeMode == .custom {
+            let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+            return colors.accent
         }
-        // 魔法皮肤使用主题强调色
-        let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
-        return colors.accent
+        return .pink
     }
 }

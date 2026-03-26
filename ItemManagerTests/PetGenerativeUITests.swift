@@ -186,9 +186,15 @@ final class PetGenerativeUITests: XCTestCase {
     func testActionSanitizerRejectsUnknownIdentifier() {
         let invalid = PetConversationToolbox.sanitizeActionIdentifier("random_unknown_action", role: .kitten)
         let valid = PetConversationToolbox.sanitizeActionIdentifier("happy_cat", role: .kitten)
+        let cat = PetConversationToolbox.sanitizeActionIdentifier("cat", role: .kitten)
+        let dog = PetConversationToolbox.sanitizeActionIdentifier("dog", role: .goldenRetriever)
+        let alias = PetConversationToolbox.sanitizeActionIdentifier("happy", role: .goldenRetriever)
 
         XCTAssertNil(invalid)
         XCTAssertEqual(valid, "happy_cat")
+        XCTAssertEqual(cat, "cat")
+        XCTAssertEqual(dog, "dog")
+        XCTAssertEqual(alias, "happy_dog")
     }
 
     func testMemoryStoreRecordsLatestOutfitPriceSummary() {

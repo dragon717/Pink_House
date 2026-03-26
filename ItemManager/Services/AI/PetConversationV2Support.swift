@@ -441,9 +441,32 @@ enum PetConversationToolbox {
 
     static func sanitizeActionIdentifier(_ actionId: String?, role: PetRole) -> String? {
         guard let actionId, !actionId.isEmpty else { return nil }
-        let normalized = actionId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = canonicalActionIdentifier(actionId, role: role)
         guard allowedActionIds(for: role).contains(normalized) else { return nil }
         return normalized
+    }
+
+    private static func canonicalActionIdentifier(_ actionId: String, role: PetRole) -> String {
+        let normalized = actionId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        switch normalized {
+        case "happy":
+            return role == .kitten ? "happy_cat" : "happy_dog"
+        case "sleepy":
+            return role == .kitten ? "sleepy_cat" : "sleepy_dog"
+        case "angry":
+            return role == .kitten ? "angry_cat" : "angry_dog"
+        case "curious":
+            return role == .kitten ? "curious_cat" : "curious_dog"
+        case "playful":
+            return role == .kitten ? "playful_cat" : "playful_dog"
+        case "sad":
+            return role == .kitten ? "sad_cat" : "sad_dog"
+        case "thinking":
+            return role == .kitten ? "thinking_cat" : "thinking_dog"
+        default:
+            return normalized
+        }
     }
 
     private static func allowedActionIds(for role: PetRole) -> Set<String> {
@@ -451,16 +474,16 @@ enum PetConversationToolbox {
         case .kitten:
             return [
                 "happy_cat", "sleepy_cat", "angry_cat", "curious_cat",
-                "playful_cat", "sad_cat"
+                "playful_cat", "sad_cat", "thinking_cat", "cat"
             ]
         case .goldenRetriever:
             return [
                 "happy_dog", "sleepy_dog", "angry_dog", "curious_dog",
-                "playful_dog", "sad_dog", "thinking_dog"
+                "playful_dog", "sad_dog", "thinking_dog", "dog"
             ]
         @unknown default:
             return [
-                "happy_cat", "sleepy_cat", "curious_cat"
+                "happy_cat", "sleepy_cat", "curious_cat", "cat", "dog"
             ]
         }
     }

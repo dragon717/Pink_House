@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import UIKit
 
 struct PetHomeView: View {
     @StateObject private var viewModel = PetViewModel()
@@ -28,6 +29,20 @@ struct PetHomeView: View {
     
     // 用于监听媒体状态通知
     @State private var cancellables = Set<AnyCancellable>()
+
+    @ViewBuilder
+    private func petShortcutIcon(for pet: PetCharacter, size: CGFloat) -> some View {
+        if UIImage(named: pet.quickOptionIconName) != nil {
+            Image(pet.quickOptionIconName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: pet == .maomao ? "dog.fill" : "cat.fill")
+                .font(.system(size: size))
+                .foregroundStyle(.orange)
+        }
+    }
     
     var body: some View {
         Group {
@@ -222,6 +237,7 @@ struct PetHomeView: View {
                                                 viewModel.switchPet(pet)
                                             } label: {
                                                 HStack {
+                                                    petShortcutIcon(for: pet, size: 14)
                                                     let pName = viewModel.status.petNames[pet.id] ?? ""
                                                     let nameText = pName.isEmpty ? "" : " - \"\(pName)\""
                                                     Text("\(pet.displayName)\(nameText)")
@@ -272,9 +288,7 @@ struct PetHomeView: View {
                             }
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: viewModel.currentPet == .maomao ? "dog.fill" : "cat.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(.orange)
+                                petShortcutIcon(for: viewModel.currentPet, size: 16)
                                 
                                 let displayName = viewModel.status.displayName
                                 

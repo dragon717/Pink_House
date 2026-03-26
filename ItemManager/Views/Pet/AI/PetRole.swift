@@ -64,6 +64,7 @@ enum PetRole {
             - sleepy_cat (困倦/睡觉)
             - angry_cat (生气/炸毛)
             - curious_cat (好奇/偷看)
+            - cat (通用情绪/兜底)
             
             限制字数：你的回复请保持在 50 字以内。
             """
@@ -126,6 +127,7 @@ enum PetRole {
             - curious_dog (好奇/歪头)
             - sleepy_dog (困倦/睡觉)
             - thinking_dog (思考/发呆)
+            - dog (通用情绪/兜底)
             
             限制字数：你的回复请保持在 50 字以内。
             """

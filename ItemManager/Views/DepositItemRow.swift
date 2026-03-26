@@ -155,8 +155,7 @@ struct DepositItemRow: View {
                         TextField("请输入备注", text: $editingNote)
                         Button("取消", role: .cancel) { }
                         Button("保存") {
-                            clothing.note = editingNote
-                            try? modelContext.save()
+                            saveNoteChange()
                         }
                     }
                 }
@@ -215,6 +214,20 @@ struct DepositItemRow: View {
             } else {
                 return nil
             }
+        }
+    }
+    
+    private func saveNoteChange() {
+        let now = Date()
+        clothing.note = editingNote
+        clothing.updatedAt = now
+        clothing.lastModified = now
+        
+        do {
+            try modelContext.save()
+            Task { await SharedPersistence.shared.syncWidgetData() }
+        } catch {
+            print("DepositItemRow: Failed to save note change: \(error)")
         }
     }
 }
@@ -328,11 +341,24 @@ struct SimpleDepositItemRow: View {
                     TextField("请输入备注", text: $editingNote)
                     Button("取消", role: .cancel) { }
                     Button("保存") {
-                        clothing.note = editingNote
-                        try? modelContext.save()
+                        saveNoteChange()
                     }
                 }
             }
+        }
+    }
+    
+    private func saveNoteChange() {
+        let now = Date()
+        clothing.note = editingNote
+        clothing.updatedAt = now
+        clothing.lastModified = now
+        
+        do {
+            try modelContext.save()
+            Task { await SharedPersistence.shared.syncWidgetData() }
+        } catch {
+            print("SimpleDepositItemRow: Failed to save note change: \(error)")
         }
     }
 }

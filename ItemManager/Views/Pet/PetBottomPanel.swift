@@ -468,6 +468,14 @@ struct ShopView: View {
     
     @State private var searchText = ""
     @State private var selectedCategoryId = "all"
+    @State private var lastDraggedItemId: String?
+    @State private var lastDraggedAt: Date = .distantPast
+    
+    private let dragTapSuppressionInterval: TimeInterval = 0.35
+    
+    private var shouldUseShopFilters: Bool {
+        panelState == .expanded || isLandscape
+    }
     
     var filteredItems: [PetItemDefinition] {
         var items = config.items.sorted { $0.sortIndex < $1.sortIndex }
@@ -488,10 +496,24 @@ struct ShopView: View {
         return items
     }
     
+    var displayedItems: [PetItemDefinition] {
+        shouldUseShopFilters ? filteredItems : config.items.sorted { $0.sortIndex < $1.sortIndex }
+    }
+    
+    private func markDragStarted(for itemId: String) {
+        lastDraggedItemId = itemId
+        lastDraggedAt = Date()
+    }
+    
+    private func shouldSuppressPurchaseTap(for itemId: String) -> Bool {
+        guard lastDraggedItemId == itemId else { return false }
+        return Date().timeIntervalSince(lastDraggedAt) < dragTapSuppressionInterval
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Search & Filter Header (Only when expanded or landscape)
-            if panelState == .expanded || isLandscape {
+            if shouldUseShopFilters {
                 VStack(spacing: 12) {
                     // Search Bar
                     HStack {
@@ -540,34 +562,21 @@ struct ShopView: View {
             }
             
             // Content
-            if panelState == .expanded || isLandscape {
-                // 展开：网格布局
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
-                        ForEach(filteredItems) { item in
-                            ShopItemView(item: item) {
-                                buy(item)
-                            }
-                            .draggable("shop:\(item.id)")
+            ScrollView(.vertical, showsIndicators: true) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
+                    ForEach(displayedItems) { item in
+                        ShopItemView(item: item) {
+                            guard !shouldSuppressPurchaseTap(for: item.id) else { return }
+                            buy(item)
+                        }
+                        .onDrag {
+                            markDragStarted(for: item.id)
+                            return NSItemProvider(object: "shop:\(item.id)" as NSString)
                         }
                     }
-                    .padding(20)
-                    .padding(.bottom, 50)
                 }
-            } else {
-                // 竖屏收起：横向滚动
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 15) {
-                        ForEach(filteredItems) { item in
-                            ShopItemView(item: item) {
-                                buy(item)
-                            }
-                            .draggable("shop:\(item.id)")
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                }
+                .padding(20)
+                .padding(.bottom, panelState == .expanded || isLandscape ? 50 : 20)
             }
         }
     }

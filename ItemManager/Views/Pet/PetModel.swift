@@ -269,6 +269,13 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
     var portraitImageName: String {
         return "\(rawValue)_portrait"
     }
+
+    var quickOptionIconName: String {
+        switch self {
+        case .naicha: return "cat"
+        case .maomao: return "dog"
+        }
+    }
     
     // 萌宠对话中使用的happy表情图片名
     var happyImageName: String {
