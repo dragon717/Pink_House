@@ -213,7 +213,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .exportCSV:
             return "tablecells"
         case .cloudFileBackupRestore:
-            return "icloud.and.arrow.up.and.arrow.down"
+            return "arrow.triangle.2.circlepath.icloud"
         }
     }
     

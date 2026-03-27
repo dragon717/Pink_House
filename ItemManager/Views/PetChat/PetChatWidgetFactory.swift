@@ -14,28 +14,29 @@ enum PetChatWidgetFactory {
 
         let recommendationCard = PetWidgetData(
             type: .insightCard,
-            title: "衣橱命中",
+            title: "衣橱搭配",
             subtitle: """
-            裙子：\(names(selection.dresses, fallback: "未命中"))
-            鞋子：\(names(selection.shoes, fallback: "未命中"))
-            伞具：\(names(selection.umbrellas, fallback: "未命中"))
+            外套：\(names(selection.outerwears, fallback: outerwearFallback(weather)))
+            裙子：\(names(selection.dresses, fallback: "无"))
+            鞋子：\(names(selection.shoes, fallback: "无"))
+            伞具：\(names(selection.umbrellas, fallback: "无"))
             """
         )
 
         let actions = PetWidgetData(
             type: .quickOptions,
-            title: "继续告诉我你的偏好：",
+            title: "想换一种：",
             options: [
-                PetWidgetOption(title: "A. 更防雨一点", command: "ask:请按雨天优先再给我一套更稳妥的穿搭。", icon: "cloud.rain"),
-                PetWidgetOption(title: "B. 更甜美一点", command: "ask:请保留天气因素，改成更甜美的搭配。", icon: "heart"),
-                PetWidgetOption(title: "C. 先安慰我再推荐", command: "mood_support", icon: "sparkles")
+                PetWidgetOption(title: "更防雨", command: "ask:请按雨天优先再给我一套更稳妥的穿搭。", icon: "cloud.rain"),
+                PetWidgetOption(title: "更甜美", command: "ask:请保留天气因素，改成更甜美的搭配。", icon: "heart"),
+                PetWidgetOption(title: "先安慰我", command: "mood_support", icon: "sparkles")
             ]
         )
 
         let container = PetWidgetData(
             type: .container,
-            title: "天气穿搭面板",
-            subtitle: "可继续微调风格",
+            title: "天气穿搭",
+            subtitle: "可继续微调",
             children: [weatherCard, recommendationCard, actions]
         )
 
@@ -43,28 +44,45 @@ enum PetChatWidgetFactory {
     }
 
     private static func weatherTitle(_ weather: WeatherData?) -> String {
-        guard let weather else { return "天气卡片（未获取到实时天气）" }
-        return "\(weather.city) \(weather.condition.rawValue)"
+        guard let weather else { return "天气" }
+        return "\(weather.city) · \(weather.condition.rawValue)"
     }
 
     private static func weatherSubtitle(_ weather: WeatherData?) -> String {
-        guard let weather else { return "先按稳妥方案推荐，稍后可重试天气查询。" }
-        return "体感参考：\(Int(weather.temperature))°C，穿搭会优先兼顾舒适和场景。"
+        guard let weather else { return "先按稳妥方案推荐。" }
+        let feelsLike = Int(weather.feelsLikeTemperature.rounded())
+        if feelsLike >= 24, weather.windSpeed < 4 {
+            return "体感约\(feelsLike)°C，通常不用特地带外套。"
+        }
+        return "体感约\(feelsLike)°C，风速\(String(format: "%.1f m/s", weather.windSpeed))。"
     }
 
     private static func weatherMetrics(_ weather: WeatherData?) -> [PetWidgetMetric] {
         guard let weather else {
             return [
-                PetWidgetMetric(name: "温度", value: "--"),
+                PetWidgetMetric(name: "气温", value: "--"),
+                PetWidgetMetric(name: "体感", value: "--"),
                 PetWidgetMetric(name: "湿度", value: "--"),
                 PetWidgetMetric(name: "风速", value: "--")
             ]
         }
         return [
-            PetWidgetMetric(name: "温度", value: "\(Int(weather.temperature))°C"),
+            PetWidgetMetric(name: "气温", value: "\(Int(weather.temperature.rounded()))°C"),
+            PetWidgetMetric(name: "体感", value: "\(Int(weather.feelsLikeTemperature.rounded()))°C"),
             PetWidgetMetric(name: "湿度", value: "\(weather.humidity)%"),
             PetWidgetMetric(name: "风速", value: String(format: "%.1f m/s", weather.windSpeed))
         ]
+    }
+
+    private static func outerwearFallback(_ weather: WeatherData?) -> String {
+        guard let weather else { return "建议先找一件薄外套" }
+        if weather.feelsLikeTemperature < 18 {
+            return "建议优先找一件外套"
+        }
+        if weather.feelsLikeTemperature >= 24, weather.windSpeed < 4 {
+            return "这会儿大概率不用带外套"
+        }
+        return "可选轻薄开衫"
     }
 
     private static func names(_ items: [Clothing], fallback: String) -> String {

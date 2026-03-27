@@ -111,17 +111,27 @@ enum PetThemeConversationEngine {
         let separators = ["叫", "命名为", "名称是", "名字是", "为"]
         for separator in separators {
             if let range = compact.range(of: separator) {
-                let value = compact[range.upperBound...]
+                let rawValue = compact[range.upperBound...]
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .replacingOccurrences(of: "主题", with: "")
-                    .replacingOccurrences(of: "配色", with: "")
-                    .trimmingCharacters(in: CharacterSet(charactersIn: "「」\"'。！？!?，,"))
-                if !value.isEmpty {
-                    return String(value.prefix(16))
+                let cleanedValue = normalizeThemeName(rawValue)
+                if !cleanedValue.isEmpty {
+                    return String(cleanedValue.prefix(16))
                 }
             }
         }
         return nil
+    }
+
+    private static func normalizeThemeName<S: StringProtocol>(_ rawValue: S) -> String {
+        var value = String(rawValue)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "「」\"'。！？!?，, "))
+
+        for suffix in ["主题", "配色"] where value.hasSuffix(suffix) {
+            value.removeLast(suffix.count)
+            value = value.trimmingCharacters(in: CharacterSet(charactersIn: "「」\"'。！？!?，, "))
+        }
+
+        return value
     }
 
     private static func matchThemeName(from text: String, candidates: [String]) -> String? {

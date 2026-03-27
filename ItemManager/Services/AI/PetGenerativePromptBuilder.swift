@@ -110,8 +110,10 @@ enum PetGenerativePromptBuilder {
     2) JSON 结构固定：
     {"text":"...","widgets":[{"type":"quick_options","title":"...","options":[{"title":"A. ...","command":"..."},{"title":"B. ...","command":"..."},{"title":"C. ...","command":"..."}]}]}
     3) text 要口语化、拟人化，可撒娇安抚；严禁出现模型名、服务商名或“JSON对象”等技术词。
+       text 内允许附带 0 或 1 个 [IMAGE:动作ID] 表情指令，但绝不能超过 1 个。
     4) widgets 最多 2 个；每个 options 最多 3 个；command 仅可用：
        outfit_suggest / weather_guidance / search_prompt / mood_support / ask:具体问题
     5) 若本轮与衣橱无关，不要编造衣橱数据；若与穿搭相关，优先基于给定候选单品给建议。
+    6) 若用户在找衣服、做推荐或问“有没有某类单品”，优先使用衣橱里真实存在的标签、类型、备注词汇；若通用类目和用户自定义叫法不一致，先转成用户自己的词再回答。
     """
 }

@@ -88,6 +88,7 @@ struct ItemManagerApp: App {
     init() {
         // Ensure NotificationManager is initialized to set the delegate
         _ = NotificationManager.shared
+        _ = WardrobeNavigationStyle.normalizeStoredPreference()
         
         // 预热 RealityKit 渲染引擎，避免 Object Capture 时的材质加载错误
         // 这会在 App 启动时预加载 engine:throttleGhosted.rematerial 等内部资源
@@ -114,6 +115,7 @@ struct MainContentView: View {
     @State private var showDailyCheckIn = false
     @State private var didStartLaunchFlow = false
     @State private var hasCompletedLaunchPresentation = false
+    @State private var pendingFirstLaunchGuideAfterCheckIn = false
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     
     var body: some View {
@@ -196,13 +198,20 @@ struct MainContentView: View {
             } else if newPhase == .active {
                 // 从后台回到前台时检查是否需要打卡
                 checkAndShowDailyCheckIn()
+                startDeferredFirstLaunchGuideIfNeeded()
             }
+        }
+        .onChange(of: showDailyCheckIn) { _, isPresented in
+            guard !isPresented else { return }
+            startDeferredFirstLaunchGuideIfNeeded()
         }
     }
     
     // MARK: - 启动初始化（不阻塞开屏消失）
     @MainActor
     private func runStartupInitialization() async {
+        PetHistoryResetManager.shared.applyForcedResetIfNeeded()
+
         // 0. Preload Spatial Assets (iOS 26+ only)
         // 仅在支持的系统上预加载，避免旧设备浪费资源
         if #available(iOS 26.0, *) {
@@ -271,20 +280,41 @@ struct MainContentView: View {
         
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 300_000_000) // 等待 0.3 秒确保动画完成
-            guideManager.startGuide()
-            // 检查是否需要显示每日打卡（仅在未显示新手引导时）
-            if !guideManager.isShowingGuide {
+            if guideManager.shouldShowGuide && !DailyCheckInManager.shared.hasCheckedInToday {
+                pendingFirstLaunchGuideAfterCheckIn = true
                 checkAndShowDailyCheckIn()
+            } else {
+                guideManager.startGuide()
+                if !guideManager.isShowingGuide {
+                    checkAndShowDailyCheckIn()
+                }
             }
         }
+    }
+
+    @MainActor
+    private func startDeferredFirstLaunchGuideIfNeeded() {
+        guard pendingFirstLaunchGuideAfterCheckIn else { return }
+        guard !showDailyCheckIn else { return }
+        guard DailyCheckInManager.shared.hasCheckedInToday else { return }
+        guard guideManager.shouldShowGuide else {
+            pendingFirstLaunchGuideAfterCheckIn = false
+            return
+        }
+
+        pendingFirstLaunchGuideAfterCheckIn = false
+        guideManager.startGuide()
     }
     
     // MARK: - 检查并显示每日打卡
     private func checkAndShowDailyCheckIn() {
+        guard !showDailyCheckIn else { return }
+
         // 检查今天是否已经打卡
         if !DailyCheckInManager.shared.hasCheckedInToday {
             // 延迟一点显示，让主界面先加载完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard !showDailyCheckIn, !DailyCheckInManager.shared.hasCheckedInToday else { return }
                 showDailyCheckIn = true
             }
         }

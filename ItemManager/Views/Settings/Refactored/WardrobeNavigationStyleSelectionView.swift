@@ -3,14 +3,21 @@ import SwiftUI
 struct WardrobeNavigationStyleSelectionView: View {
     @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
     
+    private var wardrobeNavigationStyleBinding: Binding<WardrobeNavigationStyle> {
+        Binding(
+            get: { wardrobeNavigationStyle.resolvedForCurrentDevice },
+            set: { wardrobeNavigationStyle = $0.resolvedForCurrentDevice }
+        )
+    }
+    
     var body: some View {
         AdaptiveSettingsView(title: "选择样式") {
             AdaptiveSection(
                 header: "衣橱顶部导航",
                 footer: "经典导航栏保持现有布局；时尚导航栏会将排序/筛选放在左侧，顶部标签切换居中，视图/更多/创建放在右侧。"
             ) {
-                Picker("样式", selection: $wardrobeNavigationStyle) {
-                    ForEach(WardrobeNavigationStyle.allCases) { style in
+                Picker("样式", selection: wardrobeNavigationStyleBinding) {
+                    ForEach(WardrobeNavigationStyle.availableStylesForCurrentDevice) { style in
                         Text(style.displayName).tag(style)
                     }
                 }
@@ -20,9 +27,14 @@ struct WardrobeNavigationStyleSelectionView: View {
                 styleRow(.classic, icon: "rectangle.leadinghalf.filled")
                     .adaptiveRow()
                 
-                styleRow(.fashion, icon: "rectangle.center.inset.filled")
-                    .adaptiveRow(showDivider: false)
+                if WardrobeNavigationStyle.availableStylesForCurrentDevice.contains(.fashion) {
+                    styleRow(.fashion, icon: "rectangle.center.inset.filled")
+                        .adaptiveRow(showDivider: false)
+                }
             }
+        }
+        .onAppear {
+            wardrobeNavigationStyle = WardrobeNavigationStyle.normalizeStoredPreference()
         }
     }
     
@@ -52,7 +64,7 @@ struct WardrobeNavigationStyleSelectionView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            wardrobeNavigationStyle = style
+            wardrobeNavigationStyle = style.resolvedForCurrentDevice
         }
     }
 }

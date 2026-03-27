@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct PetGenerativeWidgetHost: View {
     let widgets: [PetWidgetData]
@@ -47,6 +48,7 @@ enum PetWidgetRegistry {
 private struct PetQuickOptionsWidget: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
 
     let widget: PetWidgetData
@@ -74,12 +76,94 @@ private struct PetQuickOptionsWidget: View {
         }
     }
 
-    var body: some View {
-        let skin = themeManager.petChatSkinTheme
-        let optionFill = skin.resolvedQuickOptionFill(themeManager: themeManager, colorScheme: colorScheme)
-        let optionStroke = skin.resolvedQuickOptionStroke(themeManager: themeManager, colorScheme: colorScheme)
-        let optionText = skin.resolvedQuickOptionTextColor(themeManager: themeManager, colorScheme: colorScheme)
+    private var preferredColumnCount: Int {
+        if UIDevice.current.userInterfaceIdiom == .pad || horizontalSizeClass == .regular {
+            return 4
+        }
+        return 3
+    }
 
+    private var resolvedColumnCount: Int {
+        max(1, min(preferredColumnCount, widget.options.count))
+    }
+
+    private var optionFill: Color {
+        themeManager.petChatSkinTheme.resolvedQuickOptionFill(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var optionStroke: Color {
+        themeManager.petChatSkinTheme.resolvedQuickOptionStroke(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var optionText: Color {
+        themeManager.petChatSkinTheme.resolvedQuickOptionTextColor(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var optionRows: [[PetWidgetOption]] {
+        return stride(from: 0, to: widget.options.count, by: resolvedColumnCount).map { start in
+            Array(widget.options[start..<min(start + resolvedColumnCount, widget.options.count)])
+        }
+    }
+
+    private var usesStackedOptionLayout: Bool {
+        resolvedColumnCount >= 3
+    }
+
+    @ViewBuilder
+    private func optionButton(_ option: PetWidgetOption) -> some View {
+        Button {
+            if guideTarget(for: option) != nil {
+                NotificationCenter.default.post(name: .petChatGuideOptionTapped, object: nil)
+            }
+            onAction(option)
+        } label: {
+            Group {
+                if usesStackedOptionLayout {
+                    VStack(spacing: 6) {
+                        if let icon = option.icon, !icon.isEmpty {
+                            optionIconView(icon)
+                                .frame(height: 16)
+                        }
+                        Text(option.title)
+                            .font(.caption)
+                            .lineLimit(3)
+                            .lineSpacing(2)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 74, alignment: .center)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 10)
+                } else {
+                    HStack(alignment: .center, spacing: 8) {
+                        if let icon = option.icon, !icon.isEmpty {
+                            optionIconView(icon)
+                        }
+                        Text(option.title)
+                            .font(.caption)
+                            .lineLimit(3)
+                            .lineSpacing(2)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                }
+            }
+            .foregroundStyle(optionText)
+            .background(optionFill)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(optionStroke, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .captureGuideTarget(guideTarget(for: option))
+    }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = widget.title, !title.isEmpty {
                 Text(title)
@@ -87,34 +171,20 @@ private struct PetQuickOptionsWidget: View {
                     .foregroundStyle(themeManager.secondaryTextColor)
             }
 
-            ForEach(widget.options) { option in
-                Button {
-                    if guideTarget(for: option) != nil {
-                        NotificationCenter.default.post(name: .petChatGuideOptionTapped, object: nil)
-                    }
-                    onAction(option)
-                } label: {
+            VStack(spacing: 8) {
+                ForEach(Array(optionRows.enumerated()), id: \.offset) { _, row in
                     HStack(spacing: 8) {
-                        if let icon = option.icon, !icon.isEmpty {
-                            optionIconView(icon)
+                        ForEach(row) { option in
+                            optionButton(option)
                         }
-                        Text(option.title)
-                            .font(.caption)
-                            .lineLimit(2)
+                        if row.count < resolvedColumnCount {
+                            ForEach(0..<(resolvedColumnCount - row.count), id: \.self) { _ in
+                                Color.clear
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
                     }
-                    .foregroundStyle(optionText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(optionFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(optionStroke, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                .buttonStyle(.plain)
-                .captureGuideTarget(guideTarget(for: option))
             }
         }
         .padding(.top, 2)
@@ -124,26 +194,45 @@ private struct PetQuickOptionsWidget: View {
 private struct PetWeatherWidget: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isExpanded = false
 
     let widget: PetWidgetData
 
     var body: some View {
         let palette = MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
-        VStack(alignment: .leading, spacing: 8) {
-            if let title = widget.title, !title.isEmpty {
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(palette.primaryText)
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let title = widget.title, !title.isEmpty {
+                            Text(title)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(palette.primaryText)
+                        }
+                        if let subtitle = widget.subtitle, !subtitle.isEmpty {
+                            Text(subtitle)
+                                .font(.caption2)
+                                .foregroundStyle(palette.secondaryText)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(isExpanded ? nil : 2)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(palette.secondaryText)
+                        .padding(.top, 2)
+                }
             }
-            if let subtitle = widget.subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(palette.secondaryText)
-            }
+            .buttonStyle(.plain)
 
-            if !widget.metrics.isEmpty {
-                HStack(spacing: 8) {
+            if isExpanded && !widget.metrics.isEmpty {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
                     ForEach(widget.metrics) { metric in
                         VStack(spacing: 2) {
                             Text(metric.name)
@@ -155,11 +244,12 @@ private struct PetWeatherWidget: View {
                                 .foregroundStyle(palette.primaryText)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 8)
                         .background(palette.quickOptionFill)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(10)
@@ -444,6 +534,7 @@ private struct PetInventoryPanelWidget: View {
     let onAction: (PetWidgetOption) -> Void
 
     @ObservedObject private var petDataManager = PetDataManager.shared
+    @State private var isDropTargeted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -471,8 +562,8 @@ private struct PetInventoryPanelWidget: View {
             if widget.options.isEmpty {
                 PetPanelEmptyState(
                     systemIcon: "shippingbox",
-                    title: "背包空空的",
-                    subtitle: "去商店补一点猫粮、罐头或者玩具吧。"
+                    title: "我的背包空空的",
+                    subtitle: "带我去商店补一点猫粮、罐头或者玩具吧。"
                 )
             } else {
                 ScrollView(.vertical, showsIndicators: true) {
@@ -486,7 +577,10 @@ private struct PetInventoryPanelWidget: View {
                                         .padding(.vertical, 2)
                                 }
                                 .buttonStyle(.plain)
-                                .draggable(option.command)
+                                .contentShape(Rectangle())
+                                .onDrag {
+                                    PetEmbeddedPanelDragDrop.itemProvider(for: option.command)
+                                }
                             }
                         }
                     }
@@ -501,19 +595,20 @@ private struct PetInventoryPanelWidget: View {
     private var inventoryDropZone: some View {
         HStack(spacing: 6) {
             Image(systemName: "pawprint.circle.fill")
-            Text("拖拽到这里就地投喂")
+            Text("拖到这里就能直接喂我")
                 .font(.caption2)
         }
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .center)
-        .background(Color.blue.opacity(0.08))
+        .background(isDropTargeted ? Color.blue.opacity(0.16) : Color.blue.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .dropDestination(for: String.self) { payloads, _ in
-            guard let payload = payloads.first else { return false }
-            onAction(PetWidgetOption(title: "拖拽使用", command: payload, icon: "pawprint.circle.fill"))
-            return true
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onDrop(of: PetEmbeddedPanelDragDrop.supportedTypeIdentifiers, isTargeted: $isDropTargeted) { providers in
+            PetEmbeddedPanelDragDrop.handleDrop(from: providers) { payload in
+                onAction(PetWidgetOption(title: "拖拽使用", command: payload, icon: "pawprint.circle.fill"))
+            }
         }
     }
 
@@ -571,6 +666,7 @@ private struct PetShopPanelWidget: View {
     let onAction: (PetWidgetOption) -> Void
 
     @ObservedObject private var petDataManager = PetDataManager.shared
+    @State private var isDropTargeted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -598,8 +694,8 @@ private struct PetShopPanelWidget: View {
             if widget.options.isEmpty {
                 PetPanelEmptyState(
                     systemIcon: "cart",
-                    title: "商店暂时空着",
-                    subtitle: "等会儿再来看看有没有新道具。"
+                    title: "今天的小卖部空空的",
+                    subtitle: "等会儿再陪我来看看有没有新道具。"
                 )
             } else {
                 ScrollView(.vertical, showsIndicators: true) {
@@ -610,7 +706,10 @@ private struct PetShopPanelWidget: View {
                                     onAction(option)
                                 }
                                 .padding(.vertical, 2)
-                                .draggable(option.command)
+                                .contentShape(Rectangle())
+                                .onDrag {
+                                    PetEmbeddedPanelDragDrop.itemProvider(for: option.command)
+                                }
                             }
                         }
                     }
@@ -625,19 +724,24 @@ private struct PetShopPanelWidget: View {
     private var shopDropZone: some View {
         HStack(spacing: 6) {
             Image(systemName: "cart.circle.fill")
-            Text("拖拽到这里快速投喂")
+            Text("拖到这里就能买来马上喂我")
                 .font(.caption2)
         }
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .center)
-        .background(Color.orange.opacity(0.08))
+        .background(isDropTargeted ? Color.orange.opacity(0.16) : Color.orange.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .dropDestination(for: String.self) { payloads, _ in
-            guard let payload = payloads.first else { return false }
-            onAction(PetWidgetOption(title: "拖拽购买", command: payload, icon: "cart.circle.fill"))
-            return true
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onDrop(of: PetEmbeddedPanelDragDrop.supportedTypeIdentifiers, isTargeted: $isDropTargeted) { providers in
+            PetEmbeddedPanelDragDrop.handleDrop(from: providers) { payload in
+                let itemId = payload
+                    .replacingOccurrences(of: "buy_item:", with: "")
+                    .replacingOccurrences(of: "shop:", with: "")
+                guard !itemId.isEmpty else { return }
+                onAction(PetWidgetOption(title: "拖拽投喂", command: "drag_shop_item:\(itemId)", icon: "cart.circle.fill"))
+            }
         }
     }
 
@@ -986,9 +1090,34 @@ private struct PetMoneyCounterWidget: View {
     }
 }
 
+private enum PetEmbeddedPanelDragDrop {
+    static let supportedTypeIdentifiers = [UTType.plainText.identifier]
+
+    static func itemProvider(for command: String) -> NSItemProvider {
+        NSItemProvider(object: command as NSString)
+    }
+
+    static func handleDrop(from providers: [NSItemProvider], perform: @escaping (String) -> Void) -> Bool {
+        guard let provider = providers.first(where: { $0.canLoadObject(ofClass: NSString.self) }) else {
+            return false
+        }
+
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let payload = object as? String, !payload.isEmpty else { return }
+            DispatchQueue.main.async {
+                perform(payload)
+            }
+        }
+
+        return true
+    }
+}
+
 private struct PetDivinationPanelWidget: View {
     let widget: PetWidgetData
     let onAction: (PetWidgetOption) -> Void
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var currentFortune: Fortune?
     @State private var videoState: VideoState = .initial
@@ -1098,14 +1227,14 @@ private struct PetDivinationPanelWidget: View {
 
                     ZStack {
                         if videoState == .finished && showFortuneText, let currentFortune {
-                            FortuneInterpretationView(fortune: currentFortune)
+                            interpretationView(for: currentFortune)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .bottom).combined(with: .opacity),
                                     removal: .opacity
                                 ))
                         }
                     }
-                    .frame(height: 100)
+                    .frame(height: interpretationContainerHeight)
 
                     ZStack {
                         if videoState == .initial {
@@ -1167,6 +1296,23 @@ private struct PetDivinationPanelWidget: View {
     private func calculateContainerSize(for size: CGSize) -> CGFloat {
         let widthBased = size.width * 0.78
         return min(max(widthBased, 220), 280)
+    }
+
+    private var interpretationContainerHeight: CGFloat {
+        horizontalSizeClass == .regular ? 116 : 100
+    }
+
+    private var interpretationContentWidth: CGFloat {
+        horizontalSizeClass == .regular ? 420 : 360
+    }
+
+    @ViewBuilder
+    private func interpretationView(for fortune: Fortune) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            FortuneInterpretationView(fortune: fortune)
+                .frame(width: interpretationContentWidth)
+                .padding(.horizontal, 2)
+        }
     }
 
     private func divinationButton(title: String, icon: String, action: @escaping () -> Void) -> some View {

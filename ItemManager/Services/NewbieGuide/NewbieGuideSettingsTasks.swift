@@ -230,7 +230,7 @@ extension FeatureExperienceGuideOverlay {
                 radius: 28
             )
 
-            if widgetCustomizeStep.showCatPaw {
+            if widgetCustomizeStep.showCatPaw && !guideManager.isPadGuideLayout {
                 CatPawTapAnimation(
                     position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
                     delay: 0.5

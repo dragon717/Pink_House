@@ -163,15 +163,20 @@ struct ModernTabView: View {
         .overlay(alignment: .bottomTrailing) {
             modernPetChatTabGuideAnchor
         }
+        .background {
+            ModernTabBarItemFrameCaptureView(tabIndex: 1, targetKey: .homeHouseTab)
+        }
         .overlay {
             RewardBubbleView()
-            // 悬浮宠物默认显示，不再依赖解锁状态
-            PetOverlayView(action: {
-                // 点击悬浮小猫：切换到萌宠对话 Tab
-                withAnimation {
-                    selectedTab = 3
-                }
-            }, petName: petDataManager.status.displayName)
+            // 进入萌宠对话页后不再显示悬浮宠物，避免与搜索/输入交互冲突
+            if selectedTab != 3 {
+                PetOverlayView(action: {
+                    // 点击悬浮小猫：切换到萌宠对话 Tab
+                    withAnimation {
+                        selectedTab = 3
+                    }
+                }, petName: petDataManager.status.displayName)
+            }
             // 修复：使用正确的 Binding 传递 selectedTab
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
@@ -260,6 +265,78 @@ struct ModernTabView: View {
         .allowsHitTesting(false)
     }
 }
+
+#if canImport(UIKit)
+private struct ModernTabBarItemFrameCaptureView: UIViewRepresentable {
+    let tabIndex: Int
+    let targetKey: GuideTargetKey
+
+    func makeUIView(context: Context) -> TabBarFrameCaptureUIView {
+        let view = TabBarFrameCaptureUIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        view.tabIndex = tabIndex
+        view.targetKey = targetKey
+        return view
+    }
+
+    func updateUIView(_ uiView: TabBarFrameCaptureUIView, context: Context) {
+        uiView.tabIndex = tabIndex
+        uiView.targetKey = targetKey
+        uiView.scheduleCapture()
+    }
+}
+
+private final class TabBarFrameCaptureUIView: UIView {
+    var tabIndex: Int = 0
+    var targetKey: GuideTargetKey = .homeHouseTab
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        scheduleCapture()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        scheduleCapture()
+    }
+
+    func scheduleCapture() {
+        DispatchQueue.main.async { [weak self] in
+            self?.captureFrame()
+        }
+    }
+
+    private func captureFrame() {
+        guard let window else { return }
+        guard let tabBar = findTabBar(in: window) else { return }
+
+        let buttons = tabBar.subviews
+            .filter { NSStringFromClass(type(of: $0)).contains("UITabBarButton") }
+            .sorted { $0.frame.minX < $1.frame.minX }
+
+        guard buttons.indices.contains(tabIndex) else { return }
+
+        let button = buttons[tabIndex]
+        let frame = button.convert(button.bounds, to: nil)
+        AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(frame, for: targetKey)
+    }
+
+    private func findTabBar(in view: UIView) -> UITabBar? {
+        if let tabBar = view as? UITabBar {
+            return tabBar
+        }
+
+        for subview in view.subviews {
+            if let tabBar = findTabBar(in: subview) {
+                return tabBar
+            }
+        }
+
+        return nil
+    }
+}
+#endif
 
 // MARK: - 衣橱 Tab 内容
 @available(iOS 18.0, *)
@@ -519,13 +596,15 @@ struct LegacyTabView: View {
         }
         .overlay {
             RewardBubbleView()
-            // 悬浮宠物默认显示，不再依赖解锁状态
-            PetOverlayView(action: {
-                // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
-                withAnimation {
-                    selectedTab = 3
-                }
-            }, petName: petDataManager.status.displayName)
+            // 进入萌宠对话页后不再显示悬浮宠物，避免与搜索/输入交互冲突
+            if selectedTab != 3 {
+                PetOverlayView(action: {
+                    // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
+                    withAnimation {
+                        selectedTab = 3
+                    }
+                }, petName: petDataManager.status.displayName)
+            }
             SmallWorldMenuOverlay(
                 selectedTab: $selectedTab,
                 smallWorldDestination: $smallWorldDestination,

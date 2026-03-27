@@ -55,9 +55,30 @@ struct QuickActionButton: View {
 }
 
 struct OutfitSaveSuccessToast: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
     let message: String
     @State private var iconScale: CGFloat = 0.5
     @State private var showGlow = false
+
+    private var primaryAccent: Color {
+        themeManager.petChatSkinTheme.resolvedAssistantAccentColor(
+            themeManager: themeManager,
+            colorScheme: colorScheme
+        )
+    }
+
+    private var secondaryAccent: Color {
+        primaryAccent.mixed(
+            with: colorScheme == .dark ? .white : .black,
+            amount: colorScheme == .dark ? 0.24 : 0.14
+        )
+    }
+
+    private var sparkleColor: Color {
+        primaryAccent.mixed(with: .yellow, amount: 0.42)
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -66,8 +87,8 @@ struct OutfitSaveSuccessToast: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                Color.pink.opacity(0.5),
-                                Color.pink.opacity(0.0)
+                                primaryAccent.opacity(0.5),
+                                primaryAccent.opacity(0.0)
                             ],
                             center: .center,
                             startRadius: 10,
@@ -80,7 +101,7 @@ struct OutfitSaveSuccessToast: View {
                 Circle()
                     .stroke(
                         AngularGradient(
-                            colors: [.pink, .purple, .pink],
+                            colors: [primaryAccent, secondaryAccent, primaryAccent],
                             center: .center
                         ),
                         lineWidth: 2
@@ -91,7 +112,7 @@ struct OutfitSaveSuccessToast: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [.pink.opacity(0.3), .purple.opacity(0.3)],
+                                colors: [primaryAccent.opacity(0.3), secondaryAccent.opacity(0.3)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -102,7 +123,7 @@ struct OutfitSaveSuccessToast: View {
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.pink, .purple],
+                                colors: [primaryAccent, secondaryAccent],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -113,7 +134,7 @@ struct OutfitSaveSuccessToast: View {
                 ForEach(0..<6) { i in
                     Image(systemName: "star.fill")
                         .font(.system(size: 10))
-                        .foregroundColor(.yellow)
+                        .foregroundColor(sparkleColor)
                         .offset(
                             x: cos(Double(i) * .pi / 3) * 50,
                             y: sin(Double(i) * .pi / 3) * 50
@@ -131,7 +152,7 @@ struct OutfitSaveSuccessToast: View {
 
                 Text(message)
                     .font(.subheadline)
-                    .foregroundColor(.pink)
+                    .foregroundColor(primaryAccent)
                     .multilineTextAlignment(.center)
             }
         }
@@ -146,7 +167,142 @@ struct OutfitSaveSuccessToast: View {
             RoundedRectangle(cornerRadius: 24)
                 .stroke(
                     LinearGradient(
-                        colors: [.pink.opacity(0.3), .purple.opacity(0.3)],
+                        colors: [primaryAccent.opacity(0.3), secondaryAccent.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .padding(.horizontal, 40)
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.5)) {
+                iconScale = 1.0
+            }
+
+            withAnimation(.easeIn(duration: 0.5)) {
+                showGlow = true
+            }
+        }
+    }
+}
+
+struct PetActionSuccessToast: View {
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    let title: String
+    let message: String
+    let systemImage: String
+    @State private var iconScale: CGFloat = 0.5
+    @State private var showGlow = false
+
+    private var primaryAccent: Color {
+        themeManager.petChatSkinTheme.resolvedAssistantAccentColor(
+            themeManager: themeManager,
+            colorScheme: colorScheme
+        )
+    }
+
+    private var secondaryAccent: Color {
+        primaryAccent.mixed(
+            with: colorScheme == .dark ? .white : .black,
+            amount: colorScheme == .dark ? 0.24 : 0.14
+        )
+    }
+
+    private var sparkleColor: Color {
+        primaryAccent.mixed(with: .yellow, amount: 0.42)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                primaryAccent.opacity(0.5),
+                                primaryAccent.opacity(0.0)
+                            ],
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                    .opacity(showGlow ? 1 : 0)
+
+                Circle()
+                    .stroke(
+                        AngularGradient(
+                            colors: [primaryAccent, secondaryAccent, primaryAccent],
+                            center: .center
+                        ),
+                        lineWidth: 2
+                    )
+                    .frame(width: 70, height: 70)
+
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [primaryAccent.opacity(0.3), secondaryAccent.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+
+                    Image(systemName: systemImage)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [primaryAccent, secondaryAccent],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .scaleEffect(iconScale)
+                }
+
+                ForEach(0..<6) { i in
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(sparkleColor)
+                        .offset(
+                            x: cos(Double(i) * .pi / 3) * 50,
+                            y: sin(Double(i) * .pi / 3) * 50
+                        )
+                        .scaleEffect(iconScale)
+                }
+            }
+            .frame(height: 100)
+
+            VStack(spacing: 8) {
+                Text("✨ \(title)")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(primaryAccent)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 24)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [primaryAccent.opacity(0.3), secondaryAccent.opacity(0.3)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),

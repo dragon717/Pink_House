@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AIThinkingAnimation: View {
     @State private var dotScales: [CGFloat] = [0.5, 0.5, 0.5]
@@ -30,9 +31,28 @@ struct AIThinkingAnimation: View {
 struct ModernAIThinkingView: View {
     @State private var rotation: Double = 0
     @State private var pulseScale: CGFloat = 1.0
+    let petImageName: String?
+    let isConfused: Bool
+
+    init(petImageName: String? = nil, isConfused: Bool = false) {
+        self.petImageName = petImageName
+        self.isConfused = isConfused
+    }
 
     var body: some View {
         HStack(spacing: 12) {
+            if let petImageName, UIImage(named: petImageName) != nil {
+                Image(petImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 28, height: 28)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(Color.pink.opacity(0.25), lineWidth: 1.5)
+                    )
+            }
+
             ZStack {
                 Circle()
                     .stroke(Color.pink.opacity(0.2), lineWidth: 3)
@@ -52,7 +72,7 @@ struct ModernAIThinkingView: View {
                     .rotationEffect(.degrees(rotation))
             }
 
-            Text("思考中")
+            Text(isConfused ? "嗯…我有点疑惑，再想想" : "思考中")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 

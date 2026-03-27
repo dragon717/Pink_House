@@ -519,10 +519,12 @@ extension FeatureExperienceGuideOverlay {
                 radius: 28
             )
 
-            CatPawTapAnimation(
-                position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
-                delay: 0.5
-            )
+            if !guideManager.isPadGuideLayout {
+                CatPawTapAnimation(
+                    position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
+                    delay: 0.5
+                )
+            }
 
             if guideManager.lastKnownHomeTab == "me" {
                 Button {

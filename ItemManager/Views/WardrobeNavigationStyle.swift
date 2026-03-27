@@ -1,10 +1,56 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum WardrobeNavigationStyle: String, CaseIterable, Identifiable {
     case classic = "classic"
     case fashion = "fashion"
     
+    static let userDefaultsKey = "UserPreference_WardrobeNavigationStyle"
+    
     var id: String { rawValue }
+    
+    static var availableStylesForCurrentDevice: [WardrobeNavigationStyle] {
+        availableStyles(for: currentUserInterfaceIdiom)
+    }
+    
+    static var currentUserInterfaceIdiom: UIUserInterfaceIdiom {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom
+        #else
+        .unspecified
+        #endif
+    }
+    
+    static func availableStyles(for idiom: UIUserInterfaceIdiom) -> [WardrobeNavigationStyle] {
+        idiom == .pad ? [.classic] : Self.allCases
+    }
+    
+    func resolved(for idiom: UIUserInterfaceIdiom) -> WardrobeNavigationStyle {
+        Self.availableStyles(for: idiom).contains(self) ? self : .classic
+    }
+    
+    var resolvedForCurrentDevice: WardrobeNavigationStyle {
+        resolved(for: Self.currentUserInterfaceIdiom)
+    }
+    
+    @discardableResult
+    static func normalizeStoredPreference(
+        userDefaults: UserDefaults = .standard,
+        idiom: UIUserInterfaceIdiom = currentUserInterfaceIdiom
+    ) -> WardrobeNavigationStyle {
+        let storedStyle = userDefaults.string(forKey: userDefaultsKey)
+            .flatMap(Self.init(rawValue:))
+            ?? .classic
+        let normalizedStyle = storedStyle.resolved(for: idiom)
+        
+        if storedStyle != normalizedStyle || userDefaults.string(forKey: userDefaultsKey) != normalizedStyle.rawValue {
+            userDefaults.set(normalizedStyle.rawValue, forKey: userDefaultsKey)
+        }
+        
+        return normalizedStyle
+    }
     
     var displayName: String {
         switch self {

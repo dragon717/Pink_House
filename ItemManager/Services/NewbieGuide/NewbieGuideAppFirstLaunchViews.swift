@@ -346,38 +346,45 @@ struct AppFirstLaunchGuideOverlay: View {
 
     private var pointingMask: some View {
         ZStack {
-            GeometryReader { _ in
-                ZStack {
-                    Color.black
-                        .opacity(0.4)
-                        .ignoresSafeArea()
+            if guideManager.isPadGuideLayout {
+                Color.black
+                    .opacity(0.4)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            } else {
+                GeometryReader { _ in
+                    ZStack {
+                        Color.black
+                            .opacity(0.4)
+                            .ignoresSafeArea()
 
-                    Circle()
-                        .frame(width: 80, height: 80)
-                        .position(guideManager.highlightCirclePosition)
-                        .blendMode(.destinationOut)
+                        Circle()
+                            .frame(width: 80, height: 80)
+                            .position(guideManager.highlightCirclePosition)
+                            .blendMode(.destinationOut)
+                    }
+                    .compositingGroup()
+                    .allowsHitTesting(false)
                 }
-                .compositingGroup()
-                .allowsHitTesting(false)
-            }
 
-            if guideManager.showPointingVideo {
-                GuideCatVideoPlayer(
-                    videoName: guideManager.pointingVideoName,
-                    isLooping: false,
-                    isFlipped: false,
-                    onFinished: nil
-                )
-                .position(guideManager.createButtonPosition)
-                .allowsHitTesting(false)
-            }
+                if guideManager.showPointingVideo {
+                    GuideCatVideoPlayer(
+                        videoName: guideManager.pointingVideoName,
+                        isLooping: false,
+                        isFlipped: false,
+                        onFinished: nil
+                    )
+                    .position(guideManager.createButtonPosition)
+                    .allowsHitTesting(false)
+                }
 
-            if guideManager.showCreateButtonHighlight {
-                HighlightPulseViewNoClick(
-                    center: guideManager.highlightCirclePosition,
-                    radius: 35
-                )
-                .allowsHitTesting(false)
+                if guideManager.showCreateButtonHighlight {
+                    HighlightPulseViewNoClick(
+                        center: guideManager.highlightCirclePosition,
+                        radius: 35
+                    )
+                    .allowsHitTesting(false)
+                }
             }
 
             VStack {

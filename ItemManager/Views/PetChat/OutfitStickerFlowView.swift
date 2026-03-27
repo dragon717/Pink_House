@@ -202,19 +202,9 @@ struct OutfitStickerFlowView: View {
                     let allCutoutsDescriptor = FetchDescriptor<CutoutItem>()
                     let allCutouts = try modelContext.fetch(allCutoutsDescriptor)
                     
-                    var found: [CutoutItem] = []
-                    var missing: [Clothing] = []
-                    
-                    for clothing in clothings {
-                        // 在内存中查找匹配的抠图
-                        if let cutout = allCutouts.first(where: { $0.linkedClothingID == clothing.id }) {
-                            found.append(cutout)
-                        } else {
-                            missing.append(clothing)
-                        }
-                    }
-                    
-                    return (found, missing)
+                    let resolved = OOTDCutoutResolver.resolveCutouts(for: clothings, from: allCutouts)
+                    try? modelContext.save()
+                    return (resolved.found, resolved.missing)
                 }
                 
                 self.availableCutouts = foundCutouts

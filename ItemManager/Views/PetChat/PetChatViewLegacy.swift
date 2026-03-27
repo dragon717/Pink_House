@@ -1,51 +1,24 @@
-//
-//  PetChatView.swift
-//  ItemManager
-//
-//  萌宠对话视图 - 整合AI对话、衣橱统计、查询、搭配色、搜索功能
-//
-
 import SwiftUI
 import SwiftData
 import CoreLocation
-import UIKit
 
-// MARK: - 组件文件索引（按职责拆分）
-// 核心页面：
-// - PetChatView.swift（iOS 18+ 主视图）
-// - PetChatViewLegacy.swift（iOS 18 以下兼容视图）
-// - PetChatViewPreview.swift（预览入口）
-//
-// 复用组件：
-// - PetChatBubbleView.swift（消息气泡/卡片渲染）
-// - PetChatThinkingAndFeedViews.swift（思考态/投喂动画）
-// - PetChatAuxiliaryViews.swift（通用小组件，如成功 Toast）
-// - PetChatStatusPanelWidgets.swift（状态面板 Widget）
-// - PetCurrencyExchangeSheet.swift（货币兑换面板）
-// - PetChatHistorySearchSheet.swift（历史消息搜索）
-// - PetThemeSwitchOverlay.swift（主题切换过渡）
-
-// MARK: - 萌宠对话主视图
-@available(iOS 18.0, *)
-struct PetChatView: View {
+// MARK: - iOS 18以下版本
+struct PetChatViewLegacy: View {
     @Binding var searchText: String
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
-
+    
     @StateObject private var petAI = PetAIService.shared
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var messages: [PetChatMessage] = []
     @State private var inputText = ""
-    @State private var iPadSearchFocusRequestID = 0
     @State private var isThinking = false
     @State private var isThinkingLongWait = false
     @State private var thinkingDelayWorkItem: DispatchWorkItem?
     @State private var selectedClothing: Clothing?
     @State private var navigateToDetail = false
-    // iOS26 搜索栏展开状态（用于控制常用菜单长按交互）
-    @State private var isSearchPresented = false
     @State private var hasEnteredOnce = false
     @State private var showingHistorySearch = false
     @State private var showingMeowCoinStore = false
@@ -54,17 +27,11 @@ struct PetChatView: View {
     @State private var showingRenameAlert = false
     @State private var renameInputText = ""
     @State private var showingInitialAdoptionSheet = false
-    @State private var isHistoryUnlocked = false
-    @State private var historyUnlockProgress: CGFloat = 0
-    @State private var showingHistoryUnlockHint = false
-    @State private var isChatScrollPinnedToTop = true
-    @State private var initialHistoryMessageIDs = Set<UUID>()
-    @State private var lockedWelcomeTimestamp = Date()
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
     @State private var showingOutfitStickerFlow = false
-
+    
     // 保存成功提示状态
     @State private var showingSaveSuccessToast = false
     @State private var showingPurchaseSuccessToast = false
@@ -74,33 +41,14 @@ struct PetChatView: View {
     @State private var showingThemeSwitchOverlay = false
     @State private var activeFeedAnimation: PetFeedAnimationPayload?
     @State private var feedAnimationNonce: Int = 0
-    @State private var keyboardOverlap: CGFloat = 0
 
-    // 每日问候管理器
     @StateObject private var greetingManager = DailyGreetingManager.shared
     @StateObject private var adoptionViewModel = PetViewModel(status: PetDataManager.shared.status)
-
-    // 搜索框提示文字，使用用户起的宠物名字
-    private var searchPrompt: String {
+    
+    // 输入框提示文字，使用用户起的宠物名字
+    private var inputPlaceholder: String {
         let petName = PetDataManager.shared.status.displayName
         return "和\(petName)对话、搜索裙子..."
-    }
-
-    private var usesInlinePetSearchInput: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
-    }
-
-    private let historyUnlockThreshold: CGFloat = 72
-
-    private var visibleMessages: [PetChatMessage] {
-        if isHistoryUnlocked {
-            return messages
-        }
-        return messages.filter { !initialHistoryMessageIDs.contains($0.id) }
-    }
-
-    private var hasLockedHistory: Bool {
-        !isHistoryUnlocked && !initialHistoryMessageIDs.isEmpty
     }
 
     private var quickMenuOwnedPets: [PetCharacter] {
@@ -116,10 +64,6 @@ struct PetChatView: View {
 
     private var currentCharacter: PetCharacter {
         PetDataManager.shared.getCurrentPetCharacter()
-    }
-
-    private var searchModeFloatingBottomPadding: CGFloat {
-        keyboardOverlap > 0 ? 56 : 20
     }
 
     private func localizedCatchphraseText(_ text: String) -> String {
@@ -143,12 +87,6 @@ struct PetChatView: View {
     private func presentAdoptionSheet() {
         adoptionViewModel.status = PetDataManager.shared.status
         showingInitialAdoptionSheet = true
-    }
-
-    private func reusableWelcomeText() -> String {
-        let greeting = greetingManager.getGreetingTitle()
-        let petDisplayName = PetDataManager.shared.status.displayName
-        return "\(greeting)\(currentCharacter.catchphraseSuffix) 我是你的衣橱管家\(petDisplayName)，有什么可以帮你的吗？"
     }
 
     private var currentThinkingImageName: String {
@@ -183,56 +121,21 @@ struct PetChatView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: workItem)
     }
 
-    @ViewBuilder
-    private var lockedWelcomeBubble: some View {
-        PetChatBubble(
-            message: PetChatMessage(
-                text: reusableWelcomeText(),
-                isUser: false,
-                isAIGenerated: true,
-                timestamp: lockedWelcomeTimestamp
-            ),
-            petName: petAI.petName,
-            onCardTap: handleClothingTap,
-            onSearchResultTap: handleClothingTap,
-            onOutfitTap: handleOutfitTap,
-            onWidgetAction: handleWidgetAction
-        )
-        .padding(.top, 20)
-    }
-
-    private var guideSearchBarCaptureAnchor: some View {
-        GeometryReader { proxy in
-            let searchFrame = CGRect(
-                x: 16,
-                y: max(proxy.safeAreaInsets.top + 56, 94),
-                width: proxy.size.width - 32,
-                height: 44
+    private var legacyThinkingBubble: some View {
+        HStack {
+            AnyView(
+                ModernAIThinkingView(
+                    petImageName: currentThinkingImageName,
+                    isConfused: isThinkingLongWait
+                )
             )
-
-            Color.clear
-                .frame(width: searchFrame.width, height: searchFrame.height)
-                .position(x: searchFrame.midX, y: searchFrame.midY)
-                .captureGuideTarget(.petChatSearchBar)
-                .allowsHitTesting(false)
+            .id("thinking")
+            Spacer()
         }
-        .allowsHitTesting(false)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
-
-    private var iPadSearchInputBar: some View {
-        PetDialogueInputView(
-            text: $searchText,
-            placeholder: searchPrompt,
-            onSend: sendMessageFromSearchBar,
-            focusRequestID: iPadSearchFocusRequestID,
-            onFocusChange: handleInlineSearchFocusChange
-        )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-        .captureGuideTarget(.petChatSearchBar)
-    }
-
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -240,102 +143,43 @@ struct PetChatView: View {
                 LiquidBackground()
                     .ignoresSafeArea()
 
-                // 聊天记录 - 使用 overlay 放置悬浮按钮
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        GeometryReader { geo in
-                            Color.clear
-                                .preference(
-                                    key: PetChatScrollTopOffsetPreferenceKey.self,
-                                    value: geo.frame(in: .named("PetChatScrollView")).minY
-                                )
+                VStack(spacing: 0) {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(messages) { message in
+                                    AnyView(legacyMessageBubble(for: message))
+                                }
+                                
+                                if isThinking {
+                                    legacyThinkingBubble
+                                }
+                            }
+                            .padding(.vertical, 16)
                         }
-                        .frame(height: 0)
-
-                        LazyVStack(spacing: 16) {
-                            ForEach(visibleMessages) { message in
-                                AnyView(messageBubble(for: message))
+                        .onChange(of: messages.count) { _ in
+                            if let lastId = messages.last?.id {
+                                withAnimation {
+                                    proxy.scrollTo(lastId, anchor: .bottom)
+                                }
                             }
-
-                            if visibleMessages.isEmpty && hasLockedHistory {
-                                lockedWelcomeBubble
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-
+                        }
+                        .onChange(of: isThinking) { _ in
+                            updateThinkingPhase(isActive: isThinking)
                             if isThinking {
-                                HStack {
-                                    ModernAIThinkingView(
-                                        petImageName: currentThinkingImageName,
-                                        isConfused: isThinkingLongWait
-                                    )
-                                        .id("thinking")
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                            }
-                        }
-                        .padding(.vertical, 16)
-                    }
-                    .coordinateSpace(name: "PetChatScrollView")
-                    .scrollContentBackground(.hidden)
-                    .onPreferenceChange(PetChatScrollTopOffsetPreferenceKey.self) { minY in
-                        handleHistoryUnlockScrollOffset(minY)
-                    }
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 5)
-                            .onChanged(handleHistoryUnlockDragChanged)
-                            .onEnded(handleHistoryUnlockDragEnded)
-                    )
-                    .overlay(alignment: .top) {
-                        if hasLockedHistory {
-                            Group {
-                                if showingHistoryUnlockHint || historyUnlockProgress > 0 {
-                                    historyUnlockIndicator
-                                } else {
-                                    lockedHistoryTopHint
-                                        .onTapGesture {
-                                            unlockHistory()
-                                        }
+                                withAnimation {
+                                    proxy.scrollTo("thinking", anchor: .bottom)
                                 }
                             }
-                            .padding(.top, 8)
-                            .allowsHitTesting(true)
                         }
                     }
-                    .onChange(of: messages.count) { _ in
-                        if let lastId = visibleMessages.last?.id {
-                            withAnimation {
-                                proxy.scrollTo(lastId, anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: isThinking) { _ in
-                        updateThinkingPhase(isActive: isThinking)
-                        if isThinking {
-                            withAnimation {
-                                proxy.scrollTo("thinking", anchor: .bottom)
-                            }
-                        }
-                    }
+                    
+                    // 底部输入区域（Legacy 版本使用萌宠对话框样式）
+                    petDialogueInputArea
                 }
             }
             .navigationTitle("\(petAI.petName)的悄悄话")
             .navigationBarTitleDisplayMode(.inline)
-            .if(!usesInlinePetSearchInput) { view in
-                view
-                    .searchable(
-                        text: $searchText,
-                        isPresented: $isSearchPresented,
-                        placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: searchPrompt
-                    )
-                    .onSubmit(of: .search) {
-                        if !searchText.isEmpty {
-                            sendMessageFromSearchBar()
-                        }
-                    }
-            }
             .navigationDestination(isPresented: $navigateToDetail) {
                 if let clothing = selectedClothing {
                     ClothingDetailView(clothing: clothing)
@@ -406,297 +250,275 @@ struct PetChatView: View {
                     }
                 }
             }
-            .overlay(alignment: .top) {
-                if !usesInlinePetSearchInput {
-                    guideSearchBarCaptureAnchor
-                }
-            }
-            .safeAreaInset(edge: .top) {
-                if usesInlinePetSearchInput {
-                    iPadSearchInputBar
-                }
-            }
             .onAppear {
                 if messages.isEmpty {
                     loadInitialGreeting()
                 }
                 presentInitialAdoptionSheetIfNeeded()
                 ensureGuideEmbeddedOptionMessageIfNeeded()
-                // 配置 AI 服务
                 configureAIService()
                 // 首次进入萌宠对话页面时，自动展开搜索栏
                 if !hasEnteredOnce {
                     hasEnteredOnce = true
-                    if usesInlinePetSearchInput {
-                        requestInlineSearchFocus()
-                    } else {
-                        withAnimation {
-                            isSearchPresented = true
-                        }
-                    }
+                    // iOS 18 以下版本不支持 isPresented，使用 searchText 触发搜索模式
+                    searchText = " "
                 }
-                DispatchQueue.main.async {
-                    broadcastFloatingPetOverlayState()
-                }
-            }
-            .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
-                ensureGuideEmbeddedOptionMessageIfNeeded()
-            }
-            .onChange(of: isSearchPresented) { oldValue, newValue in
-                // 当 iOS26 搜索栏展开/收起时，通知常用菜单禁用/启用长按交互
-                broadcastFloatingPetOverlayState()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .autoExpandPetChatSearch)) { _ in
-                if usesInlinePetSearchInput {
-                    requestInlineSearchFocus()
-                } else {
-                    withAnimation {
-                        isSearchPresented = true
-                    }
-                }
+                NotificationCenter.default.post(
+                    name: .petChatSearchStateChanged,
+                    object: nil,
+                    userInfo: ["isSearching": !searchText.isEmpty]
+                )
             }
             .onDisappear {
                 thinkingDelayWorkItem?.cancel()
                 isThinkingLongWait = false
                 purchaseToastHideWorkItem?.cancel()
                 showingPurchaseSuccessToast = false
-                broadcastFloatingPetOverlayState(false)
+                NotificationCenter.default.post(
+                    name: .petChatSearchStateChanged,
+                    object: nil,
+                    userInfo: ["isSearching": false]
+                )
+            }
+            .onChange(of: searchText) { _, newValue in
+                NotificationCenter.default.post(
+                    name: .petChatSearchStateChanged,
+                    object: nil,
+                    userInfo: ["isSearching": !newValue.isEmpty]
+                )
+            }
+            .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
+                ensureGuideEmbeddedOptionMessageIfNeeded()
             }
             .onChange(of: messages.count) { _, _ in
                 PetChatTranscriptStore.save(messages: messages)
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
-                updateKeyboardOverlap(from: notification)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                keyboardOverlap = 0
-                DispatchQueue.main.async {
-                    broadcastFloatingPetOverlayState()
-                }
-            }
-            // iOS26+ 悬浮按钮 - 使用 safeAreaInset 确保跟随键盘移动
-            .safeAreaInset(edge: .bottom) {
-                // 当搜索栏展开时显示按钮在键盘上方
-                if isSearchPresented {
-                    floatingButtonsRow
-                        .padding(.bottom, searchModeFloatingBottomPadding)
-                        .background(.clear) // 透明背景，不遮挡内容
-                }
-            }
-            // 搜索栏收起时的悬浮按钮（原位显示）
-            .overlay(alignment: .bottom) {
-                if !isSearchPresented {
-                    floatingButtonsRow
-                        .padding(.bottom, 20)
-                }
-            }
         }
     }
 
-    private var floatingButtonsRow: some View {
-        HStack {
-            iOS26LeftFloatingButton
-                .padding(.leading, 16)
-
-            Spacer()
-
-            if !usesInlinePetSearchInput {
-                iOS26RightFloatingButton
-                    .padding(.trailing, 16)
-            }
-        }
-    }
-
-    // iOS26+ 左侧悬浮菜单按钮
-    private var iOS26LeftFloatingButton: some View {
-        Menu {
-            Section("AI搭配") {
-                Button {
-                    handleOutfitSuggestion("帮我搭配一套")
-                } label: {
-                    Label("智能搭配", systemImage: "wand.and.stars")
-                }
-
+    // 萌宠对话框样式的输入区域（iOS18 版本）- 放在底部导航栏上方
+    private var petDialogueInputArea: some View {
+        VStack(spacing: 0) {
+            // 使用萌宠对话框样式
+            HStack(spacing: 12) {
+                // 左侧功能菜单按钮
                 Menu {
-                    Button {
-                        createQuickOutfit(style: "甜美", occasion: "约会")
-                    } label: {
-                        Label("甜美约会", systemImage: "heart.fill")
+                    // AI搭配菜单
+                    Menu("AI搭配") {
+                        Button {
+                            handleOutfitSuggestion("帮我搭配一套")
+                        } label: {
+                            Label("智能搭配", systemImage: "wand.and.stars")
+                        }
+
+                        Button {
+                            createQuickOutfit(style: "甜美", occasion: "约会")
+                        } label: {
+                            Label("甜美约会", systemImage: "heart")
+                        }
+
+                        Button {
+                            createQuickOutfit(style: "优雅", occasion: "茶会")
+                        } label: {
+                            Label("优雅茶会", systemImage: "cup.and.saucer")
+                        }
+
+                        Button {
+                            createQuickOutfit(style: "日常", occasion: "出门")
+                        } label: {
+                            Label("日常出门", systemImage: "bag")
+                        }
+                    }
+
+                    Menu("快捷功能") {
+                        Button {
+                            handleWardrobeStatistics()
+                        } label: {
+                            Label("统计裙子", systemImage: "chart.pie")
+                        }
+
+                        Button {
+                            handlePetStatusOverview()
+                        } label: {
+                            Label("查看萌宠状态", systemImage: "heart.text.square.fill")
+                        }
+
+                        if quickMenuOwnedPets.count > 1 {
+                            Button {
+                                handleSwitchPetIntent()
+                            } label: {
+                                Label("切换萌宠", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                        }
+
+                        if let adoptionTitle = quickMenuAdoptionTitle {
+                            Button {
+                                handleSecondPetAdoptionIntent()
+                            } label: {
+                                Label(adoptionTitle, systemImage: "plus.circle.fill")
+                            }
+                        }
+
+                        Button {
+                            handleRenamePetIntent()
+                        } label: {
+                            Label("改名", systemImage: "pencil")
+                        }
+
+                        Button {
+                            handleInventoryPanel()
+                        } label: {
+                            Label("看看我的背包", systemImage: "shippingbox.fill")
+                        }
+
+                        Button {
+                            handleShopPanel()
+                        } label: {
+                            Label("带我逛逛商店", systemImage: "cart.fill")
+                        }
+                        
+                        Button {
+                            handleWeatherOutfitGuidance()
+                        } label: {
+                            Label("查看天气穿搭", systemImage: "cloud.sun.rain.fill")
+                        }
+
+                        Button {
+                            handleDepositPlanQuery()
+                        } label: {
+                            Label("尾款提醒", systemImage: "tag")
+                        }
+                        
+                        Button {
+                            handleMoneyCounterPanel()
+                        } label: {
+                            Label("去来财数钞票", systemImage: "yensign.circle.fill")
+                        }
+
+                        Button {
+                            handleDivinationPanel()
+                        } label: {
+                            Label("今日求签", systemImage: "wand.and.stars")
+                        }
                     }
 
                     Button {
-                        createQuickOutfit(style: "优雅", occasion: "茶会")
+                        inputText = WardrobeContextManager.shared.defaultSearchPrompt(clothings: clothings)
                     } label: {
-                        Label("优雅茶会", systemImage: "cup.and.saucer.fill")
+                        Label("查找衣柜", systemImage: "magnifyingglass")
                     }
 
                     Button {
-                        createQuickOutfit(style: "日常", occasion: "出门")
+                        showingHistorySearch = true
                     } label: {
-                        Label("日常出门", systemImage: "bag.fill")
+                        Label("历史消息查询", systemImage: "clock.arrow.circlepath")
                     }
                 } label: {
-                    Label("快速搭配", systemImage: "sparkles")
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.pink)
                 }
-            }
-
-            Menu {
-                Button {
-                    handleWardrobeStatistics()
-                } label: {
-                    Label("统计裙子", systemImage: "chart.pie.fill")
-                }
-
-                Button {
-                    handlePetStatusOverview()
-                } label: {
-                    Label("查看萌宠状态", systemImage: "heart.text.square.fill")
-                }
-
-                if quickMenuOwnedPets.count > 1 {
-                    Button {
-                        handleSwitchPetIntent()
-                    } label: {
-                        Label("切换萌宠", systemImage: "arrow.triangle.2.circlepath")
+                
+                // 中间输入框（萌宠对话框样式）
+                ZStack(alignment: .leading) {
+                    if inputText.isEmpty {
+                        Text(inputPlaceholder)
+                            .foregroundStyle(.gray.opacity(0.6))
+                            .padding(.horizontal, 16)
                     }
+                    
+                    TextField("", text: $inputText)
+                        .font(.system(size: 17))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                 }
-
-                if let adoptionTitle = quickMenuAdoptionTitle {
-                    Button {
-                        handleSecondPetAdoptionIntent()
-                    } label: {
-                        Label(adoptionTitle, systemImage: "plus.circle.fill")
-                    }
-                }
-
-                Button {
-                    handleRenamePetIntent()
-                } label: {
-                    Label("改名", systemImage: "pencil")
-                }
-
-                Button {
-                    handleInventoryPanel()
-                } label: {
-                    Label("看看我的背包", systemImage: "shippingbox.fill")
-                }
-
-                Button {
-                    handleShopPanel()
-                } label: {
-                    Label("带我逛逛商店", systemImage: "cart.fill")
-                }
-
-                Button {
-                    handleWeatherOutfitGuidance()
-                } label: {
-                    Label("查看天气穿搭", systemImage: "cloud.sun.rain.fill")
-                }
-
-                Button {
-                    handleDepositPlanQuery()
-                } label: {
-                    Label("尾款提醒", systemImage: "tag.fill")
-                }
-
-                Button {
-                    handleMoneyCounterPanel()
-                } label: {
-                    Label("去来财数钞票", systemImage: "yensign.circle.fill")
-                }
-
-                Button {
-                    handleDivinationPanel()
-                } label: {
-                    Label("今日求签", systemImage: "wand.and.stars")
-                }
-            } label: {
-                Label("快捷功能", systemImage: "sparkles")
-            }
-
-            Section("查找") {
-                Button {
-                    searchText = WardrobeContextManager.shared.defaultSearchPrompt(clothings: clothings)
-                } label: {
-                    Label("查找衣柜", systemImage: "magnifyingglass")
-                }
-
-                Button {
-                    showingHistorySearch = true
-                } label: {
-                    Label("历史消息查询", systemImage: "clock.arrow.circlepath")
-                }
-            }
-
-            Section("其他") {
-                Button {
-                    handleDivinationPanel()
-                } label: {
-                    Label("今日运势", systemImage: "star.fill")
-                }
-            }
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 24))
-                .foregroundStyle(.pink)
-                .frame(width: 50, height: 50)
-                .background(
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                .background(Color(.systemBackground))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
                 )
-        }
-    }
-
-    // iOS26+ 右侧悬浮发送按钮
-    private var iOS26RightFloatingButton: some View {
-        Button {
-            if !searchText.isEmpty {
-                sendMessageFromSearchBar()
+                
+                // 右侧发送按钮（猫爪样式）
+                Button {
+                    if !inputText.isEmpty {
+                        sendMessageFromInput()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "FFC0CB"), Color(hex: "FFB6C1")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: Color(hex: "FF69B4").opacity(0.3), radius: 2, x: 0, y: 2)
+                        
+                        Image(systemName: "pawprint.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                    }
+                    .frame(width: 44, height: 44)
+                }
+                .disabled(inputText.isEmpty)
+                .opacity(inputText.isEmpty ? 0.5 : 1.0)
             }
-        } label: {
-            Text("发送")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(searchText.isEmpty ? .gray.opacity(0.5) : .pink)
-                .frame(width: 50, height: 50)
-                .background(
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-                )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .disabled(searchText.isEmpty)
+        .background(
+            ZStack {
+                // 主体气泡背景
+                RoundedRectangle(cornerRadius: 30)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "FFD1DC"), Color(hex: "FFC0CB")],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
+                
+                // 气泡尾巴（左下角）
+                GeometryReader { geo in
+                    Path { path in
+                        path.move(to: CGPoint(x: 30, y: geo.size.height - 25))
+                        path.addLine(to: CGPoint(x: 18, y: geo.size.height + 6))
+                        path.addLine(to: CGPoint(x: 50, y: geo.size.height - 15))
+                        path.closeSubpath()
+                    }
+                    .fill(Color(hex: "FFC0CB"))
+                }
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 30)
+                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+        )
+        // 添加底部安全区域间距，避免与底部导航栏重叠
+        .padding(.bottom, 80)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
-
+    
+    
     // 从底部输入框发送消息 - 等同于 PetDialogueInputView 的功能
     private func sendMessageFromInput() {
         let userText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty else { return }
-
+        
         // 清空输入框
         inputText = ""
-
+        
         // 添加用户消息到对话
         let userMessage = PetChatMessage(text: userText, isUser: true)
         messages.append(userMessage)
-
+        
         // 处理用户意图
         processUserIntent(userText)
-    }
-
-    private func updateKeyboardOverlap(from notification: Notification) {
-        guard
-            let userInfo = notification.userInfo,
-            let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
-        else {
-            return
-        }
-
-        let screenHeight = UIScreen.main.bounds.height
-        keyboardOverlap = max(0, screenHeight - endFrame.minY)
-        DispatchQueue.main.async {
-            broadcastFloatingPetOverlayState()
-        }
     }
 
     private func reuseHistoryQuery(_ query: String) {
@@ -708,89 +530,6 @@ struct PetChatView: View {
         processUserIntent(userText)
     }
 
-    private func requestInlineSearchFocus() {
-        guard usesInlinePetSearchInput else { return }
-        iPadSearchFocusRequestID += 1
-    }
-
-    private var shouldHideFloatingPetOverlay: Bool {
-        keyboardOverlap > 0 || (usesInlinePetSearchInput && isSearchPresented)
-    }
-
-    private func broadcastFloatingPetOverlayState(_ isHidden: Bool? = nil) {
-        NotificationCenter.default.post(
-            name: .petChatSearchStateChanged,
-            object: nil,
-            userInfo: ["isSearching": isHidden ?? shouldHideFloatingPetOverlay]
-        )
-    }
-
-    private func handleInlineSearchFocusChange(_ isFocused: Bool) {
-        guard usesInlinePetSearchInput, isSearchPresented != isFocused else { return }
-        withAnimation {
-            isSearchPresented = isFocused
-        }
-    }
-
-    // 从搜索栏发送消息 - 等同于 PetDialogueInputView 的功能
-    private func sendMessageFromSearchBar() {
-        let userText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !userText.isEmpty else { return }
-
-        // 清空搜索栏
-        searchText = ""
-
-        // 添加用户消息到对话
-        let userMessage = PetChatMessage(text: userText, isUser: true)
-        messages.append(userMessage)
-
-        // 处理用户意图（和底部输入框一样的逻辑）
-        processUserIntent(userText)
-    }
-
-    // 处理来自搜索栏的搜索（菜单中的搜索功能）
-    private func handleSearchFromSearchBar(_ query: String) {
-        // 添加用户搜索消息
-        let userMessage = PetChatMessage(text: "\(query)", isUser: true)
-        messages.append(userMessage)
-
-        isThinking = true
-        let resolution = WardrobeContextManager.shared.resolveSearch(query: query, clothings: clothings)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            isThinking = false
-            
-            let responseText: String
-            if resolution.results.isEmpty {
-                if resolution.normalizedQuery.isEmpty {
-                    responseText = localizedCatchphraseText("我已经先学了你衣橱里的标签和类型啦～你可以直接试试这句：\(resolution.suggestedPrompt)")
-                } else {
-                    let learnedTerms = resolution.matchedTerms.joined(separator: "、")
-                    responseText = localizedCatchphraseText(
-                        learnedTerms.isEmpty
-                        ? "喵… 还没找到完全对得上的叫法呢。你可以试试这样问我：\(resolution.suggestedPrompt)"
-                        : "喵… 还没找到完全同名的，但我学到你衣橱里常用这些词：\(learnedTerms)。你可以试试这样问我：\(resolution.suggestedPrompt)"
-                    )
-                }
-            } else {
-                let termSuffix = resolution.matchedTerms.isEmpty ? "" : "，我还顺着你常用的词「\(resolution.matchedTerms.joined(separator: "、"))」一起找了"
-                responseText = "（眼睛发亮）找到\(resolution.results.count)件相关的单品\(termSuffix)，主人快看看~"
-            }
-            
-            let message = PetChatMessage(
-                text: responseText,
-                isUser: false,
-                type: .searchResults,
-                searchResults: resolution.results.isEmpty ? nil : resolution.results
-            )
-            messages.append(message)
-            
-            // 清空搜索栏
-            searchText = ""
-        }
-    }
-
-    // 配置AI服务 - 根据当前选中的宠物使用对应的AI角色
     private func configureAIService() {
         let wardrobeContext = WardrobeContextManager.shared.generateWardrobeSummary(
             clothings: clothings,
@@ -804,140 +543,24 @@ struct PetChatView: View {
             wardrobeContext: wardrobeContext
         )
     }
-
-    // 加载初始问候
+    
     private func loadInitialGreeting() {
         let localTranscript = PetChatTranscriptStore.load()
         if !localTranscript.isEmpty {
-            initialHistoryMessageIDs = Set(localTranscript.map(\.id))
             messages = localTranscript
             return
         }
 
+        let greeting = greetingManager.getGreetingTitle()
+        // 根据当前宠物使用对应的问候语和用户起的宠物名字
+        let petDisplayName = PetDataManager.shared.status.displayName // 使用用户起的宠物名字
         let onboardingWidgets = onboardingWidgetsForCurrentPetState()
         let welcomeMessage = PetChatMessage(
-            text: reusableWelcomeText(),
+            text: "\(greeting)\(currentCharacter.catchphraseSuffix) 我是你的衣橱管家\(petDisplayName)，有什么可以帮你的吗？",
             isUser: false,
             widgets: onboardingWidgets
         )
         messages.append(welcomeMessage)
-    }
-
-    private var historyUnlockIndicator: some View {
-        let progress = min(max(historyUnlockProgress, 0), 1)
-
-        return HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .stroke(Color.pink.opacity(0.2), lineWidth: 3)
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(Color.pink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-
-                Text("\(Int(progress * 100))%")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.pink)
-            }
-            .frame(width: 34, height: 34)
-
-            Text(localizedCatchphraseText(progress >= 1 ? "松手就给你翻旧日记喵~" : "再下拉一点就能看喵~"))
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.92))
-        .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
-    }
-
-    private var lockedHistoryTopHint: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.caption)
-                .foregroundStyle(.pink.opacity(0.85))
-            Text(localizedCatchphraseText("下拉或者点这里，我就把旧日记翻给你看喵~"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.9))
-        .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
-    }
-
-    private func handleHistoryUnlockScrollOffset(_ minY: CGFloat) {
-        isChatScrollPinnedToTop = minY >= -8
-
-        guard hasLockedHistory else {
-            resetHistoryUnlockHintIfNeeded(animated: false)
-            return
-        }
-
-        let overscroll = max(0, minY)
-        let progress = min(overscroll / historyUnlockThreshold, 1)
-
-        if progress >= 1 {
-            unlockHistory()
-            return
-        }
-
-        historyUnlockProgress = progress
-        showingHistoryUnlockHint = overscroll > 8 && isChatScrollPinnedToTop
-
-        if overscroll <= 0 {
-            resetHistoryUnlockHintIfNeeded(animated: true)
-        }
-    }
-
-    private func handleHistoryUnlockDragChanged(_ value: DragGesture.Value) {
-        guard hasLockedHistory, isChatScrollPinnedToTop else { return }
-
-        let pullDistance = max(0, value.translation.height)
-        guard pullDistance > 0 else { return }
-
-        let progress = min(pullDistance / historyUnlockThreshold, 1)
-        historyUnlockProgress = max(historyUnlockProgress, progress)
-        showingHistoryUnlockHint = true
-    }
-
-    private func handleHistoryUnlockDragEnded(_ value: DragGesture.Value) {
-        guard hasLockedHistory else { return }
-
-        let pullDistance = max(0, value.translation.height)
-        let progress = max(historyUnlockProgress, min(pullDistance / historyUnlockThreshold, 1))
-
-        if progress >= 1 {
-            unlockHistory()
-        } else {
-            resetHistoryUnlockHintIfNeeded(animated: true)
-        }
-    }
-
-    private func resetHistoryUnlockHintIfNeeded(animated: Bool) {
-        guard historyUnlockProgress > 0 || showingHistoryUnlockHint else { return }
-
-        let reset = {
-            historyUnlockProgress = 0
-            showingHistoryUnlockHint = false
-        }
-
-        if animated {
-            withAnimation(.easeOut(duration: 0.2)) {
-                reset()
-            }
-        } else {
-            reset()
-        }
-    }
-
-    private func unlockHistory() {
-        isHistoryUnlocked = true
-        showingHistoryUnlockHint = false
-        historyUnlockProgress = 0
-        initialHistoryMessageIDs.removeAll(keepingCapacity: false)
     }
 
     private func onboardingWidgetsForCurrentPetState() -> [PetWidgetData] {
@@ -985,23 +608,151 @@ struct PetChatView: View {
             )
         )
     }
-
-    // 发送消息
+    
     private func sendMessage() {
         let userText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty else { return }
-
+        
         inputText = ""
-
-        // 添加用户消息
+        
         let userMessage = PetChatMessage(text: userText, isUser: true)
         messages.append(userMessage)
-
-        // 处理用户意图
+        
         processUserIntent(userText)
     }
 
-    // 处理用户意图
+    // 创建消息气泡视图（Legacy版本）
+    private func legacyMessageBubble(for message: PetChatMessage) -> some View {
+        PetChatBubble(
+            message: message,
+            petName: petAI.petName,
+            onCardTap: legacyHandleClothingTap,
+            onSearchResultTap: legacyHandleClothingTap,
+            onOutfitTap: legacyHandleOutfitTap,
+            onWidgetAction: legacyHandleWidgetAction
+        )
+        .id(message.id)
+    }
+
+    // 处理服装点击（Legacy版本）
+    private func legacyHandleClothingTap(_ clothing: Clothing) {
+        selectedClothing = clothing
+        navigateToDetail = true
+    }
+
+    // 处理搭配建议点击（Legacy版本）- 直接保存到默认手帐
+    private func legacyHandleOutfitTap(_ suggestion: OutfitSuggestionData) {
+        guard !isSavingOutfit else { return }
+        
+        selectedOutfitClothings = suggestion.clothings
+        
+        // 直接执行保存流程
+        Task {
+            await legacySaveOutfitToDefaultBook(clothings: suggestion.clothings)
+        }
+    }
+    
+    // MARK: - Legacy版本保存搭配到默认手帐
+    private func legacySaveOutfitToDefaultBook(clothings: [Clothing]) async {
+        await MainActor.run {
+            isSavingOutfit = true
+        }
+        
+        do {
+            // 获取所有抠图
+            let allCutouts = try modelContext.fetch(FetchDescriptor<CutoutItem>())
+            
+            // 查找推荐裙装的抠图（带路径/哈希兜底）
+            let resolved = OOTDCutoutResolver.resolveCutouts(for: clothings, from: allCutouts)
+            let availableCutouts = resolved.found
+            try? modelContext.save()
+            
+            // 至少需要2个抠图才能生成搭配
+            guard availableCutouts.count >= 2 else {
+                await MainActor.run {
+                    isSavingOutfit = false
+                    let missingNames = resolved.missing.map(\.name).joined(separator: "、")
+                    let detail = missingNames.isEmpty ? "" : "\n缺少抠图：\(missingNames)"
+                    // 显示错误消息
+                    let errorMessage = PetChatMessage(
+                        text: localizedCatchphraseText("（歪头）至少需要2件单品的抠图才能生成搭配喵~\(detail)"),
+                        isUser: false
+                    )
+                    messages.append(errorMessage)
+                }
+                return
+            }
+            
+            // 生成搭配布局
+            let outfit = OOTDLayoutEngine.shared.createOutfitWithLayout(
+                cutouts: availableCutouts,
+                book: nil,
+                description: "AI搭配推荐"
+            )
+            
+            // 获取或创建默认手帐
+            let book = try await legacyGetOrCreateDefaultBook()
+            
+            // 保存到数据库
+            await MainActor.run {
+                outfit.book = book
+                modelContext.insert(outfit)
+                if let items = outfit.items {
+                    for item in items {
+                        modelContext.insert(item)
+                    }
+                }
+                try? modelContext.save()
+                
+                // 显示成功提示
+                isSavingOutfit = false
+                selectedOutfitClothings = []
+                
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                    showingSaveSuccessToast = true
+                }
+                
+                // 播放成功音效和震动
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                
+                // 3秒后自动关闭提示
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        showingSaveSuccessToast = false
+                    }
+                }
+            }
+            
+        } catch {
+            await MainActor.run {
+                isSavingOutfit = false
+                let errorMessage = PetChatMessage(
+                    text: "（挠头）保存搭配失败了：\(error.localizedDescription)",
+                    isUser: false
+                )
+                messages.append(errorMessage)
+            }
+        }
+    }
+    
+    // MARK: - Legacy版本获取或创建默认手帐
+    private func legacyGetOrCreateDefaultBook() async throws -> BookGroup {
+        try await MainActor.run {
+            let allBooks = try modelContext.fetch(FetchDescriptor<BookGroup>())
+            
+            if let existingBook = allBooks.first(where: { $0.title == "默认手帐" && $0.deletedAt == nil }) {
+                return existingBook
+            }
+            
+            // 创建默认手帐
+            let newBook = BookGroup(title: "默认手帐")
+            modelContext.insert(newBook)
+            try modelContext.save()
+            return newBook
+        }
+    }
+
     private func processUserIntent(_ text: String) {
         if handleDirectPetSwitchMention(text) {
             return
@@ -1479,55 +1230,6 @@ struct PetChatView: View {
         )
     }
 
-    private func handleRenamePetIntent() {
-        var status = PetDataManager.shared.status
-        guard !status.ownedPetIds.isEmpty, status.selectedPetId != nil else {
-            messages.append(PetChatMessage(text: "先领养一个萌宠，再来改名喔～", isUser: false, isAIGenerated: true))
-            return
-        }
-
-        if (status.inventory["renameCard"] ?? 0) <= 0 {
-            let renameCost = PetConfigManager.shared.getItem(byId: "renameCard")?.price ?? 10
-            guard status.meowCoin >= renameCost else {
-                showingMeowCoinStore = true
-                messages.append(PetChatMessage(text: "改名项圈需要 \(renameCost) 喵币，你现在喵币不够，先带你去 Apple 原生充值～", isUser: false, isAIGenerated: true))
-                return
-            }
-
-            status.meowCoin -= renameCost
-            status.inventory["renameCard", default: 0] += 1
-            PetDataManager.shared.saveStatus(status)
-            messages.append(PetChatMessage(text: "已帮你买好改名项圈，来起个新名字吧～", isUser: false, isAIGenerated: true))
-        }
-
-        renameInputText = status.displayName
-        showingRenameAlert = true
-    }
-
-    private func commitPetRename() {
-        let trimmed = renameInputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        var status = PetDataManager.shared.status
-        guard let selectedPetId = status.selectedPetId else { return }
-        guard (status.inventory["renameCard"] ?? 0) > 0 else {
-            handleRenamePetIntent()
-            return
-        }
-
-        let cleanName = trimmed
-            .replacingOccurrences(of: "\"", with: "")
-            .replacingOccurrences(of: "“", with: "")
-            .replacingOccurrences(of: "”", with: "")
-
-        status.inventory["renameCard", default: 0] -= 1
-        status.petNames[selectedPetId] = cleanName
-        PetDataManager.shared.saveStatus(status)
-        configureAIService()
-
-        messages.append(PetChatMessage(text: "改名成功！我现在叫「\(cleanName)」～", isUser: false, isAIGenerated: true))
-    }
-
     private func handleMeowCoinTopUpIntent() {
         let widget = PetWidgetData(
             type: .quickOptions,
@@ -1591,7 +1293,56 @@ struct PetChatView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: hideWorkItem)
     }
 
-    private func handleWidgetAction(_ option: PetWidgetOption, messageID: UUID) {
+    private func handleRenamePetIntent() {
+        var status = PetDataManager.shared.status
+        guard !status.ownedPetIds.isEmpty, status.selectedPetId != nil else {
+            messages.append(PetChatMessage(text: "先领养一个萌宠，再来改名喔～", isUser: false, isAIGenerated: true))
+            return
+        }
+
+        if (status.inventory["renameCard"] ?? 0) <= 0 {
+            let renameCost = PetConfigManager.shared.getItem(byId: "renameCard")?.price ?? 10
+            guard status.meowCoin >= renameCost else {
+                showingMeowCoinStore = true
+                messages.append(PetChatMessage(text: "改名项圈需要 \(renameCost) 喵币，你现在喵币不够，先带你去 Apple 原生充值～", isUser: false, isAIGenerated: true))
+                return
+            }
+
+            status.meowCoin -= renameCost
+            status.inventory["renameCard", default: 0] += 1
+            PetDataManager.shared.saveStatus(status)
+            messages.append(PetChatMessage(text: "已帮你买好改名项圈，来起个新名字吧～", isUser: false, isAIGenerated: true))
+        }
+
+        renameInputText = status.displayName
+        showingRenameAlert = true
+    }
+
+    private func commitPetRename() {
+        let trimmed = renameInputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        var status = PetDataManager.shared.status
+        guard let selectedPetId = status.selectedPetId else { return }
+        guard (status.inventory["renameCard"] ?? 0) > 0 else {
+            handleRenamePetIntent()
+            return
+        }
+
+        let cleanName = trimmed
+            .replacingOccurrences(of: "\"", with: "")
+            .replacingOccurrences(of: "“", with: "")
+            .replacingOccurrences(of: "”", with: "")
+
+        status.inventory["renameCard", default: 0] -= 1
+        status.petNames[selectedPetId] = cleanName
+        PetDataManager.shared.saveStatus(status)
+        configureAIService()
+
+        messages.append(PetChatMessage(text: "改名成功！我现在叫「\(cleanName)」～", isUser: false, isAIGenerated: true))
+    }
+
+    private func legacyHandleWidgetAction(_ option: PetWidgetOption, messageID: UUID) {
         if handleInlineYarnBallShortcut(option, messageID: messageID) {
             return
         }
@@ -1819,151 +1570,16 @@ struct PetChatView: View {
         return true
     }
 
-    // 创建消息气泡视图
-    private func messageBubble(for message: PetChatMessage) -> some View {
-        PetChatBubble(
-            message: message,
-            petName: petAI.petName,
-            onCardTap: handleClothingTap,
-            onSearchResultTap: handleClothingTap,
-            onOutfitTap: handleOutfitTap,
-            onWidgetAction: handleWidgetAction
-        )
-        .id(message.id)
-    }
-
-    // 处理服装点击
-    private func handleClothingTap(_ clothing: Clothing) {
-        selectedClothing = clothing
-        navigateToDetail = true
-    }
-
-    // 处理搭配建议点击 - 直接保存到默认手帐
-    private func handleOutfitTap(_ suggestion: OutfitSuggestionData) {
-        guard !isSavingOutfit else { return }
-
-        // 设置要展示的搭配裙装列表
-        selectedOutfitClothings = suggestion.clothings
-
-        // 直接执行保存流程
-        Task {
-            await saveOutfitToDefaultBook(clothings: suggestion.clothings)
-        }
-    }
-
-    // MARK: - 保存搭配到默认手帐
-    private func saveOutfitToDefaultBook(clothings: [Clothing]) async {
-        await MainActor.run {
-            isSavingOutfit = true
-        }
-
-        do {
-            // 获取所有抠图
-            let allCutouts = try modelContext.fetch(FetchDescriptor<CutoutItem>())
-
-            // 查找推荐裙装的抠图（带路径/哈希兜底）
-            let resolved = OOTDCutoutResolver.resolveCutouts(for: clothings, from: allCutouts)
-            let availableCutouts = resolved.found
-            try? modelContext.save()
-
-            // 至少需要2个抠图才能生成搭配
-            guard availableCutouts.count >= 2 else {
-                await MainActor.run {
-                    isSavingOutfit = false
-                    let missingNames = resolved.missing.map(\.name).joined(separator: "、")
-                    let detail = missingNames.isEmpty ? "" : "\n缺少抠图：\(missingNames)"
-                    // 显示错误消息
-                    let errorMessage = PetChatMessage(
-                        text: localizedCatchphraseText("（歪头）至少需要2件单品的抠图才能生成搭配喵~\(detail)"),
-                        isUser: false
-                    )
-                    messages.append(errorMessage)
-                }
-                return
-            }
-
-            // 生成搭配布局
-            let outfit = OOTDLayoutEngine.shared.createOutfitWithLayout(
-                cutouts: availableCutouts,
-                book: nil,
-                description: "AI搭配推荐"
-            )
-
-            // 获取或创建默认手帐
-            let book = try await getOrCreateDefaultBook()
-
-            // 保存到数据库
-            await MainActor.run {
-                outfit.book = book
-                modelContext.insert(outfit)
-                if let items = outfit.items {
-                    for item in items {
-                        modelContext.insert(item)
-                    }
-                }
-                try? modelContext.save()
-
-                // 显示成功提示
-                isSavingOutfit = false
-                selectedOutfitClothings = []
-
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                    showingSaveSuccessToast = true
-                }
-
-                // 播放成功音效和震动
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
-
-                // 3秒后自动关闭提示
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showingSaveSuccessToast = false
-                    }
-                }
-            }
-
-        } catch {
-            await MainActor.run {
-                isSavingOutfit = false
-                let errorMessage = PetChatMessage(
-                    text: "（挠头）保存搭配失败了：\(error.localizedDescription)",
-                    isUser: false
-                )
-                messages.append(errorMessage)
-            }
-        }
-    }
-
-    // MARK: - 获取或创建默认手帐
-    private func getOrCreateDefaultBook() async throws -> BookGroup {
-        try await MainActor.run {
-            let allBooks = try modelContext.fetch(FetchDescriptor<BookGroup>())
-
-            if let existingBook = allBooks.first(where: { $0.title == "默认手帐" && $0.deletedAt == nil }) {
-                return existingBook
-            }
-
-            // 创建默认手帐
-            let newBook = BookGroup(title: "默认手帐")
-            modelContext.insert(newBook)
-            try modelContext.save()
-            return newBook
-        }
-    }
-
-    // 处理衣橱统计
     private func handleWardrobeStatistics() {
         isThinking = true
 
-        // 计算统计数据
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
         let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
         let mostExpensiveItem = clothings.max(by: { $0.inventoryTotalPrice < $1.inventoryTotalPrice })
         let depositPlans = clothings.filter { $0.isDepositPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
-
+        
         let stats = WardrobeStats(
             totalCount: totalCount,
             totalValue: totalValue,
@@ -1972,18 +1588,17 @@ struct PetChatView: View {
             totalDeposit: totalDeposit,
             totalBalance: totalBalance
         )
-
-        // 模拟思考延迟
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             isThinking = false
-
+            
             let responseText: String
             if totalCount == 0 {
                 responseText = localizedCatchphraseText("喵？你的衣橱还是空的耶，快去添加几件漂亮裙子吧~")
             } else {
                 responseText = "（翻看着小账本）主人，你的衣橱里有\(totalCount)件宝贝，总价值\(NSDecimalNumber(decimal: totalValue).stringValue)元呢！"
             }
-
+            
             let message = PetChatMessage(
                 text: responseText,
                 isUser: false,
@@ -1993,12 +1608,10 @@ struct PetChatView: View {
             messages.append(message)
         }
     }
-
-    // 处理搭配色推荐
+    
     private func handleColorMatch() {
         isThinking = true
-
-        // 根据衣橱颜色分布生成推荐
+        
         let colorRecommendations = [
             ColorRecommendation(
                 primaryColor: "粉色",
@@ -2022,12 +1635,12 @@ struct PetChatView: View {
                 reasoning: "紫色与黑色的搭配神秘又高贵，金色点缀更显华丽~"
             )
         ]
-
+        
         let randomRec = colorRecommendations.randomElement()!
-
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             isThinking = false
-
+            
             let message = PetChatMessage(
                 text: "（歪头思考）主人今天想走什么风格呢？我给你搭配了一套~",
                 isUser: false,
@@ -2037,16 +1650,14 @@ struct PetChatView: View {
             messages.append(message)
         }
     }
-
-    // 处理搜索
+    
     private func handleSearch(_ query: String) {
         isThinking = true
-
         let resolution = WardrobeContextManager.shared.resolveSearch(query: query, clothings: clothings)
-
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             isThinking = false
-
+            
             let responseText: String
             if resolution.results.isEmpty {
                 if resolution.normalizedQuery.isEmpty {
@@ -2063,7 +1674,7 @@ struct PetChatView: View {
                 let termSuffix = resolution.matchedTerms.isEmpty ? "" : "，还顺着你常用的词「\(resolution.matchedTerms.joined(separator: "、"))」一起找了"
                 responseText = "（眼睛发亮）找到\(resolution.results.count)件相关的单品\(termSuffix)，主人快看看~"
             }
-
+            
             let message = PetChatMessage(
                 text: responseText,
                 isUser: false,
@@ -2073,28 +1684,27 @@ struct PetChatView: View {
             messages.append(message)
         }
     }
-
-    // 处理尾款查询
+    
     private func handleDepositPlanQuery() {
         isThinking = true
-
+        
         // 计算完整的衣橱统计数据
         let totalCount = clothings.reduce(0) { $0 + $1.stock }
         let totalValue = clothings.reduce(Decimal(0)) { $0 + $1.inventoryTotalPrice }
         let depositPlans = clothings.filter { $0.isDepositPlan }
         let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
         let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
-
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             isThinking = false
-
+            
             let responseText: String
             if depositPlans.isEmpty {
                 responseText = localizedCatchphraseText("喵~ 目前没有待补款的裙子呢，主人的钱包可以休息一下啦！")
             } else {
                 responseText = localizedCatchphraseText("（认真脸）主人还有\(depositPlans.count)款裙子要补尾款，一共要准备\(NSDecimalNumber(decimal: totalBalance).stringValue)元喵~")
             }
-
+            
             let stats = WardrobeStats(
                 totalCount: totalCount,
                 totalValue: totalValue,
@@ -2103,7 +1713,7 @@ struct PetChatView: View {
                 totalDeposit: totalDeposit,
                 totalBalance: totalBalance
             )
-
+            
             let message = PetChatMessage(
                 text: responseText,
                 isUser: false,
@@ -2119,9 +1729,9 @@ struct PetChatView: View {
         let text: String
         if let suggestion = latestRecentOutfitSuggestion(in: messages, dialogueTurns: 2),
            let summary = buildOutfitPriceSummary(clothings: suggestion.clothings) {
-            text = "（翻出刚刚的推荐清单）\(summary)～要不要我按这个预算再给你一套同风格的？"
+            text = "（翻出刚刚的推荐清单）\(summary)～你要我顺便按这个价位再补一套吗？"
         } else if let summary = PetConversationMemoryStore.shared.latestOutfitPriceSummary(for: role) {
-            text = "（翻出小账本）\(summary)～要不要我按这个预算再给你一套同风格的？"
+            text = "（翻出小账本）\(summary)～你要我顺便按这个价位再补一套吗？"
         } else {
             text = localizedCatchphraseText("（挠挠耳朵）我这边还没记到最近一套搭配价格喵，先让我给你搭一套，再帮你精确算总价吧。")
         }
@@ -2132,11 +1742,11 @@ struct PetChatView: View {
         )
         messages.append(message)
     }
-
+    
     private func handleWeatherOutfitGuidance() {
         isThinking = true
         let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(from: clothings)
-
+        
         Task { @MainActor in
             let weather = await fetchCurrentWeather()
             let responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
@@ -2154,12 +1764,12 @@ struct PetChatView: View {
             messages.append(message)
         }
     }
-
+    
     @MainActor
     private func fetchCurrentWeather() async -> WeatherData? {
         let locationService = LocationService.shared
         let weatherService = WeatherService.shared
-
+        
         if let location = await locationService.getCurrentLocation() {
             let cityInfo = await locationService.reverseGeocode(location)
             let city = cityInfo?.city ?? locationService.currentCity
@@ -2169,12 +1779,12 @@ struct PetChatView: View {
                 city: city == "未知城市" ? "当前位置" : city
             )
         }
-
+        
         let cachedCity = locationService.currentCity
         if cachedCity != "未知城市" {
             return await weatherService.fetchWeatherForCity(cachedCity)
         }
-
+        
         return nil
     }
 
@@ -2197,7 +1807,7 @@ struct PetChatView: View {
             )
         )
     }
-
+    
     private func navigateToWealthCounting() {
         let message = PetChatMessage(
             text: "走吧，我们去「来财」数钞票放松一下～",
@@ -2207,8 +1817,7 @@ struct PetChatView: View {
         // 直接跳转到来财的数钱页签
         TabNavigationManager.shared.navigate(to: .smallWorld(.wealth(.moneyCounting)))
     }
-
-    // 处理AI对话
+    
     private func handleAIChat(_ text: String) {
         isThinking = true
 
@@ -2261,14 +1870,15 @@ struct PetChatView: View {
         }
     }
 
-    // MARK: - 搭配建议处理
+    // MARK: - 搭配建议处理（Legacy版本）
 
     /// 处理搭配建议请求
     private func handleOutfitSuggestion(_ text: String) {
-        // 检查是否有足够的裙装
-        guard clothings.count >= 2 else {
+        // 检查是否有足够的抠图
+        let availableCount = OutfitSuggestionService.shared.availableCutoutCount(context: modelContext)
+        guard availableCount >= 2 else {
             let message = PetChatMessage(
-                text: localizedCatchphraseText("（歪头）主人衣橱里的裙子还不够呢，至少需要2件单品才能搭配喵~"),
+                text: localizedCatchphraseText("（歪头）主人衣橱里的抠图还不够呢，至少需要2件单品才能搭配喵~ 快去生成一些抠图吧！"),
                 isUser: false
             )
             messages.append(message)
@@ -2279,7 +1889,7 @@ struct PetChatView: View {
 
         Task {
             do {
-                // 添加超时机制，防止卡住
+                // 添加超时机制
                 let (selectedClothings, responseText, style, occasion) = try await withTimeout(seconds: 30) {
                     try await OutfitSuggestionService.shared.processOutfitRequest(
                         query: text,
@@ -2315,7 +1925,7 @@ struct PetChatView: View {
                 await MainActor.run {
                     isThinking = false
                     let message = PetChatMessage(
-                        text: localizedCatchphraseText("（蹭蹭你）我刚刚卡壳了喵…可以试试切稳定网络、把需求说短一点（场景+风格），或者等半分钟再试，我会继续陪你慢慢挑~"),
+                        text: localizedCatchphraseText("（抱住你）我刚刚想太久啦喵…你可以先给我“场景+风格”短句，或换稳定网络再试一次，我会乖乖继续帮你配~"),
                         isUser: false
                     )
                     messages.append(message)
@@ -2387,7 +1997,7 @@ struct PetChatView: View {
                 await MainActor.run {
                     isThinking = false
                     let message = PetChatMessage(
-                        text: localizedCatchphraseText("（蹭蹭你）我刚刚卡壳了喵…可以试试切稳定网络、把需求说短一点（场景+风格），或者等半分钟再试，我会继续陪你慢慢挑~"),
+                        text: localizedCatchphraseText("（抱住你）我刚刚想太久啦喵…你可以先给我“场景+风格”短句，或换稳定网络再试一次，我会乖乖继续帮你配~"),
                         isUser: false
                     )
                     messages.append(message)
@@ -2403,13 +2013,5 @@ struct PetChatView: View {
                 }
             }
         }
-    }
-}
-
-private struct PetChatScrollTopOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }

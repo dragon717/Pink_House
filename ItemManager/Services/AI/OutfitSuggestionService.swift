@@ -19,6 +19,14 @@ class OutfitSuggestionService {
 
     private init() {}
 
+    private var currentCharacter: PetCharacter {
+        PetDataManager.shared.getCurrentPetCharacter()
+    }
+
+    private func localizedCatchphraseText(_ text: String) -> String {
+        currentCharacter.localizedCatchphraseText(text)
+    }
+
     // MARK: - 主要流程
 
     /// 处理用户的搭配请求
@@ -167,8 +175,11 @@ class OutfitSuggestionService {
 
     /// 构建搭配专用Prompt
     private func buildOutfitPrompt(query: String, wardrobeSummary: String, candidatesJSON: String) -> String {
+        let roleDescription = currentCharacter == .maomao ? "热情贴心的金毛搭配助手" : "会撒娇的小橘猫搭配闺蜜"
+        let catchphraseRequirement = currentCharacter == .maomao ? "带汪~" : "带喵~"
+        let roleStyleRequirement = currentCharacter == .maomao ? "描述要符合金毛狗狗角色（带汪~，用括号表示动作）" : "描述要符合小橘猫角色（带喵~，用括号表示动作）"
         return """
-        你是主人的专业Lo裙搭配师，精通Lolita时尚穿搭。
+        你是主人的专业Lo裙搭配师，精通Lolita时尚穿搭，是一个\(roleDescription)。
 
         用户需求：\(query)
 
@@ -183,10 +194,12 @@ class OutfitSuggestionService {
         2. 考虑场合适配性
         3. 优先选择JSK/OP作为主体
         4. 搭配理由要像闺蜜一样亲切自然
+        5. 优先学习并复用用户衣橱里真实存在的标签、类型和备注词汇，不要硬造“开衫外套上衣”这类用户未使用的类目词
+        6. 如果用户说的是泛类目（例如上衣/外套），请优先从候选单品的标签、类型、备注里找对应叫法，再做推荐
 
         请严格按以下JSON格式返回（不要包含其他内容）：
         {
-          "description": "搭配描述（30字以内，带喵~）",
+          "description": "搭配描述（30字以内，\(catchphraseRequirement)）",
           "selectedItemNames": ["单品名称1", "单品名称2", ...],
           "style": "甜美/优雅/哥特/CLA/日常",
           "occasion": "日常/约会/茶会/通勤",
@@ -196,7 +209,8 @@ class OutfitSuggestionService {
         重要提示：
         - selectedItemNames 必须从候选单品中挑选，不要编造不存在名称
         - 如果候选不足，请返回空数组并说明
-        - 描述要符合小橘猫角色（带喵~，用括号表示动作）
+        - \(roleStyleRequirement)
+        - 若没有完全同名的类目，请改用用户衣橱里已有的标签/类型名称表达
         - 只返回 JSON，不要额外解释
         """
     }
@@ -218,7 +232,7 @@ class OutfitSuggestionService {
 
         do {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                let description = json["description"] as? String ?? "为你搭配了一套~喵"
+                let description = json["description"] as? String ?? localizedCatchphraseText("为你搭配了一套~喵")
                 let selectedNames = (json["selectedItemNames"] as? [String] ?? [])
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }
@@ -348,17 +362,17 @@ enum OutfitSuggestionError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noItemsAvailable:
-            return "（歪头）主人衣橱里好像没有合适的裙子呢，要不要先添置几件新的呀？喵~"
+            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（歪头）主人衣橱里好像没有合适的裙子呢，要不要先添置几件新的呀？喵~")
         case .insufficientItems:
-            return "（蹭蹭）主人衣橱里的裙子还不够呢，至少要有 2 件才能帮我搭配喵~"
+            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（蹭蹭）主人衣橱里的裙子还不够呢，至少要有 2 件才能帮我搭配喵~")
         case .insufficientNonDepositItems:
-            return "（蹭蹭）主人衣橱里已经到手的裙子还不够呢~ 至少要有 2 件才能智能搭配喵！那些还没补尾款的不算哦~"
+            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（蹭蹭）主人衣橱里已经到手的裙子还不够呢~ 至少要有 2 件才能智能搭配喵！那些还没补尾款的不算哦~")
         case .invalidJSONFormat:
-            return "（挠头）我刚刚有点晕，没听懂主人的意思，可以再说一次喵？"
-        case .parseError(let message):
-            return "（歪头）我好像理解错了，让我再想想喵..."
-        case .aiServiceError(let message):
-            return "（蹭蹭）刚刚网络好像卡了一下下，主人再试一次好不好喵？"
+            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（挠头）我刚刚有点晕，没听懂主人的意思，可以再说一次喵？")
+        case .parseError:
+            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（歪头）我好像理解错了，让我再想想喵...")
+        case .aiServiceError:
+            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（蹭蹭）刚刚网络好像卡了一下下，主人再试一次好不好喵？")
         }
     }
 }

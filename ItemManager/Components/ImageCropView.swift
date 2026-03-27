@@ -19,6 +19,7 @@ struct ImageCropView: View {
     let aspectRatio: CGFloat?
     let targetWidth: CGFloat?
     let overlayType: CropOverlayType
+    let contentMode: ContentMode
     let onCrop: (UIImage) -> Void
     let onCancel: () -> Void
 
@@ -36,12 +37,14 @@ struct ImageCropView: View {
          aspectRatio: CGFloat? = nil,
          targetWidth: CGFloat? = nil,
          overlayType: CropOverlayType = .rectangle,
+         contentMode: ContentMode = .fit,
          onCrop: @escaping (UIImage) -> Void,
          onCancel: @escaping () -> Void) {
         self.image = image
         self.aspectRatio = aspectRatio
         self.targetWidth = targetWidth
         self.overlayType = overlayType
+        self.contentMode = contentMode
         self.onCrop = onCrop
         self.onCancel = onCancel
     }
@@ -116,7 +119,7 @@ struct ImageCropView: View {
 
                                 Image(uiImage: displayImg)
                                     .resizable()
-                                    .scaledToFit()
+                                    .aspectRatio(contentMode: contentMode)
                                     .scaleEffect(scale)
                                     .offset(offset)
                                     .gesture(
@@ -248,7 +251,7 @@ struct ImageCropView: View {
                 Color.clear
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFit()
+                    .aspectRatio(contentMode: contentMode)
                     .scaleEffect(scale)
                     .offset(x: offset.width * multiplier, y: offset.height * multiplier)
                     .frame(width: width, height: height)

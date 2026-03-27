@@ -126,12 +126,13 @@ final class PetConversationMemoryStore {
 
     func recordOutfitSelection(clothings: [Clothing], role: PetRole) {
         guard !clothings.isEmpty else { return }
-        let selected = Array(clothings.prefix(3))
-        let details = selected.map { item in
+        let detailLimit = 6
+        let details = clothings.prefix(detailLimit).map { item in
             "\(item.name)(¥\(priceText(item.unitTotalPrice)))"
         }.joined(separator: "、")
-        let total = selected.reduce(Decimal(0)) { $0 + $1.unitTotalPrice }
-        let snapshot = "最近搭配：\(details)；合计¥\(priceText(total))"
+        let detailSuffix = clothings.count > detailLimit ? "等\(clothings.count)件" : ""
+        let total = clothings.reduce(Decimal(0)) { $0 + $1.unitTotalPrice }
+        let snapshot = "最近搭配：\(details)\(detailSuffix)；合计¥\(priceText(total))"
         append([PetMemoryEntry(kind: .outfitSnapshot, content: snapshot)], for: role)
     }
 
@@ -163,6 +164,21 @@ final class PetConversationMemoryStore {
             " - \(label(for: entry.kind))：\(entry.content)"
         }
         return lines.joined(separator: "\n")
+    }
+
+    func resetAll() {
+        lock.lock()
+        storage = [:]
+        loaded = true
+        cloudBootstrapStarted = true
+        cloudUploadGeneration += 1
+        lock.unlock()
+
+        UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+
+        Task { [weak self] in
+            await self?.deleteAllCloudRecords()
+        }
     }
 
     private func append(_ entries: [PetMemoryEntry], for role: PetRole) {
@@ -349,6 +365,35 @@ final class PetConversationMemoryStore {
         }
     }
 
+    private func deleteAllCloudRecords() async {
+        let recordIDs = [
+            CKRecord.ID(recordName: cloudRecordPrefix + "kitten"),
+            CKRecord.ID(recordName: cloudRecordPrefix + "golden_retriever")
+        ]
+
+        do {
+            try await deleteRecords(recordIDs, in: cloudContainer.privateCloudDatabase)
+        } catch {
+            print("PetConversationMemoryStore cloud delete skipped: \(error.localizedDescription)")
+        }
+    }
+
+    private func deleteRecords(_ recordIDs: [CKRecord.ID], in database: CKDatabase) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            let operation = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: recordIDs)
+            operation.qualityOfService = .utility
+            operation.modifyRecordsResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: ())
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            database.add(operation)
+        }
+    }
+
     private func isCloudNewer(cloudEntries: [PetMemoryEntry], localEntries: [PetMemoryEntry]) -> Bool {
         let cloudTime = cloudEntries.map(\.timestamp).max() ?? .distantPast
         let localTime = localEntries.map(\.timestamp).max() ?? .distantPast
@@ -427,6 +472,9 @@ enum PetConversationToolbox {
 
         lines.append("【动作输出约束】")
         lines.append("- 可用动作ID：\(allowedActionIds(for: role).sorted().joined(separator: "、"))")
+        lines.append("- 若要带表情，只能在 text 中内嵌 0 或 1 个 [IMAGE:动作ID]。")
+        lines.append("- 单条回复最多 1 个表情，不允许同时输出多个 [IMAGE:...]。")
+        lines.append("- 优先在 开心安慰 / 疑惑没听懂 / 思考等待 / 困倦卡顿 这些场景带表情。")
         lines.append("- 若不需要动作，不输出动作ID。")
         return lines.joined(separator: "\n")
     }
@@ -452,16 +500,18 @@ enum PetConversationToolbox {
         switch normalized {
         case "happy":
             return role == .kitten ? "happy_cat" : "happy_dog"
+        case "playful", "excited":
+            return role == .kitten ? "happy_cat" : "happy_dog"
         case "sleepy":
+            return role == .kitten ? "sleepy_cat" : "sleepy_dog"
+        case "sad", "tired":
             return role == .kitten ? "sleepy_cat" : "sleepy_dog"
         case "angry":
             return role == .kitten ? "angry_cat" : "angry_dog"
         case "curious":
             return role == .kitten ? "curious_cat" : "curious_dog"
-        case "playful":
-            return role == .kitten ? "playful_cat" : "playful_dog"
-        case "sad":
-            return role == .kitten ? "sad_cat" : "sad_dog"
+        case "confused", "puzzled":
+            return role == .kitten ? "curious_cat" : "curious_dog"
         case "thinking":
             return role == .kitten ? "thinking_cat" : "thinking_dog"
         default:
@@ -474,12 +524,12 @@ enum PetConversationToolbox {
         case .kitten:
             return [
                 "happy_cat", "sleepy_cat", "angry_cat", "curious_cat",
-                "playful_cat", "sad_cat", "thinking_cat", "cat"
+                "thinking_cat", "cat"
             ]
         case .goldenRetriever:
             return [
                 "happy_dog", "sleepy_dog", "angry_dog", "curious_dog",
-                "playful_dog", "sad_dog", "thinking_dog", "dog"
+                "thinking_dog", "dog"
             ]
         @unknown default:
             return [

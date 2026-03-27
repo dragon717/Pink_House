@@ -2213,8 +2213,7 @@ struct ClearPetChatTestView: View {
     }
 
     private func clearPetChatHistory() {
-        // 清除萌宠对话历史记录
-        UserDefaults.standard.removeObject(forKey: "pet_chat_transcript_v3")
+        PetHistoryResetManager.shared.clearAllPetHistory(reason: "lab_manual_clear")
         messageCount = 0
         showClearedSuccess = true
     }

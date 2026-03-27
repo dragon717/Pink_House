@@ -84,6 +84,10 @@ struct HomeView: View {
     @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
     @AppStorage("UserPreference_FilterMode") private var filterMode: FilterMode = .classic
     
+    private var effectiveWardrobeNavigationStyle: WardrobeNavigationStyle {
+        wardrobeNavigationStyle.resolvedForCurrentDevice
+    }
+    
     // Filter States
     @State private var selectedTagIDs: Set<UUID> = []
     @State private var selectedBrandIDs: Set<UUID> = []
@@ -208,7 +212,7 @@ struct HomeView: View {
                 }
             }
             .toolbar {
-                if wardrobeNavigationStyle == .classic {
+                if effectiveWardrobeNavigationStyle == .classic {
                     ToolbarItem(placement: .topBarLeading) {
                         tabSwitcher
                     }
@@ -252,6 +256,7 @@ struct HomeView: View {
             .onAppear {
                 // 确保初始状态下搜索栏不显示
                 isSearchActive = false
+                wardrobeNavigationStyle = WardrobeNavigationStyle.normalizeStoredPreference()
             }
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {

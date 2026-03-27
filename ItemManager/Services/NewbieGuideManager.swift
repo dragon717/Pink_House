@@ -75,6 +75,14 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     var shouldShowGuide: Bool {
         return !state.isCompleted && isFirstLaunch
     }
+
+    var isPadGuideLayout: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    var shouldUseGuideFallbackFrames: Bool {
+        !isPadGuideLayout
+    }
     
     // MARK: - Initialization
     
@@ -2783,10 +2791,12 @@ struct FeatureExperienceGuideOverlay: View {
                             radius: 34
                         )
 
-                        CatPawTapAnimation(
-                            position: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
-                            delay: 0.5
-                        )
+                        if !guideManager.isPadGuideLayout {
+                            CatPawTapAnimation(
+                                position: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
+                                delay: 0.5
+                            )
+                        }
 
                         VStack {
                             featureStepBubble(

@@ -57,6 +57,7 @@ struct SmallWorldMenuOverlay: View {
     @ObservedObject private var hapticManager = HapticEngineManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
     @ObservedObject private var tabNavigationManager = TabNavigationManager.shared
+    @ObservedObject private var guideManager = AppFirstLaunchGuideManager.shared
 
     private let isLowMemoryDevice: Bool = {
         return ProcessInfo.processInfo.physicalMemory < 4 * 1024 * 1024 * 1024
@@ -137,10 +138,19 @@ struct SmallWorldMenuOverlay: View {
             let safeAreaTop = geometry.safeAreaInsets.top
             let tabBarHeight = 65.0 + safeAreaBottom
             let topBarHeight = 65.0 + safeAreaTop
-            let triggerHeight = isIPad ? topBarHeight : tabBarHeight
-            let triggerAreaWidth = min(geometry.size.width / 4, 100)
-            let smallWorldTabCenterX = geometry.size.width * 0.375
-            let smallWorldTabCenterY = isIPad ? triggerHeight / 2 : geometry.size.height - triggerHeight / 2
+            let fallbackTriggerHeight = isIPad ? topBarHeight : tabBarHeight
+            let fallbackTriggerWidth = min(geometry.size.width / 4, 100)
+            let fallbackFrame = CGRect(
+                x: geometry.size.width * 0.375 - fallbackTriggerWidth / 2,
+                y: (isIPad ? 0 : geometry.size.height - fallbackTriggerHeight),
+                width: fallbackTriggerWidth,
+                height: fallbackTriggerHeight
+            )
+            let houseTabFrame = resolvedHouseTabFrame(in: geometry, fallbackFrame: fallbackFrame)
+            let triggerHeight = houseTabFrame.height
+            let triggerAreaWidth = houseTabFrame.width
+            let smallWorldTabCenterX = houseTabFrame.midX
+            let smallWorldTabCenterY = houseTabFrame.midY
 
             // 只在菜单显示时才使用全屏遮罩，否则只显示触发区域
             if showMenu {
@@ -251,6 +261,23 @@ struct SmallWorldMenuOverlay: View {
                 isPetChatSearching = isSearching
             }
         }
+    }
+
+    private func resolvedHouseTabFrame(in geometry: GeometryProxy, fallbackFrame: CGRect) -> CGRect {
+        guard let frame = guideManager.guideTargetFrame(for: .homeHouseTab) else {
+            return fallbackFrame
+        }
+
+        let expandedFrame = frame.insetBy(dx: -8, dy: -8)
+        let screenBounds = CGRect(origin: .zero, size: geometry.size)
+
+        guard expandedFrame.width > 0,
+              expandedFrame.height > 0,
+              screenBounds.intersects(expandedFrame) else {
+            return fallbackFrame
+        }
+
+        return expandedFrame
     }
 
     // MARK: - 单层轮盘菜单

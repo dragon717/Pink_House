@@ -341,7 +341,7 @@ struct GeneralSettingsView: View {
         .fullScreenCover(item: $cropRequest) { request in
             // Use 'request.image' here directly
             
-            ImageCropView(image: request.image) { croppedImage in
+            ImageCropView(image: request.image, contentMode: .fill) { croppedImage in
                     // If isNewSelection is true, we update both original and display image.
                     // If false, we only update display image (cropped version), keeping original intact.
                     

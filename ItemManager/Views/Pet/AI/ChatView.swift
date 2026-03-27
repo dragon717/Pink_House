@@ -22,13 +22,15 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var isSending = false
     
-    // 历史记录解锁状态（上滑触发）
+    // 历史记录解锁状态（下拉触发）
     @State private var isHistoryUnlocked = false
     @State private var historyUnlockProgress: CGFloat = 0
     @State private var showingHistoryUnlockHint = false
+    @State private var isChatScrollPinnedToTop = true
     @State private var initialHistoryMessageIDs = Set<UUID>()
     @State private var isLoadingHistoryPage = false
     @State private var previousTopVisibleMessageId: UUID?
+    @State private var lockedWelcomeTimestamp = Date()
     
     // Edit Mode State
     @State private var isEditing = false
@@ -49,9 +51,11 @@ struct ChatView: View {
     @AppStorage("hasShownAIDisclaimer") private var hasShownAIDisclaimer = false
     @State private var showingDisclaimer = false
     @State private var showingHistorySearch = false
+    @StateObject private var greetingManager = DailyGreetingManager.shared
     
-    private let historyUnlockThreshold: CGFloat = 120
+    private let historyUnlockThreshold: CGFloat = 72
     private let historyPageSize: Int = 10
+    private let lockedWelcomeMessageID = UUID(uuidString: "A4FB4D91-7F98-4A4F-B847-5B2F792DC9B5") ?? UUID()
     
     // 初始化时传入 Service
     init(service: PetAIService) {
@@ -69,12 +73,44 @@ struct ChatView: View {
     private var hasLockedHistory: Bool {
         !isHistoryUnlocked && !initialHistoryMessageIDs.isEmpty
     }
+
+    private var currentCharacter: PetCharacter {
+        PetDataManager.shared.getCurrentPetCharacter()
+    }
+
+    private func localizedCatchphraseText(_ text: String) -> String {
+        currentCharacter.localizedCatchphraseText(text)
+    }
+    
+    private var reusableWelcomeText: String {
+        let greeting = greetingManager.getGreetingTitle()
+        let petDisplayName = PetDataManager.shared.status.displayName
+        return "\(greeting)\(currentCharacter.catchphraseSuffix) 我是你的衣橱管家\(petDisplayName)，有什么可以帮你的吗？"
+    }
+    
+    private var lockedWelcomeMessage: ChatMessage {
+        ChatMessage(
+            id: lockedWelcomeMessageID,
+            text: reusableWelcomeText,
+            isUser: false,
+            timestamp: lockedWelcomeTimestamp
+        )
+    }
     
     var body: some View {
         VStack(spacing: 0) {
             // 聊天记录区域
             ScrollViewReader { proxy in
                 ScrollView {
+                    GeometryReader { geo in
+                        Color.clear
+                            .preference(
+                                key: PetAIChatScrollTopOffsetPreferenceKey.self,
+                                value: geo.frame(in: .named("PetAIChatScrollView")).minY
+                            )
+                    }
+                    .frame(height: 0)
+
                     LazyVStack(spacing: 20) {
                         if isHistoryUnlocked {
                             if isLoadingHistoryPage {
@@ -134,16 +170,41 @@ struct ChatView: View {
                         }
                         
                         if visibleMessages.isEmpty {
-                            Color.clear.frame(height: 1)
+                            if hasLockedHistory {
+                                MessageBubble(message: lockedWelcomeMessage, isAI: true)
+                                    .padding(.horizontal)
+                                    .padding(.top, 20)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                Color.clear.frame(height: 1)
+                            }
                         }
                     }
                     .padding(.vertical)
                 }
-                .simultaneousGesture(historyUnlockGesture(using: proxy))
+                .coordinateSpace(name: "PetAIChatScrollView")
+                .onPreferenceChange(PetAIChatScrollTopOffsetPreferenceKey.self) { minY in
+                    handleHistoryUnlockScrollOffset(minY)
+                }
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 5)
+                        .onChanged(handleHistoryUnlockDragChanged)
+                        .onEnded(handleHistoryUnlockDragEnded)
+                )
                 .overlay(alignment: .top) {
-                    if hasLockedHistory && (showingHistoryUnlockHint || historyUnlockProgress > 0) {
-                        historyUnlockIndicator
-                            .padding(.top, 8)
+                    if hasLockedHistory {
+                        Group {
+                            if showingHistoryUnlockHint || historyUnlockProgress > 0 {
+                                historyUnlockIndicator
+                            } else {
+                                lockedHistoryTopHint
+                                    .onTapGesture {
+                                        unlockHistory()
+                                    }
+                            }
+                        }
+                        .padding(.top, 8)
+                        .allowsHitTesting(true)
                     }
                 }
                 .onChange(of: petAI.uiMessages) { _ in
@@ -359,7 +420,7 @@ struct ChatView: View {
             }
             .frame(width: 34, height: 34)
             
-            Text(progress >= 1 ? "松手打开历史记录" : "继续上滑查看历史记录")
+            Text(localizedCatchphraseText(progress >= 1 ? "松手就给你翻旧日记喵~" : "再下拉一点就能看喵~"))
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
         }
@@ -370,46 +431,93 @@ struct ChatView: View {
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
     }
     
-    private func historyUnlockGesture(using proxy: ScrollViewProxy) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                guard hasLockedHistory else { return }
-                
-                let upwardDistance = max(0, -value.translation.height)
-                let progress = min(upwardDistance / historyUnlockThreshold, 1)
-                
-                historyUnlockProgress = progress
-                showingHistoryUnlockHint = upwardDistance > 8
-            }
-            .onEnded { _ in
-                guard hasLockedHistory else { return }
-                
-                let shouldUnlock = historyUnlockProgress >= 1
-                if shouldUnlock {
-                    unlockHistory(using: proxy)
-                } else {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        historyUnlockProgress = 0
-                        showingHistoryUnlockHint = false
-                    }
-                }
-            }
+    private var lockedHistoryTopHint: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.caption)
+                .foregroundStyle(.pink.opacity(0.85))
+            Text(localizedCatchphraseText("下拉或者点这里，我就把旧日记翻给你看喵~"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.9))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
     }
     
-    private func unlockHistory(using proxy: ScrollViewProxy) {
+    private func handleHistoryUnlockScrollOffset(_ minY: CGFloat) {
+        isChatScrollPinnedToTop = minY >= -8
+
+        guard hasLockedHistory else {
+            resetHistoryUnlockHintIfNeeded(animated: false)
+            return
+        }
+
+        let overscroll = max(0, minY)
+        let progress = min(overscroll / historyUnlockThreshold, 1)
+
+        if progress >= 1 {
+            unlockHistory()
+            return
+        }
+
+        historyUnlockProgress = progress
+        showingHistoryUnlockHint = overscroll > 8 && isChatScrollPinnedToTop
+
+        if overscroll <= 0 {
+            resetHistoryUnlockHintIfNeeded(animated: true)
+        }
+    }
+
+    private func handleHistoryUnlockDragChanged(_ value: DragGesture.Value) {
+        guard hasLockedHistory, isChatScrollPinnedToTop else { return }
+
+        let pullDistance = max(0, value.translation.height)
+        guard pullDistance > 0 else { return }
+
+        let progress = min(pullDistance / historyUnlockThreshold, 1)
+        historyUnlockProgress = max(historyUnlockProgress, progress)
+        showingHistoryUnlockHint = true
+    }
+
+    private func handleHistoryUnlockDragEnded(_ value: DragGesture.Value) {
+        guard hasLockedHistory else { return }
+
+        let pullDistance = max(0, value.translation.height)
+        let progress = max(historyUnlockProgress, min(pullDistance / historyUnlockThreshold, 1))
+
+        if progress >= 1 {
+            unlockHistory()
+        } else {
+            resetHistoryUnlockHintIfNeeded(animated: true)
+        }
+    }
+
+    private func resetHistoryUnlockHintIfNeeded(animated: Bool) {
+        guard historyUnlockProgress > 0 || showingHistoryUnlockHint else { return }
+
+        let reset = {
+            historyUnlockProgress = 0
+            showingHistoryUnlockHint = false
+        }
+
+        if animated {
+            withAnimation(.easeOut(duration: 0.2)) {
+                reset()
+            }
+        } else {
+            reset()
+        }
+    }
+    
+    private func unlockHistory() {
         isHistoryUnlocked = true
         showingHistoryUnlockHint = false
         historyUnlockProgress = 0
         petAI.activatePagedHistoryMode(initialVisibleCount: historyPageSize)
         initialHistoryMessageIDs.removeAll(keepingCapacity: false)
-        
-        DispatchQueue.main.async {
-            if let lastId = petAI.uiMessages.last?.id {
-                withAnimation(.easeOut(duration: 0.25)) {
-                    proxy.scrollTo(lastId, anchor: .bottom)
-                }
-            }
-        }
     }
     
     private func loadMoreHistoryIfNeeded() {
@@ -491,5 +599,13 @@ struct ChatView: View {
                 )
             )
         )
+    }
+}
+
+private struct PetAIChatScrollTopOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

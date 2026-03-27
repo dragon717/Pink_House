@@ -2,29 +2,25 @@ import Foundation
 
 enum PetChatTranscriptStore {
     private static let storageKey = "pet_chat_transcript_v3"
+    private static let legacyImportFlagKey = "pet_chat_transcript_v3_legacy_imported_v1"
 
     static func historyWindowSize() -> Int {
         let memoryInGB = ProcessInfo.processInfo.physicalMemory / 1_073_741_824
-        if memoryInGB >= 6 { return 80 }
-        if memoryInGB >= 4 { return 50 }
-        return 30
+        if memoryInGB >= 6 { return 35 }
+        if memoryInGB >= 4 { return 18 }
+        return 10
     }
 
     static func save(messages: [PetChatMessage]) {
-        let window = historyWindowSize()
-        let payload = messages.suffix(window).map(PersistedPetChatMessage.init)
+        let payload = normalizedPersistedMessages(from: messages).map(PersistedPetChatMessage.init)
         guard let data = try? JSONEncoder().encode(Array(payload)) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
     }
 
     static func load() -> [PetChatMessage] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([PersistedPetChatMessage].self, from: data),
-              !decoded.isEmpty else {
-            return []
-        }
-        let window = historyWindowSize()
-        return decoded.suffix(window).map(\.message)
+        let storedMessages = loadStoredMessages()
+        let migratedMessages = migrateLegacyHistoryIfNeeded(existingMessages: storedMessages)
+        return normalizedPersistedMessages(from: migratedMessages)
     }
 
     static func query(
@@ -59,6 +55,88 @@ enum PetChatTranscriptStore {
             return load().filter(isReusableUserMessage).count
         }
         return load().count
+    }
+
+    static func clearAll() {
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        UserDefaults.standard.removeObject(forKey: legacyImportFlagKey)
+    }
+
+    private static func loadStoredMessages() -> [PetChatMessage] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let decoded = try? JSONDecoder().decode([PersistedPetChatMessage].self, from: data),
+              !decoded.isEmpty else {
+            return []
+        }
+        return decoded.map(\.message)
+    }
+
+    private static func migrateLegacyHistoryIfNeeded(existingMessages: [PetChatMessage]) -> [PetChatMessage] {
+        let legacyMessages = loadLegacyMessages()
+        guard !legacyMessages.isEmpty else { return existingMessages }
+
+        let mergedMessages = mergeMessages(existingMessages, with: legacyMessages)
+        let hasImportedLegacy = UserDefaults.standard.bool(forKey: legacyImportFlagKey)
+
+        if !hasImportedLegacy || mergedMessages.count != existingMessages.count {
+            let payload = normalizedPersistedMessages(from: mergedMessages).map(PersistedPetChatMessage.init)
+            if let data = try? JSONEncoder().encode(Array(payload)) {
+                UserDefaults.standard.set(data, forKey: storageKey)
+                UserDefaults.standard.set(true, forKey: legacyImportFlagKey)
+            }
+        }
+
+        return mergedMessages
+    }
+
+    private static func loadLegacyMessages() -> [PetChatMessage] {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let legacyURL = documents.appendingPathComponent("chat_history.json")
+
+        guard FileManager.default.fileExists(atPath: legacyURL.path),
+              let data = try? Data(contentsOf: legacyURL),
+              let decoded = try? JSONDecoder().decode([ChatMessage].self, from: data),
+              !decoded.isEmpty else {
+            return []
+        }
+
+        return decoded.map { legacyMessage in
+            PetChatMessage(
+                text: legacyMessage.isUser ? legacyMessage.text : sanitizeAssistantText(legacyMessage.text),
+                isUser: legacyMessage.isUser,
+                isUserAuthored: legacyMessage.isUser,
+                imageName: legacyMessage.imageName,
+                isAIGenerated: !legacyMessage.isUser,
+                timestamp: legacyMessage.timestamp
+            )
+        }
+    }
+
+    private static func mergeMessages(_ currentMessages: [PetChatMessage], with legacyMessages: [PetChatMessage]) -> [PetChatMessage] {
+        var seen = Set<PersistedMessageKey>()
+        let sortedMessages = (currentMessages + legacyMessages).sorted { lhs, rhs in
+            if lhs.timestamp == rhs.timestamp {
+                if lhs.isUser != rhs.isUser {
+                    return lhs.isUser && !rhs.isUser
+                }
+                return lhs.text < rhs.text
+            }
+            return lhs.timestamp < rhs.timestamp
+        }
+
+        let merged = sortedMessages.filter { message in
+            seen.insert(PersistedMessageKey(message: message)).inserted
+        }
+
+        return normalizedPersistedMessages(from: merged)
+    }
+
+    private static func normalizedPersistedMessages(from messages: [PetChatMessage]) -> [PetChatMessage] {
+        let maxPersistedMessages = historyWindowSize()
+        if messages.count > maxPersistedMessages {
+            return Array(messages.suffix(maxPersistedMessages))
+        }
+        return messages
     }
 
     private static func encodeType(_ type: PetChatMessageType) -> String {
@@ -186,5 +264,17 @@ enum PetChatTranscriptStore {
         // 用户可见内容必须去掉 JSON/代码感。
         let humanized = PetResponseHumanizer.humanize(text)
         return humanized.isEmpty ? text : humanized
+    }
+
+    private struct PersistedMessageKey: Hashable {
+        let text: String
+        let isUser: Bool
+        let timestampBucket: Int64
+
+        init(message: PetChatMessage) {
+            self.text = message.text
+            self.isUser = message.isUser
+            self.timestampBucket = Int64(message.timestamp.timeIntervalSince1970.rounded())
+        }
     }
 }

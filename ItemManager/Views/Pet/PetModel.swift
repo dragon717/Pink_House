@@ -276,6 +276,28 @@ enum PetCharacter: String, Codable, CaseIterable, Identifiable {
         case .maomao: return "dog"
         }
     }
+
+    var catchphraseSuffix: String {
+        switch self {
+        case .naicha: return "喵~"
+        case .maomao: return "汪~"
+        }
+    }
+
+    func localizedCatchphraseText(_ text: String) -> String {
+        guard self == .maomao else { return text }
+
+        return text
+            .replacingOccurrences(of: "喵~", with: "汪~")
+            .replacingOccurrences(of: "喵？", with: "汪？")
+            .replacingOccurrences(of: "喵?", with: "汪?")
+            .replacingOccurrences(of: "喵...", with: "汪...")
+            .replacingOccurrences(of: "喵…", with: "汪…")
+            .replacingOccurrences(of: "喵！", with: "汪！")
+            .replacingOccurrences(of: "喵!", with: "汪!")
+            .replacingOccurrences(of: "喵，", with: "汪，")
+            .replacingOccurrences(of: "喵。", with: "汪。")
+    }
     
     // 萌宠对话中使用的happy表情图片名
     var happyImageName: String {

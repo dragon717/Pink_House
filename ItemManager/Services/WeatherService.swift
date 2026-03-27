@@ -5,11 +5,30 @@ import Combine
 // MARK: - 天气数据模型
 struct WeatherData: Codable {
     let temperature: Double
+    let apparentTemperature: Double?
     let condition: WeatherCondition
     let humidity: Int
     let windSpeed: Double
     let city: String
     let updateTime: Date
+
+    init(
+        temperature: Double,
+        apparentTemperature: Double? = nil,
+        condition: WeatherCondition,
+        humidity: Int,
+        windSpeed: Double,
+        city: String,
+        updateTime: Date
+    ) {
+        self.temperature = temperature
+        self.apparentTemperature = apparentTemperature
+        self.condition = condition
+        self.humidity = humidity
+        self.windSpeed = windSpeed
+        self.city = city
+        self.updateTime = updateTime
+    }
 }
 
 // MARK: - 天气状况枚举
@@ -88,7 +107,7 @@ class WeatherService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        let urlString = "\(baseURL)?latitude=\(latitude)&longitude=\(longitude)&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m"
+        let urlString = "\(baseURL)?latitude=\(latitude)&longitude=\(longitude)&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m"
         
         guard let url = URL(string: urlString) else {
             errorMessage = "无效的URL"
@@ -101,6 +120,7 @@ class WeatherService: ObservableObject {
             
             let weather = WeatherData(
                 temperature: response.current.temperature_2m,
+                apparentTemperature: response.current.apparent_temperature,
                 condition: mapWeatherCode(response.current.weather_code),
                 humidity: response.current.relative_humidity_2m,
                 windSpeed: response.current.wind_speed_10m,
@@ -170,6 +190,7 @@ struct OpenMeteoResponse: Codable {
 
 struct CurrentWeather: Codable {
     let temperature_2m: Double
+    let apparent_temperature: Double
     let relative_humidity_2m: Int
     let weather_code: Int
     let wind_speed_10m: Double
@@ -177,9 +198,29 @@ struct CurrentWeather: Codable {
 
 // MARK: - 温度适配建议
 extension WeatherData {
+    var feelsLikeTemperature: Double {
+        if let apparentTemperature {
+            return apparentTemperature
+        }
+
+        var adjusted = temperature
+
+        if temperature <= 18 {
+            adjusted -= min(max(windSpeed - 1.5, 0) * 0.6, 4.0)
+        } else if temperature >= 24, humidity >= 70 {
+            adjusted += humidity >= 80 ? 1.5 : 0.8
+        }
+
+        if windSpeed >= 6 {
+            adjusted -= 0.8
+        }
+
+        return adjusted
+    }
+
     // 根据温度获取穿搭建议
     var temperatureAdvice: String {
-        switch temperature {
+        switch feelsLikeTemperature {
         case ..<0:
             return "极寒天气，建议穿厚实的外套，注意保暖"
         case 0..<10:

@@ -83,29 +83,33 @@ class PetAIService: ObservableObject {
     // 停止生成标志
     private var shouldStopGeneration = false
     
-    // 小内存设备优化：低内存保留30条，中档50条，高内存80条
+    // 小内存设备优化：低内存保留10条，中档18条，高内存35条
     private var latestWindowSize: Int {
         let memoryInGB = ProcessInfo.processInfo.physicalMemory / 1_073_741_824
-        if memoryInGB >= 6 { return 80 }
-        if memoryInGB >= 4 { return 50 }
-        return 30
+        if memoryInGB >= 6 { return 35 }
+        if memoryInGB >= 4 { return 18 }
+        return 10
     }
     private let historyPageSize = 10
-    private let maxPersistedMessages = 1200
+    private var maxPersistedMessages: Int { latestWindowSize }
     private var isHistoryExpanded = false
 
     private var personaProfile: PetPersonaProfile {
         PetPersonaRegistry.profile(for: role, petName: petName)
     }
-    
+
     private init() {
         // Initialize with placeholder history
-        self.history = [
+        self.history = Self.makeInitialHistory()
+        self.loadMessages()
+    }
+
+    private static func makeInitialHistory() -> [DSMessage] {
+        [
             DSMessage(role: "system", content: ""),
             DSMessage(role: "user", content: "你好，我是你的主人。"),
-            DSMessage(role: "assistant", content: "（蹭蹭你的手）主人好呀喵！[IMAGE:happy_cat]")
+            DSMessage(role: "assistant", content: "（蹭蹭你的手）主人好呀！[IMAGE:happy_cat]")
         ]
-        self.loadMessages()
     }
     
     // MARK: - Persistence
@@ -137,6 +141,30 @@ class PetAIService: ObservableObject {
     func reloadHistory() {
         self.isHistoryLoaded = false
         self.loadMessages()
+    }
+
+    func clearPersistedHistory() {
+        currentTask?.cancel()
+        shouldStopGeneration = false
+        isProcessing = false
+        allMessages = []
+        uiMessages = []
+        isHistoryExpanded = false
+        isHistoryLoaded = true
+        history = Self.makeInitialHistory()
+
+        do {
+            if FileManager.default.fileExists(atPath: messagesFileURL.path) {
+                try FileManager.default.removeItem(at: messagesFileURL)
+            }
+        } catch {
+            print("❌ [PetAIService] Failed to clear chat history file: \(error)")
+        }
+
+        let corruptedURL = messagesFileURL.deletingPathExtension().appendingPathExtension("corrupted.json")
+        if FileManager.default.fileExists(atPath: corruptedURL.path) {
+            try? FileManager.default.removeItem(at: corruptedURL)
+        }
     }
     
     private func loadMessages() {
@@ -462,6 +490,8 @@ class PetAIService: ObservableObject {
         let apiKey = self.apiKey
         let provider = self.provider
         let historyLimit = historyMessageLimit(forPromptLength: text.count)
+        let fallbackCharacter: PetCharacter = role == .goldenRetriever ? .maomao : .naicha
+        let fallbackUnknownReply = fallbackCharacter.localizedCatchphraseText("（歪头摇尾巴，不知道你在说什么喵...）")
         
         print("🔍 [PetAIService] 发送请求 - Provider: \(provider)")
         if apiKey.isEmpty {
@@ -532,7 +562,7 @@ class PetAIService: ObservableObject {
                         let mmResponse = try JSONDecoder().decode(MinimaxResponse.self, from: data)
                         // Prefer text content
                         let textBlock = mmResponse.content.first { $0.type == "text" }
-                        return textBlock?.text ?? "（歪头摇尾巴，不知道你在说什么喵...）"
+                        return textBlock?.text ?? fallbackUnknownReply
                         
                     } else if provider == .deepSeek {
                         // DeepSeek Logic
@@ -567,7 +597,7 @@ class PetAIService: ObservableObject {
                         
                         // 解析响应
                         let dsResponse = try JSONDecoder().decode(DSResponse.self, from: data)
-                        return dsResponse.choices.first?.message.content ?? "（歪头摇尾巴，不知道你在说什么喵...）"
+                        return dsResponse.choices.first?.message.content ?? fallbackUnknownReply
                     } else {
                         throw NSError(domain: "PetAIService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Unsupported AI Provider: \(provider)"])
                     }
@@ -663,21 +693,20 @@ class PetAIService: ObservableObject {
         var imageName: String? = nil
         var cleanText = text
         
-        // 如果找到匹配项
-        if let match = results.first {
-            // 提取图片名称 (捕获组 1)
-            if match.numberOfRanges > 1 {
+        if !results.isEmpty {
+            for match in results where match.numberOfRanges > 1 {
                 let range = match.range(at: 1)
-                imageName = nsString.substring(with: range)
+                let candidate = nsString.substring(with: range)
+                if let safeImageName = PetConversationToolbox.sanitizeActionIdentifier(candidate, role: role) {
+                    imageName = safeImageName
+                    break
+                }
             }
-            
-            // 从文本中移除指令
-            // 注意：这里只处理了第一个匹配项，如果可能有多个，建议用循环或替换
+
             cleanText = regex.stringByReplacingMatches(in: text, options: [], range: NSRange(location: 0, length: nsString.length), withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        
-        let safeImageName = PetConversationToolbox.sanitizeActionIdentifier(imageName, role: role)
-        return (cleanText, safeImageName)
+
+        return (cleanText, imageName)
     }
 
     private func defaultTimeoutImageName() -> String {

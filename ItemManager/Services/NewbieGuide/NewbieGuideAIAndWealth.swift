@@ -54,7 +54,7 @@ extension FeatureExperienceGuideOverlay {
                 radius: 34
             )
 
-            if wealthGuideStep.showCatPaw {
+            if wealthGuideStep.showCatPaw && !guideManager.isPadGuideLayout {
                 CatPawTapAnimation(
                     position: houseTabPawPosition,
                     delay: 0.5
@@ -225,7 +225,7 @@ extension FeatureExperienceGuideOverlay {
                 radius: 28
             )
 
-            if aiAnalysisStep.showCatPaw {
+            if aiAnalysisStep.showCatPaw && !guideManager.isPadGuideLayout {
                 CatPawTapAnimation(
                     position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
                     delay: 0.5
@@ -373,7 +373,7 @@ extension FeatureExperienceGuideOverlay {
             )
             .allowsHitTesting(false)
 
-            if aiAnalysisStep.showCatPaw {
+            if aiAnalysisStep.showCatPaw && !guideManager.isPadGuideLayout {
                 CatPawTapAnimation(
                     position: CGPoint(x: tabFrame.midX, y: tabFrame.midY),
                     delay: 0.5
@@ -486,7 +486,7 @@ extension FeatureExperienceGuideOverlay {
         fallback: CGRect
     ) -> CGRect {
         guard let globalFrame, globalFrame.width > 0, globalFrame.height > 0 else {
-            return fallback
+            return guideManager.shouldUseGuideFallbackFrames ? fallback : .zero
         }
 
         let overlayGlobalOrigin = geometry.frame(in: .global).origin

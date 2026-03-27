@@ -22,14 +22,21 @@ struct WardrobeSettingsView: View {
     // Filter Mode
     @AppStorage("UserPreference_FilterMode") private var filterMode: FilterMode = .classic
     
+    private var wardrobeNavigationStyleBinding: Binding<WardrobeNavigationStyle> {
+        Binding(
+            get: { wardrobeNavigationStyle.resolvedForCurrentDevice },
+            set: { wardrobeNavigationStyle = $0.resolvedForCurrentDevice }
+        )
+    }
+    
     var body: some View {
         @Bindable var theme = themeManager
         
         AdaptiveSettingsView(title: "梦幻衣橱") {
             // MARK: - 界面样式
             AdaptiveSection(header: "界面样式") {
-                Picker("选择样式", selection: $wardrobeNavigationStyle) {
-                    ForEach(WardrobeNavigationStyle.allCases) { style in
+                Picker("选择样式", selection: wardrobeNavigationStyleBinding) {
+                    ForEach(WardrobeNavigationStyle.availableStylesForCurrentDevice) { style in
                         Text(style.displayName).tag(style)
                     }
                 }
@@ -94,6 +101,7 @@ struct WardrobeSettingsView: View {
             }
         }
         .onAppear {
+            wardrobeNavigationStyle = WardrobeNavigationStyle.normalizeStoredPreference()
             NotificationCenter.default.post(name: .wardrobeSettingsOpened, object: nil)
         }
         // Image Picker Logic
@@ -222,7 +230,7 @@ struct WardrobeSettingsView: View {
     }
     
     private func handleCropRequest(_ request: CropRequest) -> some View {
-        ImageCropView(image: request.image) { croppedImage in
+        ImageCropView(image: request.image, contentMode: .fill) { croppedImage in
             if request.isNewSelection {
                 themeManager.setBackgroundImage(croppedImage)
                 themeManager.originalImage = request.image

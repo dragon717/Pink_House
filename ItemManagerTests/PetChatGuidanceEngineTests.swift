@@ -24,6 +24,7 @@ final class PetChatGuidanceEngineTests: XCTestCase {
     
     func testRelevantWardrobeJSONContainsNameAndFeaturesOnly() {
         let clothing = Clothing(name: "草莓JSK", types: "JSK", colors: "粉色", accessories: "发带")
+        clothing.tags = [Tag(name: "甜系")]
         clothing.accessoryItems = [AccessoryItem(name: "草莓发夹", price: 29)]
         
         let json = WardrobeContextManager.shared.generateRelevantItemsJSON(
@@ -34,12 +35,15 @@ final class PetChatGuidanceEngineTests: XCTestCase {
         
         XCTAssertTrue(json.contains("\"name\""))
         XCTAssertTrue(json.contains("\"features\""))
+        XCTAssertTrue(json.contains("甜系"))
         XCTAssertFalse(json.contains("\"id\""))
         XCTAssertFalse(json.contains("\"query\""))
         XCTAssertFalse(json.contains("价格"))
     }
 
-    func testWeatherQueryPrefersDressShoeUmbrellaContext() {
+    func testWeatherQueryPrefersDressOuterwearShoeUmbrellaContext() {
+        let outerwear = Clothing(name: "奶油云朵罩衫", types: "罩衫")
+        outerwear.tags = [Tag(name: "薄针织")]
         let dress = Clothing(name: "莓莓JSK", types: "JSK")
         let shoe = Clothing(name: "奶油玛丽珍鞋", types: "鞋")
         let umbrella = Clothing(name: "透明雨伞", types: "配饰")
@@ -47,13 +51,33 @@ final class PetChatGuidanceEngineTests: XCTestCase {
 
         let json = WardrobeContextManager.shared.generateRelevantItemsJSON(
             query: "今天下雨，帮我看天气穿搭",
-            clothings: [dress, shoe, umbrella, unrelated],
-            maxItems: 3
+            clothings: [outerwear, dress, shoe, umbrella, unrelated],
+            maxItems: 5
         )
 
+        XCTAssertTrue(json.contains("罩衫") || json.contains("薄针织"))
         XCTAssertTrue(json.contains("JSK"))
         XCTAssertTrue(json.contains("玛丽珍"))
         XCTAssertTrue(json.contains("雨伞"))
+    }
+
+    func testRequestedOuterwearOutfitQueryKeepsOuterwearInCandidateJSON() {
+        let cardigan = Clothing(name: "奶油云朵开衫", types: "针织开衫", colors: "米白")
+        cardigan.tags = [Tag(name: "通勤披肩")]
+
+        let jsk = Clothing(name: "草莓JSK", types: "JSK", colors: "粉色")
+        let op = Clothing(name: "铃兰OP", types: "OP", colors: "蓝色")
+        let brooch = Clothing(name: "兔兔胸针", types: "小物")
+        let socks = Clothing(name: "花边袜", types: "小物")
+
+        let json = WardrobeContextManager.shared.generateRelevantItemsJSON(
+            query: "帮我来一套开衫穿搭",
+            clothings: [jsk, op, brooch, socks, cardigan],
+            maxItems: 3
+        )
+
+        XCTAssertTrue(json.contains("奶油云朵开衫"))
+        XCTAssertTrue(json.contains("草莓JSK") || json.contains("铃兰OP"))
     }
     
     func testHumanizerRemovesJSONCodeStyle() {
@@ -96,34 +120,52 @@ final class PetChatGuidanceEngineTests: XCTestCase {
     }
     
     func testPickWeatherOutfitItemsFindsDressShoeUmbrella() {
+        let outerwear = Clothing(name: "奶油针织开衫", types: "外套")
         let dress = Clothing(name: "花嫁JSK", types: "JSK")
         let shoe = Clothing(name: "复古玛丽珍鞋", types: "鞋子")
         let umbrella = Clothing(name: "透明雨伞", types: "配饰")
         
-        let result = PetChatGuidanceEngine.pickWeatherOutfitItems(from: [dress, shoe, umbrella])
+        let result = PetChatGuidanceEngine.pickWeatherOutfitItems(from: [outerwear, dress, shoe, umbrella])
         
+        XCTAssertTrue(result.outerwears.contains(where: { $0.id == outerwear.id }))
         XCTAssertTrue(result.dresses.contains(where: { $0.id == dress.id }))
         XCTAssertTrue(result.shoes.contains(where: { $0.id == shoe.id }))
         XCTAssertTrue(result.umbrellas.contains(where: { $0.id == umbrella.id }))
-        XCTAssertEqual(result.combinedItems.count, 3)
+        XCTAssertEqual(result.combinedItems.count, 4)
+    }
+
+    func testPickWeatherOutfitItemsMatchesOuterwearFromTagsAndType() {
+        let outerwear = Clothing(name: "奶油云朵", types: "罩衫")
+        outerwear.tags = [Tag(name: "薄针织"), Tag(name: "春日外搭")]
+        outerwear.note = "早晚降温时穿"
+        let dress = Clothing(name: "铃兰JSK", types: "JSK")
+
+        let result = PetChatGuidanceEngine.pickWeatherOutfitItems(from: [outerwear, dress])
+
+        XCTAssertTrue(result.outerwears.contains(where: { $0.id == outerwear.id }))
     }
     
-    func testBuildWeatherAdviceContainsRainHint() {
+    func testBuildWeatherAdviceContainsFeelsLikeAndOuterwearHint() {
+        let outerwear = Clothing(name: "奶油开衫", types: "外套")
         let dress = Clothing(name: "薄荷JSK", types: "JSK")
         let weather = WeatherData(
-            temperature: 16,
+            temperature: 11,
+            apparentTemperature: 9,
             condition: .moderateRain,
             humidity: 80,
-            windSpeed: 3.2,
+            windSpeed: 4.1,
             city: "上海",
             updateTime: Date()
         )
-        let selection = WeatherWardrobeSelection(dresses: [dress], shoes: [], umbrellas: [])
+        let selection = WeatherWardrobeSelection(outerwears: [outerwear], dresses: [dress], shoes: [], umbrellas: [])
         
         let text = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
         
         XCTAssertTrue(text.contains("中雨"))
-        XCTAssertTrue(text.contains("降水风险"))
+        XCTAssertTrue(text.contains("体感大约9°C"))
+        XCTAssertTrue(text.contains("风速4.1m/s"))
+        XCTAssertTrue(text.contains("外套"))
+        XCTAssertTrue(text.contains("奶油开衫"))
         XCTAssertTrue(text.contains("薄荷JSK"))
     }
 
@@ -147,5 +189,36 @@ final class PetChatGuidanceEngineTests: XCTestCase {
 
         XCTAssertNotNil(block)
         XCTAssertLessThanOrEqual(block?.count ?? 0, 2400)
+    }
+
+    func testSearchResolutionLearnsUserTagsForGenericOuterwearQuery() {
+        let cardigan = Clothing(name: "奶油云朵开衫", types: "针织开衫", colors: "米白")
+        cardigan.tags = [Tag(name: "通勤披肩"), Tag(name: "奶油针织")]
+        cardigan.note = "秋天外搭用"
+
+        let jsk = Clothing(name: "草莓JSK", types: "JSK", colors: "粉色")
+
+        let resolution = WardrobeContextManager.shared.resolveSearch(
+            query: "帮我找外套上衣",
+            clothings: [cardigan, jsk]
+        )
+
+        XCTAssertTrue(resolution.results.contains(where: { $0.id == cardigan.id }))
+        XCTAssertTrue(resolution.matchedTerms.contains(where: { $0.contains("开衫") || $0.contains("披肩") || $0.contains("针织") }))
+        XCTAssertTrue(resolution.suggestedPrompt.contains("标签"))
+    }
+
+    func testWardrobeContextBlockIncludesVocabularyLearning() {
+        let cardigan = Clothing(name: "奶油云朵开衫", types: "针织开衫")
+        cardigan.tags = [Tag(name: "通勤披肩")]
+
+        let block = WardrobeContextManager.shared.buildWardrobeContextBlockIfNeeded(
+            query: "帮我找外套上衣",
+            clothings: [cardigan],
+            maxItems: 6
+        )
+
+        XCTAssertTrue(block?.contains("用户衣橱词汇偏好") == true)
+        XCTAssertTrue(block?.contains("通勤披肩") == true || block?.contains("针织开衫") == true)
     }
 }

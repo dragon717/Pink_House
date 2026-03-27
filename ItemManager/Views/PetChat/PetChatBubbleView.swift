@@ -10,8 +10,25 @@ struct PetChatBubble: View {
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showAllResults = false
     @State private var showingReportButton = false
+
+    private var screenWidth: CGFloat {
+        UIScreen.main.bounds.width
+    }
+
+    private var contentBubbleMaxWidth: CGFloat {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return min(screenWidth * 0.55, 520)
+        }
+        return min(screenWidth - 104, 340)
+    }
+
+    private var textBubbleMaxWidth: CGFloat {
+        if embeddedQuickOptionWidgets.isEmpty {
+            return min(contentBubbleMaxWidth, screenWidth * 0.72)
+        }
+        return contentBubbleMaxWidth
+    }
     
     private var currentPetCharacter: PetCharacter {
         guard let petId = PetDataManager.shared.status.selectedPetId,
@@ -40,47 +57,87 @@ struct PetChatBubble: View {
                     .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.8))
                     .padding(.leading, 4)
                 }
+
+                if let expressionImageName = standaloneExpressionImageName {
+                    standaloneExpressionView(imageName: expressionImageName)
+                }
                 
                 switch message.type {
                 case .text, .thinking:
-                    textBubble
+                    if shouldMergeStandaloneWidgets {
+                        mergedBubble(mainContentMaxWidth: contentBubbleMaxWidth) {
+                            textContent
+                        }
+                    } else {
+                        textBubble
+                    }
                 case .wardrobeCard:
                     if let clothing = message.clothing {
-                        wardrobeCardBubble(clothing)
+                        if shouldMergeStandaloneWidgets {
+                            mergedBubble(mainContentMaxWidth: contentBubbleMaxWidth) {
+                                wardrobeCardContent(clothing)
+                            }
+                        } else {
+                            wardrobeCardBubble(clothing)
+                        }
                     } else {
                         textBubble
                     }
                 case .statistics:
                     if let stats = message.statistics {
-                        statisticsBubble(stats)
+                        if shouldMergeStandaloneWidgets {
+                            mergedBubble(mainContentMaxWidth: contentBubbleMaxWidth) {
+                                statisticsContent(stats)
+                            }
+                        } else {
+                            statisticsBubble(stats)
+                        }
                     } else {
                         textBubble
                     }
                 case .colorMatch:
                     if let colorRec = message.colorRecommendation {
-                        colorMatchBubble(colorRec)
+                        if shouldMergeStandaloneWidgets {
+                            mergedBubble(mainContentMaxWidth: contentBubbleMaxWidth) {
+                                colorMatchContent(colorRec)
+                            }
+                        } else {
+                            colorMatchBubble(colorRec)
+                        }
                     } else {
                         textBubble
                     }
                 case .searchResults:
                     if let results = message.searchResults {
-                        searchResultsBubble(results)
+                        if shouldMergeStandaloneWidgets {
+                            mergedBubble(mainContentMaxWidth: contentBubbleMaxWidth) {
+                                searchResultsContent(results)
+                            }
+                        } else {
+                            searchResultsBubble(results)
+                        }
                     } else {
                         textBubble
                     }
                 case .outfitSuggestion:
                     if let suggestion = message.outfitSuggestion {
-                        outfitSuggestionBubble(suggestion)
+                        if shouldMergeStandaloneWidgets {
+                            mergedBubble(mainContentMaxWidth: contentBubbleMaxWidth) {
+                                outfitSuggestionContent(suggestion)
+                            }
+                        } else {
+                            outfitSuggestionBubble(suggestion)
+                        }
                     } else {
                         textBubble
                     }
                 }
 
-                if !standaloneWidgets.isEmpty {
+                if !shouldMergeStandaloneWidgets && !standaloneWidgets.isEmpty {
                     PetGenerativeWidgetHost(widgets: standaloneWidgets) { option in
                         onWidgetAction(option, message.id)
                     }
-                    .frame(maxWidth: 320, alignment: message.isUser ? .trailing : .leading)
+                    .frame(maxWidth: contentBubbleMaxWidth, alignment: message.isUser ? .trailing : .leading)
                 }
                 
                 HStack(spacing: 12) {
@@ -174,6 +231,10 @@ struct PetChatBubble: View {
         return embeddedQuickOptionWidgets.isEmpty ? widgets : []
     }
 
+    private var shouldMergeStandaloneWidgets: Bool {
+        !message.isUser && !standaloneWidgets.isEmpty
+    }
+
     private var defaultPetExpressionImageName: String {
         if UIImage(named: currentPetCharacter.quickOptionIconName) != nil {
             return currentPetCharacter.quickOptionIconName
@@ -182,6 +243,15 @@ struct PetChatBubble: View {
     }
 
     private func fallbackEmotionImageName(for imageName: String) -> String? {
+        if imageName.hasPrefix("playful_") {
+            return currentPetCharacter.happyImageName
+        }
+        if imageName.hasPrefix("sad_") {
+            return currentPetCharacter.sleepyImageName
+        }
+        if imageName.hasPrefix("confused_") || imageName == "confused" {
+            return currentPetCharacter.confusedImageName
+        }
         if imageName.hasSuffix("_cat") || imageName == "cat" {
             return UIImage(named: "cat") != nil ? "cat" : "happy_cat"
         }
@@ -199,6 +269,31 @@ struct PetChatBubble: View {
             return fallback
         }
         return rawName
+    }
+
+    private var standaloneExpressionImageName: String? {
+        guard !message.isUser, message.type == .text || message.type == .thinking else {
+            return nil
+        }
+        if let explicitImageName = message.imageName, !explicitImageName.isEmpty {
+            return resolvedBubbleImageName(from: explicitImageName)
+        }
+        guard let meaning = detectPetChatExpressionMeaning(in: message.text) else {
+            return nil
+        }
+        return resolvedBubbleImageName(from: currentPetCharacter.chatExpressionImageName(for: meaning))
+    }
+
+    @ViewBuilder
+    private func standaloneExpressionView(imageName: String) -> some View {
+        if let image = UIImage(named: imageName) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 110, maxHeight: 110)
+                .padding(.leading, 4)
+                .transition(.opacity.combined(with: .scale))
+        }
     }
 
     @ViewBuilder
@@ -247,44 +342,35 @@ struct PetChatBubble: View {
         }
     }
     
-    private var textBubble: some View {
-        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
-            if !message.isUser, let imageName = message.imageName {
-                let resolvedImageName = resolvedBubbleImageName(from: imageName)
-                if let image = UIImage(named: resolvedImageName) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: 200)
-                        .cornerRadius(12)
-                        .overlay(alignment: .bottomTrailing) {
-                            PetStampView()
-                                .scaleEffect(0.5)
-                                .padding(4)
-                        }
-                } else {
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .frame(width: 150, height: 150)
-                            .cornerRadius(12)
-                        
-                        VStack {
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundColor(.gray)
-                            Text(imageName)
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                    }
+    private func mergedBubble<Content: View>(
+        mainContentMaxWidth: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 12) {
+            content()
+
+            PetGenerativeWidgetHost(widgets: standaloneWidgets) { option in
+                onWidgetAction(option, message.id)
+            }
+            .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(bubbleBackground(isUser: message.isUser))
+        .frame(maxWidth: mainContentMaxWidth, alignment: message.isUser ? .trailing : .leading)
+        .onLongPressGesture {
+            if !message.isUser && message.isAIGenerated {
+                withAnimation {
+                    showingReportButton = true
                 }
             }
-            
+        }
+    }
+
+    private var textContent: some View {
+        VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
-                Text(message.text)
-                    .font(.subheadline)
-                    .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
+                bubbleText(expandsToBubbleWidth: !embeddedQuickOptionWidgets.isEmpty)
 
                 if !embeddedQuickOptionWidgets.isEmpty {
                     PetGenerativeWidgetHost(widgets: embeddedQuickOptionWidgets) { option in
@@ -293,11 +379,31 @@ struct PetChatBubble: View {
                     .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func bubbleText(expandsToBubbleWidth: Bool) -> some View {
+        let text = Text(message.text)
+            .font(.subheadline)
+            .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
+            .multilineTextAlignment(message.isUser ? .trailing : .leading)
+            .fixedSize(horizontal: false, vertical: true)
+
+        if expandsToBubbleWidth {
+            text.frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
+        } else {
+            text
+        }
+    }
+
+    private var textBubble: some View {
+        textContent
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(bubbleBackground(isUser: message.isUser))
-        }
-        .frame(maxWidth: embeddedQuickOptionWidgets.isEmpty ? 280 : 320, alignment: message.isUser ? .trailing : .leading)
+        
+        .frame(maxWidth: textBubbleMaxWidth, alignment: message.isUser ? .trailing : .leading)
         .onLongPressGesture {
             if !message.isUser && message.isAIGenerated {
                 withAnimation {
@@ -307,16 +413,19 @@ struct PetChatBubble: View {
         }
     }
     
-    private func wardrobeCardBubble(_ clothing: Clothing) -> some View {
+    private func wardrobeCardContent(_ clothing: Clothing) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             Button {
                 onCardTap(clothing)
             } label: {
-                HStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
                     if let firstImagePath = clothing.imagePaths.first {
                         AsyncLocalImageView(
                             fileName: firstImagePath,
@@ -341,8 +450,10 @@ struct PetChatBubble: View {
                         Text(clothing.name)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .lineLimit(1)
+                            .lineLimit(3)
                             .foregroundStyle(aiBubbleTextColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .layoutPriority(1)
                         
                         if let brand = clothing.brand {
                             Text(brand.name)
@@ -367,17 +478,24 @@ struct PetChatBubble: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
+    }
+
+    private func wardrobeCardBubble(_ clothing: Clothing) -> some View {
+        wardrobeCardContent(clothing)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(bubbleBackground(isUser: false))
+            .frame(maxWidth: contentBubbleMaxWidth, alignment: .leading)
     }
     
-    private func statisticsBubble(_ stats: WardrobeStats) -> some View {
+    private func statisticsContent(_ stats: WardrobeStats) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             VStack(spacing: 10) {
                 statRow(icon: "hanger", title: "总件数", value: "\(stats.totalCount) 件")
@@ -396,14 +514,18 @@ struct PetChatBubble: View {
             .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
+    }
+
+    private func statisticsBubble(_ stats: WardrobeStats) -> some View {
+        statisticsContent(stats)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(bubbleBackground(isUser: false))
+            .frame(maxWidth: contentBubbleMaxWidth, alignment: .leading)
     }
     
     private func statRow(icon: String, title: String, value: String) -> some View {
-        HStack {
+        HStack(alignment: .top) {
             Image(systemName: icon)
                 .font(.caption)
                 .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
@@ -419,15 +541,20 @@ struct PetChatBubble: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(aiBubbleTextColor)
-                .lineLimit(1)
+                .lineLimit(3)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
     
-    private func colorMatchBubble(_ colorRec: ColorRecommendation) -> some View {
+    private func colorMatchContent(_ colorRec: ColorRecommendation) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             HStack(spacing: 8) {
                 colorCircle(colorRec.primaryColor, label: "主色")
@@ -440,10 +567,14 @@ struct PetChatBubble: View {
                 .foregroundStyle(themeManager.secondaryTextColor)
                 .lineLimit(2)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
+    }
+
+    private func colorMatchBubble(_ colorRec: ColorRecommendation) -> some View {
+        colorMatchContent(colorRec)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(bubbleBackground(isUser: false))
+            .frame(maxWidth: contentBubbleMaxWidth, alignment: .leading)
     }
     
     private func colorCircle(_ colorName: String, label: String) -> some View {
@@ -471,98 +602,35 @@ struct PetChatBubble: View {
         return colorMap[name] ?? .pink
     }
     
-    private func searchResultsBubble(_ results: [Clothing]) -> some View {
+    private func searchResultsContent(_ results: [Clothing]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(message.text)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
-            
-            VStack(spacing: 8) {
-                ForEach(showAllResults ? results : Array(results.prefix(3))) { clothing in
-                    Button {
-                        onSearchResultTap(clothing)
-                    } label: {
-                        HStack(spacing: 10) {
-                            if let firstImagePath = clothing.imagePaths.first {
-                                AsyncLocalImageView(
-                                    fileName: firstImagePath,
-                                    displaySize: CGSize(width: 40, height: 40),
-                                    contentMode: .fill,
-                                    cornerRadius: 6,
-                                    placeholderColor: themeManager.tertiaryTextColor.opacity(0.2)
-                                )
-                                .frame(width: 40, height: 40)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            } else {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(themeManager.tertiaryTextColor.opacity(0.2))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Image(systemName: "tshirt")
-                                            .font(.caption)
-                                            .foregroundStyle(themeManager.secondaryTextColor)
-                                    )
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(clothing.name)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .lineLimit(1)
-                                    .foregroundStyle(aiBubbleTextColor)
-                                
-                                Text("¥\(NSDecimalNumber(decimal: clothing.price).stringValue)")
-                                    .font(.caption2)
-                                    .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                            }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption2)
-                                .foregroundStyle(themeManager.tertiaryTextColor)
-                        }
-                        .padding(8)
-                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
-                if results.count > 3 {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showAllResults.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: showAllResults ? "chevron.up" : "chevron.down")
-                                .font(.caption2)
-                            Text(showAllResults ? "收起" : "还有 \(results.count - 3) 件...")
-                                .font(.caption)
-                        }
-                        .foregroundStyle(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 8)
-                        .background(skinTheme.resolvedAssistantAccentColor(themeManager: themeManager, colorScheme: colorScheme).opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.top, 4)
-                }
-            }
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            clothingCarousel(results, onTap: onSearchResultTap)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
     }
 
-    private func outfitSuggestionBubble(_ suggestion: OutfitSuggestionData) -> some View {
+    private func searchResultsBubble(_ results: [Clothing]) -> some View {
+        searchResultsContent(results)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(bubbleBackground(isUser: false))
+            .frame(maxWidth: contentBubbleMaxWidth, alignment: .leading)
+    }
+
+    private func outfitSuggestionContent(_ suggestion: OutfitSuggestionData) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(suggestion.description)
                 .font(.subheadline)
                 .foregroundStyle(aiBubbleTextColor)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 8) {
                 Label(suggestion.style, systemImage: "sparkles")
@@ -587,51 +655,7 @@ struct PetChatBubble: View {
                     .font(.caption)
                     .foregroundStyle(themeManager.secondaryTextColor)
 
-                ForEach(suggestion.clothings.prefix(4)) { clothing in
-                    Button {
-                        onCardTap(clothing)
-                    } label: {
-                        HStack(spacing: 8) {
-                            if let firstPath = clothing.imagePaths.first,
-                               let image = ImageManager.shared.loadImage(fileName: firstPath) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            } else {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(themeManager.tertiaryTextColor.opacity(0.2))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Image(systemName: "tshirt")
-                                            .foregroundStyle(themeManager.tertiaryTextColor)
-                                    )
-                            }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(clothing.name)
-                                    .font(.subheadline)
-                                    .lineLimit(1)
-                                    .foregroundStyle(aiBubbleTextColor)
-                                Text(clothing.brand?.name ?? "未知品牌")
-                                    .font(.caption)
-                                    .foregroundStyle(themeManager.secondaryTextColor)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(themeManager.tertiaryTextColor)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
+                clothingCarousel(Array(suggestion.clothings.prefix(8)), onTap: onCardTap)
             }
 
             Button {
@@ -660,10 +684,14 @@ struct PetChatBubble: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(bubbleBackground(isUser: false))
-        .frame(maxWidth: 320, alignment: .leading)
+    }
+
+    private func outfitSuggestionBubble(_ suggestion: OutfitSuggestionData) -> some View {
+        outfitSuggestionContent(suggestion)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(bubbleBackground(isUser: false))
+            .frame(maxWidth: contentBubbleMaxWidth, alignment: .leading)
     }
 
     private func outfitItemsPreview(_ outfit: Outfit) -> some View {
@@ -700,6 +728,69 @@ struct PetChatBubble: View {
                     .background(Color.gray.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+        }
+    }
+
+    private func clothingCarousel(_ clothings: [Clothing], onTap: @escaping (Clothing) -> Void) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(clothings) { clothing in
+                    Button {
+                        onTap(clothing)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            clothingCarouselImage(for: clothing)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(clothing.name)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(aiBubbleTextColor)
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                if let brandName = clothing.brand?.name,
+                                   !brandName.isEmpty {
+                                    Text(brandName)
+                                        .font(.caption2)
+                                        .foregroundStyle(themeManager.secondaryTextColor)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(8)
+                        .frame(width: 128, alignment: .topLeading)
+                        .background(skinTheme.resolvedAssistantCardBackground(themeManager: themeManager, colorScheme: colorScheme))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    @ViewBuilder
+    private func clothingCarouselImage(for clothing: Clothing) -> some View {
+        if let firstImagePath = clothing.imagePaths.first {
+            AsyncLocalImageView(
+                fileName: firstImagePath,
+                displaySize: CGSize(width: 112, height: 112),
+                contentMode: .fill,
+                cornerRadius: 10,
+                placeholderColor: themeManager.tertiaryTextColor.opacity(0.2)
+            )
+            .frame(width: 112, height: 112)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(themeManager.tertiaryTextColor.opacity(0.2))
+                .frame(width: 112, height: 112)
+                .overlay(
+                    Image(systemName: "tshirt")
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                )
         }
     }
 }

@@ -648,11 +648,25 @@ struct OOTDEditorView: View {
         processingMessage = "正在深度修复数据..."
         
         Task {
+            let report = await OOTDDataRepairService.shared.deepRepair(context: modelContext) { message in
+                Task { @MainActor in
+                    processingMessage = message
+                }
+            }
+
+            await MainActor.run {
+                processingMessage = report.shortSummary
+                print("[OOTD Repair] \(report.detailedSummary)")
+                if !report.errors.isEmpty {
+                    print("[OOTD Repair] Errors:\n\(report.errors.joined(separator: "\n"))")
+                }
+            }
+
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             await MainActor.run {
                 isProcessing = false
+                processingMessage = ""
             }
         }
     }
 }
-

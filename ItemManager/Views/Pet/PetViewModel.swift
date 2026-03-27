@@ -196,13 +196,22 @@ class PetViewModel: ObservableObject {
     // MARK: - Pet Adoption & Switching
     
     // 获取领养价格
-    func getAdoptionPrice(for pet: PetCharacter) -> (price: Int, currency: PetCurrency) {
+    static func adoptionPrice(for pet: PetCharacter, ownedPetIds: [String]) -> (price: Int, currency: PetCurrency) {
+        // 规则：第一只宠物免费（不限角色）
+        if ownedPetIds.isEmpty {
+            return (0, .fishCoin)
+        }
+        
         switch pet {
         case .maomao:
             return (60, .meowCoin)
         default:
-            return (0, .fishCoin) // 默认免费
+            return (0, .fishCoin)
         }
+    }
+    
+    func getAdoptionPrice(for pet: PetCharacter) -> (price: Int, currency: PetCurrency) {
+        Self.adoptionPrice(for: pet, ownedPetIds: status.ownedPetIds)
     }
     
     // 领养宠物 (返回是否成功)
@@ -914,8 +923,9 @@ class PetViewModel: ObservableObject {
                 // 随机撒娇语音 (增加互动感)
                 let interactions = ["蹭蹭~", "喵~", "主人最好了", "好舒服喵", "还要摸摸"]
                 let randomText = interactions.randomElement() ?? "喵~"
+                let localizedText = currentPet.localizedCatchphraseText(randomText)
                 Task { @MainActor in
-                    PetVoiceManager.shared.speak(randomText, for: self.currentPet.aiRole)
+                    PetVoiceManager.shared.speak(localizedText, for: self.currentPet.aiRole)
                 }
             }
             

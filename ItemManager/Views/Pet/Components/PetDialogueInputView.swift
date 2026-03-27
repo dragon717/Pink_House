@@ -2,25 +2,32 @@ import SwiftUI
 
 struct PetDialogueInputView: View {
     @Binding var text: String
+    var placeholder: String = "请输入的文字"
     var onSend: () -> Void
+    var focusRequestID: Int = 0
+    var onFocusChange: ((Bool) -> Void)? = nil
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @FocusState private var isFocused: Bool
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // 输入框
             ZStack(alignment: .leading) {
                 if text.isEmpty {
-                    Text("请输入的文字")
+                    Text(placeholder)
                         .foregroundStyle(themeManager.tertiaryTextColor.opacity(0.6))
                         .padding(.horizontal, 16)
                 }
-                
+
                 TextField("", text: $text)
                     .focused($isFocused)
                     .font(.system(size: 17))
                     .foregroundStyle(themeManager.primaryTextColor)
+                    .submitLabel(.send)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit(onSend)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
             }
@@ -31,7 +38,7 @@ struct PetDialogueInputView: View {
                 Capsule()
                     .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
             )
-            
+
             // 发送按钮 (猫爪)
             Button(action: onSend) {
                 ZStack {
@@ -47,7 +54,7 @@ struct PetDialogueInputView: View {
                             )
                         )
                         .shadow(color: themeManager.cardTintColor.opacity(0.3), radius: 2, x: 0, y: 2)
-                    
+
                     Image(systemName: "pawprint.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(.white)
@@ -63,7 +70,7 @@ struct PetDialogueInputView: View {
                 RoundedRectangle(cornerRadius: 30)
                     .fill(themeManager.cardBackgroundColor)
                     .shadow(color: themeManager.accentTextColor.opacity(0.15), radius: 10, x: 0, y: 5)
-                
+
                 // 气泡尾巴 (左下角)
                 GeometryReader { geo in
                     Path { path in
@@ -81,7 +88,15 @@ struct PetDialogueInputView: View {
             RoundedRectangle(cornerRadius: 30)
                 .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
         )
-
+        .onChange(of: isFocused) { _, newValue in
+            onFocusChange?(newValue)
+        }
+        .onChange(of: focusRequestID) { _, newValue in
+            guard newValue > 0 else { return }
+            DispatchQueue.main.async {
+                isFocused = true
+            }
+        }
     }
 }
 
