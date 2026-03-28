@@ -5,7 +5,7 @@ final class PetHistoryResetManager {
     static let shared = PetHistoryResetManager()
 
     private static let resetAppliedVersionKey = "pet_history_reset_applied_version"
-    private static let targetVersion = "1.6"
+    private static let targetVersion = "1.4"
 
     private init() {}
 

@@ -139,11 +139,11 @@ struct SmallWorldMenuOverlay: View {
             let tabBarHeight = 65.0 + safeAreaBottom
             let topBarHeight = 65.0 + safeAreaTop
             let fallbackTriggerHeight = isIPad ? topBarHeight : tabBarHeight
-            let fallbackTriggerWidth = min(geometry.size.width / 4, 100)
+            // 移除固定宽度计算的 fallbackFrame，完全依赖 TabBarItemAnchorResolver 获取真实的 house tab 位置
             let fallbackFrame = CGRect(
-                x: geometry.size.width * 0.375 - fallbackTriggerWidth / 2,
+                x: geometry.size.width / 2 - 34,  // 使用屏幕中心作为 fallback，避免固定宽度计算
                 y: (isIPad ? 0 : geometry.size.height - fallbackTriggerHeight),
-                width: fallbackTriggerWidth,
+                width: 68,
                 height: fallbackTriggerHeight
             )
             let houseTabFrame = resolvedHouseTabFrame(in: geometry, fallbackFrame: fallbackFrame)
@@ -264,20 +264,13 @@ struct SmallWorldMenuOverlay: View {
     }
 
     private func resolvedHouseTabFrame(in geometry: GeometryProxy, fallbackFrame: CGRect) -> CGRect {
-        guard let frame = guideManager.guideTargetFrame(for: .homeHouseTab) else {
-            return fallbackFrame
-        }
-
-        let expandedFrame = frame.insetBy(dx: -8, dy: -8)
-        let screenBounds = CGRect(origin: .zero, size: geometry.size)
-
-        guard expandedFrame.width > 0,
-              expandedFrame.height > 0,
-              screenBounds.intersects(expandedFrame) else {
-            return fallbackFrame
-        }
-
-        return expandedFrame
+        TabBarItemAnchorResolver.resolvedFrame(
+            for: .homeHouseTab,
+            preferredTabIndex: 1,
+            in: geometry,
+            expansion: 0,  // 移除额外的扩展偏移，直接使用 tab 的原始位置
+            fallback: fallbackFrame
+        )
     }
 
     // MARK: - 单层轮盘菜单

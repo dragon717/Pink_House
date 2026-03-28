@@ -257,7 +257,7 @@ struct MainTabView: View {
             if #available(iOS 18.0, *) {
                 ModernTabView()
             } else {
-                LegacyTabView()  // iOS 17 及以下回退
+                LegacyTabView()  // iOS 18 及以下回退
             }
         }
     }

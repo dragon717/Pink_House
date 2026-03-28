@@ -105,8 +105,8 @@ struct SpaceBookToolbar: ToolbarContent {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .foregroundStyle(.primary)
+                        .captureGuideToolbarIconTarget(.spaceBookDetailMoreMenuButton)
                 }
-                .captureGuideTarget(.spaceBookDetailMoreMenuButton)
             }
         }
     }

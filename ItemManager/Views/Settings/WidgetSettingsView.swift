@@ -157,7 +157,7 @@ struct WidgetSettingsView: View {
                                 .font(.headline)
                                 .foregroundStyle(.pink)
                             
-                            Text("小组件支持深色模式，且在 iOS 17+ 待机模式下有更好的显示效果。")
+                            Text("小组件支持深色模式，且在 iOS 18+ 待机模式下有更好的显示效果。")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }

@@ -101,10 +101,11 @@ enum PetChatTranscriptStore {
         }
 
         return decoded.map { legacyMessage in
-            PetChatMessage(
-                text: legacyMessage.isUser ? legacyMessage.text : sanitizeAssistantText(legacyMessage.text),
+            let sanitizedUserText = sanitizeUserText(legacyMessage.text)
+            return PetChatMessage(
+                text: legacyMessage.isUser ? sanitizedUserText : sanitizeAssistantText(legacyMessage.text),
                 isUser: legacyMessage.isUser,
-                isUserAuthored: legacyMessage.isUser,
+                isUserAuthored: legacyMessage.isUser && isLikelyManualUserText(sanitizedUserText),
                 imageName: legacyMessage.imageName,
                 isAIGenerated: !legacyMessage.isUser,
                 timestamp: legacyMessage.timestamp
@@ -186,7 +187,7 @@ enum PetChatTranscriptStore {
         }
 
         init(message: PetChatMessage) {
-            self.text = message.isUser ? message.text : sanitizeAssistantText(message.text)
+            self.text = message.isUser ? sanitizeUserText(message.text) : sanitizeAssistantText(message.text)
             self.isUser = message.isUser
             self.isUserAuthored = message.isUserAuthored
             self.timestamp = message.timestamp
@@ -222,7 +223,7 @@ enum PetChatTranscriptStore {
         }
 
         var message: PetChatMessage {
-            let displayText = isUser ? text : PetChatTranscriptStore.sanitizeAssistantText(text)
+            let displayText = isUser ? PetChatTranscriptStore.sanitizeUserText(text) : PetChatTranscriptStore.sanitizeAssistantText(text)
             return PetChatMessage(
                 text: displayText,
                 isUser: isUser,
@@ -238,11 +239,14 @@ enum PetChatTranscriptStore {
 
     private static func isReusableUserMessage(_ message: PetChatMessage) -> Bool {
         guard message.isUser, message.isUserAuthored else { return false }
-        let trimmed = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = sanitizeUserText(message.text).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         // 历史列表只展示自然语言，避免 JSON 透出到用户界面。
         if (trimmed.hasPrefix("{") && trimmed.hasSuffix("}")) ||
             (trimmed.hasPrefix("[") && trimmed.hasSuffix("]")) {
+            return false
+        }
+        if PetGenerativePromptBuilder.containsInternalPromptLeak(trimmed) {
             return false
         }
         if !isLikelyManualUserText(trimmed) {
@@ -252,18 +256,27 @@ enum PetChatTranscriptStore {
     }
 
     private static func isLikelyManualUserText(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = sanitizeUserText(text).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
+        if PetGenerativePromptBuilder.containsInternalPromptLeak(trimmed) {
+            return false
+        }
         let blockedCommands: Set<String> = [
             "今日打卡", "去打卡", "签到", "数钞票", "来财", "喂食"
         ]
         return !blockedCommands.contains(trimmed)
     }
 
+    private static func sanitizeUserText(_ text: String) -> String {
+        PetGenerativePromptBuilder.recoverUserFacingText(from: text)
+    }
+
     private static func sanitizeAssistantText(_ text: String) -> String {
         // 用户可见内容必须去掉 JSON/代码感。
-        let humanized = PetResponseHumanizer.humanize(text)
-        return humanized.isEmpty ? text : humanized
+        var cleaned = PetGenerativePromptBuilder.sanitizeMessageText(text)
+        let humanized = PetResponseHumanizer.humanize(cleaned)
+        let result = humanized.isEmpty ? cleaned : humanized
+        return PetGenerativePromptBuilder.sanitizeMessageText(result)
     }
 
     private struct PersistedMessageKey: Hashable {
@@ -272,7 +285,7 @@ enum PetChatTranscriptStore {
         let timestampBucket: Int64
 
         init(message: PetChatMessage) {
-            self.text = message.text
+            self.text = message.isUser ? PetChatTranscriptStore.sanitizeUserText(message.text) : PetChatTranscriptStore.sanitizeAssistantText(message.text)
             self.isUser = message.isUser
             self.timestampBucket = Int64(message.timestamp.timeIntervalSince1970.rounded())
         }

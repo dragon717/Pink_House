@@ -117,6 +117,42 @@ final class PetGenerativeUITests: XCTestCase {
         XCTAssertTrue(prompt.contains("0 或 1 个 [IMAGE:动作ID]"))
     }
 
+    func testRecoverUserFacingTextExtractsPromptQuestion() {
+        let prompt = PetGenerativePromptBuilder.buildPrompt(
+            input: .init(
+                userQuery: "我今天有点焦虑",
+                wardrobeContextBlock: "以下是衣橱摘要（仅供参考）：...",
+                persona: PetPersonaRegistry.profile(for: .kitten, petName: "奶茶"),
+                module: .mood,
+                recentAssistantReplies: []
+            )
+        )
+
+        let recovered = PetGenerativePromptBuilder.recoverUserFacingText(from: prompt)
+
+        XCTAssertEqual(recovered, "我今天有点焦虑")
+    }
+
+    func testRecoverUserFacingTextExtractsImageAnalysisQuestion() {
+        let prompt = """
+        视觉描述：这是一条粉色裙子。
+
+        用户问题：这条适合春天吗？
+
+        (重要提示：请务必保持小橘猫的角色设定（喵~）。)
+        """
+
+        let recovered = PetGenerativePromptBuilder.recoverUserFacingText(from: prompt)
+
+        XCTAssertEqual(recovered, "这条适合春天吗？")
+    }
+
+    func testPromptLeakDetectorMatchesInternalPromptMarkers() {
+        XCTAssertTrue(PetGenerativePromptBuilder.containsInternalPromptLeak("【输出协议（必须遵守）】 仅输出 JSON 对象"))
+        XCTAssertTrue(PetGenerativePromptBuilder.containsInternalPromptLeak("角色卡：- 性格：傲娇"))
+        XCTAssertFalse(PetGenerativePromptBuilder.containsInternalPromptLeak("我今天有点焦虑，陪陪我吧"))
+    }
+
     func testWeatherWidgetFactoryBuildsContainerWithChildren() {
         let outerwear = Clothing(name: "奶油开衫", types: "外套")
         let dress = Clothing(name: "薄荷JSK", types: "JSK")

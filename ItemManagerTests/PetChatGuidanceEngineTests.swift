@@ -221,4 +221,37 @@ final class PetChatGuidanceEngineTests: XCTestCase {
         XCTAssertTrue(block?.contains("用户衣橱词汇偏好") == true)
         XCTAssertTrue(block?.contains("通勤披肩") == true || block?.contains("针织开衫") == true)
     }
+
+    func testOutfitHarmonyReplacesClashingShoesWithNeutralOption() {
+        let dress = Clothing(name: "夜空JSK", types: "JSK", colors: "蓝色")
+        let purpleShoes = Clothing(name: "葡萄玛丽珍", types: "鞋子", colors: "紫色")
+        let whiteShoes = Clothing(name: "奶油玛丽珍", types: "鞋子", colors: "白色")
+
+        let result = OutfitColorHarmonyEngine.refineSelection(
+            [dress, purpleShoes],
+            within: [dress, purpleShoes, whiteShoes]
+        )
+
+        XCTAssertTrue(result.contains(where: { $0.id == dress.id }))
+        XCTAssertTrue(result.contains(where: { $0.id == whiteShoes.id }))
+        XCTAssertFalse(result.contains(where: { $0.id == purpleShoes.id }))
+    }
+
+    func testOutfitHarmonyKeepsNonNeutralFamiliesWithinTwo() {
+        let dress = Clothing(name: "草莓JSK", types: "JSK", colors: "粉色")
+        let blueOuterwear = Clothing(name: "海盐开衫", types: "开衫", colors: "蓝色")
+        let redAccessory = Clothing(name: "莓果发带", types: "发带", colors: "红色")
+        let blackShoes = Clothing(name: "夜色玛丽珍", types: "鞋子", colors: "黑色")
+        let whiteAccessory = Clothing(name: "奶油手袖", types: "手袖", colors: "白色")
+
+        let result = OutfitColorHarmonyEngine.refineSelection(
+            [dress, blueOuterwear, redAccessory, blackShoes],
+            within: [dress, blueOuterwear, redAccessory, blackShoes, whiteAccessory]
+        )
+
+        XCTAssertLessThanOrEqual(
+            OutfitColorHarmonyEngine.dominantNonNeutralFamilyNames(in: result).count,
+            2
+        )
+    }
 }

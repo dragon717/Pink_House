@@ -27,8 +27,8 @@ enum PetChatWidgetFactory {
             type: .quickOptions,
             title: "想换一种：",
             options: [
-                PetWidgetOption(title: "更防雨", command: "ask:请按雨天优先再给我一套更稳妥的穿搭。", icon: "cloud.rain"),
-                PetWidgetOption(title: "更甜美", command: "ask:请保留天气因素，改成更甜美的搭配。", icon: "heart"),
+                PetWidgetOption(title: "更防雨", command: "weather_guidance:rain", icon: "cloud.rain"),
+                PetWidgetOption(title: "更甜美", command: "weather_guidance:sweet", icon: "heart"),
                 PetWidgetOption(title: "先安慰我", command: "mood_support", icon: "sparkles")
             ]
         )

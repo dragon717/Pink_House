@@ -158,7 +158,7 @@ struct MessageBubble: View {
                         }
                     }
                     
-                    Text(message.text)
+                    Text(PetGenerativePromptBuilder.sanitizeMessageText(message.text))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(
@@ -234,7 +234,7 @@ struct MessageBubble: View {
                         }
                         
                         // 2. 文字内容
-                        Text(message.text)
+                        Text(PetGenerativePromptBuilder.sanitizeMessageText(message.text))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .background(

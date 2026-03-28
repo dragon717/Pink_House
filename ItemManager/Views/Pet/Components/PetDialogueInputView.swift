@@ -4,89 +4,103 @@ struct PetDialogueInputView: View {
     @Binding var text: String
     var placeholder: String = "请输入的文字"
     var onSend: () -> Void
+    var onQuickMenuAction: (() -> Void)? = nil
     var focusRequestID: Int = 0
     var onFocusChange: ((Bool) -> Void)? = nil
-    @Environment(ThemeManager.self) private var themeManager
-    @Environment(\.colorScheme) private var colorScheme
+    
     @FocusState private var isFocused: Bool
-
+    
     var body: some View {
-        HStack(spacing: 12) {
-            // 输入框
-            ZStack(alignment: .leading) {
-                if text.isEmpty {
-                    Text(placeholder)
-                        .foregroundStyle(themeManager.tertiaryTextColor.opacity(0.6))
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                if let onQuickMenuAction = onQuickMenuAction {
+                    Button(action: onQuickMenuAction) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.pink)
+                    }
+                }
+                
+                ZStack(alignment: .leading) {
+                    if text.isEmpty {
+                        Text(placeholder)
+                            .foregroundStyle(.gray.opacity(0.6))
+                            .padding(.horizontal, 16)
+                    }
+                    
+                    TextField("", text: $text)
+                        .focused($isFocused)
+                        .font(.system(size: 17))
+                        .foregroundStyle(.primary)
+                        .submitLabel(.send)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit(onSend)
                         .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                 }
-
-                TextField("", text: $text)
-                    .focused($isFocused)
-                    .font(.system(size: 17))
-                    .foregroundStyle(themeManager.primaryTextColor)
-                    .submitLabel(.send)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .onSubmit(onSend)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-            }
-            .background(themeManager.cardBackgroundColor)
-            .clipShape(Capsule())
-            // 简单的内阴影效果
-            .overlay(
-                Capsule()
-                    .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
-            )
-
-            // 发送按钮 (猫爪)
-            Button(action: onSend) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    themeManager.cardTintColor.mixed(with: .white, amount: 0.1),
-                                    themeManager.cardTintColor.mixed(with: .black, amount: 0.05)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                .background(Color(.systemBackground))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                )
+                
+                Button {
+                    if !text.isEmpty {
+                        onSend()
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "FFC0CB"), Color(hex: "FFB6C1")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .shadow(color: themeManager.cardTintColor.opacity(0.3), radius: 2, x: 0, y: 2)
-
-                    Image(systemName: "pawprint.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                            .shadow(color: Color(hex: "FF69B4").opacity(0.3), radius: 2, x: 0, y: 2)
+                        
+                        Image(systemName: "pawprint.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                    }
+                    .frame(width: 44, height: 44)
                 }
-                .frame(width: 50, height: 50)
+                .disabled(text.isEmpty)
+                .opacity(text.isEmpty ? 0.5 : 1.0)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .padding(16)
         .background(
             ZStack {
-                // 主体气泡 - 使用主题卡片背景色
                 RoundedRectangle(cornerRadius: 30)
-                    .fill(themeManager.cardBackgroundColor)
-                    .shadow(color: themeManager.accentTextColor.opacity(0.15), radius: 10, x: 0, y: 5)
-
-                // 气泡尾巴 (左下角)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(hex: "FFD1DC"), Color(hex: "FFC0CB")],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
+                
                 GeometryReader { geo in
                     Path { path in
-                        path.move(to: CGPoint(x: 20, y: geo.size.height - 20)) // 起点在圆角上方一点
-                        path.addLine(to: CGPoint(x: 8, y: geo.size.height + 6)) // 延伸出去的点
-                        path.addLine(to: CGPoint(x: 40, y: geo.size.height - 10)) // 回到气泡底部
+                        path.move(to: CGPoint(x: 30, y: geo.size.height - 25))
+                        path.addLine(to: CGPoint(x: 18, y: geo.size.height + 6))
+                        path.addLine(to: CGPoint(x: 50, y: geo.size.height - 15))
                         path.closeSubpath()
                     }
-                    .fill(themeManager.cardBackgroundColor) // 与气泡背景一致
+                    .fill(Color(hex: "FFC0CB"))
                 }
             }
         )
-        // 确保整体有立体感
         .overlay(
             RoundedRectangle(cornerRadius: 30)
-                .stroke(themeManager.accentTextColor.opacity(0.15), lineWidth: 1)
+                .stroke(Color.white.opacity(0.4), lineWidth: 1)
         )
         .onChange(of: isFocused) { _, newValue in
             onFocusChange?(newValue)

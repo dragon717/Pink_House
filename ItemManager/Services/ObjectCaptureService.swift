@@ -42,7 +42,7 @@ enum ObjectCaptureStage {
 
 #if os(iOS)
 
-@available(iOS 17.0, *)
+@available(iOS 18.0, *)
 @MainActor
 class ObjectCaptureService: ObservableObject {
     
@@ -483,7 +483,7 @@ class ObjectCaptureService: ObservableObject {
     }
 }
 
-@available(iOS 17.0, *)
+@available(iOS 18.0, *)
 extension PhotogrammetrySession.Output.ProcessingStage {
     var processingStageString: String {
         switch self {

@@ -130,7 +130,9 @@ class PetAIService: ObservableObject {
         
         do {
             trimPersistedMessagesIfNeeded()
-            let data = try JSONEncoder().encode(allMessages)
+            let sanitizedMessages = allMessages.map(Self.sanitizePersistedMessage)
+            syncSanitizedMessages(sanitizedMessages)
+            let data = try JSONEncoder().encode(sanitizedMessages)
             try data.write(to: messagesFileURL)
         } catch {
             print("Failed to save chat history: \(error)")
@@ -176,6 +178,7 @@ class PetAIService: ObservableObject {
         do {
             let data = try Data(contentsOf: messagesFileURL)
             let messages = try JSONDecoder().decode([ChatMessage].self, from: data)
+                .map(Self.sanitizePersistedMessage)
             if messages.count > maxPersistedMessages {
                 self.allMessages = Array(messages.suffix(maxPersistedMessages))
             } else {
@@ -299,9 +302,10 @@ class PetAIService: ObservableObject {
     }
     
     private func appendToHistory(_ message: ChatMessage, appendToUI: Bool = true) {
-        allMessages.append(message)
+        let sanitizedMessage = Self.sanitizePersistedMessage(message)
+        allMessages.append(sanitizedMessage)
         if appendToUI {
-            uiMessages.append(message)
+            uiMessages.append(sanitizedMessage)
             // 默认窗口模式下限制 30 条，避免常驻内存增长
             if !isHistoryExpanded, uiMessages.count > latestWindowSize {
                 uiMessages.removeFirst(uiMessages.count - latestWindowSize)
@@ -318,6 +322,34 @@ class PetAIService: ObservableObject {
         if !isHistoryExpanded, uiMessages.count > latestWindowSize {
             uiMessages.removeFirst(uiMessages.count - latestWindowSize)
         }
+    }
+
+    private func syncSanitizedMessages(_ sanitizedMessages: [ChatMessage]) {
+        allMessages = sanitizedMessages
+        let sanitizedByID = Dictionary(uniqueKeysWithValues: sanitizedMessages.map { ($0.id, $0) })
+        uiMessages = uiMessages.compactMap { sanitizedByID[$0.id] }
+    }
+
+    private static func sanitizePersistedMessage(_ message: ChatMessage) -> ChatMessage {
+        let sanitizedText: String
+        
+        if message.isUser {
+            sanitizedText = PetGenerativePromptBuilder.recoverUserFacingText(from: message.text)
+        } else {
+            sanitizedText = PetGenerativePromptBuilder.sanitizeMessageText(message.text)
+        }
+        
+        guard sanitizedText != message.text else { return message }
+
+        return ChatMessage(
+            id: message.id,
+            text: sanitizedText,
+            rawText: message.rawText,
+            imageName: message.imageName,
+            imagePath: message.imagePath,
+            isUser: message.isUser,
+            timestamp: message.timestamp
+        )
     }
     
     private func saveImageToDisk(image: UIImage) -> String? {
@@ -458,7 +490,7 @@ class PetAIService: ObservableObject {
         responseMode: AIResponseMode = .humanized
     ) async -> ChatMessage {
         print("🐾 [PetAIService] sendMessage length=\(text.count)")
-        let historyUserText = displayText ?? text
+        let historyUserText = PetGenerativePromptBuilder.recoverUserFacingText(from: displayText ?? text)
         if let displayText,
            !displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            displayText != "..." {

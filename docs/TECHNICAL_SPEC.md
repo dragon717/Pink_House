@@ -13,7 +13,7 @@
 鉴于 SwiftUI 的声明式特性，MVVM 是最自然的适配架构。
 *   **Model**: SwiftData `@Model` 类 (Item, Tag 等)。
 *   **View**: SwiftUI 视图，负责 UI 呈现和用户交互。
-*   **ViewModel**: `ObservableObject` 或 `@Observable` (iOS 17+ 宏)，负责业务逻辑、数据处理、状态绑定。
+*   **ViewModel**: `ObservableObject` 或 `@Observable` (iOS 18+ 宏)，负责业务逻辑、数据处理、状态绑定。
 
 ### 2.2 目录结构规划
 ```

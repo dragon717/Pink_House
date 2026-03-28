@@ -19,6 +19,28 @@ struct AccessoryItemData: Identifiable, Equatable, Codable {
     var imagePaths: [String]? = nil
 }
 
+// MARK: - Price Helper
+
+final class ClothingPriceHelper {
+    static let shared = ClothingPriceHelper()
+    
+    private init() {}
+    
+    func calculateTotal(deposit: Double, balance: Double) -> Double {
+        if deposit > 0 && balance > 0 {
+            return deposit + balance
+        }
+        return 0
+    }
+    
+    func validatePrices(total: Double, deposit: Double, balance: Double) -> Bool {
+        if deposit > 0 && balance > 0 {
+            return abs(total - (deposit + balance)) < 0.01
+        }
+        return true
+    }
+}
+
 // MARK: - Reusable Components
 
 struct PriceRow: View {

@@ -71,10 +71,24 @@ enum PetChatGuidanceEngine {
     private static let shoeKeywords = ["鞋", "皮鞋", "高跟", "玛丽珍", "乐福", "靴", "凉鞋", "单鞋"]
     private static let umbrellaKeywords = ["伞", "雨伞", "晴雨伞", "折叠伞", "防晒伞"]
     
-    static func pickWeatherOutfitItems(from clothings: [Clothing]) -> WeatherWardrobeSelection {
+    static func pickWeatherOutfitItems(from clothings: [Clothing], stylePreference: String? = nil) -> WeatherWardrobeSelection {
         // 过滤掉心愿尾款的裙装（只从已到手单品中选择）
         let availableClothings = clothings.filter { !$0.isDepositPlan }
-        let ordered = availableClothings.sorted { $0.createdAt > $1.createdAt }
+        
+        // 根据风格偏好排序
+        let ordered: [Clothing]
+        if let stylePreference = stylePreference, !stylePreference.isEmpty {
+            ordered = availableClothings.sorted { 
+                let score1 = calculateStyleScore(for: $0, style: stylePreference)
+                let score2 = calculateStyleScore(for: $1, style: stylePreference)
+                if score1 != score2 {
+                    return score1 > score2
+                }
+                return $0.createdAt > $1.createdAt
+            }
+        } else {
+            ordered = availableClothings.sorted { $0.createdAt > $1.createdAt }
+        }
 
         var outerwears: [Clothing] = []
         var dresses: [Clothing] = []
@@ -107,6 +121,39 @@ enum PetChatGuidanceEngine {
         }
 
         return WeatherWardrobeSelection(outerwears: outerwears, dresses: dresses, shoes: shoes, umbrellas: umbrellas)
+    }
+    
+    /// 根据风格计算单品评分
+    private static func calculateStyleScore(for clothing: Clothing, style: String) -> Int {
+        var score = 0
+        let searchable = buildSearchableText(for: clothing)
+        let lowerStyle = style.lowercased()
+        
+        // 甜美风格关键词
+        if lowerStyle.contains("甜美") || lowerStyle.contains("sweet") {
+            let sweetKeywords = ["粉", "樱", "蜜桃", "桃", "玫瑰", "蕾丝", "蝴蝶结", "荷叶边", "蓬蓬", "可爱", "软妹", "甜"]
+            for keyword in sweetKeywords where containsAny(in: searchable, keywords: [keyword]) {
+                score += 10
+            }
+        }
+        
+        // 优雅风格关键词
+        if lowerStyle.contains("优雅") || lowerStyle.contains("elegant") {
+            let elegantKeywords = ["优雅", "精致", "缎面", "丝质", "珍珠", "古典", "cla", "classic", "姬袖", "长款", "端庄"]
+            for keyword in elegantKeywords where containsAny(in: searchable, keywords: [keyword]) {
+                score += 10
+            }
+        }
+        
+        // 防雨风格关键词
+        if lowerStyle.contains("防雨") || lowerStyle.contains("rain") || lowerStyle.contains("稳妥") {
+            let rainKeywords = ["防水", "雨", "厚", "保暖", "稳妥", "安全", "深色", "黑", "灰", "藏青", "绀"]
+            for keyword in rainKeywords where containsAny(in: searchable, keywords: [keyword]) {
+                score += 10
+            }
+        }
+        
+        return score
     }
     
     static func buildWeatherAdvice(weather: WeatherData?, selection: WeatherWardrobeSelection) -> String {

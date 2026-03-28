@@ -26,17 +26,13 @@ extension FeatureExperienceGuideOverlay {
             width: 68,
             height: tabBarHeight
         )
-        let capturedHouseTabFrame = aiGuideTargetFrame(
-            globalFrame: guideManager.guideTargetFrame(for: .homeHouseTab),
+        let houseTabFrame = TabBarItemAnchorResolver.resolvedFrame(
+            for: .homeHouseTab,
+            preferredTabIndex: 1,
             in: geometry,
             fallback: fallbackHouseTabFrame
         )
-        let houseTabFrame = CGRect(
-            x: capturedHouseTabFrame.midX - 34,
-            y: capturedHouseTabFrame.midY - (tabBarHeight / 2),
-            width: 68,
-            height: tabBarHeight
-        )
+        let houseTabRadius = max(34, max(houseTabFrame.width, houseTabFrame.height) / 2)
         let houseTabPawPosition = CGPoint(
             x: min(max(houseTabFrame.midX, 24), screenBounds.width - 24),
             y: min(max(houseTabFrame.midY, 24), screenBounds.height - 24)
@@ -46,15 +42,15 @@ extension FeatureExperienceGuideOverlay {
             HollowMaskView(
                 highlightFrame: houseTabFrame,
                 highlightType: .circle,
-                cornerRadius: 28
+                cornerRadius: houseTabRadius
             )
 
             HighlightPulseViewNoClick(
                 center: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
-                radius: 34
+                radius: houseTabRadius
             )
 
-            if wealthGuideStep.showCatPaw && !guideManager.isPadGuideLayout {
+            if wealthGuideStep.showCatPaw {
                 CatPawTapAnimation(
                     position: houseTabPawPosition,
                     delay: 0.5
@@ -225,7 +221,7 @@ extension FeatureExperienceGuideOverlay {
                 radius: 28
             )
 
-            if aiAnalysisStep.showCatPaw && !guideManager.isPadGuideLayout {
+            if aiAnalysisStep.showCatPaw {
                 CatPawTapAnimation(
                     position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
                     delay: 0.5
@@ -373,7 +369,7 @@ extension FeatureExperienceGuideOverlay {
             )
             .allowsHitTesting(false)
 
-            if aiAnalysisStep.showCatPaw && !guideManager.isPadGuideLayout {
+            if aiAnalysisStep.showCatPaw {
                 CatPawTapAnimation(
                     position: CGPoint(x: tabFrame.midX, y: tabFrame.midY),
                     delay: 0.5

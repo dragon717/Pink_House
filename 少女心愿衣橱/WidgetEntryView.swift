@@ -24,7 +24,7 @@ struct WidgetEntryView: View {
     
     var body: some View {
         // 使用 ZStack 确保布局层级清晰
-        // 实际上 iOS 17 的 containerBackground 会自动处理背景裁剪和适配（包括 StandBy）
+        // 实际上 iOS 18 的 containerBackground 会自动处理背景裁剪和适配（包括 StandBy）
         Group {
             switch family {
             case .systemSmall:

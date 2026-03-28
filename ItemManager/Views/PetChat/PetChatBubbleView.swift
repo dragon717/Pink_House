@@ -384,7 +384,8 @@ struct PetChatBubble: View {
 
     @ViewBuilder
     private func bubbleText(expandsToBubbleWidth: Bool) -> some View {
-        let text = Text(message.text)
+        let cleanedText = PetGenerativePromptBuilder.sanitizeMessageText(message.text)
+        let text = Text(cleanedText)
             .font(.subheadline)
             .foregroundStyle(message.isUser ? userBubbleTextColor : aiBubbleTextColor)
             .multilineTextAlignment(message.isUser ? .trailing : .leading)

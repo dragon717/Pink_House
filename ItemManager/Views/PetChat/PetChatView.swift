@@ -220,16 +220,15 @@ struct PetChatView: View {
     }
 
     private var iPadSearchInputBar: some View {
-        PetDialogueInputView(
+        PetChatiPadInputBar(
             text: $searchText,
             placeholder: searchPrompt,
             onSend: sendMessageFromSearchBar,
+            callbacks: menuCallbacks,
+            context: menuContext,
             focusRequestID: iPadSearchFocusRequestID,
             onFocusChange: handleInlineSearchFocusChange
         )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
         .captureGuideTarget(.petChatSearchBar)
     }
 
@@ -411,7 +410,7 @@ struct PetChatView: View {
                     guideSearchBarCaptureAnchor
                 }
             }
-            .safeAreaInset(edge: .top) {
+            .safeAreaInset(edge: .bottom) {
                 if usesInlinePetSearchInput {
                     iPadSearchInputBar
                 }
@@ -474,18 +473,17 @@ struct PetChatView: View {
                     broadcastFloatingPetOverlayState()
                 }
             }
-            // iOS26+ 悬浮按钮 - 使用 safeAreaInset 确保跟随键盘移动
+            // iOS26+ 悬浮按钮 - 使用 safeAreaInset 确保跟随键盘移动（仅 iPhone）
             .safeAreaInset(edge: .bottom) {
-                // 当搜索栏展开时显示按钮在键盘上方
-                if isSearchPresented {
+                if !usesInlinePetSearchInput, keyboardOverlap > 0 {
                     floatingButtonsRow
                         .padding(.bottom, searchModeFloatingBottomPadding)
                         .background(.clear) // 透明背景，不遮挡内容
                 }
             }
-            // 搜索栏收起时的悬浮按钮（原位显示）
+            // 键盘收起时的悬浮按钮（原位显示）- 仅 iPhone
             .overlay(alignment: .bottom) {
-                if !isSearchPresented {
+                if !usesInlinePetSearchInput, keyboardOverlap <= 0 {
                     floatingButtonsRow
                         .padding(.bottom, 20)
                 }
@@ -500,141 +498,19 @@ struct PetChatView: View {
 
             Spacer()
 
-            if !usesInlinePetSearchInput {
-                iOS26RightFloatingButton
-                    .padding(.trailing, 16)
-            }
+            iOS26RightFloatingButton
+                .padding(.trailing, 16)
         }
     }
 
     // iOS26+ 左侧悬浮菜单按钮
     private var iOS26LeftFloatingButton: some View {
         Menu {
-            Section("AI搭配") {
-                Button {
-                    handleOutfitSuggestion("帮我搭配一套")
-                } label: {
-                    Label("智能搭配", systemImage: "wand.and.stars")
-                }
-
-                Menu {
-                    Button {
-                        createQuickOutfit(style: "甜美", occasion: "约会")
-                    } label: {
-                        Label("甜美约会", systemImage: "heart.fill")
-                    }
-
-                    Button {
-                        createQuickOutfit(style: "优雅", occasion: "茶会")
-                    } label: {
-                        Label("优雅茶会", systemImage: "cup.and.saucer.fill")
-                    }
-
-                    Button {
-                        createQuickOutfit(style: "日常", occasion: "出门")
-                    } label: {
-                        Label("日常出门", systemImage: "bag.fill")
-                    }
-                } label: {
-                    Label("快速搭配", systemImage: "sparkles")
-                }
-            }
-
-            Menu {
-                Button {
-                    handleWardrobeStatistics()
-                } label: {
-                    Label("统计裙子", systemImage: "chart.pie.fill")
-                }
-
-                Button {
-                    handlePetStatusOverview()
-                } label: {
-                    Label("查看萌宠状态", systemImage: "heart.text.square.fill")
-                }
-
-                if quickMenuOwnedPets.count > 1 {
-                    Button {
-                        handleSwitchPetIntent()
-                    } label: {
-                        Label("切换萌宠", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                }
-
-                if let adoptionTitle = quickMenuAdoptionTitle {
-                    Button {
-                        handleSecondPetAdoptionIntent()
-                    } label: {
-                        Label(adoptionTitle, systemImage: "plus.circle.fill")
-                    }
-                }
-
-                Button {
-                    handleRenamePetIntent()
-                } label: {
-                    Label("改名", systemImage: "pencil")
-                }
-
-                Button {
-                    handleInventoryPanel()
-                } label: {
-                    Label("看看我的背包", systemImage: "shippingbox.fill")
-                }
-
-                Button {
-                    handleShopPanel()
-                } label: {
-                    Label("带我逛逛商店", systemImage: "cart.fill")
-                }
-
-                Button {
-                    handleWeatherOutfitGuidance()
-                } label: {
-                    Label("查看天气穿搭", systemImage: "cloud.sun.rain.fill")
-                }
-
-                Button {
-                    handleDepositPlanQuery()
-                } label: {
-                    Label("尾款提醒", systemImage: "tag.fill")
-                }
-
-                Button {
-                    handleMoneyCounterPanel()
-                } label: {
-                    Label("去来财数钞票", systemImage: "yensign.circle.fill")
-                }
-
-                Button {
-                    handleDivinationPanel()
-                } label: {
-                    Label("今日求签", systemImage: "wand.and.stars")
-                }
-            } label: {
-                Label("快捷功能", systemImage: "sparkles")
-            }
-
-            Section("查找") {
-                Button {
-                    searchText = WardrobeContextManager.shared.defaultSearchPrompt(clothings: clothings)
-                } label: {
-                    Label("查找衣柜", systemImage: "magnifyingglass")
-                }
-
-                Button {
-                    showingHistorySearch = true
-                } label: {
-                    Label("历史消息查询", systemImage: "clock.arrow.circlepath")
-                }
-            }
-
-            Section("其他") {
-                Button {
-                    handleDivinationPanel()
-                } label: {
-                    Label("今日运势", systemImage: "star.fill")
-                }
-            }
+            PetChatMenuContent(
+                callbacks: menuCallbacks,
+                context: menuContext,
+                useSectionLayout: true
+            )
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 24))
@@ -646,6 +522,44 @@ struct PetChatView: View {
                         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
                 )
         }
+    }
+    
+    // 菜单回调
+    private var menuCallbacks: PetChatMenuCallbacks {
+        PetChatMenuCallbacks(
+            handleOutfitSuggestion: { query in
+                handleOutfitSuggestion(query)
+            },
+            createQuickOutfit: { style, occasion in
+                createQuickOutfit(style: style, occasion: occasion)
+            },
+            handleWardrobeStatistics: { handleWardrobeStatistics() },
+            handlePetStatusOverview: { handlePetStatusOverview() },
+            handleSwitchPetIntent: { handleSwitchPetIntent() },
+            handleSecondPetAdoptionIntent: { handleSecondPetAdoptionIntent() },
+            handleRenamePetIntent: { handleRenamePetIntent() },
+            handleInventoryPanel: { handleInventoryPanel() },
+            handleShopPanel: { handleShopPanel() },
+            handleWeatherOutfitGuidance: { handleWeatherOutfitGuidance() },
+            handleDepositPlanQuery: { handleDepositPlanQuery() },
+            handleMoneyCounterPanel: { handleMoneyCounterPanel() },
+            handleDivinationPanel: { handleDivinationPanel() },
+            onSearchWardrobe: {
+                searchText = WardrobeContextManager.shared.defaultSearchPrompt(clothings: clothings)
+            },
+            onShowHistorySearch: {
+                showingHistorySearch = true
+            }
+        )
+    }
+    
+    // 菜单上下文
+    private var menuContext: PetChatMenuContext {
+        PetChatMenuContext(
+            clothings: clothings,
+            quickMenuOwnedPets: quickMenuOwnedPets,
+            quickMenuAdoptionTitle: quickMenuAdoptionTitle
+        )
     }
 
     // iOS26+ 右侧悬浮发送按钮
@@ -1669,6 +1583,18 @@ struct PetChatView: View {
 #endif
         case "open_money_counting":
             refreshPanel(for: "open_money_counting", messageID: messageID)
+        case let cmd where cmd.hasPrefix("weather_guidance:"):
+            let styleParam = String(cmd.dropFirst("weather_guidance:".count))
+            let stylePreference: String?
+            switch styleParam {
+            case "rain":
+                stylePreference = "防雨 稳妥"
+            case "sweet":
+                stylePreference = "甜美"
+            default:
+                stylePreference = nil
+            }
+            handleWeatherOutfitGuidance(stylePreference: stylePreference)
         default:
             if option.command.hasPrefix("use_item:") {
                 let rawId = String(option.command.dropFirst("use_item:".count))
@@ -1915,6 +1841,9 @@ struct PetChatView: View {
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.success)
 
+                // 发送通知，跳转到魔法平面书页
+                NotificationCenter.default.post(name: .navigateToBook, object: nil)
+
                 // 3秒后自动关闭提示
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     withAnimation(.easeOut(duration: 0.3)) {
@@ -2133,13 +2062,24 @@ struct PetChatView: View {
         messages.append(message)
     }
 
-    private func handleWeatherOutfitGuidance() {
+    private func handleWeatherOutfitGuidance(stylePreference: String? = nil) {
         isThinking = true
-        let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(from: clothings)
+        let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(from: clothings, stylePreference: stylePreference)
 
         Task { @MainActor in
             let weather = await fetchCurrentWeather()
-            let responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
+            let responseText: String
+            if let stylePreference = stylePreference {
+                if stylePreference.contains("甜美") {
+                    responseText = "好哒~这就给你搭配一套甜美的风格！"
+                } else if stylePreference.contains("防雨") {
+                    responseText = "没问题~这就给你搭配一套更稳妥防雨的！"
+                } else {
+                    responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
+                }
+            } else {
+                responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
+            }
             let items = selection.combinedItems
             let widgets = PetChatWidgetFactory.weatherGuidanceWidgets(weather: weather, selection: selection)
 

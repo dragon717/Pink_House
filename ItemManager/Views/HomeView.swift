@@ -527,7 +527,7 @@ struct HomeView: View {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
-                .captureGuideTarget(.wardrobeMoreMenuButton)
+                .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
                 .onTapGesture {
                     NotificationCenter.default.post(name: .wardrobeMoreMenuOpened, object: nil)
                 }
@@ -1099,7 +1099,7 @@ struct HomeView: View {
             Image(systemName: "plus")
                 .font(.system(size: 14))
                 .foregroundStyle(magicPalette.navigationForeground)
-                .captureGuideTarget(.wardrobeAddButton)
+                .captureGuideToolbarIconTarget(.wardrobeAddButton)
                 .onTapGesture {
                     notifyWardrobeAddMenuOpened()
                 }

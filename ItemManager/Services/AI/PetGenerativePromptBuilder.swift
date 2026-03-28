@@ -98,11 +98,94 @@ enum PetGenerativePromptBuilder {
             .map(text)
     }
 
+    static func recoverUserFacingText(from storedText: String) -> String {
+        let normalized = storedText.replacingOccurrences(of: "\r\n", with: "\n")
+        let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        for marker in userQuestionMarkers {
+            if let extracted = extractPromptField(after: marker, in: trimmed),
+               !extracted.isEmpty {
+                return extracted
+            }
+        }
+
+        return trimmed
+    }
+
+    static func containsInternalPromptLeak(_ text: String) -> Bool {
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !normalized.isEmpty else { return false }
+        return internalPromptMarkers.contains { normalized.contains($0) }
+    }
+
+    static func sanitizeMessageText(_ text: String) -> String {
+        var result = text
+        
+        for marker in allPromptLeakMarkers {
+            result = result.replacingOccurrences(of: marker, with: "", options: .caseInsensitive)
+        }
+        
+        for marker in internalPromptMarkers {
+            result = result.replacingOccurrences(of: marker, with: "", options: .caseInsensitive)
+        }
+        
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private static func shouldIncludeOutfitPriceHint(query: String) -> Bool {
         let lower = query.lowercased()
         return (lower.contains("刚刚搭配") || lower.contains("上一套") || lower.contains("刚才那套") || lower.contains("三件衣服")) &&
             (lower.contains("价格") || lower.contains("总价") || lower.contains("多少钱"))
     }
+
+    private static func extractPromptField(after marker: String, in text: String) -> String? {
+        guard let markerRange = text.range(of: marker) else { return nil }
+        let suffix = String(text[markerRange.upperBound...])
+        let field = suffix.components(separatedBy: "\n\n").first ?? suffix
+        let cleaned = field.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return nil }
+        return cleaned
+    }
+
+    private static let userQuestionMarkers = [
+        "用户原始问题：",
+        "用户问题："
+    ]
+
+    private static let allPromptLeakMarkers = [
+        "json对象",
+        "JSON对象",
+        "json 对象",
+        "JSON 对象",
+        "仅输出 json",
+        "仅输出 JSON",
+        "输出 json",
+        "输出 JSON",
+        "json 结构",
+        "JSON 结构",
+        "输出协议",
+        "【输出协议",
+        "请务必保持"
+    ]
+
+    private static let internalPromptMarkers = [
+        "你正在扮演：",
+        "角色卡：",
+        "模块目标：",
+        "禁用词：",
+        "历史记忆（只作参考",
+        "最近搭配价格快照",
+        "最近你刚说过：",
+        "用户原始问题：",
+        "【输出协议",
+        "仅输出 json 对象",
+        "json 结构固定",
+        "用户问题：",
+        "重要提示：请务必保持"
+    ]
 
     private static let outputProtocol = """
     【输出协议（必须遵守）】

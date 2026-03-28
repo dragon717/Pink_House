@@ -308,32 +308,9 @@ private final class TabBarFrameCaptureUIView: UIView {
     }
 
     private func captureFrame() {
-        guard let window else { return }
-        guard let tabBar = findTabBar(in: window) else { return }
-
-        let buttons = tabBar.subviews
-            .filter { NSStringFromClass(type(of: $0)).contains("UITabBarButton") }
-            .sorted { $0.frame.minX < $1.frame.minX }
-
-        guard buttons.indices.contains(tabIndex) else { return }
-
-        let button = buttons[tabIndex]
-        let frame = button.convert(button.bounds, to: nil)
+        let frame = TabBarItemAnchorResolver.liveFrame(at: tabIndex)
+        guard let frame else { return }
         AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(frame, for: targetKey)
-    }
-
-    private func findTabBar(in view: UIView) -> UITabBar? {
-        if let tabBar = view as? UITabBar {
-            return tabBar
-        }
-
-        for subview in view.subviews {
-            if let tabBar = findTabBar(in: subview) {
-                return tabBar
-            }
-        }
-
-        return nil
     }
 }
 #endif

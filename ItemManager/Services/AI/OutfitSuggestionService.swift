@@ -55,7 +55,11 @@ class OutfitSuggestionService {
         )
 
         // 2. 获取推荐的裙装
-        let selectedClothings = matchSelectedClothings(suggestion: suggestion, clothings: availableClothings)
+        let matchedClothings = matchSelectedClothings(suggestion: suggestion, clothings: availableClothings)
+        let selectedClothings = OutfitColorHarmonyEngine.refineSelection(
+            matchedClothings,
+            within: availableClothings
+        )
 
         guard !selectedClothings.isEmpty else {
             throw OutfitSuggestionError.noItemsAvailable
@@ -88,54 +92,189 @@ class OutfitSuggestionService {
             throw OutfitSuggestionError.insufficientNonDepositItems
         }
         
-        // 按类别分组
-        let grouped = Dictionary(grouping: availableClothings) { clothing -> String in
-            // 根据名称判断类别
-            let name = clothing.name.lowercased()
-            if name.contains("jsk") || name.contains("op") || name.contains("sk") || name.contains("裙") {
+        // 根据风格和场景对裙装进行评分排序
+        let scoredClothings = availableClothings.map { clothing in
+            (clothing: clothing, score: calculateOutfitScore(clothing: clothing, style: style, occasion: occasion))
+        }.sorted { $0.score > $1.score }
+        
+        // 从高评分的裙装中选择
+        var result: [Clothing] = []
+        var usedCategories = Set<String>()
+        
+        // 先按类别分组
+        let grouped = Dictionary(grouping: scoredClothings) { item -> String in
+            let clothing = item.clothing
+            let text = searchableText(for: clothing)
+            if matchesAny(text, keywords: ["jsk", "op", "sk", "裙", "连衣", "吊带", "半裙"]) {
                 return "裙装"
-            } else if name.contains("外套") || name.contains("开衫") {
+            } else if matchesAny(text, keywords: ["外套", "开衫", "罩衫", "针织", "披肩", "披风", "小外套", "短外套", "大衣", "斗篷", "风衣", "夹克", "西装", "西服", "毛衣", "卫衣", "上衣", "衬衫", "内搭", "打底", "马甲", "背心"]) {
                 return "外套"
-            } else if name.contains("鞋") || name.contains("靴") {
+            } else if matchesAny(text, keywords: ["鞋", "皮鞋", "高跟", "玛丽珍", "乐福", "靴", "凉鞋", "单鞋"]) {
                 return "鞋子"
             } else {
                 return "配饰"
             }
         }
         
-        // 选择搭配物品（每类选一个）
-        var result: [Clothing] = []
-        
-        // 优先选择裙装
+        // 优先选择裙装（选择评分最高的）
         if let dresses = grouped["裙装"], !dresses.isEmpty {
-            result.append(dresses.randomElement()!)
+            let bestDress = dresses.max { $0.score < $1.score }!.clothing
+            result.append(bestDress)
+            usedCategories.insert("裙装")
         }
         
-        // 选择上衣/外套
+        // 选择外套（选择评分最高的且与裙装颜色和谐的）
         if let tops = grouped["外套"], !tops.isEmpty {
-            result.append(tops.randomElement()!)
+            let sortedTops = tops.sorted { $0.score > $1.score }
+            if let bestTop = sortedTops.first?.clothing {
+                result.append(bestTop)
+                usedCategories.insert("外套")
+            }
         }
         
-        // 选择鞋子
+        // 选择鞋子（选择评分最高的）
         if let shoes = grouped["鞋子"], !shoes.isEmpty {
-            result.append(shoes.randomElement()!)
+            let sortedShoes = shoes.sorted { $0.score > $1.score }
+            if let bestShoe = sortedShoes.first?.clothing {
+                result.append(bestShoe)
+                usedCategories.insert("鞋子")
+            }
         }
         
-        // 选择配饰（最多 2 个）
+        // 选择配饰（选择评分最高的 1-2 个）
         if let accessories = grouped["配饰"], !accessories.isEmpty {
-            result.append(contentsOf: accessories.prefix(2))
+            let sortedAccessories = accessories.sorted { $0.score > $1.score }
+            result.append(contentsOf: sortedAccessories.prefix(2).map { $0.clothing })
         }
         
-        // 如果按名称分类没有结果，随机选择 2-4 件
+        // 如果按分类选择后数量不足，从高评分列表中补充
         if result.count < 2 {
-            result = Array(availableClothings.shuffled().prefix(min(4, availableClothings.count)))
+            let remaining = scoredClothings.filter { item in
+                !result.contains { $0.id == item.clothing.id }
+            }
+            result.append(contentsOf: remaining.prefix(4 - result.count).map { $0.clothing })
         }
+        
+        // 如果还是不足，随机选择补充
+        if result.count < 2 {
+            let remaining = availableClothings.filter { !result.contains($0) }
+            result.append(contentsOf: remaining.shuffled().prefix(2 - result.count))
+        }
+        
+        // 使用颜色和谐引擎优化
+        result = OutfitColorHarmonyEngine.refineSelection(result, within: availableClothings)
         
         guard result.count >= 2 else {
             throw OutfitSuggestionError.insufficientItems
         }
         
         return result
+    }
+    
+    /// 根据风格和场景计算裙装评分
+    private func calculateOutfitScore(clothing: Clothing, style: String, occasion: String) -> Int {
+        var score = 0
+        let text = searchableText(for: clothing)
+        
+        // 风格关键词匹配
+        let styleKeywords = getStyleKeywords(style)
+        let matchedStyleKeywords = styleKeywords.filter { matchesAny(text, keywords: [$0]) }
+        score += matchedStyleKeywords.count * 30
+        
+        // 场景关键词匹配
+        let occasionKeywords = getOccasionKeywords(occasion)
+        let matchedOccasionKeywords = occasionKeywords.filter { matchesAny(text, keywords: [$0]) }
+        score += matchedOccasionKeywords.count * 25
+        
+        // 颜色匹配（根据风格偏好的颜色）
+        let preferredColors = getPreferredColors(style)
+        let matchedColors = preferredColors.filter { matchesAny(text, keywords: [$0]) }
+        score += matchedColors.count * 20
+        
+        // 新品优先（按创建时间）
+        let daysSinceCreation = Date().timeIntervalSince(clothing.createdAt) / 86400
+        if daysSinceCreation < 7 {
+            score += 15
+        } else if daysSinceCreation < 30 {
+            score += 5
+        }
+        
+        // 基础加分
+        score += 10
+        
+        return score
+    }
+    
+    /// 获取裙装的可搜索文本
+    private func searchableText(for clothing: Clothing) -> String {
+        let tagNames = clothing.tags?.map(\.name).joined(separator: ",") ?? ""
+        let accessoryNames = clothing.accessoryItems?.map(\.name).joined(separator: ",") ?? ""
+
+        return [
+            clothing.name,
+            clothing.types,
+            clothing.colors,
+            clothing.note,
+            clothing.accessories,
+            tagNames,
+            accessoryNames
+        ]
+        .joined(separator: ",")
+        .lowercased()
+    }
+    
+    /// 检查文本是否包含任意关键词
+    private func matchesAny(_ text: String, keywords: [String]) -> Bool {
+        keywords.contains { text.contains($0.lowercased()) }
+    }
+    
+    /// 获取风格对应的关键词
+    private func getStyleKeywords(_ style: String) -> [String] {
+        let lowerStyle = style.lowercased()
+        
+        if lowerStyle.contains("甜美") || lowerStyle.contains("sweet") {
+            return ["粉", "樱", "蜜桃", "桃", "玫瑰", "蕾丝", "蝴蝶结", "荷叶边", "蓬蓬", "可爱", "软妹", "甜", "洛丽塔", "lolita"]
+        } else if lowerStyle.contains("优雅") || lowerStyle.contains("elegant") {
+            return ["优雅", "精致", "缎面", "丝质", "珍珠", "古典", "cla", "classic", "姬袖", "长款", "端庄"]
+        } else if lowerStyle.contains("哥特") || lowerStyle.contains("gothic") {
+            return ["黑", "暗", "哥特", "gothic", "蕾丝", "十字架", "朋克", "酷", "暗黑"]
+        } else if lowerStyle.contains("日常") || lowerStyle.contains("casual") {
+            return ["日常", "休闲", "简单", "轻便", "舒适", "棉", "麻"]
+        } else {
+            return ["裙", "jsk", "op", "sk"]
+        }
+    }
+    
+    /// 获取场景对应的关键词
+    private func getOccasionKeywords(_ occasion: String) -> [String] {
+        let lowerOccasion = occasion.lowercased()
+        
+        if lowerOccasion.contains("约会") || lowerOccasion.contains("date") {
+            return ["约会", "浪漫", "甜美", "可爱", "精致", "粉", "红"]
+        } else if lowerOccasion.contains("茶会") || lowerOccasion.contains("tea") {
+            return ["茶会", "优雅", "精致", "cla", "classic", "长款", "姬袖"]
+        } else if lowerOccasion.contains("通勤") || lowerOccasion.contains("work") {
+            return ["通勤", "日常", "简约", "干练", "西装", "衬衫"]
+        } else if lowerOccasion.contains("出门") || lowerOccasion.contains("go out") {
+            return ["日常", "休闲", "轻便", "舒适"]
+        } else {
+            return ["日常"]
+        }
+    }
+    
+    /// 获取风格偏好的颜色
+    private func getPreferredColors(_ style: String) -> [String] {
+        let lowerStyle = style.lowercased()
+        
+        if lowerStyle.contains("甜美") || lowerStyle.contains("sweet") {
+            return ["粉", "樱", "蜜桃", "桃", "白", "米白", "奶白"]
+        } else if lowerStyle.contains("优雅") || lowerStyle.contains("elegant") {
+            return ["白", "米白", "奶白", "香槟", "绀", "藏青", "酒红", "棕", "灰"]
+        } else if lowerStyle.contains("哥特") || lowerStyle.contains("gothic") {
+            return ["黑", "暗", "酒红", "紫", "绀"]
+        } else {
+            return []
+        }
     }
 
     // MARK: - 私有方法
@@ -175,43 +314,29 @@ class OutfitSuggestionService {
 
     /// 构建搭配专用Prompt
     private func buildOutfitPrompt(query: String, wardrobeSummary: String, candidatesJSON: String) -> String {
-        let roleDescription = currentCharacter == .maomao ? "热情贴心的金毛搭配助手" : "会撒娇的小橘猫搭配闺蜜"
-        let catchphraseRequirement = currentCharacter == .maomao ? "带汪~" : "带喵~"
-        let roleStyleRequirement = currentCharacter == .maomao ? "描述要符合金毛狗狗角色（带汪~，用括号表示动作）" : "描述要符合小橘猫角色（带喵~，用括号表示动作）"
+        let roleSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
         return """
-        你是主人的专业Lo裙搭配师，精通Lolita时尚穿搭，是一个\(roleDescription)。
+        需求：\(query)
 
-        用户需求：\(query)
-
-        衣橱摘要：
-        \(wardrobeSummary)
-        
-        已遴选候选单品（JSON，仅名字和特征）：
+        候选单品：
         \(candidatesJSON)
 
-        请从上述候选单品中选择2-4件进行搭配，要求：
-        1. 考虑颜色协调性（同色系或互补色）
-        2. 考虑场合适配性
-        3. 优先选择JSK/OP作为主体
-        4. 搭配理由要像闺蜜一样亲切自然
-        5. 优先学习并复用用户衣橱里真实存在的标签、类型和备注词汇，不要硬造“开衫外套上衣”这类用户未使用的类目词
-        6. 如果用户说的是泛类目（例如上衣/外套），请优先从候选单品的标签、类型、备注里找对应叫法，再做推荐
+        请从候选中选2-4件搭配：
+        - 按品类（裙装/外套/鞋子/配饰）筛选
+        - 优先同色系/近色系，主色1-2种，不超3种
+        - 优先JSK/OP，鞋子同色或黑白灰米棕
+        - 用候选单品的标签/类型词汇
 
-        请严格按以下JSON格式返回（不要包含其他内容）：
+        返回JSON：
         {
-          "description": "搭配描述（30字以内，\(catchphraseRequirement)）",
-          "selectedItemNames": ["单品名称1", "单品名称2", ...],
+          "description": "搭配描述，30字内，带\(roleSuffix)",
+          "selectedItemNames": ["单品名1", "单品名2"],
           "style": "甜美/优雅/哥特/CLA/日常",
           "occasion": "日常/约会/茶会/通勤",
-          "reasoning": "搭配理由（50字以内）"
+          "reasoning": "理由，50字内"
         }
 
-        重要提示：
-        - selectedItemNames 必须从候选单品中挑选，不要编造不存在名称
-        - 如果候选不足，请返回空数组并说明
-        - \(roleStyleRequirement)
-        - 若没有完全同名的类目，请改用用户衣橱里已有的标签/类型名称表达
-        - 只返回 JSON，不要额外解释
+        只返回JSON，不要额外解释。
         """
     }
 
@@ -346,6 +471,381 @@ class OutfitSuggestionService {
         }
         
         return selected
+    }
+}
+
+private enum OutfitPieceCategory: Int {
+    case dress
+    case outerwear
+    case shoes
+    case accessory
+    case other
+
+    var isMajorPiece: Bool {
+        switch self {
+        case .dress, .outerwear, .other:
+            return true
+        case .shoes, .accessory:
+            return false
+        }
+    }
+
+    var allowsAdjacentHue: Bool {
+        switch self {
+        case .outerwear, .accessory, .other:
+            return true
+        case .dress, .shoes:
+            return false
+        }
+    }
+}
+
+private enum OutfitColorFamily: String, Hashable {
+    case pink
+    case red
+    case orange
+    case yellow
+    case green
+    case blue
+    case purple
+    case brown
+    case neutral
+    case metallic
+    case multicolor
+
+    var isNeutralLike: Bool {
+        self == .neutral || self == .metallic
+    }
+
+    func isAdjacent(to other: OutfitColorFamily) -> Bool {
+        if self == other {
+            return true
+        }
+
+        switch (self, other) {
+        case (.pink, .red), (.red, .pink),
+             (.pink, .purple), (.purple, .pink),
+             (.red, .orange), (.orange, .red),
+             (.orange, .yellow), (.yellow, .orange),
+             (.yellow, .green), (.green, .yellow),
+             (.green, .blue), (.blue, .green),
+             (.brown, .orange), (.orange, .brown),
+             (.brown, .red), (.red, .brown):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+enum OutfitColorHarmonyEngine {
+    static func refineSelection(_ selected: [Clothing], within pool: [Clothing]) -> [Clothing] {
+        let uniquePool = uniqueClothings(pool)
+        let preferred = uniqueClothings(selected)
+
+        guard let anchor = chooseAnchor(from: preferred, pool: uniquePool) else {
+            return Array(preferred.prefix(4))
+        }
+
+        var result: [Clothing] = [anchor]
+        var used = Set([anchor.id])
+        let preferredIDs = Set(preferred.map(\.id))
+
+        var desiredCategories = preferred
+            .filter { $0.id != anchor.id }
+            .map { pieceCategory(for: $0) }
+            .reduce(into: [OutfitPieceCategory]()) { partialResult, category in
+                if !partialResult.contains(category) {
+                    partialResult.append(category)
+                }
+            }
+
+        for category in [OutfitPieceCategory.outerwear, .shoes, .accessory, .other] where !desiredCategories.contains(category) {
+            desiredCategories.append(category)
+        }
+
+        for category in desiredCategories {
+            guard result.count < 4 else { break }
+            if let candidate = bestCandidate(
+                for: category,
+                anchor: anchor,
+                current: result,
+                preferredIDs: preferredIDs,
+                pool: uniquePool,
+                used: used,
+                minimumScore: 20
+            ) {
+                result.append(candidate)
+                used.insert(candidate.id)
+            }
+        }
+
+        while result.count < 2 {
+            guard let candidate = bestFallbackCandidate(
+                anchor: anchor,
+                current: result,
+                preferredIDs: preferredIDs,
+                pool: uniquePool,
+                used: used
+            ) else {
+                break
+            }
+            result.append(candidate)
+            used.insert(candidate.id)
+        }
+
+        return Array(result.prefix(4))
+    }
+
+    static func dominantNonNeutralFamilyNames(in items: [Clothing]) -> Set<String> {
+        Set(
+            items
+                .flatMap { nonNeutralFamilies(for: $0) }
+                .map(\.rawValue)
+        )
+    }
+
+    private static func chooseAnchor(from selected: [Clothing], pool: [Clothing]) -> Clothing? {
+        let combined = uniqueClothings(selected + pool)
+        return combined.max { lhs, rhs in
+            anchorScore(lhs, preferredIDs: Set(selected.map(\.id))) < anchorScore(rhs, preferredIDs: Set(selected.map(\.id)))
+        }
+    }
+
+    private static func anchorScore(_ clothing: Clothing, preferredIDs: Set<UUID>) -> Int {
+        var score = 0
+        let category = pieceCategory(for: clothing)
+
+        if preferredIDs.contains(clothing.id) {
+            score += 80
+        }
+        if category == .dress {
+            score += 120
+        } else if category == .other {
+            score += 40
+        }
+        if !nonNeutralFamilies(for: clothing).isEmpty {
+            score += 25
+        }
+        if !clothing.colors.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            score += 12
+        }
+
+        return score
+    }
+
+    private static func bestCandidate(
+        for category: OutfitPieceCategory,
+        anchor: Clothing,
+        current: [Clothing],
+        preferredIDs: Set<UUID>,
+        pool: [Clothing],
+        used: Set<UUID>,
+        minimumScore: Int
+    ) -> Clothing? {
+        let candidates = pool.filter { !used.contains($0.id) && pieceCategory(for: $0) == category }
+        guard !candidates.isEmpty else { return nil }
+
+        let ranked = candidates
+            .map { ($0, compatibilityScore($0, anchor: anchor, current: current, preferredIDs: preferredIDs)) }
+            .sorted {
+                if $0.1 == $1.1 {
+                    return $0.0.createdAt > $1.0.createdAt
+                }
+                return $0.1 > $1.1
+            }
+
+        guard let best = ranked.first, best.1 >= minimumScore else {
+            return nil
+        }
+
+        return best.0
+    }
+
+    private static func bestFallbackCandidate(
+        anchor: Clothing,
+        current: [Clothing],
+        preferredIDs: Set<UUID>,
+        pool: [Clothing],
+        used: Set<UUID>
+    ) -> Clothing? {
+        pool
+            .filter { !used.contains($0.id) }
+            .map { ($0, compatibilityScore($0, anchor: anchor, current: current, preferredIDs: preferredIDs)) }
+            .sorted {
+                if $0.1 == $1.1 {
+                    return $0.0.createdAt > $1.0.createdAt
+                }
+                return $0.1 > $1.1
+            }
+            .first?
+            .0
+    }
+
+    private static func compatibilityScore(
+        _ candidate: Clothing,
+        anchor: Clothing,
+        current: [Clothing],
+        preferredIDs: Set<UUID>
+    ) -> Int {
+        let category = pieceCategory(for: candidate)
+        let anchorFamilies = nonNeutralFamilies(for: anchor)
+        let candidateFamilies = nonNeutralFamilies(for: candidate)
+        let currentMajorFamilies = dominantNonNeutralFamilies(
+            in: current.filter { pieceCategory(for: $0).isMajorPiece }
+        )
+        let currentAllFamilies = dominantNonNeutralFamilies(in: current)
+
+        var score = 0
+
+        if preferredIDs.contains(candidate.id) {
+            score += 50
+        }
+
+        if category == .shoes {
+            score += 20
+        } else if category == .outerwear {
+            score += 15
+        } else if category == .accessory {
+            score += 8
+        }
+
+        if candidateFamilies.isEmpty {
+            score += category == .shoes ? 32 : 22
+        } else if anchorFamilies.isEmpty {
+            score += 8
+        } else if !candidateFamilies.isDisjoint(with: anchorFamilies) {
+            score += 38
+        } else if category.allowsAdjacentHue && candidateFamilies.contains(where: { family in
+            anchorFamilies.contains(where: { $0.isAdjacent(to: family) })
+        }) {
+            score += 18
+        } else if category == .shoes {
+            score -= 75
+        } else {
+            score -= 60
+        }
+
+        if candidateFamilies.contains(.multicolor) {
+            score -= category.isMajorPiece ? 26 : 12
+        }
+
+        if category.isMajorPiece {
+            let resultingMajorFamilies = currentMajorFamilies.union(candidateFamilies)
+            if resultingMajorFamilies.count > 2 {
+                score -= (resultingMajorFamilies.count - 2) * 40
+            }
+        }
+
+        let resultingAllFamilies = currentAllFamilies.union(candidateFamilies)
+        if resultingAllFamilies.count > 2 {
+            score -= (resultingAllFamilies.count - 2) * 25
+        }
+
+        if !candidateFamilies.isEmpty &&
+            currentAllFamilies.count >= 2 &&
+            resultingAllFamilies.count > currentAllFamilies.count {
+            score -= 35
+        }
+
+        if category == .accessory && current.contains(where: { pieceCategory(for: $0) == .accessory }) {
+            score -= 18
+        }
+
+        return score
+    }
+
+    private static func uniqueClothings(_ clothings: [Clothing]) -> [Clothing] {
+        var seen = Set<UUID>()
+        return clothings.filter { seen.insert($0.id).inserted }
+    }
+
+    private static func dominantNonNeutralFamilies(in items: [Clothing]) -> Set<OutfitColorFamily> {
+        Set(items.flatMap { nonNeutralFamilies(for: $0) })
+    }
+
+    private static func nonNeutralFamilies(for clothing: Clothing) -> Set<OutfitColorFamily> {
+        Set(colorFamilies(for: clothing).filter { !$0.isNeutralLike })
+    }
+
+    private static func colorFamilies(for clothing: Clothing) -> Set<OutfitColorFamily> {
+        let text = searchableText(for: clothing)
+        var families = Set<OutfitColorFamily>()
+
+        if matchesAny(text, keywords: ["多色", "彩色", "拼色", "撞色", "multicolor"]) {
+            families.insert(.multicolor)
+        }
+        if matchesAny(text, keywords: ["白", "米白", "奶白", "奶油", "象牙", "香槟", "灰", "黑", "银", "米色", "杏色", "beige", "cream", "white", "black", "grey", "gray"]) {
+            families.insert(.neutral)
+        }
+        if matchesAny(text, keywords: ["金", "银", "metal", "metallic"]) {
+            families.insert(.metallic)
+        }
+        if matchesAny(text, keywords: ["粉", "樱", "蜜桃", "桃", "rose", "pink"]) {
+            families.insert(.pink)
+        }
+        if matchesAny(text, keywords: ["酒红", "红", "莓", "绯", "赤", "burgundy", "red"]) {
+            families.insert(.red)
+        }
+        if matchesAny(text, keywords: ["橙", "杏黄", "珊瑚", "orange", "coral"]) {
+            families.insert(.orange)
+        }
+        if matchesAny(text, keywords: ["黄", "鹅黄", "柠檬", "yellow"]) {
+            families.insert(.yellow)
+        }
+        if matchesAny(text, keywords: ["若草", "薄荷", "牛油果", "绿", "mint", "green"]) {
+            families.insert(.green)
+        }
+        if matchesAny(text, keywords: ["萨克斯", "sax", "绀", "藏青", "海军蓝", "天蓝", "水蓝", "蓝", "blue", "navy"]) {
+            families.insert(.blue)
+        }
+        if matchesAny(text, keywords: ["薰衣草", "丁香", "紫", "lavender", "purple"]) {
+            families.insert(.purple)
+        }
+        if matchesAny(text, keywords: ["棕", "咖", "巧克力", "驼", "卡其", "brown", "camel", "khaki"]) {
+            families.insert(.brown)
+        }
+
+        return families
+    }
+
+    private static func pieceCategory(for clothing: Clothing) -> OutfitPieceCategory {
+        let text = searchableText(for: clothing)
+
+        if matchesAny(text, keywords: ["jsk", "op", "sk", "裙", "连衣", "吊带", "半裙"]) {
+            return .dress
+        }
+        if matchesAny(text, keywords: ["外套", "开衫", "罩衫", "针织", "披肩", "披风", "小外套", "短外套", "大衣", "斗篷", "风衣", "夹克", "西装", "西服", "毛衣", "卫衣", "上衣", "衬衫", "内搭", "打底", "马甲", "背心"]) {
+            return .outerwear
+        }
+        if matchesAny(text, keywords: ["鞋", "皮鞋", "高跟", "玛丽珍", "乐福", "靴", "凉鞋", "单鞋"]) {
+            return .shoes
+        }
+        if matchesAny(text, keywords: ["发带", "kc", "头饰", "胸针", "包", "袜", "手袖", "腰带", "项链", "耳环", "手链", "发夹", "配饰", "小物"]) {
+            return .accessory
+        }
+        return .other
+    }
+
+    private static func searchableText(for clothing: Clothing) -> String {
+        let tagNames = clothing.tags?.map(\.name).joined(separator: ",") ?? ""
+        let accessoryNames = clothing.accessoryItems?.map(\.name).joined(separator: ",") ?? ""
+
+        return [
+            clothing.name,
+            clothing.types,
+            clothing.colors,
+            clothing.note,
+            clothing.accessories,
+            tagNames,
+            accessoryNames
+        ]
+        .joined(separator: ",")
+        .lowercased()
+    }
+
+    private static func matchesAny(_ text: String, keywords: [String]) -> Bool {
+        keywords.contains { text.contains($0.lowercased()) }
     }
 }
 

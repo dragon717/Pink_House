@@ -283,8 +283,8 @@ struct SpatialBookShelfView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                             .foregroundStyle(.primary)
+                            .captureGuideToolbarIconTarget(.spaceBookShelfMoreMenuButton)
                     }
-                    .captureGuideTarget(.spaceBookShelfMoreMenuButton)
                 }
             }
         }

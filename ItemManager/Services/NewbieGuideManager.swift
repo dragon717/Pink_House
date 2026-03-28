@@ -50,14 +50,19 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     // 小猫跑步终点位置（右上角）
     var createButtonPosition: CGPoint {
         let screenBounds = UIScreen.main.bounds
-        return CGPoint(x: screenBounds.width * 0.8, y: screenBounds.height * 0.10)
+        let addButtonFrame = firstLaunchAddButtonGuideFrame
+        let horizontalOffset = min(max(screenBounds.width * 0.075, addButtonFrame.width * 0.75), 44)
+        let verticalOffset = min(max(screenBounds.height * 0.035, addButtonFrame.height * 0.78), 42)
+        return CGPoint(
+            x: max(32, addButtonFrame.midX - horizontalOffset),
+            y: min(screenBounds.height - 140, addButtonFrame.midY + verticalOffset)
+        )
     }
     
     // 高亮圈位置（+ 号按钮位置）- 可以独立调整
     var highlightCirclePosition: CGPoint {
-        let screenBounds = UIScreen.main.bounds
-        // 高亮圈往上挪一些
-        return CGPoint(x: screenBounds.width * 0.88, y: screenBounds.height * 0.035)
+        let addButtonFrame = firstLaunchAddButtonGuideFrame
+        return CGPoint(x: addButtonFrame.midX, y: addButtonFrame.midY)
     }
     
     // 悬浮小猫起始位置（底部中间）- 往上移动
@@ -236,6 +241,103 @@ final class AppFirstLaunchGuideManager: ObservableObject {
 
     func guideTargetFrame(for key: GuideTargetKey) -> CGRect? {
         guideTargetFrames[key]
+    }
+
+    func normalizedTopTrailingToolbarButtonFrame(
+        _ frame: CGRect,
+        containerSize: CGSize,
+        safeAreaTop: CGFloat
+    ) -> CGRect {
+        let minimumSide: CGFloat = 40
+        let maximumSide: CGFloat = 48
+        var normalized = frame
+
+        let looksLikeGroupedCapsule = frame.width > frame.height * 1.45 && frame.width > 52
+        if looksLikeGroupedCapsule {
+            let targetSide = min(max(frame.height - 6, minimumSide), maximumSide)
+            normalized = CGRect(
+                x: frame.maxX - targetSide - 4,
+                y: frame.midY - targetSide / 2,
+                width: targetSide,
+                height: targetSide
+            )
+        }
+
+        let looksLikeIconOnlyCapture = normalized.width < 30 || normalized.height < 30
+        if looksLikeIconOnlyCapture || normalized.width < minimumSide || normalized.height < minimumSide {
+            let targetSide = min(
+                max(max(normalized.width, normalized.height) + (looksLikeIconOnlyCapture ? 22 : 8), minimumSide),
+                maximumSide
+            )
+            let verticalBias = looksLikeIconOnlyCapture
+                ? min(max(containerSize.height * 0.012, targetSide * 0.24), targetSide * 0.40)
+                : 0
+            normalized = CGRect(
+                x: normalized.midX - targetSide / 2,
+                y: normalized.midY - targetSide / 2 + verticalBias,
+                width: targetSide,
+                height: targetSide
+            )
+        }
+
+        let minX: CGFloat = 8
+        let maxX = max(minX, containerSize.width - normalized.width - 8)
+        let minY = max(safeAreaTop + 6, 12)
+        let maxY = max(minY, containerSize.height * 0.34)
+
+        return CGRect(
+            x: min(max(normalized.minX, minX), maxX),
+            y: min(max(normalized.minY, minY), maxY),
+            width: normalized.width,
+            height: normalized.height
+        )
+    }
+
+    private var currentWindowSafeAreaTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.top ?? 0
+    }
+
+    private var firstLaunchAddButtonGuideFrame: CGRect {
+        let screenBounds = UIScreen.main.bounds
+        let safeAreaTop = currentWindowSafeAreaTop
+        let fallbackFrame = CGRect(
+            x: screenBounds.width - 56,
+            y: max(safeAreaTop + 6, 12),
+            width: 40,
+            height: 40
+        )
+
+        if let moreMenuGlobalFrame = guideTargetFrame(for: .wardrobeMoreMenuButton),
+           moreMenuGlobalFrame.width > 0,
+           moreMenuGlobalFrame.height > 0 {
+            let moreButtonFrame = normalizedTopTrailingToolbarButtonFrame(
+                moreMenuGlobalFrame,
+                containerSize: screenBounds.size,
+                safeAreaTop: safeAreaTop
+            )
+            let inferredAddFrame = CGRect(
+                x: min(screenBounds.width - moreButtonFrame.width - 8, moreButtonFrame.maxX + 8),
+                y: moreButtonFrame.minY,
+                width: moreButtonFrame.width,
+                height: moreButtonFrame.height
+            )
+            return normalizedTopTrailingToolbarButtonFrame(
+                inferredAddFrame,
+                containerSize: screenBounds.size,
+                safeAreaTop: safeAreaTop
+            )
+        }
+
+        let capturedFrame = guideTargetFrame(for: .wardrobeAddButton) ?? fallbackFrame
+        return normalizedTopTrailingToolbarButtonFrame(
+            capturedFrame,
+            containerSize: screenBounds.size,
+            safeAreaTop: safeAreaTop
+        )
     }
 
     func updateGuideTargetFrame(_ frame: CGRect, for key: GuideTargetKey) {
@@ -1272,44 +1374,10 @@ struct FeatureExperienceGuideOverlay: View {
         _ frame: CGRect,
         in geometry: GeometryProxy
     ) -> CGRect {
-        let minimumSide: CGFloat = 34
-        let maximumSide: CGFloat = 46
-
-        var normalized = frame
-
-        // iOS 新导航样式下，右上角按钮可能被系统组合进同一胶囊。
-        // 引导要稳定对准最右侧的「+」按钮，而不是整个胶囊组。
-        let looksLikeGroupedCapsule = frame.width > frame.height * 1.45 && frame.width > 52
-        if looksLikeGroupedCapsule {
-            let targetSide = min(max(frame.height - 8, minimumSide), maximumSide)
-            normalized = CGRect(
-                x: frame.maxX - targetSide - 6,
-                y: frame.midY - targetSide / 2,
-                width: targetSide,
-                height: targetSide
-            )
-        }
-
-        if normalized.width < minimumSide || normalized.height < minimumSide {
-            let side = min(max(max(normalized.width, normalized.height) + 14, minimumSide), maximumSide)
-            normalized = CGRect(
-                x: normalized.midX - side / 2,
-                y: normalized.midY - side / 2,
-                width: side,
-                height: side
-            )
-        }
-
-        let minX: CGFloat = 8
-        let maxX = max(minX, geometry.size.width - normalized.width - 8)
-        let minY = max(geometry.safeAreaInsets.top + 4, 10)
-        let maxY = max(minY, geometry.size.height * 0.34)
-
-        return CGRect(
-            x: min(max(normalized.minX, minX), maxX),
-            y: min(max(normalized.minY, minY), maxY),
-            width: normalized.width,
-            height: normalized.height
+        guideManager.normalizedTopTrailingToolbarButtonFrame(
+            frame,
+            containerSize: geometry.size,
+            safeAreaTop: geometry.safeAreaInsets.top
         )
     }
 
@@ -1606,8 +1674,7 @@ struct FeatureExperienceGuideOverlay: View {
     func wardrobeGuideContent(accent: Color) -> some View {
         GeometryReader { geometry in
             let addFrame = wardrobeAddButtonGuideFrame(in: geometry)
-
-            let step1GuideFrame = addFrame.offsetBy(dx: 0, dy: 32)
+            let step1GuideFrame = addFrame
 
             switch wardrobeAddGuideStep {
             case .step1_clickAddButton:
@@ -2773,22 +2840,29 @@ struct FeatureExperienceGuideOverlay: View {
                 switch magicStickerGuideStep {
                 case .step1_longPressHouseTab:
                     let tabBarHeight: CGFloat = 56
-                    let houseTabFrame = CGRect(
+                    let fallbackHouseTabFrame = CGRect(
                         x: (geometry.size.width * 0.375) - 34,
                         y: geometry.size.height - geometry.safeAreaInsets.bottom - tabBarHeight,
                         width: 68,
                         height: tabBarHeight
                     )
+                    let houseTabFrame = TabBarItemAnchorResolver.resolvedFrame(
+                        for: .homeHouseTab,
+                        preferredTabIndex: 1,
+                        in: geometry,
+                        fallback: fallbackHouseTabFrame
+                    )
+                    let houseTabRadius = max(34, max(houseTabFrame.width, houseTabFrame.height) / 2)
                     ZStack {
                         HollowMaskView(
                             highlightFrame: houseTabFrame,
                             highlightType: .circle,
-                            cornerRadius: 28
+                            cornerRadius: houseTabRadius
                         )
 
                         HighlightPulseViewNoClick(
                             center: CGPoint(x: houseTabFrame.midX, y: houseTabFrame.midY),
-                            radius: 34
+                            radius: houseTabRadius
                         )
 
                         if !guideManager.isPadGuideLayout {
@@ -2854,26 +2928,22 @@ struct FeatureExperienceGuideOverlay: View {
             switch batchEditGuideStep {
             case .step1_clickMoreMenu:
                 let fallbackFrame = CGRect(x: geometry.size.width - 64, y: max(geometry.safeAreaInsets.top + 8, 12), width: 36, height: 36)
-                let targetFrame = aiGuideTargetFrame(
+                let rawTargetFrame = aiGuideTargetFrame(
                     globalFrame: guideManager.guideTargetFrame(for: .wardrobeMoreMenuButton),
                     in: geometry,
                     fallback: fallbackFrame
                 )
-                // 右上角“更多”按钮在新导航样式下会偏上；
-                // 统一下移高亮与猫爪，确保两者持续对齐真实菜单入口
-                let step1GuideYOffset: CGFloat = 26
-                let adjustedFrame = CGRect(
-                    x: max(8, targetFrame.minX - 10),
-                    y: max(geometry.safeAreaInsets.top + 12, targetFrame.minY + step1GuideYOffset),
-                    width: targetFrame.width,
-                    height: targetFrame.height
+                let targetFrame = guideManager.normalizedTopTrailingToolbarButtonFrame(
+                    rawTargetFrame,
+                    containerSize: geometry.size,
+                    safeAreaTop: geometry.safeAreaInsets.top
                 )
                 // 菜单定位必须基于原始「更多」按钮坐标；
                 // 不要复用 step1 的下移高亮坐标，否则会把「编辑」行 fallback 算到下方。
-                let menuEditFrame = batchEditMenuEditEntryGuideFrame(in: geometry, moreButtonFrame: targetFrame)
+                let menuEditFrame = batchEditMenuEditEntryGuideFrame(in: geometry, moreButtonFrame: rawTargetFrame)
                 let shouldHighlightEditEntry = didOpenBatchEditMoreMenu ||
                     guideManager.guideTargetFrame(for: .wardrobeEditMenuEntry) != nil
-                let step1Frame = shouldHighlightEditEntry ? menuEditFrame : adjustedFrame
+                let step1Frame = shouldHighlightEditEntry ? menuEditFrame : targetFrame
                 let step1CornerRadius: CGFloat = shouldHighlightEditEntry ? 14 : 18
                 let step1Title = shouldHighlightEditEntry ? "点击「编辑」" : "点击右上角更多按钮"
                 let step1Message = shouldHighlightEditEntry

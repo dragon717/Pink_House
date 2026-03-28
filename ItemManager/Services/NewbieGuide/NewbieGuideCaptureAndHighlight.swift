@@ -62,6 +62,18 @@ extension View {
     func captureGuideInteractionRegion(_ id: String) -> some View {
         modifier(GuideInteractionRegionCaptureModifier(id: id))
     }
+
+    func captureGuideToolbarIconTarget(
+        _ key: GuideTargetKey,
+        touchSize: CGFloat = 36
+    ) -> some View {
+        overlay {
+            Color.clear
+                .frame(width: touchSize, height: touchSize)
+                .allowsHitTesting(false)
+                .captureGuideTarget(key)
+        }
+    }
 }
 
 struct HighlightPulseViewNoClick: View {
@@ -71,18 +83,24 @@ struct HighlightPulseViewNoClick: View {
     @State private var pulseScale: CGFloat = 1.0
     @State private var pulseOpacity: Double = 0.8
 
+    private var adaptiveRadius: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        let scaleFactor = screenWidth / 375.0
+        return radius * scaleFactor
+    }
+
     var body: some View {
         Group {
-            if UIDevice.current.userInterfaceIdiom != .pad, radius > 0 {
+            if radius > 0 {
                 ZStack {
                     Circle()
                         .stroke(Color.white.opacity(pulseOpacity), lineWidth: 2)
-                        .frame(width: radius * 2 * pulseScale, height: radius * 2 * pulseScale)
+                        .frame(width: adaptiveRadius * 2 * pulseScale, height: adaptiveRadius * 2 * pulseScale)
                         .position(center)
 
                     Circle()
                         .stroke(Color.white, lineWidth: 2)
-                        .frame(width: radius * 2, height: radius * 2)
+                        .frame(width: adaptiveRadius * 2, height: adaptiveRadius * 2)
                         .position(center)
                         .shadow(color: .white.opacity(0.5), radius: 10, x: 0, y: 0)
                 }
@@ -111,6 +129,16 @@ struct RoundedRectHighlightView: View {
     @State private var pulseScale: CGFloat = 1.0
     @State private var pulseOpacity: Double = 0.6
 
+    private var adaptiveFrame: CGRect {
+        let screenWidth = UIScreen.main.bounds.width
+        let scaleFactor = screenWidth / 375.0
+        let newWidth = frame.width * scaleFactor
+        let newHeight = frame.height * scaleFactor
+        let newX = frame.midX - newWidth / 2
+        let newY = frame.midY - newHeight / 2
+        return CGRect(x: newX, y: newY, width: newWidth, height: newHeight)
+    }
+
     var body: some View {
         Group {
             if !frame.isEmpty {
@@ -118,14 +146,14 @@ struct RoundedRectHighlightView: View {
                     if showPulse {
                         RoundedRectangle(cornerRadius: cornerRadius)
                             .stroke(Color.white.opacity(pulseOpacity), lineWidth: 2)
-                            .frame(width: frame.width * pulseScale, height: frame.height * pulseScale)
-                            .position(x: frame.midX, y: frame.midY)
+                            .frame(width: adaptiveFrame.width * pulseScale, height: adaptiveFrame.height * pulseScale)
+                            .position(x: adaptiveFrame.midX, y: adaptiveFrame.midY)
                     }
 
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .stroke(Color.white, lineWidth: 2)
-                        .frame(width: frame.width, height: frame.height)
-                        .position(x: frame.midX, y: frame.midY)
+                        .frame(width: adaptiveFrame.width, height: adaptiveFrame.height)
+                        .position(x: adaptiveFrame.midX, y: adaptiveFrame.midY)
                         .shadow(color: .white.opacity(0.5), radius: 10, x: 0, y: 0)
                 }
                 .allowsHitTesting(false)
@@ -155,12 +183,25 @@ struct CatPawTapAnimation: View {
     @State private var tapScale: CGFloat = 1.0
     @State private var tapOpacity: Double = 1.0
 
+    private var scaleFactor: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        return screenWidth / 375.0
+    }
+
+    private var pawSize: CGFloat {
+        30 * scaleFactor
+    }
+
+    private var circleSize: CGFloat {
+        50 * scaleFactor
+    }
+
     var body: some View {
         Group {
             if position.x > 0, position.y > 0 {
                 ZStack {
                     Image(systemName: "pawprint.fill")
-                        .font(.system(size: 30))
+                        .font(.system(size: pawSize))
                         .foregroundColor(.white)
                         .scaleEffect(tapScale)
                         .opacity(tapOpacity)
@@ -169,7 +210,7 @@ struct CatPawTapAnimation: View {
 
                     Circle()
                         .stroke(Color.white.opacity(tapOpacity * 0.5), lineWidth: 2)
-                        .frame(width: 50 * tapScale, height: 50 * tapScale)
+                        .frame(width: circleSize * tapScale, height: circleSize * tapScale)
                         .position(position)
                 }
                 .allowsHitTesting(false)
@@ -215,11 +256,20 @@ struct HollowMaskView: View {
     let highlightType: HighlightType
     let cornerRadius: CGFloat
 
+    private var adaptiveHighlightFrame: CGRect {
+        let screenWidth = UIScreen.main.bounds.width
+        let scaleFactor = screenWidth / 375.0
+        let newWidth = highlightFrame.width * scaleFactor
+        let newHeight = highlightFrame.height * scaleFactor
+        let newX = highlightFrame.midX - newWidth / 2
+        let newY = highlightFrame.midY - newHeight / 2
+        return CGRect(x: newX, y: newY, width: newWidth, height: newHeight)
+    }
+
     var body: some View {
         GeometryReader { _ in
             Group {
-                if !highlightFrame.isEmpty,
-                   !(highlightType == .circle && UIDevice.current.userInterfaceIdiom == .pad) {
+                if !highlightFrame.isEmpty {
                     ZStack {
                         Color.black
                             .opacity(0.5)
@@ -228,13 +278,13 @@ struct HollowMaskView: View {
                         switch highlightType {
                         case .circle:
                             Circle()
-                                .frame(width: highlightFrame.width, height: highlightFrame.height)
-                                .position(x: highlightFrame.midX, y: highlightFrame.midY)
+                                .frame(width: adaptiveHighlightFrame.width, height: adaptiveHighlightFrame.height)
+                                .position(x: adaptiveHighlightFrame.midX, y: adaptiveHighlightFrame.midY)
                                 .blendMode(.destinationOut)
                         case .roundedRect:
                             RoundedRectangle(cornerRadius: cornerRadius)
-                                .frame(width: highlightFrame.width, height: highlightFrame.height)
-                                .position(x: highlightFrame.midX, y: highlightFrame.midY)
+                                .frame(width: adaptiveHighlightFrame.width, height: adaptiveHighlightFrame.height)
+                                .position(x: adaptiveHighlightFrame.midX, y: adaptiveHighlightFrame.midY)
                                 .blendMode(.destinationOut)
                         }
                     }
