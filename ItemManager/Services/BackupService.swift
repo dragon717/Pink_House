@@ -81,7 +81,8 @@ class BackupService {
         "voiceToneId",
         "UserCustomFontFileName",
         "HasRedeemedVIP_Prince",
-        "userProfiles"  // v1.6: 用户资料（包含所有用户的昵称和头像路径）
+        "userProfiles", // v1.6: 用户资料（包含所有用户的昵称和头像路径）
+        "newbieGuide.firstCompletionRewardClaimed" // 新手引导首次完成奖励（永久一次）
     ]
     
     // MARK: - Internal Helpers
@@ -2512,7 +2513,7 @@ class BackupService {
                     } else if let doubleVal = value as? Double {
                          UserDefaults.standard.set(doubleVal, forKey: key)
                     }
-                case "theme_is_blur_enabled", "isDepositNotificationEnabled", "shouldShowWealthContainerBackground", "HasRedeemedVIP_Prince":
+                case "theme_is_blur_enabled", "isDepositNotificationEnabled", "shouldShowWealthContainerBackground", "HasRedeemedVIP_Prince", "newbieGuide.firstCompletionRewardClaimed":
                     if let boolVal = Bool(value) { UserDefaults.standard.set(boolVal, forKey: key) }
                     else if let intVal = Int(value) { UserDefaults.standard.set(intVal == 1, forKey: key) }
                 case "depositNotificationDaysBefore":

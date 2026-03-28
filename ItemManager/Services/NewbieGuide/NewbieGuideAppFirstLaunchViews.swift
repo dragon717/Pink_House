@@ -262,6 +262,12 @@ struct SkipGuideConfirmationView: View {
 struct AppFirstLaunchGuideOverlay: View {
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @State private var showingSkipConfirmation = false
+    
+    private var welcomeHighlightDiameter: CGFloat {
+        guard guideManager.isPadGuideLayout else { return 100 }
+        let scaleFactor = UIScreen.main.bounds.width / 375.0
+        return 100 * scaleFactor
+    }
 
     var body: some View {
         ZStack {
@@ -280,7 +286,7 @@ struct AppFirstLaunchGuideOverlay: View {
                 SkipGuideConfirmationView(
                     onConfirm: {
                         showingSkipConfirmation = false
-                        guideManager.completeGuide()
+                        guideManager.completeGuide(shouldGrantFirstCompletionReward: false)
                     },
                     onCancel: {
                         showingSkipConfirmation = false
@@ -301,7 +307,7 @@ struct AppFirstLaunchGuideOverlay: View {
                         .ignoresSafeArea()
 
                     Circle()
-                        .frame(width: 100, height: 100)
+                        .frame(width: welcomeHighlightDiameter, height: welcomeHighlightDiameter)
                         .position(guideManager.floatingCatStartPosition)
                         .blendMode(.destinationOut)
                 }

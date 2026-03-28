@@ -203,7 +203,7 @@ class PetViewModel: ObservableObject {
         }
         
         switch pet {
-        case .maomao:
+        case .naicha, .maomao:
             return (60, .meowCoin)
         default:
             return (0, .fishCoin)

@@ -4,16 +4,40 @@ import Combine
 import UIKit
 #endif
 
+enum WheelExpansionDirection {
+    case upward
+    case downward
+}
+
 // MARK: - 轮盘配置（统一管理角度范围）
 enum WheelConfig {
-    // 轮盘角度范围（以正左方为0°，顺时针为正）
-    static let startAngle: Double = -135  // 左边界
-    static let endAngle: Double = -45     // 右边界
-    static var totalAngle: Double { endAngle - startAngle }  // 总角度范围
+    static let menuPadding: Double = 10
 
-    // 单层菜单配置
-    static let menuPadding: Double = 10  // 边距
-    static var menuTotalAngle: Double { totalAngle - menuPadding * 2 }
+    static func leftAngle(for direction: WheelExpansionDirection) -> Double {
+        switch direction {
+        case .upward:
+            return -135
+        case .downward:
+            return 135
+        }
+    }
+
+    static func rightAngle(for direction: WheelExpansionDirection) -> Double {
+        switch direction {
+        case .upward:
+            return -45
+        case .downward:
+            return 45
+        }
+    }
+
+    static func backgroundStartAngle(for direction: WheelExpansionDirection) -> Double {
+        min(leftAngle(for: direction), rightAngle(for: direction))
+    }
+
+    static func backgroundEndAngle(for direction: WheelExpansionDirection) -> Double {
+        max(leftAngle(for: direction), rightAngle(for: direction))
+    }
 }
 
 // MARK: - 轮盘菜单数据模型
@@ -44,6 +68,8 @@ struct SmallWorldMenuOverlay: View {
     @State private var isPressing: Bool = false
     @State private var didLongPressTrigger: Bool = false
     @State private var menuOrigin: CGPoint = .zero
+    @State private var menuExpansionProgress: CGFloat = 0
+    @State private var menuHideWorkItem: DispatchWorkItem?
     @State private var startLocation: CGPoint = .zero
     @State private var timer: Timer?
     private let longPressDuration: TimeInterval = 0.35
@@ -69,6 +95,16 @@ struct SmallWorldMenuOverlay: View {
         #else
         return false
         #endif
+    }
+
+    private var menuExpansionDirection: WheelExpansionDirection {
+        if isIPad {
+            if #available(iOS 26.0, *) {
+                return .downward
+            }
+            return .upward
+        }
+        return .upward
     }
 
     // 莫妮卡粉色
@@ -168,13 +204,13 @@ struct SmallWorldMenuOverlay: View {
                     radius: getMenuRadius(geometry: geometry),
                     isLowMemoryDevice: isLowMemoryDevice,
                     monicaPink: monicaPink,
+                    direction: menuExpansionDirection,
+                    expansionProgress: menuExpansionProgress,
                     onItemSelected: { item in
                         selectItem(item.destination)
                     }
                 )
                 .position(x: menuOrigin.x, y: menuOrigin.y)
-                .transition(.scale.combined(with: .opacity))
-                .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showMenu)
             }
 
             // 长按进度指示器
@@ -274,11 +310,13 @@ struct SmallWorldMenuOverlay: View {
     }
 
     // MARK: - 单层轮盘菜单
-    struct WheelMenuView: View {
+    private struct WheelMenuView: View {
         let items: [WheelMenuItem]
         let radius: CGFloat
         let isLowMemoryDevice: Bool
         let monicaPink: Color
+        let direction: WheelExpansionDirection
+        let expansionProgress: CGFloat
         let onItemSelected: (WheelMenuItem) -> Void
 
         // 根据菜单数量计算自适应大小
@@ -301,23 +339,31 @@ struct SmallWorldMenuOverlay: View {
 
         var body: some View {
             let sizes = getAdaptiveSizes(count: items.count)
+            let leftAngle = WheelConfig.leftAngle(for: direction)
+            let rightAngle = WheelConfig.rightAngle(for: direction)
 
             ZStack {
                 // 轮盘背景（淡淡的莫妮卡粉）
                 WheelBackground(
                     radius: radius + 40,
-                    startAngle: WheelConfig.startAngle,
-                    endAngle: WheelConfig.endAngle,
+                    startAngle: WheelConfig.backgroundStartAngle(for: direction),
+                    endAngle: WheelConfig.backgroundEndAngle(for: direction),
                     monicaPink: monicaPink
                 )
+                .scaleEffect(0.88 + 0.12 * expansionProgress)
+                .opacity(0.35 + 0.65 * expansionProgress)
+                .animation(.easeOut(duration: 0.2), value: expansionProgress)
 
                 // 5个菜单项使用上下两排布局：下面2个，上面3个
                 // 顺序：上排[0,2,4] 下排[1,3]（按选择顺序交叉排列）
                 if items.count == 5 {
+                    let outerAngles: [Double] = direction == .upward ? [-135, -95, -55] : [135, 95, 55]
+                    let innerAngles: [Double] = direction == .upward ? [-120, -60] : [120, 60]
+
                     // 上排：3个菜单项（items[0,2,4]从左到右，间距更紧凑）
                     ForEach(0..<3) { position in
                         let index = position * 2  // 0, 2, 4
-                        let angle = -135 + Double(position) * 40
+                        let angle = outerAngles[position]
                         let radians = angle * .pi / 180
                         let x = radius * cos(radians)
                         let y = radius * sin(radians)
@@ -332,15 +378,20 @@ struct SmallWorldMenuOverlay: View {
                         ) {
                             onItemSelected(items[index])
                         }
-                        .offset(x: x, y: y)
-                        .transition(.scale.combined(with: .opacity))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
+                        .offset(x: x * expansionProgress, y: y * expansionProgress)
+                        .opacity(expansionProgress)
+                        .scaleEffect(0.84 + 0.16 * expansionProgress)
+                        .animation(
+                            .spring(response: 0.32, dampingFraction: 0.72)
+                                .delay(Double(index) * 0.02),
+                            value: expansionProgress
+                        )
                     }
 
                     // 下排：2个菜单项（items[1,3]从左到右）
                     ForEach(0..<2) { position in
                         let index = position * 2 + 1  // 1, 3
-                        let angle = -120 + Double(position) * 60
+                        let angle = innerAngles[position]
                         let radians = angle * .pi / 180
                         let innerRadius = radius * 0.6
                         let x = innerRadius * cos(radians)
@@ -356,19 +407,24 @@ struct SmallWorldMenuOverlay: View {
                         ) {
                             onItemSelected(items[index])
                         }
-                        .offset(x: x, y: y)
-                        .transition(.scale.combined(with: .opacity))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
+                        .offset(x: x * expansionProgress, y: y * expansionProgress)
+                        .opacity(expansionProgress)
+                        .scaleEffect(0.84 + 0.16 * expansionProgress)
+                        .animation(
+                            .spring(response: 0.32, dampingFraction: 0.72)
+                                .delay(Double(index) * 0.02),
+                            value: expansionProgress
+                        )
                     }
                 } else {
                     // 其他数量使用原来的弧形布局
                     ForEach(items.indices, id: \.self) { index in
-                        let itemStartAngle = WheelConfig.startAngle + WheelConfig.menuPadding
-                        let step = items.count > 1 ? WheelConfig.menuTotalAngle / Double(items.count - 1) : 0
-                        let angle = itemStartAngle + Double(index) * step
-                        let radians = angle * .pi / 180
-                        let x = radius * cos(radians)
-                        let y = radius * sin(radians)
+                        let t = items.count > 1 ? Double(index) / Double(items.count - 1) : 0.5
+                        let angle = leftAngle + (rightAngle - leftAngle) * t
+                        let paddedAngle = angle + (direction == .upward ? WheelConfig.menuPadding : -WheelConfig.menuPadding)
+                        let paddedRadians = paddedAngle * .pi / 180
+                        let x = radius * cos(paddedRadians)
+                        let y = radius * sin(paddedRadians)
 
                         ItemBubble(
                             item: items[index],
@@ -380,9 +436,14 @@ struct SmallWorldMenuOverlay: View {
                         ) {
                             onItemSelected(items[index])
                         }
-                        .offset(x: x, y: y)
-                        .transition(.scale.combined(with: .opacity))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7).delay(Double(index) * 0.03), value: items.count)
+                        .offset(x: x * expansionProgress, y: y * expansionProgress)
+                        .opacity(expansionProgress)
+                        .scaleEffect(0.84 + 0.16 * expansionProgress)
+                        .animation(
+                            .spring(response: 0.32, dampingFraction: 0.72)
+                                .delay(Double(index) * 0.02),
+                            value: expansionProgress
+                        )
                     }
                 }
             }
@@ -538,6 +599,9 @@ struct SmallWorldMenuOverlay: View {
         hapticManager.playUIFeedback(intensity: 0.8, sharpness: 0.7, fallbackStyle: .heavy)
         didLongPressTrigger = true
 
+        menuHideWorkItem?.cancel()
+        menuHideWorkItem = nil
+
         // 重置轮盘状态
         wheelRotation = 0
 
@@ -545,10 +609,12 @@ struct SmallWorldMenuOverlay: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             menuOrigin = CGPoint(x: smallWorldTabCenterX, y: smallWorldTabCenterY)
+            menuExpansionProgress = 0
+            showMenu = true
         }
 
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            showMenu = true
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.75)) {
+            menuExpansionProgress = 1
         }
         NotificationCenter.default.post(name: .smallWorldQuickMenuOpened, object: nil)
 
@@ -557,15 +623,22 @@ struct SmallWorldMenuOverlay: View {
     }
 
     private func closeMenu() {
-        withAnimation(.easeOut(duration: 0.2)) {
-            showMenu = false
+        menuHideWorkItem?.cancel()
+        menuHideWorkItem = nil
+
+        withAnimation(.easeOut(duration: 0.16)) {
+            menuExpansionProgress = 0
         }
+
+        let hideWorkItem = DispatchWorkItem {
+            self.showMenu = false
+        }
+        menuHideWorkItem = hideWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16, execute: hideWorkItem)
     }
 
     private func selectItem(_ dest: SmallWorldDestination) {
-        withAnimation(.easeOut(duration: 0.15)) {
-            showMenu = false
-        }
+        closeMenu()
 
         DispatchQueue.main.async {
             var transaction = Transaction()

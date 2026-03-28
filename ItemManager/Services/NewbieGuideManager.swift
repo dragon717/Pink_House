@@ -42,6 +42,8 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     
     private let stateKey = "newbieGuide.state"
     private let hasSeenWelcomeKey = "newbieGuide.hasSeenWelcome"
+    private let firstCompletionRewardClaimedKey = "newbieGuide.firstCompletionRewardClaimed"
+    private let firstCompletionRewardAmount = 888
     
     let runningVideoName = "naicha_new_role"
     let pointingVideoName = "naicha_pointto"
@@ -68,7 +70,10 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     // 悬浮小猫起始位置（底部中间）- 往上移动
     var floatingCatStartPosition: CGPoint {
         let screenBounds = UIScreen.main.bounds
-        return CGPoint(x: screenBounds.width / 2, y: screenBounds.height - 155)
+        let proportionalDownOffset = screenBounds.height * 0.024
+        let maxAllowedY = screenBounds.height - max(currentWindowSafeAreaBottom + 92, 108)
+        let targetY = min(screenBounds.height - 155 + proportionalDownOffset, maxAllowedY)
+        return CGPoint(x: screenBounds.width / 2, y: targetY)
     }
     
     // MARK: - 计算属性
@@ -301,6 +306,14 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             .safeAreaInsets.top ?? 0
     }
 
+    private var currentWindowSafeAreaBottom: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.bottom ?? 0
+    }
+
     private var firstLaunchAddButtonGuideFrame: CGRect {
         let screenBounds = UIScreen.main.bounds
         let safeAreaTop = currentWindowSafeAreaTop
@@ -443,7 +456,9 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     }
 
     /// 完成引导
-    func completeGuide() {
+    func completeGuide(shouldGrantFirstCompletionReward: Bool = true) {
+        let wasCompletedBefore = state.isCompleted
+
         state.isCompleted = true
         currentStep = .complete
         isShowingGuide = false
@@ -451,6 +466,10 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         showPointingVideo = false
         showCreateButtonHighlight = false
         resetGuideInteractiveRegions()
+
+        if shouldGrantFirstCompletionReward, !wasCompletedBefore {
+            grantFirstCompletionRewardIfNeeded()
+        }
         saveState()
     }
 
@@ -465,6 +484,18 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         resetGuideInteractiveRegions()
         UserDefaults.standard.set(false, forKey: hasSeenWelcomeKey)
         saveState()
+    }
+
+    private func grantFirstCompletionRewardIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: firstCompletionRewardClaimedKey) else { return }
+
+        UserDefaults.standard.set(true, forKey: firstCompletionRewardClaimedKey)
+        RewardManager.shared.triggerReward(
+            type: .custom(
+                amount: firstCompletionRewardAmount,
+                message: "首次完成新手引导，鱼币 +\(firstCompletionRewardAmount)"
+            )
+        )
     }
 }
 
