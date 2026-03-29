@@ -20,7 +20,23 @@ enum PetChatTranscriptStore {
     static func load() -> [PetChatMessage] {
         let storedMessages = loadStoredMessages()
         let migratedMessages = migrateLegacyHistoryIfNeeded(existingMessages: storedMessages)
-        return normalizedPersistedMessages(from: migratedMessages)
+        let normalized = normalizedPersistedMessages(from: migratedMessages)
+        return normalized.filter { message in
+            if message.isUser && !message.isUserAuthored {
+                return false
+            }
+            if message.isUser && message.isUserAuthored {
+                let trimmed = sanitizeUserText(message.text).trimmingCharacters(in: .whitespacesAndNewlines)
+                if (trimmed.hasPrefix("{") && trimmed.hasSuffix("}")) ||
+                    (trimmed.hasPrefix("[") && trimmed.hasSuffix("]")) {
+                    return false
+                }
+                if !isLikelyManualUserText(trimmed) {
+                    return false
+                }
+            }
+            return true
+        }
     }
 
     static func query(
@@ -262,7 +278,12 @@ enum PetChatTranscriptStore {
             return false
         }
         let blockedCommands: Set<String> = [
-            "今日打卡", "去打卡", "签到", "数钞票", "来财", "喂食"
+            "今日打卡", "去打卡", "签到", "数钞票", "来财", "喂食",
+            "智能搭配", "快速搭配", "甜美约会", "优雅茶会", "日常出门",
+            "统计裙子", "查看萌宠状态", "切换萌宠", "改名",
+            "看看我的背包", "带我逛逛商店", "查看天气穿搭",
+            "尾款提醒", "去来财数钞票", "今日求签", "今日运势",
+            "查找衣柜", "历史消息查询", "帮我搭配一套"
         ]
         return !blockedCommands.contains(trimmed)
     }

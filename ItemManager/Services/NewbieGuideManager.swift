@@ -1072,11 +1072,12 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindFrameDrivenEvents<Content: View>(_ content: Content) -> some View {
         content
-            .onChange(of: guideManager.aiAnalysisVIPCardGlobalFrame) { _, vipCardFrame in
+            .onChange(of: guideManager.guideTargetFrame(for: .aiAnalysisVIPCard)) { _, vipCardFrame in
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
                    aiAnalysisStep == .preUnlockStep1ReturnToMe,
+                   currentTab == "me",
                    vipCardFrame != nil {
-                    print("[FeatureExperienceGuide] 检测到VIP卡片位置，step1进入step2")
+                    print("[FeatureExperienceGuide] 检测到在me界面且VIP卡片frame已采集，step1进入step2")
                     withAnimation(.easeInOut(duration: 0.3)) {
                         aiAnalysisStep = .preUnlockStep2ClickVIP
                     }
