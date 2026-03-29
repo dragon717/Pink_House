@@ -239,9 +239,13 @@ enum CalendarGuideStep: Int, CaseIterable {
 }
 
 enum MagicStickerGuideStep: Int, CaseIterable {
-    case step1_longPressHouseTab = 1
-    case step2_clickMagicStickerEntry = 2
-    case step3_magicStickerExplanation = 3
+    case step1_returnToMeForMenuSetup = 1
+    case step2_clickFavoriteMenuSettings = 2
+    case step3_addMagicStickerButton = 3
+    case step4_returnToMeAfterMenuSetup = 4
+    case step5_longPressHouseTab = 5
+    case step6_clickMagicStickerEntry = 6
+    case step7_magicStickerExplanation = 7
 }
 
 enum BatchEditGuideStep: Int, CaseIterable {

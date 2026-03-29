@@ -41,6 +41,35 @@ extension FeatureExperienceGuideOverlay {
         [.ootd, .ootdDefaultBook, .calendar, .batchImport, .spaceBook].contains(feature)
     }
 
+    var isMagicStickerInFavoriteMenu: Bool {
+        favoriteMenuSettingsManager.selectedItems.contains(.ootd)
+    }
+
+    func shouldUseMagicStickerMenuSetupGuide() -> Bool {
+        !isMagicStickerInFavoriteMenu
+    }
+
+    var magicStickerGuideTotalSteps: Int {
+        magicStickerGuideRequiresMenuSetup ? 7 : 3
+    }
+
+    func magicStickerGuideDisplayStep(for step: MagicStickerGuideStep) -> Int {
+        if magicStickerGuideRequiresMenuSetup {
+            return step.rawValue
+        }
+
+        switch step {
+        case .step5_longPressHouseTab:
+            return 1
+        case .step6_clickMagicStickerEntry:
+            return 2
+        case .step7_magicStickerExplanation:
+            return 3
+        default:
+            return 1
+        }
+    }
+
     func returnGuideBackButtonFrame(in geometry: GeometryProxy) -> CGRect {
         CGRect(
             x: 16,
@@ -105,6 +134,7 @@ extension FeatureExperienceGuideOverlay {
         hasSpaceBooksForGuide = false
         hasSpaceBookPagesForGuide = false
         didOpenBatchEditMoreMenu = false
+        magicStickerGuideRequiresMenuSetup = false
 
         switch feature {
         case .aiAnalysis:
@@ -142,7 +172,10 @@ extension FeatureExperienceGuideOverlay {
             wardrobeAddGuideStep = .step1_clickAddButton
         case .ootdDefaultBook:
             if FeatureUnlockManager.shared.isUnlocked(feature) {
-                magicStickerGuideStep = .step1_longPressHouseTab
+                magicStickerGuideRequiresMenuSetup = shouldUseMagicStickerMenuSetupGuide()
+                magicStickerGuideStep = magicStickerGuideRequiresMenuSetup
+                    ? .step1_returnToMeForMenuSetup
+                    : .step5_longPressHouseTab
             } else {
                 wardrobeAddGuideStep = .step1_clickAddButton
             }
@@ -185,6 +218,47 @@ extension FeatureExperienceGuideOverlay {
 
         withAnimation(.easeInOut(duration: 0.3)) {
             wealthGuideStep = .step3_divination
+        }
+    }
+
+    func advanceMagicStickerGuideFromReturnStep() {
+        guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook else { return }
+        guard magicStickerGuideRequiresMenuSetup else { return }
+        guard magicStickerGuideStep == .step1_returnToMeForMenuSetup else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            magicStickerGuideStep = .step2_clickFavoriteMenuSettings
+        }
+    }
+
+    func advanceMagicStickerGuideToAddButtonStep() {
+        guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook else { return }
+        guard magicStickerGuideRequiresMenuSetup else { return }
+        guard magicStickerGuideStep == .step2_clickFavoriteMenuSettings else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            magicStickerGuideStep = .step3_addMagicStickerButton
+        }
+    }
+
+    func advanceMagicStickerGuideToReturnAfterSetupStep() {
+        guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook else { return }
+        guard magicStickerGuideRequiresMenuSetup else { return }
+        guard magicStickerGuideStep == .step3_addMagicStickerButton else { return }
+        guard isMagicStickerInFavoriteMenu else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            magicStickerGuideStep = .step4_returnToMeAfterMenuSetup
+        }
+    }
+
+    func advanceMagicStickerGuideToLongPressStep() {
+        guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook else { return }
+        guard magicStickerGuideRequiresMenuSetup else { return }
+        guard magicStickerGuideStep == .step4_returnToMeAfterMenuSetup else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            magicStickerGuideStep = .step5_longPressHouseTab
         }
     }
 
@@ -348,6 +422,38 @@ extension FeatureExperienceGuideOverlay {
 
         withAnimation(.easeInOut(duration: 0.25)) {
             wardrobeAddGuideStep = .step2_chooseTargetOption
+        }
+    }
+
+    func handleMagicStickerGuideReturnAction() {
+        guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook else { return }
+        guard magicStickerGuideRequiresMenuSetup else { return }
+        guard magicStickerGuideStep == .step1_returnToMeForMenuSetup else { return }
+
+        NotificationCenter.default.post(name: .dismissMagicTasksView, object: nil)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
+                  magicStickerGuideRequiresMenuSetup,
+                  magicStickerGuideStep == .step1_returnToMeForMenuSetup,
+                  guideManager.lastKnownHomeTab == "me" else { return }
+            advanceMagicStickerGuideFromReturnStep()
+        }
+    }
+
+    func handleMagicStickerGuideReturnFromMenuSettingsAction() {
+        guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook else { return }
+        guard magicStickerGuideRequiresMenuSetup else { return }
+        guard magicStickerGuideStep == .step4_returnToMeAfterMenuSetup else { return }
+
+        NotificationCenter.default.post(name: .dismissFavoriteMenuSettingsView, object: nil)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
+                  magicStickerGuideRequiresMenuSetup,
+                  magicStickerGuideStep == .step4_returnToMeAfterMenuSetup,
+                  guideManager.lastKnownHomeTab == "me" else { return }
+            advanceMagicStickerGuideToLongPressStep()
         }
     }
 

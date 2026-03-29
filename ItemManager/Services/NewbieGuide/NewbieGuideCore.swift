@@ -58,6 +58,7 @@ enum PointDirection {
 enum GuideTargetKey: String, CaseIterable, Hashable {
     case aiAnalysisVIPCard = "aiAnalysis.vipCard"
     case aiAnalysisExchangeButton = "aiAnalysis.exchangeButton"
+    case aiAnalysisVIPTrialConfirmButton = "aiAnalysis.vipTrialConfirmButton"
     case homePetChatTab = "home.petChatTab"
     case petChatSearchBar = "petChat.searchBar"
     case petChatGuideOptionButton = "petChat.guideOptionButton"
@@ -97,6 +98,8 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     case wardrobeDoneSelectionButton = "wardrobe.doneSelectionButton"
     case ootdEntry = "ootd.entry"
     case calendarEntry = "calendar.entry"
+    case favoriteMenuSettingsEntry = "favoriteMenu.settingsEntry"
+    case favoriteMenuMagicStickerAddButton = "favoriteMenu.magicStickerAddButton"
     case favoriteMenuMagicStickerEntry = "favoriteMenu.magicStickerEntry"
     case themeColorModeTabs = "themeColorMode.tabs"
     case spaceBookModeTabs = "spaceBook.modeTabs"

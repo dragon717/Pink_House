@@ -1,8 +1,16 @@
 import SwiftUI
 import UIKit
 
+enum GuideAdaptiveScale {
+    static func factor(screenWidth: CGFloat = UIScreen.main.bounds.width) -> CGFloat {
+        guard UIDevice.current.userInterfaceIdiom != .pad else { return 1.0 }
+        return screenWidth / 375.0
+    }
+}
+
 struct GuideTargetCaptureModifier: ViewModifier {
     let key: GuideTargetKey
+    @ObservedObject private var guideManager = AppFirstLaunchGuideManager.shared
 
     func body(content: Content) -> some View {
         content.background(
@@ -14,6 +22,9 @@ struct GuideTargetCaptureModifier: ViewModifier {
                     }
                     .onChange(of: frame) { _, newValue in
                         AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(newValue, for: key)
+                    }
+                    .onChange(of: guideManager.guideTargetCaptureVersion) { _, _ in
+                        AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(frame, for: key)
                     }
             }
         )
@@ -84,8 +95,7 @@ struct HighlightPulseViewNoClick: View {
     @State private var pulseOpacity: Double = 0.8
 
     private var adaptiveRadius: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        let scaleFactor = screenWidth / 375.0
+        let scaleFactor = GuideAdaptiveScale.factor()
         return radius * scaleFactor
     }
 
@@ -130,8 +140,7 @@ struct RoundedRectHighlightView: View {
     @State private var pulseOpacity: Double = 0.6
 
     private var adaptiveFrame: CGRect {
-        let screenWidth = UIScreen.main.bounds.width
-        let scaleFactor = screenWidth / 375.0
+        let scaleFactor = GuideAdaptiveScale.factor()
         let newWidth = frame.width * scaleFactor
         let newHeight = frame.height * scaleFactor
         let newX = frame.midX - newWidth / 2
@@ -184,8 +193,7 @@ struct CatPawTapAnimation: View {
     @State private var tapOpacity: Double = 1.0
 
     private var scaleFactor: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        return screenWidth / 375.0
+        GuideAdaptiveScale.factor()
     }
 
     private var pawSize: CGFloat {
@@ -257,8 +265,7 @@ struct HollowMaskView: View {
     let cornerRadius: CGFloat
 
     private var adaptiveHighlightFrame: CGRect {
-        let screenWidth = UIScreen.main.bounds.width
-        let scaleFactor = screenWidth / 375.0
+        let scaleFactor = GuideAdaptiveScale.factor()
         let newWidth = highlightFrame.width * scaleFactor
         let newHeight = highlightFrame.height * scaleFactor
         let newX = highlightFrame.midX - newWidth / 2

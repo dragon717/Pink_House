@@ -190,7 +190,7 @@ struct SystemSettingsView: View {
     private func prepareBackup() {
         NotificationCenter.default.post(name: .localBackupTriggered, object: nil)
         isLoading = true
-        loadingMessage = "正在打包数据..."
+        loadingMessage = "正在打包数据，备份需要时间，耐心等待，不要退出本界面..."
         let container = modelContext.container
         Task {
             do {

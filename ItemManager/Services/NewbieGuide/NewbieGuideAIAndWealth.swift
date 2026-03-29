@@ -297,28 +297,36 @@ extension FeatureExperienceGuideOverlay {
             width: screenBounds.width - 40,
             height: 56
         )
+        let trialConfirmFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .aiAnalysisVIPTrialConfirmButton),
+            in: geometry,
+            fallback: .zero
+        )
         let exchangeButtonFrame = aiGuideTargetFrame(
             globalFrame: guideManager.guideTargetFrame(for: .aiAnalysisExchangeButton),
             in: geometry,
             fallback: fallbackExchangeFrame
         )
+        let shouldGuideTrialConfirm = !VIPManager.shared.isVIP && !trialConfirmFrame.isEmpty
+        let targetFrame = shouldGuideTrialConfirm ? trialConfirmFrame : exchangeButtonFrame
+        let targetCornerRadius: CGFloat = shouldGuideTrialConfirm ? 16 : 12
 
         return ZStack {
             HollowMaskView(
-                highlightFrame: exchangeButtonFrame,
+                highlightFrame: targetFrame,
                 highlightType: .roundedRect,
-                cornerRadius: 12
+                cornerRadius: targetCornerRadius
             )
 
             RoundedRectHighlightView(
-                frame: exchangeButtonFrame,
-                cornerRadius: 12
+                frame: targetFrame,
+                cornerRadius: targetCornerRadius
             )
             .allowsHitTesting(false)
 
             if aiAnalysisStep.showCatPaw {
                 CatPawTapAnimation(
-                    position: CGPoint(x: exchangeButtonFrame.midX, y: exchangeButtonFrame.midY),
+                    position: CGPoint(x: targetFrame.midX, y: targetFrame.midY),
                     delay: 0.5
                 )
                 .allowsHitTesting(false)
@@ -327,6 +335,10 @@ extension FeatureExperienceGuideOverlay {
             VStack {
                 aiAnalysisBubble(
                     step: aiAnalysisStep,
+                    titleOverride: shouldGuideTrialConfirm ? "确认免费体验" : nil,
+                    messageOverride: shouldGuideTrialConfirm
+                    ? "点击弹窗里的「确认体验」，先免费体验 VIP 特权，解锁萌宠智能对话。"
+                    : nil,
                     onSkip: {
                         guideManager.dismissFeatureExperienceGuide()
                     },
@@ -496,11 +508,17 @@ extension FeatureExperienceGuideOverlay {
 
     func aiAnalysisBubble(
         step: AIAnalysisGuideStep,
+        titleOverride: String? = nil,
+        messageOverride: String? = nil,
+        completionButtonTitleOverride: String? = nil,
         onSkip: @escaping () -> Void,
         onComplete: @escaping () -> Void
     ) -> some View {
         AIAnalysisGuideBubbleView(
             step: step,
+            titleOverride: titleOverride,
+            messageOverride: messageOverride,
+            completionButtonTitleOverride: completionButtonTitleOverride,
             onSkip: onSkip,
             onComplete: onComplete
         )

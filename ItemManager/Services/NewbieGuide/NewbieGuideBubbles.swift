@@ -108,6 +108,9 @@ struct GenericFeatureGuideBubbleView: View {
 
 struct AIAnalysisGuideBubbleView: View {
     let step: AIAnalysisGuideStep
+    let titleOverride: String?
+    let messageOverride: String?
+    let completionButtonTitleOverride: String?
     let onSkip: () -> Void
     let onComplete: () -> Void
 
@@ -151,11 +154,11 @@ struct AIAnalysisGuideBubbleView: View {
                     }
                 }
 
-                Text(step.title)
+                Text(titleOverride ?? step.title)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(magicPalette.primaryText)
 
-                Text(step.message)
+                Text(messageOverride ?? step.message)
                     .font(.system(size: 14))
                     .foregroundStyle(magicPalette.secondaryText)
                     .multilineTextAlignment(.center)
@@ -166,7 +169,7 @@ struct AIAnalysisGuideBubbleView: View {
                     Button {
                         onComplete()
                     } label: {
-                        Text(step.completionButtonTitle)
+                        Text(completionButtonTitleOverride ?? step.completionButtonTitle)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(magicPalette.bubbleUserTextColor)
                             .frame(maxWidth: .infinity)

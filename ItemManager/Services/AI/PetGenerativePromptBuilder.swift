@@ -103,6 +103,14 @@ enum PetGenerativePromptBuilder {
         let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
 
+        if let extractedOutfitQuery = extractFieldBetweenMarkers(
+            startMarkers: ["需求：", "需求:"],
+            endMarkers: ["候选单品：", "候选单品:", "请从候选中选"],
+            in: trimmed
+        ) {
+            return extractedOutfitQuery
+        }
+
         for marker in userQuestionMarkers {
             if let extracted = extractPromptField(after: marker, in: trimmed),
                !extracted.isEmpty {
@@ -150,6 +158,34 @@ enum PetGenerativePromptBuilder {
         return cleaned
     }
 
+    private static func extractFieldBetweenMarkers(
+        startMarkers: [String],
+        endMarkers: [String],
+        in text: String
+    ) -> String? {
+        for startMarker in startMarkers {
+            guard let startRange = text.range(of: startMarker) else { continue }
+            let suffix = String(text[startRange.upperBound...])
+
+            let earliestEndRange = endMarkers
+                .compactMap { suffix.range(of: $0) }
+                .min(by: { $0.lowerBound < $1.lowerBound })
+
+            let candidate: String
+            if let endRange = earliestEndRange {
+                candidate = String(suffix[..<endRange.lowerBound])
+            } else {
+                candidate = suffix.components(separatedBy: "\n\n").first ?? suffix
+            }
+
+            let cleaned = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleaned.isEmpty {
+                return cleaned
+            }
+        }
+        return nil
+    }
+
     private static let userQuestionMarkers = [
         "用户原始问题：",
         "用户问题："
@@ -184,7 +220,9 @@ enum PetGenerativePromptBuilder {
         "仅输出 json 对象",
         "json 结构固定",
         "用户问题：",
-        "重要提示：请务必保持"
+        "重要提示：请务必保持",
+        "候选单品：",
+        "请从候选中选"
     ]
 
     private static let outputProtocol = """

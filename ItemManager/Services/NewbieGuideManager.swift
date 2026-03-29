@@ -23,6 +23,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     @Published var currentFeatureExperienceFeature: FeatureItem? = nil
     @Published private var guideTargetFrames: [GuideTargetKey: CGRect] = [:]
     @Published private var guideInteractiveRegions: [String: CGRect] = [:]
+    @Published private(set) var guideTargetCaptureVersion: UInt = 0
     @Published private(set) var lastKnownHomeTab: String = "wardrobe"
     
     // 向后兼容：保留已使用字段名，内部改为统一存储
@@ -200,6 +201,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         print("[FeatureExperienceGuide] 启动引导成功: \(feature.rawValue)")
         resetFeatureGuideTargetFrames()
         resetGuideInteractiveRegions()
+        requestGuideTargetRecapture()
         currentFeatureExperienceFeature = feature
         isShowingFeatureExperienceGuide = true
     }
@@ -358,6 +360,10 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         guideTargetFrames[key] = frame
     }
 
+    func requestGuideTargetRecapture() {
+        guideTargetCaptureVersion &+= 1
+    }
+
     func updateGuideInteractiveRegion(_ frame: CGRect, for id: String) {
         guard frame.width > 0, frame.height > 0 else { return }
         guideInteractiveRegions[id] = frame
@@ -404,6 +410,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         resetGuideTargetFrames([
             .aiAnalysisVIPCard,
             .aiAnalysisExchangeButton,
+            .aiAnalysisVIPTrialConfirmButton,
             .homeHouseTab,
             .homePetChatTab,
             .petChatSearchBar,
@@ -443,6 +450,8 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             .wardrobeDoneSelectionButton,
             .ootdEntry,
             .calendarEntry,
+            .favoriteMenuSettingsEntry,
+            .favoriteMenuMagicStickerAddButton,
             .favoriteMenuMagicStickerEntry,
             .themeColorModeTabs,
             .spaceBookModeTabs,
@@ -504,6 +513,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
 struct FeatureExperienceGuideOverlay: View {
     @StateObject var guideManager = AppFirstLaunchGuideManager.shared
     @StateObject var authManager = AuthenticationManager.shared
+    @StateObject var favoriteMenuSettingsManager = FavoriteMenuSettingsManager.shared
     @State var showingFullDescription = false
     @Environment(ThemeManager.self) var themeManager
     @Environment(\.colorScheme) var colorScheme
@@ -524,7 +534,8 @@ struct FeatureExperienceGuideOverlay: View {
     @State var tagBrandFieldGuideStep: TagBrandFieldGuideStep = .step1_returnToMe
     @State var ootdGuideStep: OOTDGuideStep = .step1_clickOotdEntry
     @State var calendarGuideStep: CalendarGuideStep = .step1_clickCalendarEntry
-    @State var magicStickerGuideStep: MagicStickerGuideStep = .step1_longPressHouseTab
+    @State var magicStickerGuideStep: MagicStickerGuideStep = .step5_longPressHouseTab
+    @State var magicStickerGuideRequiresMenuSetup: Bool = false
     @State var batchEditGuideStep: BatchEditGuideStep = .step1_clickMoreMenu
     @State var didOpenBatchEditMoreMenu: Bool = false
     @State var spaceBookGuideStep: SpaceBookGuideStep = .step1_clickWardrobeOotdEntry
@@ -609,6 +620,11 @@ struct FeatureExperienceGuideOverlay: View {
                    tab == "me" {
                     advanceWidgetGuideFromReturnStep()
                 }
+                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
+                   magicStickerGuideStep == .step1_returnToMeForMenuSetup,
+                   tab == "me" {
+                    advanceMagicStickerGuideFromReturnStep()
+                }
                 if guideManager.currentFeatureExperienceFeature == .themeCustomize,
                    themeCustomizeGuideStep == .step1_returnToMe,
                    tab == "me" {
@@ -647,6 +663,10 @@ struct FeatureExperienceGuideOverlay: View {
                 if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
                    widgetCustomizeStep == .step1_returnToMe {
                     advanceWidgetGuideFromReturnStep()
+                }
+                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
+                   magicStickerGuideStep == .step1_returnToMeForMenuSetup {
+                    advanceMagicStickerGuideFromReturnStep()
                 }
                 if guideManager.currentFeatureExperienceFeature == .themeCustomize,
                    themeCustomizeGuideStep == .step1_returnToMe {
@@ -910,7 +930,8 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindHouseGuideEvents<Content: View>(_ content: Content) -> some View {
         let houseEntryBound = bindHouseEntryGuideEvents(content)
-        let spaceBookStateBound = bindSpaceBookStateGuideEvents(houseEntryBound)
+        let magicStickerSetupBound = bindMagicStickerSetupGuideEvents(houseEntryBound)
+        let spaceBookStateBound = bindSpaceBookStateGuideEvents(magicStickerSetupBound)
         return bindSpaceBookEditorGuideEvents(spaceBookStateBound)
     }
 
@@ -940,19 +961,29 @@ struct FeatureExperienceGuideOverlay: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .smallWorldQuickMenuOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step1_longPressHouseTab {
+                   magicStickerGuideStep == .step5_longPressHouseTab {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step2_clickMagicStickerEntry
+                        magicStickerGuideStep = .step6_clickMagicStickerEntry
                     }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .ootdDefaultBookOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep.rawValue < MagicStickerGuideStep.step3_magicStickerExplanation.rawValue {
+                   magicStickerGuideStep.rawValue < MagicStickerGuideStep.step7_magicStickerExplanation.rawValue {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step3_magicStickerExplanation
+                        magicStickerGuideStep = .step7_magicStickerExplanation
                     }
                 }
+            }
+    }
+
+    private func bindMagicStickerSetupGuideEvents<Content: View>(_ content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .favoriteMenuSettingsOpened)) { _ in
+                advanceMagicStickerGuideToAddButtonStep()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .favoriteMenuSettingsViewDismissed)) { _ in
+                advanceMagicStickerGuideToLongPressStep()
             }
     }
 
@@ -1062,12 +1093,25 @@ struct FeatureExperienceGuideOverlay: View {
             }
             .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerEntry)) { _, frame in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step1_longPressHouseTab,
+                   magicStickerGuideStep == .step5_longPressHouseTab,
                    frame != nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step2_clickMagicStickerEntry
+                        magicStickerGuideStep = .step6_clickMagicStickerEntry
                     }
                 }
+            }
+            .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerAddButton)) { _, frame in
+                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
+                   magicStickerGuideRequiresMenuSetup,
+                   magicStickerGuideStep == .step2_clickFavoriteMenuSettings,
+                   frame != nil {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        magicStickerGuideStep = .step3_addMagicStickerButton
+                    }
+                }
+            }
+            .onChange(of: favoriteMenuSettingsManager.selectedItems) { _, _ in
+                advanceMagicStickerGuideToReturnAfterSetupStep()
             }
             .onChange(of: guideManager.guideTargetFrame(for: .wealthMainTabSegment)) { _, segmentFrame in
                 if guideManager.currentFeatureExperienceFeature == .wealth,
@@ -2869,7 +2913,75 @@ struct FeatureExperienceGuideOverlay: View {
         return AnyView(
             GeometryReader { geometry in
                 switch magicStickerGuideStep {
-                case .step1_longPressHouseTab:
+                case .step1_returnToMeForMenuSetup:
+                    returnToMeGuideContent(
+                        in: geometry,
+                        title: "先返回「我」界面",
+                        message: "你的常用菜单里还没有「魔法贴纸」，先从魔法任务页返回到「我」，我们去补上这个入口。",
+                        currentStep: magicStickerGuideDisplayStep(for: .step1_returnToMeForMenuSetup),
+                        totalSteps: magicStickerGuideTotalSteps,
+                        accent: .pink,
+                        onReturn: handleMagicStickerGuideReturnAction
+                    )
+                case .step2_clickFavoriteMenuSettings:
+                    let fallbackFrame = CGRect(
+                        x: geometry.size.width * 0.5 + 8,
+                        y: geometry.size.height * 0.48,
+                        width: (geometry.size.width - 48) / 2,
+                        height: 92
+                    )
+                    let targetFrame = aiGuideTargetFrame(
+                        globalFrame: guideManager.guideTargetFrame(for: .favoriteMenuSettingsEntry),
+                        in: geometry,
+                        fallback: fallbackFrame
+                    )
+                    highlightedRectGuideContent(
+                        frame: targetFrame,
+                        cornerRadius: 16,
+                        title: "点击「常用菜单」",
+                        message: "先进入「常用菜单设置」，把「魔法贴纸」加入长按菜单。",
+                        currentStep: magicStickerGuideDisplayStep(for: .step2_clickFavoriteMenuSettings),
+                        totalSteps: magicStickerGuideTotalSteps,
+                        accent: .pink,
+                        actionTitle: nil,
+                        onAction: nil,
+                        bubbleOnTop: true
+                    )
+                case .step3_addMagicStickerButton:
+                    let fallbackFrame = CGRect(
+                        x: geometry.size.width - 74,
+                        y: max(geometry.safeAreaInsets.top + 210, geometry.size.height * 0.36),
+                        width: 44,
+                        height: 44
+                    )
+                    let targetFrame = aiGuideTargetFrame(
+                        globalFrame: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerAddButton),
+                        in: geometry,
+                        fallback: fallbackFrame
+                    )
+                    highlightedRectGuideContent(
+                        frame: targetFrame,
+                        cornerRadius: 22,
+                        title: "添加「魔法贴纸」",
+                        message: "点击右侧 + 把「魔法贴纸」加进常用菜单。若提示已满，先移除一个旧入口再添加。",
+                        currentStep: magicStickerGuideDisplayStep(for: .step3_addMagicStickerButton),
+                        totalSteps: magicStickerGuideTotalSteps,
+                        accent: .pink,
+                        actionTitle: nil,
+                        onAction: nil,
+                        bubbleOnTop: true
+                    )
+                case .step4_returnToMeAfterMenuSetup:
+                    returnToMeGuideContent(
+                        in: geometry,
+                        title: "返回「我」界面",
+                        message: "很好！现在从常用菜单设置返回到「我」，我们继续长按 House tab 体验魔法贴纸。",
+                        currentStep: magicStickerGuideDisplayStep(for: .step4_returnToMeAfterMenuSetup),
+                        totalSteps: magicStickerGuideTotalSteps,
+                        accent: .pink,
+                        onReturn: handleMagicStickerGuideReturnFromMenuSettingsAction
+                    )
+                case .step5_longPressHouseTab:
                     let tabBarHeight: CGFloat = 56
                     let fallbackHouseTabFrame = CGRect(
                         x: (geometry.size.width * 0.375) - 34,
@@ -2907,8 +3019,8 @@ struct FeatureExperienceGuideOverlay: View {
                             featureStepBubble(
                                 title: "长按 House tab",
                                 message: "请长按底部的 House tab，弹出常用菜单后，我们一起找到「魔法贴纸」。",
-                                currentStep: 1,
-                                totalSteps: 3,
+                                currentStep: magicStickerGuideDisplayStep(for: .step5_longPressHouseTab),
+                                totalSteps: magicStickerGuideTotalSteps,
                                 accent: .pink,
                                 actionTitle: nil,
                                 onSkip: { guideManager.dismissFeatureExperienceGuide() },
@@ -2918,7 +3030,7 @@ struct FeatureExperienceGuideOverlay: View {
                             Spacer()
                         }
                     }
-                case .step2_clickMagicStickerEntry:
+                case .step6_clickMagicStickerEntry:
                     let fallbackFrame = CGRect(x: geometry.size.width * 0.18, y: geometry.size.height * 0.56, width: 96, height: 84)
                     let targetFrame = aiGuideTargetFrame(
                         globalFrame: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerEntry),
@@ -2930,19 +3042,19 @@ struct FeatureExperienceGuideOverlay: View {
                         cornerRadius: 24,
                         title: "点击「魔法贴纸」",
                         message: "在长按弹出的常用菜单里点击「魔法贴纸」，进入默认贴纸编辑页。",
-                        currentStep: 2,
-                        totalSteps: 3,
+                        currentStep: magicStickerGuideDisplayStep(for: .step6_clickMagicStickerEntry),
+                        totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         actionTitle: nil,
                         onAction: nil,
                         bubbleOnTop: true
                     )
-                case .step3_magicStickerExplanation:
+                case .step7_magicStickerExplanation:
                     bottomBubbleGuideContent(
                         title: "认识魔法贴纸",
                         message: "这里会直接进入默认贴纸页。主体区域是贴纸编辑内容，常用菜单能帮你继续跳到别的 House 功能；如果把贴纸加入手帐，还能继续回到对应手帐里编辑。",
-                        currentStep: 3,
-                        totalSteps: 3,
+                        currentStep: magicStickerGuideDisplayStep(for: .step7_magicStickerExplanation),
+                        totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         actionTitle: "知道了",
                         onAction: {

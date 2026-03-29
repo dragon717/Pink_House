@@ -304,6 +304,7 @@ class OutfitSuggestionService {
         // 调用AI服务
         let aiMessage = await PetAIService.shared.sendMessage(
             prompt,
+            displayText: query,
             enableVoice: false,
             responseMode: .raw
         )

@@ -1,103 +1,45 @@
 {
-  "fill" : {
-    "solid" : "display-p3:0.50000,0.31960,0.39118,1.00000"
-  },
+  "fill-specializations" : [
+    {
+      "value" : {
+        "solid" : "display-p3:0.97255,0.83922,0.89412,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "display-p3:0.67387,0.42803,0.53128,1.00000"
+      }
+    }
+  ],
   "groups" : [
     {
       "layers" : [
-
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
-      }
-    },
-    {
-      "blur-material" : null,
-      "hidden" : false,
-      "layers" : [
-
-      ],
-      "lighting" : "individual",
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
         {
-          "hidden" : true,
-          "image-name" : "logo.png",
-          "name" : "logo"
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
-        {
-          "blend-mode" : "normal",
+          "blend-mode-specializations" : [
+            {
+              "appearance" : "tinted",
+              "value" : "normal"
+            }
+          ],
           "fill" : "none",
-          "glass" : true,
-          "hidden" : false,
-          "image-name" : "text.png",
-          "name" : "text",
-          "opacity" : 1,
+          "image-name" : "logo-new.png",
+          "name" : "logo-new",
+          "opacity-specializations" : [
+            {
+              "appearance" : "tinted",
+              "value" : 1
+            }
+          ],
           "position" : {
-            "scale" : 0.6,
+            "scale" : 0.5,
             "translation-in-points" : [
-              -9,
-              284.359375
+              0,
+              0
             ]
           }
-        },
-        {
-          "glass" : true,
-          "image-name" : "dress_front.png",
-          "name" : "dress_front",
-          "position" : {
-            "scale" : 0.75,
-            "translation-in-points" : [
-              12.6171875,
-              190.0859375
-            ]
-          }
-        },
-        {
-          "glass" : true,
-          "image-name" : "dress.png",
-          "name" : "dress",
-          "opacity" : 1,
-          "position" : {
-            "scale" : 0.6,
-            "translation-in-points" : [
-              0.8999999999998636,
-              129.859375
-            ]
-          }
-        },
-        {
-          "image-name" : "bg.png",
-          "name" : "bg"
         }
       ],
-      "name" : "少女心愿立体logo",
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5

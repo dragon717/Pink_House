@@ -230,8 +230,10 @@ struct VIPCenterView: View {
                 VIPTrialPopupView(
                     isPresented: $showTrialPopup,
                     onConfirm: {
-                        // 用户点击确认体验，开始试用期
                         let result = vipManager.startTrialPeriod()
+                        if result.success {
+                            NotificationCenter.default.post(name: .vipExchangeAttempted, object: nil)
+                        }
                         alertMessage = result.message
                         showingPurchaseAlert = true
                     },
@@ -240,6 +242,11 @@ struct VIPCenterView: View {
                         print("用户选择稍后体验VIP")
                     }
                 )
+            }
+        }
+        .onChange(of: showTrialPopup) { _, isShowing in
+            if !isShowing {
+                AppFirstLaunchGuideManager.shared.resetGuideTargetFrames([.aiAnalysisVIPTrialConfirmButton])
             }
         }
         .onAppear {
@@ -254,6 +261,9 @@ struct VIPCenterView: View {
                 }
                 hasCheckedTrialOnAppear = true
             }
+        }
+        .onDisappear {
+            AppFirstLaunchGuideManager.shared.resetGuideTargetFrames([.aiAnalysisVIPTrialConfirmButton])
         }
     }
     

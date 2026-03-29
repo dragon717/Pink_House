@@ -128,6 +128,7 @@ struct VIPTrialPopupView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .shadow(color: Color(hex: "FFD700").opacity(0.4), radius: 12, x: 0, y: 6)
                         }
+                        .captureGuideTarget(.aiAnalysisVIPTrialConfirmButton)
                         
                         // 稍后按钮
                         Button(action: {

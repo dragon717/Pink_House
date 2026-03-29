@@ -279,95 +279,9 @@ struct MagicTaskDetailView: View {
                     }
                     .listRowBackground(Color.clear)
 
-                    // 任务信息
-                    Section("任务信息") {
-                        let condition = manager.getCondition(for: feature)
-                        let conditionType = UnlockConditionType(rawValue: condition.type)
-
-                        HStack {
-                            Image(systemName: conditionType?.icon ?? "sparkles")
-                                .frame(width: 24)
-                                .foregroundColor(themeManager.accentTextColor)
-                            Text("任务类型")
-                                .foregroundColor(themeManager.primaryTextColor)
-                            Spacer()
-                            Text(conditionType?.displayName ?? "体验任务")
-                                .foregroundColor(themeManager.secondaryTextColor)
-                        }
-
-                        HStack {
-                            Image(systemName: "text.bubble")
-                                .frame(width: 24)
-                                .foregroundColor(themeManager.accentTextColor)
-                            Text("任务说明")
-                                .foregroundColor(themeManager.primaryTextColor)
-                            Spacer()
-                            Text(feature.defaultCondition.description)
-                                .foregroundColor(themeManager.secondaryTextColor)
-                                .multilineTextAlignment(.trailing)
-                        }
-
-                        // 进度条
-                        if let progress = calculateProgress(for: condition) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text(progress.isCompleted ? "已完成" : "当前进度")
-                                        .font(.subheadline)
-                                        .foregroundColor(progress.isCompleted ? themeManager.accentTextColor : themeManager.primaryTextColor)
-                                    Spacer()
-                                    Text("\(Int(progress.current)) / \(Int(progress.total))")
-                                        .font(.caption)
-                                        .foregroundColor(progress.isCompleted ? themeManager.accentTextColor : themeManager.secondaryTextColor)
-                                }
-
-                                ProgressView(value: min(progress.current, progress.total), total: progress.total)
-                                    .progressViewStyle(.linear)
-                                    .tint(progress.isCompleted ? themeManager.accentTextColor : themeManager.accentTextColor)
-                            }
-                            .padding(.vertical, 8)
-                        }
-                    }
-
-                    // 解锁按钮
-                    if !manager.isUnlocked(feature) {
-                        Section {
-                            let check = manager.checkUnlockCondition(feature)
-
-                            if check.met {
-                                Button {
-                                    unlockFeature()
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "lock.open.fill")
-                                        Text("立即解锁")
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                    }
-                                }
-                                .tint(themeManager.accentTextColor)
-                            } else {
-                                HStack {
-                                    Spacer()
-                                    VStack(spacing: 8) {
-                                        Image(systemName: "lock.fill")
-                                            .font(.title2)
-                                            .foregroundColor(themeManager.tertiaryTextColor)
-
-                                        Text(check.message ?? "尚未满足解锁条件")
-                                            .font(.caption)
-                                            .foregroundColor(themeManager.secondaryTextColor)
-                                            .multilineTextAlignment(.center)
-                                    }
-                                    Spacer()
-                                }
-                                .padding(.vertical, 20)
-                            }
-                        }
-                    }
-
-                    // 任务操作按钮
                     let condition = manager.getCondition(for: feature)
+                    let conditionType = UnlockConditionType(rawValue: condition.type)
+                    let progress = calculateProgress(for: condition)
                     let isExperienceTask = condition.type == UnlockConditionType.manual.rawValue
                     let isUnlocked = manager.isUnlocked(feature)
                     let hasDestination = feature.destination != nil || feature.isSettingsFeature
@@ -376,191 +290,139 @@ struct MagicTaskDetailView: View {
                     let canShowGuide = FeatureUnlockManager.experienceGuidedFeatures.contains(feature) && (
                         isExperienceTask || isUnlocked || manager.canStartPreUnlockGuide(for: feature)
                     )
+                    let unlockCheck = manager.checkUnlockCondition(feature)
 
-                    // 任务状态
-                    Section("任务状态") {
-                        HStack {
-                            Text("任务状态")
-                                .foregroundColor(themeManager.primaryTextColor)
-                            Spacer()
-                            Text(isUnlocked ? "已完成" : "未完成")
-                                .foregroundColor(isUnlocked ? themeManager.accentTextColor : themeManager.secondaryTextColor)
-                        }
+                    // 核心信息（双列豆腐块）
+                    Section("核心信息") {
+                        VStack(spacing: 12) {
+                            LazyVGrid(columns: infoColumns, spacing: 12) {
+                                infoTofuBlock(
+                                    title: "任务类型",
+                                    value: conditionType?.displayName ?? "体验任务",
+                                    icon: conditionType?.icon ?? "sparkles"
+                                )
 
-                        if isExperienceTask,
-                           let reward = experienceFishCoinReward,
-                           let stepCount = experienceGuideStepCount {
-                            HStack {
-                                Text("任务奖励")
-                                    .foregroundColor(themeManager.primaryTextColor)
-                                Spacer()
-                                Text("鱼币 +\(reward)")
-                                    .foregroundColor(themeManager.accentTextColor)
+                                infoTofuBlock(
+                                    title: "任务状态",
+                                    value: isUnlocked ? "已完成" : "未完成",
+                                    icon: isUnlocked ? "checkmark.circle.fill" : "clock",
+                                    emphasized: isUnlocked
+                                )
+
+                                if isExperienceTask,
+                                   let reward = experienceFishCoinReward {
+                                    infoTofuBlock(
+                                        title: "任务奖励",
+                                        value: "鱼币 +\(reward)",
+                                        icon: "sparkles.rectangle.stack.fill",
+                                        emphasized: true
+                                    )
+                                }
+
+                                if isExperienceTask,
+                                   let stepCount = experienceGuideStepCount {
+                                    infoTofuBlock(
+                                        title: "引导步数",
+                                        value: "\(stepCount) 步",
+                                        icon: "figure.walk"
+                                    )
+                                }
                             }
 
-                            HStack {
-                                Text("引导步数")
+                            if let progress {
+                                progressTofuBlock(progress)
+                            }
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "text.alignleft")
+                                        .font(.caption)
+                                        .foregroundColor(themeManager.secondaryTextColor)
+                                    Text("任务说明")
+                                        .font(.caption)
+                                        .foregroundColor(themeManager.secondaryTextColor)
+                                }
+                                Text(feature.defaultCondition.description)
+                                    .font(.subheadline)
                                     .foregroundColor(themeManager.primaryTextColor)
-                                Spacer()
-                                Text("\(stepCount) 步")
-                                    .foregroundColor(themeManager.secondaryTextColor)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.65 : 0.9))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(themeManager.accentTextColor.opacity(0.12), lineWidth: 1)
+                            )
+
+                            if !isUnlocked {
+                                progressSpaceBlock(
+                                    progress: progress,
+                                    conditionType: conditionType,
+                                    fallbackMessage: unlockCheck.message
+                                )
                             }
                         }
+                        .padding(.vertical, 4)
                     }
 
-                    // 体验型任务：始终显示两个按钮
-                    if isExperienceTask {
-                        // 新手引导按钮
-                        if canShowGuide {
-                            Section {
-                                Button {
-                                    dismiss()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        NotificationCenter.default.post(
-                                            name: .showFirstUseGuide,
-                                            object: nil,
-                                            userInfo: ["feature": feature.rawValue]
-                                        )
-                                    }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "sparkles")
-                                        Text("新手引导")
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                    }
-                                }
-                                .tint(.pink)
-                            }
-                        }
-
-                        // 进入功能按钮
-                        if hasDestination {
-                            Section {
-                                Button {
-                                    dismiss()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        feature.postNavigationFromMagicTask()
-                                    }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "arrow.right.circle.fill")
-                                        Text("进入功能")
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                    }
-                                }
-                                .tint(themeManager.accentTextColor)
-                            }
-                        }
-                    }
-                    // 解锁型任务：根据解锁状态显示不同按钮
-                    else if isUnlocked {
-                        // 已解锁：显示"新手引导"和"进入功能"
-                        if canShowGuide {
-                            Section {
-                                Button {
-                                    dismiss()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        NotificationCenter.default.post(
-                                            name: .showFirstUseGuide,
-                                            object: nil,
-                                            userInfo: ["feature": feature.rawValue]
-                                        )
-                                    }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "sparkles")
-                                        Text("新手引导")
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                    }
-                                }
-                                .tint(.pink)
-                            }
-                        }
-
-                        if hasDestination {
-                            Section {
-                                Button {
-                                    dismiss()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        feature.postNavigationFromMagicTask()
-                                    }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "arrow.right.circle.fill")
-                                        Text("进入功能")
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                    }
-                                }
-                                .tint(themeManager.accentTextColor)
-                            }
-                        }
-                    } else {
-                        // 未解锁：若支持则显示新手引导，否则显示"了解任务"和"前往体验"
-                        if canShowGuide {
-                            Section {
-                                Button {
-                                    dismiss()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        NotificationCenter.default.post(
-                                            name: .showFirstUseGuide,
-                                            object: nil,
-                                            userInfo: ["feature": feature.rawValue]
-                                        )
-                                    }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "sparkles")
-                                        Text("新手引导")
-                                            .fontWeight(.medium)
-                                        Spacer()
-                                    }
-                                }
-                                .tint(.pink)
-                            }
-                        }
-
+                    // 解锁按钮
+                    if !isUnlocked && !unlockCheck.met {
                         Section {
-                            Button {
-                                // 展示任务说明/进度信息
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    Image(systemName: "info.circle")
-                                    Text("了解任务")
-                                        .fontWeight(.medium)
-                                    Spacer()
-                                }
-                            }
-                            .tint(.gray)
+                            statusHintTofuBlock(
+                                message: unlockCheck.message ?? "尚未满足解锁条件"
+                            )
                         }
+                    }
 
-                        if hasDestination {
-                            Section {
-                                Button {
-                                    dismiss()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        feature.postNavigationFromMagicTask()
+                    // 任务操作按钮
+                    let shouldShowActionSection = (!isUnlocked && (unlockCheck.met || canShowGuide)) || (isUnlocked && (hasDestination || canShowGuide))
+                    if shouldShowActionSection {
+                        Section("推荐操作") {
+                            VStack(spacing: 12) {
+                                if !isUnlocked {
+                                    if unlockCheck.met {
+                                        taskActionTofuBlock(
+                                            title: "立即解锁",
+                                            icon: "lock.open.fill",
+                                            style: .primary
+                                        ) {
+                                            unlockFeature()
+                                        }
+                                    } else if canShowGuide {
+                                        taskActionTofuBlock(
+                                            title: "去完成任务",
+                                            icon: "sparkles",
+                                            style: .primary
+                                        ) {
+                                            dismissAndShowGuide()
+                                        }
                                     }
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Image(systemName: "arrow.right.circle")
-                                        Text("前往体验")
-                                            .fontWeight(.medium)
-                                        Spacer()
+                                } else {
+                                    if hasDestination {
+                                        taskActionTofuBlock(
+                                            title: "进入功能",
+                                            icon: "arrow.right.circle.fill",
+                                            style: .primary
+                                        ) {
+                                            dismissAndNavigateToFeature()
+                                        }
+                                    }
+
+                                    if canShowGuide {
+                                        taskActionTofuBlock(
+                                            title: "新手引导",
+                                            icon: "sparkles",
+                                            style: .secondary
+                                        ) {
+                                            dismissAndShowGuide()
+                                        }
                                     }
                                 }
-                                .tint(themeManager.accentTextColor)
                             }
+                            .padding(.vertical, 4)
                         }
                     }
                 }
@@ -601,6 +463,235 @@ struct MagicTaskDetailView: View {
         )
         .cornerRadius(12)
     }
+
+    private var infoColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+    }
+
+    private func infoTofuBlock(
+        title: String,
+        value: String,
+        icon: String,
+        emphasized: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundColor(themeManager.accentTextColor)
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(themeManager.secondaryTextColor)
+            }
+
+            Text(value)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(emphasized ? themeManager.accentTextColor : themeManager.primaryTextColor)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.65 : 0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(themeManager.accentTextColor.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private func progressTofuBlock(_ progress: (current: Double, total: Double, isCompleted: Bool)) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(progress.isCompleted ? "进度已达成" : "进度条")
+                    .font(.caption)
+                    .foregroundColor(themeManager.secondaryTextColor)
+                Spacer()
+                Text("\(Int(progress.current)) / \(Int(progress.total))")
+                    .font(.caption)
+                    .foregroundColor(progress.isCompleted ? themeManager.accentTextColor : themeManager.secondaryTextColor)
+            }
+
+            ProgressView(value: min(progress.current, progress.total), total: progress.total)
+                .progressViewStyle(.linear)
+                .tint(themeManager.accentTextColor)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.65 : 0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(themeManager.accentTextColor.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private func progressSpaceBlock(
+        progress: (current: Double, total: Double, isCompleted: Bool)?,
+        conditionType: UnlockConditionType?,
+        fallbackMessage: String?
+    ) -> some View {
+        let message = progressSpaceMessage(
+            progress: progress,
+            conditionType: conditionType,
+            fallbackMessage: fallbackMessage
+        )
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.forward.circle")
+                    .font(.caption)
+                    .foregroundColor(themeManager.accentTextColor)
+                Text("进步空间")
+                    .font(.caption)
+                    .foregroundColor(themeManager.secondaryTextColor)
+            }
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(themeManager.primaryTextColor)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.65 : 0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(themeManager.accentTextColor.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private func progressSpaceMessage(
+        progress: (current: Double, total: Double, isCompleted: Bool)?,
+        conditionType: UnlockConditionType?,
+        fallbackMessage: String?
+    ) -> String {
+        guard let progress else {
+            return fallbackMessage ?? "继续完成任务条件即可解锁。"
+        }
+
+        if progress.isCompleted {
+            return "条件已达成，点击下方“立即解锁”即可完成任务。"
+        }
+
+        let remaining = max(0, Int(ceil(progress.total - progress.current)))
+        switch conditionType {
+        case .vip:
+            return "开通 VIP 即可完成任务。"
+        case .meowCoin:
+            return "还差 \(remaining) 喵币，继续互动或签到可加快完成。"
+        case .clothingCount:
+            return "还差 \(remaining) 件衣物，继续录入衣橱即可推进。"
+        case .loginDays:
+            return "再签到 \(remaining) 天即可完成任务。"
+        case .petLevel:
+            return "萌宠等级还差 \(remaining) 级，继续陪伴互动可升级。"
+        default:
+            return fallbackMessage ?? "继续完成任务条件即可解锁。"
+        }
+    }
+
+    private enum TaskActionStyle {
+        case primary
+        case secondary
+    }
+
+    private func statusHintTofuBlock(message: String) -> some View {
+        HStack {
+            Spacer()
+            VStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.title2)
+                    .foregroundColor(themeManager.tertiaryTextColor)
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(themeManager.secondaryTextColor)
+                    .multilineTextAlignment(.center)
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, minHeight: 96)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.65 : 0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(themeManager.accentTextColor.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func taskActionTofuBlock(
+        title: String,
+        icon: String,
+        style: TaskActionStyle,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(title)
+                    .fontWeight(.semibold)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .opacity(style == .primary ? 0.9 : 0.55)
+            }
+            .foregroundColor(style == .primary ? .white : themeManager.primaryTextColor)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .padding(.horizontal, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        style == .primary
+                        ? themeManager.accentTextColor
+                        : themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.65 : 0.9)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(
+                        style == .primary
+                        ? themeManager.accentTextColor.opacity(0.25)
+                        : themeManager.accentTextColor.opacity(0.12),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func dismissAndShowGuide() {
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            NotificationCenter.default.post(
+                name: .showFirstUseGuide,
+                object: nil,
+                userInfo: ["feature": feature.rawValue]
+            )
+        }
+    }
+
+    private func dismissAndNavigateToFeature() {
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            feature.postNavigationFromMagicTask()
+        }
+    }
     
     private func unlockFeature() {
         let result = manager.unlock(feature)
@@ -619,13 +710,6 @@ struct MagicTaskDetailView: View {
         showUnlockAlert = true
     }
     
-    private func conditionIcon(for condition: UnlockCondition) -> String {
-        guard let type = UnlockConditionType(rawValue: condition.type) else {
-            return "lock.fill"
-        }
-        return type.icon
-    }
-    
     private func calculateProgress(for condition: UnlockCondition) -> (current: Double, total: Double, isCompleted: Bool)? {
         // 如果已解锁，显示完整进度 1/1
         if manager.isUnlocked(feature) {
@@ -640,7 +724,7 @@ struct MagicTaskDetailView: View {
         }
         
         let current: Double
-        let total = Double(condition.requiredValue)
+        let total = max(1.0, Double(condition.requiredValue))
         
         switch type {
         case .vip:

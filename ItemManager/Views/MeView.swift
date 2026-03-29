@@ -211,6 +211,7 @@ struct MeView: View {
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .captureGuideTarget(.favoriteMenuSettingsEntry)
                         
                         // 小组件
                         WidgetSettingsCard()

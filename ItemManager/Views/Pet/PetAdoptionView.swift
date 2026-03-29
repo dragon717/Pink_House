@@ -104,7 +104,6 @@ struct PetAdoptionCard: View {
     var body: some View {
         GeometryReader { geo in
             let layout = PetAdoptionCardLayout(size: geo.size)
-            let shouldUseScrollableContent = geo.size.height < 560
             let frame = geo.frame(in: .global)
             let minX = frame.minX
             let rotation = Double(minX / -20)
@@ -114,15 +113,15 @@ struct PetAdoptionCard: View {
                     .fill(.ultraThinMaterial)
                     .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                 
-                if shouldUseScrollableContent {
+                ViewThatFits(in: .vertical) {
+                    adoptionCardContent(layout: layout, minX: minX, expandsVertically: true)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
                     ScrollView(.vertical, showsIndicators: false) {
-                        adoptionCardContent(layout: layout.compactVariant, minX: minX)
+                        adoptionCardContent(layout: layout.compactVariant, minX: minX, expandsVertically: false)
                             .padding(.vertical, 4)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    adoptionCardContent(layout: layout, minX: minX)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .padding(layout.outerPadding)
@@ -135,12 +134,13 @@ struct PetAdoptionCard: View {
     }
 
     @ViewBuilder
-    private func adoptionCardContent(layout: PetAdoptionCardLayout, minX: CGFloat) -> some View {
+    private func adoptionCardContent(layout: PetAdoptionCardLayout, minX: CGFloat, expandsVertically: Bool) -> some View {
         VStack(spacing: layout.contentSpacing) {
             Image(pet.portraitImageName)
                 .resizable()
                 .scaledToFit()
-                .frame(maxHeight: layout.imageHeight)
+                .frame(maxWidth: layout.imageMaxWidth, maxHeight: layout.imageHeight)
+                .frame(height: layout.imageHeight)
                 .clipShape(RoundedRectangle(cornerRadius: layout.imageCornerRadius))
                 .shadow(radius: 5)
                 .scaleEffect(1.0 + abs(minX / 1000.0))
@@ -159,7 +159,9 @@ struct PetAdoptionCard: View {
             }
             .padding(.horizontal, layout.textHorizontalPadding)
             
-            Spacer(minLength: layout.bottomSpacing)
+            if expandsVertically {
+                Spacer(minLength: layout.bottomSpacing)
+            }
             
             if isOwned {
                 Text("已领养")
@@ -237,6 +239,7 @@ private struct PetAdoptionCardLayout {
     let textSpacing: CGFloat
     let textHorizontalPadding: CGFloat
     let imageHeight: CGFloat
+    let imageMaxWidth: CGFloat
     let imageCornerRadius: CGFloat
     let titleFontSize: CGFloat
     let descriptionFontSize: CGFloat
@@ -261,6 +264,7 @@ private struct PetAdoptionCardLayout {
         textSpacing = compact ? 6 : 8
         textHorizontalPadding = (size.width * (compact ? 0.02 : 0.04)).clamped(to: 8...18)
         imageHeight = min((size.height * (compact ? 0.34 : 0.42)).clamped(to: 120...260), size.width * 0.78)
+        imageMaxWidth = (size.width * (compact ? 0.72 : 0.8)).clamped(to: 140...320)
         imageCornerRadius = (shortestSide * 0.05).clamped(to: 16...22)
         titleFontSize = (size.width * (compact ? 0.055 : 0.065)).clamped(to: 20...28)
         descriptionFontSize = (size.width * (compact ? 0.034 : 0.038)).clamped(to: 13...17)

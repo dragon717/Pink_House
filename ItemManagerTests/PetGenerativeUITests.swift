@@ -147,9 +147,26 @@ final class PetGenerativeUITests: XCTestCase {
         XCTAssertEqual(recovered, "这条适合春天吗？")
     }
 
+    func testRecoverUserFacingTextExtractsOutfitDemandQuestion() {
+        let prompt = """
+        需求：帮我搭配一套出门穿搭
+
+        候选单品：
+        {"items":[{"name":"奶油JSK","features":["类型:JSK","颜色:米白"]}]}
+
+        请从候选中选2-4件搭配：
+        - 按品类筛选
+        """
+
+        let recovered = PetGenerativePromptBuilder.recoverUserFacingText(from: prompt)
+
+        XCTAssertEqual(recovered, "帮我搭配一套出门穿搭")
+    }
+
     func testPromptLeakDetectorMatchesInternalPromptMarkers() {
         XCTAssertTrue(PetGenerativePromptBuilder.containsInternalPromptLeak("【输出协议（必须遵守）】 仅输出 JSON 对象"))
         XCTAssertTrue(PetGenerativePromptBuilder.containsInternalPromptLeak("角色卡：- 性格：傲娇"))
+        XCTAssertTrue(PetGenerativePromptBuilder.containsInternalPromptLeak("候选单品：{\"items\":[]}"))
         XCTAssertFalse(PetGenerativePromptBuilder.containsInternalPromptLeak("我今天有点焦虑，陪陪我吧"))
     }
 

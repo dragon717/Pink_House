@@ -213,7 +213,7 @@ struct DataManagementView: View {
     private func prepareBackup() {
         print("DataManagementView: 准备备份数据...")
         isLoading = true
-        loadingMessage = "正在打包数据..."
+        loadingMessage = "正在打包数据，备份需要时间，耐心等待，不要退出本界面..."
         
         // Catch container on MainActor
         let container = modelContext.container

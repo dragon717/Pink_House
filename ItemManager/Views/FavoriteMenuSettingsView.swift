@@ -57,7 +57,8 @@ struct FavoriteMenuSettingsView: View {
                             AvailableItemRow(
                                 item: item,
                                 isSelected: false,
-                                isDisabled: selectedAndUnlockedItems.count >= maxItems
+                                isDisabled: selectedAndUnlockedItems.count >= maxItems,
+                                guideTargetKey: item == .ootd ? .favoriteMenuMagicStickerAddButton : nil
                             ) {
                                 if selectedAndUnlockedItems.count >= maxItems {
                                     showMaxItemsAlert = true
@@ -102,6 +103,15 @@ struct FavoriteMenuSettingsView: View {
                     Text("最多只能添加 \(maxItems) 个常用功能，请先删除一些再添加新的")
                 }
             }
+        }
+        .onAppear {
+            NotificationCenter.default.post(name: .favoriteMenuSettingsOpened, object: nil)
+        }
+        .onDisappear {
+            NotificationCenter.default.post(name: .favoriteMenuSettingsViewDismissed, object: nil)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dismissFavoriteMenuSettingsView)) { _ in
+            dismiss()
         }
     }
     
@@ -155,6 +165,7 @@ private struct AvailableItemRow: View {
     let item: FavoriteMenuItem
     let isSelected: Bool
     let isDisabled: Bool
+    let guideTargetKey: GuideTargetKey?
     let action: () -> Void
     @Environment(ThemeManager.self) private var themeManager
 
@@ -177,6 +188,7 @@ private struct AvailableItemRow: View {
                 Image(systemName: isDisabled ? "plus.circle" : "plus.circle.fill")
                     .font(.title3)
                     .foregroundColor(isDisabled ? themeManager.secondaryTextColor : themeManager.accentTextColor)
+                    .captureGuideTarget(guideTargetKey)
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)

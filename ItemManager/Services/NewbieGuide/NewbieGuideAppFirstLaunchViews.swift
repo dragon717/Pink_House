@@ -265,8 +265,8 @@ struct AppFirstLaunchGuideOverlay: View {
     
     private var welcomeHighlightDiameter: CGFloat {
         guard guideManager.isPadGuideLayout else { return 100 }
-        let scaleFactor = UIScreen.main.bounds.width / 375.0
-        return 100 * scaleFactor
+        let widthBased = UIScreen.main.bounds.width * 0.18
+        return min(max(widthBased, 128), 150)
     }
 
     var body: some View {
@@ -359,7 +359,7 @@ struct AppFirstLaunchGuideOverlay: View {
                         .ignoresSafeArea()
 
                     let screenWidth = UIScreen.main.bounds.width
-                    let scaleFactor = screenWidth / 375.0
+                    let scaleFactor = GuideAdaptiveScale.factor(screenWidth: screenWidth)
                     let holeSize = 80 * scaleFactor
                     
                     Circle()

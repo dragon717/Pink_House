@@ -20,9 +20,9 @@ enum FavoriteMenuItem: String, CaseIterable, Identifiable {
     
     // MARK: - 默认常用菜单配置
     // 实验室-菜单设置中"清除常用菜单历史，恢复到默认"使用的配置
-    // 当前默认：萌宠、拼豆工坊、世界书、穿搭手帐、来财
+    // 当前默认：House、回收站
     static var defaultFavoriteItems: [FavoriteMenuItem] {
-        [.ootd, .perler, .bigWorld, .fashionJournal, .wealth]
+        [.smallWorld, .recycleBin]
     }
     
     var id: String { rawValue }
@@ -141,9 +141,9 @@ class FavoriteMenuSettings {
     }
     
     // 默认选中的功能（用于初始化时无保存数据的情况）
-    // 注意：这里只保留House菜单作为最低保底，实际默认配置请使用 FavoriteMenuItem.defaultFavoriteItems
+    // 注意：这里用于初始化无保存数据时的默认选项
     static var defaultItems: [FavoriteMenuItem] {
-        [.smallWorld]
+        [.smallWorld, .recycleBin]
     }
 }
 
