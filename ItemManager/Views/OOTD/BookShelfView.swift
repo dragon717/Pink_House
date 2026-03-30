@@ -179,6 +179,8 @@ struct BookShelfView: View {
                 let hasUserPages = hasUserCreatedPages()
                 print("[Guide] BookShelf onAppear - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
                 NotificationCenter.default.post(name: .ootdShelfOpened, object: nil, userInfo: ["hasBooks": hasUserBooks, "hasPages": hasUserPages])
+                // 同时发送新通知用于空间手帐前置任务引导
+                NotificationCenter.default.post(name: .ootdBookShelfOpened, object: nil, userInfo: ["hasNonDefaultBooks": hasUserBooks, "hasPages": hasUserPages])
             }
             .onChange(of: books) { _, _ in
                 // 数据变化时重新发送通知（用于空间手帐引导，确保数据加载后状态正确）
@@ -187,6 +189,8 @@ struct BookShelfView: View {
                 let hasUserPages = hasUserCreatedPages()
                 print("[Guide] BookShelf books changed - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
                 NotificationCenter.default.post(name: .ootdShelfOpened, object: nil, userInfo: ["hasBooks": hasUserBooks, "hasPages": hasUserPages])
+                // 同时发送新通知用于空间手帐前置任务引导
+                NotificationCenter.default.post(name: .ootdBookShelfOpened, object: nil, userInfo: ["hasNonDefaultBooks": hasUserBooks, "hasPages": hasUserPages])
             }
             .onChange(of: selectedBook) { _, newValue in
                 // 同步选中状态到外部

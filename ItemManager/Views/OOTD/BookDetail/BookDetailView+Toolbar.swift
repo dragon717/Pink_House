@@ -136,6 +136,7 @@ extension BookDetailView {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
         }
+        .captureGuideTarget(.ootdDetailMoreMenuButton)
     }
 
     private var addPageMenu: some View {

@@ -134,6 +134,7 @@ extension FeatureExperienceGuideOverlay {
         customColorScrollStepStartedAt = nil
         isSpaceBookCreationPromptVisible = false
         hasSpaceBooksForGuide = false
+        hasNonDefaultSpaceBooksForGuide = false
         hasSpaceBookPagesForGuide = false
         didOpenBatchEditMoreMenu = false
 
@@ -154,7 +155,7 @@ extension FeatureExperienceGuideOverlay {
         magicStickerGuideStep = .step5_longPressHouseTab
         magicStickerGuideRequiresMenuSetup = false
         batchEditGuideStep = .step1_clickMoreMenu
-        spaceBookGuideStep = .step1_clickWardrobeOotdEntry
+        spaceBookGuideStep = .preUnlockStep1_clickWardrobeOotdEntry
         wealthGuideStep = .step1_clickHouseTab
 
         // 根据当前功能设置正确的初始状态
@@ -211,8 +212,13 @@ extension FeatureExperienceGuideOverlay {
             }
         case .spaceBook:
             if FeatureUnlockManager.shared.isUnlocked(feature) {
+                // 已解锁：进入完整引导（共7步，从衣橱穿搭手帐入口开始）
                 spaceBookGuideStep = .step1_clickWardrobeOotdEntry
+            } else if FeatureUnlockManager.shared.isUnlocked(.ootd) {
+                // ootd已解锁但spaceBook未解锁：走前置任务引导（共5步）
+                spaceBookGuideStep = .preUnlockStep1_clickWardrobeOotdEntry
             } else {
+                // ootd未解锁：先引导用户解锁ootd（衣橱预引导）
                 wardrobeAddGuideStep = .step1_clickAddButton
             }
         case .batchEdit:

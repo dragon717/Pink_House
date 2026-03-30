@@ -404,20 +404,20 @@ struct MagicTaskCompletionStackView: View {
                     Text("魔法任务完成")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(themeManager.primaryTextColor)
-                    
+
                     Spacer()
-                    
+
                     // 未读数量
                     if manager.unreadCount > 0 {
                         Text("\(manager.unreadCount) 个新任务")
                             .font(.caption)
-                            .foregroundColor(themeManager.accentTextColor)
+                            .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
-                            .background(themeManager.accentTextColor.opacity(0.12))
+                            .background(themeManager.accentTextColor)
                             .cornerRadius(8)
                     }
-                    
+
                     // 全部已读按钮
                     if manager.hasUnread {
                         Button("全部已读") {
@@ -426,13 +426,13 @@ struct MagicTaskCompletionStackView: View {
                         .font(.caption)
                         .foregroundColor(themeManager.accentTextColor)
                     }
-                    
+
                     // 清除已读按钮
                     Button("清除已读") {
                         manager.clearReadCompletions()
                     }
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(themeManager.secondaryTextColor)
                     .disabled(!manager.completions.contains { $0.isRead })
                 }
                 .padding(.horizontal, 4)

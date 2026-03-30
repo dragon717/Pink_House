@@ -167,20 +167,21 @@ struct BookGridView: View {
                         }
                     }
                     .buttonStyle(BouncingButtonStyle())
+                    .captureGuideTarget(books.first?.id == book.id ? .ootdFirstBookCard : nil)
                     .contextMenu {
                         Button {
                             onRename(book)
                         } label: {
                             Label("重命名", systemImage: "pencil")
                         }
-                        
+
                         Button {
                             selectedBookForCover = book
                             showingCoverPicker = true
                         } label: {
                             Label("修改封面", systemImage: "photo")
                         }
-                        
+
                         Button(role: .destructive) {
                             onDelete(book)
                         } label: {

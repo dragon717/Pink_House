@@ -287,7 +287,11 @@ extension Notification.Name {
     static let batchImportViewOpened = Notification.Name("batchImportViewOpened")
     static let dreamDressCalendarOpened = Notification.Name("dreamDressCalendarOpened")
     static let ootdShelfOpened = Notification.Name("ootdShelfOpened")
+    // 穿搭手帐书架打开通知（用于空间手帐前置任务引导）
+    static let ootdBookShelfOpened = Notification.Name("ootdBookShelfOpened")
     static let ootdDefaultBookOpened = Notification.Name("ootdDefaultBookOpened")
+    // 穿搭手帐详情页打开通知（用于空间手帐前置任务引导）
+    static let ootdBookDetailOpened = Notification.Name("ootdBookDetailOpened")
     static let smallWorldQuickMenuOpened = Notification.Name("smallWorldQuickMenuOpened")
     static let favoriteMenuSettingsOpened = Notification.Name("favoriteMenuSettingsOpened")
     static let dismissFavoriteMenuSettingsView = Notification.Name("dismissFavoriteMenuSettingsView")

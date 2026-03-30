@@ -255,16 +255,174 @@ enum BatchEditGuideStep: Int, CaseIterable {
     case step4_finishSelection = 4
 }
 
+// MARK: - 空间手帐引导步骤
+// 根据流程图，分为两个阶段：
+// 阶段1：未解锁时（前置任务引导 - 共5步）
+// 阶段2：已解锁后（完整引导 - 共7步）
 enum SpaceBookGuideStep: Int, CaseIterable {
-    case step1_clickWardrobeOotdEntry = 1
-    case step1a_createOotdBook = 2
-    case step1b_createOotdPage = 3
-    case step2_switchToSpaceTab = 4
-    case step3_createSpaceBook = 5
-    case step4_createFirstPage = 6
-    case step5_open3DEditor = 7
-    case step6_openScanner = 8
-    case step7_scannerHowTo = 9
+    // MARK: 阶段1: 前置任务引导（解锁前）- 共5步
+    case preUnlockStep1_clickWardrobeOotdEntry = 1  // 点击衣橱「穿搭手帐」
+    case preUnlockStep2_createOotdBook = 2          // 右上角「更多」→ 新建手帐
+    case preUnlockStep3_clickOotdBook = 3           // 点击刚创建的手帐进入
+    case preUnlockStep4_createOotdPage = 4          // 手帐详情页「更多」→ 新建书页
+    case preUnlockStep5_complete = 5                // 前置任务完成！自动解锁空间手帐
+
+    // MARK: 阶段2: 完整功能引导（解锁后）- 共7步
+    case step1_clickWardrobeOotdEntry = 6          // 点击衣橱「穿搭手帐」（解锁后入口）
+    case step2_switchToSpaceTab = 7                // 切换到空间页签
+    case step3_createSpaceBook = 8                 // 创建空间手帐
+    case step4_createSpacePage = 9                 // 创建空间书页
+    case step5_enter3DEditor = 10                  // 进入3D编辑器
+    case step6_openScanner = 11                    // 打开空间扫描器
+    case step7_scannerHowTo = 12                   // 扫描操作指引
+
+    // MARK: - Flow 定义
+    enum Flow {
+        case preUnlock  // 前置任务引导（5步）
+        case postUnlock // 完整功能引导（7步，从第6步开始编号）
+    }
+
+    var flow: Flow {
+        switch self {
+        case .preUnlockStep1_clickWardrobeOotdEntry,
+             .preUnlockStep2_createOotdBook,
+             .preUnlockStep3_clickOotdBook,
+             .preUnlockStep4_createOotdPage,
+             .preUnlockStep5_complete:
+            return .preUnlock
+        case .step1_clickWardrobeOotdEntry,
+             .step2_switchToSpaceTab,
+             .step3_createSpaceBook,
+             .step4_createSpacePage,
+             .step5_enter3DEditor,
+             .step6_openScanner,
+             .step7_scannerHowTo:
+            return .postUnlock
+        }
+    }
+
+    // MARK: - 步骤信息
+
+    /// 当前流程中的步骤序号（用于UI显示）
+    var stepNumberInFlow: Int {
+        switch flow {
+        case .preUnlock:
+            return rawValue
+        case .postUnlock:
+            return rawValue - 5  // 解锁后步骤从1开始计数
+        }
+    }
+
+    /// 当前流程的总步数
+    var totalStepsInFlow: Int {
+        switch flow {
+        case .preUnlock:
+            return 5
+        case .postUnlock:
+            return 7
+        }
+    }
+
+    /// 标题
+    var title: String {
+        switch self {
+        // 前置任务引导
+        case .preUnlockStep1_clickWardrobeOotdEntry:
+            return "点击衣橱「穿搭手帐」"
+        case .preUnlockStep2_createOotdBook:
+            return "新建穿搭手帐"
+        case .preUnlockStep3_clickOotdBook:
+            return "进入手帐"
+        case .preUnlockStep4_createOotdPage:
+            return "新建书页"
+        case .preUnlockStep5_complete:
+            return "前置任务完成"
+
+        // 完整功能引导
+        case .step1_clickWardrobeOotdEntry:
+            return "点击衣橱「穿搭手帐」"
+        case .step2_switchToSpaceTab:
+            return "切换到空间页签"
+        case .step3_createSpaceBook:
+            return "创建空间手帐"
+        case .step4_createSpacePage:
+            return "创建空间书页"
+        case .step5_enter3DEditor:
+            return "进入3D编辑器"
+        case .step6_openScanner:
+            return "打开空间扫描器"
+        case .step7_scannerHowTo:
+            return "扫描操作指引"
+        }
+    }
+
+    /// 提示消息
+    var message: String {
+        switch self {
+        // 前置任务引导
+        case .preUnlockStep1_clickWardrobeOotdEntry:
+            return "点击衣橱统计卡片里的「穿搭手帐」入口，进入穿搭手帐。"
+        case .preUnlockStep2_createOotdBook:
+            return "点击右上角「更多」，选择「新建手帐」，创建一个非默认手帐。"
+        case .preUnlockStep3_clickOotdBook:
+            return "点击刚创建的「非默认手帐」进入详情页。"
+        case .preUnlockStep4_createOotdPage:
+            return "在手帐详情页点击右上角「更多」，选择「新建书页」。"
+        case .preUnlockStep5_complete:
+            return "恭喜完成前置任务！空间手帐功能已自动解锁。"
+
+        // 完整功能引导
+        case .step1_clickWardrobeOotdEntry:
+            return "先从衣橱统计卡片进入「穿搭手帐」，空间手帐入口就在里面。"
+        case .step2_switchToSpaceTab:
+            return "点击上方「空间」页签，切换到空间手帐模式。"
+        case .step3_createSpaceBook:
+            return "点击右上角「更多」，选择「新建空间手帐」。"
+        case .step4_createSpacePage:
+            return "点击右上角「更多」，选择「新建空间书页」。"
+        case .step5_enter3DEditor:
+            return "点击书页卡片，进入3D编辑器开始创作。"
+        case .step6_openScanner:
+            return "点击左侧工具栏「导入」按钮，再选择「相机」进入空间扫描。"
+        case .step7_scannerHowTo:
+            return "请在光线充足的地方扫描；让镜头包住物体，先完成稳定定位，再做360°扫描。"
+        }
+    }
+
+    /// 是否显示猫爪动画
+    var showCatPaw: Bool {
+        switch self {
+        case .preUnlockStep1_clickWardrobeOotdEntry,
+             .preUnlockStep2_createOotdBook,
+             .preUnlockStep3_clickOotdBook,
+             .preUnlockStep4_createOotdPage:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 是否显示完成按钮
+    var showsCompletionButton: Bool {
+        switch self {
+        case .preUnlockStep5_complete, .step7_scannerHowTo:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 完成按钮标题
+    var completionButtonTitle: String {
+        switch self {
+        case .preUnlockStep5_complete:
+            return "开始空间手帐之旅"
+        case .step7_scannerHowTo:
+            return "知道了，完成引导"
+        default:
+            return "知道了"
+        }
+    }
 }
 
 enum WealthGuideStep: Int, CaseIterable {

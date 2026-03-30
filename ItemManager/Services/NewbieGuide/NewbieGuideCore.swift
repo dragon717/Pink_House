@@ -107,6 +107,10 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     case spaceBookFirstBookCard = "spaceBook.firstBookCard"
     case spaceBookDetailMoreMenuButton = "spaceBook.detailMoreMenuButton"
     case spaceBookFirstPageCard = "spaceBook.firstPageCard"
+    // 穿搭手帐（OOTD）- 用于空间手帐前置任务引导
+    case ootdShelfMoreMenuButton = "ootd.shelfMoreMenuButton"
+    case ootdFirstBookCard = "ootd.firstBookCard"
+    case ootdDetailMoreMenuButton = "ootd.detailMoreMenuButton"
     case spatialCanvasToolbar = "spatialCanvas.toolbar"
     case spatialCanvasImportMenu = "spatialCanvas.importMenu"
 }

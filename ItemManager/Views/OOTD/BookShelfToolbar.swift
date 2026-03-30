@@ -61,7 +61,7 @@ struct BookShelfToolbar: ToolbarContent {
                         } label: {
                             Label("新建手帐", systemImage: "plus.rectangle.on.folder")
                         }
-                        
+
                         Button {
                             showingTrash = true
                         } label: {
@@ -72,6 +72,7 @@ struct BookShelfToolbar: ToolbarContent {
                             .font(.system(size: 22))
                             .foregroundStyle(.primary)
                     }
+                    .captureGuideTarget(.ootdShelfMoreMenuButton)
                 }
             }
         }

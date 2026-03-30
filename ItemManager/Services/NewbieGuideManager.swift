@@ -538,11 +538,12 @@ struct FeatureExperienceGuideOverlay: View {
     @State var magicStickerGuideRequiresMenuSetup: Bool = false
     @State var batchEditGuideStep: BatchEditGuideStep = .step1_clickMoreMenu
     @State var didOpenBatchEditMoreMenu: Bool = false
-    @State var spaceBookGuideStep: SpaceBookGuideStep = .step1_clickWardrobeOotdEntry
+    @State var spaceBookGuideStep: SpaceBookGuideStep = .preUnlockStep1_clickWardrobeOotdEntry
     @State var wealthGuideStep: WealthGuideStep = .step1_clickHouseTab
     @State var currentTab: String = "wardrobe"
     @State var isSpaceBookCreationPromptVisible: Bool = false
     @State var hasSpaceBooksForGuide: Bool = false
+    @State var hasNonDefaultSpaceBooksForGuide: Bool = false  // 是否有非默认手帐（用于进入时判断逻辑）
     @State var hasSpaceBookPagesForGuide: Bool = false
 
     var magicPalette: MagicThemePalette {
@@ -975,24 +976,25 @@ struct FeatureExperienceGuideOverlay: View {
                         ootdGuideStep = .step2_ootdExplanation
                     }
                 }
+                // 空间手帐引导：Step 1 -> 后续步骤（根据进入时判断逻辑）
                 if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step1_clickWardrobeOotdEntry {
-                    let hasBooks = notification.userInfo?["hasBooks"] as? Bool ?? false
+                   spaceBookGuideStep == .preUnlockStep1_clickWardrobeOotdEntry {
+                    let hasNonDefaultBooks = notification.userInfo?["hasNonDefaultBooks"] as? Bool ?? false
                     let hasPages = notification.userInfo?["hasPages"] as? Bool ?? false
-                    print("[Guide] Received ootdShelfOpened - hasBooks: \(hasBooks), hasPages: \(hasPages)")
+                    print("[Guide] Received ootdBookShelfOpened - hasNonDefaultBooks: \(hasNonDefaultBooks), hasPages: \(hasPages)")
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        if !hasBooks {
-                            // 没有手帐本，引导创建手帐本
-                            print("[Guide] Advancing to step1a_createOotdBook")
-                            spaceBookGuideStep = .step1a_createOotdBook
+                        if !hasNonDefaultBooks {
+                            // 没有非默认手帐，引导创建手帐（Step 1 -> Step 2）
+                            print("[Guide] Advancing to preUnlockStep2_createOotdBook")
+                            spaceBookGuideStep = .preUnlockStep2_createOotdBook
                         } else if !hasPages {
-                            // 有手帐本但没有书页，引导创建书页
-                            print("[Guide] Advancing to step1b_createOotdPage")
-                            spaceBookGuideStep = .step1b_createOotdPage
+                            // 有非默认手帐但没有书页，跳过Step 2直接进入Step 3（点击进入手帐）
+                            print("[Guide] Skipping step2, advancing to preUnlockStep3_clickOotdBook")
+                            spaceBookGuideStep = .preUnlockStep3_clickOotdBook
                         } else {
-                            // 都有，进入空间页签引导
-                            print("[Guide] Advancing to step2_switchToSpaceTab")
-                            spaceBookGuideStep = .step2_switchToSpaceTab
+                            // 都有，直接到 Step 5（前置任务完成）
+                            print("[Guide] Skipping step2-4, advancing to preUnlockStep5_complete")
+                            spaceBookGuideStep = .preUnlockStep5_complete
                         }
                     }
                 }
@@ -1035,56 +1037,110 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindSpaceBookStateGuideEvents<Content: View>(_ content: Content) -> some View {
         content
-            .onReceive(NotificationCenter.default.publisher(for: .ootdBookCreated)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step1a_createOotdBook {
+            // MARK: 前置任务引导事件（解锁前）
+            // Step 1 -> Step 2: 进入穿搭手帐书架
+            .onReceive(NotificationCenter.default.publisher(for: .ootdBookShelfOpened)) { _ in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 前置任务引导：Step 1 -> Step 2
+                if spaceBookGuideStep == .preUnlockStep1_clickWardrobeOotdEntry {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step1b_createOotdPage
+                        // 根据进入时的判断逻辑决定是否跳过Step 2
+                        // 有非默认手帐则跳过Step 2
+                        spaceBookGuideStep = shouldSkipPreUnlockStep2() ? .preUnlockStep3_clickOotdBook : .preUnlockStep2_createOotdBook
                     }
                 }
             }
+            // Step 2 -> Step 3: 创建了穿搭手帐
+            .onReceive(NotificationCenter.default.publisher(for: .ootdBookCreated)) { notification in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                let isDefault = notification.userInfo?["isDefault"] as? Bool ?? false
+                // 前置任务引导：Step 2 -> Step 3
+                if spaceBookGuideStep == .preUnlockStep2_createOotdBook, !isDefault {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        spaceBookGuideStep = .preUnlockStep3_clickOotdBook
+                    }
+                }
+            }
+            // Step 3 -> Step 4: 进入手帐详情页
+            .onReceive(NotificationCenter.default.publisher(for: .ootdBookDetailOpened)) { _ in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 前置任务引导：Step 3 -> Step 4
+                if spaceBookGuideStep == .preUnlockStep3_clickOotdBook {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        // 根据进入时的判断逻辑决定是否跳过Step 4
+                        // 有手帐且有书页则直接到Step 5
+                        spaceBookGuideStep = shouldSkipPreUnlockStep4() ? .preUnlockStep5_complete : .preUnlockStep4_createOotdPage
+                    }
+                }
+            }
+            // Step 4 -> Step 5: 创建了书页
             .onReceive(NotificationCenter.default.publisher(for: .ootdPageCreated)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step1b_createOotdPage {
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 前置任务引导：Step 4 -> Step 5（完成）
+                if spaceBookGuideStep == .preUnlockStep4_createOotdPage {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        spaceBookGuideStep = .preUnlockStep5_complete
+                    }
+                }
+            }
+
+            // MARK: 完整功能引导事件（解锁后）
+            // Step 6 -> Step 7: 进入穿搭手帐书架 -> 切换到空间页签
+            .onReceive(NotificationCenter.default.publisher(for: .ootdBookShelfOpened)) { _ in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 完整引导：Step 6 -> Step 7
+                if spaceBookGuideStep == .step1_clickWardrobeOotdEntry {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         spaceBookGuideStep = .step2_switchToSpaceTab
                     }
                 }
             }
+            // Step 7 -> Step 8: 切换到空间页签 -> 创建空间手帐
             .onReceive(NotificationCenter.default.publisher(for: .spatialBookShelfOpened)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step2_switchToSpaceTab {
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 完整引导：Step 7 -> Step 8
+                if spaceBookGuideStep == .step2_switchToSpaceTab {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         spaceBookGuideStep = .step3_createSpaceBook
                     }
                 }
             }
+            // Step 8 -> Step 9: 创建/进入空间手帐详情
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookDetailOpened)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step3_createSpaceBook {
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 完整引导：Step 8 -> Step 9
+                if spaceBookGuideStep == .step3_createSpaceBook {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = hasSpaceBookPagesForGuide ? .step5_open3DEditor : .step4_createFirstPage
+                        // 已有书页则跳过Step 9直接进入Step 10
+                        spaceBookGuideStep = hasSpaceBookPagesForGuide ? .step5_enter3DEditor : .step4_createSpacePage
                     }
                 }
             }
+            // Step 9 -> Step 10: 创建空间书页
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookPageCreated)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step4_createFirstPage {
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 完整引导：Step 9 -> Step 10
+                if spaceBookGuideStep == .step4_createSpacePage {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step5_open3DEditor
+                        spaceBookGuideStep = .step5_enter3DEditor
                     }
                 }
             }
+            // 弹窗状态变化
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookCreationPromptVisibilityChanged)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 let isVisible = notification.userInfo?["isVisible"] as? Bool ?? false
                 isSpaceBookCreationPromptVisible = isVisible
             }
+            // 书架数据状态
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookShelfDataStateChanged)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 let hasBooks = notification.userInfo?["hasBooks"] as? Bool ?? false
+                let hasNonDefaultBooks = notification.userInfo?["hasNonDefaultBooks"] as? Bool ?? false
                 hasSpaceBooksForGuide = hasBooks
+                hasNonDefaultSpaceBooksForGuide = hasNonDefaultBooks
             }
+            // 详情页数据状态
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookDetailDataStateChanged)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 let hasPages = notification.userInfo?["hasPages"] as? Bool ?? false
@@ -1094,28 +1150,47 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindSpaceBookEditorGuideEvents<Content: View>(_ content: Content) -> some View {
         content
+            // Step 10 -> Step 11: 进入3D编辑器
             .onReceive(NotificationCenter.default.publisher(for: .spatialCanvasEditorOpened)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step5_open3DEditor {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step6_openScanner
-                    }
-                } else if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                          spaceBookGuideStep == .step4_createFirstPage,
-                          hasSpaceBookPagesForGuide {
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 完整引导：Step 10 -> Step 11
+                if spaceBookGuideStep == .step5_enter3DEditor {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         spaceBookGuideStep = .step6_openScanner
                     }
                 }
             }
+            // Step 11 -> Step 12: 打开空间扫描器
             .onReceive(NotificationCenter.default.publisher(for: .objectCaptureScannerOpened)) { _ in
-                if guideManager.currentFeatureExperienceFeature == .spaceBook,
-                   spaceBookGuideStep == .step6_openScanner {
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                // 完整引导：Step 11 -> Step 12（最后一步）
+                if spaceBookGuideStep == .step6_openScanner {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         spaceBookGuideStep = .step7_scannerHowTo
                     }
                 }
             }
+    }
+
+    // MARK: - 空间手帐进入时的判断逻辑
+    /// 流程图关键逻辑：
+    /// - 有非默认手帐？→ 跳过Step 2
+    /// - 有手帐且有书页？→ 直接到Step 5
+    /// - 只有默认手帐？→ 从Step 2开始
+    /// - 注：默认手帐(title="默认手帐")不算！
+
+    /// 是否应该跳过前置任务 Step 2（新建手帐）
+    /// 条件：用户已有非默认手帐
+    private func shouldSkipPreUnlockStep2() -> Bool {
+        // 根据流程图：有非默认手帐 → 跳过 Step 2
+        return hasNonDefaultSpaceBooksForGuide
+    }
+
+    /// 是否应该跳过前置任务 Step 4（新建书页）
+    /// 条件：用户已有手帐且有书页
+    private func shouldSkipPreUnlockStep4() -> Bool {
+        // 根据流程图：有手帐且有书页 → 直接到 Step 5
+        return hasSpaceBookPagesForGuide
     }
 
     private func bindWealthGuideEvents<Content: View>(_ content: Content) -> some View {
@@ -1265,6 +1340,9 @@ struct FeatureExperienceGuideOverlay: View {
     }
 
     // MARK: - 空间手帐引导
+    // 根据流程图：https://github.com/Pink_House/docs/space_book_guide_flow.png
+    // 阶段1: 未解锁时（前置任务引导 - 共5步）
+    // 阶段2: 已解锁后（完整引导 - 共11步）
 
     var spaceBookGuideContent: some View {
         // 1. 先检查 ootd 是否解锁，如果未解锁，引导用户先完成 ootd 新手引导（解锁穿搭手帐功能）
@@ -1272,254 +1350,402 @@ struct FeatureExperienceGuideOverlay: View {
             return AnyView(ootdGuideContent)
         }
 
-        // 2. ootd 已解锁，再检查 spaceBook 是否解锁
-        if let preUnlockGuide = preUnlockWardrobeGuideContentIfNeeded(for: .spaceBook) {
-            return preUnlockGuide
-        }
-
+        // 2. ootd 已解锁，根据 spaceBook 解锁状态决定引导流程
         return AnyView(
             GeometryReader { geometry in
                 switch spaceBookGuideStep {
+                // MARK: 阶段1: 前置任务引导（解锁前）
+                case .preUnlockStep1_clickWardrobeOotdEntry:
+                    spaceBookPreUnlockStep1Content(in: geometry)
+                case .preUnlockStep2_createOotdBook:
+                    spaceBookPreUnlockStep2Content(in: geometry)
+                case .preUnlockStep3_clickOotdBook:
+                    spaceBookPreUnlockStep3Content(in: geometry)
+                case .preUnlockStep4_createOotdPage:
+                    spaceBookPreUnlockStep4Content(in: geometry)
+                case .preUnlockStep5_complete:
+                    spaceBookPreUnlockStep5Content()
+
+                // MARK: 阶段2: 完整功能引导（解锁后）
                 case .step1_clickWardrobeOotdEntry:
-                    let targetFrame = wardrobeOotdEntryGuideFrame(in: geometry)
-                    highlightedRectGuideContent(
-                        frame: targetFrame,
-                        cornerRadius: 18,
-                        title: "点击统计卡片里的「穿搭手帐」",
-                        message: "先点这个入口进入穿搭手帐，我们再去空间页签创建空间手帐。",
-                        currentStep: 1,
-                        totalSteps: 9,
-                        accent: .blue,
-                        actionTitle: nil,
-                        onAction: nil
-                    )
-                case .step1a_createOotdBook:
-                    VStack {
-                        Spacer()
-                        featureStepBubble(
-                            title: "创建第一本穿搭手帐",
-                            message: "点击右上角「+」按钮，新建一个穿搭手帐，这是解锁空间手帐的前置任务。",
-                            currentStep: 2,
-                            totalSteps: 9,
-                            accent: .blue,
-                            actionTitle: nil,
-                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                            onAction: nil
-                        )
-                        .padding(.bottom, 120)
-                    }
-                case .step1b_createOotdPage:
-                    VStack {
-                        Spacer()
-                        featureStepBubble(
-                            title: "创建第一张书页",
-                            message: "点击手帐进入详情页，然后点击右上角「+」添加第一张书页。",
-                            currentStep: 3,
-                            totalSteps: 9,
-                            accent: .blue,
-                            actionTitle: nil,
-                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                            onAction: nil
-                        )
-                        .padding(.bottom, 120)
-                    }
+                    spaceBookPostUnlockStep0Content(in: geometry)
                 case .step2_switchToSpaceTab:
-                    let fallbackFrame = CGRect(x: (geometry.size.width - 160) / 2, y: max(geometry.safeAreaInsets.top + 8, 12), width: 160, height: 32)
-                    let targetFrame = aiGuideTargetFrame(
-                        globalFrame: guideManager.guideTargetFrame(for: .spaceBookModeTabs),
-                        in: geometry,
-                        fallback: fallbackFrame
-                    )
-                    highlightedRectGuideContent(
-                        frame: targetFrame,
-                        cornerRadius: 12,
-                        title: "切到「空间」页签",
-                        message: "上方这里可以在「平面 / 空间」之间切换。请切到「空间」，下一步就去右上角「更多」新建空间手帐。",
-                        currentStep: 4,
-                        totalSteps: 9,
-                        accent: .blue,
-                        actionTitle: nil,
-                        onAction: nil
-                    )
+                    spaceBookPostUnlockStep1Content(in: geometry)
                 case .step3_createSpaceBook:
-                            if hasSpaceBooksForGuide {
-                                let fallbackFrame = CGRect(
-                                    x: 24,
-                                    y: max(geometry.safeAreaInsets.top + 100, geometry.size.height * 0.22),
-                                    width: min(180, geometry.size.width - 48),
-                                    height: 220
-                                )
-                                let targetFrame = aiGuideTargetFrame(
-                                    globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstBookCard),
-                                    in: geometry,
-                                    fallback: fallbackFrame
-                                )
-                                highlightedRectGuideContent(
-                                    frame: targetFrame,
-                                    cornerRadius: 20,
-                                    title: "直接点第一本空间手帐",
-                                    message: "你已经有空间手帐了，不用新建。先点进第一本，我们继续下一步。",
-                                    currentStep: 5,
-                                    totalSteps: 9,
-                                    accent: .blue,
-                                    actionTitle: nil,
-                                    onAction: nil
-                                )
-                            } else {
-                                if isSpaceBookCreationPromptVisible {
-                                    VStack {
-                                        featureStepBubble(
-                                            title: "输入名称后点创建",
-                                            message: "已打开新建弹窗，输入空间手帐名称并点击创建，即可进入下一步。",
-                                            currentStep: 5,
-                                            totalSteps: 9,
-                                            accent: .blue,
-                                            actionTitle: nil,
-                                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                                            onAction: nil
-                                        )
-                                        .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
-                                        Spacer()
-                                    }
-                                } else {
-                                    let fallbackFrame = CGRect(
-                                        x: geometry.size.width - 70,
-                                        y: max(geometry.safeAreaInsets.top + 12, 16),
-                                        width: 50,
-                                        height: 50
-                                    )
-                                    let targetFrame = aiGuideTargetFrame(
-                                        globalFrame: guideManager.guideTargetFrame(for: .spaceBookShelfMoreMenuButton),
-                                        in: geometry,
-                                        fallback: fallbackFrame
-                                    )
-                                    highlightedRectGuideContent(
-                                        frame: targetFrame,
-                                        cornerRadius: 12,
-                                        title: "点右上角「更多」新建空间手帐",
-                                        message: "请点右上角「更多」，选择「新建空间手帐」。输入名称并点击创建。",
-                                        currentStep: 5,
-                                        totalSteps: 9,
-                                        accent: .blue,
-                                        actionTitle: nil,
-                                        onAction: nil
-                                    )
-                                }
-                            }
-                        case .step4_createFirstPage:
-                            if hasSpaceBookPagesForGuide {
-                                let fallbackFrame = CGRect(
-                                    x: 24,
-                                    y: geometry.size.height * 0.22,
-                                    width: (geometry.size.width - 64) / 2,
-                                    height: 180
-                                )
-                                let targetFrame = aiGuideTargetFrame(
-                                    globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstPageCard),
-                                    in: geometry,
-                                    fallback: fallbackFrame
-                                )
-                                highlightedRectGuideContent(
-                                    frame: targetFrame,
-                                    cornerRadius: 12,
-                                    title: "直接点第一张空间书页",
-                                    message: "当前手帐里已经有书页了，不用新建，直接点第一张进入 3D 编辑。",
-                                    currentStep: 6,
-                                    totalSteps: 9,
-                                    accent: .blue,
-                                    actionTitle: nil,
-                                    onAction: nil
-                                )
-                            } else {
-                                if isSpaceBookCreationPromptVisible {
-                                    VStack {
-                                        featureStepBubble(
-                                            title: "输入首张名字后点创建",
-                                            message: "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。",
-                                            currentStep: 6,
-                                            totalSteps: 9,
-                                            accent: .blue,
-                                            actionTitle: nil,
-                                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                                            onAction: nil
-                                        )
-                                        .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
-                                        Spacer()
-                                    }
-                                } else {
-                                    let fallbackFrame = CGRect(
-                                        x: geometry.size.width - 70,
-                                        y: max(geometry.safeAreaInsets.top + 12, 16),
-                                        width: 50,
-                                        height: 50
-                                    )
-                                    let targetFrame = aiGuideTargetFrame(
-                                        globalFrame: guideManager.guideTargetFrame(for: .spaceBookDetailMoreMenuButton),
-                                        in: geometry,
-                                        fallback: fallbackFrame
-                                    )
-                                    highlightedRectGuideContent(
-                                        frame: targetFrame,
-                                        cornerRadius: 12,
-                                        title: "点右上角「更多」新建空间书页",
-                                        message: "进入新手帐后，点右上角「更多」并选择「新建空间搭配」，输入首张名字后点击创建。",
-                                        currentStep: 6,
-                                        totalSteps: 9,
-                                        accent: .blue,
-                                        actionTitle: nil,
-                                        onAction: nil
-                                    )
-                                }
-                            }
-                        case .step5_open3DEditor:
-                            let fallbackFrame = CGRect(x: 24, y: geometry.size.height * 0.22, width: (geometry.size.width - 64) / 2, height: 180)
-                            let targetFrame = aiGuideTargetFrame(
-                                globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstPageCard),
-                                in: geometry,
-                                fallback: fallbackFrame
-                            )
-                            highlightedRectGuideContent(
-                                frame: targetFrame,
-                                cornerRadius: 12,
-                                title: "进入空间书页",
-                                message: "点击书页进入 3D 编辑界面。若是刚创建的首张书页，也是在这里进入。",
-                                currentStep: 7,
-                                totalSteps: 9,
-                                accent: .blue,
-                                actionTitle: nil,
-                                onAction: nil
-                            )
-                        case .step6_openScanner:
-                            let fallbackFrame = CGRect(x: 8, y: geometry.size.height * 0.42, width: 60, height: 96)
-                            let targetFrame = aiGuideTargetFrame(
-                                globalFrame: guideManager.guideTargetFrame(for: .spatialCanvasImportMenu),
-                                in: geometry,
-                                fallback: fallbackFrame
-                            )
-                            highlightedRectGuideContent(
-                                frame: targetFrame,
-                                cornerRadius: 20,
-                                title: "左侧工具栏点「导入」再点「相机」",
-                                message: "这是进入空间扫描的入口。请先打开导入菜单，再点击「相机」进入扫描界面。",
-                                currentStep: 8,
-                                totalSteps: 9,
-                                accent: .blue,
-                                actionTitle: nil,
-                                onAction: nil
-                            )
+                    spaceBookPostUnlockStep2Content(in: geometry)
+                case .step4_createSpacePage:
+                    spaceBookPostUnlockStep3Content(in: geometry)
+                case .step5_enter3DEditor:
+                    spaceBookPostUnlockStep4Content(in: geometry)
+                case .step6_openScanner:
+                    spaceBookPostUnlockStep5Content(in: geometry)
                 case .step7_scannerHowTo:
-                    bottomBubbleGuideContent(
-                        title: "开始空间扫描（最后一步）",
-                        message: "请在光线充足的地方开始检测；让镜头尽量包住需要扫描的物体，先完成稳定定位，再围绕物体做后续 360° 扫描。做到这一步就完成本次引导啦。",
-                        currentStep: 9,
-                        totalSteps: 9,
-                        accent: .blue,
-                        actionTitle: "知道了，完成引导",
-                        onAction: {
-                            guideManager.completeFeatureExperienceGuide()
-                        }
-                    )
+                    spaceBookPostUnlockStep6Content()
                 }
+            }
+        )
+    }
+
+    // MARK: 阶段1: 前置任务引导（解锁前）- 共5步
+
+    /// Step 1: 点击衣橱「穿搭手帐」
+    func spaceBookPreUnlockStep1Content(in geometry: GeometryProxy) -> some View {
+        let targetFrame = wardrobeOotdEntryGuideFrame(in: geometry)
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 18,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 2: 右上角「更多」→ 新建手帐
+    func spaceBookPreUnlockStep2Content(in geometry: GeometryProxy) -> some View {
+        let fallbackFrame = CGRect(
+            x: geometry.size.width - 70,
+            y: max(geometry.safeAreaInsets.top + 12, 16),
+            width: 50,
+            height: 50
+        )
+        let targetFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .ootdShelfMoreMenuButton),
+            in: geometry,
+            fallback: fallbackFrame
+        )
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 12,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 3: 点击刚创建的手帐进入
+    func spaceBookPreUnlockStep3Content(in geometry: GeometryProxy) -> some View {
+        // 优先高亮非默认手帐（刚创建的），如果没有则高亮第一本手帐
+        let fallbackFrame = CGRect(
+            x: 24,
+            y: max(geometry.safeAreaInsets.top + 100, geometry.size.height * 0.22),
+            width: min(180, geometry.size.width - 48),
+            height: 220
+        )
+        let targetFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .ootdFirstBookCard),
+            in: geometry,
+            fallback: fallbackFrame
+        )
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 20,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 4: 手帐详情页「更多」→ 新建书页
+    func spaceBookPreUnlockStep4Content(in geometry: GeometryProxy) -> some View {
+        let fallbackFrame = CGRect(
+            x: geometry.size.width - 70,
+            y: max(geometry.safeAreaInsets.top + 12, 16),
+            width: 50,
+            height: 50
+        )
+        let targetFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .ootdDetailMoreMenuButton),
+            in: geometry,
+            fallback: fallbackFrame
+        )
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 12,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 5: 前置任务完成！自动解锁空间手帐
+    func spaceBookPreUnlockStep5Content() -> some View {
+        bottomBubbleGuideContent(
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: spaceBookGuideStep.completionButtonTitle,
+            onAction: {
+                // 解锁空间手帐
+                _ = FeatureUnlockManager.shared.unlock(.spaceBook, force: true)
+                // 标记引导完成
+                guideManager.completeFeatureExperienceGuide()
+            }
+        )
+    }
+
+    // MARK: 阶段2: 完整功能引导（解锁后）- 共7步
+
+    /// Step 6: 点击衣橱「穿搭手帐」（解锁后入口）
+    func spaceBookPostUnlockStep0Content(in geometry: GeometryProxy) -> some View {
+        let targetFrame = wardrobeOotdEntryGuideFrame(in: geometry)
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 18,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 7: 切换到空间页签
+    func spaceBookPostUnlockStep1Content(in geometry: GeometryProxy) -> some View {
+        let fallbackFrame = CGRect(
+            x: (geometry.size.width - 160) / 2,
+            y: max(geometry.safeAreaInsets.top + 8, 12),
+            width: 160,
+            height: 32
+        )
+        let targetFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .spaceBookModeTabs),
+            in: geometry,
+            fallback: fallbackFrame
+        )
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 12,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 8: 创建空间手帐
+    func spaceBookPostUnlockStep2Content(in geometry: GeometryProxy) -> AnyView {
+        if hasSpaceBooksForGuide {
+            // 用户已有空间手帐，引导点击第一本
+            let fallbackFrame = CGRect(
+                x: 24,
+                y: max(geometry.safeAreaInsets.top + 100, geometry.size.height * 0.22),
+                width: min(180, geometry.size.width - 48),
+                height: 220
+            )
+            let targetFrame = aiGuideTargetFrame(
+                globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstBookCard),
+                in: geometry,
+                fallback: fallbackFrame
+            )
+            return AnyView(highlightedRectGuideContent(
+                frame: targetFrame,
+                cornerRadius: 20,
+                title: "直接点第一本空间手帐",
+                message: "你已经有空间手帐了，不用新建。先点进第一本，我们继续下一步。",
+                currentStep: spaceBookGuideStep.stepNumberInFlow,
+                totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                accent: .blue,
+                actionTitle: nil,
+                onAction: nil
+            ))
+        } else if isSpaceBookCreationPromptVisible {
+            // 新建弹窗已打开
+            return AnyView(VStack {
+                featureStepBubble(
+                    title: "输入名称后点创建",
+                    message: "已打开新建空间手帐弹窗，输入名称并点击创建，即可进入下一步。",
+                    currentStep: spaceBookGuideStep.stepNumberInFlow,
+                    totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                    accent: .blue,
+                    actionTitle: nil,
+                    onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                    onAction: nil
+                )
+                .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
+                Spacer()
+            })
+        } else {
+            // 引导点击右上角「更多」
+            let fallbackFrame = CGRect(
+                x: geometry.size.width - 70,
+                y: max(geometry.safeAreaInsets.top + 12, 16),
+                width: 50,
+                height: 50
+            )
+            let targetFrame = aiGuideTargetFrame(
+                globalFrame: guideManager.guideTargetFrame(for: .spaceBookShelfMoreMenuButton),
+                in: geometry,
+                fallback: fallbackFrame
+            )
+            return AnyView(highlightedRectGuideContent(
+                frame: targetFrame,
+                cornerRadius: 12,
+                title: spaceBookGuideStep.title,
+                message: spaceBookGuideStep.message,
+                currentStep: spaceBookGuideStep.stepNumberInFlow,
+                totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                accent: .blue,
+                actionTitle: nil,
+                onAction: nil
+            ))
+        }
+    }
+
+    /// Step 9: 创建空间书页
+    func spaceBookPostUnlockStep3Content(in geometry: GeometryProxy) -> AnyView {
+        if hasSpaceBookPagesForGuide {
+            // 用户已有空间书页，引导点击第一张
+            let fallbackFrame = CGRect(
+                x: 24,
+                y: geometry.size.height * 0.22,
+                width: (geometry.size.width - 64) / 2,
+                height: 180
+            )
+            let targetFrame = aiGuideTargetFrame(
+                globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstPageCard),
+                in: geometry,
+                fallback: fallbackFrame
+            )
+            return AnyView(highlightedRectGuideContent(
+                frame: targetFrame,
+                cornerRadius: 12,
+                title: "直接点第一张空间书页",
+                message: "当前手帐里已经有书页了，不用新建，直接点第一张进入 3D 编辑。",
+                currentStep: spaceBookGuideStep.stepNumberInFlow,
+                totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                accent: .blue,
+                actionTitle: nil,
+                onAction: nil
+            ))
+        } else if isSpaceBookCreationPromptVisible {
+            // 新建书页弹窗已打开
+            return AnyView(VStack {
+                featureStepBubble(
+                    title: "输入书页名称后点创建",
+                    message: "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。",
+                    currentStep: spaceBookGuideStep.stepNumberInFlow,
+                    totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                    accent: .blue,
+                    actionTitle: nil,
+                    onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                    onAction: nil
+                )
+                .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
+                Spacer()
+            })
+        } else {
+            // 引导点击右上角「更多」
+            let fallbackFrame = CGRect(
+                x: geometry.size.width - 70,
+                y: max(geometry.safeAreaInsets.top + 12, 16),
+                width: 50,
+                height: 50
+            )
+            let targetFrame = aiGuideTargetFrame(
+                globalFrame: guideManager.guideTargetFrame(for: .spaceBookDetailMoreMenuButton),
+                in: geometry,
+                fallback: fallbackFrame
+            )
+            return AnyView(highlightedRectGuideContent(
+                frame: targetFrame,
+                cornerRadius: 12,
+                title: spaceBookGuideStep.title,
+                message: spaceBookGuideStep.message,
+                currentStep: spaceBookGuideStep.stepNumberInFlow,
+                totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                accent: .blue,
+                actionTitle: nil,
+                onAction: nil
+            ))
+        }
+    }
+
+    /// Step 10: 进入3D编辑器
+    func spaceBookPostUnlockStep4Content(in geometry: GeometryProxy) -> some View {
+        let fallbackFrame = CGRect(
+            x: 24,
+            y: geometry.size.height * 0.22,
+            width: (geometry.size.width - 64) / 2,
+            height: 180
+        )
+        let targetFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .spaceBookFirstPageCard),
+            in: geometry,
+            fallback: fallbackFrame
+        )
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 12,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 11: 打开空间扫描器
+    func spaceBookPostUnlockStep5Content(in geometry: GeometryProxy) -> some View {
+        let fallbackFrame = CGRect(
+            x: 8,
+            y: geometry.size.height * 0.42,
+            width: 60,
+            height: 96
+        )
+        let targetFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .spatialCanvasImportMenu),
+            in: geometry,
+            fallback: fallbackFrame
+        )
+        return highlightedRectGuideContent(
+            frame: targetFrame,
+            cornerRadius: 20,
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: nil,
+            onAction: nil
+        )
+    }
+
+    /// Step 12: 扫描操作指引
+    func spaceBookPostUnlockStep6Content() -> some View {
+        bottomBubbleGuideContent(
+            title: spaceBookGuideStep.title,
+            message: spaceBookGuideStep.message,
+            currentStep: spaceBookGuideStep.stepNumberInFlow,
+            totalSteps: spaceBookGuideStep.totalStepsInFlow,
+            accent: .blue,
+            actionTitle: spaceBookGuideStep.completionButtonTitle,
+            onAction: {
+                guideManager.completeFeatureExperienceGuide()
             }
         )
     }
