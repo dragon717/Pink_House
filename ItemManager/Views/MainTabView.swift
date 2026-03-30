@@ -133,24 +133,36 @@ struct ModernTabView: View {
             Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
                 WardrobeTabContent(homeTabSelection: $homeTabSelection)
             }
-            
-            Tab(smallWorldTabTitle, systemImage: smallWorldTabIcon, value: 1) {
+
+            Tab(value: 1) {
                 SmallWorldTabContent(
                     selectedTab: $selectedTab,
                     homeTab: $homeTabSelection,
                     destination: $smallWorldDestination,
                     isPlayingOpeningAnimation: $isPlayingOpeningAnimation
                 )
+            } label: {
+                Label(smallWorldTabTitle, systemImage: smallWorldTabIcon)
+                    .background {
+                        Color.clear
+                            .captureGuideTarget(.homeHouseTab)
+                            .allowsHitTesting(false)
+                    }
             }
-            
+
             Tab("我", systemImage: "face.smiling", value: 2) {
                 MeTabContent()
             }
-            
+
             Tab(value: 3, role: .search) {
                 PetChatView(searchText: $searchText)
             } label: {
                 Label("萌宠对话", systemImage: "bubble.left.and.bubble.right.fill")
+                    .background {
+                        Color.clear
+                            .captureGuideTarget(.homePetChatTab)
+                            .allowsHitTesting(false)
+                    }
             }
         }
         // iOS 26+ 原生 API：向下滑动时自动最小化 TabBar
@@ -160,12 +172,6 @@ struct ModernTabView: View {
         .toolbarBackground(.hidden, for: .tabBar)
         .tint(magicPalette.accent)
         .environment(\.isSimulationActive, isSimulationActive)
-        .overlay(alignment: .bottomTrailing) {
-            modernPetChatTabGuideAnchor
-        }
-        .background {
-            ModernTabBarItemFrameCaptureView(tabIndex: 1, targetKey: .homeHouseTab)
-        }
         .overlay {
             RewardBubbleView()
             // 进入萌宠对话页后不再显示悬浮宠物，避免与搜索/输入交互冲突
@@ -244,132 +250,7 @@ struct ModernTabView: View {
         }
         return false
     }
-
-    private var modernPetChatTabGuideAnchor: some View {
-        GeometryReader { proxy in
-            let screenBounds = proxy.size
-            let safeAreaBottom = proxy.safeAreaInsets.bottom
-
-            // iOS 18+ 悬浮胶囊 TabBar 的实际高度约为 49pt（系统默认）
-            // 加上底部间距约 8-10pt
-            let tabBarHeight: CGFloat = 49
-            let bottomPadding: CGFloat = safeAreaBottom > 0 ? 8 : 10
-
-            // 悬浮胶囊 TabBar 有左右 padding，每个 Tab 宽度约为 (screenWidth - 32) / 4
-            let horizontalPadding: CGFloat = 16
-            let tabWidth = (screenBounds.width - horizontalPadding * 2) / 4
-
-            // PetChat Tab 是第 4 个（index 3），位置在最右边
-            let tabX = horizontalPadding + tabWidth * 3 + tabWidth / 2
-            let tabY = screenBounds.height - safeAreaBottom - bottomPadding - tabBarHeight / 2
-
-            let frame = CGRect(
-                x: tabX - 34,
-                y: tabY - 28,
-                width: 68,
-                height: 56
-            )
-
-            Color.clear
-                .frame(width: frame.width, height: frame.height)
-                .position(x: frame.midX, y: frame.midY)
-                .captureGuideTarget(.homePetChatTab)
-                .allowsHitTesting(false)
-        }
-        .allowsHitTesting(false)
-    }
-
-    private var modernHouseTabGuideAnchor: some View {
-        GeometryReader { proxy in
-            let screenBounds = proxy.size
-            let safeAreaBottom = proxy.safeAreaInsets.bottom
-
-            // iOS 18+ 悬浮胶囊 TabBar 的实际高度约为 49pt（系统默认）
-            let tabBarHeight: CGFloat = 49
-            let bottomPadding: CGFloat = safeAreaBottom > 0 ? 8 : 10
-
-            // 悬浮胶囊 TabBar 有左右 padding，每个 Tab 宽度约为 (screenWidth - 32) / 4
-            let horizontalPadding: CGFloat = 16
-            let tabWidth = (screenBounds.width - horizontalPadding * 2) / 4
-
-            // House Tab 是第 2 个（index 1），位置在左边第二个
-            let tabX = horizontalPadding + tabWidth * 1 + tabWidth / 2
-            let tabY = screenBounds.height - safeAreaBottom - bottomPadding - tabBarHeight / 2
-
-            let frame = CGRect(
-                x: tabX - 34,
-                y: tabY - 28,
-                width: 68,
-                height: 56
-            )
-
-            Color.clear
-                .frame(width: frame.width, height: frame.height)
-                .position(x: frame.midX, y: frame.midY)
-                .captureGuideTarget(.homeHouseTab)
-                .allowsHitTesting(false)
-        }
-        .allowsHitTesting(false)
-    }
 }
-
-#if canImport(UIKit)
-private struct ModernTabBarItemFrameCaptureView: UIViewRepresentable {
-    let tabIndex: Int
-    let targetKey: GuideTargetKey
-
-    func makeUIView(context: Context) -> TabBarFrameCaptureUIView {
-        let view = TabBarFrameCaptureUIView()
-        view.backgroundColor = .clear
-        view.isUserInteractionEnabled = false
-        view.tabIndex = tabIndex
-        view.targetKey = targetKey
-        return view
-    }
-
-    func updateUIView(_ uiView: TabBarFrameCaptureUIView, context: Context) {
-        uiView.tabIndex = tabIndex
-        uiView.targetKey = targetKey
-        uiView.scheduleCapture()
-    }
-}
-
-private final class TabBarFrameCaptureUIView: UIView {
-    var tabIndex: Int = 0
-    var targetKey: GuideTargetKey = .homeHouseTab
-
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        scheduleCapture()
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        scheduleCapture()
-    }
-
-    func scheduleCapture() {
-        DispatchQueue.main.async { [weak self] in
-            self?.captureFrame()
-        }
-    }
-
-    private func captureFrame() {
-        print("📸 [TabBarFrameCaptureUIView] captureFrame 被调用")
-        print("   tabIndex: \(tabIndex)")
-        print("   targetKey: \(targetKey)")
-
-        let frame = TabBarItemAnchorResolver.liveFrame(at: tabIndex)
-
-        if let frame {
-            print("   ✅ 捕获成功，frame: \(frame)")
-            AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(frame, for: targetKey)
-        } else {
-            print("   ❌ 捕获失败，frame 为 nil")
-        }
-    }
-}
-#endif
 
 // MARK: - 衣橱 Tab 内容
 @available(iOS 18.0, *)
