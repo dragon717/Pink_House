@@ -49,12 +49,12 @@ private struct PetQuickOptionsWidget: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
 
     let widget: PetWidgetData
     let onAction: (PetWidgetOption) -> Void
 
     private func guideTarget(for option: PetWidgetOption) -> GuideTargetKey? {
+        let guideManager = AppFirstLaunchGuideManager.shared
         guard guideManager.isShowingFeatureExperienceGuide,
               guideManager.currentFeatureExperienceFeature == .aiAnalysis,
               option.command == "weather_guidance" else {

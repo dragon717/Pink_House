@@ -190,7 +190,8 @@ struct PetChatView: View {
                 text: reusableWelcomeText(),
                 isUser: false,
                 isAIGenerated: true,
-                timestamp: lockedWelcomeTimestamp
+                timestamp: lockedWelcomeTimestamp,
+                widgets: onboardingWidgetsForCurrentPetState()
             ),
             petName: petAI.petName,
             onCardTap: handleClothingTap,
