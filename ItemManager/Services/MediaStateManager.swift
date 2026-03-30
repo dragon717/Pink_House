@@ -292,6 +292,8 @@ extension Notification.Name {
     static let favoriteMenuSettingsOpened = Notification.Name("favoriteMenuSettingsOpened")
     static let dismissFavoriteMenuSettingsView = Notification.Name("dismissFavoriteMenuSettingsView")
     static let favoriteMenuSettingsViewDismissed = Notification.Name("favoriteMenuSettingsViewDismissed")
+    static let ootdBookCreated = Notification.Name("ootdBookCreated")
+    static let ootdPageCreated = Notification.Name("ootdPageCreated")
     static let spatialBookShelfOpened = Notification.Name("spatialBookShelfOpened")
     static let spaceBookDetailOpened = Notification.Name("spaceBookDetailOpened")
     static let spaceBookPageCreated = Notification.Name("spaceBookPageCreated")

@@ -26,9 +26,9 @@ struct MagicThemeModuleSection: View {
     @State private var pendingDeleteThemeId: String?
     @State private var pendingDeleteThemeName: String = ""
 
-    // 检查魔法配色是否已解锁
-    private var isMagicColorUnlocked: Bool {
-        unlockManager.isUnlocked(.themeCustomize)
+    // 检查客制化配色和个性化任务是否已解锁
+    private var isPersonalizationUnlocked: Bool {
+        unlockManager.isUnlocked(.customColorPersonalization)
     }
 
     // 当前主题
@@ -101,8 +101,8 @@ struct MagicThemeModuleSection: View {
                 }
             }
 
-            // 自定义颜色设置 - 仅在魔法配色解锁时显示
-            if isMagicColorUnlocked {
+            // 自定义颜色设置 - 仅在客制化配色和个性化任务解锁时显示
+            if isPersonalizationUnlocked {
                 Divider()
                     .padding(.vertical, 4)
 

@@ -11,7 +11,13 @@ struct PetChatHistorySearchSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
 
     @State private var keyword = ""
     @State private var page = 0
@@ -107,7 +113,7 @@ struct PetChatHistorySearchSheet: View {
                             Text("\(userCount)/\(totalCount)条")
                                 .font(.caption)
                         }
-                        .foregroundStyle(.pink)
+                        .foregroundStyle(magicPalette.accent)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -131,10 +137,10 @@ struct PetChatHistorySearchSheet: View {
                 HStack(spacing: 6) {
                     Image(systemName: message.isUser ? "person.fill" : "pawprint.fill")
                         .font(.caption2)
-                        .foregroundStyle(message.isUser ? .pink : .orange)
+                        .foregroundStyle(message.isUser ? magicPalette.accent : .orange)
                     Text(message.isUser ? "你" : "萌宠")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(magicPalette.secondaryText)
                     if message.isAIGenerated {
                         Image(systemName: "sparkles")
                             .font(.caption2)
@@ -157,9 +163,17 @@ struct PetChatHistorySearchSheet: View {
                 }
 
                 if message.isUser {
-                    Text("点按可复用这条提问")
-                        .font(.caption2)
-                        .foregroundStyle(.pink.opacity(0.9))
+                    HStack(spacing: 4) {
+                        Image(systemName: "hand.tap")
+                            .font(.caption2)
+                        Text("点按可复用这条提问")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(magicPalette.accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(magicPalette.accent.opacity(0.12))
+                    .clipShape(Capsule())
                 }
             }
             .contentShape(Rectangle())
@@ -185,10 +199,10 @@ struct PetChatHistorySearchSheet: View {
             Text(label)
                 .font(.caption2)
         }
-        .foregroundStyle(.pink.opacity(0.8))
+        .foregroundStyle(magicPalette.accent.opacity(0.8))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
-        .background(Color.pink.opacity(0.08))
+        .background(magicPalette.accent.opacity(0.08))
         .clipShape(Capsule())
     }
 

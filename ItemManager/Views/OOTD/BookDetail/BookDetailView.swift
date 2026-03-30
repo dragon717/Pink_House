@@ -453,6 +453,8 @@ struct BookDetailView: View {
 
         modelContext.insert(newPage)
         loadPages()
+        // 发送通知用于空间手帐引导
+        NotificationCenter.default.post(name: .ootdPageCreated, object: nil)
     }
 
     func insertPage(after page: Outfit) {

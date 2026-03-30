@@ -11,54 +11,32 @@ enum TabBarItemAnchorResolver {
         expansion: CGFloat = 0,
         fallback: CGRect
     ) -> CGRect {
-        print("🎯 [resolvedFrame] guideTargetKey: \(guideTargetKey), preferredTabIndex: \(preferredTabIndex?.description ?? "nil")")
-
         let screenBounds = CGRect(origin: .zero, size: geometry.size)
         let candidates: [CGRect?] = [
             preferredTabIndex.flatMap { liveFrame(at: $0) },
             AppFirstLaunchGuideManager.shared.guideTargetFrame(for: guideTargetKey)
         ]
 
-        if let liveFrame = candidates[0] {
-            print("   候选1 (liveFrame): \(liveFrame)")
-        } else {
-            print("   候选1 (liveFrame): nil")
-        }
-        if let capturedFrame = candidates[1] {
-            print("   候选2 (capturedFrame): \(capturedFrame)")
-        } else {
-            print("   候选2 (capturedFrame): nil")
-        }
-
         for candidate in candidates.compactMap({ $0 }) {
             let expandedFrame = candidate.insetBy(dx: -expansion, dy: -expansion)
             guard expandedFrame.width > 0,
                   expandedFrame.height > 0,
                   screenBounds.intersects(expandedFrame) else {
-                print("   ⚠️ 候选坐标不符合条件，跳过")
                 continue
             }
-            let clampedFrame = clamped(expandedFrame, to: screenBounds)
-            print("   ✅ 使用候选坐标: \(clampedFrame)")
-            return clampedFrame
+            return clamped(expandedFrame, to: screenBounds)
         }
 
-        let clampedFallback = clamped(fallback, to: screenBounds)
-        print("   ⚠️ 使用 fallback: \(clampedFallback)")
-        return clampedFallback
+        return clamped(fallback, to: screenBounds)
     }
 
     #if canImport(UIKit)
     static func liveFrame(at tabIndex: Int) -> CGRect? {
-        print("🔍 [TabBarItemAnchorResolver] 尝试获取 tabIndex: \(tabIndex) 的坐标（UIKit 方式）")
-
         guard let window = activeWindow() else {
-            print("   ❌ 未找到 activeWindow")
             return nil
         }
 
         guard let tabBar = findTabBar(in: window) else {
-            print("   ❌ 未找到 UITabBar（iOS 18+ 现代 TabView 不使用 UITabBar）")
             return nil
         }
 
@@ -66,16 +44,12 @@ enum TabBarItemAnchorResolver {
             .filter { NSStringFromClass(type(of: $0)).contains("UITabBarButton") }
             .sorted { $0.frame.minX < $1.frame.minX }
 
-        print("   找到 \(buttons.count) 个 UITabBarButton")
-
         guard buttons.indices.contains(tabIndex) else {
-            print("   ❌ tabIndex \(tabIndex) 超出范围 (0..<\(buttons.count))")
             return nil
         }
 
         let button = buttons[tabIndex]
         let globalFrame = button.convert(button.bounds, to: nil)
-        print("   ✅ 返回 Tab[\(tabIndex)] globalFrame: \(globalFrame)")
         return globalFrame
     }
 

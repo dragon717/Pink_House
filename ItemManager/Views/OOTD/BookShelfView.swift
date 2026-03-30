@@ -128,6 +128,8 @@ struct BookShelfView: View {
                         sortIndex: maxSortIndex + 1
                     )
                     modelContext.insert(book)
+                    // 发送通知用于空间手帐引导
+                    NotificationCenter.default.post(name: .ootdBookCreated, object: nil)
                 }
             }
             .navigationDestination(for: BookGroup.self) { book in
@@ -171,7 +173,20 @@ struct BookShelfView: View {
                 performMigration()
                 // 初始化时同步选中状态
                 isBookSelected = selectedBook != nil
-                NotificationCenter.default.post(name: .ootdShelfOpened, object: nil)
+                // 计算是否有手帐本和书页（用于空间手帐引导）
+                // 注意：只统计用户手动创建的非默认手帐和书页
+                let hasUserBooks = hasUserCreatedBooks()
+                let hasUserPages = hasUserCreatedPages()
+                print("[Guide] BookShelf onAppear - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
+                NotificationCenter.default.post(name: .ootdShelfOpened, object: nil, userInfo: ["hasBooks": hasUserBooks, "hasPages": hasUserPages])
+            }
+            .onChange(of: books) { _, _ in
+                // 数据变化时重新发送通知（用于空间手帐引导，确保数据加载后状态正确）
+                // 注意：只统计用户手动创建的非默认手帐和书页
+                let hasUserBooks = hasUserCreatedBooks()
+                let hasUserPages = hasUserCreatedPages()
+                print("[Guide] BookShelf books changed - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
+                NotificationCenter.default.post(name: .ootdShelfOpened, object: nil, userInfo: ["hasBooks": hasUserBooks, "hasPages": hasUserPages])
             }
             .onChange(of: selectedBook) { _, newValue in
                 // 同步选中状态到外部
@@ -216,6 +231,56 @@ struct BookShelfView: View {
         return selectedBook == nil ? "穿搭手帐" : selectedBook!.title
     }
     
+    /// 直接查询获取有效书页数量（避免关系数据延迟加载问题）
+    private func fetchValidPageCount() -> Int {
+        let descriptor = FetchDescriptor<Outfit>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.book?.deletedAt == nil }
+        )
+        do {
+            let pages = try modelContext.fetch(descriptor)
+            return pages.count
+        } catch {
+            print("[BookShelf] Failed to fetch page count: \(error)")
+            return 0
+        }
+    }
+
+    /// 检查是否有用户手动创建的非默认手帐
+    private func hasUserCreatedBooks() -> Bool {
+        let defaultBookTitle = "默认手帐"
+        // 查询非默认且未删除的手帐
+        let descriptor = FetchDescriptor<BookGroup>(
+            predicate: #Predicate { $0.deletedAt == nil && $0.title != defaultBookTitle }
+        )
+        do {
+            let userBooks = try modelContext.fetch(descriptor)
+            return !userBooks.isEmpty
+        } catch {
+            print("[BookShelf] Failed to fetch user created books: \(error)")
+            return false
+        }
+    }
+
+    /// 检查用户手动创建的手帐中是否有书页
+    private func hasUserCreatedPages() -> Bool {
+        let defaultBookTitle = "默认手帐"
+        // 查询属于非默认手帐且未删除的书页
+        let descriptor = FetchDescriptor<Outfit>(
+            predicate: #Predicate {
+                $0.deletedAt == nil &&
+                $0.book?.deletedAt == nil &&
+                $0.book?.title != defaultBookTitle
+            }
+        )
+        do {
+            let userPages = try modelContext.fetch(descriptor)
+            return !userPages.isEmpty
+        } catch {
+            print("[BookShelf] Failed to fetch user created pages: \(error)")
+            return false
+        }
+    }
+
     private func deleteBook(_ book: BookGroup) {
         book.isDeleted = true
         book.deletedAt = Date()

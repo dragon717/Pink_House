@@ -771,14 +771,14 @@ struct PetChatView: View {
         HStack(spacing: 6) {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.caption)
-                .foregroundStyle(.pink.opacity(0.85))
+                .foregroundStyle(MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme).accent.opacity(0.85))
             Text(localizedCatchphraseText("下拉或者点这里，我就把旧日记翻给你看喵~"))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme).secondaryText)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.9))
+        .background(MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme).cardBackground.opacity(colorScheme == .dark ? 0.9 : 0.85))
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
     }

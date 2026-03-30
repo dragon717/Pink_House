@@ -257,12 +257,14 @@ enum BatchEditGuideStep: Int, CaseIterable {
 
 enum SpaceBookGuideStep: Int, CaseIterable {
     case step1_clickWardrobeOotdEntry = 1
-    case step2_switchToSpaceTab = 2
-    case step3_createSpaceBook = 3
-    case step4_createFirstPage = 4
-    case step5_open3DEditor = 5
-    case step6_openScanner = 6
-    case step7_scannerHowTo = 7
+    case step1a_createOotdBook = 2
+    case step1b_createOotdPage = 3
+    case step2_switchToSpaceTab = 4
+    case step3_createSpaceBook = 5
+    case step4_createFirstPage = 6
+    case step5_open3DEditor = 7
+    case step6_openScanner = 8
+    case step7_scannerHowTo = 9
 }
 
 enum WealthGuideStep: Int, CaseIterable {

@@ -230,7 +230,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .ootdDefaultBook:
             return .clothingCount(3)
         case .wealth:
-            return .loginDays(3)
+            return .loginDays(2)
         case .calendar:
             return .clothingCount(10)
         case .bigWorld:
@@ -249,7 +249,7 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .themeCustomize:
             return .meowCoin(50)
         case .widgetCustomize:
-            return .loginDays(7)
+            return .loginDays(3)
         case .aiAnalysis:
             return .vip()
         case .customColorPersonalization:

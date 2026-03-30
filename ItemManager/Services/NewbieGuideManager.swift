@@ -968,7 +968,7 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindHouseEntryGuideEvents<Content: View>(_ content: Content) -> some View {
         content
-            .onReceive(NotificationCenter.default.publisher(for: .ootdShelfOpened)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .ootdShelfOpened)) { notification in
                 if guideManager.currentFeatureExperienceFeature == .ootd,
                    ootdGuideStep == .step1_clickOotdEntry {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -977,8 +977,23 @@ struct FeatureExperienceGuideOverlay: View {
                 }
                 if guideManager.currentFeatureExperienceFeature == .spaceBook,
                    spaceBookGuideStep == .step1_clickWardrobeOotdEntry {
+                    let hasBooks = notification.userInfo?["hasBooks"] as? Bool ?? false
+                    let hasPages = notification.userInfo?["hasPages"] as? Bool ?? false
+                    print("[Guide] Received ootdShelfOpened - hasBooks: \(hasBooks), hasPages: \(hasPages)")
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step2_switchToSpaceTab
+                        if !hasBooks {
+                            // 没有手帐本，引导创建手帐本
+                            print("[Guide] Advancing to step1a_createOotdBook")
+                            spaceBookGuideStep = .step1a_createOotdBook
+                        } else if !hasPages {
+                            // 有手帐本但没有书页，引导创建书页
+                            print("[Guide] Advancing to step1b_createOotdPage")
+                            spaceBookGuideStep = .step1b_createOotdPage
+                        } else {
+                            // 都有，进入空间页签引导
+                            print("[Guide] Advancing to step2_switchToSpaceTab")
+                            spaceBookGuideStep = .step2_switchToSpaceTab
+                        }
                     }
                 }
             }
@@ -1020,6 +1035,22 @@ struct FeatureExperienceGuideOverlay: View {
 
     private func bindSpaceBookStateGuideEvents<Content: View>(_ content: Content) -> some View {
         content
+            .onReceive(NotificationCenter.default.publisher(for: .ootdBookCreated)) { _ in
+                if guideManager.currentFeatureExperienceFeature == .spaceBook,
+                   spaceBookGuideStep == .step1a_createOotdBook {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        spaceBookGuideStep = .step1b_createOotdPage
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ootdPageCreated)) { _ in
+                if guideManager.currentFeatureExperienceFeature == .spaceBook,
+                   spaceBookGuideStep == .step1b_createOotdPage {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        spaceBookGuideStep = .step2_switchToSpaceTab
+                    }
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .spatialBookShelfOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .spaceBook,
                    spaceBookGuideStep == .step2_switchToSpaceTab {
@@ -1236,6 +1267,12 @@ struct FeatureExperienceGuideOverlay: View {
     // MARK: - 空间手帐引导
 
     var spaceBookGuideContent: some View {
+        // 1. 先检查 ootd 是否解锁，如果未解锁，引导用户先完成 ootd 新手引导（解锁穿搭手帐功能）
+        if !FeatureUnlockManager.shared.isUnlocked(.ootd) {
+            return AnyView(ootdGuideContent)
+        }
+
+        // 2. ootd 已解锁，再检查 spaceBook 是否解锁
         if let preUnlockGuide = preUnlockWardrobeGuideContentIfNeeded(for: .spaceBook) {
             return preUnlockGuide
         }
@@ -1251,11 +1288,41 @@ struct FeatureExperienceGuideOverlay: View {
                         title: "点击统计卡片里的「穿搭手帐」",
                         message: "先点这个入口进入穿搭手帐，我们再去空间页签创建空间手帐。",
                         currentStep: 1,
-                        totalSteps: 7,
+                        totalSteps: 9,
                         accent: .blue,
                         actionTitle: nil,
                         onAction: nil
                     )
+                case .step1a_createOotdBook:
+                    VStack {
+                        Spacer()
+                        featureStepBubble(
+                            title: "创建第一本穿搭手帐",
+                            message: "点击右上角「+」按钮，新建一个穿搭手帐，这是解锁空间手帐的前置任务。",
+                            currentStep: 2,
+                            totalSteps: 9,
+                            accent: .blue,
+                            actionTitle: nil,
+                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                            onAction: nil
+                        )
+                        .padding(.bottom, 120)
+                    }
+                case .step1b_createOotdPage:
+                    VStack {
+                        Spacer()
+                        featureStepBubble(
+                            title: "创建第一张书页",
+                            message: "点击手帐进入详情页，然后点击右上角「+」添加第一张书页。",
+                            currentStep: 3,
+                            totalSteps: 9,
+                            accent: .blue,
+                            actionTitle: nil,
+                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                            onAction: nil
+                        )
+                        .padding(.bottom, 120)
+                    }
                 case .step2_switchToSpaceTab:
                     let fallbackFrame = CGRect(x: (geometry.size.width - 160) / 2, y: max(geometry.safeAreaInsets.top + 8, 12), width: 160, height: 32)
                     let targetFrame = aiGuideTargetFrame(
@@ -1268,8 +1335,8 @@ struct FeatureExperienceGuideOverlay: View {
                         cornerRadius: 12,
                         title: "切到「空间」页签",
                         message: "上方这里可以在「平面 / 空间」之间切换。请切到「空间」，下一步就去右上角「更多」新建空间手帐。",
-                        currentStep: 2,
-                        totalSteps: 7,
+                        currentStep: 4,
+                        totalSteps: 9,
                         accent: .blue,
                         actionTitle: nil,
                         onAction: nil
@@ -1292,8 +1359,8 @@ struct FeatureExperienceGuideOverlay: View {
                                     cornerRadius: 20,
                                     title: "直接点第一本空间手帐",
                                     message: "你已经有空间手帐了，不用新建。先点进第一本，我们继续下一步。",
-                                    currentStep: 3,
-                                    totalSteps: 7,
+                                    currentStep: 5,
+                                    totalSteps: 9,
                                     accent: .blue,
                                     actionTitle: nil,
                                     onAction: nil
@@ -1304,8 +1371,8 @@ struct FeatureExperienceGuideOverlay: View {
                                         featureStepBubble(
                                             title: "输入名称后点创建",
                                             message: "已打开新建弹窗，输入空间手帐名称并点击创建，即可进入下一步。",
-                                            currentStep: 3,
-                                            totalSteps: 7,
+                                            currentStep: 5,
+                                            totalSteps: 9,
                                             accent: .blue,
                                             actionTitle: nil,
                                             onSkip: { guideManager.dismissFeatureExperienceGuide() },
@@ -1331,8 +1398,8 @@ struct FeatureExperienceGuideOverlay: View {
                                         cornerRadius: 12,
                                         title: "点右上角「更多」新建空间手帐",
                                         message: "请点右上角「更多」，选择「新建空间手帐」。输入名称并点击创建。",
-                                        currentStep: 3,
-                                        totalSteps: 7,
+                                        currentStep: 5,
+                                        totalSteps: 9,
                                         accent: .blue,
                                         actionTitle: nil,
                                         onAction: nil
@@ -1357,8 +1424,8 @@ struct FeatureExperienceGuideOverlay: View {
                                     cornerRadius: 12,
                                     title: "直接点第一张空间书页",
                                     message: "当前手帐里已经有书页了，不用新建，直接点第一张进入 3D 编辑。",
-                                    currentStep: 4,
-                                    totalSteps: 7,
+                                    currentStep: 6,
+                                    totalSteps: 9,
                                     accent: .blue,
                                     actionTitle: nil,
                                     onAction: nil
@@ -1369,8 +1436,8 @@ struct FeatureExperienceGuideOverlay: View {
                                         featureStepBubble(
                                             title: "输入首张名字后点创建",
                                             message: "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。",
-                                            currentStep: 4,
-                                            totalSteps: 7,
+                                            currentStep: 6,
+                                            totalSteps: 9,
                                             accent: .blue,
                                             actionTitle: nil,
                                             onSkip: { guideManager.dismissFeatureExperienceGuide() },
@@ -1396,8 +1463,8 @@ struct FeatureExperienceGuideOverlay: View {
                                         cornerRadius: 12,
                                         title: "点右上角「更多」新建空间书页",
                                         message: "进入新手帐后，点右上角「更多」并选择「新建空间搭配」，输入首张名字后点击创建。",
-                                        currentStep: 4,
-                                        totalSteps: 7,
+                                        currentStep: 6,
+                                        totalSteps: 9,
                                         accent: .blue,
                                         actionTitle: nil,
                                         onAction: nil
@@ -1416,8 +1483,8 @@ struct FeatureExperienceGuideOverlay: View {
                                 cornerRadius: 12,
                                 title: "进入空间书页",
                                 message: "点击书页进入 3D 编辑界面。若是刚创建的首张书页，也是在这里进入。",
-                                currentStep: 5,
-                                totalSteps: 7,
+                                currentStep: 7,
+                                totalSteps: 9,
                                 accent: .blue,
                                 actionTitle: nil,
                                 onAction: nil
@@ -1434,8 +1501,8 @@ struct FeatureExperienceGuideOverlay: View {
                                 cornerRadius: 20,
                                 title: "左侧工具栏点「导入」再点「相机」",
                                 message: "这是进入空间扫描的入口。请先打开导入菜单，再点击「相机」进入扫描界面。",
-                                currentStep: 6,
-                                totalSteps: 7,
+                                currentStep: 8,
+                                totalSteps: 9,
                                 accent: .blue,
                                 actionTitle: nil,
                                 onAction: nil
@@ -1444,8 +1511,8 @@ struct FeatureExperienceGuideOverlay: View {
                     bottomBubbleGuideContent(
                         title: "开始空间扫描（最后一步）",
                         message: "请在光线充足的地方开始检测；让镜头尽量包住需要扫描的物体，先完成稳定定位，再围绕物体做后续 360° 扫描。做到这一步就完成本次引导啦。",
-                        currentStep: 7,
-                        totalSteps: 7,
+                        currentStep: 9,
+                        totalSteps: 9,
                         accent: .blue,
                         actionTitle: "知道了，完成引导",
                         onAction: {

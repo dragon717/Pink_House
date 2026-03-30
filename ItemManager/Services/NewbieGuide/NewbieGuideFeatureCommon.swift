@@ -553,8 +553,15 @@ extension FeatureExperienceGuideOverlay {
     }
 
     func usesPreUnlockWardrobeGuide(for feature: FeatureItem) -> Bool {
-        isPreUnlockWardrobeGuideReusableFeature(feature) &&
-        !FeatureUnlockManager.shared.isUnlocked(feature)
+        guard isPreUnlockWardrobeGuideReusableFeature(feature) else { return false }
+
+        // spaceBook 特殊处理：如果 ootd 已解锁，即使 spaceBook 未解锁也不走衣橱预引导
+        // 因为 spaceBook 的解锁条件是"创建一个穿搭手账以及手账书页"，此时应引导用户去点击穿搭手帐入口
+        if feature == .spaceBook {
+            return !FeatureUnlockManager.shared.isUnlocked(.ootd)
+        }
+
+        return !FeatureUnlockManager.shared.isUnlocked(feature)
     }
 
     func acceptsManualCreateGuideCompletion(for feature: FeatureItem) -> Bool {
