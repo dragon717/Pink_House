@@ -110,6 +110,7 @@ enum GuideTargetKey: String, CaseIterable, Hashable {
     // 穿搭手帐（OOTD）- 用于空间手帐前置任务引导
     case ootdShelfMoreMenuButton = "ootd.shelfMoreMenuButton"
     case ootdFirstBookCard = "ootd.firstBookCard"
+    case ootdFirstNonDefaultBookCard = "ootd.firstNonDefaultBookCard"
     case ootdDetailMoreMenuButton = "ootd.detailMoreMenuButton"
     case spatialCanvasToolbar = "spatialCanvas.toolbar"
     case spatialCanvasImportMenu = "spatialCanvas.importMenu"

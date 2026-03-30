@@ -1432,7 +1432,7 @@ struct FeatureExperienceGuideOverlay: View {
 
     /// Step 3: 点击刚创建的手帐进入
     func spaceBookPreUnlockStep3Content(in geometry: GeometryProxy) -> some View {
-        // 优先高亮非默认手帐（刚创建的），如果没有则高亮第一本手帐
+        // 高亮第一个非默认手帐（用户刚创建的）
         let fallbackFrame = CGRect(
             x: 24,
             y: max(geometry.safeAreaInsets.top + 100, geometry.size.height * 0.22),
@@ -1440,7 +1440,7 @@ struct FeatureExperienceGuideOverlay: View {
             height: 220
         )
         let targetFrame = aiGuideTargetFrame(
-            globalFrame: guideManager.guideTargetFrame(for: .ootdFirstBookCard),
+            globalFrame: guideManager.guideTargetFrame(for: .ootdFirstNonDefaultBookCard),
             in: geometry,
             fallback: fallbackFrame
         )

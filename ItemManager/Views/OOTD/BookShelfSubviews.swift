@@ -145,6 +145,11 @@ struct BookGridView: View {
     var onBookTap: ((BookGroup) -> Void)?
     var openingBook: BookGroup?
     
+    // 第一个非默认手帐（用于新手引导高亮）
+    private var firstNonDefaultBook: BookGroup? {
+        books.first { $0.title != "默认手帐" }
+    }
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 24)], spacing: 32) {
@@ -167,7 +172,7 @@ struct BookGridView: View {
                         }
                     }
                     .buttonStyle(BouncingButtonStyle())
-                    .captureGuideTarget(books.first?.id == book.id ? .ootdFirstBookCard : nil)
+                    .captureGuideTarget(guideTargetKey(for: book))
                     .contextMenu {
                         Button {
                             onRename(book)
@@ -192,6 +197,19 @@ struct BookGridView: View {
             }
             .padding(24)
         }
+    }
+
+    /// 根据手帐返回对应的高亮目标键
+    private func guideTargetKey(for book: BookGroup) -> GuideTargetKey? {
+        // 第一个非默认手帐（用于 Step 3 引导）
+        if book.id == firstNonDefaultBook?.id {
+            return .ootdFirstNonDefaultBookCard
+        }
+        // 第一个手帐（用于其他场景）
+        if book.id == books.first?.id {
+            return .ootdFirstBookCard
+        }
+        return nil
     }
 }
 
