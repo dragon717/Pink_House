@@ -1,7 +1,7 @@
 import Foundation
 
 enum PetChatTranscriptStore {
-    private static let storageKey = "pet_chat_transcript_v3"
+    private static let storageKey = "pet_chat_transcript_v4"
     private static let legacyImportFlagKey = "pet_chat_transcript_v3_legacy_imported_v1"
 
     static func historyWindowSize() -> Int {
@@ -17,9 +17,11 @@ enum PetChatTranscriptStore {
         UserDefaults.standard.set(data, forKey: storageKey)
     }
 
-    static func load() -> [PetChatMessage] {
-        let storedMessages = loadStoredMessages()
-        let migratedMessages = migrateLegacyHistoryIfNeeded(existingMessages: storedMessages)
+    /// 加载历史消息，并支持通过 clothings 数组 enrich Clothing 对象引用
+    static func load(enrichingWith clothings: [Clothing] = []) -> [PetChatMessage] {
+        let lookup = makeClothingLookup(from: clothings)
+        let storedMessages = loadStoredMessages(enrichingWith: lookup)
+        let migratedMessages = migrateLegacyHistoryIfNeeded(existingMessages: storedMessages, clothings: clothings)
         let normalized = normalizedPersistedMessages(from: migratedMessages)
         return normalized.filter { message in
             if message.isUser && !message.isUserAuthored {
@@ -39,13 +41,15 @@ enum PetChatTranscriptStore {
         }
     }
 
+    /// 查询历史消息（支持 enrich Clothing 对象）
     static func query(
         keyword: String? = nil,
         page: Int = 0,
         pageSize: Int = 20,
-        onlyUserMessages: Bool = true
+        onlyUserMessages: Bool = true,
+        clothings: [Clothing] = []
     ) -> [PetChatMessage] {
-        let all = load()
+        let all = load(enrichingWith: clothings)
         let base = onlyUserMessages ? all.filter(isReusableUserMessage) : all
         let trimmedKeyword = keyword?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let filtered: [PetChatMessage]
@@ -88,11 +92,11 @@ enum PetChatTranscriptStore {
         return Array(newestFirst[start..<end])
     }
 
-    static func count(onlyUserMessages: Bool = true) -> Int {
+    static func count(onlyUserMessages: Bool = true, clothings: [Clothing] = []) -> Int {
         if onlyUserMessages {
-            return load().filter(isReusableUserMessage).count
+            return load(enrichingWith: clothings).filter(isReusableUserMessage).count
         }
-        return load().count
+        return load(enrichingWith: clothings).count
     }
 
     static func clearAll() {
@@ -100,16 +104,81 @@ enum PetChatTranscriptStore {
         UserDefaults.standard.removeObject(forKey: legacyImportFlagKey)
     }
 
-    private static func loadStoredMessages() -> [PetChatMessage] {
+    // MARK: - Clothing Lookup Helper
+
+    private static func makeClothingLookup(from clothings: [Clothing]) -> (UUID) -> Clothing? {
+        let byID = Dictionary(clothings.compactMap { (id: $0.id, clothing: $0) }, uniquingKeysWith: { first, _ in first })
+        return { byID[$0] }
+    }
+
+    // MARK: - Persisted Structures for Rich Content
+
+    /// 持久化的衣橱统计数据（用 UUID 替代 Clothing 引用）
+    private struct PersistedWardrobeStats: Codable {
+        let totalCount: Int
+        let totalValue: String
+        let mostExpensiveItemID: UUID?
+        let depositPlanCount: Int
+        let totalDeposit: String
+        let totalBalance: String
+
+        init(from stats: WardrobeStats) {
+            self.totalCount = stats.totalCount
+            self.totalValue = NSDecimalNumber(decimal: stats.totalValue).stringValue
+            self.mostExpensiveItemID = stats.mostExpensiveItem?.id
+            self.depositPlanCount = stats.depositPlanCount
+            self.totalDeposit = NSDecimalNumber(decimal: stats.totalDeposit).stringValue
+            self.totalBalance = NSDecimalNumber(decimal: stats.totalBalance).stringValue
+        }
+
+        func toWardrobeStats(lookupClothing: (UUID) -> Clothing?) -> WardrobeStats {
+            WardrobeStats(
+                totalCount: totalCount,
+                totalValue: Decimal(string: totalValue) ?? 0,
+                mostExpensiveItem: mostExpensiveItemID.flatMap(lookupClothing),
+                depositPlanCount: depositPlanCount,
+                totalDeposit: Decimal(string: totalDeposit) ?? 0,
+                totalBalance: Decimal(string: totalBalance) ?? 0
+            )
+        }
+    }
+
+    /// 持久化的穿搭建议数据（用 UUID 列表替代 [Clothing]）
+    private struct PersistedOutfitSuggestionData: Codable {
+        let clothingIDs: [UUID]
+        let description: String
+        let style: String
+        let occasion: String
+
+        init(from data: OutfitSuggestionData) {
+            self.clothingIDs = data.clothings.map(\.id)
+            self.description = data.description
+            self.style = data.style
+            self.occasion = data.occasion
+        }
+
+        func toOutfitSuggestionData(lookupClothing: (UUID) -> Clothing?) -> OutfitSuggestionData {
+            let resolvedClothings = clothingIDs.compactMap(lookupClothing)
+            return OutfitSuggestionData(
+                clothings: resolvedClothings,
+                description: description,
+                style: style,
+                occasion: occasion,
+                layoutInfos: nil
+            )
+        }
+    }
+
+    private static func loadStoredMessages(enrichingWith lookupClothing: (UUID) -> Clothing?) -> [PetChatMessage] {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let decoded = try? JSONDecoder().decode([PersistedPetChatMessage].self, from: data),
               !decoded.isEmpty else {
             return []
         }
-        return decoded.map(\.message)
+        return decoded.map { $0.message(lookupClothing: lookupClothing) }
     }
 
-    private static func migrateLegacyHistoryIfNeeded(existingMessages: [PetChatMessage]) -> [PetChatMessage] {
+    private static func migrateLegacyHistoryIfNeeded(existingMessages: [PetChatMessage], clothings: [Clothing]) -> [PetChatMessage] {
         let legacyMessages = loadLegacyMessages()
         guard !legacyMessages.isEmpty else { return existingMessages }
 
@@ -117,11 +186,8 @@ enum PetChatTranscriptStore {
         let hasImportedLegacy = UserDefaults.standard.bool(forKey: legacyImportFlagKey)
 
         if !hasImportedLegacy || mergedMessages.count != existingMessages.count {
-            let payload = normalizedPersistedMessages(from: mergedMessages).map(PersistedPetChatMessage.init)
-            if let data = try? JSONEncoder().encode(Array(payload)) {
-                UserDefaults.standard.set(data, forKey: storageKey)
-                UserDefaults.standard.set(true, forKey: legacyImportFlagKey)
-            }
+            save(messages: mergedMessages)
+            UserDefaults.standard.set(true, forKey: legacyImportFlagKey)
         }
 
         return mergedMessages
@@ -213,6 +279,13 @@ enum PetChatTranscriptStore {
         let typeRaw: String
         let widgets: [PetWidgetData]?
 
+        // 新增：结构化内容持久化（用 UUID 替代 Clothing 对象）
+        let clothingID: UUID?
+        let searchResultIDs: [UUID]?
+        let persistedStats: PersistedWardrobeStats?
+        let colorRecommendation: ColorRecommendation?
+        let persistedOutfit: PersistedOutfitSuggestionData?
+
         private enum CodingKeys: String, CodingKey {
             case text
             case isUser
@@ -222,6 +295,11 @@ enum PetChatTranscriptStore {
             case isAIGenerated
             case typeRaw
             case widgets
+            case clothingID
+            case searchResultIDs
+            case persistedStats
+            case colorRecommendation
+            case persistedOutfit
         }
 
         init(message: PetChatMessage) {
@@ -233,6 +311,13 @@ enum PetChatTranscriptStore {
             self.isAIGenerated = message.isAIGenerated
             self.typeRaw = PetChatTranscriptStore.encodeType(message.type)
             self.widgets = message.widgets
+
+            // 保存结构化数据
+            self.clothingID = message.clothing?.id
+            self.searchResultIDs = message.searchResults?.map(\.id)
+            self.persistedStats = message.statistics.map(PersistedWardrobeStats.init)
+            self.colorRecommendation = message.colorRecommendation
+            self.persistedOutfit = message.outfitSuggestion.map(PersistedOutfitSuggestionData.init)
         }
 
         init(from decoder: Decoder) throws {
@@ -246,6 +331,11 @@ enum PetChatTranscriptStore {
             isAIGenerated = try container.decodeIfPresent(Bool.self, forKey: .isAIGenerated) ?? !isUser
             typeRaw = try container.decodeIfPresent(String.self, forKey: .typeRaw) ?? "text"
             widgets = try container.decodeIfPresent([PetWidgetData].self, forKey: .widgets)
+            clothingID = try container.decodeIfPresent(UUID.self, forKey: .clothingID)
+            searchResultIDs = try container.decodeIfPresent([UUID].self, forKey: .searchResultIDs)
+            persistedStats = try container.decodeIfPresent(PersistedWardrobeStats.self, forKey: .persistedStats)
+            colorRecommendation = try container.decodeIfPresent(ColorRecommendation.self, forKey: .colorRecommendation)
+            persistedOutfit = try container.decodeIfPresent(PersistedOutfitSuggestionData.self, forKey: .persistedOutfit)
         }
 
         func encode(to encoder: Encoder) throws {
@@ -258,18 +348,28 @@ enum PetChatTranscriptStore {
             try container.encode(isAIGenerated, forKey: .isAIGenerated)
             try container.encode(typeRaw, forKey: .typeRaw)
             try container.encodeIfPresent(widgets, forKey: .widgets)
+            try container.encodeIfPresent(clothingID, forKey: .clothingID)
+            try container.encodeIfPresent(searchResultIDs, forKey: .searchResultIDs)
+            try container.encodeIfPresent(persistedStats, forKey: .persistedStats)
+            try container.encodeIfPresent(colorRecommendation, forKey: .colorRecommendation)
+            try container.encodeIfPresent(persistedOutfit, forKey: .persistedOutfit)
         }
 
-        var message: PetChatMessage {
+        func message(lookupClothing: (UUID) -> Clothing?) -> PetChatMessage {
             let displayText = isUser ? PetChatTranscriptStore.sanitizeUserText(text) : PetChatTranscriptStore.sanitizeAssistantText(text)
             return PetChatMessage(
                 text: displayText,
                 isUser: isUser,
                 type: PetChatTranscriptStore.decodeType(typeRaw),
                 isUserAuthored: isUserAuthored,
+                clothing: clothingID.flatMap(lookupClothing),
+                searchResults: searchResultIDs?.compactMap(lookupClothing),
+                statistics: persistedStats?.toWardrobeStats(lookupClothing: lookupClothing),
+                colorRecommendation: colorRecommendation,
                 imageName: imageName,
                 isAIGenerated: isAIGenerated,
                 timestamp: timestamp,
+                outfitSuggestion: persistedOutfit?.toOutfitSuggestionData(lookupClothing: lookupClothing),
                 widgets: widgets
             )
         }

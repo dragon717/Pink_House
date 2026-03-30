@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct PetChatHistorySearchSheet: View {
     private static let pageSize = 20
@@ -9,6 +10,8 @@ struct PetChatHistorySearchSheet: View {
     }()
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) var clothings: [Clothing]
 
     @State private var keyword = ""
     @State private var page = 0
@@ -93,8 +96,8 @@ struct PetChatHistorySearchSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    let userCount = PetChatTranscriptStore.count(onlyUserMessages: true)
-                    let totalCount = PetChatTranscriptStore.count(onlyUserMessages: false)
+                    let userCount = PetChatTranscriptStore.count(onlyUserMessages: true, clothings: clothings)
+                    let totalCount = PetChatTranscriptStore.count(onlyUserMessages: false, clothings: clothings)
                     Button {
                         reload()
                     } label: {
@@ -224,7 +227,8 @@ struct PetChatHistorySearchSheet: View {
             keyword: keyword.trimmingCharacters(in: .whitespacesAndNewlines),
             page: page,
             pageSize: Self.pageSize,
-            onlyUserMessages: false
+            onlyUserMessages: false,
+            clothings: clothings
         )
         results = batch
         hasMore = batch.count == Self.pageSize
@@ -239,7 +243,8 @@ struct PetChatHistorySearchSheet: View {
             keyword: keyword.trimmingCharacters(in: .whitespacesAndNewlines),
             page: nextPage,
             pageSize: Self.pageSize,
-            onlyUserMessages: false
+            onlyUserMessages: false,
+            clothings: clothings
         )
         if batch.isEmpty {
             hasMore = false

@@ -721,7 +721,7 @@ struct PetChatView: View {
 
     // 加载初始问候
     private func loadInitialGreeting() {
-        let localTranscript = PetChatTranscriptStore.load()
+        let localTranscript = PetChatTranscriptStore.load(enrichingWith: clothings)
         if !localTranscript.isEmpty {
             initialHistoryMessageIDs = Set(localTranscript.map(\.id))
             messages = localTranscript

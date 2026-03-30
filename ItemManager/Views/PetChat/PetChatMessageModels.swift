@@ -67,7 +67,7 @@ struct WardrobeStats {
     let totalBalance: Decimal
 }
 
-struct ColorRecommendation {
+struct ColorRecommendation: Codable {
     let primaryColor: String
     let secondaryColor: String
     let accentColor: String

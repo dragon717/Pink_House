@@ -478,7 +478,7 @@ struct PetChatViewLegacy: View {
     }
     
     private func loadInitialGreeting() {
-        let localTranscript = PetChatTranscriptStore.load()
+        let localTranscript = PetChatTranscriptStore.load(enrichingWith: clothings)
         if !localTranscript.isEmpty {
             messages = localTranscript
             return
