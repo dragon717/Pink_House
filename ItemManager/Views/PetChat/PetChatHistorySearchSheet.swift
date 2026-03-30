@@ -93,15 +93,15 @@ struct PetChatHistorySearchSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    let count = PetChatTranscriptStore.count(onlyUserMessages: true)
+                    let userCount = PetChatTranscriptStore.count(onlyUserMessages: true)
+                    let totalCount = PetChatTranscriptStore.count(onlyUserMessages: false)
                     Button {
-                        // 点击可刷新数据
                         reload()
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.clockwise")
                                 .font(.caption2)
-                            Text("\(count)条可复用")
+                            Text("\(userCount)/\(totalCount)条")
                                 .font(.caption)
                         }
                         .foregroundStyle(.pink)
@@ -132,6 +132,11 @@ struct PetChatHistorySearchSheet: View {
                     Text(message.isUser ? "你" : "萌宠")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                    if message.isAIGenerated {
+                        Image(systemName: "sparkles")
+                            .font(.caption2)
+                            .foregroundStyle(.orange.opacity(0.8))
+                    }
                     Spacer()
                     Text(timeText(message.timestamp))
                         .font(.caption2)
@@ -141,6 +146,13 @@ struct PetChatHistorySearchSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(.primary)
                     .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+
+                // 显示嵌入式交互界面标签（萌宠回复中的 widgets）
+                if let widgets = message.widgets, !widgets.isEmpty {
+                    widgetsPreview(widgets)
+                }
+
                 if message.isUser {
                     Text("点按可复用这条提问")
                         .font(.caption2)
@@ -153,14 +165,66 @@ struct PetChatHistorySearchSheet: View {
         .disabled(!message.isUser)
     }
 
+    @ViewBuilder
+    private func widgetsPreview(_ widgets: [PetWidgetData]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(widgets.prefix(3)) { widget in
+                widgetLabel(for: widget)
+            }
+        }
+    }
+
+    private func widgetLabel(for widget: PetWidgetData) -> some View {
+        let (icon, label) = widgetTypeInfo(widget)
+        return HStack(spacing: 2) {
+            Image(systemName: icon)
+                .font(.caption2)
+            Text(label)
+                .font(.caption2)
+        }
+        .foregroundStyle(.pink.opacity(0.8))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.pink.opacity(0.08))
+        .clipShape(Capsule())
+    }
+
+    private func widgetTypeInfo(_ widget: PetWidgetData) -> (icon: String, label: String) {
+        switch widget.type {
+        case .quickOptions:
+            return ("rectangle.grid.1x2", "选项")
+        case .weatherCard:
+            return ("cloud.sun", "天气")
+        case .container:
+            return ("square.stack", "容器")
+        case .insightCard:
+            return ("lightbulb", "洞察")
+        case .statusPanel:
+            return ("chart.bar", "状态")
+        case .currencyPanel:
+            return ("dollarsign.circle", "货币")
+        case .inventoryPanel:
+            return ("backpack", "背包")
+        case .shopPanel:
+            return ("cart", "商店")
+        case .moneyCounter:
+            return ("banknote", "数钱")
+        case .divinationPanel:
+            return ("wand.and.stars", "求签")
+        case .unknown:
+            return ("questionmark.circle", "其他")
+        }
+    }
+
     private func reload() {
         isLoading = true
         page = 0
+        // 查询所有消息（用户消息 + 萌宠回复），以显示完整的对话上下文和 widgets
         let batch = PetChatTranscriptStore.query(
             keyword: keyword.trimmingCharacters(in: .whitespacesAndNewlines),
             page: page,
             pageSize: Self.pageSize,
-            onlyUserMessages: true
+            onlyUserMessages: false
         )
         results = batch
         hasMore = batch.count == Self.pageSize
@@ -175,7 +239,7 @@ struct PetChatHistorySearchSheet: View {
             keyword: keyword.trimmingCharacters(in: .whitespacesAndNewlines),
             page: nextPage,
             pageSize: Self.pageSize,
-            onlyUserMessages: true
+            onlyUserMessages: false
         )
         if batch.isEmpty {
             hasMore = false

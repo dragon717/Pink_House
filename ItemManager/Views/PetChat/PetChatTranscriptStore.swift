@@ -27,8 +27,8 @@ enum PetChatTranscriptStore {
             }
             if message.isUser && message.isUserAuthored {
                 let trimmed = sanitizeUserText(message.text).trimmingCharacters(in: .whitespacesAndNewlines)
-                if (trimmed.hasPrefix("{") && trimmed.hasSuffix("}")) ||
-                    (trimmed.hasPrefix("[") && trimmed.hasSuffix("]")) {
+                // 加强JSON过滤，防止JSON内容透出到用户界面
+                if isJSONLikeContent(trimmed) {
                     return false
                 }
                 if !isLikelyManualUserText(trimmed) {
@@ -53,7 +53,29 @@ enum PetChatTranscriptStore {
             filtered = base
         } else {
             filtered = base.filter { message in
-                message.text.localizedCaseInsensitiveContains(trimmedKeyword)
+                // 搜索消息文本
+                if message.text.localizedCaseInsensitiveContains(trimmedKeyword) {
+                    return true
+                }
+                // 搜索 widgets 中的内容（标题、选项等）
+                if let widgets = message.widgets {
+                    for widget in widgets {
+                        if let title = widget.title,
+                           title.localizedCaseInsensitiveContains(trimmedKeyword) {
+                            return true
+                        }
+                        if let subtitle = widget.subtitle,
+                           subtitle.localizedCaseInsensitiveContains(trimmedKeyword) {
+                            return true
+                        }
+                        for option in widget.options {
+                            if option.title.localizedCaseInsensitiveContains(trimmedKeyword) {
+                                return true
+                            }
+                        }
+                    }
+                }
+                return false
             }
         }
 
@@ -258,8 +280,7 @@ enum PetChatTranscriptStore {
         let trimmed = sanitizeUserText(message.text).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         // 历史列表只展示自然语言，避免 JSON 透出到用户界面。
-        if (trimmed.hasPrefix("{") && trimmed.hasSuffix("}")) ||
-            (trimmed.hasPrefix("[") && trimmed.hasSuffix("]")) {
+        if isJSONLikeContent(trimmed) {
             return false
         }
         if PetGenerativePromptBuilder.containsInternalPromptLeak(trimmed) {
@@ -269,6 +290,53 @@ enum PetChatTranscriptStore {
             return false
         }
         return true
+    }
+
+    /// 检测内容是否为JSON格式或类似代码的内容
+    private static func isJSONLikeContent(_ text: String) -> Bool {
+        // 基本JSON结构检测
+        if (text.hasPrefix("{") && text.hasSuffix("}")) ||
+            (text.hasPrefix("[") && text.hasSuffix("]")) {
+            return true
+        }
+
+        // 检测常见JSON关键字和模式
+        let jsonIndicators = [
+            "\"name\":", "\"type\":", "\"id\":", "\"value\":",
+            "\"content\":", "\"message\":", "\"data\":", "\"result\":",
+            "\"status\":", "\"code\":", "\"error\":",
+            "function_call", "tool_call", "\"role\":", "\"system\"",
+            "\"user\":", "\"assistant\":", "\"model\":"
+        ]
+
+        let lowercased = text.lowercased()
+        var jsonIndicatorCount = 0
+        for indicator in jsonIndicators {
+            if lowercased.contains(indicator) {
+                jsonIndicatorCount += 1
+                // 如果包含多个JSON关键字，大概率是JSON
+                if jsonIndicatorCount >= 2 {
+                    return true
+                }
+            }
+        }
+
+        // 检测嵌套大括号或中括号（可能是复杂JSON）
+        let openBraces = text.filter { $0 == "{" }.count
+        let closeBraces = text.filter { $0 == "}" }.count
+        let openBrackets = text.filter { $0 == "[" }.count
+        let closeBrackets = text.filter { $0 == "]" }.count
+
+        // 如果包含成对的JSON括号，且内容较长，认为是JSON
+        if (openBraces > 0 && openBraces == closeBraces) ||
+            (openBrackets > 0 && openBrackets == closeBrackets) {
+            // 如果包含冒号后跟引号的模式（JSON键值对特征）
+            if text.contains("\":\"") || text.contains("\": ") {
+                return true
+            }
+        }
+
+        return false
     }
 
     private static func isLikelyManualUserText(_ text: String) -> Bool {

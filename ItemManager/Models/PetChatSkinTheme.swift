@@ -197,9 +197,16 @@ enum PetChatSkinTheme: String, CaseIterable, Codable, Identifiable, Equatable {
         return themeManager.accentTextColor.opacity(0.24)
     }
 
-    /// 用户气泡文字颜色 - 根据主题自适应，确保在渐变背景上有足够对比度
+    /// 用户气泡文字颜色 - 在亮色模式下与萌宠气泡保持一致，确保视觉统一
     func resolvedUserBubbleTextColor(themeManager: ThemeManager, colorScheme: ColorScheme) -> Color {
         if self == .magic || themeManager.colorSchemeMode == .custom {
+            let isDark = colorScheme == .dark
+            // 亮色模式下与萌宠气泡文字颜色保持一致，使用主题主色
+            if !isDark {
+                let colors = Self.currentThemeColors(themeManager: themeManager, colorScheme: colorScheme)
+                return colors.primary
+            }
+            // 暗色模式下根据气泡背景自适应
             let bubbleColors = resolvedUserBubbleColors(themeManager: themeManager, colorScheme: colorScheme)
             return Self.adaptiveUserBubbleTextColor(for: bubbleColors)
         }
