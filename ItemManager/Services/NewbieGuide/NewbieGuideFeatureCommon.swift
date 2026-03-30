@@ -127,6 +127,8 @@ extension FeatureExperienceGuideOverlay {
 
     func resetGuideStepState() {
         guard let feature = guideManager.currentFeatureExperienceFeature else { return }
+
+        // 重置所有共享状态，防止不同功能之间的状态污染
         showingFullDescription = false
         themeScrollStepStartedAt = nil
         customColorScrollStepStartedAt = nil
@@ -134,8 +136,28 @@ extension FeatureExperienceGuideOverlay {
         hasSpaceBooksForGuide = false
         hasSpaceBookPagesForGuide = false
         didOpenBatchEditMoreMenu = false
-        magicStickerGuideRequiresMenuSetup = false
 
+        // 重置所有步骤状态到初始值，避免缓存污染
+        aiAnalysisStep = .preUnlockStep1ReturnToMe
+        widgetCustomizeStep = .step1_returnToMe
+        wardrobeAddGuideStep = .step1_clickAddButton
+        themeCustomizeGuideStep = .step1_returnToMe
+        localFileBackupRestoreGuideStep = .step1_returnToMe
+        exportCSVGuideStep = .step1_returnToMe
+        cloudFileBackupRestoreGuideStep = .step1_returnToMe
+        customColorPersonalizationGuideStep = .step1_returnToMe
+        personalPreferenceGuideStep = .step1_returnToMe
+        privacyDisplayGuideStep = .step1_returnToMe
+        tagBrandFieldGuideStep = .step1_returnToMe
+        ootdGuideStep = .step1_clickOotdEntry
+        calendarGuideStep = .step1_clickCalendarEntry
+        magicStickerGuideStep = .step5_longPressHouseTab
+        magicStickerGuideRequiresMenuSetup = false
+        batchEditGuideStep = .step1_clickMoreMenu
+        spaceBookGuideStep = .step1_clickWardrobeOotdEntry
+        wealthGuideStep = .step1_clickHouseTab
+
+        // 根据当前功能设置正确的初始状态
         switch feature {
         case .aiAnalysis:
             if FeatureUnlockManager.shared.isUnlocked(feature) {
@@ -145,10 +167,6 @@ extension FeatureExperienceGuideOverlay {
                 }
             } else {
                 aiAnalysisStep = .preUnlockStep1ReturnToMe
-                if guideManager.lastKnownHomeTab == "me",
-                   guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
-                    aiAnalysisStep = .preUnlockStep2ClickVIP
-                }
             }
         case .widgetCustomize:
             widgetCustomizeStep = .step1_returnToMe

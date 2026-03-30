@@ -248,18 +248,65 @@ struct ModernTabView: View {
     private var modernPetChatTabGuideAnchor: some View {
         GeometryReader { proxy in
             let screenBounds = proxy.size
-            let tabBarHeight: CGFloat = 56
+            let safeAreaBottom = proxy.safeAreaInsets.bottom
+
+            // iOS 18+ 悬浮胶囊 TabBar 的实际高度约为 49pt（系统默认）
+            // 加上底部间距约 8-10pt
+            let tabBarHeight: CGFloat = 49
+            let bottomPadding: CGFloat = safeAreaBottom > 0 ? 8 : 10
+
+            // 悬浮胶囊 TabBar 有左右 padding，每个 Tab 宽度约为 (screenWidth - 32) / 4
+            let horizontalPadding: CGFloat = 16
+            let tabWidth = (screenBounds.width - horizontalPadding * 2) / 4
+
+            // PetChat Tab 是第 4 个（index 3），位置在最右边
+            let tabX = horizontalPadding + tabWidth * 3 + tabWidth / 2
+            let tabY = screenBounds.height - safeAreaBottom - bottomPadding - tabBarHeight / 2
+
             let frame = CGRect(
-                x: (screenBounds.width * 0.875) - 34,
-                y: screenBounds.height - proxy.safeAreaInsets.bottom - tabBarHeight,
+                x: tabX - 34,
+                y: tabY - 28,
                 width: 68,
-                height: tabBarHeight
+                height: 56
             )
 
             Color.clear
                 .frame(width: frame.width, height: frame.height)
                 .position(x: frame.midX, y: frame.midY)
                 .captureGuideTarget(.homePetChatTab)
+                .allowsHitTesting(false)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var modernHouseTabGuideAnchor: some View {
+        GeometryReader { proxy in
+            let screenBounds = proxy.size
+            let safeAreaBottom = proxy.safeAreaInsets.bottom
+
+            // iOS 18+ 悬浮胶囊 TabBar 的实际高度约为 49pt（系统默认）
+            let tabBarHeight: CGFloat = 49
+            let bottomPadding: CGFloat = safeAreaBottom > 0 ? 8 : 10
+
+            // 悬浮胶囊 TabBar 有左右 padding，每个 Tab 宽度约为 (screenWidth - 32) / 4
+            let horizontalPadding: CGFloat = 16
+            let tabWidth = (screenBounds.width - horizontalPadding * 2) / 4
+
+            // House Tab 是第 2 个（index 1），位置在左边第二个
+            let tabX = horizontalPadding + tabWidth * 1 + tabWidth / 2
+            let tabY = screenBounds.height - safeAreaBottom - bottomPadding - tabBarHeight / 2
+
+            let frame = CGRect(
+                x: tabX - 34,
+                y: tabY - 28,
+                width: 68,
+                height: 56
+            )
+
+            Color.clear
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+                .captureGuideTarget(.homeHouseTab)
                 .allowsHitTesting(false)
         }
         .allowsHitTesting(false)
@@ -308,9 +355,18 @@ private final class TabBarFrameCaptureUIView: UIView {
     }
 
     private func captureFrame() {
+        print("📸 [TabBarFrameCaptureUIView] captureFrame 被调用")
+        print("   tabIndex: \(tabIndex)")
+        print("   targetKey: \(targetKey)")
+
         let frame = TabBarItemAnchorResolver.liveFrame(at: tabIndex)
-        guard let frame else { return }
-        AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(frame, for: targetKey)
+
+        if let frame {
+            print("   ✅ 捕获成功，frame: \(frame)")
+            AppFirstLaunchGuideManager.shared.updateGuideTargetFrame(frame, for: targetKey)
+        } else {
+            print("   ❌ 捕获失败，frame 为 nil")
+        }
     }
 }
 #endif

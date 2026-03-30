@@ -57,8 +57,6 @@ final class MagicTaskCompletionManager: ObservableObject {
             }
         }
         
-        // 播放提示音效和震动
-        HapticEngineManager.shared.playFireworksHaptic()
     }
     
     // MARK: - 添加可解锁提示
@@ -84,9 +82,6 @@ final class MagicTaskCompletionManager: ObservableObject {
             }
         }
         
-        // 播放轻微的提示音效和震动
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
     }
     
     // MARK: - 移除任务完成

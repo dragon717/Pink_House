@@ -668,22 +668,25 @@ final class FeatureUnlockManager: ObservableObject {
         status.isUnlocked = true
         status.unlockedAt = Date()
         status.unlockedBy = by
-        
+
         featureStatuses[feature.rawValue] = status
         saveStatuses()
-        
-        // 发送通知
+
+        // 发送通知（同时发送 rawValue 和 FeatureItem 对象以保持兼容性）
         NotificationCenter.default.post(
             name: Self.featureUnlockedNotification,
             object: nil,
-            userInfo: ["feature": feature.rawValue]
+            userInfo: [
+                "feature": feature,
+                "featureRawValue": feature.rawValue
+            ]
         )
         NotificationCenter.default.post(
             name: Self.featureStatusChangedNotification,
             object: nil,
             userInfo: ["feature": feature.rawValue]
         )
-        
+
         // 添加到常驻任务完成提示（在主线程）
         // 使用卡片堆叠方式显示，不再显示大卡片弹窗
         DispatchQueue.main.async {

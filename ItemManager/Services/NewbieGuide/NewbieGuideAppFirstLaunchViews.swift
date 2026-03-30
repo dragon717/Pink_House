@@ -533,6 +533,9 @@ final class GuideTopOverlayWindowManager {
         window.windowLevel = .alert + 1
         window.isHidden = true
 
+        // 显式设置 window 的 frame 为整个 scene 的 bounds
+        window.frame = scene.coordinateSpace.bounds
+
         overlayWindow = window
         currentScene = scene
     }

@@ -660,6 +660,15 @@ struct FeatureExperienceGuideOverlay: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .magicTasksViewDismissed)) { _ in
+                if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
+                   aiAnalysisStep == .preUnlockStep1ReturnToMe {
+                    if guideManager.lastKnownHomeTab == "me",
+                       guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            aiAnalysisStep = .preUnlockStep2ClickVIP
+                        }
+                    }
+                }
                 if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
                    widgetCustomizeStep == .step1_returnToMe {
                     advanceWidgetGuideFromReturnStep()
@@ -714,6 +723,28 @@ struct FeatureExperienceGuideOverlay: View {
                     (aiAnalysisStep == .postUnlockStep1ClickPetChatTab && currentTab == "petChat") {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         aiAnalysisStep = .postUnlockStep3FeatureIntro
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: FeatureUnlockManager.featureUnlockedNotification)) { notification in
+                guard let feature = notification.userInfo?["feature"] as? FeatureItem else { return }
+
+                // AI 分析功能解锁后，自动切换到解锁后引导流程
+                if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
+                   feature == .aiAnalysis,
+                   aiAnalysisStep.flow == .preUnlock {
+                    print("[FeatureExperienceGuide] AI分析已解锁，切换到解锁后引导流程")
+
+                    // 关闭魔法任务页面
+                    NotificationCenter.default.post(name: .dismissMagicTasksView, object: nil)
+
+                    // 延迟切换到解锁后引导
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            aiAnalysisStep = .postUnlockStep1ClickPetChatTab
+                        }
                     }
                 }
             }
@@ -1268,21 +1299,44 @@ struct FeatureExperienceGuideOverlay: View {
                                     onAction: nil
                                 )
                             } else {
-                                VStack {
-                                    featureStepBubble(
-                                        title: isSpaceBookCreationPromptVisible ? "输入名称后点创建" : "点右上角「更多」新建空间手帐",
-                                        message: isSpaceBookCreationPromptVisible
-                                            ? "已打开新建弹窗，输入空间手帐名称并点击创建，即可进入下一步。"
-                                            : "请点右上角「更多」，选择「新建空间手帐」。输入名称并点击创建。",
+                                if isSpaceBookCreationPromptVisible {
+                                    VStack {
+                                        featureStepBubble(
+                                            title: "输入名称后点创建",
+                                            message: "已打开新建弹窗，输入空间手帐名称并点击创建，即可进入下一步。",
+                                            currentStep: 3,
+                                            totalSteps: 7,
+                                            accent: .blue,
+                                            actionTitle: nil,
+                                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                            onAction: nil
+                                        )
+                                        .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
+                                        Spacer()
+                                    }
+                                } else {
+                                    let fallbackFrame = CGRect(
+                                        x: geometry.size.width - 70,
+                                        y: max(geometry.safeAreaInsets.top + 12, 16),
+                                        width: 50,
+                                        height: 50
+                                    )
+                                    let targetFrame = aiGuideTargetFrame(
+                                        globalFrame: guideManager.guideTargetFrame(for: .spaceBookShelfMoreMenuButton),
+                                        in: geometry,
+                                        fallback: fallbackFrame
+                                    )
+                                    highlightedRectGuideContent(
+                                        frame: targetFrame,
+                                        cornerRadius: 12,
+                                        title: "点右上角「更多」新建空间手帐",
+                                        message: "请点右上角「更多」，选择「新建空间手帐」。输入名称并点击创建。",
                                         currentStep: 3,
                                         totalSteps: 7,
                                         accent: .blue,
                                         actionTitle: nil,
-                                        onSkip: { guideManager.dismissFeatureExperienceGuide() },
                                         onAction: nil
                                     )
-                                    .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
-                                    Spacer()
                                 }
                             }
                         case .step4_createFirstPage:
@@ -1310,21 +1364,44 @@ struct FeatureExperienceGuideOverlay: View {
                                     onAction: nil
                                 )
                             } else {
-                                VStack {
-                                    featureStepBubble(
-                                        title: "输入首张名字后点创建",
-                                        message: isSpaceBookCreationPromptVisible
-                                            ? "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。"
-                                            : "进入新手帐后，点右上角「更多」并选择「新建空间搭配」，输入首张名字后点击创建。",
+                                if isSpaceBookCreationPromptVisible {
+                                    VStack {
+                                        featureStepBubble(
+                                            title: "输入首张名字后点创建",
+                                            message: "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。",
+                                            currentStep: 4,
+                                            totalSteps: 7,
+                                            accent: .blue,
+                                            actionTitle: nil,
+                                            onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                            onAction: nil
+                                        )
+                                        .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
+                                        Spacer()
+                                    }
+                                } else {
+                                    let fallbackFrame = CGRect(
+                                        x: geometry.size.width - 70,
+                                        y: max(geometry.safeAreaInsets.top + 12, 16),
+                                        width: 50,
+                                        height: 50
+                                    )
+                                    let targetFrame = aiGuideTargetFrame(
+                                        globalFrame: guideManager.guideTargetFrame(for: .spaceBookDetailMoreMenuButton),
+                                        in: geometry,
+                                        fallback: fallbackFrame
+                                    )
+                                    highlightedRectGuideContent(
+                                        frame: targetFrame,
+                                        cornerRadius: 12,
+                                        title: "点右上角「更多」新建空间书页",
+                                        message: "进入新手帐后，点右上角「更多」并选择「新建空间搭配」，输入首张名字后点击创建。",
                                         currentStep: 4,
                                         totalSteps: 7,
                                         accent: .blue,
                                         actionTitle: nil,
-                                        onSkip: { guideManager.dismissFeatureExperienceGuide() },
                                         onAction: nil
                                     )
-                                    .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
-                                    Spacer()
                                 }
                             }
                         case .step5_open3DEditor:
@@ -1461,12 +1538,14 @@ struct FeatureExperienceGuideOverlay: View {
         in geometry: GeometryProxy,
         addFrame: CGRect
     ) -> CGRect {
-        let screenBounds = geometry.size
         let hasDraftContinueEntry = hasValidWardrobeDraftForGuide()
-        let menuWidth = min(max(screenBounds.width * 0.58, 208), 292)
-        let menuHeight: CGFloat = hasDraftContinueEntry ? 167 : 118
-        let x = min(max(addFrame.maxX - menuWidth - 8, 12), screenBounds.width - menuWidth - 12)
-        let y = max(geometry.safeAreaInsets.top + 10, addFrame.maxY + 16)
+        // 增大宽度，覆盖整个菜单区域
+        let menuWidth: CGFloat = 240
+        // 标准 SwiftUI Menu 行高 44pt，稍微增加高度
+        let menuHeight: CGFloat = hasDraftContinueEntry ? 156 : 112
+        // 向左上偏移：x 减小（更靠左），y 减小（更靠上）
+        let x = geometry.size.width - menuWidth - 8
+        let y = addFrame.maxY - 8
         return CGRect(x: x, y: y, width: menuWidth, height: menuHeight)
     }
 
@@ -1477,15 +1556,15 @@ struct FeatureExperienceGuideOverlay: View {
     ) -> CGRect {
         let hasDraftContinueEntry = hasValidWardrobeDraftForGuide()
         let menuFrame = wardrobeMenuAreaFrameFromAddButton(in: geometry, addFrame: addFrame)
-        let totalRows: CGFloat = hasDraftContinueEntry ? 3 : 2
-        let rowHeight = (menuFrame.height - 20) / totalRows
+        // 标准 SwiftUI Menu 行高 44pt
+        let rowHeight: CGFloat = 44
         let baseRowIndex: CGFloat = preferBatchImport ? 1 : 0
         let rowIndex: CGFloat = baseRowIndex + (hasDraftContinueEntry ? 1 : 0)
         return CGRect(
-            x: menuFrame.minX + 14,
+            x: menuFrame.minX + 4,
             y: menuFrame.minY + 8 + rowHeight * rowIndex,
-            width: menuFrame.width - 28,
-            height: rowHeight - 6
+            width: menuFrame.width - 8,
+            height: rowHeight
         )
     }
 
@@ -1498,15 +1577,16 @@ struct FeatureExperienceGuideOverlay: View {
         _ frame: CGRect,
         expected: CGRect
     ) -> Bool {
-        let verticalTolerance = max(40, expected.height * 1.05)
-        let horizontalTolerance = max(70, expected.width * 0.45)
+        // 放宽容差，让捕获的 frame 更容易被接受
+        let verticalTolerance = max(60, expected.height * 1.5)
+        let horizontalTolerance = max(90, expected.width * 0.6)
         let widthRatio = frame.width / max(expected.width, 1)
         let heightRatio = frame.height / max(expected.height, 1)
 
         return abs(frame.midY - expected.midY) <= verticalTolerance &&
             abs(frame.midX - expected.midX) <= horizontalTolerance &&
-            widthRatio >= 0.45 && widthRatio <= 1.8 &&
-            heightRatio >= 0.45 && heightRatio <= 1.8
+            widthRatio >= 0.35 && widthRatio <= 2.2 &&
+            heightRatio >= 0.35 && heightRatio <= 2.2
     }
 
     func isReasonableWardrobeMenuCaptureFrame(
@@ -1514,11 +1594,16 @@ struct FeatureExperienceGuideOverlay: View {
         in geometry: GeometryProxy,
         addFrame: CGRect
     ) -> Bool {
-        guard frame.width >= 80, frame.height >= 24 else { return false }
-        guard frame.minY < geometry.size.height * 0.45 else { return false }
-        guard abs(frame.midX - addFrame.midX) < geometry.size.width * 0.46 else { return false }
-        guard frame.maxX > geometry.size.width * 0.45 else { return false }
-        guard frame.width <= geometry.size.width * 0.78 else { return false }
+        // 放宽尺寸检查，Menu 项可能比预期小
+        guard frame.width >= 60, frame.height >= 20 else { return false }
+        // 放宽垂直位置限制：Menu 可以在屏幕上半部分（截图中就在上方）
+        guard frame.minY < geometry.size.height * 0.65 else { return false }
+        // 放宽水平位置检查，Menu 可能在按钮左侧或右侧
+        guard abs(frame.midX - addFrame.midX) < geometry.size.width * 0.55 else { return false }
+        // 确保 frame 不在太靠左的位置
+        guard frame.maxX > geometry.size.width * 0.35 else { return false }
+        // 放宽宽度限制
+        guard frame.width <= geometry.size.width * 0.85 else { return false }
         return true
     }
 
@@ -1526,85 +1611,10 @@ struct FeatureExperienceGuideOverlay: View {
         in geometry: GeometryProxy,
         addFrame: CGRect
     ) -> CGRect {
-        let menuAreaFallback = wardrobeMenuAreaFrameFromAddButton(in: geometry, addFrame: addFrame)
-
-        guard let feature = guideManager.currentFeatureExperienceFeature,
-              let target = wardrobeGuideStep2Target(for: feature) else {
-            return menuAreaFallback
-        }
-
-        let manualExpected = wardrobeMenuOptionFrameFromAddButton(
-            in: geometry,
-            addFrame: addFrame,
-            preferBatchImport: false
-        )
-        let batchExpected = wardrobeMenuOptionFrameFromAddButton(
-            in: geometry,
-            addFrame: addFrame,
-            preferBatchImport: true
-        )
-
-        let manualCaptured = localGuideTargetFrame(for: .wardrobeManualCreateEntry, in: geometry)
-        let batchCaptured = localGuideTargetFrame(for: .wardrobeBatchImportEntry, in: geometry)
-
-        let manualFrame = manualCaptured.flatMap {
-            isReasonableWardrobeMenuCaptureFrame($0, in: geometry, addFrame: addFrame) &&
-            isCloseToExpectedWardrobeMenuOptionFrame($0, expected: manualExpected) ? $0 : nil
-        }
-        let batchFrame = batchCaptured.flatMap {
-            isReasonableWardrobeMenuCaptureFrame($0, in: geometry, addFrame: addFrame) &&
-            isCloseToExpectedWardrobeMenuOptionFrame($0, expected: batchExpected) ? $0 : nil
-        }
-
-        switch target {
-        case .batchImport:
-            if let batchFrame, let manualFrame {
-                let chosen = batchFrame.midY >= manualFrame.midY ? batchFrame : manualFrame
-                return chosen.insetBy(dx: -6, dy: -4)
-            }
-            if let batchFrame {
-                return batchFrame.insetBy(dx: -6, dy: -4)
-            }
-            if let manualFrame,
-               isCloseToExpectedWardrobeMenuOptionFrame(manualFrame, expected: batchExpected) {
-                return manualFrame.insetBy(dx: -6, dy: -4)
-            }
-            return wardrobeMenuOptionFrameFromAddButton(
-                in: geometry,
-                addFrame: addFrame,
-                preferBatchImport: true
-            )
-
-        case .manualCreate:
-            if let manualFrame, let batchFrame {
-                let chosen = manualFrame.midY <= batchFrame.midY ? manualFrame : batchFrame
-                return chosen.insetBy(dx: -6, dy: -4)
-            }
-            if let manualFrame {
-                return manualFrame.insetBy(dx: -6, dy: -4)
-            }
-            if let batchFrame,
-               isCloseToExpectedWardrobeMenuOptionFrame(batchFrame, expected: manualExpected) {
-                return batchFrame.insetBy(dx: -6, dy: -4)
-            }
-            return wardrobeMenuOptionFrameFromAddButton(
-                in: geometry,
-                addFrame: addFrame,
-                preferBatchImport: false
-            )
-
-        case .either:
-            if let manualFrame, let batchFrame {
-                return manualFrame.union(batchFrame).insetBy(dx: -4, dy: -4)
-            }
-            if let manualFrame {
-                return manualFrame
-            }
-            if let batchFrame {
-                return batchFrame
-            }
-            return menuAreaFallback
-        }
+        // 直接高亮整个菜单区域，不精确捕获单个选项
+        let menuFrame = wardrobeMenuAreaFrameFromAddButton(in: geometry, addFrame: addFrame)
+        // 扩大范围确保覆盖完整菜单
+        return menuFrame.insetBy(dx: -12, dy: -12)
     }
 
     func wardrobeShortcutActionFallbackFrame(in geometry: GeometryProxy) -> CGRect {
@@ -1765,6 +1775,7 @@ struct FeatureExperienceGuideOverlay: View {
                         frame: step1GuideFrame,
                         cornerRadius: 18
                     )
+                    .zIndex(1000)
 
                     CatPawTapAnimation(
                         position: CGPoint(
@@ -1773,6 +1784,14 @@ struct FeatureExperienceGuideOverlay: View {
                         ),
                         delay: 0.5
                     )
+                    .zIndex(1000)
+
+                    // 添加透明点击区域，允许点击穿透到下层实际的 + 号按钮
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(Color.white.opacity(0.001))
+                        .frame(width: step1GuideFrame.width, height: step1GuideFrame.height)
+                        .allowsHitTesting(false)
+                        .position(x: step1GuideFrame.midX, y: step1GuideFrame.midY)
 
                     VStack {
                         Spacer()
@@ -2983,10 +3002,11 @@ struct FeatureExperienceGuideOverlay: View {
                         onReturn: handleMagicStickerGuideReturnFromMenuSettingsAction
                     )
                 case .step5_longPressHouseTab:
-                    let tabBarHeight: CGFloat = 56
+                    let safeAreaBottom = geometry.safeAreaInsets.bottom
+                    let tabBarHeight = 65.0 + safeAreaBottom
                     let fallbackHouseTabFrame = CGRect(
-                        x: (geometry.size.width * 0.375) - 34,
-                        y: geometry.size.height - geometry.safeAreaInsets.bottom - tabBarHeight,
+                        x: geometry.size.width / 2 - 34,
+                        y: geometry.size.height - tabBarHeight,
                         width: 68,
                         height: tabBarHeight
                     )
@@ -2994,6 +3014,7 @@ struct FeatureExperienceGuideOverlay: View {
                         for: .homeHouseTab,
                         preferredTabIndex: 1,
                         in: geometry,
+                        expansion: 0,
                         fallback: fallbackHouseTabFrame
                     )
                     let houseTabRadius = max(34, max(houseTabFrame.width, houseTabFrame.height) / 2)

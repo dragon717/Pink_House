@@ -18,25 +18,37 @@ extension FeatureExperienceGuideOverlay {
     }
 
     func wealthStep1Content(in geometry: GeometryProxy) -> some View {
+        print("💰 [wealthStep1Content] 开始渲染")
         let screenBounds = geometry.size
-        let tabBarHeight: CGFloat = 56
+        let safeAreaBottom = geometry.safeAreaInsets.bottom
+        let tabBarHeight = 65.0 + safeAreaBottom
         let fallbackHouseTabFrame = CGRect(
-            x: (screenBounds.width * 0.375) - 34,
-            y: screenBounds.height - geometry.safeAreaInsets.bottom - tabBarHeight,
+            x: screenBounds.width / 2 - 34,
+            y: screenBounds.height - tabBarHeight,
             width: 68,
             height: tabBarHeight
         )
+        print("   screenBounds: \(screenBounds)")
+        print("   safeAreaBottom: \(safeAreaBottom)")
+        print("   fallbackHouseTabFrame: \(fallbackHouseTabFrame)")
+
         let houseTabFrame = TabBarItemAnchorResolver.resolvedFrame(
             for: .homeHouseTab,
             preferredTabIndex: 1,
             in: geometry,
+            expansion: 0,
             fallback: fallbackHouseTabFrame
         )
+        print("   最终 houseTabFrame: \(houseTabFrame)")
+
         let houseTabRadius = max(34, max(houseTabFrame.width, houseTabFrame.height) / 2)
         let houseTabPawPosition = CGPoint(
             x: min(max(houseTabFrame.midX, 24), screenBounds.width - 24),
             y: min(max(houseTabFrame.midY, 24), screenBounds.height - 24)
         )
+        print("   houseTabRadius: \(houseTabRadius)")
+        print("   houseTabPawPosition: \(houseTabPawPosition)")
+
 
         return ZStack {
             HollowMaskView(
@@ -354,19 +366,31 @@ extension FeatureExperienceGuideOverlay {
     }
 
     func postUnlockStep1Content(in geometry: GeometryProxy) -> some View {
-        let tabGuideYOffset: CGFloat = -18
-        let fallbackTabFrame = petChatTabFallbackFrame(in: geometry)
-        let rawTabFrame = aiGuideTargetFrame(
-            globalFrame: guideManager.guideTargetFrame(for: .homePetChatTab),
+        print("🐱 [postUnlockStep1Content] 开始渲染")
+        let screenBounds = geometry.size
+        let safeAreaBottom = geometry.safeAreaInsets.bottom
+        let tabBarHeight: CGFloat = 65.0 + safeAreaBottom
+        let fallbackTabFrame = CGRect(
+            x: (screenBounds.width * 0.875) - 34,
+            y: screenBounds.height - tabBarHeight,
+            width: 68,
+            height: tabBarHeight
+        )
+        print("   screenBounds: \(screenBounds)")
+        print("   safeAreaBottom: \(safeAreaBottom)")
+        print("   fallbackTabFrame: \(fallbackTabFrame)")
+
+        // 使用 TabBarItemAnchorResolver 获取真实坐标
+        // tabIndex: 3 对应 PetChat Tab（第四个 Tab）
+        let tabFrame = TabBarItemAnchorResolver.resolvedFrame(
+            for: .homePetChatTab,
+            preferredTabIndex: 3,
             in: geometry,
+            expansion: 0,
             fallback: fallbackTabFrame
         )
-        let tabFrame = CGRect(
-            x: rawTabFrame.midX - 34,
-            y: rawTabFrame.midY - 28 + tabGuideYOffset,
-            width: 68,
-            height: 56
-        )
+        print("   最终 tabFrame: \(tabFrame)")
+
 
         return ZStack {
             HollowMaskView(
@@ -477,17 +501,6 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
-    func petChatTabFallbackFrame(in geometry: GeometryProxy) -> CGRect {
-        let screenBounds = geometry.size
-        let tabBarHeight: CGFloat = 56
-        return CGRect(
-            x: (screenBounds.width * 0.875) - 34,
-            y: screenBounds.height - geometry.safeAreaInsets.bottom - tabBarHeight,
-            width: 68,
-            height: tabBarHeight
-        )
-    }
-
     func aiGuideTargetFrame(
         globalFrame: CGRect?,
         in geometry: GeometryProxy,
@@ -497,13 +510,9 @@ extension FeatureExperienceGuideOverlay {
             return guideManager.shouldUseGuideFallbackFrames ? fallback : .zero
         }
 
-        let overlayGlobalOrigin = geometry.frame(in: .global).origin
-        return CGRect(
-            x: globalFrame.minX - overlayGlobalOrigin.x,
-            y: globalFrame.minY - overlayGlobalOrigin.y,
-            width: globalFrame.width,
-            height: globalFrame.height
-        )
+        // 直接返回 global frame，因为 overlay window 与主应用窗口使用相同的坐标系
+        // overlay window 会自动对齐到主应用窗口，不需要额外的坐标转换
+        return globalFrame
     }
 
     func aiAnalysisBubble(
