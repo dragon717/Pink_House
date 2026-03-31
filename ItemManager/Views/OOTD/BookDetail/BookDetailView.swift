@@ -270,8 +270,9 @@ struct BookDetailView: View {
                 loadPages()
                 // 打印当前手帐的书页状态
                 printBookPagesStatus()
-                // 发送通知用于空间手帐前置任务引导
-                NotificationCenter.default.post(name: .ootdBookDetailOpened, object: nil)
+                // 发送通知用于空间手帐前置任务引导（附带书页状态）
+                let hasPages = sortedPages.contains { $0.deletedAt == nil }
+                NotificationCenter.default.post(name: .ootdBookDetailOpened, object: nil, userInfo: ["hasPages": hasPages])
             }
     }
 

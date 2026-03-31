@@ -296,6 +296,8 @@ extension Notification.Name {
     static let favoriteMenuSettingsOpened = Notification.Name("favoriteMenuSettingsOpened")
     static let dismissFavoriteMenuSettingsView = Notification.Name("dismissFavoriteMenuSettingsView")
     static let favoriteMenuSettingsViewDismissed = Notification.Name("favoriteMenuSettingsViewDismissed")
+    static let ootdShelfMoreMenuOpened = Notification.Name("ootdShelfMoreMenuOpened")
+    static let ootdDetailMoreMenuOpened = Notification.Name("ootdDetailMoreMenuOpened")
     static let ootdBookCreated = Notification.Name("ootdBookCreated")
     static let ootdPageCreated = Notification.Name("ootdPageCreated")
     static let spatialBookShelfOpened = Notification.Name("spatialBookShelfOpened")
@@ -306,6 +308,7 @@ extension Notification.Name {
     static let spaceBookDetailDataStateChanged = Notification.Name("spaceBookDetailDataStateChanged")
     static let spatialCanvasEditorOpened = Notification.Name("spatialCanvasEditorOpened")
     static let objectCaptureScannerOpened = Notification.Name("objectCaptureScannerOpened")
+    static let spatialCanvasImportMenuOpened = Notification.Name("spatialCanvasImportMenuOpened")
 }
 
 // MARK: - View Modifier

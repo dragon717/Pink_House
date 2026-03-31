@@ -539,6 +539,7 @@ struct FeatureExperienceGuideOverlay: View {
     @State var batchEditGuideStep: BatchEditGuideStep = .step1_clickMoreMenu
     @State var didOpenBatchEditMoreMenu: Bool = false
     @State var spaceBookGuideStep: SpaceBookGuideStep = .preUnlockStep1_clickWardrobeOotdEntry
+    @State var didOpenSpatialImportMenu: Bool = false  // 空间画布「导入」菜单是否已打开
     @State var wealthGuideStep: WealthGuideStep = .step1_clickHouseTab
     @State var currentTab: String = "wardrobe"
     @State var isSpaceBookCreationPromptVisible: Bool = false
@@ -1185,10 +1186,17 @@ struct FeatureExperienceGuideOverlay: View {
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 // 完整引导：Step 11 -> Step 12（最后一步）
                 if spaceBookGuideStep == .step6_openScanner {
+                    didOpenSpatialImportMenu = false
                     withAnimation(.easeInOut(duration: 0.3)) {
                         spaceBookGuideStep = .step7_scannerHowTo
                     }
                 }
+            }
+            // 空间画布「导入」菜单打开
+            .onReceive(NotificationCenter.default.publisher(for: .spatialCanvasImportMenuOpened)) { _ in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook,
+                      spaceBookGuideStep == .step6_openScanner else { return }
+                didOpenSpatialImportMenu = true
             }
     }
 
@@ -1752,27 +1760,64 @@ struct FeatureExperienceGuideOverlay: View {
 
     /// Step 11: 打开空间扫描器
     func spaceBookPostUnlockStep5Content(in geometry: GeometryProxy) -> some View {
-        let fallbackFrame = CGRect(
+        let importButtonFallback = CGRect(
             x: 8,
             y: geometry.size.height * 0.42,
             width: 60,
             height: 96
         )
-        let targetFrame = aiGuideTargetFrame(
+        let importButtonFrame = aiGuideTargetFrame(
             globalFrame: guideManager.guideTargetFrame(for: .spatialCanvasImportMenu),
             in: geometry,
-            fallback: fallbackFrame
+            fallback: importButtonFallback
         )
+
+        // 菜单打开后，高亮扩展到整个菜单区域（按钮 + 弹出菜单项）
+        let targetFrame: CGRect
+        let cornerRadius: CGFloat
+        let title: String
+        let message: String
+        if didOpenSpatialImportMenu {
+            targetFrame = spatialImportMenuAreaFrame(in: geometry, importButtonFrame: importButtonFrame)
+            cornerRadius = 14
+            title = "选择「相机」"
+            message = "菜单已打开，点击「相机」进入空间扫描。"
+        } else {
+            targetFrame = importButtonFrame
+            cornerRadius = 20
+            title = spaceBookGuideStep.title
+            message = spaceBookGuideStep.message
+        }
+
         return highlightedRectGuideContent(
             frame: targetFrame,
-            cornerRadius: 20,
-            title: spaceBookGuideStep.title,
-            message: spaceBookGuideStep.message,
+            cornerRadius: cornerRadius,
+            title: title,
+            message: message,
             currentStep: spaceBookGuideStep.stepNumberInFlow,
             totalSteps: spaceBookGuideStep.totalStepsInFlow,
             accent: .blue,
             actionTitle: nil,
             onAction: nil
+        )
+    }
+
+    /// 基于导入按钮位置计算展开菜单区域
+    func spatialImportMenuAreaFrame(
+        in geometry: GeometryProxy,
+        importButtonFrame: CGRect
+    ) -> CGRect {
+        // 菜单在按钮右侧展开，包含 3 个菜单项（图片/相机/3D模型）
+        let menuWidth: CGFloat = 180
+        let menuHeight: CGFloat = 150
+        let padding: CGFloat = 20
+        let menuX = importButtonFrame.maxX + 4
+        let menuY = importButtonFrame.minY - padding
+        return CGRect(
+            x: importButtonFrame.minX - padding,
+            y: menuY,
+            width: menuWidth + padding * 2,
+            height: max(menuHeight, importButtonFrame.height) + padding * 2
         )
     }
 

@@ -135,8 +135,16 @@ extension BookDetailView {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
+                .onTapGesture {
+                    NotificationCenter.default.post(name: .ootdDetailMoreMenuOpened, object: nil)
+                }
         }
         .captureGuideTarget(.ootdDetailMoreMenuButton)
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                NotificationCenter.default.post(name: .ootdDetailMoreMenuOpened, object: nil)
+            }
+        )
     }
 
     private var addPageMenu: some View {

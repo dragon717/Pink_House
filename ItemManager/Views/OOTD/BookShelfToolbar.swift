@@ -71,8 +71,16 @@ struct BookShelfToolbar: ToolbarContent {
                         Image(systemName: "ellipsis.circle")
                             .font(.system(size: 22))
                             .foregroundStyle(.primary)
+                            .onTapGesture {
+                                NotificationCenter.default.post(name: .ootdShelfMoreMenuOpened, object: nil)
+                            }
                     }
                     .captureGuideTarget(.ootdShelfMoreMenuButton)
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            NotificationCenter.default.post(name: .ootdShelfMoreMenuOpened, object: nil)
+                        }
+                    )
                 }
             }
         }

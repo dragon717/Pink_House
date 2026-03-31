@@ -137,6 +137,7 @@ extension FeatureExperienceGuideOverlay {
         hasNonDefaultSpaceBooksForGuide = false
         hasSpaceBookPagesForGuide = false
         didOpenBatchEditMoreMenu = false
+        didOpenSpatialImportMenu = false
 
         // 重置所有步骤状态到初始值，避免缓存污染
         aiAnalysisStep = .preUnlockStep1ReturnToMe
@@ -712,7 +713,8 @@ extension FeatureExperienceGuideOverlay {
         actionTitle: String?,
         onAction: (() -> Void)?,
         bubbleOnTop: Bool = false,
-        showPulse: Bool = true
+        showPulse: Bool = true,
+        onHighlightTap: (() -> Void)? = nil
     ) -> some View {
         ZStack {
             ZStack {
@@ -729,6 +731,17 @@ extension FeatureExperienceGuideOverlay {
                 )
             }
             .allowsHitTesting(false)
+
+            // 高亮区域的透明点击层，用于在点击穿透的同时通知引导推进
+            if let onHighlightTap = onHighlightTap {
+                Color.clear
+                    .frame(width: frame.width, height: frame.height)
+                    .position(x: frame.midX, y: frame.midY)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onHighlightTap()
+                    }
+            }
 
             VStack {
                 if bubbleOnTop {

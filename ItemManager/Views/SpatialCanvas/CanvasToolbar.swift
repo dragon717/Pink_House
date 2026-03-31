@@ -232,6 +232,11 @@ struct ImportMenuButton: View {
         }
         .captureGuideTarget(.spatialCanvasImportMenu)
         .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                NotificationCenter.default.post(name: .spatialCanvasImportMenuOpened, object: nil)
+            }
+        )
         .pressEvents {
             withAnimation(.easeInOut(duration: 0.1)) {
                 isPressed = true
