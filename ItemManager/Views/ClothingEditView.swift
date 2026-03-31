@@ -903,7 +903,8 @@ struct ClothingEditView: View {
     }
     
     private func updateTotalPrice() {
-        // 保存前校验：若定金和尾款都存在，则校正总价
+        // 定金和尾款都为0时，保留用户手动填的总价
+        guard deposit > 0 || balance > 0 else { return }
         priceTotal = ClothingPriceHelper.shared.calculateTotal(deposit: deposit, balance: balance)
     }
     
