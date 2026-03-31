@@ -18,19 +18,16 @@ extension FeatureExperienceGuideOverlay {
     }
 
     func wealthStep1Content(in geometry: GeometryProxy) -> some View {
-        print("💰 [wealthStep1Content] 开始渲染")
         let screenBounds = geometry.size
         let safeAreaBottom = geometry.safeAreaInsets.bottom
-        let tabBarHeight = 65.0 + safeAreaBottom
-        let fallbackHouseTabFrame = CGRect(
-            x: screenBounds.width / 2 - 34,
-            y: screenBounds.height - tabBarHeight,
-            width: 68,
-            height: tabBarHeight
+        let safeAreaTop = geometry.safeAreaInsets.top
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        let fallbackHouseTabFrame = SmallWorldMenuOverlay.buildFallbackFrame(
+            screenSize: screenBounds,
+            safeAreaTop: safeAreaTop,
+            safeAreaBottom: safeAreaBottom,
+            isIPad: isIPad
         )
-        print("   screenBounds: \(screenBounds)")
-        print("   safeAreaBottom: \(safeAreaBottom)")
-        print("   fallbackHouseTabFrame: \(fallbackHouseTabFrame)")
 
         let houseTabFrame = TabBarItemAnchorResolver.resolvedFrame(
             for: .homeHouseTab,
@@ -39,15 +36,12 @@ extension FeatureExperienceGuideOverlay {
             expansion: 0,
             fallback: fallbackHouseTabFrame
         )
-        print("   最终 houseTabFrame: \(houseTabFrame)")
 
         let houseTabRadius = max(34, max(houseTabFrame.width, houseTabFrame.height) / 2)
         let houseTabPawPosition = CGPoint(
             x: min(max(houseTabFrame.midX, 24), screenBounds.width - 24),
             y: min(max(houseTabFrame.midY, 24), screenBounds.height - 24)
         )
-        print("   houseTabRadius: \(houseTabRadius)")
-        print("   houseTabPawPosition: \(houseTabPawPosition)")
 
 
         return ZStack {

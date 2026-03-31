@@ -172,15 +172,11 @@ struct SmallWorldMenuOverlay: View {
         GeometryReader { geometry in
             let safeAreaBottom = geometry.safeAreaInsets.bottom
             let safeAreaTop = geometry.safeAreaInsets.top
-            let tabBarHeight = 65.0 + safeAreaBottom
-            let topBarHeight = 65.0 + safeAreaTop
-            let fallbackTriggerHeight = isIPad ? topBarHeight : tabBarHeight
-            // 移除固定宽度计算的 fallbackFrame，完全依赖 TabBarItemAnchorResolver 获取真实的 house tab 位置
-            let fallbackFrame = CGRect(
-                x: geometry.size.width / 2 - 34,  // 使用屏幕中心作为 fallback，避免固定宽度计算
-                y: (isIPad ? 0 : geometry.size.height - fallbackTriggerHeight),
-                width: 68,
-                height: fallbackTriggerHeight
+            let fallbackFrame = Self.buildFallbackFrame(
+                screenSize: geometry.size,
+                safeAreaTop: safeAreaTop,
+                safeAreaBottom: safeAreaBottom,
+                isIPad: isIPad
             )
             let houseTabFrame = resolvedHouseTabFrame(in: geometry, fallbackFrame: fallbackFrame)
             let triggerHeight = houseTabFrame.height
@@ -304,9 +300,43 @@ struct SmallWorldMenuOverlay: View {
             for: .homeHouseTab,
             preferredTabIndex: 1,
             in: geometry,
-            expansion: 0,  // 移除额外的扩展偏移，直接使用 tab 的原始位置
+            expansion: 0,
             fallback: fallbackFrame
         )
+    }
+
+    /// iOS 26 的 Liquid Glass tab bar 不居中，需要根据设备类型计算合理的 fallback
+    static func buildFallbackFrame(
+        screenSize: CGSize,
+        safeAreaTop: CGFloat,
+        safeAreaBottom: CGFloat,
+        isIPad: Bool
+    ) -> CGRect {
+        if isIPad {
+            // iPadOS 26: 顶部 floating pill，居中，高度约 50
+            let pillHeight: CGFloat = 50
+            let pillY = safeAreaTop + 4
+            // iPad 的 floating pill 大约占屏幕宽度的 40%，居中
+            let pillWidth = screenSize.width * 0.4
+            let pillX = (screenSize.width - pillWidth) / 2
+            let tabCount = CGFloat(TabBarItemAnchorResolver.mainTabCount)
+            let segmentWidth = pillWidth / tabCount
+            // House tab = index 1
+            let tabX = pillX + segmentWidth * 1
+            return CGRect(x: tabX, y: pillY, width: segmentWidth, height: pillHeight)
+        } else {
+            // iOS 26 iPhone: Liquid Glass tab bar 底部，platter 偏左（search 分离在右侧）
+            // 从日志：platter 约从 x=screenWidth*0.05 开始，宽约 screenWidth*0.74
+            let tabBarHeight: CGFloat = 62
+            let tabBarY = screenSize.height - tabBarHeight - safeAreaBottom
+            let platterX = screenSize.width * 0.05
+            let platterWidth = screenSize.width * 0.74
+            let tabCount = CGFloat(TabBarItemAnchorResolver.mainTabCount)
+            let segmentWidth = platterWidth / tabCount
+            // House tab = index 1
+            let tabX = platterX + segmentWidth * 1
+            return CGRect(x: tabX, y: tabBarY, width: segmentWidth, height: tabBarHeight)
+        }
     }
 
     // MARK: - 单层轮盘菜单

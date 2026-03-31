@@ -1621,37 +1621,52 @@ struct FeatureExperienceGuideOverlay: View {
                 onAction: nil
             ))
         } else if isSpaceBookCreationPromptVisible {
-            // 新建弹窗已打开
-            return AnyView(VStack {
-                featureStepBubble(
-                    title: "输入名称后点创建",
-                    message: "已打开新建空间手帐弹窗，输入名称并点击创建，即可进入下一步。",
-                    currentStep: spaceBookGuideStep.stepNumberInFlow,
-                    totalSteps: spaceBookGuideStep.totalStepsInFlow,
-                    accent: .blue,
-                    actionTitle: nil,
-                    onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                    onAction: nil
-                )
-                .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
-                Spacer()
-            })
+            // 新建弹窗已打开 - 高亮整个输入弹窗区域
+            let dialogWidth: CGFloat = 270
+            let dialogHeight: CGFloat = 180
+            let dialogFrame = CGRect(
+                x: (geometry.size.width - dialogWidth) / 2,
+                y: (geometry.size.height - dialogHeight) / 2,
+                width: dialogWidth,
+                height: dialogHeight
+            )
+            return AnyView(highlightedRectGuideContent(
+                frame: dialogFrame,
+                cornerRadius: 16,
+                title: "输入名称后点创建",
+                message: "已打开新建空间手帐弹窗，输入名称并点击创建，即可进入下一步。",
+                currentStep: spaceBookGuideStep.stepNumberInFlow,
+                totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                accent: .blue,
+                actionTitle: nil,
+                onAction: nil,
+                bubbleOnTop: true
+            ))
         } else {
-            // 引导点击右上角「更多」
-            let fallbackFrame = CGRect(
+            // 高亮「更多」按钮 + 下拉菜单区域（整体高亮，菜单展开后自然在高亮范围内）
+            let buttonFallback = CGRect(
                 x: geometry.size.width - 70,
                 y: max(geometry.safeAreaInsets.top + 12, 16),
                 width: 50,
                 height: 50
             )
-            let targetFrame = aiGuideTargetFrame(
+            let buttonFrame = aiGuideTargetFrame(
                 globalFrame: guideManager.guideTargetFrame(for: .spaceBookShelfMoreMenuButton),
                 in: geometry,
-                fallback: fallbackFrame
+                fallback: buttonFallback
+            )
+            // 扩展高亮区域，覆盖按钮和下拉菜单（2个菜单项）
+            let menuWidth: CGFloat = 260
+            let menuHeight: CGFloat = 130
+            let expandedFrame = CGRect(
+                x: buttonFrame.maxX - menuWidth,
+                y: buttonFrame.minY - 8,
+                width: menuWidth,
+                height: buttonFrame.height + menuHeight + 16
             )
             return AnyView(highlightedRectGuideContent(
-                frame: targetFrame,
-                cornerRadius: 12,
+                frame: expandedFrame,
+                cornerRadius: 16,
                 title: spaceBookGuideStep.title,
                 message: spaceBookGuideStep.message,
                 currentStep: spaceBookGuideStep.stepNumberInFlow,
@@ -1690,37 +1705,52 @@ struct FeatureExperienceGuideOverlay: View {
                 onAction: nil
             ))
         } else if isSpaceBookCreationPromptVisible {
-            // 新建书页弹窗已打开
-            return AnyView(VStack {
-                featureStepBubble(
-                    title: "输入书页名称后点创建",
-                    message: "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。",
-                    currentStep: spaceBookGuideStep.stepNumberInFlow,
-                    totalSteps: spaceBookGuideStep.totalStepsInFlow,
-                    accent: .blue,
-                    actionTitle: nil,
-                    onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                    onAction: nil
-                )
-                .padding(.top, max(geometry.safeAreaInsets.top + 24, 72))
-                Spacer()
-            })
+            // 新建书页弹窗已打开 - 高亮整个输入弹窗区域
+            let dialogWidth: CGFloat = 270
+            let dialogHeight: CGFloat = 180
+            let dialogFrame = CGRect(
+                x: (geometry.size.width - dialogWidth) / 2,
+                y: (geometry.size.height - dialogHeight) / 2,
+                width: dialogWidth,
+                height: dialogHeight
+            )
+            return AnyView(highlightedRectGuideContent(
+                frame: dialogFrame,
+                cornerRadius: 16,
+                title: "输入书页名称后点创建",
+                message: "已打开新建书页弹窗，输入名称并点击创建，即可进入下一步。",
+                currentStep: spaceBookGuideStep.stepNumberInFlow,
+                totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                accent: .blue,
+                actionTitle: nil,
+                onAction: nil,
+                bubbleOnTop: true
+            ))
         } else {
-            // 引导点击右上角「更多」
-            let fallbackFrame = CGRect(
+            // 高亮「更多」按钮 + 下拉菜单区域（整体高亮，菜单展开后自然在高亮范围内）
+            let buttonFallback = CGRect(
                 x: geometry.size.width - 70,
                 y: max(geometry.safeAreaInsets.top + 12, 16),
                 width: 50,
                 height: 50
             )
-            let targetFrame = aiGuideTargetFrame(
+            let buttonFrame = aiGuideTargetFrame(
                 globalFrame: guideManager.guideTargetFrame(for: .spaceBookDetailMoreMenuButton),
                 in: geometry,
-                fallback: fallbackFrame
+                fallback: buttonFallback
+            )
+            // 扩展高亮区域，覆盖按钮和下拉菜单（5个菜单项+分割线）
+            let menuWidth: CGFloat = 260
+            let menuHeight: CGFloat = 280
+            let expandedFrame = CGRect(
+                x: buttonFrame.maxX - menuWidth,
+                y: buttonFrame.minY - 8,
+                width: menuWidth,
+                height: buttonFrame.height + menuHeight + 16
             )
             return AnyView(highlightedRectGuideContent(
-                frame: targetFrame,
-                cornerRadius: 12,
+                frame: expandedFrame,
+                cornerRadius: 16,
                 title: spaceBookGuideStep.title,
                 message: spaceBookGuideStep.message,
                 currentStep: spaceBookGuideStep.stepNumberInFlow,
@@ -3368,12 +3398,13 @@ struct FeatureExperienceGuideOverlay: View {
                     )
                 case .step6_longPressHouseTab:
                     let safeAreaBottom = geometry.safeAreaInsets.bottom
-                    let tabBarHeight = 65.0 + safeAreaBottom
-                    let fallbackHouseTabFrame = CGRect(
-                        x: geometry.size.width / 2 - 34,
-                        y: geometry.size.height - tabBarHeight,
-                        width: 68,
-                        height: tabBarHeight
+                    let safeAreaTop = geometry.safeAreaInsets.top
+                    let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+                    let fallbackHouseTabFrame = SmallWorldMenuOverlay.buildFallbackFrame(
+                        screenSize: geometry.size,
+                        safeAreaTop: safeAreaTop,
+                        safeAreaBottom: safeAreaBottom,
+                        isIPad: isIPad
                     )
                     let houseTabFrame = TabBarItemAnchorResolver.resolvedFrame(
                         for: .homeHouseTab,

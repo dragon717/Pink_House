@@ -134,7 +134,7 @@ struct RococoSmallWorldView: View {
                 }
                 .scaleEffect(finalZoomScale * currentZoomScale)
                 .offset(x: finalDragOffset.width + currentDragOffset.width, y: finalDragOffset.height + currentDragOffset.height)
-                .gesture(
+                .simultaneousGesture(
                     MagnificationGesture()
                         .onChanged { scale in
                             currentZoomScale = scale
