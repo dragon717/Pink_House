@@ -1927,10 +1927,11 @@ struct FeatureExperienceGuideOverlay: View {
     ) -> CGRect {
         let screenBounds = geometry.size
         let menuWidth = min(max(screenBounds.width * 0.52, 216), 300)
-        let menuHeight: CGFloat = 172
+        let menuHeight: CGFloat = 112
+        let padding: CGFloat = 24
         let x = min(max(moreButtonFrame.maxX - menuWidth + 4, 12), screenBounds.width - menuWidth - 12)
-        let y = max(geometry.safeAreaInsets.top + 2, moreButtonFrame.maxY)
-        return CGRect(x: x, y: y, width: menuWidth, height: menuHeight)
+        let menuY = max(geometry.safeAreaInsets.top + 2, moreButtonFrame.maxY)
+        return CGRect(x: x - padding, y: menuY - padding, width: menuWidth + padding * 2, height: menuHeight + padding * 2)
     }
 
     func batchEditMenuEditEntryFallbackFrame(
@@ -1938,7 +1939,7 @@ struct FeatureExperienceGuideOverlay: View {
         moreButtonFrame: CGRect
     ) -> CGRect {
         let menuFrame = batchEditMenuAreaFrameFromMoreButton(in: geometry, moreButtonFrame: moreButtonFrame)
-        let rowHeight = (menuFrame.height - 22) / 3
+        let rowHeight = (menuFrame.height - 16) / 2
         return CGRect(
             x: menuFrame.minX + 14,
             y: menuFrame.minY + 8 + rowHeight,
@@ -2104,93 +2105,29 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             case .step2_chooseTargetOption:
-                if let feature = guideManager.currentFeatureExperienceFeature,
-                   feature == .batchImport,
-                   let target = wardrobeGuideStep2Target(for: feature),
-                   target != .either {
-                    let shortcutTitle = target == .batchImport ? "点击「批量导入」" : "点击「手动创建」"
-                    let actionTitle = target == .batchImport ? "打开「批量导入」" : "打开「手动创建」"
-                    let actionMessage = target == .batchImport
-                        ? "点击下方按钮，直接进入「批量导入」流程。"
-                        : "点击下方按钮，直接进入「手动创建」流程。"
-                    let shortcutKey: GuideTargetKey = target == .batchImport
-                        ? .wardrobeShortcutBatchImportAction
-                        : .wardrobeShortcutManualCreateAction
+                let optionFrame = wardrobeGuideStep2Frame(in: geometry, addFrame: addFrame)
 
-                    let shortcutFrame = aiGuideTargetFrame(
-                        globalFrame: guideManager.guideTargetFrame(for: shortcutKey),
-                        in: geometry,
-                        fallback: wardrobeShortcutActionFallbackFrame(in: geometry)
+                highlightedRectGuideContent(
+                    frame: optionFrame,
+                    cornerRadius: 14,
+                    title: currentWardrobeGuideStep2Title,
+                    message: currentWardrobeGuideStep2Message,
+                    currentStep: 2,
+                    totalSteps: 2,
+                    accent: accent,
+                    actionTitle: nil,
+                    onAction: nil
+                )
+                .overlay {
+                    CatPawTapAnimation(
+                        position: CGPoint(
+                            x: optionFrame.midX,
+                            y: optionFrame.midY
+                        ),
+                        delay: 0.5
                     )
-
-                    ZStack {
-                        HollowMaskView(
-                            highlightFrame: shortcutFrame,
-                            highlightType: .roundedRect,
-                            cornerRadius: 12
-                        )
-
-                        RoundedRectHighlightView(
-                            frame: shortcutFrame,
-                            cornerRadius: 12
-                        )
-
-                        CatPawTapAnimation(
-                            position: CGPoint(
-                                x: shortcutFrame.midX,
-                                y: shortcutFrame.midY
-                            ),
-                            delay: 0.5
-                        )
-                        .opacity(0.4)
-                        .allowsHitTesting(false)
-
-                        VStack {
-                            Spacer()
-                            featureStepBubble(
-                                title: shortcutTitle,
-                                message: actionMessage,
-                                currentStep: 2,
-                                totalSteps: 2,
-                                accent: accent,
-                                actionTitle: actionTitle,
-                                actionGuideTarget: shortcutKey,
-                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
-                                onAction: {
-                                    NotificationCenter.default.post(
-                                        name: target == .batchImport ? .guideRequestWardrobeBatchImport : .guideRequestWardrobeManualCreate,
-                                        object: nil
-                                    )
-                                }
-                            )
-                            .padding(.bottom, 120)
-                        }
-                    }
-                } else {
-                    let optionFrame = wardrobeGuideStep2Frame(in: geometry, addFrame: addFrame)
-
-                    highlightedRectGuideContent(
-                        frame: optionFrame,
-                        cornerRadius: 14,
-                        title: currentWardrobeGuideStep2Title,
-                        message: currentWardrobeGuideStep2Message,
-                        currentStep: 2,
-                        totalSteps: 2,
-                        accent: accent,
-                        actionTitle: nil,
-                        onAction: nil
-                    )
-                    .overlay {
-                        CatPawTapAnimation(
-                            position: CGPoint(
-                                x: optionFrame.midX,
-                                y: optionFrame.midY
-                            ),
-                            delay: 0.5
-                        )
-                        .opacity(0.4)
-                        .allowsHitTesting(false)
-                    }
+                    .opacity(0.4)
+                    .allowsHitTesting(false)
                 }
             }
         }
@@ -3398,10 +3335,10 @@ struct FeatureExperienceGuideOverlay: View {
                 )
                 // 菜单定位必须基于原始「更多」按钮坐标；
                 // 不要复用 step1 的下移高亮坐标，否则会把「编辑」行 fallback 算到下方。
-                let menuEditFrame = batchEditMenuEditEntryGuideFrame(in: geometry, moreButtonFrame: rawTargetFrame)
+                let menuAreaFrame = batchEditMenuAreaFrameFromMoreButton(in: geometry, moreButtonFrame: rawTargetFrame)
                 let shouldHighlightEditEntry = didOpenBatchEditMoreMenu ||
                     guideManager.guideTargetFrame(for: .wardrobeEditMenuEntry) != nil
-                let step1Frame = shouldHighlightEditEntry ? menuEditFrame : targetFrame
+                let step1Frame = shouldHighlightEditEntry ? menuAreaFrame : targetFrame
                 let step1CornerRadius: CGFloat = shouldHighlightEditEntry ? 14 : 18
                 let step1Title = shouldHighlightEditEntry ? "点击「编辑」" : "点击右上角更多按钮"
                 let step1Message = shouldHighlightEditEntry
