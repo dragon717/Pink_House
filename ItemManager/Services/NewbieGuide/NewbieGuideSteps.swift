@@ -1,6 +1,14 @@
 import Foundation
 
-enum AIAnalysisGuideStep: Int, CaseIterable {
+// MARK: - 统一引导步骤协议
+
+protocol GuideStepDescribable {
+    var title: String { get }
+    var message: String { get }
+    var showCatPaw: Bool { get }
+}
+
+enum AIAnalysisGuideStep: Int, CaseIterable, GuideStepDescribable {
     case preUnlockStep1ReturnToMe = 1
     case preUnlockStep2ClickVIP = 2
     case preUnlockStep3Exchange = 3
@@ -121,7 +129,7 @@ enum AIAnalysisGuideStep: Int, CaseIterable {
     }
 }
 
-enum WidgetCustomizeGuideStep: Int, CaseIterable {
+enum WidgetCustomizeGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_scrollToWidget = 2
     case step3_clickWidgetEntry = 3
@@ -159,107 +167,398 @@ enum WidgetCustomizeGuideStep: Int, CaseIterable {
     }
 }
 
-enum WardrobeAddGuideStep: Int, CaseIterable {
+enum WardrobeAddGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_clickAddButton = 1
     case step2_chooseTargetOption = 2
+
+    var title: String {
+        switch self {
+        case .step1_clickAddButton: return "点击右上角 + 号"
+        case .step2_chooseTargetOption: return "选择创建方式"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_clickAddButton: return "先点击衣橱右上角的 + 号，展开创建菜单。"
+        case .step2_chooseTargetOption: return "在展开菜单中选择创建方式，继续完成任务。"
+        }
+    }
+
+    var showCatPaw: Bool {
+        switch self {
+        case .step1_clickAddButton: return true
+        case .step2_chooseTargetOption: return false
+        }
+    }
 }
 
-enum ThemeCustomizeGuideStep: Int, CaseIterable {
+enum ThemeCustomizeGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_scrollToThemeEntry = 2
     case step3_clickThemeEntry = 3
     case step4_switchToMagicTab = 4
     case step5_magicThemeExplanation = 5
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_scrollToThemeEntry: return "下滑找到主题配色"
+        case .step3_clickThemeEntry: return "点击主题配色豆腐块"
+        case .step4_switchToMagicTab: return "切换到魔法配色页签"
+        case .step5_magicThemeExplanation: return "认识魔法配色"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先从魔法任务页返回到「我」，再去找主题配色豆腐块。"
+        case .step2_scrollToThemeEntry: return "请继续向下滑动，在设置豆腐块区域找到「主题配色」入口。"
+        case .step3_clickThemeEntry: return "在「我」页找到「主题配色」豆腐块，点进去进入主题页。"
+        case .step4_switchToMagicTab: return "这里有「原生魔法配色」和「客制化配色」两个页签。请切到「魔法配色」，看看自动调色是怎么工作的。"
+        case .step5_magicThemeExplanation: return "魔法配色会根据背景和卡片自动调整字体与模块颜色。你可以先看预览，再决定是否长期使用这套自动调色方案。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum CustomColorPersonalizationGuideStep: Int, CaseIterable {
+enum CustomColorPersonalizationGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_scrollToThemeEntry = 2
     case step3_clickThemeEntry = 3
     case step4_switchToCustomTab = 4
-    case step5_personalizationExplanation = 5
+    case step5_scrollToPersonalization = 5
+    case step6_personalizationExplanation = 6
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_scrollToThemeEntry: return "下滑找到主题配色"
+        case .step3_clickThemeEntry: return "点击主题配色豆腐块"
+        case .step4_switchToCustomTab: return "切换到客制化配色页签"
+        case .step5_scrollToPersonalization: return "下滑找到个性化入口"
+        case .step6_personalizationExplanation: return "认识个性化入口"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先从魔法任务页返回到「我」，再去找主题配色豆腐块。"
+        case .step2_scrollToThemeEntry: return "请继续向下滑动，在设置豆腐块区域找到「主题配色」入口。"
+        case .step3_clickThemeEntry: return "在「我」页找到「主题配色」豆腐块，点进去进入主题页。"
+        case .step4_switchToCustomTab: return "请切到「客制化配色」，我们下一步会看「个性化」入口和我的主题方案。"
+        case .step5_scrollToPersonalization: return "请继续向下滑动，找到「个性化」豆腐块。"
+        case .step6_personalizationExplanation: return "这里是「个性化」豆腐块。点击后会展开「我的主题方案」，你可以继续自定义字体配色和卡片样式，打造自己的专属主题。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum LocalFileBackupRestoreGuideStep: Int, CaseIterable {
+enum LocalFileBackupRestoreGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_scrollToSystemSettings = 2
     case step3_clickSystemSettings = 3
     case step4_introBackupData = 4
     case step5_introRestoreData = 5
     case step6_firstBackup = 6
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_scrollToSystemSettings: return "下滑找到系统与更多"
+        case .step3_clickSystemSettings: return "点击系统与更多"
+        case .step4_introBackupData: return "先认识「备份数据」"
+        case .step5_introRestoreData: return "再认识「恢复数据」"
+        case .step6_firstBackup: return "现在做一次首次备份"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先从魔法任务页返回到「我」，我们去找本地文件备份入口。"
+        case .step2_scrollToSystemSettings: return "继续向下滑动，在设置豆腐块区域找到「系统与更多」。"
+        case .step3_clickSystemSettings: return "点开「系统与更多」，进入系统设置页。"
+        case .step4_introBackupData: return "备份是最重要的一步：它会把当前数据打包保存，防止误删、换机或重装时丢失记录。建议养成定期备份习惯。"
+        case .step5_introRestoreData: return "恢复可以把已备份的数据找回来，支持跨设备/跨平台迁移后继续使用。先有备份，恢复才有意义。"
+        case .step6_firstBackup: return "请点击「备份数据」完成首次备份。备份可能需要一点时间；若你现在不方便，也可以点左上角「跳过」，下次再备份。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum ExportCSVGuideStep: Int, CaseIterable {
+enum ExportCSVGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_scrollToSystemSettings = 2
     case step3_clickSystemSettings = 3
     case step4_clickExportCSV = 4
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_scrollToSystemSettings: return "下滑找到系统与更多"
+        case .step3_clickSystemSettings: return "点击系统与更多"
+        case .step4_clickExportCSV: return "点击导出到 CSV"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先从魔法任务页返回到「我」，我们去找导出表格入口。"
+        case .step2_scrollToSystemSettings: return "继续向下滑动，在设置豆腐块区域找到「系统与更多」。"
+        case .step3_clickSystemSettings: return "点开「系统与更多」，进入系统设置页。"
+        case .step4_clickExportCSV: return "点击「导出 CSV (Export CSV)」，即可开始导出表格文件。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum CloudFileBackupRestoreGuideStep: Int, CaseIterable {
+enum CloudFileBackupRestoreGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_clickAccountSync = 2
     case step3_signInAppleID = 3
     case step4_cloudBackupExplanation = 4
     case step5_realtimeSyncDelayExplanation = 5
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_clickAccountSync: return "点击账户与同步"
+        case .step3_signInAppleID: return "先登录 Apple ID"
+        case .step4_cloudBackupExplanation: return "认识云端文件备份与恢复"
+        case .step5_realtimeSyncDelayExplanation: return "iCloud 及时同步与延迟说明"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先从魔法任务页返回到「我」，再去「账户与同步」。"
+        case .step2_clickAccountSync: return "点开这个豆腐块，进入账号与 iCloud 同步管理页面。"
+        case .step3_signInAppleID: return "点击这里完成 Apple 登录。登录后才能使用云端文件备份与恢复，以及 iCloud 自动同步。"
+        case .step4_cloudBackupExplanation: return "这里可以「备份到云端」和「从云端恢复」。建议你先备份一份，这样换设备或误删后都能快速找回数据。"
+        case .step5_realtimeSyncDelayExplanation: return "开启后会自动同步变更。大多数情况下是秒级到几十秒；网络较慢、系统省电或后台调度时，可能延迟到 1～5 分钟，属正常现象。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum PersonalPreferenceGuideStep: Int, CaseIterable {
+enum PersonalPreferenceGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_clickWardrobeEntry = 2
     case step3_interfaceStyle = 3
     case step4_filterMode = 4
     case step5_appAppearance = 5
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_clickWardrobeEntry: return "点击梦幻衣橱豆腐块"
+        case .step3_interfaceStyle: return "界面样式：决定衣橱导航布局"
+        case .step4_filterMode: return "筛选模式：决定你怎么筛衣服"
+        case .step5_appAppearance: return "应用外观：控制整体观感"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先返回到「我」页，我们一起去找梦幻衣橱豆腐块。"
+        case .step2_clickWardrobeEntry: return "进入梦幻衣橱设置页后，我们会一起看界面样式、筛选模式和应用外观这些个性化体验。"
+        case .step3_interfaceStyle: return "这里用来切换衣橱的导航形态。不同样式会影响顶部导航与操作按钮的组织方式，按你的使用习惯选更顺手的就行。"
+        case .step4_filterMode: return "经典筛选是下拉菜单，适合快速单项筛；多维筛选是半屏多选，适合组合条件做更精细筛选。"
+        case .step5_appAppearance: return "这里是个性化最核心的一块：背景类型决定用纯色还是图片；背景颜色/图片与不透明度决定整体氛围；高斯模糊决定前景内容与背景的层次；「字体配色与卡片样式」则影响文字可读性和卡片风格。搭配好这几项，你会得到更舒适也更有个人风格的界面。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum PrivacyDisplayGuideStep: Int, CaseIterable {
+enum PrivacyDisplayGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_clickWardrobeEntry = 2
     case step3_showPurchasePrice = 3
     case step4_showOriginalPrice = 4
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_clickWardrobeEntry: return "点击梦幻衣橱豆腐块"
+        case .step3_showPurchasePrice: return "入库价格开关"
+        case .step4_showOriginalPrice: return "原价开关"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先返回到「我」页，我们一起去找梦幻衣橱豆腐块。"
+        case .step2_clickWardrobeEntry: return "进入梦幻衣橱设置页后，我们来认识「隐私显示」里的两个开关。"
+        case .step3_showPurchasePrice: return "打开时，衣橱列表会显示每件衣服的入库价格；关闭后会隐藏入库价格，适合共享屏幕或给别人看衣橱时保护隐私。"
+        case .step4_showOriginalPrice: return "这个开关控制列表中是否显示原价信息。你可以和入库价格分开管理：例如只看当前入库价，或两者都隐藏，让衣橱浏览更清爽、更私密。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum TagBrandFieldGuideStep: Int, CaseIterable {
+enum TagBrandFieldGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMe = 1
     case step2_clickWardrobeEntry = 2
     case step3_scrollToManagementEntries = 3
     case step4_tagManagement = 4
     case step5_brandManagement = 5
     case step6_fieldManagement = 6
+
+    var title: String {
+        switch self {
+        case .step1_returnToMe: return "返回「我」界面"
+        case .step2_clickWardrobeEntry: return "点击梦幻衣橱豆腐块"
+        case .step3_scrollToManagementEntries: return "下滑找到管理项"
+        case .step4_tagManagement: return "标签管理"
+        case .step5_brandManagement: return "品牌管理"
+        case .step6_fieldManagement: return "属性字段管理"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMe: return "先返回到「我」页，我们一起去找梦幻衣橱豆腐块。"
+        case .step2_clickWardrobeEntry: return "进入梦幻衣橱设置页后，我们会依次认识标签管理、品牌管理和属性字段管理。"
+        case .step3_scrollToManagementEntries: return "请继续下滑到页面下方，找到「标签管理 / 品牌管理 / 属性字段排序与显示」这三项。"
+        case .step4_tagManagement: return "这里管理你所有标签（例如风格、场景、季节等）。把标签体系整理好后，衣橱筛选会更快、更准，也更方便复用。"
+        case .step5_brandManagement: return "这里统一维护品牌名称，避免同品牌出现多个写法。品牌数据干净后，统计、筛选和搜索都会更稳定。"
+        case .step6_fieldManagement: return "这里可以控制属性字段的显示与排序。把常用字段放前面、低频字段放后面，日常录入和查看都会更顺手。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum OOTDGuideStep: Int, CaseIterable {
+enum OOTDGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_clickOotdEntry = 1
     case step2_ootdExplanation = 2
+
+    var title: String {
+        switch self {
+        case .step1_clickOotdEntry: return "点击 House 的穿搭手帐热区"
+        case .step2_ootdExplanation: return "认识穿搭手帐和书页"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_clickOotdEntry: return "先从 House 里的穿搭手帐热区进入，我们再认识手帐本和书页。"
+        case .step2_ootdExplanation: return "这里先看到的是手帐本列表；点进任意一本后，就能看到它下面的书页。书页里可以继续记录搭配、图片和灵感。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum CalendarGuideStep: Int, CaseIterable {
+enum CalendarGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_clickCalendarEntry = 1
     case step2_calendarExplanation = 2
+
+    var title: String {
+        switch self {
+        case .step1_clickCalendarEntry: return "点击 House 的梦裙日历热区"
+        case .step2_calendarExplanation: return "认识梦裙日历"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_clickCalendarEntry: return "先从 House 里的梦裙日历热区进入，我们再认识最近、月度、年度三个视图。"
+        case .step2_calendarExplanation: return "最近会按时间线看近期记录，月度适合查具体月份，年度更适合总览全年的热度分布。右上角默认勾选了「只看心愿尾款」，所以你一进来就会先看到尾款相关内容。"
+        }
+    }
+
+    var showCatPaw: Bool { false }
 }
 
-enum MagicStickerGuideStep: Int, CaseIterable {
+enum MagicStickerGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_returnToMeForMenuSetup = 1
-    case step2_clickFavoriteMenuSettings = 2
-    case step3_addMagicStickerButton = 3
-    case step4_returnToMeAfterMenuSetup = 4
-    case step5_longPressHouseTab = 5
-    case step6_clickMagicStickerEntry = 6
-    case step7_magicStickerExplanation = 7
+    case step2_scrollToFavoriteMenu = 2
+    case step3_clickFavoriteMenuSettings = 3
+    case step4_addMagicStickerButton = 4
+    case step5_returnToMeAfterMenuSetup = 5
+    case step6_longPressHouseTab = 6
+    case step7_clickMagicStickerEntry = 7
+    case step8_magicStickerExplanation = 8
+
+    var title: String {
+        switch self {
+        case .step1_returnToMeForMenuSetup: return "先返回「我」界面"
+        case .step2_scrollToFavoriteMenu: return "请向下滑动"
+        case .step3_clickFavoriteMenuSettings: return "点击「常用菜单」"
+        case .step4_addMagicStickerButton: return "添加「魔法贴纸」"
+        case .step5_returnToMeAfterMenuSetup: return "返回「我」界面"
+        case .step6_longPressHouseTab: return "长按 House tab"
+        case .step7_clickMagicStickerEntry: return "点击「魔法贴纸」"
+        case .step8_magicStickerExplanation: return "认识魔法贴纸"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_returnToMeForMenuSetup: return "你的常用菜单里还没有「魔法贴纸」，先从魔法任务页返回到「我」，我们去补上这个入口。"
+        case .step2_scrollToFavoriteMenu: return "下滑找到「常用菜单」入口"
+        case .step3_clickFavoriteMenuSettings: return "先进入「常用菜单设置」，把「魔法贴纸」加入长按菜单。"
+        case .step4_addMagicStickerButton: return "点击右侧 + 把「魔法贴纸」加进常用菜单。若提示已满，先移除一个旧入口再添加。"
+        case .step5_returnToMeAfterMenuSetup: return "很好！现在从常用菜单设置返回到「我」，我们继续长按 House tab 体验魔法贴纸。"
+        case .step6_longPressHouseTab: return "请长按底部的 House tab，弹出常用菜单后，我们一起找到「魔法贴纸」。"
+        case .step7_clickMagicStickerEntry: return "在长按弹出的常用菜单里点击「魔法贴纸」，进入默认贴纸编辑页。"
+        case .step8_magicStickerExplanation: return "这里会直接进入默认贴纸页。主体区域是贴纸编辑内容，常用菜单能帮你继续跳到别的 House 功能；如果把贴纸加入手帐，还能继续回到对应手帐里编辑。"
+        }
+    }
+
+    var showCatPaw: Bool {
+        switch self {
+        case .step6_longPressHouseTab: return true
+        default: return false
+        }
+    }
 }
 
-enum BatchEditGuideStep: Int, CaseIterable {
+enum BatchEditGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_clickMoreMenu = 1
     case step2_selectOneCard = 2
     case step3_toolbarExplanation = 3
     case step4_finishSelection = 4
+
+    var title: String {
+        switch self {
+        case .step1_clickMoreMenu: return "点击右上角更多按钮"
+        case .step2_selectOneCard: return "选中一张卡片"
+        case .step3_toolbarExplanation: return "认识批量编辑工具条"
+        case .step4_finishSelection: return "点完成结束批量编辑"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .step1_clickMoreMenu: return "先点右上角「更多」，再在弹出菜单里选择「编辑」。进入编辑态后，我们继续下一步。"
+        case .step2_selectOneCard: return "随便点选一张衣橱卡片，让底部批量工具条进入可用状态。"
+        case .step3_toolbarExplanation: return "底部这排就是批量编辑常用操作：删除、复制、更多、全选。更多里还能继续做标签、品牌、颜色、尺码、状态等批量处理。"
+        case .step4_finishSelection: return "现在不用继续操作了，直接点右上角的完成勾选，退出这次批量编辑体验。"
+        }
+    }
+
+    var showCatPaw: Bool {
+        switch self {
+        case .step1_clickMoreMenu, .step3_toolbarExplanation: return true
+        default: return false
+        }
+    }
 }
 
 // MARK: - 空间手帐引导步骤
 // 根据流程图，分为两个阶段：
 // 阶段1：未解锁时（前置任务引导 - 共5步）
 // 阶段2：已解锁后（完整引导 - 共7步）
-enum SpaceBookGuideStep: Int, CaseIterable {
+enum SpaceBookGuideStep: Int, CaseIterable, GuideStepDescribable {
     // MARK: 阶段1: 前置任务引导（解锁前）- 共5步
     case preUnlockStep1_clickWardrobeOotdEntry = 1  // 点击衣橱「穿搭手帐」
     case preUnlockStep2_createOotdBook = 2          // 右上角「更多」→ 新建手帐
@@ -425,7 +724,7 @@ enum SpaceBookGuideStep: Int, CaseIterable {
     }
 }
 
-enum WealthGuideStep: Int, CaseIterable {
+enum WealthGuideStep: Int, CaseIterable, GuideStepDescribable {
     case step1_clickHouseTab = 1
     case step2_clickWealthEntry = 2
     case step3_divination = 3

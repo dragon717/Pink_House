@@ -362,10 +362,16 @@ extension FeatureExperienceGuideOverlay {
         onSkip: @escaping () -> Void,
         onComplete: @escaping () -> Void
     ) -> some View {
-        WidgetCustomizeGuideBubbleView(
-            step: step,
+        let isLastStep = (step == .step4_widgetExplanation)
+        return featureStepBubble(
+            title: step.title,
+            message: step.message,
+            currentStep: step.rawValue,
+            totalSteps: WidgetCustomizeGuideStep.allCases.count,
+            accent: magicPalette.accent,
+            actionTitle: isLastStep ? "知道了" : nil,
             onSkip: onSkip,
-            onComplete: onComplete
+            onAction: isLastStep ? onComplete : nil
         )
     }
 }

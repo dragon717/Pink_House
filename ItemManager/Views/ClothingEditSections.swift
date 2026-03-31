@@ -511,21 +511,20 @@ struct ClothingPriceView: View {
     }
     
     private func calculateAccessoriesTotal() {
-        let total = accessoryList.reduce(0) { $0 + $1.price }
+        let total = accessoryList.reduce(0.0) { $0 + $1.price }
         accessoriesPrice = total
     }
     
     // MARK: - 价格自动计算逻辑
     
-    /// 判断是否满足自动计算条件（三个价格中至少输入了两个）
+    /// 判断是否满足自动计算条件：总价必须已填，且定金或尾款至少填了一个
     private var canAutoCalculate: Bool {
         let hasTotal = priceTotal > 0
         let hasDeposit = deposit > 0
         let hasBalance = balance > 0
-        
-        // 至少有两个值已输入，且第三个值为0或可以计算
-        let filledCount = (hasTotal ? 1 : 0) + (hasDeposit ? 1 : 0) + (hasBalance ? 1 : 0)
-        return filledCount >= 2
+
+        // 总价必须有值，才能计算定金或尾款
+        return hasTotal && (hasDeposit || hasBalance)
     }
     
     /// 自动计算价格（手动触发，带反馈）
@@ -536,13 +535,8 @@ struct ClothingPriceView: View {
     
     /// 执行自动计算，返回结果和提示信息
     private func performAutoCalculate() -> (success: Bool, message: String) {
-        // 情况1: 定金 + 尾款 → 计算总价
-        if deposit > 0 && balance > 0 && priceTotal == 0 {
-            priceTotal = deposit + balance
-            return (true, "已自动计算总价：¥\(String(format: "%.2f", priceTotal))")
-        }
-        // 情况2: 总价 + 定金 → 计算尾款
-        else if priceTotal > 0 && deposit > 0 && balance == 0 {
+        // 情况1: 总价 + 定金 → 计算尾款
+        if priceTotal > 0 && deposit > 0 && balance == 0 {
             let newBalance = priceTotal - deposit
             if newBalance >= 0 {
                 balance = newBalance
@@ -551,7 +545,7 @@ struct ClothingPriceView: View {
                 return (false, "计算失败：定金不能大于总价")
             }
         }
-        // 情况3: 总价 + 尾款 → 计算定金
+        // 情况2: 总价 + 尾款 → 计算定金
         else if priceTotal > 0 && balance > 0 && deposit == 0 {
             let newDeposit = priceTotal - balance
             if newDeposit >= 0 {
@@ -561,7 +555,7 @@ struct ClothingPriceView: View {
                 return (false, "计算失败：尾款不能大于总价")
             }
         }
-        // 情况4: 三个值都已输入，校验并校正（以定金+尾款为准重新计算总价）
+        // 情况3: 三个值都已输入，校验并校正（以定金+尾款为准重新计算总价）
         else if priceTotal > 0 && deposit > 0 && balance > 0 {
             let calculatedTotal = deposit + balance
             if calculatedTotal != priceTotal {

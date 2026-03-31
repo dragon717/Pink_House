@@ -534,7 +534,7 @@ struct FeatureExperienceGuideOverlay: View {
     @State var tagBrandFieldGuideStep: TagBrandFieldGuideStep = .step1_returnToMe
     @State var ootdGuideStep: OOTDGuideStep = .step1_clickOotdEntry
     @State var calendarGuideStep: CalendarGuideStep = .step1_clickCalendarEntry
-    @State var magicStickerGuideStep: MagicStickerGuideStep = .step5_longPressHouseTab
+    @State var magicStickerGuideStep: MagicStickerGuideStep = .step6_longPressHouseTab
     @State var magicStickerGuideRequiresMenuSetup: Bool = false
     @State var batchEditGuideStep: BatchEditGuideStep = .step1_clickMoreMenu
     @State var didOpenBatchEditMoreMenu: Bool = false
@@ -800,7 +800,17 @@ struct FeatureExperienceGuideOverlay: View {
                             guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
                                   customColorPersonalizationGuideStep == .step4_switchToCustomTab else { return }
                             withAnimation(.easeInOut(duration: 0.3)) {
-                                customColorPersonalizationGuideStep = .step5_personalizationExplanation
+                                customColorPersonalizationGuideStep = .step5_scrollToPersonalization
+                            }
+                            // 如果个性化入口已经可见，直接跳到说明步骤
+                            if let frame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry),
+                               isGuideTargetVisibleOnScreen(frame) {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    guard customColorPersonalizationGuideStep == .step5_scrollToPersonalization else { return }
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        customColorPersonalizationGuideStep = .step6_personalizationExplanation
+                                    }
+                                }
                             }
                         }
                     }
@@ -819,7 +829,17 @@ struct FeatureExperienceGuideOverlay: View {
                    customColorPersonalizationGuideStep == .step4_switchToCustomTab,
                    mode == ColorSchemeMode.custom.rawValue {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        customColorPersonalizationGuideStep = .step5_personalizationExplanation
+                        customColorPersonalizationGuideStep = .step5_scrollToPersonalization
+                    }
+                    // 如果个性化入口已经可见，直接跳到说明步骤
+                    if let frame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry),
+                       isGuideTargetVisibleOnScreen(frame) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            guard customColorPersonalizationGuideStep == .step5_scrollToPersonalization else { return }
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                customColorPersonalizationGuideStep = .step6_personalizationExplanation
+                            }
+                        }
                     }
                 }
             }
@@ -1009,17 +1029,17 @@ struct FeatureExperienceGuideOverlay: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .smallWorldQuickMenuOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step5_longPressHouseTab {
+                   magicStickerGuideStep == .step6_longPressHouseTab {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step6_clickMagicStickerEntry
+                        magicStickerGuideStep = .step7_clickMagicStickerEntry
                     }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .ootdDefaultBookOpened)) { _ in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep.rawValue < MagicStickerGuideStep.step7_magicStickerExplanation.rawValue {
+                   magicStickerGuideStep.rawValue < MagicStickerGuideStep.step8_magicStickerExplanation.rawValue {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step7_magicStickerExplanation
+                        magicStickerGuideStep = .step8_magicStickerExplanation
                     }
                 }
             }
@@ -1231,20 +1251,20 @@ struct FeatureExperienceGuideOverlay: View {
             }
             .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerEntry)) { _, frame in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
-                   magicStickerGuideStep == .step5_longPressHouseTab,
+                   magicStickerGuideStep == .step6_longPressHouseTab,
                    frame != nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step6_clickMagicStickerEntry
+                        magicStickerGuideStep = .step7_clickMagicStickerEntry
                     }
                 }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerAddButton)) { _, frame in
                 if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
                    magicStickerGuideRequiresMenuSetup,
-                   magicStickerGuideStep == .step2_clickFavoriteMenuSettings,
+                   magicStickerGuideStep == .step3_clickFavoriteMenuSettings,
                    frame != nil {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        magicStickerGuideStep = .step3_addMagicStickerButton
+                        magicStickerGuideStep = .step4_addMagicStickerButton
                     }
                 }
             }
@@ -1325,6 +1345,27 @@ struct FeatureExperienceGuideOverlay: View {
                    customColorPersonalizationGuideStep == .step2_scrollToThemeEntry,
                    frame != nil {
                     advanceCustomColorGuideToClickStepWithMinimumDwell()
+                }
+            }
+            .onChange(of: guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)) { _, frame in
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                   customColorPersonalizationGuideStep == .step5_scrollToPersonalization,
+                   let frame,
+                   isGuideTargetVisibleOnScreen(frame) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        customColorPersonalizationGuideStep = .step6_personalizationExplanation
+                    }
+                }
+            }
+            .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuSettingsEntry)) { _, frame in
+                // 魔法贴纸引导：滚动到常用菜单入口可见时，推进到点击步骤
+                if guideManager.currentFeatureExperienceFeature == .ootdDefaultBook,
+                   magicStickerGuideStep == .step2_scrollToFavoriteMenu,
+                   let frame,
+                   isGuideTargetVisibleOnScreen(frame) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        magicStickerGuideStep = .step3_clickFavoriteMenuSettings
+                    }
                 }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .wardrobeTagManagementEntry)) { _, frame in
@@ -2139,8 +2180,8 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先从魔法任务页返回到「我」，再去找主题配色豆腐块。",
+                    title: themeCustomizeGuideStep.title,
+                    message: themeCustomizeGuideStep.message,
                     currentStep: 1,
                     totalSteps: 5,
                     accent: .purple,
@@ -2158,8 +2199,8 @@ struct FeatureExperienceGuideOverlay: View {
                         VStack {
                             Spacer()
                             featureStepBubble(
-                                title: "下滑找到主题配色",
-                                message: "请继续向下滑动，在设置豆腐块区域找到「主题配色」入口。",
+                                title: themeCustomizeGuideStep.title,
+                                message: themeCustomizeGuideStep.message,
                                 currentStep: 2,
                                 totalSteps: 5,
                                 accent: .purple,
@@ -2181,8 +2222,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "点击主题配色豆腐块",
-                    message: "在「我」页找到「主题配色」豆腐块，点进去进入主题页。",
+                    title: themeCustomizeGuideStep.title,
+                    message: themeCustomizeGuideStep.message,
                     currentStep: 3,
                     totalSteps: 5,
                     accent: .purple,
@@ -2199,8 +2240,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 12,
-                    title: "切换到魔法配色页签",
-                    message: "这里有「原生魔法配色」和「客制化配色」两个页签。请切到「魔法配色」，看看自动调色是怎么工作的。",
+                    title: themeCustomizeGuideStep.title,
+                    message: themeCustomizeGuideStep.message,
                     currentStep: 4,
                     totalSteps: 5,
                     accent: .purple,
@@ -2209,8 +2250,8 @@ struct FeatureExperienceGuideOverlay: View {
                 ))
             case .step5_magicThemeExplanation:
                 return AnyView(bottomBubbleGuideContent(
-                    title: "认识魔法配色",
-                    message: "魔法配色会根据背景和卡片自动调整字体与模块颜色。你可以先看预览，再决定是否长期使用这套自动调色方案。",
+                    title: themeCustomizeGuideStep.title,
+                    message: themeCustomizeGuideStep.message,
                     currentStep: 5,
                     totalSteps: 5,
                     accent: .purple,
@@ -2229,10 +2270,10 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先从魔法任务页返回到「我」，再去找主题配色豆腐块。",
+                    title: customColorPersonalizationGuideStep.title,
+                    message: customColorPersonalizationGuideStep.message,
                     currentStep: 1,
-                    totalSteps: 5,
+                    totalSteps: 6,
                     accent: .purple,
                     onReturn: handleReturnToMeGuideAction
                 ))
@@ -2248,10 +2289,10 @@ struct FeatureExperienceGuideOverlay: View {
                         VStack {
                             Spacer()
                             featureStepBubble(
-                                title: "下滑找到主题配色",
-                                message: "请继续向下滑动，在设置豆腐块区域找到「主题配色」入口。",
+                                title: customColorPersonalizationGuideStep.title,
+                                message: customColorPersonalizationGuideStep.message,
                                 currentStep: 2,
-                                totalSteps: 5,
+                                totalSteps: 6,
                                 accent: .purple,
                                 actionTitle: nil,
                                 onSkip: { guideManager.dismissFeatureExperienceGuide() },
@@ -2271,10 +2312,10 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "点击主题配色豆腐块",
-                    message: "在「我」页找到「主题配色」豆腐块，点进去进入主题页。",
+                    title: customColorPersonalizationGuideStep.title,
+                    message: customColorPersonalizationGuideStep.message,
                     currentStep: 3,
-                    totalSteps: 5,
+                    totalSteps: 6,
                     accent: .purple,
                     actionTitle: nil,
                     onAction: nil
@@ -2289,15 +2330,40 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 12,
-                    title: "切换到客制化配色页签",
-                    message: "请切到「客制化配色」，我们下一步会看「个性化」入口和我的主题方案。",
+                    title: customColorPersonalizationGuideStep.title,
+                    message: customColorPersonalizationGuideStep.message,
                     currentStep: 4,
-                    totalSteps: 5,
+                    totalSteps: 6,
                     accent: .purple,
                     actionTitle: nil,
                     onAction: nil
                 ))
-            case .step5_personalizationExplanation:
+            case .step5_scrollToPersonalization:
+                return AnyView(
+                    ZStack {
+                        WidgetScrollHintView(
+                            title: "请向下滑动",
+                            subtitle: "「个性化」入口在更下方"
+                        )
+                        .allowsHitTesting(false)
+
+                        VStack {
+                            Spacer()
+                            featureStepBubble(
+                                title: customColorPersonalizationGuideStep.title,
+                                message: customColorPersonalizationGuideStep.message,
+                                currentStep: 5,
+                                totalSteps: 6,
+                                accent: .purple,
+                                actionTitle: nil,
+                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                onAction: nil
+                            )
+                            .padding(.bottom, 120)
+                        }
+                    }
+                )
+            case .step6_personalizationExplanation:
                 let fallbackFrame = CGRect(
                     x: 16,
                     y: max(geometry.safeAreaInsets.top + 330, geometry.size.height * 0.56),
@@ -2312,10 +2378,10 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "认识个性化入口",
-                    message: "这里是「个性化」豆腐块。点击后会展开「我的主题方案」，你可以继续自定义字体配色和卡片样式，打造自己的专属主题。",
-                    currentStep: 5,
-                    totalSteps: 5,
+                    title: customColorPersonalizationGuideStep.title,
+                    message: customColorPersonalizationGuideStep.message,
+                    currentStep: 6,
+                    totalSteps: 6,
                     accent: .purple,
                     actionTitle: "知道了",
                     onAction: {
@@ -2333,8 +2399,8 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先从魔法任务页返回到「我」，我们去找本地文件备份入口。",
+                    title: localFileBackupRestoreGuideStep.title,
+                    message: localFileBackupRestoreGuideStep.message,
                     currentStep: 1,
                     totalSteps: 6,
                     accent: .indigo,
@@ -2352,8 +2418,8 @@ struct FeatureExperienceGuideOverlay: View {
                         VStack {
                             Spacer()
                             featureStepBubble(
-                                title: "下滑找到系统与更多",
-                                message: "继续向下滑动，在设置豆腐块区域找到「系统与更多」。",
+                                title: localFileBackupRestoreGuideStep.title,
+                                message: localFileBackupRestoreGuideStep.message,
                                 currentStep: 2,
                                 totalSteps: 6,
                                 accent: .indigo,
@@ -2375,8 +2441,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "点击系统与更多",
-                    message: "点开「系统与更多」，进入系统设置页。",
+                    title: localFileBackupRestoreGuideStep.title,
+                    message: localFileBackupRestoreGuideStep.message,
                     currentStep: 3,
                     totalSteps: 6,
                     accent: .indigo,
@@ -2396,8 +2462,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "先认识「备份数据」",
-                    message: "备份是最重要的一步：它会把当前数据打包保存，防止误删、换机或重装时丢失记录。建议养成定期备份习惯。",
+                    title: localFileBackupRestoreGuideStep.title,
+                    message: localFileBackupRestoreGuideStep.message,
                     currentStep: 4,
                     totalSteps: 6,
                     accent: .indigo,
@@ -2421,8 +2487,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "再认识「恢复数据」",
-                    message: "恢复可以把已备份的数据找回来，支持跨设备/跨平台迁移后继续使用。先有备份，恢复才有意义。",
+                    title: localFileBackupRestoreGuideStep.title,
+                    message: localFileBackupRestoreGuideStep.message,
                     currentStep: 5,
                     totalSteps: 6,
                     accent: .indigo,
@@ -2446,8 +2512,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "现在做一次首次备份",
-                    message: "请点击「备份数据」完成首次备份。备份可能需要一点时间；若你现在不方便，也可以点左上角「跳过」，下次再备份。",
+                    title: localFileBackupRestoreGuideStep.title,
+                    message: localFileBackupRestoreGuideStep.message,
                     currentStep: 6,
                     totalSteps: 6,
                     accent: .indigo,
@@ -2465,8 +2531,8 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先从魔法任务页返回到「我」，我们去找导出表格入口。",
+                    title: exportCSVGuideStep.title,
+                    message: exportCSVGuideStep.message,
                     currentStep: 1,
                     totalSteps: 4,
                     accent: .teal,
@@ -2484,8 +2550,8 @@ struct FeatureExperienceGuideOverlay: View {
                         VStack {
                             Spacer()
                             featureStepBubble(
-                                title: "下滑找到系统与更多",
-                                message: "继续向下滑动，在设置豆腐块区域找到「系统与更多」。",
+                                title: exportCSVGuideStep.title,
+                                message: exportCSVGuideStep.message,
                                 currentStep: 2,
                                 totalSteps: 4,
                                 accent: .teal,
@@ -2507,8 +2573,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "点击系统与更多",
-                    message: "点开「系统与更多」，进入系统设置页。",
+                    title: exportCSVGuideStep.title,
+                    message: exportCSVGuideStep.message,
                     currentStep: 3,
                     totalSteps: 4,
                     accent: .teal,
@@ -2531,8 +2597,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "点击导出到 CSV",
-                    message: "点击「导出 CSV (Export CSV)」，即可开始导出表格文件。",
+                    title: exportCSVGuideStep.title,
+                    message: exportCSVGuideStep.message,
                     currentStep: 4,
                     totalSteps: 4,
                     accent: .teal,
@@ -2549,8 +2615,8 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先从魔法任务页返回到「我」，再去「账户与同步」。",
+                    title: cloudFileBackupRestoreGuideStep.title,
+                    message: cloudFileBackupRestoreGuideStep.message,
                     currentStep: 1,
                     totalSteps: 5,
                     accent: .blue,
@@ -2571,8 +2637,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 20,
-                    title: "点击账户与同步",
-                    message: "点开这个豆腐块，进入账号与 iCloud 同步管理页面。",
+                    title: cloudFileBackupRestoreGuideStep.title,
+                    message: cloudFileBackupRestoreGuideStep.message,
                     currentStep: 2,
                     totalSteps: 5,
                     accent: .blue,
@@ -2594,8 +2660,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 12,
-                    title: "先登录 Apple ID",
-                    message: "点击这里完成 Apple 登录。登录后才能使用云端文件备份与恢复，以及 iCloud 自动同步。",
+                    title: cloudFileBackupRestoreGuideStep.title,
+                    message: cloudFileBackupRestoreGuideStep.message,
                     currentStep: 3,
                     totalSteps: 5,
                     accent: .blue,
@@ -2617,8 +2683,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "认识云端文件备份与恢复",
-                    message: "这里可以「备份到云端」和「从云端恢复」。建议你先备份一份，这样换设备或误删后都能快速找回数据。",
+                    title: cloudFileBackupRestoreGuideStep.title,
+                    message: cloudFileBackupRestoreGuideStep.message,
                     currentStep: 4,
                     totalSteps: 5,
                     accent: .blue,
@@ -2645,8 +2711,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "iCloud 及时同步与延迟说明",
-                    message: "开启后会自动同步变更。大多数情况下是秒级到几十秒；网络较慢、系统省电或后台调度时，可能延迟到 1～5 分钟，属正常现象。",
+                    title: cloudFileBackupRestoreGuideStep.title,
+                    message: cloudFileBackupRestoreGuideStep.message,
                     currentStep: 5,
                     totalSteps: 5,
                     accent: .blue,
@@ -2666,8 +2732,8 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先返回到「我」页，我们一起去找梦幻衣橱豆腐块。",
+                    title: personalPreferenceGuideStep.title,
+                    message: personalPreferenceGuideStep.message,
                     currentStep: 1,
                     totalSteps: 5,
                     accent: .pink,
@@ -2683,8 +2749,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "点击梦幻衣橱豆腐块",
-                    message: "进入梦幻衣橱设置页后，我们会一起看界面样式、筛选模式和应用外观这些个性化体验。",
+                    title: personalPreferenceGuideStep.title,
+                    message: personalPreferenceGuideStep.message,
                     currentStep: 2,
                     totalSteps: 5,
                     accent: .pink,
@@ -2706,8 +2772,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "界面样式：决定衣橱导航布局",
-                    message: "这里用来切换衣橱的导航形态。不同样式会影响顶部导航与操作按钮的组织方式，按你的使用习惯选更顺手的就行。",
+                    title: personalPreferenceGuideStep.title,
+                    message: personalPreferenceGuideStep.message,
                     currentStep: 3,
                     totalSteps: 5,
                     accent: .pink,
@@ -2733,8 +2799,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "筛选模式：决定你怎么筛衣服",
-                    message: "经典筛选是下拉菜单，适合快速单项筛；多维筛选是半屏多选，适合组合条件做更精细筛选。",
+                    title: personalPreferenceGuideStep.title,
+                    message: personalPreferenceGuideStep.message,
                     currentStep: 4,
                     totalSteps: 5,
                     accent: .pink,
@@ -2760,8 +2826,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "应用外观：控制整体观感",
-                    message: "这里是个性化最核心的一块：背景类型决定用纯色还是图片；背景颜色/图片与不透明度决定整体氛围；高斯模糊决定前景内容与背景的层次；「字体配色与卡片样式」则影响文字可读性和卡片风格。搭配好这几项，你会得到更舒适也更有个人风格的界面。",
+                    title: personalPreferenceGuideStep.title,
+                    message: personalPreferenceGuideStep.message,
                     currentStep: 5,
                     totalSteps: 5,
                     accent: .pink,
@@ -2780,8 +2846,8 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先返回到「我」页，我们一起去找梦幻衣橱豆腐块。",
+                    title: privacyDisplayGuideStep.title,
+                    message: privacyDisplayGuideStep.message,
                     currentStep: 1,
                     totalSteps: 4,
                     accent: .pink,
@@ -2797,8 +2863,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "点击梦幻衣橱豆腐块",
-                    message: "进入梦幻衣橱设置页后，我们来认识「隐私显示」里的两个开关。",
+                    title: privacyDisplayGuideStep.title,
+                    message: privacyDisplayGuideStep.message,
                     currentStep: 2,
                     totalSteps: 4,
                     accent: .pink,
@@ -2820,8 +2886,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "入库价格开关",
-                    message: "打开时，衣橱列表会显示每件衣服的入库价格；关闭后会隐藏入库价格，适合共享屏幕或给别人看衣橱时保护隐私。",
+                    title: privacyDisplayGuideStep.title,
+                    message: privacyDisplayGuideStep.message,
                     currentStep: 3,
                     totalSteps: 4,
                     accent: .pink,
@@ -2848,8 +2914,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 14,
-                    title: "原价开关",
-                    message: "这个开关控制列表中是否显示原价信息。你可以和入库价格分开管理：例如只看当前入库价，或两者都隐藏，让衣橱浏览更清爽、更私密。",
+                    title: privacyDisplayGuideStep.title,
+                    message: privacyDisplayGuideStep.message,
                     currentStep: 4,
                     totalSteps: 4,
                     accent: .pink,
@@ -2869,8 +2935,8 @@ struct FeatureExperienceGuideOverlay: View {
             case .step1_returnToMe:
                 return AnyView(returnToMeGuideContent(
                     in: geometry,
-                    title: "返回「我」界面",
-                    message: "先返回到「我」页，我们一起去找梦幻衣橱豆腐块。",
+                    title: tagBrandFieldGuideStep.title,
+                    message: tagBrandFieldGuideStep.message,
                     currentStep: 1,
                     totalSteps: 6,
                     accent: .pink,
@@ -2886,8 +2952,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "点击梦幻衣橱豆腐块",
-                    message: "进入梦幻衣橱设置页后，我们会依次认识标签管理、品牌管理和属性字段管理。",
+                    title: tagBrandFieldGuideStep.title,
+                    message: tagBrandFieldGuideStep.message,
                     currentStep: 2,
                     totalSteps: 6,
                     accent: .pink,
@@ -2906,8 +2972,8 @@ struct FeatureExperienceGuideOverlay: View {
                         VStack {
                             Spacer()
                             featureStepBubble(
-                                title: "下滑找到管理项",
-                                message: "请继续下滑到页面下方，找到「标签管理 / 品牌管理 / 属性字段排序与显示」这三项。",
+                                title: tagBrandFieldGuideStep.title,
+                                message: tagBrandFieldGuideStep.message,
                                 currentStep: 3,
                                 totalSteps: 6,
                                 accent: .pink,
@@ -2935,8 +3001,8 @@ struct FeatureExperienceGuideOverlay: View {
                     return AnyView(highlightedRectGuideContent(
                         frame: targetFrame,
                         cornerRadius: 14,
-                        title: "标签管理",
-                        message: "这里管理你所有标签（例如风格、场景、季节等）。把标签体系整理好后，衣橱筛选会更快、更准，也更方便复用。",
+                        title: tagBrandFieldGuideStep.title,
+                        message: tagBrandFieldGuideStep.message,
                         currentStep: 4,
                         totalSteps: 6,
                         accent: .pink,
@@ -2989,8 +3055,8 @@ struct FeatureExperienceGuideOverlay: View {
                     return AnyView(highlightedRectGuideContent(
                         frame: targetFrame,
                         cornerRadius: 14,
-                        title: "品牌管理",
-                        message: "这里统一维护品牌名称，避免同品牌出现多个写法。品牌数据干净后，统计、筛选和搜索都会更稳定。",
+                        title: tagBrandFieldGuideStep.title,
+                        message: tagBrandFieldGuideStep.message,
                         currentStep: 5,
                         totalSteps: 6,
                         accent: .pink,
@@ -3043,8 +3109,8 @@ struct FeatureExperienceGuideOverlay: View {
                     return AnyView(highlightedRectGuideContent(
                         frame: targetFrame,
                         cornerRadius: 14,
-                        title: "属性字段管理",
-                        message: "这里可以控制属性字段的显示与排序。把常用字段放前面、低频字段放后面，日常录入和查看都会更顺手。",
+                        title: tagBrandFieldGuideStep.title,
+                        message: tagBrandFieldGuideStep.message,
                         currentStep: 6,
                         totalSteps: 6,
                         accent: .pink,
@@ -3091,8 +3157,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 18,
-                    title: "点击 House 的穿搭手帐热区",
-                    message: "先从 House 里的穿搭手帐热区进入，我们再认识手帐本和书页。",
+                    title: ootdGuideStep.title,
+                    message: ootdGuideStep.message,
                     currentStep: 1,
                     totalSteps: 2,
                     accent: .orange,
@@ -3102,8 +3168,8 @@ struct FeatureExperienceGuideOverlay: View {
                 ))
             case .step2_ootdExplanation:
                 return AnyView(bottomBubbleGuideContent(
-                    title: "认识穿搭手帐和书页",
-                    message: "这里先看到的是手帐本列表；点进任意一本后，就能看到它下面的书页。书页里可以继续记录搭配、图片和灵感。",
+                    title: ootdGuideStep.title,
+                    message: ootdGuideStep.message,
                     currentStep: 2,
                     totalSteps: 2,
                     accent: .orange,
@@ -3129,8 +3195,8 @@ struct FeatureExperienceGuideOverlay: View {
                     highlightedRectGuideContent(
                         frame: targetFrame,
                         cornerRadius: 16,
-                        title: "点击 House 的梦裙日历热区",
-                        message: "先从 House 里的梦裙日历热区进入，我们再认识最近、月度、年度三个视图。",
+                        title: calendarGuideStep.title,
+                        message: calendarGuideStep.message,
                         currentStep: 1,
                         totalSteps: 2,
                         accent: .purple,
@@ -3140,8 +3206,8 @@ struct FeatureExperienceGuideOverlay: View {
                     )
                 case .step2_calendarExplanation:
                     bottomBubbleGuideContent(
-                        title: "认识梦裙日历",
-                        message: "最近会按时间线看近期记录，月度适合查具体月份，年度更适合总览全年的热度分布。右上角默认勾选了「只看心愿尾款」，所以你一进来就会先看到尾款相关内容。",
+                        title: calendarGuideStep.title,
+                        message: calendarGuideStep.message,
                         currentStep: 2,
                         totalSteps: 2,
                         accent: .purple,
@@ -3166,14 +3232,38 @@ struct FeatureExperienceGuideOverlay: View {
                 case .step1_returnToMeForMenuSetup:
                     returnToMeGuideContent(
                         in: geometry,
-                        title: "先返回「我」界面",
-                        message: "你的常用菜单里还没有「魔法贴纸」，先从魔法任务页返回到「我」，我们去补上这个入口。",
+                        title: magicStickerGuideStep.title,
+                        message: magicStickerGuideStep.message,
                         currentStep: magicStickerGuideDisplayStep(for: .step1_returnToMeForMenuSetup),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         onReturn: handleMagicStickerGuideReturnAction
                     )
-                case .step2_clickFavoriteMenuSettings:
+                case .step2_scrollToFavoriteMenu:
+                    // 滚动引导：提示用户往下滑找到常用菜单
+                    ZStack {
+                        WidgetScrollHintView(
+                            title: "请向下滑动",
+                            subtitle: "「常用菜单」入口在更下方"
+                        )
+                        .allowsHitTesting(false)
+
+                        VStack {
+                            Spacer()
+                            featureStepBubble(
+                                title: magicStickerGuideStep.title,
+                                message: magicStickerGuideStep.message,
+                                currentStep: magicStickerGuideDisplayStep(for: .step2_scrollToFavoriteMenu),
+                                totalSteps: magicStickerGuideTotalSteps,
+                                accent: .pink,
+                                actionTitle: nil,
+                                onSkip: { guideManager.dismissFeatureExperienceGuide() },
+                                onAction: nil
+                            )
+                            .padding(.bottom, max(geometry.safeAreaInsets.bottom + 80, 100))
+                        }
+                    }
+                case .step3_clickFavoriteMenuSettings:
                     let fallbackFrame = CGRect(
                         x: geometry.size.width * 0.5 + 8,
                         y: geometry.size.height * 0.48,
@@ -3188,16 +3278,16 @@ struct FeatureExperienceGuideOverlay: View {
                     highlightedRectGuideContent(
                         frame: targetFrame,
                         cornerRadius: 16,
-                        title: "点击「常用菜单」",
-                        message: "先进入「常用菜单设置」，把「魔法贴纸」加入长按菜单。",
-                        currentStep: magicStickerGuideDisplayStep(for: .step2_clickFavoriteMenuSettings),
+                        title: magicStickerGuideStep.title,
+                        message: magicStickerGuideStep.message,
+                        currentStep: magicStickerGuideDisplayStep(for: .step3_clickFavoriteMenuSettings),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         actionTitle: nil,
                         onAction: nil,
                         bubbleOnTop: true
                     )
-                case .step3_addMagicStickerButton:
+                case .step4_addMagicStickerButton:
                     let fallbackFrame = CGRect(
                         x: geometry.size.width - 74,
                         y: max(geometry.safeAreaInsets.top + 210, geometry.size.height * 0.36),
@@ -3212,26 +3302,26 @@ struct FeatureExperienceGuideOverlay: View {
                     highlightedRectGuideContent(
                         frame: targetFrame,
                         cornerRadius: 22,
-                        title: "添加「魔法贴纸」",
-                        message: "点击右侧 + 把「魔法贴纸」加进常用菜单。若提示已满，先移除一个旧入口再添加。",
-                        currentStep: magicStickerGuideDisplayStep(for: .step3_addMagicStickerButton),
+                        title: magicStickerGuideStep.title,
+                        message: magicStickerGuideStep.message,
+                        currentStep: magicStickerGuideDisplayStep(for: .step4_addMagicStickerButton),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         actionTitle: nil,
                         onAction: nil,
                         bubbleOnTop: true
                     )
-                case .step4_returnToMeAfterMenuSetup:
+                case .step5_returnToMeAfterMenuSetup:
                     returnToMeGuideContent(
                         in: geometry,
-                        title: "返回「我」界面",
-                        message: "很好！现在从常用菜单设置返回到「我」，我们继续长按 House tab 体验魔法贴纸。",
-                        currentStep: magicStickerGuideDisplayStep(for: .step4_returnToMeAfterMenuSetup),
+                        title: magicStickerGuideStep.title,
+                        message: magicStickerGuideStep.message,
+                        currentStep: magicStickerGuideDisplayStep(for: .step5_returnToMeAfterMenuSetup),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         onReturn: handleMagicStickerGuideReturnFromMenuSettingsAction
                     )
-                case .step5_longPressHouseTab:
+                case .step6_longPressHouseTab:
                     let safeAreaBottom = geometry.safeAreaInsets.bottom
                     let tabBarHeight = 65.0 + safeAreaBottom
                     let fallbackHouseTabFrame = CGRect(
@@ -3269,9 +3359,9 @@ struct FeatureExperienceGuideOverlay: View {
 
                         VStack {
                             featureStepBubble(
-                                title: "长按 House tab",
-                                message: "请长按底部的 House tab，弹出常用菜单后，我们一起找到「魔法贴纸」。",
-                                currentStep: magicStickerGuideDisplayStep(for: .step5_longPressHouseTab),
+                                title: magicStickerGuideStep.title,
+                                message: magicStickerGuideStep.message,
+                                currentStep: magicStickerGuideDisplayStep(for: .step6_longPressHouseTab),
                                 totalSteps: magicStickerGuideTotalSteps,
                                 accent: .pink,
                                 actionTitle: nil,
@@ -3282,7 +3372,7 @@ struct FeatureExperienceGuideOverlay: View {
                             Spacer()
                         }
                     }
-                case .step6_clickMagicStickerEntry:
+                case .step7_clickMagicStickerEntry:
                     let fallbackFrame = CGRect(x: geometry.size.width * 0.18, y: geometry.size.height * 0.56, width: 96, height: 84)
                     let targetFrame = aiGuideTargetFrame(
                         globalFrame: guideManager.guideTargetFrame(for: .favoriteMenuMagicStickerEntry),
@@ -3292,20 +3382,20 @@ struct FeatureExperienceGuideOverlay: View {
                     highlightedRectGuideContent(
                         frame: targetFrame,
                         cornerRadius: 24,
-                        title: "点击「魔法贴纸」",
-                        message: "在长按弹出的常用菜单里点击「魔法贴纸」，进入默认贴纸编辑页。",
-                        currentStep: magicStickerGuideDisplayStep(for: .step6_clickMagicStickerEntry),
+                        title: magicStickerGuideStep.title,
+                        message: magicStickerGuideStep.message,
+                        currentStep: magicStickerGuideDisplayStep(for: .step7_clickMagicStickerEntry),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         actionTitle: nil,
                         onAction: nil,
                         bubbleOnTop: true
                     )
-                case .step7_magicStickerExplanation:
+                case .step8_magicStickerExplanation:
                     bottomBubbleGuideContent(
-                        title: "认识魔法贴纸",
-                        message: "这里会直接进入默认贴纸页。主体区域是贴纸编辑内容，常用菜单能帮你继续跳到别的 House 功能；如果把贴纸加入手帐，还能继续回到对应手帐里编辑。",
-                        currentStep: magicStickerGuideDisplayStep(for: .step7_magicStickerExplanation),
+                        title: magicStickerGuideStep.title,
+                        message: magicStickerGuideStep.message,
+                        currentStep: magicStickerGuideDisplayStep(for: .step8_magicStickerExplanation),
                         totalSteps: magicStickerGuideTotalSteps,
                         accent: .pink,
                         actionTitle: "知道了",
@@ -3340,10 +3430,10 @@ struct FeatureExperienceGuideOverlay: View {
                     guideManager.guideTargetFrame(for: .wardrobeEditMenuEntry) != nil
                 let step1Frame = shouldHighlightEditEntry ? menuAreaFrame : targetFrame
                 let step1CornerRadius: CGFloat = shouldHighlightEditEntry ? 14 : 18
-                let step1Title = shouldHighlightEditEntry ? "点击「编辑」" : "点击右上角更多按钮"
+                let step1Title = shouldHighlightEditEntry ? "点击「编辑」" : batchEditGuideStep.title
                 let step1Message = shouldHighlightEditEntry
                     ? "菜单已经弹出啦，点击「编辑」进入批量编辑模式。"
-                    : "先点右上角「更多」，再在弹出菜单里选择「编辑」。进入编辑态后，我们继续下一步。"
+                    : batchEditGuideStep.message
                 return AnyView(highlightedRectGuideContent(
                     frame: step1Frame,
                     cornerRadius: step1CornerRadius,
@@ -3372,8 +3462,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 16,
-                    title: "选中一张卡片",
-                    message: "随便点选一张衣橱卡片，让底部批量工具条进入可用状态。",
+                    title: batchEditGuideStep.title,
+                    message: batchEditGuideStep.message,
                     currentStep: 2,
                     totalSteps: 4,
                     accent: .green,
@@ -3396,8 +3486,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: toolbarFrame,
                     cornerRadius: 16,
-                    title: "认识批量编辑工具条",
-                    message: "底部这排就是批量编辑常用操作：删除、复制、更多、全选。更多里还能继续做标签、品牌、颜色、尺码、状态等批量处理。",
+                    title: batchEditGuideStep.title,
+                    message: batchEditGuideStep.message,
                     currentStep: 3,
                     totalSteps: 4,
                     accent: .green,
@@ -3427,8 +3517,8 @@ struct FeatureExperienceGuideOverlay: View {
                 return AnyView(highlightedRectGuideContent(
                     frame: targetFrame,
                     cornerRadius: 18,
-                    title: "点完成结束批量编辑",
-                    message: "现在不用继续操作了，直接点右上角的完成勾选，退出这次批量编辑体验。",
+                    title: batchEditGuideStep.title,
+                    message: batchEditGuideStep.message,
                     currentStep: 4,
                     totalSteps: 4,
                     accent: .green,

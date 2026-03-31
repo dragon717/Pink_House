@@ -185,15 +185,31 @@ extension FeatureExperienceGuideOverlay {
         step: WealthGuideStep,
         onNext: (() -> Void)? = nil
     ) -> some View {
-        WealthGuideBubbleView(
-            step: step,
-            onSkip: {
-                guideManager.dismissFeatureExperienceGuide()
-            },
-            onNext: onNext,
-            onComplete: {
-                guideManager.completeFeatureExperienceGuide()
+        let actionTitle: String? = {
+            switch step {
+            case .step3_divination: return "下一步：数钱"
+            case .step4_moneyCounting: return "下一步：安财"
+            case .step5_wealthStorage: return "知道了"
+            default: return nil
             }
+        }()
+        let action: (() -> Void)? = {
+            if step == .step5_wealthStorage {
+                return { guideManager.completeFeatureExperienceGuide() }
+            } else if actionTitle != nil {
+                return onNext
+            }
+            return nil
+        }()
+        return featureStepBubble(
+            title: step.title,
+            message: step.message,
+            currentStep: step.rawValue,
+            totalSteps: WealthGuideStep.allCases.count,
+            accent: magicPalette.accent,
+            actionTitle: actionTitle,
+            onSkip: { guideManager.dismissFeatureExperienceGuide() },
+            onAction: action
         )
     }
 
@@ -523,13 +539,18 @@ extension FeatureExperienceGuideOverlay {
         onSkip: @escaping () -> Void,
         onComplete: @escaping () -> Void
     ) -> some View {
-        AIAnalysisGuideBubbleView(
-            step: step,
-            titleOverride: titleOverride,
-            messageOverride: messageOverride,
-            completionButtonTitleOverride: completionButtonTitleOverride,
+        let actionTitle: String? = step.showsCompletionButton
+            ? (completionButtonTitleOverride ?? step.completionButtonTitle)
+            : nil
+        return featureStepBubble(
+            title: titleOverride ?? step.title,
+            message: messageOverride ?? step.message,
+            currentStep: step.currentStepInFlow,
+            totalSteps: step.totalStepsInFlow,
+            accent: magicPalette.accent,
+            actionTitle: actionTitle,
             onSkip: onSkip,
-            onComplete: onComplete
+            onAction: step.showsCompletionButton ? onComplete : nil
         )
     }
 }
