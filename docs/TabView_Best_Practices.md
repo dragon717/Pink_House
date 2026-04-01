@@ -322,3 +322,118 @@ if #available(iOS 26.0, *) {
 5. **测试时关注最低支持版本**
 
 遵循这些实践，可以构建出稳定、兼容且符合 Apple 设计规范的 TabView 界面。
+
+---
+
+## 9. iOS 26 Tab 项位置定位（Liquid Glass 适配）
+
+### 问题背景
+
+iOS 26 引入 Liquid Glass 设计，TabBar 内部结构发生破坏性变更：
+
+| 平台 | UITabBar | UITabBarButton | 替代结构 |
+|------|----------|---------------|---------|
+| iOS ≤ 25 | ✅ | ✅ | — |
+| iOS 26 iPhone | ✅ 存在 | ❌ 移除 | `_UITabBarPlatterView` + `_UITabBarAuxiliaryView` |
+| iOS 26 iPad | ❌ 不存在 | ❌ | 顶部 floating pill，需深度搜索 |
+
+**影响**：任何依赖 `UITabBarButton` 遍历的功能（长按菜单、新手引导高亮等）在 iOS 26 上全部失效。
+
+### iOS 26 内部视图结构
+
+**iPhone（tab bar 在底部）：**
+```
+UITabBar: (0, 849, 430, 83)
+├── _UITabBarPlatterView: (21, 0, 318, 62)    ← 主 tab 容器（3个非search tab）
+├── _UITabBarPlatterView: (28, 7, 48, 48)     ← 内部小元素
+├── _UITabBarAuxiliaryView: (347, 0, 62, 62)  ← Search tab（独立分离）
+└── _UIPortalView: (0, 0, 0, 0)
+```
+
+**iPad（tab bar 在顶部 floating pill）：**
+```
+UITabBar 不在 view hierarchy 中
+需要递归搜索 window 寻找 _UITabBarPlatterView
+```
+
+### 定位策略：分层降级
+
+```
+优先级1: UITabBarButton 遍历 (iOS ≤ 25)
+    ↓ 失败
+优先级2: _UITabBarPlatterView 等分 (iOS 26, UITabBar 存在)
+    ↓ 失败
+优先级3: 深度搜索 PlatterView (iOS 26 iPad, UITabBar 不存在)
+    ↓ 失败
+优先级4: SwiftUI captureGuideTarget (iOS ≤ 25)
+    ↓ 失败
+优先级5: 智能 Fallback (按设备/iOS版本区分)
+```
+
+### PlatterView 等分算法
+
+```swift
+// 找到主 PlatterView（宽度 > 100 的最大 PlatterView）
+let platter = tabBar.subviews
+    .filter { NSStringFromClass(type(of: $0)).contains("PlatterView") && $0.frame.width > 100 }
+    .max { $0.frame.width < $1.frame.width }
+
+// 按主 tab 数量等分（不含 search tab）
+let mainTabCount = 3
+let segmentWidth = platterGlobal.width / CGFloat(mainTabCount)
+let tabFrame = CGRect(
+    x: platterGlobal.minX + segmentWidth * CGFloat(tabIndex),
+    y: platterGlobal.minY,
+    width: segmentWidth,
+    height: platterGlobal.height
+)
+```
+
+### SwiftUI Tab label 捕获失效
+
+iOS 26 的 `Tab { } label: { }` 中 label 闭包**不再作为常规 SwiftUI 视图渲染**，而是被提取为 Liquid Glass 的配置数据。因此 `GeometryReader` 的 `onAppear` 永远不会触发。
+
+```swift
+// ❌ iOS 26 上永远得不到 frame
+Tab(value: 1) {
+    Content()
+} label: {
+    Label("Title", systemImage: "icon")
+        .background {
+            Color.clear.captureGuideTarget(.homeHouseTab) // onAppear 不触发
+        }
+}
+```
+
+**应对**：Tab 项定位在 iOS 26 上完全依赖 UIKit PlatterView 路径，不依赖 SwiftUI 捕获。
+
+### Fallback 计算要点
+
+```swift
+// ❌ 错误：假设 tab bar 居中
+x: screenWidth / 2 - 34  // Liquid Glass platter 不居中，search tab 在右侧
+
+// ✅ iPhone iOS 26：platter 偏左
+let platterX = screenWidth * 0.05
+let platterWidth = screenWidth * 0.74
+let tabX = platterX + (platterWidth / 3) * tabIndex
+
+// ✅ iPad iOS 26：顶部 floating pill
+let pillY = safeAreaTop + 4
+let pillWidth = screenWidth * 0.4  // 约占 40%
+let pillX = (screenWidth - pillWidth) / 2
+```
+
+### 核心代码文件
+
+- `TabBarItemAnchorResolver.swift` — 统一定位入口，分层降级
+- `SmallWorldMenuOverlay.swift` — 长按轮盘菜单触发区域 + `buildFallbackFrame`
+- `NewbieGuideCaptureAndHighlight.swift` — SwiftUI frame 捕获（iOS ≤ 25 有效）
+
+### 调试检查清单
+
+- [ ] iPhone iOS 26: PlatterView 等分是否对齐实际 tab 按钮？
+- [ ] iPad iOS 26: 深度搜索是否找到 PlatterView？
+- [ ] Tab bar 最小化/展开时位置是否跟随更新？
+- [ ] 横屏/分屏模式下 fallback 计算是否正确？
+- [ ] iOS ≤ 25 设备不受影响？
