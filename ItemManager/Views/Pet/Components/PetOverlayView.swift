@@ -75,7 +75,6 @@ struct PetOverlayView: View {
                 // AI分析结果层
                 analysisResultLayer
             }
-            .gesture(dragGesture(in: geometry))
             .coordinateSpace(name: "PetOverlaySpace")
             .animation(getAnimation(for: interactionManager.state), value: interactionManager.state)
             .onAppear { isBreathing = true }
@@ -113,18 +112,29 @@ struct PetOverlayView: View {
     @ViewBuilder
     private func petViewLayer(geometry: GeometryProxy) -> some View {
         // 新手引导跑步动画期间隐藏原悬浮小猫
-        let shouldHide = guideManager.isRunningAnimation || 
-                        (guideManager.currentStep == .pointing && guideManager.showPointingVideo)
-        
-        PetImageView(
-            petImagePrefix: petImagePrefix,
-            state: interactionManager.state,
-            isBreathing: isBreathing,
-            catWidth: catWidth,
-            position: calculatePosition(geometry: geometry),
-            rotation: getRotationAngle()
-        )
-        .opacity(isHiddenForSnapshot || shouldHide ? 0 : 1)
+        let shouldHide = guideManager.isRunningAnimation ||
+            (guideManager.currentStep == .pointing && guideManager.showPointingVideo)
+        let petPosition = calculatePosition(geometry: geometry)
+
+        ZStack {
+            PetImageView(
+                petImagePrefix: petImagePrefix,
+                state: interactionManager.state,
+                isBreathing: isBreathing,
+                catWidth: catWidth,
+                position: petPosition,
+                rotation: getRotationAngle()
+            )
+            .opacity(isHiddenForSnapshot || shouldHide ? 0 : 1)
+
+            // 将拖拽起点限制在宠物附近，避免整屏手势覆盖底层热区。
+            Color.clear
+                .frame(width: catWidth + 28, height: catWidth + 44)
+                .contentShape(Rectangle())
+                .position(petPosition)
+                .gesture(dragGesture(in: geometry))
+                .allowsHitTesting(!(isHiddenForSnapshot || shouldHide))
+        }
     }
     
     @ViewBuilder

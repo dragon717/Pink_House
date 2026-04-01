@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SmallWorldSettingsView: View {
     @AppStorage("smallWorldSceneMode") private var smallWorldSceneMode = SmallWorldSceneMode.auto.rawValue
-    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.frenchRetro.rawValue
+    @AppStorage("smallWorldStyle") private var smallWorldStyle = SmallWorldStyle.rococo.rawValue
     @AppStorage("isSpatialSceneEnabled") private var isSpatialSceneEnabled = false
     
     @State private var showingClearCacheAlert = false
@@ -12,7 +12,7 @@ struct SmallWorldSettingsView: View {
             // 预览区域
             AdaptiveSection(header: "预览") {
                 SmallWorldPreview(
-                    style: SmallWorldStyle(rawValue: smallWorldStyle) ?? .frenchRetro,
+                    style: SmallWorldStyle(rawValue: smallWorldStyle) ?? .rococo,
                     sceneMode: SmallWorldSceneMode(rawValue: smallWorldSceneMode) ?? .auto,
                     isSpatialEnabled: isSpatialSceneEnabled
                 )
