@@ -114,33 +114,41 @@ struct BatchStringSelectionView: View {
 // MARK: - 批量状态选择视图
 struct BatchStatusSelectionView: View {
     @Binding var selectedStatus: String?
+    let options: [String]
     @Environment(\.dismiss) private var dismiss
     
     @State private var tempSelectedStatus: String? = nil
-    
-    private let statusOptions: [(String, String)] = [
-        ("上架", "checkmark.circle.fill"),
-        ("下架", "xmark.circle.fill")
-    ]
+
+    private var statusOptions: [String] {
+        Array(
+            Set(
+                options.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            )
+        ).sorted()
+    }
     
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(statusOptions, id: \.0) { status, icon in
-                        HStack {
-                            Image(systemName: icon)
-                                .foregroundStyle(status == "上架" ? .green : .orange)
-                            Text(status)
-                            Spacer()
-                            if tempSelectedStatus == status {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.pink)
+                    if statusOptions.isEmpty {
+                        Text("暂无可选状态")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(statusOptions, id: \.self) { status in
+                            HStack {
+                                Text(status)
+                                Spacer()
+                                if tempSelectedStatus == status {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.pink)
+                                }
                             }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            tempSelectedStatus = status
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                tempSelectedStatus = status
+                            }
                         }
                     }
                 }

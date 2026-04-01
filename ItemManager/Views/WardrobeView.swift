@@ -42,7 +42,7 @@ struct WardrobeView: View {
     @State private var showingAccessorySelection = false
     @State private var tempSelectedAccessories: [String] = []
     @State private var showingStatusSelection = false
-    @State private var tempSelectedStatus: String? = nil
+    @State private var tempSelectedCondition: String? = nil
     
     // 合并为小物到裙装
     @State private var showingMergeToAccessorySheet = false
@@ -215,6 +215,19 @@ struct WardrobeView: View {
             return result.sorted { $0.createdAt > $1.createdAt }
         }
     }
+
+    private var conditionBatchOptions: [String] {
+        let values = clothings
+            .flatMap {
+                $0.condition
+                    .replacingOccurrences(of: "，", with: ",")
+                    .split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
+            .filter { !$0.isEmpty }
+        let options = Array(Set(values)).sorted()
+        return options.isEmpty ? ["全新"] : options
+    }
     
     var body: some View {
         let base = AnyView(baseWardrobeView)
@@ -362,7 +375,7 @@ struct WardrobeView: View {
                     }
 
                     Button {
-                        tempSelectedStatus = nil
+                        tempSelectedCondition = nil
                         showingStatusSelection = true
                     } label: {
                         Label("改变状态", systemImage: "arrow.2.circlepath")
@@ -478,10 +491,13 @@ struct WardrobeView: View {
                 }
             }
             .sheet(isPresented: $showingStatusSelection) {
-                BatchStatusSelectionView(selectedStatus: $tempSelectedStatus)
+                BatchStatusSelectionView(
+                    selectedStatus: $tempSelectedCondition,
+                    options: conditionBatchOptions
+                )
                     .onDisappear {
-                        if let status = tempSelectedStatus {
-                            batchSetStatus(status)
+                        if let condition = tempSelectedCondition {
+                            batchSetCondition(condition)
                         }
                     }
             }
@@ -1002,15 +1018,13 @@ struct WardrobeView: View {
         tempSelectedAccessories = []
     }
     
-    private func batchSetStatus(_ status: String) {
+    private func batchSetCondition(_ condition: String) {
         let items = clothings.filter { selectedItemIDs.contains($0.id) }
-        if let newStatus = ClothingStatus(rawValue: status) {
-            for item in items {
-                item.status = newStatus
-            }
-            try? modelContext.save()
+        for item in items {
+            item.condition = condition
         }
-        tempSelectedStatus = nil
+        try? modelContext.save()
+        tempSelectedCondition = nil
     }
     
     // MARK: - 合并为小物到裙装
