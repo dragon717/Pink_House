@@ -93,6 +93,20 @@ extension FeatureExperienceGuideOverlay {
                 cornerRadius: 16
             )
 
+            Button {
+                NotificationCenter.default.post(
+                    name: .navigateToSmallWorldDestination,
+                    object: nil,
+                    userInfo: ["destination": SmallWorldDestination.wealth(nil)]
+                )
+            } label: {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.001))
+                    .frame(width: wealthEntryFrame.width, height: wealthEntryFrame.height)
+            }
+            .captureGuideInteractionRegion("feature.wealth.entry.hotspot")
+            .position(x: wealthEntryFrame.midX, y: wealthEntryFrame.midY)
+
             RoundedRectHighlightView(
                 frame: wealthEntryFrame,
                 cornerRadius: 16
