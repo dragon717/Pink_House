@@ -691,7 +691,13 @@ struct LegacyTabView: View {
                     .foregroundColor(isSelected ? magicPalette.accent : magicPalette.secondaryText)
             }
             .frame(maxWidth: .infinity)
-            .captureGuideTarget(index == 1 ? .homeHouseTab : (index == 3 ? .homePetChatTab : nil))
+            .captureGuideTarget(index == 1 ? .homeHouseTab : nil)
+            .overlay {
+                Color.clear
+                    .frame(width: 68, height: 56)
+                    .allowsHitTesting(false)
+                    .captureGuideTarget(index == 3 ? .homePetChatTab : nil)
+            }
         }
     }
 

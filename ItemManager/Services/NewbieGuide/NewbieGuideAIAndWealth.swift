@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 #if !WIDGET_EXTENSION
 extension FeatureExperienceGuideOverlay {
@@ -393,45 +396,69 @@ extension FeatureExperienceGuideOverlay {
         print("🐱 [postUnlockStep1Content] 开始渲染")
         let screenBounds = geometry.size
         let safeAreaBottom = geometry.safeAreaInsets.bottom
-        let tabBarHeight: CGFloat = 65.0 + safeAreaBottom
-        let fallbackTabFrame = CGRect(
-            x: (screenBounds.width * 0.875) - 34,
-            y: screenBounds.height - tabBarHeight,
-            width: 68,
-            height: tabBarHeight
-        )
+        let resolvedSafeAreaBottom = max(safeAreaBottom, currentGuideWindowSafeAreaBottom())
+        let fallbackTabFrame: CGRect = {
+            if #available(iOS 26.0, *) {
+                let tabBarHeight: CGFloat = 65
+                let ios26BottomCompensation = resolvedSafeAreaBottom * 0.5
+                return CGRect(
+                    x: (screenBounds.width * 0.875) - 34,
+                    y: screenBounds.height - tabBarHeight - 2 - ios26BottomCompensation,
+                    width: 68,
+                    height: tabBarHeight
+                )
+            } else {
+                let tabBarHeight: CGFloat = 56
+                let bottomPadding: CGFloat = resolvedSafeAreaBottom > 0 ? 2 : 4
+                let legacyPetChatCenterX = (screenBounds.width * 0.875) - 15
+                return CGRect(
+                    x: legacyPetChatCenterX - 34,
+                    y: screenBounds.height - resolvedSafeAreaBottom - bottomPadding - tabBarHeight,
+                    width: 68,
+                    height: tabBarHeight
+                )
+            }
+        }()
         print("   screenBounds: \(screenBounds)")
-        print("   safeAreaBottom: \(safeAreaBottom)")
+        print("   safeAreaBottom(overlay): \(safeAreaBottom)")
+        print("   safeAreaBottom(resolved): \(resolvedSafeAreaBottom)")
         print("   fallbackTabFrame: \(fallbackTabFrame)")
 
         // 使用 TabBarItemAnchorResolver 获取真实坐标
-        // tabIndex: 3 对应 PetChat Tab（第四个 Tab）
         let tabFrame = TabBarItemAnchorResolver.resolvedFrame(
             for: .homePetChatTab,
-            preferredTabIndex: 3,
             in: geometry,
             expansion: 0,
             fallback: fallbackTabFrame
         )
+        let compensatedTabFrame = compensatedGuideFrameForScale(
+            tabFrame,
+            screenWidth: screenBounds.width
+        )
+        let compensatedPulseRadius = compensatedGuideScalarForScale(
+            30,
+            screenWidth: screenBounds.width
+        )
         print("   最终 tabFrame: \(tabFrame)")
+        print("   补偿后 tabFrame: \(compensatedTabFrame)")
 
 
         return ZStack {
             HollowMaskView(
-                highlightFrame: tabFrame,
+                highlightFrame: compensatedTabFrame,
                 highlightType: .circle,
                 cornerRadius: 28
             )
 
             HighlightPulseViewNoClick(
-                center: CGPoint(x: tabFrame.midX, y: tabFrame.midY),
-                radius: 34
+                center: CGPoint(x: compensatedTabFrame.midX, y: compensatedTabFrame.midY),
+                radius: compensatedPulseRadius
             )
             .allowsHitTesting(false)
 
             if aiAnalysisStep.showCatPaw {
                 CatPawTapAnimation(
-                    position: CGPoint(x: tabFrame.midX, y: tabFrame.midY),
+                    position: CGPoint(x: compensatedTabFrame.midX, y: compensatedTabFrame.midY),
                     delay: 0.5
                 )
                 .opacity(0.45)
@@ -537,6 +564,37 @@ extension FeatureExperienceGuideOverlay {
         // 直接返回 global frame，因为 overlay window 与主应用窗口使用相同的坐标系
         // overlay window 会自动对齐到主应用窗口，不需要额外的坐标转换
         return globalFrame
+    }
+
+    func compensatedGuideFrameForScale(_ frame: CGRect, screenWidth: CGFloat) -> CGRect {
+        let scale = GuideAdaptiveScale.factor(screenWidth: screenWidth)
+        guard scale > 0 else { return frame }
+        let compensatedWidth = frame.width / scale
+        let compensatedHeight = frame.height / scale
+        return CGRect(
+            x: frame.midX - compensatedWidth / 2,
+            y: frame.midY - compensatedHeight / 2,
+            width: compensatedWidth,
+            height: compensatedHeight
+        )
+    }
+
+    func compensatedGuideScalarForScale(_ value: CGFloat, screenWidth: CGFloat) -> CGFloat {
+        let scale = GuideAdaptiveScale.factor(screenWidth: screenWidth)
+        guard scale > 0 else { return value }
+        return value / scale
+    }
+
+    func currentGuideWindowSafeAreaBottom() -> CGFloat {
+        #if canImport(UIKit)
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.bottom ?? 0
+        #else
+        return 0
+        #endif
     }
 
     func aiAnalysisBubble(
