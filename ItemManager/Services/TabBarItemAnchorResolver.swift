@@ -5,6 +5,19 @@ import UIKit
 
 enum TabBarItemAnchorResolver {
 
+    struct CompactCenterPlatterState {
+        let isCompact: Bool
+        let frame: CGRect?
+    }
+
+    struct TabBarSubviewSnapshot {
+        let depth: Int
+        let className: String
+        let frame: CGRect
+        let alpha: CGFloat
+        let isHidden: Bool
+    }
+
     /// 主 tab 数量（不含 search tab）
     static let mainTabCount = 3
 
@@ -35,6 +48,59 @@ enum TabBarItemAnchorResolver {
     }
 
     #if canImport(UIKit)
+    static func tabBarDebugSnapshots() -> [TabBarSubviewSnapshot] {
+        guard let window = activeWindow(),
+              let tabBar = findTabBar(in: window) else {
+            return []
+        }
+
+        return recursiveSnapshots(in: tabBar)
+            .sorted { lhs, rhs in
+                if lhs.frame.minX == rhs.frame.minX {
+                    if lhs.depth == rhs.depth {
+                        return lhs.frame.width < rhs.frame.width
+                    }
+                    return lhs.depth < rhs.depth
+                }
+                return lhs.frame.minX < rhs.frame.minX
+            }
+    }
+
+    private static func recursiveSnapshots(in root: UIView, depth: Int = 0) -> [TabBarSubviewSnapshot] {
+        var snapshots: [TabBarSubviewSnapshot] = root.subviews.map { view in
+            TabBarSubviewSnapshot(
+                depth: depth,
+                className: NSStringFromClass(type(of: view)),
+                frame: view.convert(view.bounds, to: nil),
+                alpha: view.alpha,
+                isHidden: view.isHidden
+            )
+        }
+
+        for subview in root.subviews {
+            snapshots.append(contentsOf: recursiveSnapshots(in: subview, depth: depth + 1))
+        }
+
+        return snapshots
+    }
+
+    static func compactCenterPlatterState() -> CompactCenterPlatterState? {
+        guard let window = activeWindow(),
+              let tabBar = findTabBar(in: window),
+              let platter = findMainPlatter(in: tabBar) else {
+            return nil
+        }
+
+        let globalFrame = platter.convert(platter.bounds, to: nil)
+        guard globalFrame.width > 0, globalFrame.height > 0, window.bounds.width > 0 else {
+            return nil
+        }
+
+        let widthRatio = globalFrame.width / window.bounds.width
+        let isCompact = platter.isHidden || platter.alpha < 0.01 || widthRatio < 0.68
+        return CompactCenterPlatterState(isCompact: isCompact, frame: globalFrame)
+    }
+
     static func liveFrame(at tabIndex: Int) -> CGRect? {
         guard let window = activeWindow() else {
             return nil
@@ -183,6 +249,14 @@ enum TabBarItemAnchorResolver {
         return nil
     }
     #else
+    static func tabBarDebugSnapshots() -> [TabBarSubviewSnapshot] {
+        []
+    }
+
+    static func compactCenterPlatterState() -> CompactCenterPlatterState? {
+        nil
+    }
+
     static func liveFrame(at tabIndex: Int) -> CGRect? {
         nil
     }

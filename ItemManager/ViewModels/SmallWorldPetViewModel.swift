@@ -472,7 +472,6 @@ class SmallWorldPetViewModel: ObservableObject {
         let distance = hypot(dx, dy)
         guard distance > 0.0001 else { return fallback }
 
-        // 统一用数学坐标系（Y 轴向上）做角度判定
         let vx = dx / distance
         let vy = -dy / distance
         let angle = isometricAxisAngleDegrees * .pi / 180.0
@@ -501,7 +500,6 @@ class SmallWorldPetViewModel: ObservableObject {
     private func shouldPlayTurn(currentKind: LoopKind, target: LoopDescriptor) -> Bool {
         guard turnCommittedTarget == nil else { return false }
         guard currentKind == .up, target.kind == .down else { return false }
-        // 仅当左右方向保持不变（左上->左下 或 右上->右下）时播放 turn
         return isMotionVideoMirrored != target.mirrored
     }
 

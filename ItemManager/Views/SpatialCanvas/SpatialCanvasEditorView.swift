@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 import SwiftData
 import PhotosUI
 import RealityKit
@@ -1534,6 +1535,5 @@ struct ModelCard: View {
 }
 
 // MARK: - 占位视图组件
-
 
 

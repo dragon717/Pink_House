@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct VIPCardView: View {
     let vipNumber: String

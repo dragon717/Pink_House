@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import RealityKit
 import simd
 #if os(iOS)

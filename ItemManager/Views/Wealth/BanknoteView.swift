@@ -1,5 +1,6 @@
 
 import SwiftUI
+import Combine
 
 struct BanknoteView: View {
     let denomination: Denomination

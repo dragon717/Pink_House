@@ -1,5 +1,6 @@
 
 import SwiftUI
+import Combine
 
 struct MoneyStackView: View {
     let denomination: Denomination

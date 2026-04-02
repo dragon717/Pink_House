@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -41,6 +42,7 @@ extension View {
             self
         }
     }
+
 }
 
 // MARK: - iOS 18+ 现代 TabView
@@ -57,6 +59,14 @@ struct ModernTabView: View {
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
     
     @State private var searchText = ""
+    @State private var isBottomBarCompact = false
+    @State private var compactCenterPlatterFrame: CGRect?
+    @State private var lastLoggedCompactSignature: String?
+    @State private var lastLoggedTabBarLayoutSignature: String?
+    @State private var lastLoggedOrbitLayoutSignature: String?
+
+    private let bottomAccessoryCatConfig = BottomAccessoryCatDiamondOrbitConfig()
+    private let tabBarStateTicker = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
     
     // MARK: - 动态 Tab 标题和图标
     private var smallWorldTabTitle: String {
@@ -128,6 +138,25 @@ struct ModernTabView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var supportsBottomAccessoryCat: Bool {
+        if #available(iOS 26.0, *), UIDevice.current.userInterfaceIdiom == .phone {
+            return true
+        }
+        return false
+    }
+
+    private var shouldShowDiamondOrbitCat: Bool {
+        selectedTab != 3 && supportsBottomAccessoryCat && isBottomBarCompact && compactCenterPlatterFrame != nil
+    }
+
+    private var shouldShowFloatingOverlayCat: Bool {
+        selectedTab != 3 && !shouldShowDiamondOrbitCat
+    }
+
+    private var bottomAccessoryPetId: String {
+        petDataManager.status.selectedPetId ?? "naicha"
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
@@ -172,10 +201,20 @@ struct ModernTabView: View {
         .toolbarBackground(.hidden, for: .tabBar)
         .tint(magicPalette.accent)
         .environment(\.isSimulationActive, isSimulationActive)
+        .onReceive(tabBarStateTicker) { _ in
+            refreshCompactTabBarState()
+        }
         .overlay {
             RewardBubbleView()
+            if #available(iOS 26.0, *) {
+                if shouldShowDiamondOrbitCat, let compactCenterPlatterFrame {
+                    let orbitLayout = diamondOrbitLayout(frame: compactCenterPlatterFrame)
+                    diamondOrbitOverlay(layout: orbitLayout)
+                        .position(x: orbitLayout.center.x, y: orbitLayout.center.y)
+                }
+            }
             // 进入萌宠对话页后不再显示悬浮宠物，避免与搜索/输入交互冲突
-            if selectedTab != 3 {
+            if shouldShowFloatingOverlayCat {
                 PetOverlayView(action: {
                     // 点击悬浮小猫：切换到萌宠对话 Tab
                     withAnimation {
@@ -227,6 +266,9 @@ struct ModernTabView: View {
             }
         }
         .onChange(of: selectedTab) { newTab in
+            if newTab == 3 {
+                isBottomBarCompact = false
+            }
             // 发送Tab切换通知，用于新手引导
             let tabName: String
             switch newTab {
@@ -249,6 +291,141 @@ struct ModernTabView: View {
             return true
         }
         return false
+    }
+
+    private func refreshCompactTabBarState() {
+        guard supportsBottomAccessoryCat, selectedTab != 3 else {
+            let signature = "disabled-tab-\(selectedTab)"
+            if lastLoggedCompactSignature != signature {
+                print("[BottomCat] probe disabled, selectedTab=\(selectedTab), supportsBottomAccessoryCat=\(supportsBottomAccessoryCat)")
+                lastLoggedCompactSignature = signature
+            }
+            compactCenterPlatterFrame = nil
+            isBottomBarCompact = false
+            return
+        }
+
+        let state = TabBarItemAnchorResolver.compactCenterPlatterState()
+        compactCenterPlatterFrame = state?.frame
+        isBottomBarCompact = state?.isCompact == true
+
+        let frameText: String
+        if let frame = state?.frame {
+            frameText = String(
+                format: "(x:%.1f y:%.1f w:%.1f h:%.1f)",
+                frame.minX, frame.minY, frame.width, frame.height
+            )
+        } else {
+            frameText = "nil"
+        }
+        let signature = "compact=\(isBottomBarCompact)-frame=\(frameText)"
+        if lastLoggedCompactSignature != signature {
+            print("[BottomCat] compactState changed -> compact=\(isBottomBarCompact), frame=\(frameText), showDiamond=\(shouldShowDiamondOrbitCat)")
+            lastLoggedCompactSignature = signature
+        }
+
+        let snapshots = TabBarItemAnchorResolver.tabBarDebugSnapshots()
+        let layoutSignature = snapshots
+            .map {
+                String(
+                    format: "d%ld %@:(%.1f,%.1f,%.1f,%.1f) a=%.2f h=%@",
+                    $0.depth,
+                    $0.className,
+                    $0.frame.minX,
+                    $0.frame.minY,
+                    $0.frame.width,
+                    $0.frame.height,
+                    $0.alpha,
+                    $0.isHidden ? "Y" : "N"
+                )
+            }
+            .joined(separator: " | ")
+        if !layoutSignature.isEmpty, layoutSignature != lastLoggedTabBarLayoutSignature {
+            print("[BottomCat] tabBar subviews -> \(layoutSignature)")
+            lastLoggedTabBarLayoutSignature = layoutSignature
+        }
+
+        if isBottomBarCompact, let frame = compactCenterPlatterFrame {
+            let orbitLayout = diamondOrbitLayout(frame: frame)
+            let orbitSignature = String(
+                format: "anchor=(%.1f,%.1f) center=(%.1f,%.1f) size=(%.1f,%.1f) normalizedCenter=(%.3f,%.3f)",
+                orbitLayout.anchor.x,
+                orbitLayout.anchor.y,
+                orbitLayout.center.x,
+                orbitLayout.center.y,
+                orbitLayout.size.width,
+                orbitLayout.size.height,
+                orbitLayout.config.normalizedCenterPoint?.x ?? 0.5,
+                orbitLayout.config.normalizedCenterPoint?.y ?? 0.5
+            )
+            if lastLoggedOrbitLayoutSignature != orbitSignature {
+                print("[BottomCat] orbitLayout -> \(orbitSignature)")
+                lastLoggedOrbitLayoutSignature = orbitSignature
+            }
+        }
+    }
+
+    private func diamondOrbitLayout(
+        frame: CGRect
+    ) -> (config: BottomAccessoryCatDiamondOrbitConfig, size: CGSize, center: CGPoint, anchor: CGPoint) {
+        let overlayWidth = max(frame.width + 40, 236)
+        let overlayHeight = max(frame.height + 78, 140)
+        let overlaySize = CGSize(width: overlayWidth, height: overlayHeight)
+        let floatingCatAnchor = CGPoint(
+            x: UIScreen.main.bounds.midX,
+            y: UIScreen.main.bounds.height - currentWindowSafeAreaBottom - 35
+        )
+        let overlayCenter = CGPoint(
+            x: floatingCatAnchor.x,
+            y: floatingCatAnchor.y + max(overlayHeight * 0.16, 20)
+        )
+        let overlayOrigin = CGPoint(
+            x: overlayCenter.x - overlayWidth / 2,
+            y: overlayCenter.y - overlayHeight / 2
+        )
+
+        var config = bottomAccessoryCatConfig
+        config.startAnchor = .top
+        config.contentHeight = overlayHeight
+        config.diamondWidthRatio = 0.5
+        config.diamondHeightRatio = 0.42
+        config.centerYOffset = -0.08
+        config.speedScale = 0.5
+
+        let topAnchorNormalizedY = (floatingCatAnchor.y - overlayOrigin.y) / overlayHeight
+        let halfHeight = config.diamondHeightRatio / 2
+        let normalizedCenterY = max(
+            halfHeight + 0.02,
+            min(1 - halfHeight - 0.02, topAnchorNormalizedY + halfHeight)
+        )
+        config.normalizedCenterPoint = CGPoint(x: 0.5, y: normalizedCenterY)
+
+        return (config: config, size: overlaySize, center: overlayCenter, anchor: floatingCatAnchor)
+    }
+
+    private var currentWindowSafeAreaBottom: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.bottom ?? 0
+    }
+
+    @available(iOS 26.0, *)
+    private func diamondOrbitOverlay(
+        layout: (config: BottomAccessoryCatDiamondOrbitConfig, size: CGSize, center: CGPoint, anchor: CGPoint)
+    ) -> some View {
+        return BottomAccessoryCatDiamondOrbitView(
+            config: layout.config,
+            petName: bottomAccessoryPetId,
+            action: {
+                withAnimation {
+                    selectedTab = 3
+                }
+            }
+        )
+        .frame(width: layout.size.width, height: layout.size.height)
+        .allowsHitTesting(true)
     }
 }
 

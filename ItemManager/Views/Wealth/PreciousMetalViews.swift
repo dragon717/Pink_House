@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - 黄金存储视图
 

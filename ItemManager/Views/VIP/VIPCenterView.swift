@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct VIPCenterView: View {
     @ObservedObject var vipManager = VIPManager.shared

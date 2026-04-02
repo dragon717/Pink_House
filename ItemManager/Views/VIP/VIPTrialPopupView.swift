@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // VIP试用期弹窗视图 - 现代化设计
 struct VIPTrialPopupView: View {
