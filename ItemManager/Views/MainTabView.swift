@@ -373,7 +373,7 @@ struct ModernTabView: View {
         let overlaySize = CGSize(width: overlayWidth, height: overlayHeight)
         let floatingCatAnchor = CGPoint(
             x: UIScreen.main.bounds.midX,
-            y: frame.maxY - 35
+            y: frame.maxY - 49
         )
         let overlayCenter = CGPoint(
             x: floatingCatAnchor.x,
@@ -390,6 +390,7 @@ struct ModernTabView: View {
         config.diamondWidthRatio = 0.5
         config.diamondHeightRatio = 0.54
         config.centerYOffset = -0.08
+        config.speedScale = 0.5
 
         let bottomAnchorNormalizedY = (floatingCatAnchor.y - overlayOrigin.y) / overlayHeight
         let halfHeight = config.diamondHeightRatio / 2

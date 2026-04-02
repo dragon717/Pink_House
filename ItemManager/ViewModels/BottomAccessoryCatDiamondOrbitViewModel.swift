@@ -315,7 +315,7 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
     }
 
     private func loopPlaybackRate() -> Float {
-        petName == "maomao" ? 0.9 : 1.0
+        1.0
     }
 
     private func pauseMovementForTurn() {
