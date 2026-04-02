@@ -369,15 +369,15 @@ struct ModernTabView: View {
         frame: CGRect
     ) -> (config: BottomAccessoryCatDiamondOrbitConfig, size: CGSize, center: CGPoint, anchor: CGPoint) {
         let overlayWidth = max(frame.width + 40, 236)
-        let overlayHeight = max(frame.height + 78, 140)
+        let overlayHeight = max(frame.height + 92, 156)
         let overlaySize = CGSize(width: overlayWidth, height: overlayHeight)
         let floatingCatAnchor = CGPoint(
             x: UIScreen.main.bounds.midX,
-            y: UIScreen.main.bounds.height - currentWindowSafeAreaBottom - 35
+            y: frame.maxY - 35
         )
         let overlayCenter = CGPoint(
             x: floatingCatAnchor.x,
-            y: floatingCatAnchor.y + max(overlayHeight * 0.16, 20)
+            y: floatingCatAnchor.y - max(overlayHeight * 0.26, 30)
         )
         let overlayOrigin = CGPoint(
             x: overlayCenter.x - overlayWidth / 2,
@@ -388,27 +388,18 @@ struct ModernTabView: View {
         config.startAnchor = .top
         config.contentHeight = overlayHeight
         config.diamondWidthRatio = 0.5
-        config.diamondHeightRatio = 0.42
+        config.diamondHeightRatio = 0.54
         config.centerYOffset = -0.08
-        config.speedScale = 0.5
 
-        let topAnchorNormalizedY = (floatingCatAnchor.y - overlayOrigin.y) / overlayHeight
+        let bottomAnchorNormalizedY = (floatingCatAnchor.y - overlayOrigin.y) / overlayHeight
         let halfHeight = config.diamondHeightRatio / 2
         let normalizedCenterY = max(
             halfHeight + 0.02,
-            min(1 - halfHeight - 0.02, topAnchorNormalizedY + halfHeight)
+            min(1 - halfHeight - 0.02, bottomAnchorNormalizedY - halfHeight)
         )
         config.normalizedCenterPoint = CGPoint(x: 0.5, y: normalizedCenterY)
 
         return (config: config, size: overlaySize, center: overlayCenter, anchor: floatingCatAnchor)
-    }
-
-    private var currentWindowSafeAreaBottom: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)?
-            .safeAreaInsets.bottom ?? 0
     }
 
     @available(iOS 26.0, *)

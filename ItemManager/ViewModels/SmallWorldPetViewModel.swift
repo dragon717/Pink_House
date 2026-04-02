@@ -25,12 +25,15 @@ class SmallWorldPetViewModel: ObservableObject {
     @Published var draggingNodeId: UUID? = nil
     
     private var timer: Timer?
-    private var startTime: Date?
+    private var movementElapsed: TimeInterval = 0
+    private var lastMovementTick: Date?
     private var isMovementPausedForTurn: Bool = false
-    private var turnPauseStartedAt: Date?
     private var playbackStage: MotionPlaybackStage = .idle
     private var latestDesiredLoop: LoopDescriptor?
     private var turnCommittedTarget: LoopDescriptor?
+    private var currentClipPlaybackTime: Double = 0
+    private var currentClipDuration: Double = 0
+    private var isTranslationFrozenByClip = false
     private var currentRoomIndex: Int = 0
     private var isCrossRoomTransitionPhase: Bool = false
     private let crossRoomTransitionDuration: TimeInterval = 0.28
@@ -140,7 +143,8 @@ class SmallWorldPetViewModel: ObservableObject {
         activePathId = path.id
         currentRoomIndex = path.roomIndex
         isVisible = true
-        startTime = Date()
+        movementElapsed = 0
+        lastMovementTick = Date()
         
         // Set initial position immediately to avoid flicker
         if step.reversed {
@@ -176,9 +180,20 @@ class SmallWorldPetViewModel: ObservableObject {
         if isMovementPausedForTurn {
             return
         }
-        
+
         let step = sequence[currentStepIndex]
-        let elapsed = Date().timeIntervalSince(startTime ?? Date())
+        let now = Date()
+        if lastMovementTick == nil {
+            lastMovementTick = now
+        }
+        let delta = now.timeIntervalSince(lastMovementTick ?? now)
+        lastMovementTick = now
+
+        if !isTranslationFrozenByClip {
+            movementElapsed += max(delta, 0)
+        }
+
+        let elapsed = movementElapsed
         let duration = path.duration * movementDurationScale()
         isCrossRoomTransitionPhase = isCrossRoomTransitionStep(currentStepIndex) && elapsed < crossRoomTransitionDuration
         
@@ -230,6 +245,8 @@ class SmallWorldPetViewModel: ObservableObject {
         timer = nil
         isVisible = false
         activePathId = nil
+        movementElapsed = 0
+        lastMovementTick = nil
         resetMotionPlaybackState()
     }
     
@@ -505,7 +522,7 @@ class SmallWorldPetViewModel: ObservableObject {
 
     private func startLoop(descriptor: LoopDescriptor) {
         resumeMovementAfterTurnIfNeeded()
-        currentMotionVideoName = clipName(for: descriptor.kind)
+        updateCurrentMotionVideoName(clipName(for: descriptor.kind))
         isMotionVideoMirrored = descriptor.mirrored
         isMotionVideoLooping = true
         motionPlaybackRate = loopPlaybackRate()
@@ -516,7 +533,7 @@ class SmallWorldPetViewModel: ObservableObject {
         if case .turning = playbackStage { return }
         pauseMovementForTurn()
         turnCommittedTarget = target
-        currentMotionVideoName = "\(petName)_left_turn"
+        updateCurrentMotionVideoName("\(petName)_left_turn")
         isMotionVideoMirrored = target.mirrored
         isMotionVideoLooping = false
         motionPlaybackRate = 2.0
@@ -525,10 +542,12 @@ class SmallWorldPetViewModel: ObservableObject {
 
     private func resetMotionPlaybackState() {
         isMovementPausedForTurn = false
-        turnPauseStartedAt = nil
         latestDesiredLoop = nil
         turnCommittedTarget = nil
-        currentMotionVideoName = "\(petName)_right_back"
+        currentClipPlaybackTime = 0
+        currentClipDuration = 0
+        isTranslationFrozenByClip = false
+        updateCurrentMotionVideoName("\(petName)_right_back")
         isMotionVideoLooping = true
         isMotionVideoMirrored = false
         motionPlaybackRate = 1.0
@@ -546,17 +565,13 @@ class SmallWorldPetViewModel: ObservableObject {
     private func pauseMovementForTurn() {
         guard !isMovementPausedForTurn else { return }
         isMovementPausedForTurn = true
-        turnPauseStartedAt = Date()
+        lastMovementTick = Date()
     }
 
     private func resumeMovementAfterTurnIfNeeded() {
         guard isMovementPausedForTurn else { return }
-        if let pauseStarted = turnPauseStartedAt, let started = startTime {
-            let pausedDuration = Date().timeIntervalSince(pauseStarted)
-            startTime = started.addingTimeInterval(pausedDuration)
-        }
         isMovementPausedForTurn = false
-        turnPauseStartedAt = nil
+        lastMovementTick = Date()
     }
 
     func handleMotionVideoFinished() {
@@ -601,6 +616,33 @@ class SmallWorldPetViewModel: ObservableObject {
             dist += hypot(p2.x - p1.x, p2.y - p1.y)
         }
         return dist
+    }
+
+    func updateMotionClipProgress(current: Double, duration: Double) {
+        currentClipPlaybackTime = max(0, current)
+        currentClipDuration = max(0, duration)
+        synchronizeTranslationFreezeState()
+    }
+
+    private func updateCurrentMotionVideoName(_ newValue: String) {
+        if currentMotionVideoName != newValue {
+            currentClipPlaybackTime = 0
+            currentClipDuration = 0
+            isTranslationFrozenByClip = false
+        }
+        currentMotionVideoName = newValue
+        synchronizeTranslationFreezeState()
+    }
+
+    private func synchronizeTranslationFreezeState() {
+        let frozen = PetClipMotionFreezePolicy.shouldFreezeTranslation(
+            videoName: currentMotionVideoName,
+            clipTime: currentClipPlaybackTime
+        )
+        if frozen != isTranslationFrozenByClip {
+            isTranslationFrozenByClip = frozen
+            lastMovementTick = Date()
+        }
     }
     
     // MARK: - Debug

@@ -46,6 +46,9 @@ struct SmallWorldPetOverlay: View {
             volume: 0,
             onFinished: {
                 viewModel.handleMotionVideoFinished()
+            },
+            onProgress: { current, duration in
+                viewModel.updateMotionClipProgress(current: current, duration: duration)
             }
         )
         .frame(width: 40, height: 40) // Adjust size as needed

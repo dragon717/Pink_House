@@ -38,6 +38,9 @@ struct BottomAccessoryCatDiamondOrbitView: View {
                     isPaused: viewModel.isPlaybackPaused,
                     onFinished: {
                         viewModel.handleMotionVideoFinished()
+                    },
+                    onProgress: { current, duration in
+                        viewModel.updateMotionClipProgress(current: current, duration: duration)
                     }
                 )
                 .frame(width: config.petSize.width, height: config.petSize.height)

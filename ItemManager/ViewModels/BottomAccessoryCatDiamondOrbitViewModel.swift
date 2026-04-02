@@ -14,15 +14,18 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
 
     private var petName: String
     private var timer: Timer?
-    private var lapStartTime: Date?
+    private var lapElapsed: TimeInterval = 0
+    private var lastMovementTick: Date?
     private var pauseEndTime: Date?
     private var completedLapsInBurst = 0
     private var patternIndex = 0
     private var isMovementPausedForTurn = false
-    private var turnPauseStartedAt: Date?
     private var latestDesiredLoop: PetDirectionalMotionEngine.LoopDescriptor?
     private var turnCommittedTarget: PetDirectionalMotionEngine.LoopDescriptor?
     private var playbackStage: MotionPlaybackStage = .idle
+    private var currentClipPlaybackTime: Double = 0
+    private var currentClipDuration: Double = 0
+    private var isTranslationFrozenByClip = false
 
     private enum MotionPlaybackStage {
         case idle
@@ -55,7 +58,9 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
     func updatePetName(_ newValue: String) {
         guard !newValue.isEmpty, petName != newValue else { return }
         petName = newValue
-        currentMotionVideoName = PetDirectionalMotionEngine.clipName(for: currentLoopKind(), petName: petName)
+        updateCurrentMotionVideoName(
+            PetDirectionalMotionEngine.clipName(for: currentLoopKind(), petName: petName)
+        )
     }
 
     func handleMotionVideoFinished() {
@@ -78,11 +83,14 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
         completedLapsInBurst = 0
         patternIndex = 0
         pauseEndTime = nil
-        lapStartTime = Date()
+        lapElapsed = 0
+        lastMovementTick = Date()
         isMovementPausedForTurn = false
-        turnPauseStartedAt = nil
         latestDesiredLoop = nil
         turnCommittedTarget = nil
+        currentClipPlaybackTime = 0
+        currentClipDuration = 0
+        isTranslationFrozenByClip = false
         isPlaybackPaused = false
         currentPosition = orderedPoints().first ?? CGPoint(x: 0.5, y: 0.5)
         startLoop(descriptor: currentLoopDescriptor(progress: 0))
@@ -93,13 +101,21 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
 
         if let pauseEndTime {
             if now < pauseEndTime {
+                lastMovementTick = now
                 return
             }
             self.pauseEndTime = nil
             isPlaybackPaused = false
             completedLapsInBurst = 0
-            lapStartTime = now
+            lapElapsed = 0
+            lastMovementTick = now
         }
+
+        if lastMovementTick == nil {
+            lastMovementTick = now
+        }
+        let delta = now.timeIntervalSince(lastMovementTick ?? now)
+        lastMovementTick = now
 
         if isMovementPausedForTurn {
             return
@@ -108,16 +124,12 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
         let lapDuration = effectiveLapDuration()
         guard lapDuration > 0 else { return }
 
-        if lapStartTime == nil {
-            lapStartTime = now
+        if !isTranslationFrozenByClip {
+            lapElapsed += max(delta, 0)
         }
 
-        guard let lapStartTime else { return }
-        var elapsed = now.timeIntervalSince(lapStartTime)
-
-        while elapsed >= lapDuration {
-            elapsed -= lapDuration
-            self.lapStartTime = self.lapStartTime?.addingTimeInterval(lapDuration)
+        while lapElapsed >= lapDuration {
+            lapElapsed -= lapDuration
             completedLapsInBurst += 1
 
             if completedLapsInBurst >= currentLapGoal() {
@@ -126,7 +138,7 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
             }
         }
 
-        let progress = CGFloat(min(max(elapsed / lapDuration, 0), 1))
+        let progress = CGFloat(min(max(lapElapsed / lapDuration, 0), 1))
         currentPosition = position(for: progress)
         let desired = desiredLoopDescriptor(currentProgress: progress, lapDuration: lapDuration)
         updateMotionPlayback(desired: desired)
@@ -134,6 +146,7 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
 
     private func beginPause(after now: Date) {
         currentPosition = orderedPoints().first ?? currentPosition
+        lapElapsed = 0
         isPlaybackPaused = true
         pauseEndTime = now.addingTimeInterval(currentPauseDuration())
         patternIndex = (patternIndex + 1) % max(config.lapPattern.count, 1)
@@ -272,7 +285,9 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
 
     private func startLoop(descriptor: PetDirectionalMotionEngine.LoopDescriptor) {
         resumeMovementAfterTurnIfNeeded()
-        currentMotionVideoName = PetDirectionalMotionEngine.clipName(for: descriptor.kind, petName: petName)
+        updateCurrentMotionVideoName(
+            PetDirectionalMotionEngine.clipName(for: descriptor.kind, petName: petName)
+        )
         isMotionVideoMirrored = descriptor.mirrored
         isMotionVideoLooping = true
         motionPlaybackRate = loopPlaybackRate()
@@ -283,7 +298,7 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
         if case .turning = playbackStage { return }
         pauseMovementForTurn()
         turnCommittedTarget = target
-        currentMotionVideoName = "\(petName)_left_turn"
+        updateCurrentMotionVideoName("\(petName)_left_turn")
         isMotionVideoMirrored = target.mirrored
         isMotionVideoLooping = false
         motionPlaybackRate = 2.0
@@ -306,16 +321,39 @@ final class BottomAccessoryCatDiamondOrbitViewModel: ObservableObject {
     private func pauseMovementForTurn() {
         guard !isMovementPausedForTurn else { return }
         isMovementPausedForTurn = true
-        turnPauseStartedAt = Date()
+        lastMovementTick = Date()
     }
 
     private func resumeMovementAfterTurnIfNeeded() {
         guard isMovementPausedForTurn else { return }
-        if let turnPauseStartedAt, let lapStartTime {
-            let pausedDuration = Date().timeIntervalSince(turnPauseStartedAt)
-            self.lapStartTime = lapStartTime.addingTimeInterval(pausedDuration)
-        }
         isMovementPausedForTurn = false
-        self.turnPauseStartedAt = nil
+        lastMovementTick = Date()
+    }
+
+    func updateMotionClipProgress(current: Double, duration: Double) {
+        currentClipPlaybackTime = max(0, current)
+        currentClipDuration = max(0, duration)
+        synchronizeTranslationFreezeState()
+    }
+
+    private func updateCurrentMotionVideoName(_ newValue: String) {
+        if currentMotionVideoName != newValue {
+            currentClipPlaybackTime = 0
+            currentClipDuration = 0
+            isTranslationFrozenByClip = false
+        }
+        currentMotionVideoName = newValue
+        synchronizeTranslationFreezeState()
+    }
+
+    private func synchronizeTranslationFreezeState() {
+        let frozen = PetClipMotionFreezePolicy.shouldFreezeTranslation(
+            videoName: currentMotionVideoName,
+            clipTime: currentClipPlaybackTime
+        )
+        if frozen != isTranslationFrozenByClip {
+            isTranslationFrozenByClip = frozen
+            lastMovementTick = Date()
+        }
     }
 }
