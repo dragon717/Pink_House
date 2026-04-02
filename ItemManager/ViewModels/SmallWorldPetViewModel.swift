@@ -11,6 +11,10 @@ class SmallWorldPetViewModel: ObservableObject {
     @Published var isMovingRight: Bool = true
     @Published var isMovingUp: Bool = false
     @Published var isVisible: Bool = false
+    @Published var currentMotionVideoName: String = "naicha_right_back"
+    @Published var isMotionVideoLooping: Bool = true
+    @Published var isMotionVideoMirrored: Bool = false
+    @Published var motionPlaybackRate: Float = 1.0
     
     // Configuration
     @Published var petName: String = "naicha"
@@ -22,11 +26,41 @@ class SmallWorldPetViewModel: ObservableObject {
     
     private var timer: Timer?
     private var startTime: Date?
+    private var isMovementPausedForTurn: Bool = false
+    private var turnPauseStartedAt: Date?
+    private var playbackStage: MotionPlaybackStage = .idle
+    private var latestDesiredLoop: LoopDescriptor?
+    private var turnCommittedTarget: LoopDescriptor?
+    private var currentRoomIndex: Int = 0
+    private var isCrossRoomTransitionPhase: Bool = false
+    private let crossRoomTransitionDuration: TimeInterval = 0.28
+    private let crossRoomTransitionDistanceFraction: CGFloat = 0.035
+    private let turnLeadTime: TimeInterval = 0.12
+    private let isometricAxisAngleDegrees: CGFloat = 35.0
+    private let maomaoLoopPlaybackRate: Float = 0.9
+    private let maomaoMovementDurationScale: TimeInterval = 1.18
     
     // Sequence Management
     private struct SequenceStep {
         let pathIndex: Int
         let reversed: Bool
+    }
+
+    private enum LoopKind {
+        case up
+        case down
+    }
+
+    private struct LoopDescriptor: Equatable {
+        let kind: LoopKind
+        let mirrored: Bool
+    }
+
+    private enum MotionPlaybackStage {
+        case idle
+        case looping(kind: LoopKind)
+        case waitingLoopFinish(currentKind: LoopKind)
+        case turning
     }
     private var sequence: [SequenceStep] = []
     private var currentStepIndex: Int = 0
@@ -84,6 +118,7 @@ class SmallWorldPetViewModel: ObservableObject {
         }
         
         currentStepIndex = 0
+        resetMotionPlaybackState()
         startStep(index: 0)
     }
     
@@ -103,6 +138,7 @@ class SmallWorldPetViewModel: ObservableObject {
         let path = config.paths[step.pathIndex]
         
         activePathId = path.id
+        currentRoomIndex = path.roomIndex
         isVisible = true
         startTime = Date()
         
@@ -118,6 +154,10 @@ class SmallWorldPetViewModel: ObservableObject {
                 currentPosition = CGPoint(x: first.x, y: first.y)
             }
         }
+        isCrossRoomTransitionPhase = isCrossRoomTransitionStep(index)
+
+        updateInitialDirection(for: path, reversed: step.reversed)
+        updateMotionPlayback()
         
         // Start/Restart Timer
         timer?.invalidate()
@@ -133,9 +173,14 @@ class SmallWorldPetViewModel: ObservableObject {
             return
         }
         
+        if isMovementPausedForTurn {
+            return
+        }
+        
         let step = sequence[currentStepIndex]
         let elapsed = Date().timeIntervalSince(startTime ?? Date())
-        let duration = path.duration
+        let duration = path.duration * movementDurationScale()
+        isCrossRoomTransitionPhase = isCrossRoomTransitionStep(currentStepIndex) && elapsed < crossRoomTransitionDuration
         
         if elapsed >= duration {
             // Step finished
@@ -144,16 +189,40 @@ class SmallWorldPetViewModel: ObservableObject {
             return
         }
         
-        // Calculate Progress
-        if step.reversed {
-            // 1.0 -> 0.0
-            currentProgress = CGFloat(1.0 - (elapsed / duration))
-        } else {
-            // 0.0 -> 1.0
-            currentProgress = CGFloat(elapsed / duration)
-        }
+        currentProgress = progressForStep(step, elapsed: elapsed, duration: duration)
         
         updatePosition(along: path, at: currentProgress)
+        let desired = desiredLoopDescriptor(path: path, step: step, elapsed: elapsed, duration: duration)
+        updateMotionPlayback(desired: desired)
+    }
+
+    private func isCrossRoomTransitionStep(_ index: Int) -> Bool {
+        guard index > 0, index < sequence.count else { return false }
+        let current = sequence[index]
+        let previous = sequence[index - 1]
+        return previous.pathIndex != current.pathIndex && previous.reversed && current.reversed
+    }
+
+    private func progressForStep(_ step: SequenceStep, elapsed: TimeInterval, duration: TimeInterval) -> CGFloat {
+        let clampedDuration = max(duration, 0.001)
+        let ratio = CGFloat(min(max(elapsed / clampedDuration, 0), 1))
+
+        guard isCrossRoomTransitionStep(currentStepIndex), step.reversed else {
+            return step.reversed ? (1.0 - ratio) : ratio
+        }
+
+        let transitionDuration = min(crossRoomTransitionDuration, clampedDuration * 0.5)
+        let transitionDistance = min(max(crossRoomTransitionDistanceFraction, 0), 0.2)
+
+        if elapsed <= transitionDuration {
+            let t = CGFloat(min(max(elapsed / max(transitionDuration, 0.001), 0), 1))
+            return 1.0 - t * transitionDistance
+        }
+
+        let remainingElapsed = elapsed - transitionDuration
+        let remainingDuration = max(clampedDuration - transitionDuration, 0.001)
+        let t = CGFloat(min(max(remainingElapsed / remainingDuration, 0), 1))
+        return (1.0 - transitionDistance) - t * (1.0 - transitionDistance)
     }
     
     func stopMovement() {
@@ -161,6 +230,7 @@ class SmallWorldPetViewModel: ObservableObject {
         timer = nil
         isVisible = false
         activePathId = nil
+        resetMotionPlaybackState()
     }
     
     private func updatePosition(along path: PetPath, at progress: CGFloat) {
@@ -183,16 +253,7 @@ class SmallWorldPetViewModel: ObservableObject {
                 let newY = p1.y + (p2.y - p1.y) * segmentProgress
                 let newPos = CGPoint(x: newX, y: newY)
                 
-                // Determine direction
-                // Only update direction if movement is significant to avoid jitter
-                if abs(newX - currentPosition.x) > 0.0001 || abs(newY - currentPosition.y) > 0.0001 {
-                    if abs(newX - currentPosition.x) > 0.0001 {
-                        isMovingRight = newX > currentPosition.x
-                    }
-                    if abs(newY - currentPosition.y) > 0.0001 {
-                        isMovingUp = newY < currentPosition.y // Y is inverted in screen coords (0 at top)
-                    }
-                }
+        updateMovementDirection(from: currentPosition, to: newPos, roomIndex: currentRoomIndex)
                 
                 currentPosition = newPos
                 return
@@ -204,6 +265,333 @@ class SmallWorldPetViewModel: ObservableObject {
         // End of path
         if let last = nodes.last {
             currentPosition = CGPoint(x: last.x, y: last.y)
+        }
+    }
+
+    private func updateInitialDirection(for path: PetPath, reversed: Bool) {
+        let nodes = path.nodes
+        guard nodes.count > 1 else { return }
+
+        let sourceNode: PathNode
+        let targetNode: PathNode
+
+        if reversed {
+            sourceNode = nodes[nodes.count - 1]
+            targetNode = nodes[nodes.count - 2]
+        } else {
+            sourceNode = nodes[0]
+            targetNode = nodes[1]
+        }
+        let source = CGPoint(x: sourceNode.x, y: sourceNode.y)
+        let target = CGPoint(x: targetNode.x, y: targetNode.y)
+        updateMovementDirection(from: source, to: target, roomIndex: path.roomIndex)
+    }
+
+    private func updateMovementDirection(from source: CGPoint, to target: CGPoint, roomIndex: Int) {
+        _ = roomIndex
+        let fallback = isMovingUp
+            ? (isMovingRight ? IsoDirection.rightUp : IsoDirection.leftUp)
+            : (isMovingRight ? IsoDirection.rightDown : IsoDirection.leftDown)
+        let direction = isoDirection(from: source, to: target, fallback: fallback)
+        applyIsoDirection(direction)
+    }
+
+    private func loopDescriptorForCurrentDirection() -> LoopDescriptor {
+        if isMovingUp {
+            // Upward movement uses right_back. Moving left mirrors it.
+            return LoopDescriptor(kind: .up, mirrored: !isMovingRight)
+        } else {
+            // Downward movement uses left_front. Moving right mirrors it.
+            return LoopDescriptor(kind: .down, mirrored: isMovingRight)
+        }
+    }
+
+    private func clipName(for kind: LoopKind) -> String {
+        switch kind {
+        case .up:
+            return "\(petName)_right_back"
+        case .down:
+            return "\(petName)_left_front"
+        }
+    }
+
+    private func updateMotionPlayback(desired override: LoopDescriptor? = nil) {
+        let baseDesired = override ?? loopDescriptorForCurrentDirection()
+        let desired: LoopDescriptor
+        if let committed = turnCommittedTarget {
+            if baseDesired.kind == .down {
+                turnCommittedTarget = nil
+                desired = baseDesired
+            } else {
+                desired = committed
+            }
+        } else {
+            desired = baseDesired
+        }
+        latestDesiredLoop = desired
+
+        switch playbackStage {
+        case .idle:
+            startLoop(descriptor: desired)
+        case .looping(let currentKind):
+            if currentKind == desired.kind {
+                isMotionVideoMirrored = desired.mirrored
+            } else if shouldPlayTurn(currentKind: currentKind, target: desired) {
+                // 转向动画需要立即打断当前循环并播放
+                startTurn(for: desired)
+            } else {
+                // 行进方向变化时，直接切到目标循环，避免被旧循环拖住
+                startLoop(descriptor: desired)
+            }
+        case .waitingLoopFinish(let currentKind):
+            if currentKind == desired.kind {
+                // Desired state switched back; resume looping current clip.
+                playbackStage = .looping(kind: currentKind)
+                isMotionVideoLooping = true
+                isMotionVideoMirrored = desired.mirrored
+            }
+        case .turning:
+            // Keep tracking desired target; consume on turn finish.
+            break
+        }
+    }
+
+    private func desiredLoopDescriptor(path: PetPath, step: SequenceStep, elapsed: TimeInterval, duration: TimeInterval) -> LoopDescriptor {
+        let current = loopDescriptorForCurrentDirection()
+
+        guard case .looping(let currentKind) = playbackStage, currentKind == .up else {
+            return current
+        }
+        guard current.kind == .up else { return current }
+        guard turnLeadTime > 0, elapsed < duration else { return current }
+
+        let lookaheadElapsed = min(duration, elapsed + turnLeadTime)
+        guard lookaheadElapsed > elapsed else { return current }
+
+        let currentProgress = progressForStep(step, elapsed: elapsed, duration: duration)
+        let lookaheadProgress = progressForStep(step, elapsed: lookaheadElapsed, duration: duration)
+        let source = position(along: path, at: currentProgress)
+        let target = position(along: path, at: lookaheadProgress)
+        let anticipated = loopDescriptor(from: source, to: target, roomIndex: path.roomIndex, fallback: current)
+
+        if shouldPlayTurn(currentKind: currentKind, target: anticipated) && anticipated.kind == .down {
+            return anticipated
+        }
+        return current
+    }
+
+    private func position(along path: PetPath, at progress: CGFloat) -> CGPoint {
+        let nodes = path.nodes
+        guard nodes.count > 1 else {
+            return nodes.first.map { CGPoint(x: $0.x, y: $0.y) } ?? .zero
+        }
+
+        let clampedProgress = min(max(progress, 0), 1)
+        let totalDistance = calculateTotalDistance(nodes: nodes)
+        let targetDistance = totalDistance * clampedProgress
+        var currentDist: CGFloat = 0
+
+        for i in 0..<nodes.count-1 {
+            let p1 = CGPoint(x: nodes[i].x, y: nodes[i].y)
+            let p2 = CGPoint(x: nodes[i+1].x, y: nodes[i+1].y)
+            let dist = hypot(p2.x - p1.x, p2.y - p1.y)
+
+            if currentDist + dist >= targetDistance {
+                let segmentProgress = dist > 0 ? (targetDistance - currentDist) / dist : 0
+                return CGPoint(
+                    x: p1.x + (p2.x - p1.x) * segmentProgress,
+                    y: p1.y + (p2.y - p1.y) * segmentProgress
+                )
+            }
+
+            currentDist += dist
+        }
+
+        if let last = nodes.last {
+            return CGPoint(x: last.x, y: last.y)
+        }
+        return .zero
+    }
+
+    private func loopDescriptor(from source: CGPoint, to target: CGPoint, roomIndex: Int, fallback: LoopDescriptor) -> LoopDescriptor {
+        let dx = target.x - source.x
+        let dy = target.y - source.y
+        let distance = hypot(dx, dy)
+        guard distance > 0.0001 else { return fallback }
+
+        _ = roomIndex
+        guard distance > 0.0001 else { return fallback }
+
+        let fallbackDirection = fallback.kind == .up
+            ? (fallback.mirrored ? IsoDirection.leftUp : IsoDirection.rightUp)
+            : (fallback.mirrored ? IsoDirection.rightDown : IsoDirection.leftDown)
+        let direction = isoDirection(from: source, to: target, fallback: fallbackDirection)
+        return loopDescriptor(for: direction)
+    }
+
+    private enum IsoDirection {
+        case rightUp
+        case leftUp
+        case rightDown
+        case leftDown
+    }
+
+    private func applyIsoDirection(_ direction: IsoDirection) {
+        switch direction {
+        case .rightUp:
+            isMovingRight = true
+            isMovingUp = true
+        case .leftUp:
+            isMovingRight = false
+            isMovingUp = true
+        case .rightDown:
+            isMovingRight = true
+            isMovingUp = false
+        case .leftDown:
+            isMovingRight = false
+            isMovingUp = false
+        }
+    }
+
+    private func loopDescriptor(for direction: IsoDirection) -> LoopDescriptor {
+        switch direction {
+        case .rightUp:
+            return LoopDescriptor(kind: .up, mirrored: false)
+        case .leftUp:
+            return LoopDescriptor(kind: .up, mirrored: true)
+        case .rightDown:
+            return LoopDescriptor(kind: .down, mirrored: true)
+        case .leftDown:
+            return LoopDescriptor(kind: .down, mirrored: false)
+        }
+    }
+
+    private func isoDirection(from source: CGPoint, to target: CGPoint, fallback: IsoDirection) -> IsoDirection {
+        let dx = target.x - source.x
+        let dy = target.y - source.y
+        let distance = hypot(dx, dy)
+        guard distance > 0.0001 else { return fallback }
+
+        // 统一用数学坐标系（Y 轴向上）做角度判定
+        let vx = dx / distance
+        let vy = -dy / distance
+        let angle = isometricAxisAngleDegrees * .pi / 180.0
+        let cosA = cos(angle)
+        let sinA = sin(angle)
+
+        let directions: [(IsoDirection, CGFloat, CGFloat)] = [
+            (.rightUp, cosA, sinA),
+            (.leftUp, -cosA, sinA),
+            (.rightDown, cosA, -sinA),
+            (.leftDown, -cosA, -sinA)
+        ]
+
+        var bestDirection = fallback
+        var bestScore = -CGFloat.greatestFiniteMagnitude
+        for (direction, axisX, axisY) in directions {
+            let score = vx * axisX + vy * axisY
+            if score > bestScore {
+                bestScore = score
+                bestDirection = direction
+            }
+        }
+        return bestDirection
+    }
+
+    private func shouldPlayTurn(currentKind: LoopKind, target: LoopDescriptor) -> Bool {
+        guard turnCommittedTarget == nil else { return false }
+        guard currentKind == .up, target.kind == .down else { return false }
+        // 仅当左右方向保持不变（左上->左下 或 右上->右下）时播放 turn
+        return isMotionVideoMirrored != target.mirrored
+    }
+
+    private func startLoop(descriptor: LoopDescriptor) {
+        resumeMovementAfterTurnIfNeeded()
+        currentMotionVideoName = clipName(for: descriptor.kind)
+        isMotionVideoMirrored = descriptor.mirrored
+        isMotionVideoLooping = true
+        motionPlaybackRate = loopPlaybackRate()
+        playbackStage = .looping(kind: descriptor.kind)
+    }
+
+    private func startTurn(for target: LoopDescriptor) {
+        if case .turning = playbackStage { return }
+        pauseMovementForTurn()
+        turnCommittedTarget = target
+        currentMotionVideoName = "\(petName)_left_turn"
+        isMotionVideoMirrored = target.mirrored
+        isMotionVideoLooping = false
+        motionPlaybackRate = 2.0
+        playbackStage = .turning
+    }
+
+    private func resetMotionPlaybackState() {
+        isMovementPausedForTurn = false
+        turnPauseStartedAt = nil
+        latestDesiredLoop = nil
+        turnCommittedTarget = nil
+        currentMotionVideoName = "\(petName)_right_back"
+        isMotionVideoLooping = true
+        isMotionVideoMirrored = false
+        motionPlaybackRate = 1.0
+        playbackStage = .idle
+    }
+
+    private func loopPlaybackRate() -> Float {
+        petName == "maomao" ? maomaoLoopPlaybackRate : 1.0
+    }
+
+    private func movementDurationScale() -> TimeInterval {
+        petName == "maomao" ? maomaoMovementDurationScale : 1.0
+    }
+
+    private func pauseMovementForTurn() {
+        guard !isMovementPausedForTurn else { return }
+        isMovementPausedForTurn = true
+        turnPauseStartedAt = Date()
+    }
+
+    private func resumeMovementAfterTurnIfNeeded() {
+        guard isMovementPausedForTurn else { return }
+        if let pauseStarted = turnPauseStartedAt, let started = startTime {
+            let pausedDuration = Date().timeIntervalSince(pauseStarted)
+            startTime = started.addingTimeInterval(pausedDuration)
+        }
+        isMovementPausedForTurn = false
+        turnPauseStartedAt = nil
+    }
+
+    func handleMotionVideoFinished() {
+        guard isVisible else { return }
+
+        switch playbackStage {
+        case .waitingLoopFinish(let currentKind):
+            guard let target = latestDesiredLoop else {
+                playbackStage = .looping(kind: currentKind)
+                isMotionVideoLooping = true
+                return
+            }
+
+            if target.kind == currentKind {
+                startLoop(descriptor: target)
+                return
+            }
+
+            // When switching from upward to downward movement, play turn clip once.
+            if shouldPlayTurn(currentKind: currentKind, target: target) {
+                startTurn(for: target)
+            } else {
+                startLoop(descriptor: target)
+            }
+        case .turning:
+            resumeMovementAfterTurnIfNeeded()
+            if let target = latestDesiredLoop {
+                startLoop(descriptor: target)
+            } else {
+                playbackStage = .idle
+            }
+        default:
+            break
         }
     }
     

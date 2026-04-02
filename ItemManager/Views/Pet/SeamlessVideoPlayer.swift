@@ -26,6 +26,8 @@ class SeamlessVideoPlayerView: UIView {
     private var currentVideoName: String?
     private var currentVideoURL: URL?
     private var isLooping: Bool = false
+    private var isMirrored: Bool = false
+    private var playbackRate: Float = 1.0
     private var isMuted: Bool = false
     private var volume: Float = 1.0
     private var onFinished: (() -> Void)?
@@ -115,7 +117,7 @@ class SeamlessVideoPlayerView: UIView {
         // 1. 检查是否正在播放
         if player.timeControlStatus != .playing {
             print("SeamlessPlayer Watchdog: Player is NOT playing (Status: \(player.timeControlStatus.rawValue)). Attempting to resume.")
-            player.play()
+            play(player: player)
         }
         
         // 2. 检查是否卡在非循环视频的结束状态
@@ -185,12 +187,15 @@ class SeamlessVideoPlayerView: UIView {
     
     // MARK: - Public Interface
     
-    func update(videoName: String, isLooping: Bool, isMuted: Bool, volume: Float, isPaused: Bool = false, onFinished: (() -> Void)?, onProgress: ((Double, Double) -> Void)?) {
+    func update(videoName: String, isLooping: Bool, isMirrored: Bool = false, playbackRate: Float = 1.0, isMuted: Bool, volume: Float, isPaused: Bool = false, onFinished: (() -> Void)?, onProgress: ((Double, Double) -> Void)?) {
         // 更新非视频属性
+        let mirrorChanged = self.isMirrored != isMirrored
+        self.isMirrored = isMirrored
         self.isMuted = isMuted
         self.volume = volume
         self.onFinished = onFinished
         self.onProgress = onProgress
+        self.playbackRate = max(0.1, playbackRate)
         
         updateVolumeAndMute()
         
@@ -203,6 +208,10 @@ class SeamlessVideoPlayerView: UIView {
         // 优化：先检查视频名字是否真正改变
         // 如果名字相同，则认为视频源相同，无需调用昂贵的 findVideoURL
         if self.currentVideoName == videoName {
+            if mirrorChanged {
+                applyMirror(to: activeLayer, mirrored: self.isMirrored)
+            }
+
             // 视频没变，但循环状态可能变了
             if self.isLooping != isLooping {
                 print("SeamlessPlayer: Loop state changed to \(isLooping)")
@@ -212,7 +221,9 @@ class SeamlessVideoPlayerView: UIView {
             
             // 确保正在播放（如果不是暂停状态）
             if activePlayer?.timeControlStatus != .playing && !isPaused {
-                activePlayer?.play()
+                play(player: activePlayer)
+            } else {
+                activePlayer?.rate = self.playbackRate
             }
             return
         }
@@ -245,7 +256,9 @@ class SeamlessVideoPlayerView: UIView {
                 updateLoopingState(isLooping: isLooping)
             }
             if activePlayer?.timeControlStatus != .playing {
-                activePlayer?.play()
+                play(player: activePlayer)
+            } else {
+                activePlayer?.rate = self.playbackRate
             }
         }
     }
@@ -266,6 +279,15 @@ class SeamlessVideoPlayerView: UIView {
         player.isMuted = isMuted
         player.volume = volume
         return player
+    }
+
+    private func play(player: AVQueuePlayer?) {
+        guard let player = player else { return }
+        if abs(playbackRate - 1.0) < 0.01 {
+            player.play()
+        } else {
+            player.playImmediately(atRate: playbackRate)
+        }
     }
     
     private func loadAndSwitch(to videoName: String, url: URL?, looping: Bool) {
@@ -297,6 +319,7 @@ class SeamlessVideoPlayerView: UIView {
         // 关键重构：每次创建新的 Player，避免复用导致的状态污染 (err -12860)
         nextPlayer = createPlayer()
         nextLayer.player = nextPlayer
+        applyMirror(to: nextLayer, mirrored: self.isMirrored)
         
         // 准备 Item
         let item = AVPlayerItem(url: url)
@@ -321,7 +344,7 @@ class SeamlessVideoPlayerView: UIView {
         )
         
         // 预播放 (缓冲)
-        nextPlayer.play()
+        play(player: nextPlayer)
         
         // 监听
         // 移除旧的 status 监听
@@ -377,12 +400,13 @@ class SeamlessVideoPlayerView: UIView {
         
         // 0. 确保新 Layer 在最上层
         context.layer.zPosition = 10
+        applyMirror(to: context.layer, mirrored: self.isMirrored)
         if let old = activeLayer {
             old.zPosition = 0
         }
         
-        // 1. 显示新 Layer
-        context.layer.opacity = 1
+        // 1. 新 Layer 先隐藏，后续在旧 Layer 淡出完成后再淡入，避免互相重叠
+        context.layer.opacity = 0
         
         // 记录旧 Layer 和 Player
         let oldLayer = activeLayer
@@ -410,6 +434,7 @@ class SeamlessVideoPlayerView: UIView {
         activeLayer = context.layer
         activePlayer = context.player
         activeLoadingID = context.loadingID
+        activePlayer?.rate = playbackRate
 
         
         // 处理 Race Condition: 检查当前的 isLooping 是否与 context.isLooping 一致
@@ -440,30 +465,41 @@ class SeamlessVideoPlayerView: UIView {
         // 6. 设置进度监听
         setupTimeObserver(for: context.player)
         
-        // 延迟关闭旧视频 (修改为 300ms)
+        let fadeOutDuration: CFTimeInterval = 0.12
+        let fadeInDuration: CFTimeInterval = 0.16
+
+        let fadeInNewLayer: () -> Void = { [weak self] in
+            guard let self = self else { return }
+            guard self.activeLayer === context.layer else { return }
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(fadeInDuration)
+            context.layer.opacity = 1
+            CATransaction.commit()
+        }
+
         if let layerToHide = oldLayer, let playerToStop = oldPlayer {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(fadeOutDuration)
+            CATransaction.setCompletionBlock { [weak self] in
                 guard let self = self else { return }
-                
-                // 关键检查：确保要隐藏的 Layer 确实不再是 activeLayer
-                // 如果在 300ms 内又切回去了，那么 activeLayer 就会等于 layerToHide，此时不应该隐藏
+
+                // 淡出旧 Layer 完成后，再淡入新 Layer，避免视觉重叠
+                fadeInNewLayer()
+
+                // 清理旧 Layer/Player
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
                 if self.activeLayer !== layerToHide {
-                    // 使用 CoreAnimation 事务
-                    CATransaction.begin()
-                    CATransaction.setDisableActions(true)
-                    layerToHide.opacity = 0
-                    layerToHide.player = nil // 断开连接，加速释放
-                    CATransaction.commit()
-                    
-                    playerToStop.pause()
-                    // playerToStop.removeAllItems() // 避免操作队列
-                    
-                    // 恢复音量 (虽然 removeAllItems 已经清理了，但重置状态是个好习惯，
-                    // 实际上下次 updateVolumeAndMute 会处理，这里可以省略，或者为了保险重置一下)
-                    // playerToStop.volume = self.volume
-                    // playerToStop.isMuted = self.isMuted
+                    layerToHide.player = nil
                 }
+                CATransaction.commit()
+                playerToStop.pause()
             }
+            layerToHide.opacity = 0
+            CATransaction.commit()
+        } else {
+            // 首帧没有旧 Layer 时直接淡入
+            fadeInNewLayer()
         }
     }
     
@@ -529,7 +565,7 @@ class SeamlessVideoPlayerView: UIView {
                 print("SeamlessPlayer: Loop triggered (Manual Seek)")
                 // 手动循环
                 self.activePlayer?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
-                self.activePlayer?.play()
+                self.play(player: self.activePlayer)
             } else {
                 print("SeamlessPlayer: Finished playing (End)")
                 self.onFinished?()
@@ -542,6 +578,14 @@ class SeamlessVideoPlayerView: UIView {
             NotificationCenter.default.removeObserver(observer)
             finishObserver = nil
         }
+    }
+
+    private func applyMirror(to layer: AVPlayerLayer?, mirrored: Bool) {
+        guard let layer = layer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.transform = CATransform3DMakeScale(mirrored ? -1 : 1, 1, 1)
+        CATransaction.commit()
     }
     
     private func findVideoURL(name: String) -> URL? {
@@ -595,6 +639,8 @@ class SeamlessVideoPlayerView: UIView {
 struct SeamlessVideoPlayer: UIViewRepresentable {
     var videoName: String
     var isLooping: Bool
+    var isMirrored: Bool = false
+    var playbackRate: Float = 1.0
     var isMuted: Bool
     var volume: Float
     var isPaused: Bool = false
@@ -611,6 +657,8 @@ struct SeamlessVideoPlayer: UIViewRepresentable {
         uiView.update(
             videoName: videoName,
             isLooping: isLooping,
+            isMirrored: isMirrored,
+            playbackRate: playbackRate,
             isMuted: isMuted,
             volume: volume,
             isPaused: isPaused,

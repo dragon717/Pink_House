@@ -5,6 +5,7 @@ import Combine
 struct GuideCatVideoPlayer: View {
     let videoName: String
     let isLooping: Bool
+    let playbackRate: Float
     let isFlipped: Bool
     let onFinished: (() -> Void)?
 
@@ -12,6 +13,7 @@ struct GuideCatVideoPlayer: View {
         PetVideoPlayer(
             videoName: videoName,
             isLooping: isLooping,
+            playbackRate: playbackRate,
             isMuted: true,
             onFinished: onFinished
         )
@@ -337,13 +339,14 @@ struct AppFirstLaunchGuideOverlay: View {
                 .ignoresSafeArea()
 
             if guideManager.isRunningAnimation {
-                let needsFlip = guideManager.catPosition.x < UIScreen.main.bounds.width / 2
-
                 GuideCatVideoPlayer(
                     videoName: guideManager.runningVideoName,
-                    isLooping: true,
-                    isFlipped: needsFlip,
-                    onFinished: nil
+                    isLooping: guideManager.isRunningVideoLooping,
+                    playbackRate: guideManager.guideVideoPlaybackRate,
+                    isFlipped: guideManager.isGuideCatFlipped,
+                    onFinished: {
+                        guideManager.handleRunningVideoPlaybackFinished()
+                    }
                 )
                 .position(guideManager.catPosition)
             }
@@ -375,10 +378,11 @@ struct AppFirstLaunchGuideOverlay: View {
                 GuideCatVideoPlayer(
                     videoName: guideManager.pointingVideoName,
                     isLooping: false,
-                    isFlipped: false,
+                    playbackRate: guideManager.guideVideoPlaybackRate,
+                    isFlipped: guideManager.isGuideCatFlipped,
                     onFinished: nil
                 )
-                .position(guideManager.createButtonPosition)
+                .position(guideManager.catPosition)
                 .allowsHitTesting(false)
             }
 

@@ -5,6 +5,7 @@ import Combine
 struct PetVideoPlayer: UIViewControllerRepresentable {
     var videoName: String
     var isLooping: Bool
+    var playbackRate: Float = 1.0
     var isMuted: Bool = false
     var volume: Float = 0.6 // 默认降低音量，防止与 BGM 叠加破音
     var onFinished: (() -> Void)?
@@ -111,7 +112,7 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             }
             
             // 确保播放
-            player.play()
+            play(player)
             
         } else {
             // URL 没变，但 isLooping 可能变了
@@ -146,12 +147,20 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             
             // 如果视频没变，确保正在播放
             if uiViewController.player?.timeControlStatus != .playing {
-                uiViewController.player?.play()
+                if let queuePlayer = context.coordinator.queuePlayer {
+                    play(queuePlayer)
+                }
             }
         }
         
         // 更新记录的状态
         context.coordinator.isLooping = isLooping
+
+        // 速率可能动态变化，保持一致
+        if let queuePlayer = context.coordinator.queuePlayer,
+           queuePlayer.timeControlStatus == .playing {
+            queuePlayer.rate = max(0.1, playbackRate)
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -215,6 +224,15 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
         
         deinit {
             cleanupAll()
+        }
+    }
+
+    private func play(_ player: AVQueuePlayer) {
+        let safeRate = max(0.1, playbackRate)
+        if abs(safeRate - 1.0) < 0.01 {
+            player.play()
+        } else {
+            player.playImmediately(atRate: safeRate)
         }
     }
 }

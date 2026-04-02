@@ -37,38 +37,17 @@ struct SmallWorldPetOverlay: View {
     
     @ViewBuilder
     var petView: some View {
-        // Decide image based on direction
-        // isMovingUp (Back), !isMovingUp (Front)
-        // isMovingRight (Right), !isMovingRight (Left)
-        
-        Group {
-            if viewModel.isMovingUp {
-                // Back View
-                if viewModel.isMovingRight {
-                    // Right Back -> Original naicha_right_back
-                    Image("\(viewModel.petName)_right_back")
-                        .resizable()
-                } else {
-                    // Left Back -> Flipped naicha_right_back
-                    Image("\(viewModel.petName)_right_back")
-                        .resizable()
-                        .scaleEffect(x: -1, y: 1)
-                }
-            } else {
-                // Front View
-                if viewModel.isMovingRight {
-                    // Right Front -> Flipped naicha_left_front
-                    Image("\(viewModel.petName)_left_front")
-                        .resizable()
-                        .scaleEffect(x: -1, y: 1)
-                } else {
-                    // Left Front -> Original naicha_left_front
-                    Image("\(viewModel.petName)_left_front")
-                        .resizable()
-                }
+        SeamlessVideoPlayer(
+            videoName: viewModel.currentMotionVideoName,
+            isLooping: viewModel.isMotionVideoLooping,
+            isMirrored: viewModel.isMotionVideoMirrored,
+            playbackRate: viewModel.motionPlaybackRate,
+            isMuted: true,
+            volume: 0,
+            onFinished: {
+                viewModel.handleMotionVideoFinished()
             }
-        }
-        .scaledToFit()
+        )
         .frame(width: 40, height: 40) // Adjust size as needed
         .shadow(radius: 5)
     }

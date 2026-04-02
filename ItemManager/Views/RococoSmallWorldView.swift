@@ -194,6 +194,9 @@ struct RococoSmallWorldView: View {
                     
                     Button(action: {
                         petViewModel.isDebugMode.toggle()
+                        if petViewModel.isDebugMode, petViewModel.activePathId == nil {
+                            petViewModel.startMovement()
+                        }
                     }) {
                         Label("显示路径调试", systemImage: petViewModel.isDebugMode ? "checkmark.circle" : "arrow.triangle.swap")
                     }
@@ -226,6 +229,7 @@ struct RococoSmallWorldView: View {
         .ignoresSafeArea()
         .onAppear {
             resetState()
+            petViewModel.startMovement()
         }
         .onDisappear {
             resetState()
@@ -233,6 +237,7 @@ struct RococoSmallWorldView: View {
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 resetState()
+                petViewModel.startMovement()
             }
         }
         .alert("功能未解锁", isPresented: $showUnlockAlert) {
@@ -416,16 +421,14 @@ struct RococoSmallWorldView: View {
                 .frame(width: containerSize.width, height: containerSize.height)
             }
             
-            if FeatureUnlockManager.shared.isUnlocked(.pet) {
-                SmallWorldPetOverlay(
-                    viewModel: petViewModel,
-                    roomIndex: imageName.contains("rococo_1") ? 0 : 1,
-                    containerSize: imageFrame.size
-                )
-                .frame(width: imageFrame.width, height: imageFrame.height)
-                .offset(x: imageFrame.minX, y: imageFrame.minY)
-                .allowsHitTesting(petViewModel.isDebugMode)
-            }
+            SmallWorldPetOverlay(
+                viewModel: petViewModel,
+                roomIndex: imageName.contains("rococo_1") ? 0 : 1,
+                containerSize: imageFrame.size
+            )
+            .frame(width: imageFrame.width, height: imageFrame.height)
+            .offset(x: imageFrame.minX, y: imageFrame.minY)
+            .allowsHitTesting(petViewModel.isDebugMode)
         }
         .frame(width: containerSize.width, height: containerSize.height, alignment: .topLeading)
     }

@@ -420,14 +420,17 @@ struct PetImageView: View {
                 .animation(breathingAnimation, value: isBreathing)
             
             // 拖拽/吸附状态
-            Image("\(petImagePrefix)_dragging")
-                .resizable()
-                .scaledToFit()
-                .frame(width: catWidth)
-                .scaleEffect(getDraggingScale(), anchor: .top)
-                .rotationEffect(rotation)
-                .offset(y: state == .snapping ? 0 : 30)
-                .opacity(shouldShowDragging ? 1 : 0)
+            SeamlessVideoPlayer(
+                videoName: "\(petImagePrefix)_dragging",
+                isLooping: true,
+                isMuted: true,
+                volume: 0
+            )
+            .frame(width: catWidth, height: catWidth)
+            .scaleEffect(getDraggingScale(), anchor: .top)
+            .rotationEffect(rotation)
+            .offset(y: state == .snapping ? 0 : 30)
+            .opacity(shouldShowDragging ? 1 : 0)
         }
         .position(position)
     }

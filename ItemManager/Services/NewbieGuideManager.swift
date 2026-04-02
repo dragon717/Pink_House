@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Combine
 import UIKit
+import AVFoundation
 
 // MARK: - App首次启动引导管理器
 
@@ -14,6 +15,8 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     @Published var isShowingGuide: Bool = false
     @Published var currentStep: AppFirstLaunchStep = .none
     @Published var isRunningAnimation: Bool = false
+    @Published var isRunningVideoLooping: Bool = true
+    @Published var isGuideCatFlipped: Bool = false
     @Published var catPosition: CGPoint = .zero
     @Published var showPointingVideo: Bool = false
     @Published var showCreateButtonHighlight: Bool = false  // 是否显示创建按钮高亮
@@ -48,7 +51,24 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     
     let runningVideoName = "naicha_new_role"
     let pointingVideoName = "naicha_pointto"
-    let runningDuration: TimeInterval = 5.0  // 跑步动画持续5秒
+    let guideVideoPlaybackRate: Float = 1.5
+    private let runningTravelDurationAt1x: TimeInterval = 4.6
+    private let defaultRunningDuration: TimeInterval = 5.0
+    private let runningStartDelay: TimeInterval = 0.3
+    private let runningTailPlaybackLeadDuration: TimeInterval = 0.12
+    private let runningTailFrameHoldDuration: TimeInterval = 0.18
+    private let runningFallbackGraceDuration: TimeInterval = 0.45
+    private(set) var runningDuration: TimeInterval = 5.0
+    private let guideVideoPrepareQueue = DispatchQueue(
+        label: "com.pinkhouse.newbieGuide.videoPrepare",
+        qos: .userInitiated
+    )
+    private var cachedFirstLaunchVideoDurations: [String: TimeInterval] = [:]
+    private var isPreparingFirstLaunchVideoDurations: Bool = false
+    private var runningStartWorkItem: DispatchWorkItem?
+    private var runningLoopStopWorkItem: DispatchWorkItem?
+    private var runningFallbackTransitionWorkItem: DispatchWorkItem?
+    private var runningFinishTransitionWorkItem: DispatchWorkItem?
     
     // 小猫跑步终点位置（右上角）
     var createButtonPosition: CGPoint {
@@ -99,6 +119,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     
     private init() {
         loadState()
+        prepareFirstLaunchVideoDurationsIfNeeded()
         NotificationCenter.default.addObserver(
             forName: .homeTabChanged,
             object: nil,
@@ -130,7 +151,8 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     
     func startGuide() {
         guard shouldShowGuide else { return }
-        
+        prepareFirstLaunchVideoDurationsIfNeeded()
+
         currentStep = .welcome
         isShowingGuide = true
         saveState()
@@ -140,33 +162,147 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     
     /// 开始跑步动画（从欢迎界面点击后调用）
     func startRunningAnimation() {
+        cancelPendingRunningAnimationWorkItems()
+
         currentStep = .running
         isRunningAnimation = true
+        isRunningVideoLooping = true
         showPointingVideo = false
         showCreateButtonHighlight = false
+        prepareFirstLaunchVideoDurationsIfNeeded()
+        runningDuration = resolvedRunningAnimationDuration()
         
         // 设置起始位置（悬浮小猫位置）
         catPosition = floatingCatStartPosition
+        isGuideCatFlipped = createButtonPosition.x < floatingCatStartPosition.x
         
         // 延迟后开始动画
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        let startWorkItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            guard self.currentStep == .running, self.isRunningAnimation else { return }
             
             // 动画移动到目标位置（创建按钮位置）
             withAnimation(.linear(duration: self.runningDuration)) {
                 self.catPosition = self.createButtonPosition
             }
-            
-            // 10秒后显示指向动画
-            DispatchQueue.main.asyncAfter(deadline: .now() + self.runningDuration) { [weak self] in
+
+            let stopLoopDelay = max(self.runningDuration, 0.1)
+
+            // 路径动画结束时先关闭循环，等待当前轮播放结束后再切换到 pointing。
+            let loopStopWorkItem = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
-                self.isRunningAnimation = false
-                self.showPointingVideo = true
-                self.showCreateButtonHighlight = true
-                self.currentStep = .pointing
-                self.saveState()
+                guard self.currentStep == .running, self.isRunningAnimation else { return }
+                self.isRunningVideoLooping = false
+            }
+            self.runningLoopStopWorkItem = loopStopWorkItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + stopLoopDelay, execute: loopStopWorkItem)
+
+            // 兜底推进：关闭循环后允许“最多再播放一整轮”再强制切换，避免提前截断首段。
+            let fallbackDelay = stopLoopDelay + max(stopLoopDelay, 0.5) + self.runningFallbackGraceDuration
+            let fallbackWorkItem = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                guard self.currentStep == .running, self.isRunningAnimation else { return }
+                self.transitionFromRunningToPointing()
+            }
+            self.runningFallbackTransitionWorkItem = fallbackWorkItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + fallbackDelay, execute: fallbackWorkItem)
+        }
+        runningStartWorkItem = startWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + runningStartDelay, execute: startWorkItem)
+    }
+
+    func handleRunningVideoPlaybackFinished() {
+        guard currentStep == .running, isRunningAnimation else { return }
+        scheduleTransitionFromRunningToPointing(after: runningTailFrameHoldDuration)
+    }
+
+    private func transitionFromRunningToPointing() {
+        guard currentStep == .running else { return }
+        cancelPendingRunningAnimationWorkItems()
+        catPosition = createButtonPosition
+        isRunningAnimation = false
+        isRunningVideoLooping = true
+        showPointingVideo = true
+        showCreateButtonHighlight = true
+        currentStep = .pointing
+        saveState()
+    }
+
+    private func resolvedVideoDuration(name: String, fallback: TimeInterval) -> TimeInterval {
+        guard let url = VideoResourceManager.shared.findVideoURL(name: name) else {
+            return fallback
+        }
+
+        let asset = AVURLAsset(url: url)
+        let duration = CMTimeGetSeconds(asset.duration)
+        guard duration.isFinite, duration > 0.1 else {
+            return fallback
+        }
+        return duration
+    }
+
+    private func prepareFirstLaunchVideoDurationsIfNeeded() {
+        let requiredVideoNames = [runningVideoName, pointingVideoName]
+        let unresolvedVideoNames = requiredVideoNames.filter { cachedFirstLaunchVideoDurations[$0] == nil }
+
+        guard !unresolvedVideoNames.isEmpty else { return }
+        guard !isPreparingFirstLaunchVideoDurations else { return }
+        isPreparingFirstLaunchVideoDurations = true
+
+        guideVideoPrepareQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            var preparedDurations: [String: TimeInterval] = [:]
+            for videoName in unresolvedVideoNames {
+                let duration = self.resolvedVideoDuration(name: videoName, fallback: self.defaultRunningDuration)
+                preparedDurations[videoName] = duration
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                for (videoName, duration) in preparedDurations {
+                    guard duration > 0 else { continue }
+                    self.cachedFirstLaunchVideoDurations[videoName] = duration
+                }
+                self.isPreparingFirstLaunchVideoDurations = false
             }
         }
+    }
+
+    private func resolvedRunningAnimationDuration() -> TimeInterval {
+        let effectiveRate = max(Double(guideVideoPlaybackRate), 0.1)
+        let tunedRunDuration = runningTravelDurationAt1x / effectiveRate
+        let runningVideoDuration = cachedFirstLaunchVideoDurations[runningVideoName] ?? defaultRunningDuration
+        let runningVideoRealDuration = runningVideoDuration / effectiveRate
+        let latestSafeRunDuration = max(
+            runningVideoRealDuration - runningStartDelay - runningTailPlaybackLeadDuration,
+            0.1
+        )
+
+        return max(min(tunedRunDuration, latestSafeRunDuration), defaultRunningDuration / 3.0)
+    }
+
+    private func scheduleTransitionFromRunningToPointing(after delay: TimeInterval) {
+        runningFinishTransitionWorkItem?.cancel()
+        let transitionWorkItem = DispatchWorkItem { [weak self] in
+            self?.transitionFromRunningToPointing()
+        }
+        runningFinishTransitionWorkItem = transitionWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, delay), execute: transitionWorkItem)
+    }
+
+    private func cancelPendingRunningAnimationWorkItems() {
+        runningStartWorkItem?.cancel()
+        runningStartWorkItem = nil
+
+        runningLoopStopWorkItem?.cancel()
+        runningLoopStopWorkItem = nil
+
+        runningFallbackTransitionWorkItem?.cancel()
+        runningFallbackTransitionWorkItem = nil
+
+        runningFinishTransitionWorkItem?.cancel()
+        runningFinishTransitionWorkItem = nil
     }
     
     /// 用户点击了创建按钮，结束引导
@@ -467,11 +603,13 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     /// 完成引导
     func completeGuide(shouldGrantFirstCompletionReward: Bool = true) {
         let wasCompletedBefore = state.isCompleted
+        cancelPendingRunningAnimationWorkItems()
 
         state.isCompleted = true
         currentStep = .complete
         isShowingGuide = false
         isRunningAnimation = false
+        isRunningVideoLooping = true
         showPointingVideo = false
         showCreateButtonHighlight = false
         resetGuideInteractiveRegions()
@@ -484,10 +622,12 @@ final class AppFirstLaunchGuideManager: ObservableObject {
 
     /// 重置引导状态
     func resetGuide() {
+        cancelPendingRunningAnimationWorkItems()
         state = AppFirstLaunchState()
         currentStep = .none
         isShowingGuide = false
         isRunningAnimation = false
+        isRunningVideoLooping = true
         showPointingVideo = false
         showCreateButtonHighlight = false
         resetGuideInteractiveRegions()

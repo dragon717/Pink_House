@@ -223,8 +223,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .wardrobe, .finalPayment, .recycleBin:
             return .free()
         case .pet:
-            // 萌宠：在VIP界面兑换码输入 "vip萌宠" 解锁
-            return .redeemCode("vip萌宠", description: "仍在认真开发和内测中，敬请期待～")
+            // 萌宠默认开启
+            return .free()
         case .ootd:
             return .clothingCount(5)
         case .ootdDefaultBook:
@@ -282,8 +282,8 @@ enum FeatureItem: String, CaseIterable, Identifiable {
     // 是否默认隐藏
     var isHiddenByDefault: Bool {
         switch self {
-        case .pet, .bigWorld, .perler, .dressStock:
-            return true // 萌宠、世界书、拼豆工坊、裙装股市默认隐藏
+        case .bigWorld, .perler, .dressStock:
+            return true // 世界书、拼豆工坊、裙装股市默认隐藏
         case .networkCommunity, .magicTasks:
             return false  // 联网社区和魔法任务默认显示
         case .filterClassic, .privacyDisplay, .tagBrandFieldDisplay, .spaceBook, .batchEdit, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore, .customColorPersonalization:
@@ -480,6 +480,9 @@ final class FeatureUnlockManager: ObservableObject {
             let defaultCondition = feature.defaultCondition
             if unlockConditions[feature.rawValue] == nil {
                 unlockConditions[feature.rawValue] = defaultCondition
+            } else if feature == .pet {
+                // 萌宠改为默认开启：兼容历史用户旧的兑换码配置
+                unlockConditions[feature.rawValue] = defaultCondition
             } else if defaultCondition.type == UnlockConditionType.redeemCode.rawValue {
                 // 对于兑换码解锁的功能，强制更新描述文字（用于文案调整）
                 unlockConditions[feature.rawValue] = defaultCondition
@@ -501,6 +504,17 @@ final class FeatureUnlockManager: ObservableObject {
                 }
                 
                 featureStatuses[feature.rawValue] = status
+            }
+
+            if feature == .pet {
+                var petStatus = getStatus(for: .pet)
+                if !petStatus.isUnlocked {
+                    petStatus.unlockedAt = petStatus.unlockedAt ?? Date()
+                    petStatus.unlockedBy = petStatus.unlockedBy ?? "free"
+                }
+                petStatus.isUnlocked = true
+                petStatus.isVisible = true
+                featureStatuses[feature.rawValue] = petStatus
             }
         }
         saveConditions()
@@ -811,7 +825,6 @@ final class FeatureUnlockManager: ObservableObject {
 
         // 定义兑换码与功能的映射
         let codeMapping: [String: FeatureItem] = [
-            "vip萌宠": .pet,
             "vip世界书": .bigWorld,
             "vip拼豆工坊": .perler,
             "vip裙装股市": .dressStock,
@@ -840,7 +853,7 @@ final class FeatureUnlockManager: ObservableObject {
 
     /// 获取所有兑换码解锁的功能列表
     func getRedeemCodeFeatures() -> [FeatureItem] {
-        return [.pet, .bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks]
+        return [.bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks]
     }
     
     // MARK: - 启动时刷新进度

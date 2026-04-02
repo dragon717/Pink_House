@@ -157,18 +157,15 @@ struct MeView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         
-                        // 智能萌宠（萌宠功能已解锁时才显示）
-                        if FeatureUnlockManager.shared.isUnlocked(.pet) {
-                            NavigationLink(destination: PetAISettingsView()) {
-                                SettingsGridItem(
-                                    title: "智能萌宠",
-                                    subtitle: "AI · 语音 · 形象",
-                                    icon: "pawprint.fill",
-                                    iconColor: .orange
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
+                        NavigationLink(destination: PetAISettingsView()) {
+                            SettingsGridItem(
+                                title: "智能萌宠",
+                                subtitle: "AI · 语音 · 形象",
+                                icon: "pawprint.fill",
+                                iconColor: .orange
+                            )
                         }
+                        .buttonStyle(PlainButtonStyle())
 
                         // 联网设置（已解锁时才显示）
                         if FeatureUnlockManager.shared.isUnlocked(.networkCommunity) {
