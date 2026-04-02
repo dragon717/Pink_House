@@ -111,15 +111,15 @@ struct BatchStringSelectionView: View {
     }
 }
 
-// MARK: - 批量状态选择视图
-struct BatchStatusSelectionView: View {
-    @Binding var selectedStatus: String?
+// MARK: - 批量成色选择视图
+struct BatchConditionSelectionView: View {
+    @Binding var selectedCondition: String?
     let options: [String]
     @Environment(\.dismiss) private var dismiss
     
-    @State private var tempSelectedStatus: String? = nil
+    @State private var tempSelectedCondition: String? = nil
 
-    private var statusOptions: [String] {
+    private var conditionOptions: [String] {
         Array(
             Set(
                 options.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -132,47 +132,47 @@ struct BatchStatusSelectionView: View {
         NavigationStack {
             List {
                 Section {
-                    if statusOptions.isEmpty {
-                        Text("暂无可选状态")
+                    if conditionOptions.isEmpty {
+                        Text("暂无可选成色")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(statusOptions, id: \.self) { status in
+                        ForEach(conditionOptions, id: \.self) { condition in
                             HStack {
-                                Text(status)
+                                Text(condition)
                                 Spacer()
-                                if tempSelectedStatus == status {
+                                if tempSelectedCondition == condition {
                                     Image(systemName: "checkmark")
                                         .foregroundStyle(.pink)
                                 }
                             }
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                tempSelectedStatus = status
+                                tempSelectedCondition = condition
                             }
                         }
                     }
                 }
             }
-            .navigationTitle("改变状态")
+            .navigationTitle("改变成色")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") {
-                        tempSelectedStatus = nil
+                        tempSelectedCondition = nil
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
-                        selectedStatus = tempSelectedStatus
+                        selectedCondition = tempSelectedCondition
                         dismiss()
                     }
-                    .disabled(tempSelectedStatus == nil)
+                    .disabled(tempSelectedCondition == nil)
                 }
             }
             .onAppear {
-                tempSelectedStatus = selectedStatus
+                tempSelectedCondition = selectedCondition
             }
         }
     }

@@ -278,7 +278,6 @@ final class AppFirstLaunchGuideManager: ObservableObject {
             runningVideoRealDuration - runningStartDelay - runningTailPlaybackLeadDuration,
             0.1
         )
-
         return max(min(tunedRunDuration, latestSafeRunDuration), defaultRunningDuration / 3.0)
     }
 

@@ -41,7 +41,7 @@ struct WardrobeView: View {
     @State private var tempSelectedLengths: [String] = []
     @State private var showingAccessorySelection = false
     @State private var tempSelectedAccessories: [String] = []
-    @State private var showingStatusSelection = false
+    @State private var showingConditionSelection = false
     @State private var tempSelectedCondition: String? = nil
     
     // 合并为小物到裙装
@@ -376,9 +376,9 @@ struct WardrobeView: View {
 
                     Button {
                         tempSelectedCondition = nil
-                        showingStatusSelection = true
+                        showingConditionSelection = true
                     } label: {
-                        Label("改变状态", systemImage: "arrow.2.circlepath")
+                        Label("改变成色", systemImage: "arrow.2.circlepath")
                     }
 
                     Divider()
@@ -490,9 +490,9 @@ struct WardrobeView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingStatusSelection) {
-                BatchStatusSelectionView(
-                    selectedStatus: $tempSelectedCondition,
+            .sheet(isPresented: $showingConditionSelection) {
+                BatchConditionSelectionView(
+                    selectedCondition: $tempSelectedCondition,
                     options: conditionBatchOptions
                 )
                     .onDisappear {

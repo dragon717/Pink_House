@@ -2,6 +2,13 @@
 
 本文档详细说明了在 `ItemManager` 项目中新增或替换萌宠视频动画的完整流程、技术细节及最佳实践。
 
+## Rococo House 专项说明
+
+Rococo House（小世界路径行走 + 等轴方向 + turn 过渡）的专项最佳实践请参考：
+
+- `docs/ROCOCO_PET_ISOMETRIC_VIDEO_BEST_PRACTICES.md`
+- `.trae/skills/swiftui-rococo-pet-isometric-video/SKILL.md`
+
 ## 1. 核心流程概览
 
 新增一个动画通常涉及以下三个步骤：

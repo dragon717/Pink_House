@@ -86,11 +86,12 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             print("Error: Could not find video resource: \(videoName) OR fallback idle.mp4")
             return
         }
+
+        context.coordinator.playbackRate = playbackRate
         
         // 检查是否需要更新视频
         // 通过 context.coordinator 记录当前正在播放的 URL，避免依赖 uiViewController.player 状态
         if context.coordinator.currentUrl != validUrl {
-            
             // 准备新的 Item
             let newItem = AVPlayerItem(url: validUrl)
             
@@ -101,14 +102,14 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
             context.coordinator.cleanupOldState()
             
             if isLooping {
-                // 设置循环
-                context.coordinator.setupLooper(item: newItem, url: validUrl)
-                player.actionAtItemEnd = .advance // 循环播放需要自动推进
+                player.replaceCurrentItem(with: newItem)
+                player.actionAtItemEnd = .none
+                context.coordinator.setupObserver(item: newItem, onFinished: onFinished, isLooping: true)
             } else {
                 // 设置单次播放监听
                 player.replaceCurrentItem(with: newItem)
                 player.actionAtItemEnd = .pause // 单次播放结束暂停在最后一帧，防止黑屏
-                context.coordinator.setupObserver(item: newItem, onFinished: onFinished)
+                context.coordinator.setupObserver(item: newItem, onFinished: onFinished, isLooping: false)
             }
             
             // 确保播放
@@ -122,25 +123,18 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                 
                 // 如果从循环 -> 不循环
                 if !isLooping {
-                    print("PetVideoPlayer: Switching from Loop to Single Play (Stop Looping)")
-                    // 禁用 Looper
-                    context.coordinator.looper?.disableLooping()
-                    context.coordinator.looper = nil
-                    
                     player.actionAtItemEnd = .pause // 切换到单次播放时，也要确保结束暂停
                     
                     // 添加结束监听，以便播放完当前遍后调用 onFinished
                     if let currentItem = player.currentItem {
-                        context.coordinator.setupObserver(item: currentItem, onFinished: onFinished)
+                        context.coordinator.setupObserver(item: currentItem, onFinished: onFinished, isLooping: false)
                     }
                 } 
                 // 如果从不循环 -> 循环 (通常是重新开始互动，这通常会伴随 URL 变化，所以可能不会走到这分支，但处理一下也无妨)
                 else {
-                    print("PetVideoPlayer: Switching from Single Play to Loop")
                     if let currentItem = player.currentItem {
-                         context.coordinator.removeObserver()
-                         context.coordinator.setupLooper(item: currentItem, url: validUrl)
-                         player.actionAtItemEnd = .advance // 恢复循环播放行为
+                         player.actionAtItemEnd = .none
+                         context.coordinator.setupObserver(item: currentItem, onFinished: onFinished, isLooping: true)
                     }
                 }
             }
@@ -171,20 +165,11 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
         var queuePlayer: AVQueuePlayer?
         var currentUrl: URL?
         var isLooping: Bool = false // 记录当前 Coordinator 的循环状态
-        var looper: AVPlayerLooper?
         var onFinished: (() -> Void)?
         var observer: Any?
+        var playbackRate: Float = 1.0
         
-        func setupLooper(item: AVPlayerItem, url: URL) {
-            guard let player = queuePlayer else { return }
-            
-            // 创建 Looper，这会自动处理循环
-            // 注意：AVPlayerLooper 需要传入 templateItem
-            self.looper = AVPlayerLooper(player: player, templateItem: item)
-            self.currentUrl = url
-        }
-        
-        func setupObserver(item: AVPlayerItem, onFinished: (() -> Void)?) {
+        func setupObserver(item: AVPlayerItem, onFinished: (() -> Void)?, isLooping: Bool) {
             self.onFinished = onFinished
             self.currentUrl = (item.asset as? AVURLAsset)?.url
             
@@ -197,6 +182,17 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
                 queue: .main
             ) { [weak self] _ in
                 guard let self = self else { return }
+                if isLooping, let player = self.queuePlayer {
+                    let safeRate = max(self.playbackRate, 0.1)
+                    player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                        if abs(safeRate - 1.0) < 0.01 {
+                            player.play()
+                        } else {
+                            player.playImmediately(atRate: safeRate)
+                        }
+                    }
+                    return
+                }
                 self.onFinished?()
             }
         }
@@ -210,8 +206,6 @@ struct PetVideoPlayer: UIViewControllerRepresentable {
         
         func cleanupOldState() {
             removeObserver()
-            looper?.disableLooping()
-            looper = nil
             // 注意：不要把 queuePlayer 置空，因为它是复用的
         }
         
