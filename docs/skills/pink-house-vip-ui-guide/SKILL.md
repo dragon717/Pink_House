@@ -15,7 +15,8 @@ description: Pink_House VIP页与高级权益UI设计技能。用于复刻截图
 
 1. 先读 [../../VIP_UI_PLAYBOOK.md](../../VIP_UI_PLAYBOOK.md)
 2. 再读 [../../VIP_REDESIGN_AND_CAPABILITY_LAYERING.md](../../VIP_REDESIGN_AND_CAPABILITY_LAYERING.md)
-3. 按下面顺序工作：
+3. 如果涉及 `-xx% OFF`、优惠角标或折扣胶囊，再读 [../pink-house-discount-badge-guide/SKILL.md](../pink-house-discount-badge-guide/SKILL.md)
+4. 按下面顺序工作：
    - 先抽视觉 token
    - 再定信息架构
    - 再映射业务权益

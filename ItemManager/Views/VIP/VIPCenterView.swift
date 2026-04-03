@@ -556,16 +556,7 @@ struct VIPCenterView: View {
                             Spacer(minLength: 8)
 
                             if let badge = plan.badgeText {
-                                Text(badge)
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
-                                    .background(Capsule().fill(Color.white.opacity(0.08)))
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                                    )
-                                    .foregroundStyle(.white)
+                                DiscountBadgeView(text: badge, style: .capsuleGlow, size: .small)
                             }
                         }
                     }
@@ -731,11 +722,7 @@ struct VIPCenterView: View {
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.leading)
 
-                Text(benefit.subtitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.68))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(2)
+                benefitSubtitleView(for: benefit, fontSize: 11)
             }
             .padding(14)
             .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
@@ -762,10 +749,7 @@ struct VIPCenterView: View {
                     Text(benefit.title)
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.white)
-                    Text(benefit.subtitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.68))
-                        .multilineTextAlignment(.leading)
+                    benefitSubtitleView(for: benefit, fontSize: 12)
                 }
                 Spacer()
             }
@@ -812,6 +796,47 @@ struct VIPCenterView: View {
                 Capsule()
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
+    }
+
+    @ViewBuilder
+    private func benefitSubtitleView(for benefit: VIPBenefit, fontSize: CGFloat) -> some View {
+        switch benefit.id {
+        case "discount":
+            VStack(alignment: .leading, spacing: 2) {
+                Text("萌宠商店")
+                    .font(.system(size: fontSize, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.68))
+                DiscountBadgeView(
+                    text: VIPManager.petShopDiscountText,
+                    style: .inlineGlow,
+                    size: fontSize > 11 ? .medium : .small
+                )
+            }
+            .multilineTextAlignment(.leading)
+        case "updates":
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("主题皮肤商店")
+                        .font(.system(size: fontSize, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.68))
+                    DiscountBadgeView(
+                        text: VIPManager.themeSkinDiscountText,
+                        style: .inlineGlow,
+                        size: fontSize > 11 ? .medium : .small
+                    )
+                }
+                Text("更多会员权益正在路上")
+                    .font(.system(size: fontSize, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.68))
+            }
+            .multilineTextAlignment(.leading)
+        default:
+            Text(benefit.subtitle)
+                .font(.system(size: fontSize, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.68))
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+        }
     }
 
     private var statusTitle: String {

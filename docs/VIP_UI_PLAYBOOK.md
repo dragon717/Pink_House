@@ -167,6 +167,20 @@ VIP 页最容易失败的地方不是样式，而是信息层级。
 
 都不用推翻现有结构。
 
+### 3.5 折扣标识要抽成共享组件
+
+像 `-5% OFF`、`-40% OFF`、`-10% OFF` 这种内容不会只出现一次。
+
+所以不要把它当成某一页的临时小装饰，而要当成跨页面复用的视觉组件。
+
+这次已经抽成：
+
+- [DiscountBadgeView.swift](/Users/muniao/Library/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/ItemManager/Views/Components/DiscountBadgeView.swift)
+
+进一步规范见：
+
+- [DISCOUNT_BADGE_UI_BEST_PRACTICES.md](/Users/muniao/Library/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/docs/DISCOUNT_BADGE_UI_BEST_PRACTICES.md)
+
 ## 4. 应用图标切换的产品与实现思路
 
 ### 4.1 调研结论
