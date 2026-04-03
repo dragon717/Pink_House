@@ -9,6 +9,8 @@ struct VIPCenterView: View {
     @State private var showSkinSelection = false
     @State private var showAppIconSelection = false
     @State private var showCoinStore = false
+    @State private var hasAcceptedVIPAgreements = false
+    @State private var showingAgreementConfirmation = false
     @State private var showInfoAlert = false
     @State private var infoAlertTitle = ""
     @State private var infoAlertMessage = ""
@@ -136,6 +138,15 @@ struct VIPCenterView: View {
         }
         .sheet(isPresented: $showCoinStore) {
             MeowCoinStoreView()
+        }
+        .alert("兑换确认", isPresented: $showingAgreementConfirmation) {
+            Button("取消", role: .cancel) { }
+            Button("我已同意并勾选") {
+                hasAcceptedVIPAgreements = true
+                performPurchase()
+            }
+        } message: {
+            Text("兑换会员前，请先阅读并勾选《会员协议》和《使用协议》。确认后将立即扣除对应喵币并生效。")
         }
         .alert("会员兑换", isPresented: $showingPurchaseAlert) {
             Button("确定", role: .cancel) { }
@@ -630,18 +641,23 @@ struct VIPCenterView: View {
 
     private var agreementSection: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "circle")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.white.opacity(0.74))
-                Text("请阅读并同意")
-                    .foregroundStyle(Color.white.opacity(0.62))
-                Text("会员协议")
-                    .foregroundStyle(.white)
-                Text("使用协议")
-                    .foregroundStyle(.white)
+            Button {
+                hasAcceptedVIPAgreements.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: hasAcceptedVIPAgreements ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(hasAcceptedVIPAgreements ? visualTheme.accentColor : Color.white.opacity(0.74))
+                    Text("请阅读并同意")
+                        .foregroundStyle(Color.white.opacity(0.62))
+                    Text("会员协议")
+                        .foregroundStyle(.white)
+                    Text("使用协议")
+                        .foregroundStyle(.white)
+                }
+                .font(.system(size: 10, weight: .medium))
             }
-            .font(.system(size: 10, weight: .medium))
+            .buttonStyle(.plain)
 
             Text("VIP 为喵币兑换型权益，不自动续费。")
                 .font(.system(size: 9, weight: .medium))
@@ -910,6 +926,14 @@ struct VIPCenterView: View {
     }
 
     private func handlePurchase() {
+        guard hasAcceptedVIPAgreements else {
+            showingAgreementConfirmation = true
+            return
+        }
+        performPurchase()
+    }
+
+    private func performPurchase() {
         NotificationCenter.default.post(name: .vipExchangeAttempted, object: nil)
         let result = vipManager.purchaseVIP(plan: selectedPlan)
         alertMessage = result.message
