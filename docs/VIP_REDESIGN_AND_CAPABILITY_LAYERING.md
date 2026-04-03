@@ -41,6 +41,12 @@
 - 已开通 VIP 且卡皮肤为 `blackGold`：使用 `black`
 - 已开通 VIP 且卡皮肤为 `monicaPink`：使用 `monicaPink`
 
+当前版本补充约束：
+
+- 默认卡片皮肤迁移为 `monicaPink`
+- 非 VIP 状态下的 VIP 页默认也走 `monicaPink`
+- `monicaPink` 主题背景主色更新为 `#FFE6EF`
+
 ---
 
 ## 3. 页面结构

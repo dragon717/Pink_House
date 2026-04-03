@@ -3,6 +3,8 @@ import Combine
 
 class VIPManager: ObservableObject {
     static let shared = VIPManager()
+    static let versionDefaultCardStyle: VIPCardStyle = .monicaPink
+    static let cardStyleMigrationKey = "VIPCardStyleDefaultApplied_2026_04_MonicaPink"
     
     // VIP Price (MeowCoin)
     static let monthlyPrice: Int = 66
@@ -17,9 +19,10 @@ class VIPManager: ObservableObject {
     @Published var isVIP: Bool = false
     @Published var vipExpireDate: Date? = nil
     @Published var vipNumber: String? = nil
-    @Published var cardStyle: VIPCardStyle = .blackGold
+    @Published var cardStyle: VIPCardStyle = .monicaPink
     
     private init() {
+        applyVersionDefaultCardStyleIfNeeded()
         // Initial load
         reloadStatus()
         
@@ -46,7 +49,16 @@ class VIPManager: ObservableObject {
         if isVIP {
             return cardStyle == .monicaPink ? .monicaPink : .black
         }
-        return .deepBlue
+        return Self.versionDefaultCardStyle == .monicaPink ? .monicaPink : .deepBlue
+    }
+
+    private func applyVersionDefaultCardStyleIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.cardStyleMigrationKey) else { return }
+
+        var status = PetDataManager.shared.status
+        status.vipStatus.cardStyle = Self.versionDefaultCardStyle
+        PetDataManager.shared.saveStatus(status)
+        UserDefaults.standard.set(true, forKey: Self.cardStyleMigrationKey)
     }
 
     var availablePlans: [VIPPlan] {

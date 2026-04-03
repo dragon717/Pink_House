@@ -49,39 +49,42 @@ struct VIPCenterView: View {
                 title: "智能统计",
                 subtitle: "本地分析 · 更懂你的衣橱",
                 icon: "chart.bar.fill",
-                preferredGlassStyle: .iceBlue
+                preferredGlassStyle: .mistBlue
             ),
             VIPBenefit(
                 id: "multimodal",
                 title: "多模态智能",
                 subtitle: "图片识别 · 智能互动",
-                icon: "sparkles"
+                icon: "sparkles",
+                preferredGlassStyle: .dustyLavender
             ),
             VIPBenefit(
                 id: "identity",
                 title: "VIP身份",
                 subtitle: "靓号身份 · 卡片皮肤",
                 icon: "crown.fill",
-                preferredGlassStyle: vipManager.cardStyle == .monicaPink ? .glossPink : .glossBlack
+                preferredGlassStyle: .roseTaupe
             ),
             VIPBenefit(
                 id: "discount",
                 title: "付费内容优惠",
                 subtitle: "萌宠商店 \(VIPManager.petShopDiscountText)",
-                icon: "ticket.fill"
+                icon: "ticket.fill",
+                preferredGlassStyle: .apricotCream
             ),
             VIPBenefit(
                 id: "weekly",
                 title: "会员周报",
                 subtitle: "每周总结 · 待做",
-                icon: "doc.text.fill"
+                icon: "doc.text.fill",
+                preferredGlassStyle: .sageMint
             ),
             VIPBenefit(
                 id: "magicTheme",
                 title: "魔法配色",
                 subtitle: "主题特权 · 智能调色",
                 icon: "paintpalette.fill",
-                preferredGlassStyle: .glossPink
+                preferredGlassStyle: .mutedLilac
             )
         ]
     }
@@ -92,14 +95,15 @@ struct VIPCenterView: View {
                 id: "icons",
                 title: "个性图标",
                 subtitle: "图标切换 · 专属收藏",
-                icon: "square.grid.2x2.fill"
+                icon: "square.grid.2x2.fill",
+                preferredGlassStyle: .dustyLavender
             ),
             VIPBenefit(
                 id: "updates",
                 title: "持续更新",
                 subtitle: "主题皮肤商店\n \(VIPManager.themeSkinDiscountText) \n · 更多会员权益正在路上",
                 icon: "heart.fill",
-                preferredGlassStyle: .glossBlack,
+                preferredGlassStyle: .roseTaupe,
                 isWide: true
             )
         ]

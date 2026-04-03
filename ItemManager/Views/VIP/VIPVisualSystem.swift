@@ -23,9 +23,9 @@ enum VIPVisualTheme: String, CaseIterable, Identifiable {
             ]
         case .monicaPink:
             return [
-                Color(hex: "5B2743"),
-                Color(hex: "2E1525"),
-                Color(hex: "090608")
+                Color(hex: "FFE6EF"),
+                Color(hex: "D88AA9"),
+                Color(hex: "5B2743")
             ]
         }
     }
@@ -76,6 +76,12 @@ enum VIPGlassStyle: String, CaseIterable, Identifiable {
     case glossBlack
     case iceBlue
     case glossPink
+    case mistBlue
+    case sageMint
+    case dustyLavender
+    case roseTaupe
+    case apricotCream
+    case mutedLilac
 
     var id: String { rawValue }
 
@@ -99,6 +105,42 @@ enum VIPGlassStyle: String, CaseIterable, Identifiable {
                 Color(hex: "51253E").opacity(0.42),
                 Color.black.opacity(0.56)
             ]
+        case .mistBlue:
+            return [
+                Color(hex: "C7D9E8").opacity(0.28),
+                Color(hex: "5F7289").opacity(0.34),
+                Color.black.opacity(0.56)
+            ]
+        case .sageMint:
+            return [
+                Color(hex: "CDD8CE").opacity(0.28),
+                Color(hex: "667666").opacity(0.34),
+                Color.black.opacity(0.56)
+            ]
+        case .dustyLavender:
+            return [
+                Color(hex: "D5CBE2").opacity(0.28),
+                Color(hex: "756A88").opacity(0.34),
+                Color.black.opacity(0.56)
+            ]
+        case .roseTaupe:
+            return [
+                Color(hex: "D9C3CB").opacity(0.28),
+                Color(hex: "7D646F").opacity(0.34),
+                Color.black.opacity(0.56)
+            ]
+        case .apricotCream:
+            return [
+                Color(hex: "E5D1C1").opacity(0.28),
+                Color(hex: "8B7066").opacity(0.34),
+                Color.black.opacity(0.56)
+            ]
+        case .mutedLilac:
+            return [
+                Color(hex: "D8CEE0").opacity(0.28),
+                Color(hex: "76657E").opacity(0.34),
+                Color.black.opacity(0.56)
+            ]
         }
     }
 
@@ -110,6 +152,18 @@ enum VIPGlassStyle: String, CaseIterable, Identifiable {
             return Color(hex: "A7EEFF").opacity(0.55)
         case .glossPink:
             return Color(hex: "FFC2EA").opacity(0.5)
+        case .mistBlue:
+            return Color(hex: "B8D8F1").opacity(0.5)
+        case .sageMint:
+            return Color(hex: "CFE4D0").opacity(0.5)
+        case .dustyLavender:
+            return Color(hex: "DCCDF0").opacity(0.5)
+        case .roseTaupe:
+            return Color(hex: "E5CAD7").opacity(0.5)
+        case .apricotCream:
+            return Color(hex: "F1D7C1").opacity(0.5)
+        case .mutedLilac:
+            return Color(hex: "E5D7F0").opacity(0.5)
         }
     }
 
@@ -121,6 +175,18 @@ enum VIPGlassStyle: String, CaseIterable, Identifiable {
             return Color(hex: "7CD9FF").opacity(0.2)
         case .glossPink:
             return Color(hex: "FF8FD8").opacity(0.2)
+        case .mistBlue:
+            return Color(hex: "9EC7E8").opacity(0.2)
+        case .sageMint:
+            return Color(hex: "B9D7B7").opacity(0.2)
+        case .dustyLavender:
+            return Color(hex: "C5B1E2").opacity(0.2)
+        case .roseTaupe:
+            return Color(hex: "D7AFC0").opacity(0.2)
+        case .apricotCream:
+            return Color(hex: "EBC0A1").opacity(0.2)
+        case .mutedLilac:
+            return Color(hex: "CDBBE2").opacity(0.2)
         }
     }
 
@@ -132,6 +198,18 @@ enum VIPGlassStyle: String, CaseIterable, Identifiable {
             return Color(hex: "D2F6FF")
         case .glossPink:
             return Color(hex: "FFE3F5")
+        case .mistBlue:
+            return Color(hex: "EDF8FF")
+        case .sageMint:
+            return Color(hex: "ECF6EC")
+        case .dustyLavender:
+            return Color(hex: "F4EDFF")
+        case .roseTaupe:
+            return Color(hex: "FFF0F6")
+        case .apricotCream:
+            return Color(hex: "FFF2E8")
+        case .mutedLilac:
+            return Color(hex: "F7EFFF")
         }
     }
 }
