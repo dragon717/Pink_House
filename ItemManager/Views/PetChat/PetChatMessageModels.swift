@@ -23,6 +23,7 @@ struct PetChatMessage: Identifiable {
     let text: String
     let isUser: Bool
     let isUserAuthored: Bool
+    let speakerPetID: String?
     let type: PetChatMessageType
     let timestamp: Date
     var clothing: Clothing?
@@ -36,6 +37,7 @@ struct PetChatMessage: Identifiable {
 
     init(text: String, isUser: Bool, type: PetChatMessageType = .text,
          isUserAuthored: Bool? = nil,
+         speakerPetID: String? = nil,
          clothing: Clothing? = nil, searchResults: [Clothing]? = nil,
          statistics: WardrobeStats? = nil, colorRecommendation: ColorRecommendation? = nil,
          imageName: String? = nil, isAIGenerated: Bool = false,
@@ -45,6 +47,12 @@ struct PetChatMessage: Identifiable {
         self.text = text
         self.isUser = isUser
         self.isUserAuthored = isUserAuthored ?? isUser
+        self.speakerPetID = Self.resolveSpeakerPetID(
+            isUser: isUser,
+            explicitSpeakerPetID: speakerPetID,
+            text: text,
+            imageName: imageName
+        )
         self.type = type
         self.timestamp = timestamp
         self.clothing = clothing
@@ -55,6 +63,70 @@ struct PetChatMessage: Identifiable {
         self.isAIGenerated = isAIGenerated
         self.outfitSuggestion = outfitSuggestion
         self.widgets = widgets
+    }
+
+    var speakerPetCharacter: PetCharacter? {
+        guard !isUser else { return nil }
+        guard let speakerPetID else {
+            if let selectedPetID = PetDataManager.shared.status.selectedPetId,
+               let character = PetCharacter(rawValue: selectedPetID) {
+                return character
+            }
+            return .naicha
+        }
+        return PetCharacter(rawValue: speakerPetID) ?? .naicha
+    }
+
+    var speakerDisplayName: String {
+        guard let character = speakerPetCharacter else { return "你" }
+        return PetDataManager.shared.status.petNames[character.id] ?? character.displayName
+    }
+
+    static func inferSpeakerPetID(from text: String, imageName: String?) -> String? {
+        if let imageName {
+            let normalizedImageName = imageName.lowercased()
+            if normalizedImageName.contains("dog") || normalizedImageName.hasSuffix("_dog") {
+                return PetCharacter.maomao.id
+            }
+            if normalizedImageName.contains("cat") || normalizedImageName.hasSuffix("_cat") {
+                return PetCharacter.naicha.id
+            }
+        }
+
+        let normalizedText = text.lowercased()
+        if normalizedText.contains("毛毛") || normalizedText.contains("汪") {
+            return PetCharacter.maomao.id
+        }
+        if normalizedText.contains("奶茶") || normalizedText.contains("喵") {
+            return PetCharacter.naicha.id
+        }
+
+        return nil
+    }
+
+    private static func resolveSpeakerPetID(
+        isUser: Bool,
+        explicitSpeakerPetID: String?,
+        text: String,
+        imageName: String?
+    ) -> String? {
+        guard !isUser else { return nil }
+
+        if let explicitSpeakerPetID,
+           PetCharacter(rawValue: explicitSpeakerPetID) != nil {
+            return explicitSpeakerPetID
+        }
+
+        if let inferredSpeakerPetID = inferSpeakerPetID(from: text, imageName: imageName) {
+            return inferredSpeakerPetID
+        }
+
+        if let selectedPetID = PetDataManager.shared.status.selectedPetId,
+           PetCharacter(rawValue: selectedPetID) != nil {
+            return selectedPetID
+        }
+
+        return PetCharacter.naicha.id
     }
 }
 

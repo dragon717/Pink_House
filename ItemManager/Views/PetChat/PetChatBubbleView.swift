@@ -30,12 +30,8 @@ struct PetChatBubble: View {
         return contentBubbleMaxWidth
     }
     
-    private var currentPetCharacter: PetCharacter {
-        guard let petId = PetDataManager.shared.status.selectedPetId,
-              let character = PetCharacter(rawValue: petId) else {
-            return .naicha
-        }
-        return character
+    private var speakerPetCharacter: PetCharacter {
+        message.speakerPetCharacter ?? .naicha
     }
     
     var body: some View {
@@ -236,21 +232,21 @@ struct PetChatBubble: View {
     }
 
     private var defaultPetExpressionImageName: String {
-        if UIImage(named: currentPetCharacter.quickOptionIconName) != nil {
-            return currentPetCharacter.quickOptionIconName
+        if UIImage(named: speakerPetCharacter.quickOptionIconName) != nil {
+            return speakerPetCharacter.quickOptionIconName
         }
-        return currentPetCharacter.happyImageName
+        return speakerPetCharacter.happyImageName
     }
 
     private func fallbackEmotionImageName(for imageName: String) -> String? {
         if imageName.hasPrefix("playful_") {
-            return currentPetCharacter.happyImageName
+            return speakerPetCharacter.happyImageName
         }
         if imageName.hasPrefix("sad_") {
-            return currentPetCharacter.sleepyImageName
+            return speakerPetCharacter.sleepyImageName
         }
         if imageName.hasPrefix("confused_") || imageName == "confused" {
-            return currentPetCharacter.confusedImageName
+            return speakerPetCharacter.confusedImageName
         }
         if imageName.hasSuffix("_cat") || imageName == "cat" {
             return UIImage(named: "cat") != nil ? "cat" : "happy_cat"
@@ -281,7 +277,7 @@ struct PetChatBubble: View {
         guard let meaning = detectPetChatExpressionMeaning(in: message.text) else {
             return nil
         }
-        return resolvedBubbleImageName(from: currentPetCharacter.chatExpressionImageName(for: meaning))
+        return resolvedBubbleImageName(from: speakerPetCharacter.chatExpressionImageName(for: meaning))
     }
 
     @ViewBuilder

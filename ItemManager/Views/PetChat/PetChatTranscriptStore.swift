@@ -273,6 +273,7 @@ enum PetChatTranscriptStore {
         let text: String
         let isUser: Bool
         let isUserAuthored: Bool
+        let speakerPetID: String?
         let timestamp: Date
         let imageName: String?
         let isAIGenerated: Bool
@@ -290,6 +291,7 @@ enum PetChatTranscriptStore {
             case text
             case isUser
             case isUserAuthored
+            case speakerPetID
             case timestamp
             case imageName
             case isAIGenerated
@@ -306,6 +308,7 @@ enum PetChatTranscriptStore {
             self.text = message.isUser ? sanitizeUserText(message.text) : sanitizeAssistantText(message.text)
             self.isUser = message.isUser
             self.isUserAuthored = message.isUserAuthored
+            self.speakerPetID = message.speakerPetID
             self.timestamp = message.timestamp
             self.imageName = message.imageName
             self.isAIGenerated = message.isAIGenerated
@@ -326,8 +329,10 @@ enum PetChatTranscriptStore {
             isUser = try container.decode(Bool.self, forKey: .isUser)
             let fallbackAuthored = isUser && PetChatTranscriptStore.isLikelyManualUserText(text)
             isUserAuthored = try container.decodeIfPresent(Bool.self, forKey: .isUserAuthored) ?? fallbackAuthored
-            timestamp = try container.decode(Date.self, forKey: .timestamp)
             imageName = try container.decodeIfPresent(String.self, forKey: .imageName)
+            speakerPetID = try container.decodeIfPresent(String.self, forKey: .speakerPetID)
+                ?? (isUser ? nil : PetChatMessage.inferSpeakerPetID(from: text, imageName: imageName))
+            timestamp = try container.decode(Date.self, forKey: .timestamp)
             isAIGenerated = try container.decodeIfPresent(Bool.self, forKey: .isAIGenerated) ?? !isUser
             typeRaw = try container.decodeIfPresent(String.self, forKey: .typeRaw) ?? "text"
             widgets = try container.decodeIfPresent([PetWidgetData].self, forKey: .widgets)
@@ -343,6 +348,7 @@ enum PetChatTranscriptStore {
             try container.encode(text, forKey: .text)
             try container.encode(isUser, forKey: .isUser)
             try container.encode(isUserAuthored, forKey: .isUserAuthored)
+            try container.encodeIfPresent(speakerPetID, forKey: .speakerPetID)
             try container.encode(timestamp, forKey: .timestamp)
             try container.encodeIfPresent(imageName, forKey: .imageName)
             try container.encode(isAIGenerated, forKey: .isAIGenerated)
@@ -362,6 +368,7 @@ enum PetChatTranscriptStore {
                 isUser: isUser,
                 type: PetChatTranscriptStore.decodeType(typeRaw),
                 isUserAuthored: isUserAuthored,
+                speakerPetID: speakerPetID,
                 clothing: clothingID.flatMap(lookupClothing),
                 searchResults: searchResultIDs?.compactMap(lookupClothing),
                 statistics: persistedStats?.toWardrobeStats(lookupClothing: lookupClothing),
@@ -471,11 +478,13 @@ enum PetChatTranscriptStore {
     private struct PersistedMessageKey: Hashable {
         let text: String
         let isUser: Bool
+        let speakerPetID: String?
         let timestampBucket: Int64
 
         init(message: PetChatMessage) {
             self.text = message.isUser ? PetChatTranscriptStore.sanitizeUserText(message.text) : PetChatTranscriptStore.sanitizeAssistantText(message.text)
             self.isUser = message.isUser
+            self.speakerPetID = message.speakerPetID
             self.timestampBucket = Int64(message.timestamp.timeIntervalSince1970.rounded())
         }
     }

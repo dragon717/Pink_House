@@ -138,7 +138,7 @@ struct PetChatHistorySearchSheet: View {
                     Image(systemName: message.isUser ? "person.fill" : "pawprint.fill")
                         .font(.caption2)
                         .foregroundStyle(message.isUser ? magicPalette.accent : .orange)
-                    Text(message.isUser ? "你" : "萌宠")
+                    Text(message.isUser ? "你" : message.speakerDisplayName)
                         .font(.caption2)
                         .foregroundStyle(magicPalette.secondaryText)
                     if message.isAIGenerated {
