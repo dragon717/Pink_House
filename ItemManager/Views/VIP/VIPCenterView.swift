@@ -97,7 +97,7 @@ struct VIPCenterView: View {
             VIPBenefit(
                 id: "updates",
                 title: "持续更新",
-                subtitle: "主题皮肤商店 \(VIPManager.themeSkinDiscountText)  · 更多会员权益正在路上",
+                subtitle: "主题皮肤商店\n \(VIPManager.themeSkinDiscountText) \n · 更多会员权益正在路上",
                 icon: "heart.fill",
                 preferredGlassStyle: .glossBlack,
                 isWide: true
@@ -831,17 +831,15 @@ struct VIPCenterView: View {
             .multilineTextAlignment(.leading)
         case "updates":
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("主题皮肤商店")
-                        .font(.system(size: fontSize, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.68))
-                    DiscountBadgeView(
-                        text: VIPManager.themeSkinDiscountText,
-                        style: .inlineGlow,
-                        size: fontSize > 11 ? .medium : .small
-                    )
-                }
-                Text("更多会员权益正在路上")
+                Text("主题皮肤商店")
+                    .font(.system(size: fontSize, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.68))
+                DiscountBadgeView(
+                    text: VIPManager.themeSkinDiscountText,
+                    style: .inlineGlow,
+                    size: fontSize > 11 ? .medium : .small
+                )
+                Text("· 更多会员权益正在路上")
                     .font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.68))
             }
