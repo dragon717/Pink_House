@@ -6,6 +6,12 @@ class VIPManager: ObservableObject {
     
     // VIP Price (MeowCoin)
     static let monthlyPrice: Int = 66
+    static let quarterlyPrice: Int = 188
+    static let petShopDiscountRate: Double = 0.6
+    static let themeSkinShopDiscountRate: Double = 0.9
+    static let quarterlyDiscountText: String = "-5% OFF"
+    static let petShopDiscountText: String = "-40% OFF"
+    static let themeSkinDiscountText: String = "-10% OFF"
     
     // Published properties for UI binding
     @Published var isVIP: Bool = false
@@ -35,12 +41,40 @@ class VIPManager: ObservableObject {
         PetDataManager.shared.saveStatus(status)
         reloadStatus()
     }
+
+    var preferredVisualTheme: VIPVisualTheme {
+        if isVIP {
+            return cardStyle == .monicaPink ? .monicaPink : .black
+        }
+        return .deepBlue
+    }
+
+    var availablePlans: [VIPPlan] {
+        [
+            VIPPlan(
+                id: "monthly",
+                title: "一个月",
+                subtitle: "\(Self.monthlyPrice)喵币",
+                months: 1,
+                meowCoins: Self.monthlyPrice,
+                badgeText: nil
+            ),
+            VIPPlan(
+                id: "quarterly",
+                title: "三个月",
+                subtitle: "\(Self.quarterlyPrice)喵币",
+                months: 3,
+                meowCoins: Self.quarterlyPrice,
+                badgeText: Self.quarterlyDiscountText
+            )
+        ]
+    }
     
     // Exchange or extend VIP
-    func purchaseVIP(months: Int = 1) -> (success: Bool, message: String) {
+    func purchaseVIP(months: Int = 1, costOverride: Int? = nil) -> (success: Bool, message: String) {
         var status = PetDataManager.shared.status
         
-        let cost = months * VIPManager.monthlyPrice
+        let cost = costOverride ?? months * VIPManager.monthlyPrice
         
         if status.meowCoin < cost {
             return (false, "喵币不足，需要 \(cost) 喵币")
@@ -74,6 +108,26 @@ class VIPManager: ObservableObject {
         reloadStatus()
         
         return (true, "开通成功！有效期至 \(newExpireDate.formatted(date: .numeric, time: .omitted))")
+    }
+
+    func purchaseVIP(plan: VIPPlan) -> (success: Bool, message: String) {
+        purchaseVIP(months: plan.months, costOverride: plan.meowCoins)
+    }
+
+    func petShopPrice(for basePrice: Int) -> Int {
+        guard isVIP else { return basePrice }
+        return Self.discountedPrice(basePrice, rate: Self.petShopDiscountRate)
+    }
+
+    func petShopDiscountText(for basePrice: Int) -> String? {
+        guard isVIP else { return nil }
+        let discounted = petShopPrice(for: basePrice)
+        guard discounted < basePrice else { return nil }
+        return "\(basePrice) → \(discounted)"
+    }
+
+    static func discountedPrice(_ basePrice: Int, rate: Double) -> Int {
+        max(1, Int((Double(basePrice) * rate).rounded()))
     }
     
     // MARK: - VIP试用期相关方法

@@ -13,6 +13,8 @@ struct AIAnalysisResultView: View {
     @State private var localMessages: [ChatMessage] = []
     @State private var inputText: String = ""
     @State private var isSending: Bool = false
+    @State private var showingVIPUpsellAlert = false
+    @State private var showingVIPCenter = false
     
     // For Image Viewer
     @State private var selectedImageWrapper: ImageWrapper?
@@ -66,8 +68,12 @@ struct AIAnalysisResultView: View {
                         }
                         
                         Button(action: {
-                            withAnimation(.spring()) {
-                                isChatMode = true
+                            if VIPManager.shared.isVIP {
+                                withAnimation(.spring()) {
+                                    isChatMode = true
+                                }
+                            } else {
+                                showingVIPUpsellAlert = true
                             }
                         }) {
                             HStack {
@@ -121,6 +127,19 @@ struct AIAnalysisResultView: View {
         }
         .fullScreenCover(item: $selectedImageWrapper) { wrapper in
             FullScreenImageViewer(image: wrapper.image)
+        }
+        .sheet(isPresented: $showingVIPCenter) {
+            NavigationStack {
+                VIPCenterView()
+            }
+        }
+        .alert("\(PetChatPremiumFeature.imageAnalysis.title) 是 VIP 权益", isPresented: $showingVIPUpsellAlert) {
+            Button("去升级VIP") {
+                showingVIPCenter = true
+            }
+            Button("稍后", role: .cancel) { }
+        } message: {
+            Text(PetChatPremiumFeature.imageAnalysis.upsellText(petName: petName))
         }
     }
     
@@ -285,6 +304,11 @@ struct AIAnalysisResultView: View {
     private func sendMessage() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+
+        guard VIPManager.shared.isVIP else {
+            showingVIPUpsellAlert = true
+            return
+        }
         
         let userMsg = ChatMessage(text: text, isUser: true)
         withAnimation {

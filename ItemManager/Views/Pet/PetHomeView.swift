@@ -362,14 +362,10 @@ struct PetHomeView: View {
                                 }
                                 
                                 Button("跟“\(viewModel.status.displayName)”聊天") {
-                                    if VIPManager.shared.isVIP {
-                                        viewModel.isAIMode = true
-                                        AudioManager.shared.isEchoModeEnabled = false // Disable Echo, AI will speak
-                                        // 直接开启，不再弹二次确认
-                                        audioManager.isInteractionEnabled = true
-                                    } else {
-                                        showVIPView = true
-                                    }
+                                    viewModel.isAIMode = true
+                                    AudioManager.shared.isEchoModeEnabled = false // Disable Echo, AI will speak
+                                    // 允许进入入口，具体第三方能力在发起请求时再引导升级
+                                    audioManager.isInteractionEnabled = true
                                 }
                                 
                                 Button("取消", role: .cancel) {}

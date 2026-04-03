@@ -569,6 +569,11 @@ class PetViewModel: ObservableObject {
         
         // 2. 尝试使用 AI 回复
         if let ai = aiService {
+            guard VIPManager.shared.isVIP else {
+                presentSpeechVIPUpsell(for: .remoteChat)
+                return
+            }
+
             Task {
                 // 显示加载状态 (可选)
                 // await MainActor.run { self.recognizedSpeechText += "..." }
@@ -599,6 +604,10 @@ class PetViewModel: ObservableObject {
     private func handleSilenceTimeout() {
         print("Silence timeout triggered.")
         guard let ai = aiService else { return }
+        guard VIPManager.shared.isVIP else {
+            presentSpeechVIPUpsell(for: .remoteChat)
+            return
+        }
         
         Task {
             // 发送一个特殊的提示给 AI，让它主动发起对话
@@ -617,6 +626,11 @@ class PetViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func presentSpeechVIPUpsell(for feature: PetChatPremiumFeature) {
+        recognizedSpeechText = feature.upsellText(petName: status.displayName)
+        scheduleSpeechBubbleClear()
     }
 
     private func buildPromptForSpeechInput(
@@ -690,6 +704,8 @@ class PetViewModel: ObservableObject {
     
     // 购买并立即消费（拖拽购买）
     func purchaseAndConsumeItem(_ item: PetItemDefinition) {
+        let finalPrice = priceForPetShopItem(item)
+
         // 0. 检查精力是否足够 (如果道具消耗精力)
         if let energyCost = item.energyCost, energyCost > 0 {
              if status.energy < Double(energyCost) {
@@ -702,11 +718,11 @@ class PetViewModel: ObservableObject {
         let canAfford: Bool
         switch item.petCurrency {
         case .fishCoin:
-            canAfford = status.fishCoin >= item.price
+            canAfford = status.fishCoin >= finalPrice
         case .meowCoin:
-            canAfford = status.meowCoin >= item.price
+            canAfford = status.meowCoin >= finalPrice
         case .boneCoin:
-            canAfford = status.boneCoin >= item.price
+            canAfford = status.boneCoin >= finalPrice
         }
         
         guard canAfford else {
@@ -717,20 +733,20 @@ class PetViewModel: ObservableObject {
         // 2. 扣钱
         switch item.petCurrency {
         case .fishCoin:
-            status.fishCoin -= item.price
+            status.fishCoin -= finalPrice
         case .meowCoin:
-            status.meowCoin -= item.price
+            status.meowCoin -= finalPrice
         case .boneCoin:
-            status.boneCoin -= item.price
+            status.boneCoin -= finalPrice
         }
         
         // 显示扣款提示 (先显示扣款，再显示属性增加)
         if item.petCurrency == .meowCoin {
-            showFloatingText("-\(item.price)", style: .meowCoin)
+            showFloatingText("-\(finalPrice)", style: .meowCoin)
         } else if item.petCurrency == .boneCoin {
-            showFloatingText("-\(item.price)", style: .boneCoin)
+            showFloatingText("-\(finalPrice)", style: .boneCoin)
         } else {
-            showFloatingText("-\(item.price)", style: .fishCoin)
+            showFloatingText("-\(finalPrice)", style: .fishCoin)
         }
         
         // 3. 消费效果 (这里不经过背包，直接产生效果)
@@ -1146,35 +1162,45 @@ class PetViewModel: ObservableObject {
     }
     
     // MARK: - Economy & Inventory
+
+    func priceForPetShopItem(_ item: PetItemDefinition) -> Int {
+        VIPManager.shared.petShopPrice(for: item.price)
+    }
+
+    func savingsForPetShopItem(_ item: PetItemDefinition) -> Int {
+        max(0, item.price - priceForPetShopItem(item))
+    }
     
     func purchaseItem(_ item: PetItemDefinition) -> Bool {
+        let finalPrice = priceForPetShopItem(item)
+
         switch item.petCurrency {
         case .fishCoin:
-            if status.fishCoin >= item.price {
-                status.fishCoin -= item.price
+            if status.fishCoin >= finalPrice {
+                status.fishCoin -= finalPrice
                 status.inventory[item.id, default: 0] += 1
                 saveStatus()
-                showFloatingText("-\(item.price)", style: .fishCoin)
+                showFloatingText("-\(finalPrice)", style: .fishCoin)
                 return true
             } else {
                 showFloatingText("余额不足", style: .warning)
             }
         case .meowCoin:
-            if status.meowCoin >= item.price {
-                status.meowCoin -= item.price
+            if status.meowCoin >= finalPrice {
+                status.meowCoin -= finalPrice
                 status.inventory[item.id, default: 0] += 1
                 saveStatus()
-                showFloatingText("-\(item.price)", style: .meowCoin)
+                showFloatingText("-\(finalPrice)", style: .meowCoin)
                 return true
             } else {
                 showFloatingText("余额不足", style: .warning)
             }
         case .boneCoin:
-            if status.boneCoin >= item.price {
-                status.boneCoin -= item.price
+            if status.boneCoin >= finalPrice {
+                status.boneCoin -= finalPrice
                 status.inventory[item.id, default: 0] += 1
                 saveStatus()
-                showFloatingText("-\(item.price)", style: .boneCoin)
+                showFloatingText("-\(finalPrice)", style: .boneCoin)
                 return true
             } else {
                 showFloatingText("余额不足", style: .warning)

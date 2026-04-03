@@ -46,6 +46,8 @@ struct ChatView: View {
     @State private var selectedReportReason: AIReportReason?
     @State private var reportDescription = ""
     @State private var showingReportSuccess = false
+    @State private var showingVIPUpsellAlert = false
+    @State private var showingVIPCenter = false
     
     // AI 免责声明状态
     @AppStorage("hasShownAIDisclaimer") private var hasShownAIDisclaimer = false
@@ -360,11 +362,24 @@ struct ChatView: View {
                 sendMessageFromHistory(query)
             }
         }
+        .sheet(isPresented: $showingVIPCenter) {
+            NavigationStack {
+                VIPCenterView()
+            }
+        }
         // 举报成功提示
         .alert("举报已提交", isPresented: $showingReportSuccess) {
             Button("确定") { }
         } message: {
             Text("感谢您的反馈，我们会持续改进 AI 内容质量。")
+        }
+        .alert("\(PetChatPremiumFeature.remoteChat.title) 是 VIP 权益", isPresented: $showingVIPUpsellAlert) {
+            Button("去升级VIP") {
+                showingVIPCenter = true
+            }
+            Button("稍后", role: .cancel) { }
+        } message: {
+            Text(PetChatPremiumFeature.remoteChat.upsellText(petName: petAI.petName))
         }
     }
     
@@ -539,6 +554,11 @@ struct ChatView: View {
     private func sendMessage() {
         let userText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty else { return }
+
+        guard VIPManager.shared.isVIP else {
+            showingVIPUpsellAlert = true
+            return
+        }
         
         inputText = ""
         isSending = true
@@ -570,6 +590,11 @@ struct ChatView: View {
     private func sendMessageFromHistory(_ query: String) {
         let userText = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty else { return }
+
+        guard VIPManager.shared.isVIP else {
+            showingVIPUpsellAlert = true
+            return
+        }
 
         isSending = true
         Task {

@@ -1,212 +1,184 @@
 import SwiftUI
-import Combine
 
-// VIP试用期弹窗视图 - 现代化设计
 struct VIPTrialPopupView: View {
+    let visualTheme: VIPVisualTheme
     @Binding var isPresented: Bool
     var onConfirm: () -> Void
     var onDismiss: () -> Void
-    
-    @Environment(ThemeManager.self) private var themeManager
+
     @State private var showContent = false
-    @State private var glowAnimation = false
-    
+
+    init(
+        visualTheme: VIPVisualTheme = VIPManager.shared.preferredVisualTheme,
+        isPresented: Binding<Bool>,
+        onConfirm: @escaping () -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.visualTheme = visualTheme
+        self._isPresented = isPresented
+        self.onConfirm = onConfirm
+        self.onDismiss = onDismiss
+    }
+
     var body: some View {
         ZStack {
-            // 半透明背景
-            Color.black.opacity(0.6)
+            Color.black.opacity(0.58)
                 .ignoresSafeArea()
                 .onTapGesture {
                     dismissPopup()
                 }
-            
-            // 弹窗内容
-            VStack(spacing: 0) {
-                // 顶部装饰区域
-                ZStack {
-                    // 渐变背景
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "FFD700"),
-                            Color(hex: "FFA500"),
-                            Color(hex: "FF6B6B")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    
-                    // 发光效果
-                    Circle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 200, height: 200)
-                        .blur(radius: 60)
-                        .offset(y: glowAnimation ? -10 : 10)
-                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: glowAnimation)
-                    
-                    // VIP图标
+
+            ZStack {
+                popupBackground
+
+                VStack(spacing: 18) {
+                    VStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(visualTheme.accentColor)
+
+                        Text("先体验 3 天 VIP")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.white)
+
+                        Text("解锁智能能力、尊贵身份与会员优惠")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(visualTheme.secondaryTextColor)
+                            .multilineTextAlignment(.center)
+                    }
+
                     VStack(spacing: 12) {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 60, weight: .bold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color.white, Color(hex: "FFF8DC")],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .shadow(color: Color(hex: "FFD700").opacity(0.8), radius: 20, x: 0, y: 0)
-                        
-                        Text("VIP")
-                            .font(.system(size: 36, weight: .black, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color.white, Color(hex: "FFF8DC")],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        privilegeRow(icon: "bubble.left.and.bubble.right.fill", text: "萌宠智能对话与多模态能力")
+                        privilegeRow(icon: "crown.fill", text: "专属 VIP 身份与卡片皮肤")
+                        privilegeRow(icon: "ticket.fill", text: "萌宠商店 \(VIPManager.petShopDiscountText)")
                     }
-                }
-                .frame(height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                
-                // 内容区域
-                VStack(spacing: 20) {
-                    // 标题
-                    VStack(spacing: 8) {
-                        Text("限时免费体验")
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color(hex: "FFD700"), Color(hex: "FFA500")],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                        
-                        Text("尊享会员特权 3 天")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    // 特权列表
-                    VStack(alignment: .leading, spacing: 16) {
-                        PrivilegeRow(icon: "brain.head.profile", text: "解锁 AI 智能对话")
-                        // PrivilegeRow(icon: "mic.fill", text: "语音交互无限制")
-                        PrivilegeRow(icon: "sparkles", text: "专属 VIP 身份标识")
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    // 按钮区域
-                    VStack(spacing: 12) {
-                        // 确认体验按钮
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3)) {
+
+                    Text("体验结束后可继续兑换 1个月 / 3个月 会员时长")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.54))
+                        .multilineTextAlignment(.center)
+
+                    VStack(spacing: 10) {
+                        Button {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
                                 onConfirm()
                                 isPresented = false
                             }
-                        }) {
+                        } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
-                                    .font(.system(size: 18, weight: .semibold))
                                 Text("确认体验")
-                                    .font(.system(size: 18, weight: .bold))
                             }
-                            .foregroundStyle(.black)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(Color.black.opacity(0.92))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
                                 LinearGradient(
                                     colors: [
-                                        Color(hex: "FFD700"),
-                                        Color(hex: "FFA500")
+                                        visualTheme.accentColor,
+                                        visualTheme.accentColor.opacity(0.82)
                                     ],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .shadow(color: Color(hex: "FFD700").opacity(0.4), radius: 12, x: 0, y: 6)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                            )
+                            .shadow(color: visualTheme.glowColor, radius: 18, x: 0, y: 8)
                         }
                         .captureGuideTarget(.aiAnalysisVIPTrialConfirmButton)
-                        
-                        // 稍后按钮
-                        Button(action: {
+
+                        Button {
                             dismissPopup()
-                        }) {
+                        } label: {
                             Text("稍后")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.vertical, 12)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.72))
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                         }
                     }
-                    .padding(.horizontal, 20)
                 }
-                .padding(.vertical, 24)
-                .background(themeManager.backgroundColor)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 26)
             }
-            .background(themeManager.backgroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: Color.black.opacity(0.3), radius: 30, x: 0, y: 15)
-            .padding(.horizontal, 32)
-            .scaleEffect(showContent ? 1.0 : 0.8)
+            .frame(maxWidth: 360)
+            .padding(.horizontal, 28)
+            .scaleEffect(showContent ? 1.0 : 0.88)
             .opacity(showContent ? 1.0 : 0.0)
-            .offset(y: showContent ? 0 : 50)
+            .offset(y: showContent ? 0 : 26)
         }
         .onAppear {
-            glowAnimation = true
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
                 showContent = true
             }
         }
     }
-    
+
+    private var popupBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: visualTheme.backgroundGradientColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(visualTheme.glowColor)
+                .frame(width: 180, height: 180)
+                .blur(radius: 42)
+                .offset(x: -76, y: -120)
+
+            VIPGlassCardBackground(glassStyle: visualTheme.primaryGlassStyle, cornerRadius: 28)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(visualTheme.primaryGlassStyle.strokeColor.opacity(0.85), lineWidth: 1)
+        )
+        .shadow(color: visualTheme.primaryGlassStyle.glowColor, radius: 24, x: 0, y: 12)
+    }
+
+    private func privilegeRow(icon: String, text: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(visualTheme.primaryGlassStyle.iconTint)
+                .frame(width: 26, height: 26)
+
+            Text(text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white)
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            VIPGlassCardBackground(glassStyle: .glossBlack, cornerRadius: 18)
+        )
+    }
+
     private func dismissPopup() {
-        withAnimation(.spring(response: 0.3)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
             showContent = false
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             onDismiss()
             isPresented = false
         }
     }
 }
 
-// 特权行组件
-private struct PrivilegeRow: View {
-    let icon: String
-    let text: String
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(hex: "FFD700"), Color(hex: "FFA500")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 32, height: 32)
-            
-            Text(text)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.primary)
-            
-            Spacer()
-        }
-    }
-}
-
-// 预览
 #Preview {
     VIPTrialPopupView(
+        visualTheme: .deepBlue,
         isPresented: .constant(true),
         onConfirm: { print("确认体验") },
         onDismiss: { print("关闭弹窗") }
     )
-    .environment(ThemeManager.shared)
 }

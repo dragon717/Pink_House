@@ -565,7 +565,12 @@ struct ShopView: View {
             ScrollView(.vertical, showsIndicators: true) {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
                     ForEach(displayedItems) { item in
-                        ShopItemView(item: item) {
+                        ShopItemView(
+                            item: item,
+                            displayPrice: viewModel.priceForPetShopItem(item),
+                            originalPrice: VIPManager.shared.isVIP ? item.price : nil,
+                            discountBadge: VIPManager.shared.isVIP ? VIPManager.petShopDiscountText : nil
+                        ) {
                             guard !shouldSuppressPurchaseTap(for: item.id) else { return }
                             buy(item)
                         }

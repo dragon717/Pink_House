@@ -237,6 +237,15 @@ class PetAIAnalysisService: ObservableObject {
         
         // 第一步：Vision识别
         let visionResult = try await performVisionRecognition(image)
+
+        if !VIPManager.shared.isVIP {
+            return PetAIAnalysisResult(
+                question: visionResult.suggestedQuestion,
+                answer: localOnlyAnswer(from: visionResult),
+                image: image,
+                context: visionResult.context
+            )
+        }
         
         // 第二步：AI分析
         let aiResult = await performAIRequest(
@@ -251,6 +260,13 @@ class PetAIAnalysisService: ObservableObject {
             image: image,
             context: visionResult.context
         )
+    }
+
+    private func localOnlyAnswer(from result: VisionAnalysisService.AnalysisResult) -> String {
+        let compactContext = result.context
+            .replacingOccurrences(of: "\n", with: " ")
+            .prefix(48)
+        return "我先用本地识别帮你看了一圈喵：\(compactContext)… 想让我继续认真分析，升级 VIP 就能解锁更完整的图片理解啦~"
     }
     
     private func performVisionRecognition(_ image: UIImage) async throws -> VisionAnalysisService.AnalysisResult {

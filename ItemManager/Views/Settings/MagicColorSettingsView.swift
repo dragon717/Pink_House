@@ -129,7 +129,7 @@ struct MagicColorSettingsView: View {
                     selectedTab = tab
                 } else {
                     let savedMode = themeManager.colorSchemeMode
-                    if savedMode == .magic && !unlockManager.isUnlocked(.themeCustomize) {
+                    if savedMode == .magic && !unlockManager.hasEffectiveAccess(.themeCustomize) {
                         selectedTab = .custom
                         themeManager.switchColorSchemeMode(to: .custom)
                     } else {
@@ -166,7 +166,7 @@ struct MagicColorSettingsView: View {
             .pickerStyle(.segmented)
             .captureGuideTarget(.themeColorModeTabs)
             .onChange(of: selectedTab) { _, newValue in
-                if newValue == .magic && !unlockManager.isUnlocked(.themeCustomize) {
+                if newValue == .magic && !unlockManager.hasEffectiveAccess(.themeCustomize) {
                     // 未解锁时弹窗提示，并切回客制化页签
                     selectedTab = .custom
                     themeManager.switchColorSchemeMode(to: .custom)

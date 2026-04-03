@@ -126,6 +126,9 @@ struct StatusView: View {
 
 struct ShopItemView: View {
     let item: PetItemDefinition
+    var displayPrice: Int? = nil
+    var originalPrice: Int? = nil
+    var discountBadge: String? = nil
     let action: () -> Void
     
     var body: some View {
@@ -146,7 +149,7 @@ struct ShopItemView: View {
                     Image(systemName: item.petCurrency.iconName) // 动态图标
                         .font(.caption2)
                         .foregroundColor(colorForCurrency(item.petCurrency))
-                    Text("\(item.price)")
+                    Text("\(displayPrice ?? item.price)")
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
@@ -155,6 +158,24 @@ struct ShopItemView: View {
                 .padding(.vertical, 2)
                 .background(Color.secondary.opacity(0.1))
                 .clipShape(Capsule())
+
+                if let originalPrice, originalPrice > (displayPrice ?? item.price) {
+                    Text("原价 \(originalPrice)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+
+                if let discountBadge {
+                    Text(discountBadge)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(Color.pink.opacity(0.85))
+                        )
+                }
             }
             .frame(width: 80)
         }

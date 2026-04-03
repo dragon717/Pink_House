@@ -49,6 +49,7 @@ struct PetChatView: View {
     @State private var hasEnteredOnce = false
     @State private var showingHistorySearch = false
     @State private var showingMeowCoinStore = false
+    @State private var showingVIPCenter = false
     @State private var showingCurrencyExchangeSheet = false
     @State private var preferredExchangeDirection: PetCurrencyExchangeDirection = .fishToBone
     @State private var showingRenameAlert = false
@@ -348,6 +349,11 @@ struct PetChatView: View {
             }
             .sheet(isPresented: $showingMeowCoinStore) {
                 MeowCoinStoreView()
+            }
+            .sheet(isPresented: $showingVIPCenter) {
+                NavigationStack {
+                    VIPCenterView()
+                }
             }
             .sheet(isPresented: $showingCurrencyExchangeSheet) {
                 PetCurrencyExchangeSheet(preferredDirection: preferredExchangeDirection)
@@ -1116,6 +1122,17 @@ struct PetChatView: View {
         }
     }
 
+    private func guardPremiumFeature(_ feature: PetChatPremiumFeature) -> Bool {
+        guard !VIPManager.shared.isVIP else { return false }
+        messages.append(
+            PetChatVIPAccessSupport.upgradeMessage(
+                for: feature,
+                petName: PetDataManager.shared.status.displayName
+            )
+        )
+        return true
+    }
+
     private func presentIntentDisambiguation(_ decision: PetChatIntentRouter.IntentDecision, rawText: String) {
         var options = decision.candidates.prefix(3).map { candidate in
             return PetWidgetOption(
@@ -1582,6 +1599,8 @@ struct PetChatView: View {
 #else
             showingMeowCoinStore = true
 #endif
+        case "open_vip_center":
+            showingVIPCenter = true
         case "open_money_counting":
             refreshPanel(for: "open_money_counting", messageID: messageID)
         case let cmd where cmd.hasPrefix("weather_guidance:"):
@@ -2064,6 +2083,10 @@ struct PetChatView: View {
     }
 
     private func handleWeatherOutfitGuidance(stylePreference: String? = nil) {
+        if guardPremiumFeature(.weatherGuidance) {
+            return
+        }
+
         isThinking = true
         let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(from: clothings, stylePreference: stylePreference)
 
@@ -2151,6 +2174,10 @@ struct PetChatView: View {
 
     // 处理AI对话
     private func handleAIChat(_ text: String) {
+        if guardPremiumFeature(.remoteChat) {
+            return
+        }
+
         isThinking = true
 
         Task {
@@ -2206,6 +2233,10 @@ struct PetChatView: View {
 
     /// 处理搭配建议请求
     private func handleOutfitSuggestion(_ text: String) {
+        if guardPremiumFeature(.outfitSuggestion) {
+            return
+        }
+
         // 检查是否有足够的裙装
         guard clothings.count >= 2 else {
             let message = PetChatMessage(
@@ -2278,6 +2309,10 @@ struct PetChatView: View {
 
     /// 快速创建搭配（无需AI）
     private func createQuickOutfit(style: String, occasion: String) {
+        if guardPremiumFeature(.outfitSuggestion) {
+            return
+        }
+
         guard clothings.count >= 2 else {
             let message = PetChatMessage(
                 text: localizedCatchphraseText("（歪头）主人衣橱里的裙子还不够呢，至少需要2件单品才能搭配喵~"),

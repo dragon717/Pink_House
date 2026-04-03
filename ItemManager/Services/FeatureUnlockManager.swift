@@ -564,6 +564,20 @@ final class FeatureUnlockManager: ObservableObject {
     func canAccess(_ feature: FeatureItem) -> Bool {
         return isUnlocked(feature) && isVisible(feature)
     }
+
+    /// 用于“VIP 期间临时开放，但已单独解锁时仍保持永久可用”的权益桥接。
+    func hasEffectiveAccess(_ feature: FeatureItem) -> Bool {
+        if isUnlocked(feature) {
+            return true
+        }
+
+        switch feature {
+        case .themeCustomize:
+            return VIPManager.shared.isVIP
+        default:
+            return false
+        }
+    }
     
     // MARK: - 解锁检查
     
