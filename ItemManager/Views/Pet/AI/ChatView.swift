@@ -55,7 +55,9 @@ struct ChatView: View {
     @State private var showingHistorySearch = false
     @StateObject private var greetingManager = DailyGreetingManager.shared
     
-    private let historyUnlockThreshold: CGFloat = 72
+    private let historyUnlockThreshold: CGFloat = 120
+    private let historyUnlockHintThreshold: CGFloat = 18
+    private let historyUnlockDragMinimumDistance: CGFloat = 12
     private let historyPageSize: Int = 10
     private let lockedWelcomeMessageID = UUID(uuidString: "A4FB4D91-7F98-4A4F-B847-5B2F792DC9B5") ?? UUID()
     
@@ -189,7 +191,7 @@ struct ChatView: View {
                     handleHistoryUnlockScrollOffset(minY)
                 }
                 .simultaneousGesture(
-                    DragGesture(minimumDistance: 5)
+                    DragGesture(minimumDistance: historyUnlockDragMinimumDistance)
                         .onChanged(handleHistoryUnlockDragChanged)
                         .onEnded(handleHistoryUnlockDragEnded)
                 )
@@ -479,7 +481,7 @@ struct ChatView: View {
         }
 
         historyUnlockProgress = progress
-        showingHistoryUnlockHint = overscroll > 8 && isChatScrollPinnedToTop
+        showingHistoryUnlockHint = overscroll > historyUnlockHintThreshold && isChatScrollPinnedToTop
 
         if overscroll <= 0 {
             resetHistoryUnlockHintIfNeeded(animated: true)
