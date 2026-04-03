@@ -186,6 +186,26 @@ VIP 页面采用以下结构：
   - 商店商品卡显示原价/折扣信息
 - `ItemManager/Views/Pet/PetHomeView.swift`
   - 萌宠语音聊天入口改为允许进入模式，远程请求时再引导升级
+- `ItemManager/Services/VIP/VIPAppIconManager.swift`
+  - 应用图标配置、当前图标状态与系统切换封装
+- `ItemManager/Views/VIP/VIPAppIconSelectionView.swift`
+  - VIP 个性图标库页面
+
+## 10. 个性图标二期前的首版实现
+
+首版已经落地：
+
+- 主图标：`少女心愿立体`
+  - 资源来源：`8b9cf4d`
+  - 对应 asset：`少女心愿logo.appiconset`
+- 备选图标：`经典图标`
+  - 对应 asset：`ClassicAppIcon.appiconset`
+
+接入方式：
+
+- VIP 用户可在 VIP 中心进入“个性图标库”
+- 图标切换使用系统 alternate icon 能力
+- 图标预览和图标资源分开维护，便于后续扩容
 
 ---
 

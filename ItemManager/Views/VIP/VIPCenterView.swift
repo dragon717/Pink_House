@@ -7,6 +7,7 @@ struct VIPCenterView: View {
     @State private var showingPurchaseAlert = false
     @State private var alertMessage = ""
     @State private var showSkinSelection = false
+    @State private var showAppIconSelection = false
     @State private var showCoinStore = false
     @State private var showInfoAlert = false
     @State private var infoAlertTitle = ""
@@ -108,23 +109,30 @@ struct VIPCenterView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 22) {
-                    topBar
                     heroSection
                     benefitsSection
-                    planSelectorSection
-                    purchaseSection
-                    agreementSection
                 }
                 .padding(.horizontal, 18)
-                .padding(.top, 16)
-                .padding(.bottom, 36)
+                .padding(.top, 18)
+                .padding(.bottom, 24)
                 .frame(maxWidth: 520)
                 .frame(maxWidth: .infinity)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            floatingTopBar
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            floatingPurchaseBar
+        }
         .sheet(isPresented: $showSkinSelection) {
             VIPCardSkinSelectionView()
+        }
+        .sheet(isPresented: $showAppIconSelection) {
+            NavigationStack {
+                VIPAppIconSelectionView()
+            }
         }
         .sheet(isPresented: $showCoinStore) {
             MeowCoinStoreView()
@@ -194,6 +202,156 @@ struct VIPCenterView: View {
         }
     }
 
+    private var floatingTopBar: some View {
+        topBar
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var floatingPurchaseBar: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 10) {
+                planSelectorSection
+                purchaseSection
+                agreementSection
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+            .background(purchasePanelBackground)
+            .padding(.horizontal, 18)
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+        }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var purchasePanelBackground: some View {
+        let panelShape = UnevenRoundedRectangle(
+            cornerRadii: .init(
+                topLeading: 34,
+                bottomLeading: 28,
+                bottomTrailing: 30,
+                topTrailing: 46
+            ),
+            style: .continuous
+        )
+
+        return ZStack {
+            panelShape
+                .fill(Color.black.opacity(0.12))
+                .background(panelShape.fill(.thinMaterial))
+                .overlay(
+                    panelShape
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.12),
+                                    .clear,
+                                    Color.black.opacity(0.03)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .blur(radius: 8)
+                )
+                .overlay(
+                    panelShape
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+                .overlay(
+                    panelShape
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "77D8FF").opacity(0.92),
+                                    Color(hex: "A7B8FF").opacity(0.88),
+                                    Color(hex: "F0E7A8").opacity(0.85),
+                                    visualTheme.accentColor.opacity(0.85)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.35
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.12), radius: 16, x: 0, y: 10)
+                .shadow(color: visualTheme.glowColor.opacity(0.1), radius: 18, x: 0, y: 4)
+
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+                .frame(width: 104, height: 20)
+                .blur(radius: 10)
+                .offset(x: -80, y: -56)
+
+            folderTabAccent
+        }
+    }
+
+    private var folderTabAccent: some View {
+        HStack {
+            UnevenRoundedRectangle(
+                cornerRadii: .init(
+                    topLeading: 20,
+                    bottomLeading: 14,
+                    bottomTrailing: 18,
+                    topTrailing: 18
+                ),
+                style: .continuous
+            )
+            .fill(Color.black.opacity(0.3))
+            .background(
+                UnevenRoundedRectangle(
+                    cornerRadii: .init(
+                        topLeading: 20,
+                        bottomLeading: 14,
+                        bottomTrailing: 18,
+                        topTrailing: 18
+                    ),
+                    style: .continuous
+                )
+                .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                UnevenRoundedRectangle(
+                    cornerRadii: .init(
+                        topLeading: 20,
+                        bottomLeading: 14,
+                        bottomTrailing: 18,
+                        topTrailing: 18
+                    ),
+                    style: .continuous
+                )
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            visualTheme.accentColor.opacity(0.7),
+                            Color(hex: "F0E7A8").opacity(0.65)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    lineWidth: 1.1
+                )
+            )
+            .frame(width: 120, height: 24)
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 42, height: 4)
+                    .offset(x: 14)
+            }
+            .offset(x: 16, y: -64)
+
+            Spacer()
+        }
+    }
+
     private var backgroundLayer: some View {
         ZStack {
             LinearGradient(
@@ -231,17 +389,29 @@ struct VIPCenterView: View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 Text("少女心愿")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                 Text("VIP")
                     .font(.system(size: 12, weight: .bold))
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
                     .background(Capsule().fill(visualTheme.accentColor.opacity(0.18)))
                     .overlay(
                         Capsule()
                             .stroke(visualTheme.accentColor.opacity(0.45), lineWidth: 1)
                     )
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.08))
+                    .background(Capsule().fill(.thinMaterial))
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
+            )
             .foregroundStyle(.white)
 
             Spacer()
@@ -261,19 +431,32 @@ struct VIPCenterView: View {
                 }
 
                 Button {
+                    if vipManager.isVIP {
+                        showAppIconSelection = true
+                    } else {
+                        presentInfoAlert(
+                            title: "个性图标",
+                            message: "开通 VIP 后即可自主切换应用图标，目前已接入「少女心愿立体」和「经典图标」两套方案。"
+                        )
+                    }
+                } label: {
+                    Label("切换图标", systemImage: "app.badge")
+                }
+
+                Button {
                     vipCodeInput = ""
                     showingVIPRedeemAlert = true
                 } label: {
                     Label("使用兑换码", systemImage: "gift")
                 }
             } label: {
-                topButton(icon: "ellipsis")
+                floatingActionButton(icon: "ellipsis")
             }
 
             Button {
                 dismiss()
             } label: {
-                topButton(icon: "xmark")
+                floatingActionButton(icon: "xmark")
             }
         }
     }
@@ -358,53 +541,40 @@ struct VIPCenterView: View {
                 Button {
                     selectedPlanID = plan.id
                 } label: {
-                    VStack(spacing: 8) {
-                        HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(plan.title)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(.white)
+
+                                Text(plan.subtitle)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.7))
+                            }
+
+                            Spacer(minLength: 8)
+
                             if let badge = plan.badgeText {
                                 Text(badge)
                                     .font(.system(size: 10, weight: .bold))
                                     .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Capsule().fill(visualTheme.accentColor.opacity(0.16)))
+                                    .padding(.vertical, 5)
+                                    .background(Capsule().fill(Color.white.opacity(0.08)))
                                     .overlay(
                                         Capsule()
-                                            .stroke(visualTheme.accentColor.opacity(0.42), lineWidth: 1)
+                                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
                                     )
                                     .foregroundStyle(.white)
                             }
-                            Spacer()
                         }
-                        .frame(height: 18)
-
-                        Spacer()
-
-                        Text(plan.title)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(.white)
-
-                        Text(plan.subtitle)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.8))
-
-                        Spacer()
                     }
-                    .padding(16)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 126)
+                    .frame(minHeight: 64, alignment: .topLeading)
                     .background(
-                        VIPGlassCardBackground(
-                            glassStyle: selectedPlanID == plan.id ? visualTheme.primaryGlassStyle : .glossBlack,
-                            cornerRadius: 22
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(
-                                selectedPlanID == plan.id
-                                ? visualTheme.primaryGlassStyle.strokeColor.opacity(0.95)
-                                : Color.white.opacity(0.08),
-                                lineWidth: selectedPlanID == plan.id ? 2 : 1
-                            )
+                        planCardBackground(isSelected: selectedPlanID == plan.id)
                     )
                 }
                 .buttonStyle(.plain)
@@ -413,7 +583,7 @@ struct VIPCenterView: View {
     }
 
     private var purchaseSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             Button {
                 handlePurchase()
             } label: {
@@ -433,23 +603,24 @@ struct VIPCenterView: View {
                 }
                 .foregroundStyle(Color.black.opacity(0.92))
                 .padding(.horizontal, 18)
-                .padding(.vertical, 18)
+                .padding(.vertical, 14)
                 .background(
                     LinearGradient(
                         colors: [
-                            visualTheme.accentColor,
-                            visualTheme.accentColor.opacity(0.82)
+                            Color(hex: "A7AEFF"),
+                            Color(hex: "5EC8FF"),
+                            Color(hex: "70D0FF")
                         ],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.3), lineWidth: 1.2)
                 )
-                .shadow(color: visualTheme.glowColor, radius: 20, x: 0, y: 10)
+                .shadow(color: Color(hex: "69C7FF").opacity(0.26), radius: 18, x: 0, y: 10)
             }
             .buttonStyle(.plain)
             .captureGuideTarget(.aiAnalysisExchangeButton)
@@ -458,8 +629,8 @@ struct VIPCenterView: View {
                 showCoinStore = true
             } label: {
                 Text("喵币不足？前往商店获取喵币")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.76))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.72))
                     .underline()
             }
             .buttonStyle(.plain)
@@ -470,8 +641,8 @@ struct VIPCenterView: View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "circle")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.white.opacity(0.72))
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.white.opacity(0.74))
                 Text("请阅读并同意")
                     .foregroundStyle(Color.white.opacity(0.62))
                 Text("会员协议")
@@ -479,14 +650,69 @@ struct VIPCenterView: View {
                 Text("使用协议")
                     .foregroundStyle(.white)
             }
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: 10, weight: .medium))
 
             Text("VIP 为喵币兑换型权益，不自动续费。")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.48))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.5))
                 .multilineTextAlignment(.center)
         }
-        .padding(.top, 4)
+        .padding(.top, 1)
+    }
+
+    private func planCardBackground(isSelected: Bool) -> some View {
+        let cornerRadius: CGFloat = 22
+
+        return RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(Color.black.opacity(isSelected ? 0.14 : 0.18))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.thinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(isSelected ? 0.14 : 0.08),
+                                .clear,
+                                Color.black.opacity(0.03)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .blur(radius: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(isSelected ? 0.12 : 0.08), lineWidth: 1)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        isSelected
+                        ? LinearGradient(
+                            colors: [
+                                Color(hex: "79D8FF"),
+                                Color(hex: "A9B2FF"),
+                                Color(hex: "F0E7A8")
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        : LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.1),
+                                Color.white.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: isSelected ? 1.35 : 1
+                    )
+            )
+            .shadow(color: isSelected ? visualTheme.glowColor.opacity(0.12) : .clear, radius: 10, x: 0, y: 6)
     }
 
     private func benefitCard(for benefit: VIPBenefit) -> some View {
@@ -555,14 +781,21 @@ struct VIPCenterView: View {
         .buttonStyle(.plain)
     }
 
-    private func topButton(icon: String) -> some View {
+    private func floatingActionButton(icon: String) -> some View {
         ZStack {
-            VIPGlassCardBackground(glassStyle: visualTheme.secondaryGlassStyle, cornerRadius: 18)
+            Circle()
+                .fill(Color.black.opacity(0.08))
+                .background(Circle().fill(.thinMaterial))
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.white)
         }
-        .frame(width: 36, height: 36)
+        .frame(width: 42, height: 42)
+        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
     }
 
     private func heroTag(text: String) -> some View {
@@ -628,10 +861,14 @@ struct VIPCenterView: View {
                 message: "VIP 期间可直接使用魔法配色；若你已经单独花喵币解锁，就算 VIP 到期也不会关闭。"
             )
         case "icons":
-            presentInfoAlert(
-                title: benefit.title,
-                message: "个性图标库会纳入当前默认图标与「少女心愿 logo」图标方案，作为专属收藏权益逐步开放。"
-            )
+            if vipManager.isVIP {
+                showAppIconSelection = true
+            } else {
+                presentInfoAlert(
+                    title: benefit.title,
+                    message: "开通 VIP 后即可自主切换应用图标，目前已接入「少女心愿立体」和「经典图标」两套方案。"
+                )
+            }
         case "weekly":
             presentInfoAlert(
                 title: benefit.title,
