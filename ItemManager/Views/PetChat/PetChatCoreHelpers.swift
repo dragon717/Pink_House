@@ -899,7 +899,7 @@ func purchasePetItemResult(itemId: String, autoFeedWhenPossible: Bool = true) ->
         guard status.meowCoin >= item.price else {
             return PetItemCommandResult(feedback: "我的喵币不够啦，先帮我充一点再来买\(item.name)吧。", feedAnimation: nil)
         }
-        status.meowCoin -= item.price
+        _ = StoreManager.spendMeowCoins(item.price, in: &status)
     case .boneCoin:
         guard status.boneCoin >= item.price else {
             return PetItemCommandResult(feedback: "我的骨头币不够啦，这个币种更适合毛毛用喔。", feedAnimation: nil)

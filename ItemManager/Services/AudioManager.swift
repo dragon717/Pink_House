@@ -34,6 +34,7 @@ enum PetVoiceType: String, CaseIterable, Identifiable {
 @MainActor
 final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate, SNResultsObserving {
     static let shared = AudioManager()
+    static let isMicrophoneInteractionTemporarilyDisabled = true
     
     // MARK: - Published Properties
     
@@ -158,6 +159,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     /// 开启后，进入 Echo 模式：监听 -> 录音 -> 识别 -> 变音播放
     @Published var isInteractionEnabled: Bool = false {
         didSet {
+            guard isInteractionEnabled != oldValue else { return }
             if isInteractionEnabled {
                 startInteraction()
             } else {
@@ -197,6 +199,7 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     private var timePitch = AVAudioUnitTimePitch()
     private var eqNode = AVAudioUnitEQ(numberOfBands: 4) // 增加到4个频段以进行更精细的控制
     private var mixerNode = AVAudioMixerNode() // 用于将输入写入文件
+    private var hasInstalledInputTap = false
     
     // VAD (Voice Activity Detection)
     private var silenceTimer: Timer?
@@ -438,6 +441,11 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         do {
             let session = AVAudioSession.sharedInstance()
             
+            if (isInteractionEnabled || isRecording) && !hasRequiredInteractionPermissions() {
+                print("AudioManager: Skip recording audio session setup because microphone/speech permission is not authorized")
+                return
+            }
+            
             // 检查当前 Category 和 Mode 是否已经正确，避免重复设置
             // 注意：AVAudioSession 的属性读取也可能有开销，但通常比 set 便宜
             let currentCategory = session.category
@@ -558,23 +566,25 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
     // MARK: - Interaction Control
     
     private func startInteraction() {
+        guard !Self.isMicrophoneInteractionTemporarilyDisabled else {
+            isInteractionEnabled = false
+            print("AudioManager: Microphone interaction is temporarily disabled")
+            return
+        }
+
         guard interactionState == .idle else { return }
         
-        interactionState = .preparing
+        guard hasRequiredInteractionPermissions() else {
+            interactionState = .idle
+            isInteractionEnabled = false
+            print("AudioManager: Microphone interaction requires explicit permission grant, skipping automatic request")
+            return
+        }
         
-        // 检查权限
-        checkPermissions { [weak self] authorized in
-            guard let self = self else { return }
-            if authorized {
-                DispatchQueue.main.async {
-                    self.startListening()
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.isInteractionEnabled = false
-                    print("AudioManager: Permissions denied")
-                }
-            }
+        interactionState = .preparing
+
+        DispatchQueue.main.async { [weak self] in
+            self?.startListening()
         }
     }
     
@@ -593,34 +603,35 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
     }
     
-    private func checkPermissions(completion: @escaping (Bool) -> Void) {
-        var micAuthorized = false
-        var speechAuthorized = false
-        
-        let group = DispatchGroup()
-        
-        // Mic
-        group.enter()
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            micAuthorized = granted
-            group.leave()
+    private func hasRequiredInteractionPermissions() -> Bool {
+        guard !Self.isMicrophoneInteractionTemporarilyDisabled else {
+            return false
         }
         
-        // Speech
-        group.enter()
-        SFSpeechRecognizer.requestAuthorization { status in
-            speechAuthorized = (status == .authorized)
-            group.leave()
+        let microphoneAuthorized: Bool
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted:
+            microphoneAuthorized = true
+        case .denied, .undetermined:
+            microphoneAuthorized = false
+        @unknown default:
+            microphoneAuthorized = false
         }
         
-        group.notify(queue: .main) {
-            completion(micAuthorized && speechAuthorized)
-        }
+        let speechAuthorized = SFSpeechRecognizer.authorizationStatus() == .authorized
+        return microphoneAuthorized && speechAuthorized
     }
     
     // MARK: - Listening & Recording Logic
     
     private func startListening() {
+        guard hasRequiredInteractionPermissions() else {
+            interactionState = .idle
+            isInteractionEnabled = false
+            print("AudioManager: Skip startListening because microphone/speech permission is not authorized")
+            return
+        }
+
         stopPlayback() // 确保没有在播放
         
         // 倾听时，暂时将 BGM 静音
@@ -861,12 +872,20 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
                 }
             }
         }
+        hasInstalledInputTap = true
     }
     
     private func stopListening() {
+        guard hasInstalledInputTap || recognitionRequest != nil || recognitionTask != nil || audioFile != nil || silenceTimer != nil else {
+            return
+        }
+
         // 不要完全 stop engine，因为可能还需要播放 BGM
         // engine.stop()
-        engine.inputNode.removeTap(onBus: 0)
+        if hasInstalledInputTap {
+            engine.inputNode.removeTap(onBus: 0)
+            hasInstalledInputTap = false
+        }
         
         // 结束 Sound Analysis
         streamAnalyzer = nil
@@ -1050,7 +1069,10 @@ final class AudioManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate
         }
         // engine.reset() // 注意：reset 可能会断开所有连接，需要谨慎。这里我们手动断开重连。
         
-        engine.inputNode.removeTap(onBus: 0)
+        if hasInstalledInputTap {
+            engine.inputNode.removeTap(onBus: 0)
+            hasInstalledInputTap = false
+        }
         
         // 断开所有相关节点，防止格式冲突
         engine.disconnectNodeOutput(playerNode)

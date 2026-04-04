@@ -232,8 +232,7 @@ class PetViewModel: ObservableObject {
         if price > 0 {
             switch currency {
             case .meowCoin:
-                if status.meowCoin < price { return false }
-                status.meowCoin -= price
+                guard StoreManager.spendMeowCoins(price, in: &status) else { return false }
             case .fishCoin:
                 if status.fishCoin < price { return false }
                 status.fishCoin -= price
@@ -735,7 +734,10 @@ class PetViewModel: ObservableObject {
         case .fishCoin:
             status.fishCoin -= finalPrice
         case .meowCoin:
-            status.meowCoin -= finalPrice
+            guard StoreManager.spendMeowCoins(finalPrice, in: &status) else {
+                showFloatingText("余额不足", style: .warning)
+                return
+            }
         case .boneCoin:
             status.boneCoin -= finalPrice
         }
@@ -1186,8 +1188,7 @@ class PetViewModel: ObservableObject {
                 showFloatingText("余额不足", style: .warning)
             }
         case .meowCoin:
-            if status.meowCoin >= finalPrice {
-                status.meowCoin -= finalPrice
+            if StoreManager.spendMeowCoins(finalPrice, in: &status) {
                 status.inventory[item.id, default: 0] += 1
                 saveStatus()
                 showFloatingText("-\(finalPrice)", style: .meowCoin)
@@ -1619,13 +1620,6 @@ class PetViewModel: ObservableObject {
     }
     
     private func requestMicrophonePermission() {
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            DispatchQueue.main.async {
-                if !granted {
-                    self.isMicrophoneEnabled = false
-                    // TODO: Show alert if needed
-                }
-            }
-        }
+        isMicrophoneEnabled = false
     }
 }

@@ -92,8 +92,9 @@ class VIPManager: ObservableObject {
             return (false, "喵币不足，需要 \(cost) 喵币")
         }
         
-        // Deduct cost
-        status.meowCoin -= cost
+        guard StoreManager.spendMeowCoins(cost, in: &status) else {
+            return (false, "喵币不足，需要 \(cost) 喵币")
+        }
         
         // Update VIP Status
         var newExpireDate: Date

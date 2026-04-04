@@ -61,6 +61,7 @@ struct PetChatView: View {
     @State private var isChatScrollPinnedToTop = true
     @State private var initialHistoryMessageIDs = Set<UUID>()
     @State private var lockedWelcomeTimestamp = Date()
+    @State private var lastInjectedAIAnalysisGuideCaptureVersion: UInt = 0
 
     // 搭配建议相关状态
     @State private var selectedOutfitClothings: [Clothing] = []
@@ -427,7 +428,7 @@ struct PetChatView: View {
                     loadInitialGreeting()
                 }
                 presentInitialAdoptionSheetIfNeeded()
-                ensureGuideEmbeddedOptionMessageIfNeeded()
+                ensureGuideEmbeddedOptionMessageIfNeeded(forceRefreshForCurrentGuideSession: true)
                 // 配置 AI 服务
                 configureAIService()
                 // 首次进入萌宠对话页面时，自动展开搜索栏
@@ -446,7 +447,7 @@ struct PetChatView: View {
                 }
             }
             .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
-                ensureGuideEmbeddedOptionMessageIfNeeded()
+                ensureGuideEmbeddedOptionMessageIfNeeded(forceRefreshForCurrentGuideSession: true)
             }
             .onChange(of: isSearchPresented) { oldValue, newValue in
                 // 当 iOS26 搜索栏展开/收起时，通知常用菜单禁用/启用长按交互
@@ -879,15 +880,37 @@ struct PetChatView: View {
         return PetWidgetSuggestionBuilder.onboardingWidgets()
     }
 
-    private func ensureGuideEmbeddedOptionMessageIfNeeded() {
+    private func isAIAnalysisGuideInjectedMessage(_ message: PetChatMessage) -> Bool {
+        guard !message.isUser,
+              let widgets = message.widgets,
+              widgets.count == 1 else { return false }
+
+        let widget = widgets[0]
+        return widget.type == .quickOptions &&
+            widget.title == "先点对话里的引导选项" &&
+            widget.options.count == 1 &&
+            widget.options[0].command == "weather_guidance"
+    }
+
+    private func ensureGuideEmbeddedOptionMessageIfNeeded(forceRefreshForCurrentGuideSession: Bool = false) {
         guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+
+        let currentGuideCaptureVersion = guideManager.guideTargetCaptureVersion
+        let shouldRefreshForSession =
+            forceRefreshForCurrentGuideSession &&
+            lastInjectedAIAnalysisGuideCaptureVersion != currentGuideCaptureVersion
+
+        if shouldRefreshForSession {
+            // 重开引导时丢掉旧的专用提示，改为补一条新的可见入口，避免目标只停留在历史记录里。
+            messages.removeAll(where: isAIAnalysisGuideInjectedMessage)
+        }
 
         let hasGuideOption = messages.contains { message in
             (message.widgets ?? []).contains { widget in
                 widget.options.contains { $0.command == "weather_guidance" }
             }
         }
-        guard !hasGuideOption else { return }
+        guard shouldRefreshForSession || !hasGuideOption else { return }
 
         let guideWidget = PetWidgetData(
             type: .quickOptions,
@@ -905,6 +928,7 @@ struct PetChatView: View {
                 widgets: [guideWidget]
             )
         )
+        lastInjectedAIAnalysisGuideCaptureVersion = currentGuideCaptureVersion
     }
 
     // 发送消息
@@ -1426,7 +1450,7 @@ struct PetChatView: View {
                 return
             }
 
-            status.meowCoin -= renameCost
+            _ = StoreManager.spendMeowCoins(renameCost, in: &status)
             status.inventory["renameCard", default: 0] += 1
             PetDataManager.shared.saveStatus(status)
             messages.append(PetChatMessage(text: "已帮你买好改名项圈，来起个新名字吧～", isUser: false, isAIGenerated: true))

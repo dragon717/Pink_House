@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct SpaceBookToolbar: ToolbarContent {
+    @ObservedObject private var guideManager = AppFirstLaunchGuideManager.shared
     @Binding var isSidebarVisible: Bool
     @Binding var gridModeValue: Int
     @Binding var isEditing: Bool
@@ -15,6 +16,7 @@ struct SpaceBookToolbar: ToolbarContent {
     @Binding var selectedPages: Set<UUID>
     @Binding var showingNewPageAlert: Bool
     @Binding var showingCoverPicker: Bool
+    @Binding var showingTrash: Bool
     var dismissAction: () -> Void
     var onRenameBook: () -> Void
 
@@ -68,45 +70,58 @@ struct SpaceBookToolbar: ToolbarContent {
                 }
 
                 // More Actions
-                Menu {
-                    Button {
-                        showingNewPageAlert = true
-                    } label: {
-                        Label("新建空间搭配", systemImage: "plus")
+                Group {
+                    if guideManager.shouldUseCustomGuideMenu(for: .spaceBookDetailMore) {
+                        Button {
+                            presentGuideMenuForSpaceBookDetailMore()
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(.primary)
+                        }
+                    } else {
+                        Menu {
+                            Button {
+                                showingNewPageAlert = true
+                            } label: {
+                                Label("新建空间搭配", systemImage: "plus")
+                            }
+
+                            Button {
+                                showingCoverPicker = true
+                            } label: {
+                                Label("修改手帐封面", systemImage: "photo")
+                            }
+
+                            Button {
+                                onRenameBook()
+                            } label: {
+                                Label("重命名手帐", systemImage: "pencil")
+                            }
+
+                            Divider()
+
+                            // 批量编辑入口
+                            Button {
+                                isBatchEditing = true
+                                selectedPages.removeAll()
+                            } label: {
+                                Label("批量编辑", systemImage: "checkmark.circle")
+                            }
+
+                            Divider()
+
+                            Button {
+                                showingTrash = true
+                            } label: {
+                                Label("垃圾篓", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(.primary)
+                        }
                     }
-
-                    Button {
-                        showingCoverPicker = true
-                    } label: {
-                        Label("修改手帐封面", systemImage: "photo")
-                    }
-
-                    Button {
-                        onRenameBook()
-                    } label: {
-                        Label("重命名手帐", systemImage: "pencil")
-                    }
-
-                    Divider()
-
-                    // 批量编辑入口
-                    Button {
-                        isBatchEditing = true
-                        selectedPages.removeAll()
-                    } label: {
-                        Label("批量编辑", systemImage: "checkmark.circle")
-                    }
-
-                    Divider()
-
-                    NavigationLink(destination: RecycleBinView(initialTab: 2)) {
-                        Label("垃圾篓", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.primary)
-                        .captureGuideToolbarIconTarget(.spaceBookDetailMoreMenuButton)
                 }
+                .captureGuideToolbarIconTarget(.spaceBookDetailMoreMenuButton)
             }
         }
     }
@@ -117,5 +132,49 @@ struct SpaceBookToolbar: ToolbarContent {
         case 3: return "rectangle.grid.3x2"
         default: return "rectangle.grid.2x2"
         }
+    }
+
+    private func presentGuideMenuForSpaceBookDetailMore() {
+        guideManager.presentGuideMenu(
+            GuideMenuPresentationState(
+                scenario: .spaceBookDetailMore,
+                anchorKey: .spaceBookDetailMoreMenuButton,
+                width: 240,
+                submenuDepth: 0,
+                items: [
+                    .action(
+                        title: "新建空间书页",
+                        systemImage: "plus",
+                        isHighlighted: true,
+                        action: { showingNewPageAlert = true }
+                    ),
+                    .action(
+                        title: "修改手帐封面",
+                        systemImage: "photo",
+                        action: { showingCoverPicker = true }
+                    ),
+                    .action(
+                        title: "重命名手帐",
+                        systemImage: "pencil",
+                        action: onRenameBook
+                    ),
+                    .divider,
+                    .action(
+                        title: "批量编辑",
+                        systemImage: "checkmark.circle",
+                        action: {
+                            isBatchEditing = true
+                            selectedPages.removeAll()
+                        }
+                    ),
+                    .divider,
+                    .action(
+                        title: "垃圾篓",
+                        systemImage: "trash",
+                        action: { showingTrash = true }
+                    )
+                ]
+            )
+        )
     }
 }

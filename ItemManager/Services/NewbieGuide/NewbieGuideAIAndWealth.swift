@@ -236,22 +236,29 @@ extension FeatureExperienceGuideOverlay {
                     preUnlockStep3Content(in: geometry)
                 case .postUnlockStep1ClickPetChatTab:
                     postUnlockStep1Content(in: geometry)
-                case .postUnlockStep2ClickSearchBar:
-                    postUnlockStep2Content(in: geometry)
-                case .postUnlockStep3FeatureIntro:
-                    postUnlockStep3Content
+                case .postUnlockStep2BrowsePets:
+                    postUnlockBrowsePetsContent(in: geometry)
+                case .postUnlockStep3AdoptNaicha:
+                    postUnlockAdoptNaichaContent(in: geometry)
+                case .postUnlockStep4NamePet:
+                    postUnlockNamePetContent(in: geometry)
+                case .postUnlockStep5ClickSearchBar:
+                    postUnlockStep5Content(in: geometry)
+                case .postUnlockStep6FeatureIntro:
+                    postUnlockStep6Content
                 }
             }
         }
     }
 
     func preUnlockStep1Content(in geometry: GeometryProxy) -> some View {
+        let progress = aiAnalysisGuideProgress(for: aiAnalysisStep)
         return returnToMeGuideContent(
             in: geometry,
             title: aiAnalysisStep.title,
             message: aiAnalysisStep.message,
-            currentStep: aiAnalysisStep.currentStepInFlow,
-            totalSteps: aiAnalysisStep.totalStepsInFlow,
+            currentStep: progress.current,
+            totalSteps: progress.total,
             accent: magicPalette.accent,
             onReturn: handleAIAnalysisGuideReturnAction
         )
@@ -455,7 +462,138 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
-    func postUnlockStep2Content(in geometry: GeometryProxy) -> some View {
+    func postUnlockBrowsePetsContent(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackCarouselFrame = CGRect(
+            x: 28,
+            y: max(geometry.safeAreaInsets.top + 110, screenBounds.height * 0.15),
+            width: screenBounds.width - 56,
+            height: min(screenBounds.height * 0.48, 460)
+        )
+        let carouselFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .petAdoptionCarousel),
+            in: geometry,
+            fallback: fallbackCarouselFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: carouselFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 28
+            )
+
+            RoundedRectHighlightView(
+                frame: carouselFrame,
+                cornerRadius: 28
+            )
+            .allowsHitTesting(false)
+
+            VStack {
+                Spacer()
+
+                HorizontalSwipeHintView(
+                    title: "请左右滑动",
+                    subtitle: "先向右滑动看看别的小伙伴，再向左滑回「奶茶」继续领养。",
+                    currentStep: aiAnalysisGuideProgress(for: aiAnalysisStep).current,
+                    totalSteps: aiAnalysisGuideProgress(for: aiAnalysisStep).total,
+                    accent: magicPalette.accent,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    }
+                )
+                .padding(.bottom, 120)
+            }
+        }
+    }
+
+    func postUnlockAdoptNaichaContent(in geometry: GeometryProxy) -> some View {
+        let screenBounds = geometry.size
+        let fallbackAdoptButtonFrame = CGRect(
+            x: 52,
+            y: screenBounds.height * 0.63,
+            width: screenBounds.width - 104,
+            height: 60
+        )
+        let adoptButtonFrame = aiGuideTargetFrame(
+            globalFrame: guideManager.guideTargetFrame(for: .petAdoptionNaichaButton),
+            in: geometry,
+            fallback: fallbackAdoptButtonFrame
+        )
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: adoptButtonFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 26
+            )
+
+            RoundedRectHighlightView(
+                frame: adoptButtonFrame,
+                cornerRadius: 26
+            )
+            .allowsHitTesting(false)
+
+            if aiAnalysisStep.showCatPaw {
+                CatPawTapAnimation(
+                    position: CGPoint(x: adoptButtonFrame.midX, y: adoptButtonFrame.midY),
+                    delay: 0.5
+                )
+                .opacity(0.45)
+                .allowsHitTesting(false)
+            }
+
+            VStack {
+                aiAnalysisBubble(
+                    step: aiAnalysisStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.top, 88)
+
+                Spacer()
+            }
+        }
+    }
+
+    func postUnlockNamePetContent(in geometry: GeometryProxy) -> some View {
+        let promptFrame = aiAnalysisNamePromptFrame(in: geometry)
+
+        return ZStack {
+            HollowMaskView(
+                highlightFrame: promptFrame,
+                highlightType: .roundedRect,
+                cornerRadius: 18
+            )
+
+            RoundedRectHighlightView(
+                frame: promptFrame,
+                cornerRadius: 18
+            )
+            .allowsHitTesting(false)
+
+            VStack {
+                aiAnalysisBubble(
+                    step: aiAnalysisStep,
+                    onSkip: {
+                        guideManager.dismissFeatureExperienceGuide()
+                    },
+                    onComplete: {
+                        guideManager.completeFeatureExperienceGuide()
+                    }
+                )
+                .padding(.top, 88)
+
+                Spacer()
+            }
+        }
+    }
+
+    func postUnlockStep5Content(in geometry: GeometryProxy) -> some View {
         let screenBounds = geometry.size
         let fallbackGuideOptionFrame = CGRect(
             x: 24,
@@ -508,7 +646,7 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
-    var postUnlockStep3Content: some View {
+    var postUnlockStep6Content: some View {
         VStack {
             Spacer()
 
@@ -523,6 +661,56 @@ extension FeatureExperienceGuideOverlay {
             )
             .padding(.bottom, 120)
         }
+    }
+
+    func aiAnalysisGuideProgress(for step: AIAnalysisGuideStep) -> (current: Int, total: Int) {
+        let steps: [AIAnalysisGuideStep]
+        switch step.flow {
+        case .preUnlock:
+            steps = AIAnalysisGuideStep.preUnlockCases
+        case .postUnlock:
+            steps = aiAnalysisRequiresPetAdoptionGuide
+                ? [
+                    .postUnlockStep1ClickPetChatTab,
+                    .postUnlockStep2BrowsePets,
+                    .postUnlockStep3AdoptNaicha,
+                    .postUnlockStep4NamePet,
+                    .postUnlockStep5ClickSearchBar,
+                    .postUnlockStep6FeatureIntro
+                ]
+                : [
+                    .postUnlockStep1ClickPetChatTab,
+                    .postUnlockStep5ClickSearchBar,
+                    .postUnlockStep6FeatureIntro
+                ]
+        }
+
+        return (
+            current: (steps.firstIndex(of: step) ?? 0) + 1,
+            total: steps.count
+        )
+    }
+
+    func aiAnalysisNamePromptFrame(in geometry: GeometryProxy) -> CGRect {
+        let dialogWidth: CGFloat = 270
+        let dialogHeight: CGFloat = 180
+        let centeredX = (geometry.size.width - dialogWidth) / 2
+        let centeredY = (geometry.size.height - dialogHeight) / 2
+        let safeAreaTop = max(geometry.safeAreaInsets.top, aiCurrentGuideWindowSafeAreaTop())
+        let safeAreaBottom = max(geometry.safeAreaInsets.bottom, currentGuideWindowSafeAreaBottom())
+        let effectiveKeyboardOverlap = max(0, guideKeyboardOverlap - safeAreaBottom)
+
+        guard effectiveKeyboardOverlap > 0 else {
+            return CGRect(x: centeredX, y: centeredY, width: dialogWidth, height: dialogHeight)
+        }
+
+        let topPadding = safeAreaTop + 20
+        let visibleBottom = geometry.size.height - effectiveKeyboardOverlap - 16
+        let maxY = max(topPadding, visibleBottom - dialogHeight)
+        let visibleCenteredY = topPadding + max(0, (visibleBottom - topPadding - dialogHeight) / 2)
+        let adjustedY = min(centeredY, max(topPadding, min(visibleCenteredY, maxY)))
+
+        return CGRect(x: centeredX, y: adjustedY, width: dialogWidth, height: dialogHeight)
     }
 
     func aiGuideTargetFrame(
@@ -570,6 +758,18 @@ extension FeatureExperienceGuideOverlay {
         #endif
     }
 
+    func aiCurrentGuideWindowSafeAreaTop() -> CGFloat {
+        #if canImport(UIKit)
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.top ?? 0
+        #else
+        return 0
+        #endif
+    }
+
     func aiAnalysisBubble(
         step: AIAnalysisGuideStep,
         titleOverride: String? = nil,
@@ -578,14 +778,15 @@ extension FeatureExperienceGuideOverlay {
         onSkip: @escaping () -> Void,
         onComplete: @escaping () -> Void
     ) -> some View {
+        let progress = aiAnalysisGuideProgress(for: step)
         let actionTitle: String? = step.showsCompletionButton
             ? (completionButtonTitleOverride ?? step.completionButtonTitle)
             : nil
         return featureStepBubble(
             title: titleOverride ?? step.title,
             message: messageOverride ?? step.message,
-            currentStep: step.currentStepInFlow,
-            totalSteps: step.totalStepsInFlow,
+            currentStep: progress.current,
+            totalSteps: progress.total,
             accent: magicPalette.accent,
             actionTitle: actionTitle,
             onSkip: onSkip,

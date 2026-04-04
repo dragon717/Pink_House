@@ -13,8 +13,11 @@ enum AIAnalysisGuideStep: Int, CaseIterable, GuideStepDescribable {
     case preUnlockStep2ClickVIP = 2
     case preUnlockStep3Exchange = 3
     case postUnlockStep1ClickPetChatTab = 4
-    case postUnlockStep2ClickSearchBar = 5
-    case postUnlockStep3FeatureIntro = 6
+    case postUnlockStep2BrowsePets = 5
+    case postUnlockStep3AdoptNaicha = 6
+    case postUnlockStep4NamePet = 7
+    case postUnlockStep5ClickSearchBar = 8
+    case postUnlockStep6FeatureIntro = 9
 
     enum Flow {
         case preUnlock
@@ -26,14 +29,26 @@ enum AIAnalysisGuideStep: Int, CaseIterable, GuideStepDescribable {
     }
 
     static var postUnlockCases: [AIAnalysisGuideStep] {
-        [.postUnlockStep1ClickPetChatTab, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro]
+        [
+            .postUnlockStep1ClickPetChatTab,
+            .postUnlockStep2BrowsePets,
+            .postUnlockStep3AdoptNaicha,
+            .postUnlockStep4NamePet,
+            .postUnlockStep5ClickSearchBar,
+            .postUnlockStep6FeatureIntro
+        ]
     }
 
     var flow: Flow {
         switch self {
         case .preUnlockStep1ReturnToMe, .preUnlockStep2ClickVIP, .preUnlockStep3Exchange:
             return .preUnlock
-        case .postUnlockStep1ClickPetChatTab, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro:
+        case .postUnlockStep1ClickPetChatTab,
+             .postUnlockStep2BrowsePets,
+             .postUnlockStep3AdoptNaicha,
+             .postUnlockStep4NamePet,
+             .postUnlockStep5ClickSearchBar,
+             .postUnlockStep6FeatureIntro:
             return .postUnlock
         }
     }
@@ -61,8 +76,11 @@ enum AIAnalysisGuideStep: Int, CaseIterable, GuideStepDescribable {
         case .preUnlockStep2ClickVIP: return "点击VIP卡片"
         case .preUnlockStep3Exchange: return "兑换会员时长"
         case .postUnlockStep1ClickPetChatTab: return "点击「萌宠对话」Tab"
-        case .postUnlockStep2ClickSearchBar: return "点击对话内引导选项"
-        case .postUnlockStep3FeatureIntro: return "萌宠智能对话怎么玩"
+        case .postUnlockStep2BrowsePets: return "左右滑动看看伙伴"
+        case .postUnlockStep3AdoptNaicha: return "领养「奶茶」"
+        case .postUnlockStep4NamePet: return "给萌宠起名字"
+        case .postUnlockStep5ClickSearchBar: return "点击对话内引导选项"
+        case .postUnlockStep6FeatureIntro: return "萌宠智能对话怎么玩"
         }
     }
 
@@ -76,18 +94,28 @@ enum AIAnalysisGuideStep: Int, CaseIterable, GuideStepDescribable {
             return "点击「兑换会员时长」，使用喵币兑换 VIP 天数，解锁萌宠智能对话。"
         case .postUnlockStep1ClickPetChatTab:
             return "先点击底部「萌宠对话」Tab，进入智能对话页。"
-        case .postUnlockStep2ClickSearchBar:
+        case .postUnlockStep2BrowsePets:
+            return "先左右滑动看看不同的小伙伴，最后回到「奶茶」，再继续下一步。"
+        case .postUnlockStep3AdoptNaicha:
+            return "选中「奶茶」后，点击下方「领养」。"
+        case .postUnlockStep4NamePet:
+            return "给你的萌宠起个名字，输入后点「确定」，我们再继续后面的智能对话引导。"
+        case .postUnlockStep5ClickSearchBar:
             return "点击对话窗口里的「看天气穿搭」引导按钮，它是嵌入在聊天气泡里的选项。"
-        case .postUnlockStep3FeatureIntro:
+        case .postUnlockStep6FeatureIntro:
             return "这里可以直接点对话内选项，也可以在输入区提问：情感陪伴、穿搭建议、衣橱统计都能聊。"
         }
     }
 
     var bubblePosition: BubblePosition {
         switch self {
-        case .preUnlockStep1ReturnToMe, .preUnlockStep2ClickVIP, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro:
+        case .preUnlockStep1ReturnToMe, .preUnlockStep2ClickVIP, .postUnlockStep5ClickSearchBar, .postUnlockStep6FeatureIntro:
             return .bottom
-        case .preUnlockStep3Exchange, .postUnlockStep1ClickPetChatTab:
+        case .preUnlockStep3Exchange,
+             .postUnlockStep1ClickPetChatTab,
+             .postUnlockStep2BrowsePets,
+             .postUnlockStep3AdoptNaicha,
+             .postUnlockStep4NamePet:
             return .top
         }
     }
@@ -96,23 +124,36 @@ enum AIAnalysisGuideStep: Int, CaseIterable, GuideStepDescribable {
         switch self {
         case .preUnlockStep1ReturnToMe, .postUnlockStep1ClickPetChatTab:
             return .circle
-        case .preUnlockStep2ClickVIP, .preUnlockStep3Exchange, .postUnlockStep2ClickSearchBar, .postUnlockStep3FeatureIntro:
+        case .preUnlockStep2ClickVIP,
+             .preUnlockStep3Exchange,
+             .postUnlockStep2BrowsePets,
+             .postUnlockStep3AdoptNaicha,
+             .postUnlockStep4NamePet,
+             .postUnlockStep5ClickSearchBar,
+             .postUnlockStep6FeatureIntro:
             return .roundedRect
         }
     }
 
     var showCatPaw: Bool {
         switch self {
-        case .preUnlockStep2ClickVIP, .postUnlockStep3FeatureIntro:
+        case .preUnlockStep2ClickVIP,
+             .postUnlockStep2BrowsePets,
+             .postUnlockStep4NamePet,
+             .postUnlockStep6FeatureIntro:
             return false
-        case .preUnlockStep1ReturnToMe, .preUnlockStep3Exchange, .postUnlockStep1ClickPetChatTab, .postUnlockStep2ClickSearchBar:
+        case .preUnlockStep1ReturnToMe,
+             .preUnlockStep3Exchange,
+             .postUnlockStep1ClickPetChatTab,
+             .postUnlockStep3AdoptNaicha,
+             .postUnlockStep5ClickSearchBar:
             return true
         }
     }
 
     var showsCompletionButton: Bool {
         switch self {
-        case .preUnlockStep3Exchange, .postUnlockStep3FeatureIntro:
+        case .preUnlockStep3Exchange, .postUnlockStep6FeatureIntro:
             return true
         default:
             return false
@@ -121,7 +162,7 @@ enum AIAnalysisGuideStep: Int, CaseIterable, GuideStepDescribable {
 
     var completionButtonTitle: String {
         switch self {
-        case .postUnlockStep3FeatureIntro:
+        case .postUnlockStep6FeatureIntro:
             return "开始体验"
         default:
             return "知道了"
@@ -220,7 +261,14 @@ enum ThemeCustomizeGuideStep: Int, CaseIterable, GuideStepDescribable {
         }
     }
 
-    var showCatPaw: Bool { false }
+    var showCatPaw: Bool {
+        switch self {
+        case .step4_switchToMagicTab:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 enum CustomColorPersonalizationGuideStep: Int, CaseIterable, GuideStepDescribable {

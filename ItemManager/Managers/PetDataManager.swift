@@ -165,8 +165,17 @@ class PetDataManager: ObservableObject {
     func updateCurrency(type: PetCurrency, delta: Int) -> Int {
         switch type {
         case .meowCoin:
-            status.meowCoin += delta
-            if status.meowCoin < 0 { status.meowCoin = 0 }
+            if delta < 0 {
+                if !StoreManager.spendMeowCoins(-delta, in: &status) {
+                    status.meowCoin = 0
+                }
+            } else {
+                status.meowCoin += delta
+                var account = StoreManager.loadMeowCoinAccount()
+                account.balance = status.meowCoin
+                account.lastUpdated = Date()
+                StoreManager.saveMeowCoinAccount(account)
+            }
         case .fishCoin:
             status.fishCoin += delta
             if status.fishCoin < 0 { status.fishCoin = 0 }

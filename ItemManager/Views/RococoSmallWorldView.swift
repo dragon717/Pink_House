@@ -44,6 +44,12 @@ struct RococoSmallWorldView: View {
     @State private var finalZoomScale: CGFloat = 1.0
     @State private var currentDragOffset: CGSize = .zero
     @State private var finalDragOffset: CGSize = .zero
+    @State private var roomDebugStartTimes: [String: Date] = [:]
+    @State private var roomLayoutEventCounts: [String: Int] = [:]
+
+    private var isZoomedInForPanGesture: Bool {
+        finalZoomScale > 1.01 || currentZoomScale > 1.01
+    }
     
     // MARK: - Hotspot Data
     private struct HotspotData: Identifiable {
@@ -164,6 +170,9 @@ struct RococoSmallWorldView: View {
                                 currentDragOffset = .zero
                             }
                         }
+                    ,
+                    // 未放大时优先交给子热区，避免整页拖拽手势和小入口点按竞争。
+                    including: isZoomedInForPanGesture ? .gesture : .subviews
                 )
                 .onChange(of: viewMode) { _ in
                     withAnimation {
@@ -392,6 +401,8 @@ struct RococoSmallWorldView: View {
         containerSize: CGSize,
         imageFrame: CGRect
     ) -> some View {
+        let layoutSignature = debugLayoutSignature(containerSize: containerSize, imageFrame: imageFrame)
+
         ZStack(alignment: .topLeading) {
             ForEach(hotspots) { hotspot in
                 ZStack {
@@ -431,6 +442,46 @@ struct RococoSmallWorldView: View {
             .allowsHitTesting(petViewModel.isDebugMode)
         }
         .frame(width: containerSize.width, height: containerSize.height, alignment: .topLeading)
+        .onAppear {
+            logCriticalHotspotMetrics(
+                imageName: imageName,
+                reason: "appear",
+                containerSize: containerSize,
+                imageFrame: imageFrame,
+                hotspots: hotspots
+            )
+        }
+        .onChange(of: layoutSignature) { _ in
+            logCriticalHotspotMetrics(
+                imageName: imageName,
+                reason: "layoutChanged",
+                containerSize: containerSize,
+                imageFrame: imageFrame,
+                hotspots: hotspots
+            )
+        }
+        .simultaneousGesture(
+            TapGesture()
+                .onEnded {
+                    logRoomTapReceipt(
+                        imageName: imageName,
+                        imageFrame: imageFrame
+                    )
+                },
+            including: .subviews
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onEnded { value in
+                    logCriticalTapDiagnostics(
+                        imageName: imageName,
+                        location: value.location,
+                        imageFrame: imageFrame,
+                        hotspots: hotspots
+                    )
+                },
+            including: .subviews
+        )
     }
 
     private func hotspotButton(hotspot: HotspotData, imageFrame: CGRect) -> some View {
@@ -468,6 +519,7 @@ struct RococoSmallWorldView: View {
             x: imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width,
             y: imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
         )
+        .buttonStyle(.plain)
     }
 
     private func wealthHotspotButton(hotspot: HotspotData, imageFrame: CGRect) -> some View {
@@ -504,6 +556,7 @@ struct RococoSmallWorldView: View {
             x: imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width,
             y: imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
         )
+        .buttonStyle(.plain)
     }
 
     private func wealthEntryCaptureAnchor(hotspot: HotspotData, imageFrame: CGRect) -> some View {
@@ -609,16 +662,16 @@ struct RococoSmallWorldView: View {
 
         switch destination {
         case .ootd:
-            // 镜子入口视觉区域较窄，小屏 Pro 机型上优先扩高并补足最小点击宽度。
+            // 镜子入口在 Pro/Pro Max 上都偏细长，放大命中区时优先补宽并显著补高。
             return CGSize(
-                width: max(baseWidth + 10, 40),
-                height: max(baseHeight + 18, 64)
+                width: max(baseWidth + 20, 56),
+                height: max(baseHeight + 28, 84)
             )
         case .calendar:
-            // 梦裙日历入口在竖屏下会缩到 30pt 左右，至少扩到系统级点击尺寸。
+            // 台历入口比视觉看起来更难点中，额外补足块状点击容错。
             return CGSize(
-                width: max(baseWidth + 12, 52),
-                height: max(baseHeight + 18, 52)
+                width: max(baseWidth + 20, 60),
+                height: max(baseHeight + 24, 64)
             )
         default:
             return CGSize(width: baseWidth, height: baseHeight)
@@ -637,6 +690,151 @@ struct RococoSmallWorldView: View {
         }
 
         return "\(hotspot.name)\n\(baseWidth)x\(baseHeight) -> \(targetWidth)x\(targetHeight)"
+    }
+
+    private func logCriticalHotspotMetrics(
+        imageName: String,
+        reason: String,
+        containerSize: CGSize,
+        imageFrame: CGRect,
+        hotspots: [HotspotData]
+    ) {
+#if DEBUG
+        if roomDebugStartTimes[imageName] == nil {
+            roomDebugStartTimes[imageName] = Date()
+        }
+        roomLayoutEventCounts[imageName, default: 0] += 1
+        let eventIndex = roomLayoutEventCounts[imageName, default: 0]
+        let elapsed = debugElapsedString(for: imageName)
+
+        for hotspot in hotspots {
+            switch hotspot.destination {
+            case .ootd, .calendar:
+                let rawWidth = max(1, hotspot.rect.width * imageFrame.width)
+                let rawHeight = max(1, hotspot.rect.height * imageFrame.height)
+                let interactionSize = hotspotInteractionSize(for: hotspot, imageFrame: imageFrame)
+                print(
+                    "[RococoSmallWorldView] 热区布局[\(imageName)] #\(eventIndex) \(reason) \(elapsed) \(hotspot.name) " +
+                    "container=\(debugSizeString(containerSize)) " +
+                    "imageFrame=(\(debugRectOriginString(imageFrame)) \(debugSizeString(imageFrame.size))) " +
+                    "imageMid=\(debugPointString(CGPoint(x: imageFrame.midX, y: imageFrame.midY))) " +
+                    "imageFrame=\(Int(imageFrame.width.rounded()))x\(Int(imageFrame.height.rounded())) " +
+                    "raw=\(Int(rawWidth.rounded()))x\(Int(rawHeight.rounded())) " +
+                    "hit=\(Int(interactionSize.width.rounded()))x\(Int(interactionSize.height.rounded()))"
+                )
+            default:
+                continue
+            }
+        }
+#endif
+    }
+
+    private func logCriticalTapDiagnostics(
+        imageName: String,
+        location: CGPoint,
+        imageFrame: CGRect,
+        hotspots: [HotspotData]
+    ) {
+#if DEBUG
+        let criticalHotspots = hotspots.filter {
+            switch $0.destination {
+            case .ootd, .calendar:
+                return true
+            default:
+                return false
+            }
+        }
+
+        guard !criticalHotspots.isEmpty else { return }
+
+        let elapsed = debugElapsedString(for: imageName)
+        let isInsideImageFrame = imageFrame.contains(location)
+
+        for hotspot in criticalHotspots {
+            let rawRect = hotspotRawRect(for: hotspot, imageFrame: imageFrame)
+            let hitRect = hotspotHitRect(for: hotspot, imageFrame: imageFrame)
+            let center = CGPoint(x: hitRect.midX, y: hitRect.midY)
+            let offset = CGPoint(x: location.x - center.x, y: location.y - center.y)
+            let distance = hypot(offset.x, offset.y)
+
+            print(
+                "[RococoSmallWorldView] 房间点按[\(imageName)] \(elapsed) " +
+                "loc=\(debugPointString(location)) " +
+                "insideImage=\(isInsideImageFrame) " +
+                "\(hotspot.name) rawHit=\(rawRect.contains(location)) " +
+                "expandedHit=\(hitRect.contains(location)) " +
+                "centerOffset=\(debugPointString(offset)) " +
+                "centerDistance=\(Int(distance.rounded())) " +
+                "rawRect=(\(debugRectOriginString(rawRect)) \(debugSizeString(rawRect.size))) " +
+                "hitRect=(\(debugRectOriginString(hitRect)) \(debugSizeString(hitRect.size)))"
+            )
+        }
+#endif
+    }
+
+    private func logRoomTapReceipt(
+        imageName: String,
+        imageFrame: CGRect
+    ) {
+#if DEBUG
+        print(
+            "[RococoSmallWorldView] 房间收到TapGesture[\(imageName)] \(debugElapsedString(for: imageName)) " +
+            "imageFrame=(\(debugRectOriginString(imageFrame)) \(debugSizeString(imageFrame.size)))"
+        )
+#endif
+    }
+
+    private func hotspotRawRect(for hotspot: HotspotData, imageFrame: CGRect) -> CGRect {
+        CGRect(
+            x: imageFrame.minX + hotspot.rect.minX * imageFrame.width,
+            y: imageFrame.minY + hotspot.rect.minY * imageFrame.height,
+            width: hotspot.rect.width * imageFrame.width,
+            height: hotspot.rect.height * imageFrame.height
+        )
+    }
+
+    private func hotspotHitRect(for hotspot: HotspotData, imageFrame: CGRect) -> CGRect {
+        let interactionSize = hotspotInteractionSize(for: hotspot, imageFrame: imageFrame)
+        let centerX = imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width
+        let centerY = imageFrame.minY + (hotspot.rect.minY + hotspot.rect.height / 2) * imageFrame.height
+
+        return CGRect(
+            x: centerX - interactionSize.width / 2,
+            y: centerY - interactionSize.height / 2,
+            width: interactionSize.width,
+            height: interactionSize.height
+        )
+    }
+
+    private func debugLayoutSignature(containerSize: CGSize, imageFrame: CGRect) -> String {
+        [
+            Int(containerSize.width.rounded()),
+            Int(containerSize.height.rounded()),
+            Int(imageFrame.minX.rounded()),
+            Int(imageFrame.minY.rounded()),
+            Int(imageFrame.width.rounded()),
+            Int(imageFrame.height.rounded())
+        ]
+        .map(String.init)
+        .joined(separator: ":")
+    }
+
+    private func debugElapsedString(for imageName: String) -> String {
+        let start = roomDebugStartTimes[imageName] ?? Date()
+        let elapsed = Date().timeIntervalSince(start)
+        return String(format: "+%.2fs", elapsed)
+    }
+
+    private func debugPointString(_ point: CGPoint) -> String {
+        "(\(Int(point.x.rounded())),\(Int(point.y.rounded())))"
+    }
+
+    private func debugRectOriginString(_ rect: CGRect) -> String {
+        "x=\(Int(rect.minX.rounded())),y=\(Int(rect.minY.rounded()))"
+    }
+
+    private func debugSizeString(_ size: CGSize) -> String {
+        "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
     }
 }
 

@@ -62,7 +62,7 @@ struct UnlockCondition: Codable, Equatable {
     }
     
     static func meowCoin(_ amount: Int) -> UnlockCondition {
-        UnlockCondition(type: "meowCoin", requiredValue: amount, description: "消耗 \(amount) 喵币解锁")
+        UnlockCondition(type: "meowCoin", requiredValue: amount, description: "累计消费 \(amount) 喵币后解锁")
     }
     
     static func clothingCount(_ count: Int) -> UnlockCondition {
@@ -483,6 +483,9 @@ final class FeatureUnlockManager: ObservableObject {
             } else if feature == .pet {
                 // 萌宠改为默认开启：兼容历史用户旧的兑换码配置
                 unlockConditions[feature.rawValue] = defaultCondition
+            } else if feature == .themeCustomize {
+                // 魔法配色的喵币任务改为“累计消费”，强制覆盖旧版本的即时扣费文案/配置
+                unlockConditions[feature.rawValue] = defaultCondition
             } else if defaultCondition.type == UnlockConditionType.redeemCode.rawValue {
                 // 对于兑换码解锁的功能，强制更新描述文字（用于文案调整）
                 unlockConditions[feature.rawValue] = defaultCondition
@@ -608,9 +611,9 @@ final class FeatureUnlockManager: ObservableObject {
             return (isVIP, isVIP ? nil : condition.description)
             
         case .meowCoin:
-            let currentCoins = PetDataManager.shared.status.meowCoin
-            let met = currentCoins >= condition.requiredValue
-            return (met, met ? nil : "当前喵币: \(currentCoins)/\(condition.requiredValue)")
+            let totalSpent = StoreManager.synchronizedMeowCoinAccount().totalSpent
+            let met = totalSpent >= condition.requiredValue
+            return (met, met ? nil : "累计消费喵币: \(totalSpent)/\(condition.requiredValue)")
             
         case .clothingCount:
             // 需要通过外部传入或从数据库查询
@@ -669,22 +672,11 @@ final class FeatureUnlockManager: ObservableObject {
             return .conditionNotMet(check.message ?? condition.description)
         }
         
-        // 检查是否需要消耗资源
-        guard let conditionType = UnlockConditionType(rawValue: condition.type) else {
+        guard UnlockConditionType(rawValue: condition.type) != nil else {
             return .conditionNotMet("未知的解锁条件")
         }
         
-        // 需要消耗喵币的，执行扣除
-        if conditionType == .meowCoin {
-            let currentCoins = PetDataManager.shared.status.meowCoin
-            if currentCoins < condition.requiredValue {
-                return .insufficientResource("喵币", condition.requiredValue, currentCoins)
-            }
-            
-            guard StoreManager.spendMeowCoins(condition.requiredValue) else {
-                return .insufficientResource("喵币", condition.requiredValue, currentCoins)
-            }
-        }
+        // meowCoin 类型表示“累计消费达到条件”后可领取解锁，不在这里再次扣费
         
         performUnlock(feature, by: condition.type)
         return .success

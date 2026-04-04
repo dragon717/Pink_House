@@ -387,7 +387,9 @@ struct PetHomeView: View {
             NotificationCenter.default.publisher(for: .petMediaShouldStop)
                 .sink { [weak audioManager, weak hapticManager] _ in
                     audioManager?.stopBackgroundMusicWithoutSaving()
-                    audioManager?.isInteractionEnabled = false
+                    if audioManager?.isInteractionEnabled == true {
+                        audioManager?.isInteractionEnabled = false
+                    }
                     hapticManager?.stopHaptics()
                 }
                 .store(in: &cancellables)

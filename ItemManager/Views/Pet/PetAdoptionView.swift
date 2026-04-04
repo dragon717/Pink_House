@@ -14,6 +14,10 @@ struct PetAdoptionView: View {
     // Alert state
     @State private var showInsufficientFundsAlert = false
     @State private var missingCurrencyName = ""
+
+    private var selectedCharacter: PetCharacter {
+        PetCharacter.allCases[safe: currentSelection] ?? .naicha
+    }
     
     var body: some View {
         GeometryReader { geo in
@@ -36,6 +40,7 @@ struct PetAdoptionView: View {
                                 isOwned: viewModel.status.ownedPetIds.contains(pet.id),
                                 price: price,
                                 currency: currency,
+                                adoptButtonGuideTarget: pet == .naicha && currentSelection == index ? .petAdoptionNaichaButton : nil,
                                 onAdopt: {
                                     // Check balance
                                     if price > 0 {
@@ -65,6 +70,7 @@ struct PetAdoptionView: View {
                     .indexViewStyle(.page(backgroundDisplayMode: .always))
                     .frame(width: layout.cardWidth, height: layout.cardHeight)
                     .frame(maxWidth: .infinity)
+                    .captureGuideTarget(.petAdoptionCarousel)
                     
                     Spacer(minLength: layout.verticalInset)
                 }
@@ -73,13 +79,46 @@ struct PetAdoptionView: View {
         }
         .navigationTitle("领养伙伴")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            postAdoptionGuideNotification(
+                .petAdoptionGuideSheetPresented,
+                pet: selectedCharacter
+            )
+        }
+        .onChange(of: currentSelection) { _, _ in
+            postAdoptionGuideNotification(
+                .petAdoptionGuideSelectionChanged,
+                pet: selectedCharacter
+            )
+        }
+        .onChange(of: showNameInput) { _, isPresented in
+            guard let pet = selectedPet else { return }
+
+            if isPresented {
+                postAdoptionGuideNotification(
+                    .petAdoptionGuideNamePromptPresented,
+                    pet: pet
+                )
+            } else if !viewModel.status.ownedPetIds.contains(pet.id) {
+                postAdoptionGuideNotification(
+                    .petAdoptionGuideNamePromptDismissed,
+                    pet: pet
+                )
+            }
+        }
         .alert("为它起个名字", isPresented: $showNameInput) {
             TextField("名字", text: $inputName)
             Button("确定") {
                 if let pet = selectedPet {
                     let name = inputName.trimmingCharacters(in: .whitespacesAndNewlines)
-                    viewModel.adoptPet(pet, name: name.isEmpty ? nil : name)
-                    dismiss()
+                    let didAdopt = viewModel.adoptPet(pet, name: name.isEmpty ? nil : name)
+                    if didAdopt {
+                        postAdoptionGuideNotification(
+                            .petAdoptionGuideCompleted,
+                            pet: pet
+                        )
+                        dismiss()
+                    }
                 }
             }
             Button("取消", role: .cancel) { }
@@ -92,6 +131,17 @@ struct PetAdoptionView: View {
             Text("您需要更多的 \(missingCurrencyName) 才能领养这只小可爱。")
         }
     }
+
+    private func postAdoptionGuideNotification(
+        _ name: Notification.Name,
+        pet: PetCharacter
+    ) {
+        NotificationCenter.default.post(
+            name: name,
+            object: nil,
+            userInfo: ["petId": pet.id]
+        )
+    }
 }
 
 struct PetAdoptionCard: View {
@@ -99,6 +149,7 @@ struct PetAdoptionCard: View {
     let isOwned: Bool
     let price: Int
     let currency: PetCurrency
+    let adoptButtonGuideTarget: GuideTargetKey?
     let onAdopt: () -> Void
     
     var body: some View {
@@ -195,6 +246,7 @@ struct PetAdoptionCard: View {
                     .clipShape(Capsule())
                     .shadow(radius: 5)
                 }
+                .captureGuideTarget(adoptButtonGuideTarget)
                 .padding(.horizontal, layout.buttonHorizontalPadding)
                 .padding(.bottom, layout.bottomSpacing)
             }
@@ -203,6 +255,12 @@ struct PetAdoptionCard: View {
         .padding(.top, layout.topPadding)
         .padding(.horizontal, layout.contentHorizontalPadding)
         .padding(.bottom, layout.bottomPadding)
+    }
+}
+
+private extension Collection {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

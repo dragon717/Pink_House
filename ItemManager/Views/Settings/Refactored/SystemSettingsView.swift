@@ -151,13 +151,13 @@ struct SystemSettingsView: View {
                 self.showingMessage = true
             }
         }
-        .alert("请再确认一次", isPresented: showingConfirmationAlert, presenting: pendingConfirmationAction) { action in
+        .alert("请再确认一次", isPresented: showingExportConfirmationAlert) {
             Button("取消", role: .cancel) { }
-            Button(action.confirmButtonTitle) {
-                handleConfirmedAction(action)
+            Button(LocalDataConfirmationAction.exportCSV.confirmButtonTitle) {
+                handleConfirmedAction(.exportCSV)
             }
-        } message: { action in
-            Text(action.message)
+        } message: {
+            Text(LocalDataConfirmationAction.exportCSV.message)
         }
         .alert("确认恢复数据？", isPresented: $showingRestoreAlert) {
             Button("取消", role: .cancel) { }
@@ -177,8 +177,27 @@ struct SystemSettingsView: View {
         } message: {
             Text("语言更改将在下次启动应用时生效。")
         }
+        .overlay {
+            if showingBackupConfirmationDialog {
+                SystemSettingsBackupConfirmationDialog(
+                    title: "请再确认一次",
+                    message: LocalDataConfirmationAction.backupData.message,
+                    confirmTitle: LocalDataConfirmationAction.backupData.confirmButtonTitle,
+                    onCancel: { pendingConfirmationAction = nil },
+                    onConfirm: { handleConfirmedAction(.backupData) }
+                )
+            }
+        }
         .onAppear {
             NotificationCenter.default.post(name: .systemSettingsOpened, object: nil)
+        }
+        .onChange(of: pendingConfirmationAction) { _, newValue in
+            if newValue != .backupData {
+                clearLocalBackupConfirmationGuideTargets()
+            }
+        }
+        .onDisappear {
+            clearLocalBackupConfirmationGuideTargets()
         }
         // Loading Overlay
         .overlay {
@@ -225,15 +244,19 @@ struct SystemSettingsView: View {
         }
     }
 
-    private var showingConfirmationAlert: Binding<Bool> {
+    private var showingExportConfirmationAlert: Binding<Bool> {
         Binding(
-            get: { pendingConfirmationAction != nil },
+            get: { pendingConfirmationAction == .exportCSV },
             set: { newValue in
                 if !newValue {
                     pendingConfirmationAction = nil
                 }
             }
         )
+    }
+
+    private var showingBackupConfirmationDialog: Bool {
+        pendingConfirmationAction == .backupData
     }
 
     private func handleConfirmedAction(_ action: LocalDataConfirmationAction) {
@@ -269,6 +292,13 @@ struct SystemSettingsView: View {
                 }
             }
         }
+    }
+
+    private func clearLocalBackupConfirmationGuideTargets() {
+        AppFirstLaunchGuideManager.shared.resetGuideTargetFrames([
+            .localBackupConfirmationDialog,
+            .localBackupConfirmButton
+        ])
     }
     
     private func performRestore() {
@@ -324,4 +354,70 @@ struct SystemSettingsView: View {
         }
     }
     
+}
+
+private struct SystemSettingsBackupConfirmationDialog: View {
+    let title: String
+    let message: String
+    let confirmTitle: String
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.42)
+                .ignoresSafeArea()
+                .onTapGesture { }
+
+            VStack(spacing: 20) {
+                VStack(spacing: 14) {
+                    Text(title)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Color.primary)
+
+                    Text(message)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.secondary)
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(5)
+                }
+
+                HStack(spacing: 16) {
+                    Button(action: onCancel) {
+                        Text("取消")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(Capsule())
+                    }
+
+                    Button(action: onConfirm) {
+                        Text(confirmTitle)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.72, green: 0.17, blue: 0.37))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color(red: 0.97, green: 0.92, blue: 0.95))
+                            .clipShape(Capsule())
+                    }
+                    .captureGuideTarget(.localBackupConfirmButton)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 28)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.16), radius: 24, x: 0, y: 12)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(Color.black.opacity(0.04), lineWidth: 1)
+            )
+            .padding(.horizontal, 24)
+            .captureGuideTarget(.localBackupConfirmationDialog)
+        }
+    }
 }

@@ -196,6 +196,7 @@ struct MagicTaskRow: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .captureGuideTarget(feature == .ootd ? .magicTasksOotdTaskRow : nil)
         .sheet(isPresented: $showDetail) {
             MagicTaskDetailView(feature: feature)
         }
@@ -356,7 +357,7 @@ struct MagicTaskDetailView: View {
                                         .font(.caption)
                                         .foregroundColor(themeManager.secondaryTextColor)
                                 }
-                                Text(feature.defaultCondition.description)
+                                Text(condition.description)
                                     .font(.subheadline)
                                     .foregroundColor(themeManager.primaryTextColor)
                             }
@@ -401,7 +402,8 @@ struct MagicTaskDetailView: View {
                                         taskActionTofuBlock(
                                             title: "立即解锁",
                                             icon: "lock.open.fill",
-                                            style: .primary
+                                            style: .primary,
+                                            actionGuideTarget: feature == .ootd ? .magicTasksOotdUnlockButton : nil
                                         ) {
                                             unlockFeature()
                                         }
@@ -602,7 +604,7 @@ struct MagicTaskDetailView: View {
         case .vip:
             return "开通 VIP 即可完成任务。"
         case .meowCoin:
-            return "还差 \(remaining) 喵币，继续互动或签到可加快完成。"
+            return "还差 \(remaining) 喵币的累计消费，去其他功能里使用喵币即可继续推进。"
         case .clothingCount:
             return "还差 \(remaining) 件衣物，继续录入衣橱即可推进。"
         case .loginDays:
@@ -652,6 +654,7 @@ struct MagicTaskDetailView: View {
         title: String,
         icon: String,
         style: TaskActionStyle,
+        actionGuideTarget: GuideTargetKey? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -687,6 +690,7 @@ struct MagicTaskDetailView: View {
             )
         }
         .buttonStyle(.plain)
+        .captureGuideTarget(actionGuideTarget)
     }
 
     private func dismissAndShowGuide() {
@@ -744,7 +748,7 @@ struct MagicTaskDetailView: View {
         case .vip:
             current = VIPManager.shared.isVIP ? 1 : 0
         case .meowCoin:
-            current = Double(PetDataManager.shared.status.meowCoin)
+            current = Double(StoreManager.synchronizedMeowCoinAccount().totalSpent)
         case .clothingCount:
             current = Double(UserDefaults.standard.integer(forKey: "clothingCount_cache"))
         case .loginDays:

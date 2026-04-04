@@ -194,9 +194,9 @@ final class ClothingEditDraftManager {
     }
 
     func hasDraft() -> Bool {
-        let hasDraft = loadDraft() != nil
-        print("DraftManager: hasDraft = \(hasDraft)")
-        return hasDraft
+        // HomeView/菜单渲染会高频读取这个状态，这里只做轻量 key 检查，
+        // 避免每次重绘都解码草稿并刷日志。
+        userDefaults.data(forKey: draftKey) != nil
     }
 }
 

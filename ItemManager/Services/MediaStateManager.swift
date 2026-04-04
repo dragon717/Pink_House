@@ -83,7 +83,9 @@ final class MediaStateManager: ObservableObject {
 
         // 停止萌宠媒体（使用不保存的方法，避免覆盖用户的持久化设置）
         AudioManager.shared.stopBackgroundMusicWithoutSaving()
-        AudioManager.shared.isInteractionEnabled = false
+        if AudioManager.shared.isInteractionEnabled {
+            AudioManager.shared.isInteractionEnabled = false
+        }
         print("🎵 萌宠背景音乐已停止（不覆盖持久化设置）")
 
         // 停止财富媒体
@@ -171,7 +173,9 @@ final class MediaStateManager: ObservableObject {
 
         // 停止背景音乐（使用不保存的方法，避免覆盖用户的持久化设置）
         AudioManager.shared.stopBackgroundMusicWithoutSaving()
-        AudioManager.shared.isInteractionEnabled = false
+        if AudioManager.shared.isInteractionEnabled {
+            AudioManager.shared.isInteractionEnabled = false
+        }
 
         // 停止震动
         HapticEngineManager.shared.stopHaptics()
@@ -247,6 +251,12 @@ extension Notification.Name {
     static let autoExpandPetChatSearch = Notification.Name("autoExpandPetChatSearch")
     // 萌宠对话内嵌引导选项点击通知（用于 AI 引导）
     static let petChatGuideOptionTapped = Notification.Name("petChatGuideOptionTapped")
+    // 萌宠领养流程通知（用于 AI 解锁后未领养分支）
+    static let petAdoptionGuideSheetPresented = Notification.Name("petAdoptionGuideSheetPresented")
+    static let petAdoptionGuideSelectionChanged = Notification.Name("petAdoptionGuideSelectionChanged")
+    static let petAdoptionGuideNamePromptPresented = Notification.Name("petAdoptionGuideNamePromptPresented")
+    static let petAdoptionGuideNamePromptDismissed = Notification.Name("petAdoptionGuideNamePromptDismissed")
+    static let petAdoptionGuideCompleted = Notification.Name("petAdoptionGuideCompleted")
     // 首页 Tab 切换通知（用于新手引导）
     static let homeTabChanged = Notification.Name("homeTabChanged")
     // VIP 中心打开通知（用于新手引导）

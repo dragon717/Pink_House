@@ -21,6 +21,7 @@ extension BookDetailView {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.primary)
         }
+        .captureGuideTarget(.ootdDetailBackButton)
     }
 
     private var sidebarToggleButton: some View {

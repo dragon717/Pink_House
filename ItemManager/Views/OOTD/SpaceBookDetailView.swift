@@ -51,6 +51,7 @@ struct SpaceBookDetailView: View {
     // Rename Book
     @State private var showingRenameBookAlert = false
     @State private var renameBookName = ""
+    @State private var showingTrash = false
     
     // 分享卡片
     @State private var showingShareCard = false
@@ -148,6 +149,7 @@ struct SpaceBookDetailView: View {
                         selectedPages: $selectedPages,
                         showingNewPageAlert: $showingNewPageAlert,
                         showingCoverPicker: $showingCoverPicker,
+                        showingTrash: $showingTrash,
                         dismissAction: { dismiss() },
                         onRenameBook: { showingRenameBookAlert = true }
                     )
@@ -204,6 +206,9 @@ struct SpaceBookDetailView: View {
                 if let newItem {
                     updateCover(with: newItem)
                 }
+            }
+            .sheet(isPresented: $showingTrash) {
+                RecycleBinView(initialTab: 2)
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的返回按钮

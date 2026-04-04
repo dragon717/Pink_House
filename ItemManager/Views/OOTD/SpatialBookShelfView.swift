@@ -10,6 +10,7 @@ import SwiftData
 import PhotosUI
 
 struct SpatialBookShelfView: View {
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<SpaceBookGroup> { $0.deletedAt == nil }, sort: \SpaceBookGroup.sortIndex, order: .forward) private var books: [SpaceBookGroup]
 
@@ -27,6 +28,7 @@ struct SpatialBookShelfView: View {
     // Delete Confirmation
     @State private var bookToDelete: SpaceBookGroup?
     @State private var showingDeleteBookAlert = false
+    @State private var showingTrash = false
 
     // Rename Book
     @State private var bookToRename: SpaceBookGroup?
@@ -182,7 +184,8 @@ struct SpatialBookShelfView: View {
         let withNewBookAlert = applyNewBookAlert(to: content)
         let withDeleteBookAlert = applyDeleteBookAlert(to: withNewBookAlert)
         let withRenameBookAlert = applyRenameBookAlert(to: withDeleteBookAlert)
-        return applyCoverPicker(to: withRenameBookAlert)
+        let withTrashSheet = applyTrashSheet(to: withRenameBookAlert)
+        return applyCoverPicker(to: withTrashSheet)
     }
 
     private func applyNewBookAlert<Content: View>(to content: Content) -> some View {
@@ -239,6 +242,12 @@ struct SpatialBookShelfView: View {
         }
     }
 
+    private func applyTrashSheet<Content: View>(to content: Content) -> some View {
+        content.sheet(isPresented: $showingTrash) {
+            RecycleBinView(initialTab: 2)
+        }
+    }
+
     private func applyCoverPicker<Content: View>(to content: Content) -> some View {
         content
             .photosPicker(isPresented: $showingCoverPicker, selection: $selectedCoverItem, matching: .images)
@@ -267,27 +276,69 @@ struct SpatialBookShelfView: View {
                             .foregroundStyle(isEditing ? .pink : .primary)
                     }
 
-                    Menu {
-                        Button {
-                            newBookName = ""
-                            showingNewBookAlert = true
-                        } label: {
-                            Label("新建空间手帐", systemImage: "plus.rectangle.on.folder")
-                        }
+                    Group {
+                        if guideManager.shouldUseCustomGuideMenu(for: .spaceBookShelfMore) {
+                            Button {
+                                presentGuideMenuForSpaceBookShelfMore()
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .foregroundStyle(.primary)
+                            }
+                        } else {
+                            Menu {
+                                Button {
+                                    createSpaceBook()
+                                } label: {
+                                    Label("新建空间手帐", systemImage: "plus.rectangle.on.folder")
+                                }
 
-                        Divider()
+                                Divider()
 
-                        NavigationLink(destination: RecycleBinView(initialTab: 2)) {
-                            Label("垃圾篓", systemImage: "trash")
+                                Button {
+                                    showingTrash = true
+                                } label: {
+                                    Label("垃圾篓", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .foregroundStyle(.primary)
+                            }
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(.primary)
-                            .captureGuideToolbarIconTarget(.spaceBookShelfMoreMenuButton)
                     }
+                    .captureGuideToolbarIconTarget(.spaceBookShelfMoreMenuButton)
                 }
             }
         }
+    }
+
+    private func createSpaceBook() {
+        newBookName = ""
+        showingNewBookAlert = true
+    }
+
+    private func presentGuideMenuForSpaceBookShelfMore() {
+        guideManager.presentGuideMenu(
+            GuideMenuPresentationState(
+                scenario: .spaceBookShelfMore,
+                anchorKey: .spaceBookShelfMoreMenuButton,
+                width: 228,
+                submenuDepth: 0,
+                items: [
+                    .action(
+                        title: "新建空间手帐",
+                        systemImage: "plus.rectangle.on.folder",
+                        isHighlighted: true,
+                        action: createSpaceBook
+                    ),
+                    .divider,
+                    .action(
+                        title: "垃圾篓",
+                        systemImage: "trash",
+                        action: { showingTrash = true }
+                    )
+                ]
+            )
+        )
     }
 
     @ViewBuilder

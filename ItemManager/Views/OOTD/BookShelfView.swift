@@ -139,6 +139,9 @@ struct BookShelfView: View {
                     isSidebarVisible: .constant(true),
                     onBack: {
                         navigationPath.removeLast()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            notifyOotdShelfGuideState()
+                        }
                     }
                 )
                 .navigationBarBackButtonHidden(true) // 隐藏系统返回按钮，使用自定义的backButton
@@ -173,14 +176,7 @@ struct BookShelfView: View {
                 performMigration()
                 // 初始化时同步选中状态
                 isBookSelected = selectedBook != nil
-                // 计算是否有手帐本和书页（用于空间手帐引导）
-                // 注意：只统计用户手动创建的非默认手帐和书页
-                let hasUserBooks = hasUserCreatedBooks()
-                let hasUserPages = hasUserCreatedPages()
-                print("[Guide] BookShelf onAppear - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
-                NotificationCenter.default.post(name: .ootdShelfOpened, object: nil, userInfo: ["hasBooks": hasUserBooks, "hasPages": hasUserPages])
-                // 同时发送新通知用于空间手帐前置任务引导
-                NotificationCenter.default.post(name: .ootdBookShelfOpened, object: nil, userInfo: ["hasNonDefaultBooks": hasUserBooks, "hasPages": hasUserPages])
+                notifyOotdShelfGuideState()
             }
             .onChange(of: showingNewBookAlert) { _, isVisible in
                 NotificationCenter.default.post(
@@ -190,14 +186,7 @@ struct BookShelfView: View {
                 )
             }
             .onChange(of: books) { _, _ in
-                // 数据变化时重新发送通知（用于空间手帐引导，确保数据加载后状态正确）
-                // 注意：只统计用户手动创建的非默认手帐和书页
-                let hasUserBooks = hasUserCreatedBooks()
-                let hasUserPages = hasUserCreatedPages()
-                print("[Guide] BookShelf books changed - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
-                NotificationCenter.default.post(name: .ootdShelfOpened, object: nil, userInfo: ["hasBooks": hasUserBooks, "hasPages": hasUserPages])
-                // 同时发送新通知用于空间手帐前置任务引导
-                NotificationCenter.default.post(name: .ootdBookShelfOpened, object: nil, userInfo: ["hasNonDefaultBooks": hasUserBooks, "hasPages": hasUserPages])
+                notifyOotdShelfGuideState()
             }
             .onChange(of: selectedBook) { _, newValue in
                 // 同步选中状态到外部
@@ -246,6 +235,23 @@ struct BookShelfView: View {
             navigationPath.append(targetBook)
         }
         navigateToBookID = nil
+    }
+
+    private func notifyOotdShelfGuideState() {
+        AppFirstLaunchGuideManager.shared.requestGuideTargetRecapture()
+        let hasUserBooks = hasUserCreatedBooks()
+        let hasUserPages = hasUserCreatedPages()
+        print("[Guide] BookShelf state notify - hasUserBooks: \(hasUserBooks), hasUserPages: \(hasUserPages), totalBooks: \(books.count)")
+        NotificationCenter.default.post(
+            name: .ootdShelfOpened,
+            object: nil,
+            userInfo: ["hasBooks": hasUserBooks, "hasPages": hasUserPages]
+        )
+        NotificationCenter.default.post(
+            name: .ootdBookShelfOpened,
+            object: nil,
+            userInfo: ["hasNonDefaultBooks": hasUserBooks, "hasPages": hasUserPages]
+        )
     }
     
     /// 直接查询获取有效书页数量（避免关系数据延迟加载问题）

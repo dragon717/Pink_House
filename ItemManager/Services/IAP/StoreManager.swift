@@ -363,6 +363,21 @@ class StoreManager: ObservableObject {
         return MeowCoinAccount()
     }
 
+    static func synchronizedMeowCoinAccount() -> MeowCoinAccount {
+        var account = loadMeowCoinAccount()
+        let actualBalance = PetDataManager.shared.status.meowCoin
+        let inferredSpent = max(account.totalSpent, max(0, account.totalPurchased - actualBalance))
+
+        if account.balance != actualBalance || account.totalSpent != inferredSpent {
+            account.balance = actualBalance
+            account.totalSpent = inferredSpent
+            account.lastUpdated = Date()
+            saveMeowCoinAccount(account)
+        }
+
+        return account
+    }
+
     static func saveMeowCoinAccount(_ account: MeowCoinAccount) {
         if let data = try? JSONEncoder().encode(account) {
             UserDefaults.standard.set(data, forKey: MeowCoinAccount.storageKey)
@@ -371,18 +386,25 @@ class StoreManager: ObservableObject {
 
     // MARK: - 消费喵币
     // 用于购买虚拟物品时扣除喵币
-    static func spendMeowCoins(_ amount: Int) -> Bool {
-        var account = loadMeowCoinAccount()
-        guard account.balance >= amount else { return false }
+    @discardableResult
+    static func spendMeowCoins(_ amount: Int, in status: inout PetStatus) -> Bool {
+        guard status.meowCoin >= amount else { return false }
 
-        account.balance -= amount
+        status.meowCoin -= amount
+
+        var account = synchronizedMeowCoinAccount()
+        account.balance = status.meowCoin
         account.totalSpent += amount
         account.lastUpdated = Date()
         saveMeowCoinAccount(account)
 
-        // 同步到 PetDataManager
+        return true
+    }
+
+    static func spendMeowCoins(_ amount: Int) -> Bool {
         var status = PetDataManager.shared.status
-        status.meowCoin = account.balance
+        guard spendMeowCoins(amount, in: &status) else { return false }
+
         PetDataManager.shared.saveStatus(status)
         Self.notifyPetStatusDidChange()
 
@@ -391,7 +413,7 @@ class StoreManager: ObservableObject {
 
     // MARK: - 获取当前喵币余额
     static func getCurrentBalance() -> Int {
-        return loadMeowCoinAccount().balance
+        return synchronizedMeowCoinAccount().balance
     }
 
     // MARK: - 检查是否可以购买

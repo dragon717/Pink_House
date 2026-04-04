@@ -173,3 +173,109 @@ struct WidgetScrollHintView: View {
         }
     }
 }
+
+struct HorizontalSwipeHintView: View {
+    let title: String
+    let subtitle: String
+    let currentStep: Int
+    let totalSteps: Int
+    let accent: Color
+    let onSkip: () -> Void
+
+    @State private var animateHint = false
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var magicPalette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var effectiveAccent: Color {
+        accent.mixed(with: magicPalette.accent, amount: 1.0)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button {
+                    onSkip()
+                } label: {
+                    Text("跳过")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(magicPalette.quickOptionText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(magicPalette.quickOptionFill)
+                        .overlay(
+                            Capsule()
+                                .stroke(magicPalette.quickOptionStroke, lineWidth: 1)
+                        )
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+
+            VStack(spacing: 14) {
+                HStack(spacing: 4) {
+                    ForEach(1...max(totalSteps, 1), id: \.self) { step in
+                        Circle()
+                            .fill(step <= currentStep ? effectiveAccent : magicPalette.tertiaryText.opacity(0.35))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+
+                Text(title)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(magicPalette.primaryText)
+
+                Text(subtitle)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(magicPalette.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 10)
+
+                HStack(spacing: 18) {
+                    Image(systemName: "arrow.left.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(effectiveAccent.opacity(animateHint ? 0.55 : 1.0))
+                        .offset(x: animateHint ? -6 : 0)
+
+                    Image(systemName: "hand.draw.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(effectiveAccent)
+                        .offset(x: animateHint ? 34 : -34)
+
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(effectiveAccent.opacity(animateHint ? 1.0 : 0.55))
+                        .offset(x: animateHint ? 6 : 0)
+                }
+                .padding(.top, 2)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 18)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(magicPalette.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(magicPalette.quickOptionStroke, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 320)
+        .padding(.horizontal, 20)
+        .captureGuideInteractionRegion("guide.text.bubble")
+        .onAppear {
+            guard !animateHint else { return }
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                animateHint = true
+            }
+        }
+    }
+}

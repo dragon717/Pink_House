@@ -294,6 +294,8 @@ struct ModernTabView: View {
     }
 
     private func refreshCompactTabBarState() {
+        let probeStart = CFAbsoluteTimeGetCurrent()
+
         guard supportsBottomAccessoryCat, selectedTab != 3 else {
             let signature = "disabled-tab-\(selectedTab)"
             if lastLoggedCompactSignature != signature {
@@ -362,6 +364,18 @@ struct ModernTabView: View {
                 print("[BottomCat] orbitLayout -> \(orbitSignature)")
                 lastLoggedOrbitLayoutSignature = orbitSignature
             }
+        }
+
+        let elapsedMs = (CFAbsoluteTimeGetCurrent() - probeStart) * 1000
+        if elapsedMs >= 6 {
+            print(
+                String(
+                    format: "[BottomCat] slow probe %.2fms, selectedTab=%d, compact=%@",
+                    elapsedMs,
+                    selectedTab,
+                    isBottomBarCompact ? "true" : "false"
+                )
+            )
         }
     }
 
@@ -1663,6 +1677,13 @@ struct MainTabView: View {
         case .tagBrandFieldDisplay:
             AppFirstLaunchGuideManager.shared.startFeatureExperienceGuide(for: .tagBrandFieldDisplay)
         case .spaceBook:
+            if !isUnlocked && !FeatureUnlockManager.shared.isUnlocked(.ootd) &&
+                FeatureUnlockManager.shared.checkUnlockCondition(.ootd).met {
+                NotificationCenter.default.post(name: .navigateToMagicTasks, object: nil)
+                startFeatureGuideAfterNavigation(feature, delay: 0.75)
+                return
+            }
+
             if isUnlocked {
                 // 空间手账引导要求先从「平面」切到「空间」，这里确保步骤2稳定可见
                 UserDefaults.standard.set("平面", forKey: "bookShelfViewMode")

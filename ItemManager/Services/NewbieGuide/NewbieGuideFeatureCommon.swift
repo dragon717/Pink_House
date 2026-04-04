@@ -8,6 +8,15 @@ extension FeatureExperienceGuideOverlay {
         case either
     }
 
+    enum SpaceBookGuideLocation {
+        case unknown
+        case wardrobeHome
+        case ootdShelf
+        case ootdPlanarDetail
+        case spaceShelf
+        case spaceDetail
+    }
+
     func wardrobeGuideAccent(for feature: FeatureItem) -> Color {
         switch feature {
         case .ootd:
@@ -131,6 +140,8 @@ extension FeatureExperienceGuideOverlay {
         // 重置所有共享状态，防止不同功能之间的状态污染
         showingFullDescription = false
         didDismissAIAnalysisReturnStep = false
+        aiAnalysisRequiresPetAdoptionGuide = false
+        didBrowseAwayFromNaichaInAIAnalysisGuide = false
         themeScrollStepStartedAt = nil
         customColorScrollStepStartedAt = nil
         isSpaceBookCreationPromptVisible = false
@@ -141,6 +152,7 @@ extension FeatureExperienceGuideOverlay {
         hasSpaceBookPagesForGuide = false
         didOpenBatchEditMoreMenu = false
         didOpenSpatialImportMenu = false
+        spaceBookGuideLocation = .unknown
 
         // 重置所有步骤状态到初始值，避免缓存污染
         aiAnalysisStep = .preUnlockStep1ReturnToMe
@@ -166,10 +178,8 @@ extension FeatureExperienceGuideOverlay {
         switch feature {
         case .aiAnalysis:
             if FeatureUnlockManager.shared.isUnlocked(feature) {
-                aiAnalysisStep = .postUnlockStep1ClickPetChatTab
-                if guideManager.lastKnownHomeTab == "petChat" {
-                    aiAnalysisStep = .postUnlockStep2ClickSearchBar
-                }
+                aiAnalysisRequiresPetAdoptionGuide = PetDataManager.shared.status.ownedPetIds.isEmpty
+                aiAnalysisStep = resolvedAIAnalysisPostUnlockEntryStep()
             } else {
                 aiAnalysisStep = .preUnlockStep1ReturnToMe
             }
@@ -215,11 +225,10 @@ extension FeatureExperienceGuideOverlay {
                 wardrobeAddGuideStep = .step1_clickAddButton
             }
         case .spaceBook:
+            syncSpaceBookGuideLocationFromVisibleTargets()
             if FeatureUnlockManager.shared.isUnlocked(feature) {
-                // 已解锁：进入完整引导（共7步，从衣橱穿搭手帐入口开始）
                 spaceBookGuideStep = .step1_clickWardrobeOotdEntry
             } else if FeatureUnlockManager.shared.isUnlocked(.ootd) {
-                // ootd已解锁但spaceBook未解锁：走前置任务引导（共5步）
                 spaceBookGuideStep = .preUnlockStep1_clickWardrobeOotdEntry
             } else {
                 // ootd未解锁：先引导用户解锁ootd（衣橱预引导）
@@ -238,6 +247,55 @@ extension FeatureExperienceGuideOverlay {
         default:
             break
         }
+    }
+
+    func syncSpaceBookGuideLocationFromVisibleTargets() {
+        let inferredLocation: SpaceBookGuideLocation
+        let hasOotdShelfAnchors =
+            guideManager.guideTargetFrame(for: .ootdShelfMoreMenuButton) != nil ||
+            guideManager.guideTargetFrame(for: .spaceBookModeTabs) != nil
+        let hasSpaceShelfAnchors =
+            guideManager.guideTargetFrame(for: .spaceBookShelfMoreMenuButton) != nil
+        let hasOotdDetailAnchors =
+            guideManager.guideTargetFrame(for: .ootdDetailBackButton) != nil ||
+            guideManager.guideTargetFrame(for: .ootdDetailMoreMenuButton) != nil
+        let hasSpaceDetailAnchors =
+            guideManager.guideTargetFrame(for: .spaceBookDetailMoreMenuButton) != nil ||
+            guideManager.guideTargetFrame(for: .spaceBookFirstPageCard) != nil
+
+        // 返回动画结束后，旧详情页的 target 可能会短暂残留；
+        // 只要当前已经重新拿到了页签/书架层 target，就优先认定为上层列表界面。
+        if hasOotdShelfAnchors {
+            inferredLocation = .ootdShelf
+        } else if hasSpaceShelfAnchors {
+            inferredLocation = .spaceShelf
+        } else if hasOotdDetailAnchors {
+            inferredLocation = .ootdPlanarDetail
+        } else if hasSpaceDetailAnchors {
+            inferredLocation = .spaceDetail
+        } else if guideManager.guideTargetFrame(for: .wardrobeOotdEntry) != nil || currentTab == "wardrobe" {
+            inferredLocation = .wardrobeHome
+        } else {
+            inferredLocation = .unknown
+        }
+
+        spaceBookGuideLocation = inferredLocation
+    }
+
+    func shouldGuideUnlockPendingOotdForSpaceBook() -> Bool {
+        guard !FeatureUnlockManager.shared.isUnlocked(.spaceBook) else { return false }
+        guard !FeatureUnlockManager.shared.isUnlocked(.ootd) else { return false }
+        return FeatureUnlockManager.shared.checkUnlockCondition(.ootd).met
+    }
+
+    func shouldShowSpaceBookReturnGuide() -> Bool {
+        guard spaceBookGuideLocation == .ootdPlanarDetail else { return false }
+
+        let hasShelfLevelTargets =
+            guideManager.guideTargetFrame(for: .spaceBookModeTabs) != nil ||
+            guideManager.guideTargetFrame(for: .ootdShelfMoreMenuButton) != nil
+
+        return !hasShelfLevelTargets
     }
 
     func advanceWealthToMainTabGuideIfNeeded() {
@@ -668,6 +726,54 @@ extension FeatureExperienceGuideOverlay {
         }
     }
 
+    func resolvedAIAnalysisPostUnlockEntryStep() -> AIAnalysisGuideStep {
+        let activeTab = currentTab == "wardrobe" ? guideManager.lastKnownHomeTab : currentTab
+        guard activeTab == "petChat" else {
+            return .postUnlockStep1ClickPetChatTab
+        }
+
+        return aiAnalysisRequiresPetAdoptionGuide
+            ? .postUnlockStep2BrowsePets
+            : .postUnlockStep5ClickSearchBar
+    }
+
+    func advanceAIAnalysisGuideAfterEnteringPetChatIfNeeded() {
+        guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+        guard aiAnalysisStep == .postUnlockStep1ClickPetChatTab else { return }
+        guard currentTab == "petChat" else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            aiAnalysisStep = aiAnalysisRequiresPetAdoptionGuide
+                ? .postUnlockStep2BrowsePets
+                : .postUnlockStep5ClickSearchBar
+        }
+    }
+
+    func handleAIAnalysisAdoptionSelectionChanged(_ petId: String) {
+        guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+        guard aiAnalysisRequiresPetAdoptionGuide else { return }
+
+        if aiAnalysisStep == .postUnlockStep3AdoptNaicha,
+           petId != PetCharacter.naicha.id {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                aiAnalysisStep = .postUnlockStep2BrowsePets
+            }
+        }
+
+        guard aiAnalysisStep == .postUnlockStep2BrowsePets else { return }
+
+        if petId != PetCharacter.naicha.id {
+            didBrowseAwayFromNaichaInAIAnalysisGuide = true
+            return
+        }
+
+        guard didBrowseAwayFromNaichaInAIAnalysisGuide else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            aiAnalysisStep = .postUnlockStep3AdoptNaicha
+        }
+    }
+
     func returnToMeGuideContent(
         in geometry: GeometryProxy,
         title: String,
@@ -737,6 +843,7 @@ extension FeatureExperienceGuideOverlay {
         onAction: (() -> Void)?,
         bubbleOnTop: Bool = false,
         showPulse: Bool = true,
+        catPawPosition: CGPoint? = nil,
         onHighlightTap: (() -> Void)? = nil
     ) -> some View {
         ZStack {
@@ -764,6 +871,13 @@ extension FeatureExperienceGuideOverlay {
                     .onTapGesture {
                         onHighlightTap()
                     }
+            }
+
+            if let catPawPosition {
+                CatPawTapAnimation(
+                    position: catPawPosition,
+                    delay: 0.5
+                )
             }
 
             VStack {
