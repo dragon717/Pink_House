@@ -442,7 +442,7 @@ struct VIPStatus: Codable {
     var isActive: Bool = false
     var expireDate: Date? = nil
     var vipNumber: String? = nil // 特殊编号
-    var cardStyle: VIPCardStyle = .blackGold // Default style
+    var cardStyle: VIPCardStyle = .monicaPink // Default style
     
     // VIP试用期相关字段
     var trialUsed: Bool = false // 是否已使用过试用期

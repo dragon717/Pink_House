@@ -7,6 +7,7 @@ struct BookDetailView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @StateObject var guideManager = AppFirstLaunchGuideManager.shared
     @Query(filter: #Predicate<BookGroup> { $0.deletedAt == nil }) private var allBooks: [BookGroup]
 
     @Binding var isSidebarVisible: Bool
@@ -797,4 +798,3 @@ struct BookDetailView: View {
         }
     }
 }
-

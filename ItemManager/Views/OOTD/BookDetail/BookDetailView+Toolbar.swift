@@ -79,72 +79,79 @@ extension BookDetailView {
     }
 
     private var moreOptionsMenu: some View {
-        Menu {
-            addPageMenu
-
-            Button {
-                showingCoverPicker = true
-            } label: {
-                Label("修改封面", systemImage: "photo")
-            }
-
-            Button {
-                showingRenameBookAlert = true
-            } label: {
-                Label("重命名手帐", systemImage: "pencil")
-            }
-
-            Divider()
-
-            // 批量编辑入口
-            Button {
-                isBatchEditing = true
-                selectedPages.removeAll()
-            } label: {
-                Label("批量编辑", systemImage: "checkmark.circle")
-            }
-
-            Divider()
-
-            Button {
-                showingTrash = true
-            } label: {
-                Label("垃圾篓", systemImage: "trash")
-            }
-
-            Divider()
-
-            Button {
-                showingBatchConfirmation = true
-            } label: {
-                Label("批量处理小裙装", systemImage: "wand.and.stars")
-            }
-
-            Button {
-                showingRepairConfirmation = true
-            } label: {
-                Label("修复数据", systemImage: "hammer")
-            }
-
-            Button {
-                showingBatchReplaceSheet = true
-            } label: {
-                Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-                .onTapGesture {
-                    NotificationCenter.default.post(name: .ootdDetailMoreMenuOpened, object: nil)
+        Group {
+            if guideManager.shouldUseCustomGuideMenu(for: .ootdDetailMore) {
+                Button {
+                    presentDetailGuideMenu()
+                } label: {
+                    moreMenuIcon
                 }
+            } else {
+                Menu {
+                    addPageMenu
+
+                    Button {
+                        showingCoverPicker = true
+                    } label: {
+                        Label("修改封面", systemImage: "photo")
+                    }
+
+                    Button {
+                        showingRenameBookAlert = true
+                    } label: {
+                        Label("重命名手帐", systemImage: "pencil")
+                    }
+
+                    Divider()
+
+                    Button {
+                        isBatchEditing = true
+                        selectedPages.removeAll()
+                    } label: {
+                        Label("批量编辑", systemImage: "checkmark.circle")
+                    }
+
+                    Divider()
+
+                    Button {
+                        showingTrash = true
+                    } label: {
+                        Label("垃圾篓", systemImage: "trash")
+                    }
+
+                    Divider()
+
+                    Button {
+                        showingBatchConfirmation = true
+                    } label: {
+                        Label("批量处理小裙装", systemImage: "wand.and.stars")
+                    }
+
+                    Button {
+                        showingRepairConfirmation = true
+                    } label: {
+                        Label("修复数据", systemImage: "hammer")
+                    }
+
+                    Button {
+                        showingBatchReplaceSheet = true
+                    } label: {
+                        Label("一键替换主图", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                } label: {
+                    moreMenuIcon
+                        .onTapGesture {
+                            notifyDetailMoreMenuOpened()
+                        }
+                }
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        notifyDetailMoreMenuOpened()
+                    }
+                )
+            }
         }
         .captureGuideTarget(.ootdDetailMoreMenuButton)
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                NotificationCenter.default.post(name: .ootdDetailMoreMenuOpened, object: nil)
-            }
-        )
     }
 
     private var addPageMenu: some View {
@@ -177,5 +184,112 @@ extension BookDetailView {
         } label: {
             Label("新增书页", systemImage: "doc.badge.plus")
         }
+    }
+
+    private var moreMenuIcon: some View {
+        Image(systemName: "ellipsis.circle")
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.primary)
+    }
+
+    private func notifyDetailMoreMenuOpened() {
+        NotificationCenter.default.post(name: .ootdDetailMoreMenuOpened, object: nil)
+    }
+
+    private func presentDetailGuideMenu() {
+        notifyDetailMoreMenuOpened()
+        guideManager.presentGuideMenu(
+            GuideMenuPresentationState(
+                scenario: .ootdDetailMore,
+                anchorKey: .ootdDetailMoreMenuButton,
+                width: 250,
+                submenuDepth: 0,
+                items: [
+                    .action(
+                        title: "新增书页",
+                        systemImage: "doc.badge.plus",
+                        isHighlighted: true,
+                        showsChevron: true,
+                        action: presentAddPageGuideMenu
+                    ),
+                    .action(
+                        title: "修改封面",
+                        systemImage: "photo",
+                        action: { showingCoverPicker = true }
+                    ),
+                    .action(
+                        title: "重命名手帐",
+                        systemImage: "pencil",
+                        action: { showingRenameBookAlert = true }
+                    ),
+                    .divider,
+                    .action(
+                        title: "批量编辑",
+                        systemImage: "checkmark.circle",
+                        action: {
+                            isBatchEditing = true
+                            selectedPages.removeAll()
+                        }
+                    ),
+                    .divider,
+                    .action(
+                        title: "垃圾篓",
+                        systemImage: "trash",
+                        action: { showingTrash = true }
+                    ),
+                    .divider,
+                    .action(
+                        title: "批量处理小裙装",
+                        systemImage: "wand.and.stars",
+                        action: { showingBatchConfirmation = true }
+                    ),
+                    .action(
+                        title: "修复数据",
+                        systemImage: "hammer",
+                        action: { showingRepairConfirmation = true }
+                    ),
+                    .action(
+                        title: "一键替换主图",
+                        systemImage: "arrow.triangle.2.circlepath",
+                        action: { showingBatchReplaceSheet = true }
+                    )
+                ]
+            )
+        )
+    }
+
+    private func presentAddPageGuideMenu() {
+        guideManager.presentGuideMenu(
+            GuideMenuPresentationState(
+                scenario: .ootdDetailAddPage,
+                anchorKey: .ootdDetailMoreMenuButton,
+                width: 236,
+                submenuDepth: 1,
+                items: [
+                    .action(
+                        title: "人台画布",
+                        systemImage: "tshirt",
+                        action: { addNewPage(canvasType: "mannequin") }
+                    ),
+                    .action(
+                        title: "空白画布",
+                        systemImage: "square.dashed",
+                        isHighlighted: true,
+                        action: { addNewPage(canvasType: "blank") }
+                    ),
+                    .action(
+                        title: "自定义图片",
+                        systemImage: "photo",
+                        action: { showingBackgroundPicker = true }
+                    ),
+                    .divider,
+                    .action(
+                        title: "批量添加图片书页",
+                        systemImage: "photo.stack",
+                        action: { showingBatchPhotoPicker = true }
+                    )
+                ]
+            )
+        )
     }
 }

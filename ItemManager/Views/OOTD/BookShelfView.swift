@@ -182,6 +182,13 @@ struct BookShelfView: View {
                 // 同时发送新通知用于空间手帐前置任务引导
                 NotificationCenter.default.post(name: .ootdBookShelfOpened, object: nil, userInfo: ["hasNonDefaultBooks": hasUserBooks, "hasPages": hasUserPages])
             }
+            .onChange(of: showingNewBookAlert) { _, isVisible in
+                NotificationCenter.default.post(
+                    name: .ootdBookCreationPromptVisibilityChanged,
+                    object: nil,
+                    userInfo: ["isVisible": isVisible]
+                )
+            }
             .onChange(of: books) { _, _ in
                 // 数据变化时重新发送通知（用于空间手帐引导，确保数据加载后状态正确）
                 // 注意：只统计用户手动创建的非默认手帐和书页
@@ -201,18 +208,7 @@ struct BookShelfView: View {
                 isSpaceBookSelected = newValue
             }
             .onChange(of: navigateToBookID) { _, newBookID in
-                // 监听从魔法贴纸加入手帐后的导航
-                if let bookID = newBookID {
-                    // 找到对应的手帐并导航到书页列表
-                    if let targetBook = books.first(where: { $0.id == bookID }) {
-                        withAnimation {
-                            // 导航到书页列表
-                            navigationPath.append(targetBook)
-                        }
-                        // 清空，避免重复导航
-                        navigateToBookID = nil
-                    }
-                }
+                handleNavigateToBookChange(newBookID)
             }
             .alert("删除手帐", isPresented: $showingDeleteBookAlert) {
                 Button("取消", role: .cancel) { bookToDelete = nil }
@@ -225,6 +221,13 @@ struct BookShelfView: View {
             } message: {
                 Text("确定要将「\(bookToDelete?.title ?? "此手帐")」移入回收站吗？")
             }
+            .onDisappear {
+                NotificationCenter.default.post(
+                    name: .ootdBookCreationPromptVisibilityChanged,
+                    object: nil,
+                    userInfo: ["isVisible": false]
+                )
+            }
         }
     }
     
@@ -233,6 +236,16 @@ struct BookShelfView: View {
             return isSpatialBookSelected ? "" : ""
         }
         return selectedBook == nil ? "穿搭手帐" : selectedBook!.title
+    }
+
+    private func handleNavigateToBookChange(_ newBookID: UUID?) {
+        guard let bookID = newBookID else { return }
+        guard let targetBook = books.first(where: { $0.id == bookID }) else { return }
+
+        withAnimation {
+            navigationPath.append(targetBook)
+        }
+        navigateToBookID = nil
     }
     
     /// 直接查询获取有效书页数量（避免关系数据延迟加载问题）

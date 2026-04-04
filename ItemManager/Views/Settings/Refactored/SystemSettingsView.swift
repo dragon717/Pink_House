@@ -5,6 +5,31 @@ import UniformTypeIdentifiers
 // 导入新手引导重置行组件
 // 注意：NewbieGuideResetRow 定义在 GeneralSettingsView.swift 中
 
+private enum LocalDataConfirmationAction: String, Identifiable {
+    case exportCSV
+    case backupData
+
+    var id: String { rawValue }
+
+    var confirmButtonTitle: String {
+        switch self {
+        case .exportCSV:
+            return "确认导出"
+        case .backupData:
+            return "确认备份"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .exportCSV:
+            return "将生成当前数据的 CSV 文件，并打开系统分享面板。确定继续吗？"
+        case .backupData:
+            return "将把当前数据打包成本地备份文件，过程可能需要一点时间。确定继续吗？"
+        }
+    }
+}
+
 struct SystemSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var languageManager = LanguageManager.shared
@@ -21,6 +46,7 @@ struct SystemSettingsView: View {
     @State private var isLoading = false
     @State private var loadingMessage = ""
     @State private var showingRestartAlert = false
+    @State private var pendingConfirmationAction: LocalDataConfirmationAction?
     
     var body: some View {
         AdaptiveSettingsView(title: "系统与更多") {
@@ -71,13 +97,17 @@ struct SystemSettingsView: View {
             
             // MARK: - 数据备份与恢复
             AdaptiveSection(header: "本地备份与恢复") {
-                Button(action: prepareCSVExport) {
+                Button {
+                    pendingConfirmationAction = .exportCSV
+                } label: {
                     Label("导出 CSV (Export CSV)", systemImage: "tablecells")
                 }
                 .captureGuideTarget(.exportCSVEntry)
                 .adaptiveRow()
                 
-                Button(action: prepareBackup) {
+                Button {
+                    pendingConfirmationAction = .backupData
+                } label: {
                     Label("备份数据 (Backup Data)", systemImage: "externaldrive.badge.plus")
                 }
                 .captureGuideTarget(.localBackupDataAction)
@@ -120,6 +150,14 @@ struct SystemSettingsView: View {
                 self.message = "选择文件失败: \(error.localizedDescription)"
                 self.showingMessage = true
             }
+        }
+        .alert("请再确认一次", isPresented: showingConfirmationAlert, presenting: pendingConfirmationAction) { action in
+            Button("取消", role: .cancel) { }
+            Button(action.confirmButtonTitle) {
+                handleConfirmedAction(action)
+            }
+        } message: { action in
+            Text(action.message)
         }
         .alert("确认恢复数据？", isPresented: $showingRestoreAlert) {
             Button("取消", role: .cancel) { }
@@ -184,6 +222,27 @@ struct SystemSettingsView: View {
                     self.isLoading = false
                 }
             }
+        }
+    }
+
+    private var showingConfirmationAlert: Binding<Bool> {
+        Binding(
+            get: { pendingConfirmationAction != nil },
+            set: { newValue in
+                if !newValue {
+                    pendingConfirmationAction = nil
+                }
+            }
+        )
+    }
+
+    private func handleConfirmedAction(_ action: LocalDataConfirmationAction) {
+        pendingConfirmationAction = nil
+        switch action {
+        case .exportCSV:
+            prepareCSVExport()
+        case .backupData:
+            prepareBackup()
         }
     }
     

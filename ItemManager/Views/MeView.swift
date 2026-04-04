@@ -440,6 +440,20 @@ struct MeView: View {
 }
 
 // MARK: - Cloud Sync Sheet
+enum CloudFileConfirmationAction: String, Identifiable {
+    case uploadBackup
+
+    var id: String { rawValue }
+
+    var confirmButtonTitle: String {
+        "确认备份"
+    }
+
+    var message: String {
+        "将把当前本地数据上传为一份云端备份。若云端已有旧备份，会以最新上传内容为准。确定继续吗？"
+    }
+}
+
 struct CloudSyncSheetView: View {
     @ObservedObject var authManager: AuthenticationManager
     @ObservedObject var cloudManager: CloudSyncManager
@@ -452,6 +466,7 @@ struct CloudSyncSheetView: View {
     @State private var showingRestoreSuccessAlert = false
     @State private var showingProfileEdit = false
     @State private var showingSignOutConfirm = false
+    @State private var pendingConfirmationAction: CloudFileConfirmationAction?
     
     var body: some View {
         NavigationStack {
@@ -472,10 +487,9 @@ struct CloudSyncSheetView: View {
                     CloudSyncControlsView(
                         authManager: authManager,
                         cloudManager: cloudManager,
-                        // 这里的 context 传递方式需要注意，CloudSyncControlsView 使用 Environment
-                        // 我们在下面 .environment(\.modelContext, modelContext) 注入
                         showingLoginRequiredAlert: $showingLoginRequiredAlert,
-                        showingSyncAlert: $showingSyncAlert
+                        showingSyncAlert: $showingSyncAlert,
+                        pendingConfirmationAction: $pendingConfirmationAction
                     )
                 } header: {
                     Text("iCloud 同步管理")
@@ -491,6 +505,14 @@ struct CloudSyncSheetView: View {
                 }
             }
             // Alert logic copied from original MeView
+            .alert("请再确认一次", isPresented: showingConfirmationAlert, presenting: pendingConfirmationAction) { action in
+                Button("取消", role: .cancel) { }
+                Button(action.confirmButtonTitle) {
+                    handleConfirmedAction(action)
+                }
+            } message: { action in
+                Text(action.message)
+            }
             .alert("确认恢复", isPresented: $showingSyncAlert) {
                 Button("取消", role: .cancel) { }
                 Button("恢复", role: .destructive) {
@@ -528,6 +550,27 @@ struct CloudSyncSheetView: View {
             NotificationCenter.default.post(name: .cloudSyncSheetOpened, object: nil)
         }
         .environment(\.modelContext, modelContext) // Inject context
+    }
+
+    private var showingConfirmationAlert: Binding<Bool> {
+        Binding(
+            get: { pendingConfirmationAction != nil },
+            set: { newValue in
+                if !newValue {
+                    pendingConfirmationAction = nil
+                }
+            }
+        )
+    }
+
+    private func handleConfirmedAction(_ action: CloudFileConfirmationAction) {
+        pendingConfirmationAction = nil
+        switch action {
+        case .uploadBackup:
+            Task {
+                await cloudManager.uploadBackup(modelContainer: modelContext.container)
+            }
+        }
     }
 }
 
@@ -743,9 +786,9 @@ struct CloudSyncControlsView: View {
     @ObservedObject var authManager: AuthenticationManager
     @ObservedObject var cloudManager: CloudSyncManager
     @StateObject private var migrationManager = SwiftDataMigrationManager.shared
-    @Environment(\.modelContext) private var modelContext
     @Binding var showingLoginRequiredAlert: Bool
     @Binding var showingSyncAlert: Bool
+    @Binding var pendingConfirmationAction: CloudFileConfirmationAction?
     
     @State private var showingRestartAlert = false
     @State private var pendingCloudSyncEnabled = false
@@ -860,9 +903,7 @@ struct CloudSyncControlsView: View {
                         if !authManager.isAuthenticated {
                             showingLoginRequiredAlert = true
                         } else {
-                            Task {
-                                await cloudManager.uploadBackup(modelContainer: modelContext.container)
-                            }
+                            pendingConfirmationAction = .uploadBackup
                         }
                     } label: {
                         Label("备份到云端", systemImage: "icloud.and.arrow.up")

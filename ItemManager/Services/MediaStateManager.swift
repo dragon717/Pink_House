@@ -299,6 +299,7 @@ extension Notification.Name {
     static let ootdShelfMoreMenuOpened = Notification.Name("ootdShelfMoreMenuOpened")
     static let ootdDetailMoreMenuOpened = Notification.Name("ootdDetailMoreMenuOpened")
     static let ootdBookCreated = Notification.Name("ootdBookCreated")
+    static let ootdBookCreationPromptVisibilityChanged = Notification.Name("ootdBookCreationPromptVisibilityChanged")
     static let ootdPageCreated = Notification.Name("ootdPageCreated")
     static let spatialBookShelfOpened = Notification.Name("spatialBookShelfOpened")
     static let spaceBookDetailOpened = Notification.Name("spaceBookDetailOpened")

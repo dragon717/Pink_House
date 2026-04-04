@@ -434,8 +434,10 @@ struct RococoSmallWorldView: View {
     }
 
     private func hotspotButton(hotspot: HotspotData, imageFrame: CGRect) -> some View {
-        Button(action: {
-            print("[RococoSmallWorldView] 热区点击: \(hotspot.name), 坐标: (\(hotspot.rect.minX), \(hotspot.rect.minY)), 尺寸: \(imageFrame.size)")
+        let interactionSize = hotspotInteractionSize(for: hotspot, imageFrame: imageFrame)
+
+        return Button(action: {
+            print("[RococoSmallWorldView] 热区点击: \(hotspot.name), 坐标: (\(hotspot.rect.minX), \(hotspot.rect.minY)), 原始尺寸: \(hotspot.rect.width * imageFrame.width)x\(hotspot.rect.height * imageFrame.height), 交互尺寸: \(interactionSize.width)x\(interactionSize.height)")
             hotspot.action()
         }) {
             if showDebugHotspots {
@@ -443,9 +445,10 @@ struct RococoSmallWorldView: View {
                     Rectangle()
                         .fill(hotspot.color.opacity(0.3))
                         .border(hotspot.color, width: 2)
-                    Text(hotspot.name)
+                    Text(hotspotDebugTitle(for: hotspot, imageFrame: imageFrame))
                         .font(.caption)
                         .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
                         .padding(4)
                         .background(.black.opacity(0.6))
                         .cornerRadius(4)
@@ -458,8 +461,8 @@ struct RococoSmallWorldView: View {
             }
         }
         .frame(
-            width: max(1, hotspot.rect.width * imageFrame.width),
-            height: max(1, hotspot.rect.height * imageFrame.height)
+            width: interactionSize.width,
+            height: interactionSize.height
         )
         .position(
             x: imageFrame.minX + (hotspot.rect.minX + hotspot.rect.width / 2) * imageFrame.width,
@@ -523,10 +526,12 @@ struct RococoSmallWorldView: View {
     }
 
     private func genericCaptureAnchor(hotspot: HotspotData, imageFrame: CGRect, key: GuideTargetKey) -> some View {
-        Color.clear
+        let interactionSize = hotspotInteractionSize(for: hotspot, imageFrame: imageFrame)
+
+        return Color.clear
             .frame(
-                width: max(1, hotspot.rect.width * imageFrame.width),
-                height: max(1, hotspot.rect.height * imageFrame.height)
+                width: interactionSize.width,
+                height: interactionSize.height
             )
             .captureGuideTarget(key)
             .position(
@@ -592,6 +597,46 @@ struct RococoSmallWorldView: View {
             return true
         }
         return false
+    }
+
+    private func hotspotInteractionSize(for hotspot: HotspotData, imageFrame: CGRect) -> CGSize {
+        let baseWidth = max(1, hotspot.rect.width * imageFrame.width)
+        let baseHeight = max(1, hotspot.rect.height * imageFrame.height)
+
+        guard let destination = hotspot.destination else {
+            return CGSize(width: baseWidth, height: baseHeight)
+        }
+
+        switch destination {
+        case .ootd:
+            // 镜子入口视觉区域较窄，小屏 Pro 机型上优先扩高并补足最小点击宽度。
+            return CGSize(
+                width: max(baseWidth + 10, 40),
+                height: max(baseHeight + 18, 64)
+            )
+        case .calendar:
+            // 梦裙日历入口在竖屏下会缩到 30pt 左右，至少扩到系统级点击尺寸。
+            return CGSize(
+                width: max(baseWidth + 12, 52),
+                height: max(baseHeight + 18, 52)
+            )
+        default:
+            return CGSize(width: baseWidth, height: baseHeight)
+        }
+    }
+
+    private func hotspotDebugTitle(for hotspot: HotspotData, imageFrame: CGRect) -> String {
+        let baseWidth = Int(max(1, hotspot.rect.width * imageFrame.width).rounded())
+        let baseHeight = Int(max(1, hotspot.rect.height * imageFrame.height).rounded())
+        let interactionSize = hotspotInteractionSize(for: hotspot, imageFrame: imageFrame)
+        let targetWidth = Int(interactionSize.width.rounded())
+        let targetHeight = Int(interactionSize.height.rounded())
+
+        guard targetWidth != baseWidth || targetHeight != baseHeight else {
+            return hotspot.name
+        }
+
+        return "\(hotspot.name)\n\(baseWidth)x\(baseHeight) -> \(targetWidth)x\(targetHeight)"
     }
 }
 

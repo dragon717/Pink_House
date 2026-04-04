@@ -3,7 +3,6 @@ import PhotosUI
 
 struct GeneralSettingsView: View {
     @Environment(ThemeManager.self) private var themeManager
-    @ObservedObject private var audioManager = AudioManager.shared
     @State private var languageManager = LanguageManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
     @State private var showingRestartAlert = false
@@ -372,21 +371,6 @@ struct GeneralSettingsView: View {
     
     @ViewBuilder
     private var personalizationSectionContent: some View {
-        // 萌宠音源设置
-        HStack {
-            Image(systemName: "mic.and.signal.meter.fill")
-                .foregroundStyle(.purple)
-            Text("\(petDataManager.status.displayName)模仿复述音源")
-            Spacer()
-            Picker("", selection: $audioManager.selectedVoiceType) {
-                ForEach(PetVoiceType.allCases) { type in
-                    Text(type.displayName).tag(type)
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-        }
-      
         NavigationLink(destination: PetCustomizationView()) {
             HStack {
                 Image(systemName: "paintpalette.fill")

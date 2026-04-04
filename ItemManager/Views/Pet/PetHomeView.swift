@@ -24,7 +24,6 @@ struct PetHomeView: View {
     @State private var showDebugDialogueInput = false
     @State private var debugInputText = ""
     @State private var showChatView = false // ChatView State
-    @State private var showMicMenu = false // Mic Menu State
     @State private var showVIPView = false // VIP View State
     
     // 用于监听媒体状态通知
@@ -343,35 +342,6 @@ struct PetHomeView: View {
                                     .foregroundStyle(hapticManager.isHapticsEnabled ? .yellow : .gray)
                             }
                             
-                            // Voice Interaction Toggle
-                            Button {
-                                if audioManager.isInteractionEnabled {
-                                    audioManager.isInteractionEnabled = false
-                                } else {
-                                    showMicMenu = true
-                                }
-                            } label: {
-                                Image(systemName: audioManager.isInteractionEnabled ? "mic.fill" : "mic.slash.fill")
-                                    .foregroundStyle(audioManager.isInteractionEnabled ? .green : .gray)
-                            }
-                            .confirmationDialog("选择互动模式", isPresented: $showMicMenu, titleVisibility: .visible) {
-                                Button("模仿你说话") {
-                                    viewModel.isAIMode = false
-                                    AudioManager.shared.isEchoModeEnabled = true // Enable Echo
-                                    audioManager.isInteractionEnabled = true
-                                }
-                                
-                                Button("跟“\(viewModel.status.displayName)”聊天") {
-                                    viewModel.isAIMode = true
-                                    AudioManager.shared.isEchoModeEnabled = false // Disable Echo, AI will speak
-                                    // 允许进入入口，具体第三方能力在发起请求时再引导升级
-                                    audioManager.isInteractionEnabled = true
-                                }
-                                
-                                Button("取消", role: .cancel) {}
-                            } message: {
-                                Text("请在安静环境下使用，以获得最佳体验～")
-                            }
                         }
                         .font(.system(size: 14)) // Smaller icons
                     }

@@ -64,6 +64,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
@@ -77,6 +78,7 @@ struct HomeView: View {
     @Binding var selectedTab: HomeTab
     @State private var showingAddSheet = false
     @State private var showingBatchImportSheet = false
+    @State private var batchImportUnlockAlert: FeatureUnlockAlert?
     @State private var isSelectionMode = false
     @State private var isEditing = false
     @State private var isSearchActive = false
@@ -287,11 +289,29 @@ struct HomeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .guideRequestWardrobeBatchImport)) { _ in
                 guard selectedTab == .wardrobe else { return }
-                showingBatchImportSheet = true
+                presentBatchImport()
             }
             .sheet(isPresented: $showingDepositNotificationSheet) {
                 NavigationStack {
                     DepositNotificationView()
+                }
+            }
+            .alert(item: $batchImportUnlockAlert) { alert in
+                if alert.canUnlock {
+                    return Alert(
+                        title: Text("解锁 \(alert.feature.displayName)"),
+                        message: Text("\(alert.condition.description)\n\n确定要解锁吗？"),
+                        primaryButton: .default(Text("解锁")) {
+                            unlockBatchImportAndPresent()
+                        },
+                        secondaryButton: .cancel(Text("取消"))
+                    )
+                } else {
+                    return Alert(
+                        title: Text("尚未满足解锁条件"),
+                        message: Text(alert.message ?? alert.condition.description),
+                        dismissButton: .default(Text("知道了"))
+                    )
                 }
             }
         }
@@ -488,55 +508,29 @@ struct HomeView: View {
     }
     
     private var moreMenuButton: some View {
-        Menu {
-            // 搜索功能
-            Button {
-                isSearchActive = true
-            } label: {
-                Label("搜索", systemImage: "magnifyingglass")
-            }
-            
-            if selectedTab == .wardrobe {
-                Divider()
-                
-                // 编辑模式（仅在非编辑模式时显示入口）
-                if !isSelectionMode {
-                    Button {
-                        withAnimation {
-                            isSelectionMode = true
+        Group {
+            if guideManager.shouldUseCustomGuideMenu(for: .wardrobeMore) {
+                Button {
+                    presentWardrobeMoreGuideMenu()
+                } label: {
+                    moreMenuIcon
+                }
+            } else {
+                Menu {
+                    wardrobeMoreMenuContent
+                } label: {
+                    moreMenuIcon
+                        .onTapGesture {
+                            notifyWardrobeMoreMenuOpened()
                         }
-                    } label: {
-                        Label("编辑", systemImage: "pencil.circle")
-                    }
-                    .captureGuideTarget(.wardrobeEditMenuEntry)
                 }
-                
-                // 自定义排序编辑（仅在非编辑模式且排序为自定义时显示入口）
-                if sortOption == .custom && !isEditing {
-                    Button {
-                        withAnimation {
-                            isEditing = true
-                        }
-                    } label: {
-                        Label("调整顺序", systemImage: "list.number")
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        notifyWardrobeMoreMenuOpened()
                     }
-                }
+                )
             }
-            
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(magicPalette.navigationForeground)
-                .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
-                .onTapGesture {
-                    NotificationCenter.default.post(name: .wardrobeMoreMenuOpened, object: nil)
-                }
         }
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                NotificationCenter.default.post(name: .wardrobeMoreMenuOpened, object: nil)
-            }
-        )
     }
 
     private var sortButton: some View {
@@ -1053,64 +1047,287 @@ struct HomeView: View {
     private func notifyWardrobeAddMenuOpened() {
         NotificationCenter.default.post(name: .wardrobeAddMenuOpened, object: nil)
     }
+
+    private func notifyWardrobeMoreMenuOpened() {
+        NotificationCenter.default.post(name: .wardrobeMoreMenuOpened, object: nil)
+    }
+
+    private var moreMenuIcon: some View {
+        Image(systemName: "ellipsis.circle")
+            .font(.system(size: 14))
+            .foregroundStyle(magicPalette.navigationForeground)
+            .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
+    }
+
+    @ViewBuilder
+    private var wardrobeMoreMenuContent: some View {
+        Button {
+            openWardrobeSearch()
+        } label: {
+            Label("搜索", systemImage: "magnifyingglass")
+        }
+
+        if selectedTab == .wardrobe {
+            Divider()
+
+            if !isSelectionMode {
+                Button {
+                    enterWardrobeSelectionMode()
+                } label: {
+                    Label("编辑", systemImage: "pencil.circle")
+                }
+                .captureGuideTarget(.wardrobeEditMenuEntry)
+            }
+
+            if sortOption == .custom && !isEditing {
+                Button {
+                    startWardrobeCustomSortEditing()
+                } label: {
+                    Label("调整顺序", systemImage: "list.number")
+                }
+            }
+        }
+    }
+
+    private func openWardrobeSearch() {
+        isSearchActive = true
+    }
+
+    private func enterWardrobeSelectionMode() {
+        withAnimation {
+            isSelectionMode = true
+        }
+    }
+
+    private func startWardrobeCustomSortEditing() {
+        withAnimation {
+            isEditing = true
+        }
+    }
+
+    private func presentWardrobeMoreGuideMenu() {
+        notifyWardrobeMoreMenuOpened()
+        guideManager.presentGuideMenu(
+            GuideMenuPresentationState(
+                scenario: .wardrobeMore,
+                anchorKey: .wardrobeMoreMenuButton,
+                width: 240,
+                submenuDepth: 0,
+                items: wardrobeMoreGuideMenuItems()
+            )
+        )
+    }
+
+    private func wardrobeMoreGuideMenuItems() -> [GuideMenuItem] {
+        var items: [GuideMenuItem] = [
+            .action(
+                title: "搜索",
+                systemImage: "magnifyingglass",
+                action: openWardrobeSearch
+            )
+        ]
+
+        if selectedTab == .wardrobe {
+            items.append(.divider)
+
+            if !isSelectionMode {
+                items.append(
+                    .action(
+                        title: "编辑",
+                        systemImage: "pencil.circle",
+                        isHighlighted: true,
+                        action: enterWardrobeSelectionMode
+                    )
+                )
+            }
+
+            if sortOption == .custom && !isEditing {
+                items.append(
+                    .action(
+                        title: "调整顺序",
+                        systemImage: "list.number",
+                        action: startWardrobeCustomSortEditing
+                    )
+                )
+            }
+        }
+
+        return items
+    }
+
+    private func continueWardrobeDraft() {
+        notifyWardrobeAddMenuOpened()
+        continueFromDraft = true
+        showingAddSheet = true
+    }
+
+    private func presentWardrobeManualCreate() {
+        notifyWardrobeAddMenuOpened()
+        continueFromDraft = false
+        showingAddSheet = true
+    }
+
+    private func presentCommunityImportAlert() {
+        notifyWardrobeAddMenuOpened()
+        showingCommunityImportAlert = true
+    }
+
+    @ViewBuilder
+    private var wardrobeAddMenuContent: some View {
+        if draftManager.hasDraft() {
+            Button {
+                continueWardrobeDraft()
+            } label: {
+                Label("从上次未保存继续", systemImage: "doc.badge.clock")
+            }
+
+            Divider()
+        }
+
+        Button {
+            presentWardrobeManualCreate()
+        } label: {
+            Label("手动创建", systemImage: "square.and.pencil")
+        }
+        .captureGuideTarget(.wardrobeManualCreateEntry)
+
+        Button {
+            notifyWardrobeAddMenuOpened()
+            presentBatchImport()
+        } label: {
+            Label("批量导入", systemImage: "square.and.arrow.down.on.square")
+        }
+        .captureGuideTarget(.wardrobeBatchImportEntry)
+
+        if networkManager.canShowNetworkUI() {
+            Button {
+                presentCommunityImportAlert()
+            } label: {
+                Label("从社区导入", systemImage: "icloud.and.arrow.down")
+            }
+        }
+    }
+
+    private func presentWardrobeAddGuideMenu() {
+        notifyWardrobeAddMenuOpened()
+        guideManager.presentGuideMenu(
+            GuideMenuPresentationState(
+                scenario: .wardrobeAdd,
+                anchorKey: .wardrobeAddButton,
+                width: 250,
+                submenuDepth: 0,
+                items: wardrobeAddGuideMenuItems()
+            )
+        )
+    }
+
+    private func wardrobeAddGuideMenuItems() -> [GuideMenuItem] {
+        var items: [GuideMenuItem] = []
+        let feature = guideManager.currentFeatureExperienceFeature
+        let highlightBatchImport = feature == .batchImport && FeatureUnlockManager.shared.isUnlocked(.batchImport)
+        let highlightManualCreate = feature == .batchImport && !highlightBatchImport
+
+        if draftManager.hasDraft() {
+            items.append(
+                .action(
+                    title: "从上次未保存继续",
+                    systemImage: "doc.badge.clock",
+                    action: continueWardrobeDraft
+                )
+            )
+            items.append(.divider)
+        }
+
+        items.append(
+            .action(
+                title: "手动创建",
+                systemImage: "square.and.pencil",
+                isHighlighted: highlightManualCreate,
+                action: presentWardrobeManualCreate
+            )
+        )
+        items.append(
+            .action(
+                title: "批量导入",
+                systemImage: "square.and.arrow.down.on.square",
+                isHighlighted: highlightBatchImport,
+                action: presentBatchImport
+            )
+        )
+
+        if networkManager.canShowNetworkUI() {
+            items.append(
+                .action(
+                    title: "从社区导入",
+                    systemImage: "icloud.and.arrow.down",
+                    action: presentCommunityImportAlert
+                )
+            )
+        }
+
+        return items
+    }
     
     private var addButton: some View {
-        Menu {
-            // 如果有草稿，显示"从上次未保存继续"选项
-            if draftManager.hasDraft() {
-                Button { 
-                    notifyWardrobeAddMenuOpened()
-                    continueFromDraft = true
-                    showingAddSheet = true 
-                } label: { 
-                    Label("从上次未保存继续", systemImage: "doc.badge.clock") 
-                }
-                
-                Divider()
-            }
-            
-            Button { 
-                notifyWardrobeAddMenuOpened()
-                continueFromDraft = false
-                showingAddSheet = true 
-            } label: { 
-                Label("手动创建", systemImage: "square.and.pencil")
-            }
-            .captureGuideTarget(.wardrobeManualCreateEntry)
-            
-            Button {
-                notifyWardrobeAddMenuOpened()
-                showingBatchImportSheet = true
-            } label: {
-                Label("批量导入", systemImage: "square.and.arrow.down.on.square")
-            }
-            .captureGuideTarget(.wardrobeBatchImportEntry)
-            
-            // 从社区导入：跟随联网功能显示/隐藏
-            if networkManager.canShowNetworkUI() {
+        Group {
+            if guideManager.shouldUseCustomGuideMenu(for: .wardrobeAdd) {
                 Button {
-                    notifyWardrobeAddMenuOpened()
-                    showingCommunityImportAlert = true
+                    presentWardrobeAddGuideMenu()
                 } label: {
-                    Label("从社区导入", systemImage: "icloud.and.arrow.down")
+                    addButtonIcon
                 }
+            } else {
+                Menu {
+                    wardrobeAddMenuContent
+                } label: {
+                    addButtonIcon
+                        .onTapGesture {
+                            notifyWardrobeAddMenuOpened()
+                        }
+                }
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        notifyWardrobeAddMenuOpened()
+                    }
+                )
             }
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 14))
-                .foregroundStyle(magicPalette.navigationForeground)
-                .captureGuideToolbarIconTarget(.wardrobeAddButton)
-                .onTapGesture {
-                    notifyWardrobeAddMenuOpened()
-                }
         }
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                notifyWardrobeAddMenuOpened()
-            }
-        )
         .alert("该功能敬请期待，联网版本激情开拓中～！", isPresented: $showingCommunityImportAlert) {
             Button("好的", role: .cancel) { }
+        }
+    }
+
+    private var addButtonIcon: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 14))
+            .foregroundStyle(magicPalette.navigationForeground)
+            .captureGuideToolbarIconTarget(.wardrobeAddButton)
+    }
+
+    private func presentBatchImport() {
+        if FeatureUnlockManager.shared.isUnlocked(.batchImport) {
+            showingBatchImportSheet = true
+            return
+        }
+
+        batchImportUnlockAlert = FeatureUnlockManager.shared.makeAlertItem(for: .batchImport)
+    }
+
+    private func unlockBatchImportAndPresent() {
+        let manager = FeatureUnlockManager.shared
+        switch manager.unlock(.batchImport) {
+        case .success, .alreadyUnlocked:
+            showingBatchImportSheet = true
+        case .conditionNotMet:
+            batchImportUnlockAlert = manager.makeAlertItem(for: .batchImport)
+        case .insufficientResource(let type, let required, let current):
+            let condition = manager.getCondition(for: .batchImport)
+            batchImportUnlockAlert = FeatureUnlockAlert(
+                feature: .batchImport,
+                condition: condition,
+                canUnlock: false,
+                message: "\(type)不足：当前 \(current)，需要 \(required)"
+            )
         }
     }
     

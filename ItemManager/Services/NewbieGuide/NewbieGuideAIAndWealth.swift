@@ -246,42 +246,15 @@ extension FeatureExperienceGuideOverlay {
     }
 
     func preUnlockStep1Content(in geometry: GeometryProxy) -> some View {
-        let backButtonFrame = returnGuideBackButtonFrame(in: geometry)
-
-        return ZStack {
-            HollowMaskView(
-                highlightFrame: backButtonFrame,
-                highlightType: .circle,
-                cornerRadius: 22
-            )
-
-            HighlightPulseViewNoClick(
-                center: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
-                radius: 28
-            )
-
-            if aiAnalysisStep.showCatPaw {
-                CatPawTapAnimation(
-                    position: CGPoint(x: backButtonFrame.midX, y: backButtonFrame.midY),
-                    delay: 0.5
-                )
-            }
-
-            VStack {
-                Spacer()
-
-                aiAnalysisBubble(
-                    step: aiAnalysisStep,
-                    onSkip: {
-                        guideManager.dismissFeatureExperienceGuide()
-                    },
-                    onComplete: {
-                        guideManager.completeFeatureExperienceGuide()
-                    }
-                )
-                .padding(.bottom, 120)
-            }
-        }
+        return returnToMeGuideContent(
+            in: geometry,
+            title: aiAnalysisStep.title,
+            message: aiAnalysisStep.message,
+            currentStep: aiAnalysisStep.currentStepInFlow,
+            totalSteps: aiAnalysisStep.totalStepsInFlow,
+            accent: magicPalette.accent,
+            onReturn: handleAIAnalysisGuideReturnAction
+        )
     }
 
     func preUnlockStep2Content(in geometry: GeometryProxy) -> some View {

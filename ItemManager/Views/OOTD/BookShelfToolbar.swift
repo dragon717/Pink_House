@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct BookShelfToolbar: ToolbarContent {
+    @ObservedObject private var guideManager = AppFirstLaunchGuideManager.shared
     @Binding var viewMode: BookShelfView.ViewMode
     @Binding var selectedBook: BookGroup?
     @Binding var isSpatialBookSelected: Bool
@@ -54,35 +55,82 @@ struct BookShelfToolbar: ToolbarContent {
                         }
                     }
                     
-                    Menu {
-                        Button {
-                            newBookName = ""
-                            showingNewBookAlert = true
-                        } label: {
-                            Label("新建手帐", systemImage: "plus.rectangle.on.folder")
-                        }
-
-                        Button {
-                            showingTrash = true
-                        } label: {
-                            Label("垃圾篓", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(.primary)
-                            .onTapGesture {
-                                NotificationCenter.default.post(name: .ootdShelfMoreMenuOpened, object: nil)
+                    Group {
+                        if guideManager.shouldUseCustomGuideMenu(for: .ootdShelfMore) {
+                            Button {
+                                presentGuideMenuForShelfMore()
+                            } label: {
+                                moreMenuIcon
                             }
+                        } else {
+                            Menu {
+                                Button {
+                                    createOotdBook()
+                                } label: {
+                                    Label("新建手帐", systemImage: "plus.rectangle.on.folder")
+                                }
+
+                                Button {
+                                    showingTrash = true
+                                } label: {
+                                    Label("垃圾篓", systemImage: "trash")
+                                }
+                            } label: {
+                                moreMenuIcon
+                                    .onTapGesture {
+                                        notifyShelfMoreMenuOpened()
+                                    }
+                            }
+                            .simultaneousGesture(
+                                TapGesture().onEnded {
+                                    notifyShelfMoreMenuOpened()
+                                }
+                            )
+                        }
                     }
                     .captureGuideTarget(.ootdShelfMoreMenuButton)
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            NotificationCenter.default.post(name: .ootdShelfMoreMenuOpened, object: nil)
-                        }
-                    )
                 }
             }
         }
+    }
+
+    private var moreMenuIcon: some View {
+        Image(systemName: "ellipsis.circle")
+            .font(.system(size: 22))
+            .foregroundStyle(.primary)
+    }
+
+    private func notifyShelfMoreMenuOpened() {
+        NotificationCenter.default.post(name: .ootdShelfMoreMenuOpened, object: nil)
+    }
+
+    private func createOotdBook() {
+        newBookName = ""
+        showingNewBookAlert = true
+    }
+
+    private func presentGuideMenuForShelfMore() {
+        notifyShelfMoreMenuOpened()
+        guideManager.presentGuideMenu(
+            GuideMenuPresentationState(
+                scenario: .ootdShelfMore,
+                anchorKey: .ootdShelfMoreMenuButton,
+                width: 220,
+                submenuDepth: 0,
+                items: [
+                    .action(
+                        title: "新建手帐",
+                        systemImage: "plus.rectangle.on.folder",
+                        isHighlighted: true,
+                        action: createOotdBook
+                    ),
+                    .action(
+                        title: "垃圾篓",
+                        systemImage: "trash",
+                        action: { showingTrash = true }
+                    )
+                ]
+            )
+        )
     }
 }

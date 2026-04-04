@@ -938,6 +938,21 @@ struct FeatureUnlockAlert: Identifiable {
     let message: String?
 }
 
+extension FeatureUnlockManager {
+    func makeAlertItem(for feature: FeatureItem) -> FeatureUnlockAlert? {
+        guard !isUnlocked(feature) else { return nil }
+
+        let check = checkUnlockCondition(feature)
+        let condition = getCondition(for: feature)
+        return FeatureUnlockAlert(
+            feature: feature,
+            condition: condition,
+            canUnlock: check.met,
+            message: check.message
+        )
+    }
+}
+
 // MARK: - SmallWorldDestination 扩展
 extension SmallWorldDestination {
     /// 映射到对应的功能项

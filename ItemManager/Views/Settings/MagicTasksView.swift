@@ -6,6 +6,7 @@ struct MagicTasksView: View {
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) private var dismiss
+    @State private var guideDismissWasRequested = false
 
     // 按解锁条件类型分组
     private var groupedFeatures: [(type: UnlockConditionType, features: [FeatureItem])] {
@@ -114,16 +115,29 @@ struct MagicTasksView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") {
+                        markGuideDismissIfNeeded()
                         dismiss()
                     }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .dismissMagicTasksView)) { _ in
+                markGuideDismissIfNeeded()
                 dismiss()
             }
             .onDisappear {
-                NotificationCenter.default.post(name: .magicTasksViewDismissed, object: nil)
+                NotificationCenter.default.post(
+                    name: .magicTasksViewDismissed,
+                    object: nil,
+                    userInfo: ["guideDismissWasRequested": guideDismissWasRequested]
+                )
+                guideDismissWasRequested = false
             }
+        }
+    }
+
+    private func markGuideDismissIfNeeded() {
+        if guideManager.isShowingFeatureExperienceGuide {
+            guideDismissWasRequested = true
         }
     }
 }

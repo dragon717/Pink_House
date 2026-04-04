@@ -10,6 +10,31 @@ import SwiftData
 import UniformTypeIdentifiers
 import UIKit
 
+private enum DataManagementConfirmationAction: String, Identifiable {
+    case exportCSV
+    case backupData
+
+    var id: String { rawValue }
+
+    var confirmButtonTitle: String {
+        switch self {
+        case .exportCSV:
+            return "确认导出"
+        case .backupData:
+            return "确认备份"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .exportCSV:
+            return "将生成当前数据的 CSV 文件，并打开系统分享面板。确定继续吗？"
+        case .backupData:
+            return "将把当前数据打包成本地备份文件，过程可能需要一点时间。确定继续吗？"
+        }
+    }
+}
+
 struct DataManagementView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true
@@ -25,6 +50,7 @@ struct DataManagementView: View {
     @State private var showingMessage = false
     @State private var isLoading = false
     @State private var loadingMessage = ""
+    @State private var pendingConfirmationAction: DataManagementConfirmationAction?
     
     var body: some View {
         ZStack {
@@ -63,11 +89,15 @@ struct DataManagementView: View {
                 }
                 
                 Section(header: Text("备份与导出")) {
-                    Button(action: prepareCSVExport) {
+                    Button {
+                        pendingConfirmationAction = .exportCSV
+                    } label: {
                         Label("导出 CSV (Export CSV)", systemImage: "tablecells")
                     }
                     
-                    Button(action: prepareBackup) {
+                    Button {
+                        pendingConfirmationAction = .backupData
+                    } label: {
                         Label("备份数据 (Backup Data)", systemImage: "externaldrive.badge.plus")
                     }
                     
@@ -124,6 +154,14 @@ struct DataManagementView: View {
                     self.showingMessage = true
                 }
             }
+            .alert("请再确认一次", isPresented: showingConfirmationAlert, presenting: pendingConfirmationAction) { action in
+                Button("取消", role: .cancel) { }
+                Button(action.confirmButtonTitle) {
+                    handleConfirmedAction(action)
+                }
+            } message: { action in
+                Text(action.message)
+            }
             .alert("确认恢复数据？", isPresented: $showingRestoreAlert) {
                 Button("取消", role: .cancel) { }
                 Button("确认恢复", role: .destructive) {
@@ -161,6 +199,27 @@ struct DataManagementView: View {
         }
         .background {
             LiquidBackground()
+        }
+    }
+
+    private var showingConfirmationAlert: Binding<Bool> {
+        Binding(
+            get: { pendingConfirmationAction != nil },
+            set: { newValue in
+                if !newValue {
+                    pendingConfirmationAction = nil
+                }
+            }
+        )
+    }
+
+    private func handleConfirmedAction(_ action: DataManagementConfirmationAction) {
+        pendingConfirmationAction = nil
+        switch action {
+        case .exportCSV:
+            prepareCSVExport()
+        case .backupData:
+            prepareBackup()
         }
     }
     

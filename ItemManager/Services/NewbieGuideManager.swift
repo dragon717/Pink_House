@@ -4,6 +4,69 @@ import Combine
 import UIKit
 import AVFoundation
 
+enum GuideMenuScenario: String {
+    case wardrobeAdd
+    case wardrobeMore
+    case ootdShelfMore
+    case ootdDetailMore
+    case ootdDetailAddPage
+}
+
+enum GuideMenuItemKind {
+    case action
+    case divider
+}
+
+struct GuideMenuItem: Identifiable {
+    let id = UUID()
+    let kind: GuideMenuItemKind
+    let title: String
+    let systemImage: String?
+    let isHighlighted: Bool
+    let showsChevron: Bool
+    let isDestructive: Bool
+    let action: (() -> Void)?
+
+    static func action(
+        title: String,
+        systemImage: String,
+        isHighlighted: Bool = false,
+        showsChevron: Bool = false,
+        isDestructive: Bool = false,
+        action: (() -> Void)? = nil
+    ) -> GuideMenuItem {
+        GuideMenuItem(
+            kind: .action,
+            title: title,
+            systemImage: systemImage,
+            isHighlighted: isHighlighted,
+            showsChevron: showsChevron,
+            isDestructive: isDestructive,
+            action: action
+        )
+    }
+
+    static var divider: GuideMenuItem {
+        GuideMenuItem(
+            kind: .divider,
+            title: "",
+            systemImage: nil,
+            isHighlighted: false,
+            showsChevron: false,
+            isDestructive: false,
+            action: nil
+        )
+    }
+}
+
+struct GuideMenuPresentationState {
+    let scenario: GuideMenuScenario
+    let anchorKey: GuideTargetKey
+    let width: CGFloat
+    let submenuDepth: Int
+    let items: [GuideMenuItem]
+}
+
 // MARK: - App首次启动引导管理器
 
 final class AppFirstLaunchGuideManager: ObservableObject {
@@ -28,6 +91,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     @Published private var guideInteractiveRegions: [String: CGRect] = [:]
     @Published private(set) var guideTargetCaptureVersion: UInt = 0
     @Published private(set) var lastKnownHomeTab: String = "wardrobe"
+    @Published var guideMenuPresentationState: GuideMenuPresentationState? = nil
     
     // 向后兼容：保留已使用字段名，内部改为统一存储
     var aiAnalysisVIPCardGlobalFrame: CGRect? {
@@ -336,6 +400,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         print("[FeatureExperienceGuide] 启动引导成功: \(feature.rawValue)")
         resetFeatureGuideTargetFrames()
         resetGuideInteractiveRegions()
+        dismissGuideMenu()
         requestGuideTargetRecapture()
         currentFeatureExperienceFeature = feature
         isShowingFeatureExperienceGuide = true
@@ -344,12 +409,13 @@ final class AppFirstLaunchGuideManager: ObservableObject {
     /// 完成当前功能体验引导
     func completeFeatureExperienceGuide() {
         if let feature = currentFeatureExperienceFeature {
-            let condition = FeatureUnlockManager.shared.getCondition(for: feature)
+            let completionFeature = resolvedCompletionFeature(for: feature)
+            let condition = FeatureUnlockManager.shared.getCondition(for: completionFeature)
             if condition.type == UnlockConditionType.manual.rawValue,
-               !FeatureUnlockManager.shared.isUnlocked(feature) {
-                let unlockResult = FeatureUnlockManager.shared.unlock(feature, force: true)
+               !FeatureUnlockManager.shared.isUnlocked(completionFeature) {
+                let unlockResult = FeatureUnlockManager.shared.unlock(completionFeature, force: true)
                 if case .success = unlockResult,
-                   let reward = feature.experienceFishCoinReward {
+                   let reward = completionFeature.experienceFishCoinReward {
                     RewardManager.shared.triggerReward(
                         type: .custom(
                             amount: reward,
@@ -359,16 +425,27 @@ final class AppFirstLaunchGuideManager: ObservableObject {
                 }
             }
             let shouldPersistCompletion =
-                FeatureUnlockManager.shared.isUnlocked(feature) ||
+                FeatureUnlockManager.shared.isUnlocked(completionFeature) ||
                 condition.type == UnlockConditionType.manual.rawValue
             if shouldPersistCompletion {
-                FeatureUnlockManager.shared.markFeatureExperienceGuideCompleted(for: feature)
+                FeatureUnlockManager.shared.markFeatureExperienceGuideCompleted(for: completionFeature)
             }
         }
         isShowingFeatureExperienceGuide = false
         currentFeatureExperienceFeature = nil
         resetFeatureGuideTargetFrames()
         resetGuideInteractiveRegions()
+        dismissGuideMenu()
+    }
+
+    private func resolvedCompletionFeature(for feature: FeatureItem) -> FeatureItem {
+        // 空间手帐未解锁且穿搭手帐也未解锁时，当前展示的是穿搭手帐的衣橱预引导。
+        // 这条链路完成后不应解锁/完成 spaceBook，而应按 ootd 的完成语义处理。
+        if feature == .spaceBook,
+           !FeatureUnlockManager.shared.isUnlocked(.ootd) {
+            return .ootd
+        }
+        return feature
     }
 
     /// 关闭功能体验引导（不标记为完成）
@@ -377,6 +454,42 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         currentFeatureExperienceFeature = nil
         resetFeatureGuideTargetFrames()
         resetGuideInteractiveRegions()
+        dismissGuideMenu()
+    }
+
+    func presentGuideMenu(_ state: GuideMenuPresentationState) {
+        guideMenuPresentationState = state
+    }
+
+    func dismissGuideMenu() {
+        guideMenuPresentationState = nil
+    }
+
+    func isGuideMenuPresented(for scenario: GuideMenuScenario) -> Bool {
+        guideMenuPresentationState?.scenario == scenario
+    }
+
+    func shouldUseCustomGuideMenu(for scenario: GuideMenuScenario) -> Bool {
+        guard isShowingFeatureExperienceGuide,
+              let feature = currentFeatureExperienceFeature else { return false }
+
+        switch scenario {
+        case .wardrobeAdd:
+            switch feature {
+            case .ootd, .ootdDefaultBook, .calendar:
+                return !FeatureUnlockManager.shared.isUnlocked(feature)
+            case .spaceBook:
+                return !FeatureUnlockManager.shared.isUnlocked(.ootd)
+            case .batchImport:
+                return true
+            default:
+                return false
+            }
+        case .wardrobeMore:
+            return feature == .batchEdit
+        case .ootdShelfMore, .ootdDetailMore, .ootdDetailAddPage:
+            return feature == .spaceBook && !FeatureUnlockManager.shared.isUnlocked(.spaceBook)
+        }
     }
 
     // MARK: - 萌宠智能对话引导目标位置信息
@@ -612,6 +725,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         showPointingVideo = false
         showCreateButtonHighlight = false
         resetGuideInteractiveRegions()
+        dismissGuideMenu()
 
         if shouldGrantFirstCompletionReward, !wasCompletedBefore {
             grantFirstCompletionRewardIfNeeded()
@@ -630,6 +744,7 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         showPointingVideo = false
         showCreateButtonHighlight = false
         resetGuideInteractiveRegions()
+        dismissGuideMenu()
         UserDefaults.standard.set(false, forKey: hasSeenWelcomeKey)
         saveState()
     }
@@ -681,7 +796,10 @@ struct FeatureExperienceGuideOverlay: View {
     @State var didOpenSpatialImportMenu: Bool = false  // 空间画布「导入」菜单是否已打开
     @State var wealthGuideStep: WealthGuideStep = .step1_clickHouseTab
     @State var currentTab: String = "wardrobe"
+    @State var didDismissAIAnalysisReturnStep: Bool = false
     @State var isSpaceBookCreationPromptVisible: Bool = false
+    @State var isOotdBookCreationPromptVisible: Bool = false
+    @State var guideKeyboardOverlap: CGFloat = 0
     @State var hasSpaceBooksForGuide: Bool = false
     @State var hasNonDefaultSpaceBooksForGuide: Bool = false  // 是否有非默认手帐（用于进入时判断逻辑）
     @State var hasSpaceBookPagesForGuide: Bool = false
@@ -703,6 +821,8 @@ struct FeatureExperienceGuideOverlay: View {
                     // 根据功能显示不同的引导内容
                     guideContent(for: feature)
                 }
+
+                FeatureGuideMenuOverlay()
             }
             .transition(.opacity)
             .zIndex(1000)
@@ -717,8 +837,9 @@ struct FeatureExperienceGuideOverlay: View {
         let houseBound = bindHouseGuideEvents(wardrobeBound)
         let wealthBound = bindWealthGuideEvents(houseBound)
         let frameBound = bindFrameDrivenEvents(wealthBound)
+        let keyboardBound = bindKeyboardEvents(frameBound)
 
-        return frameBound
+        return keyboardBound
             .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
                 resetGuideStepState()
             }
@@ -728,8 +849,66 @@ struct FeatureExperienceGuideOverlay: View {
         content.onAppear {
             print("[FeatureExperienceGuide] onAppear, feature: \(guideManager.currentFeatureExperienceFeature?.rawValue ?? "nil")")
             currentTab = guideManager.lastKnownHomeTab
+            guideKeyboardOverlap = 0
             resetGuideStepState()
         }
+    }
+
+    private func bindKeyboardEvents<Content: View>(_ content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                updateGuideKeyboardOverlap(from: notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                guideKeyboardOverlap = 0
+            }
+    }
+
+    private func updateGuideKeyboardOverlap(from notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {
+            return
+        }
+
+        let screenHeight = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .bounds.height ?? UIScreen.main.bounds.height
+
+        guideKeyboardOverlap = max(0, screenHeight - endFrame.minY)
+    }
+
+    private func keyboardAwareGuidePromptFrame(
+        in geometry: GeometryProxy,
+        dialogWidth: CGFloat = 270,
+        dialogHeight: CGFloat = 180
+    ) -> CGRect {
+        let centeredX = (geometry.size.width - dialogWidth) / 2
+        let centeredY = (geometry.size.height - dialogHeight) / 2
+        let safeAreaTop = max(geometry.safeAreaInsets.top, currentGuideWindowSafeAreaTop())
+        let safeAreaBottom = max(geometry.safeAreaInsets.bottom, currentGuideWindowSafeAreaBottom())
+        let effectiveKeyboardOverlap = max(0, guideKeyboardOverlap - safeAreaBottom)
+
+        guard effectiveKeyboardOverlap > 0 else {
+            return CGRect(x: centeredX, y: centeredY, width: dialogWidth, height: dialogHeight)
+        }
+
+        let topPadding = safeAreaTop + 20
+        let visibleBottom = geometry.size.height - effectiveKeyboardOverlap - 16
+        let maxY = max(topPadding, visibleBottom - dialogHeight)
+        let visibleCenteredY = topPadding + max(0, (visibleBottom - topPadding - dialogHeight) / 2)
+        let adjustedY = min(centeredY, max(topPadding, min(visibleCenteredY, maxY)))
+
+        return CGRect(x: centeredX, y: adjustedY, width: dialogWidth, height: dialogHeight)
+    }
+
+    private func currentGuideWindowSafeAreaTop() -> CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.top ?? 0
     }
 
     private func bindTabAndDismissEvents<Content: View>(_ content: Content) -> some View {
@@ -741,11 +920,8 @@ struct FeatureExperienceGuideOverlay: View {
 
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
                    aiAnalysisStep == .preUnlockStep1ReturnToMe,
-                   tab == "me",
-                   guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        aiAnalysisStep = .preUnlockStep2ClickVIP
-                    }
+                   tab == "me" {
+                    advanceAIAnalysisGuideFromReturnStepIfNeeded()
                 }
 
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
@@ -800,15 +976,13 @@ struct FeatureExperienceGuideOverlay: View {
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .magicTasksViewDismissed)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .magicTasksViewDismissed)) { notification in
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
                    aiAnalysisStep == .preUnlockStep1ReturnToMe {
-                    if guideManager.lastKnownHomeTab == "me",
-                       guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            aiAnalysisStep = .preUnlockStep2ClickVIP
-                        }
-                    }
+                    let wasGuideDismissRequested = notification.userInfo?["guideDismissWasRequested"] as? Bool ?? false
+                    guard wasGuideDismissRequested else { return }
+                    didDismissAIAnalysisReturnStep = true
+                    advanceAIAnalysisGuideFromReturnStepIfNeeded()
                 }
                 if guideManager.currentFeatureExperienceFeature == .widgetCustomize,
                    widgetCustomizeStep == .step1_returnToMe {
@@ -1196,103 +1370,89 @@ struct FeatureExperienceGuideOverlay: View {
     }
 
     private func bindSpaceBookStateGuideEvents<Content: View>(_ content: Content) -> some View {
-        content
-            // MARK: 前置任务引导事件（解锁前）
-            // Step 1 -> Step 2: 进入穿搭手帐书架
+        let preUnlockBound = content
             .onReceive(NotificationCenter.default.publisher(for: .ootdBookShelfOpened)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
-                // 前置任务引导：Step 1 -> Step 2
                 if spaceBookGuideStep == .preUnlockStep1_clickWardrobeOotdEntry {
+                    let nextStep: SpaceBookGuideStep = shouldSkipPreUnlockStep2()
+                        ? .preUnlockStep3_clickOotdBook
+                        : .preUnlockStep2_createOotdBook
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        // 根据进入时的判断逻辑决定是否跳过Step 2
-                        // 有非默认手帐则跳过Step 2
-                        spaceBookGuideStep = shouldSkipPreUnlockStep2() ? .preUnlockStep3_clickOotdBook : .preUnlockStep2_createOotdBook
+                        spaceBookGuideStep = nextStep
                     }
                 }
             }
-            // Step 2 -> Step 3: 创建了穿搭手帐
             .onReceive(NotificationCenter.default.publisher(for: .ootdBookCreated)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 let isDefault = notification.userInfo?["isDefault"] as? Bool ?? false
-                // 前置任务引导：Step 2 -> Step 3
-                if spaceBookGuideStep == .preUnlockStep2_createOotdBook, !isDefault {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .preUnlockStep3_clickOotdBook
-                    }
+                guard spaceBookGuideStep == .preUnlockStep2_createOotdBook else { return }
+                guard !isDefault else { return }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    spaceBookGuideStep = .preUnlockStep3_clickOotdBook
                 }
             }
-            // Step 3 -> Step 4: 进入手帐详情页
+            .onReceive(NotificationCenter.default.publisher(for: .ootdBookCreationPromptVisibilityChanged)) { notification in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                isOotdBookCreationPromptVisible = notification.userInfo?["isVisible"] as? Bool ?? false
+            }
             .onReceive(NotificationCenter.default.publisher(for: .ootdBookDetailOpened)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
-                // 前置任务引导：Step 3 -> Step 4
                 if spaceBookGuideStep == .preUnlockStep3_clickOotdBook {
+                    let nextStep: SpaceBookGuideStep = shouldSkipPreUnlockStep4()
+                        ? .preUnlockStep5_complete
+                        : .preUnlockStep4_createOotdPage
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        // 根据进入时的判断逻辑决定是否跳过Step 4
-                        // 有手帐且有书页则直接到Step 5
-                        spaceBookGuideStep = shouldSkipPreUnlockStep4() ? .preUnlockStep5_complete : .preUnlockStep4_createOotdPage
+                        spaceBookGuideStep = nextStep
                     }
                 }
             }
-            // Step 4 -> Step 5: 创建了书页
             .onReceive(NotificationCenter.default.publisher(for: .ootdPageCreated)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
-                // 前置任务引导：Step 4 -> Step 5（完成）
-                if spaceBookGuideStep == .preUnlockStep4_createOotdPage {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .preUnlockStep5_complete
-                    }
+                guard spaceBookGuideStep == .preUnlockStep4_createOotdPage else { return }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    spaceBookGuideStep = .preUnlockStep5_complete
                 }
             }
 
-            // MARK: 完整功能引导事件（解锁后）
-            // Step 6 -> Step 7: 进入穿搭手帐书架 -> 切换到空间页签
+        let postUnlockBound = preUnlockBound
             .onReceive(NotificationCenter.default.publisher(for: .ootdBookShelfOpened)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
-                // 完整引导：Step 6 -> Step 7
-                if spaceBookGuideStep == .step1_clickWardrobeOotdEntry {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step2_switchToSpaceTab
-                    }
+                guard spaceBookGuideStep == .step1_clickWardrobeOotdEntry else { return }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    spaceBookGuideStep = .step2_switchToSpaceTab
                 }
             }
-            // Step 7 -> Step 8: 切换到空间页签 -> 创建空间手帐
             .onReceive(NotificationCenter.default.publisher(for: .spatialBookShelfOpened)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
-                // 完整引导：Step 7 -> Step 8
-                if spaceBookGuideStep == .step2_switchToSpaceTab {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step3_createSpaceBook
-                    }
+                guard spaceBookGuideStep == .step2_switchToSpaceTab else { return }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    spaceBookGuideStep = .step3_createSpaceBook
                 }
             }
-            // Step 8 -> Step 9: 创建/进入空间手帐详情
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookDetailOpened)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
-                // 完整引导：Step 8 -> Step 9
-                if spaceBookGuideStep == .step3_createSpaceBook {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        // 已有书页则跳过Step 9直接进入Step 10
-                        spaceBookGuideStep = hasSpaceBookPagesForGuide ? .step5_enter3DEditor : .step4_createSpacePage
-                    }
+                guard spaceBookGuideStep == .step3_createSpaceBook else { return }
+                let nextStep: SpaceBookGuideStep = hasSpaceBookPagesForGuide
+                    ? .step5_enter3DEditor
+                    : .step4_createSpacePage
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    spaceBookGuideStep = nextStep
                 }
             }
-            // Step 9 -> Step 10: 创建空间书页
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookPageCreated)) { _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
-                // 完整引导：Step 9 -> Step 10
-                if spaceBookGuideStep == .step4_createSpacePage {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        spaceBookGuideStep = .step5_enter3DEditor
-                    }
+                guard spaceBookGuideStep == .step4_createSpacePage else { return }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    spaceBookGuideStep = .step5_enter3DEditor
                 }
             }
-            // 弹窗状态变化
+
+        return postUnlockBound
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookCreationPromptVisibilityChanged)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 let isVisible = notification.userInfo?["isVisible"] as? Bool ?? false
                 isSpaceBookCreationPromptVisible = isVisible
             }
-            // 书架数据状态
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookShelfDataStateChanged)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 let hasBooks = notification.userInfo?["hasBooks"] as? Bool ?? false
@@ -1300,7 +1460,6 @@ struct FeatureExperienceGuideOverlay: View {
                 hasSpaceBooksForGuide = hasBooks
                 hasNonDefaultSpaceBooksForGuide = hasNonDefaultBooks
             }
-            // 详情页数据状态
             .onReceive(NotificationCenter.default.publisher(for: .spaceBookDetailDataStateChanged)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 let hasPages = notification.userInfo?["hasPages"] as? Bool ?? false
@@ -1379,12 +1538,11 @@ struct FeatureExperienceGuideOverlay: View {
             .onChange(of: guideManager.guideTargetFrame(for: .aiAnalysisVIPCard)) { _, vipCardFrame in
                 if guideManager.currentFeatureExperienceFeature == .aiAnalysis,
                    aiAnalysisStep == .preUnlockStep1ReturnToMe,
+                   didDismissAIAnalysisReturnStep,
                    currentTab == "me",
                    vipCardFrame != nil {
-                    print("[FeatureExperienceGuide] 检测到在me界面且VIP卡片frame已采集，step1进入step2")
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        aiAnalysisStep = .preUnlockStep2ClickVIP
-                    }
+                    print("[FeatureExperienceGuide] AI返回步骤完成后检测到VIP卡片frame，step1进入step2")
+                    advanceAIAnalysisGuideFromReturnStepIfNeeded()
                 }
             }
             .onChange(of: guideManager.widgetCustomizeEntryGlobalFrame) { _, widgetEntryFrame in
@@ -1594,6 +1752,22 @@ struct FeatureExperienceGuideOverlay: View {
 
     /// Step 2: 右上角「更多」→ 新建手帐
     func spaceBookPreUnlockStep2Content(in geometry: GeometryProxy) -> some View {
+        if isOotdBookCreationPromptVisible {
+            let dialogFrame = keyboardAwareGuidePromptFrame(in: geometry)
+            return AnyView(highlightedRectGuideContent(
+                frame: dialogFrame,
+                cornerRadius: 16,
+                title: "输入名称后点创建",
+                message: "已打开新建手帐弹窗，输入名称并点击创建，就能继续下一步。",
+                currentStep: spaceBookGuideStep.stepNumberInFlow,
+                totalSteps: spaceBookGuideStep.totalStepsInFlow,
+                accent: .blue,
+                actionTitle: nil,
+                onAction: nil,
+                bubbleOnTop: true
+            ))
+        }
+
         let fallbackFrame = CGRect(
             x: geometry.size.width - 70,
             y: max(geometry.safeAreaInsets.top + 12, 16),
@@ -1605,7 +1779,7 @@ struct FeatureExperienceGuideOverlay: View {
             in: geometry,
             fallback: fallbackFrame
         )
-        return highlightedRectGuideContent(
+        return AnyView(highlightedRectGuideContent(
             frame: targetFrame,
             cornerRadius: 12,
             title: spaceBookGuideStep.title,
@@ -1615,7 +1789,7 @@ struct FeatureExperienceGuideOverlay: View {
             accent: .blue,
             actionTitle: nil,
             onAction: nil
-        )
+        ))
     }
 
     /// Step 3: 点击刚创建的手帐进入
@@ -1761,14 +1935,7 @@ struct FeatureExperienceGuideOverlay: View {
             ))
         } else if isSpaceBookCreationPromptVisible {
             // 新建弹窗已打开 - 高亮整个输入弹窗区域
-            let dialogWidth: CGFloat = 270
-            let dialogHeight: CGFloat = 180
-            let dialogFrame = CGRect(
-                x: (geometry.size.width - dialogWidth) / 2,
-                y: (geometry.size.height - dialogHeight) / 2,
-                width: dialogWidth,
-                height: dialogHeight
-            )
+            let dialogFrame = keyboardAwareGuidePromptFrame(in: geometry)
             return AnyView(highlightedRectGuideContent(
                 frame: dialogFrame,
                 cornerRadius: 16,
@@ -1845,14 +2012,7 @@ struct FeatureExperienceGuideOverlay: View {
             ))
         } else if isSpaceBookCreationPromptVisible {
             // 新建书页弹窗已打开 - 高亮整个输入弹窗区域
-            let dialogWidth: CGFloat = 270
-            let dialogHeight: CGFloat = 180
-            let dialogFrame = CGRect(
-                x: (geometry.size.width - dialogWidth) / 2,
-                y: (geometry.size.height - dialogHeight) / 2,
-                width: dialogWidth,
-                height: dialogHeight
-            )
+            let dialogFrame = keyboardAwareGuidePromptFrame(in: geometry)
             return AnyView(highlightedRectGuideContent(
                 frame: dialogFrame,
                 cornerRadius: 16,

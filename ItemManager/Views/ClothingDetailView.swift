@@ -355,6 +355,14 @@ struct ClothingDetailView: View {
         // Schedule notification for the copy
         NotificationManager.shared.scheduleNotification(for: newClothing)
         
+        do {
+            try modelContext.save()
+            // 更新衣物数量缓存，用于魔法任务进度实时显示
+            updateClothingCountCache()
+        } catch {
+            print("ClothingDetailView: Failed to save duplicated clothing: \(error)")
+        }
+        
         Task { await SharedPersistence.shared.syncWidgetData() }
         
         dismiss()

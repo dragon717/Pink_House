@@ -130,9 +130,12 @@ extension FeatureExperienceGuideOverlay {
 
         // 重置所有共享状态，防止不同功能之间的状态污染
         showingFullDescription = false
+        didDismissAIAnalysisReturnStep = false
         themeScrollStepStartedAt = nil
         customColorScrollStepStartedAt = nil
         isSpaceBookCreationPromptVisible = false
+        isOotdBookCreationPromptVisible = false
+        guideKeyboardOverlap = 0
         hasSpaceBooksForGuide = false
         hasNonDefaultSpaceBooksForGuide = false
         hasSpaceBookPagesForGuide = false
@@ -629,7 +632,7 @@ extension FeatureExperienceGuideOverlay {
         case .calendar:
             return "在菜单里选择「手动创建」或「批量导入」任一方式，先录入裙子，梦裙日历才会有内容。"
         case .spaceBook:
-            return "在菜单里选择「手动创建」或「批量导入」任一方式，先补齐衣橱内容，再完成空间手帐前置任务。"
+            return "在菜单里选择「手动创建」或「批量导入」任一方式，先补齐衣橱内容并解锁穿搭手帐，之后再继续空间手帐前置任务。"
         case .batchImport:
             if FeatureUnlockManager.shared.isUnlocked(feature) {
                 return "现在点击「批量导入」，就能一次导入多件裙子。"
@@ -643,6 +646,26 @@ extension FeatureExperienceGuideOverlay {
 
     func handleReturnToMeGuideAction() {
         NotificationCenter.default.post(name: .dismissMagicTasksView, object: nil)
+    }
+
+    func handleAIAnalysisGuideReturnAction() {
+        guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+        guard aiAnalysisStep == .preUnlockStep1ReturnToMe else { return }
+
+        didDismissAIAnalysisReturnStep = true
+        NotificationCenter.default.post(name: .dismissMagicTasksView, object: nil)
+    }
+
+    func advanceAIAnalysisGuideFromReturnStepIfNeeded() {
+        guard guideManager.currentFeatureExperienceFeature == .aiAnalysis else { return }
+        guard aiAnalysisStep == .preUnlockStep1ReturnToMe else { return }
+        guard didDismissAIAnalysisReturnStep else { return }
+        guard currentTab == "me" || guideManager.lastKnownHomeTab == "me" else { return }
+        guard guideManager.guideTargetFrame(for: .aiAnalysisVIPCard) != nil else { return }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            aiAnalysisStep = .preUnlockStep2ClickVIP
+        }
     }
 
     func returnToMeGuideContent(

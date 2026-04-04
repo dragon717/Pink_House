@@ -25,7 +25,10 @@ struct BatchImportView: View {
     @State private var imageCache: [String: UIImage] = [:]
     @State private var isProcessing: Bool = false
     @State private var showingConfirmation: Bool = false
+    @State private var unlockAlertItem: FeatureUnlockAlert?
     @State private var currentLoadTask: Task<Void, Never>?
+    @State private var hasValidatedAccess = false
+    @State private var hasPostedOpenNotification = false
     
     // Camera & ActionSheet States
     @State private var showingActionSheet = false
@@ -164,7 +167,29 @@ struct BatchImportView: View {
                 loadImages(from: newItems)
             }
             .onAppear {
-                NotificationCenter.default.post(name: .batchImportViewOpened, object: nil)
+                validateAccessOnAppear()
+            }
+        }
+        .alert(item: $unlockAlertItem) { alert in
+            if alert.canUnlock {
+                return Alert(
+                    title: Text("解锁 \(alert.feature.displayName)"),
+                    message: Text("\(alert.condition.description)\n\n确定要解锁吗？"),
+                    primaryButton: .default(Text("解锁")) {
+                        unlockBatchImportAccess()
+                    },
+                    secondaryButton: .cancel(Text("取消")) {
+                        dismiss()
+                    }
+                )
+            } else {
+                return Alert(
+                    title: Text("尚未满足解锁条件"),
+                    message: Text(alert.message ?? alert.condition.description),
+                    dismissButton: .default(Text("知道了")) {
+                        dismiss()
+                    }
+                )
             }
         }
     }
@@ -191,6 +216,42 @@ struct BatchImportView: View {
         }
         
         return UIImage(cgImage: downsampledImage)
+    }
+
+    private func validateAccessOnAppear() {
+        guard !hasValidatedAccess else { return }
+        hasValidatedAccess = true
+
+        if FeatureUnlockManager.shared.isUnlocked(.batchImport) {
+            postOpenedNotificationIfNeeded()
+            return
+        }
+
+        unlockAlertItem = FeatureUnlockManager.shared.makeAlertItem(for: .batchImport)
+    }
+
+    private func unlockBatchImportAccess() {
+        let manager = FeatureUnlockManager.shared
+        switch manager.unlock(.batchImport) {
+        case .success, .alreadyUnlocked:
+            postOpenedNotificationIfNeeded()
+        case .conditionNotMet:
+            unlockAlertItem = manager.makeAlertItem(for: .batchImport)
+        case .insufficientResource(let type, let required, let current):
+            let condition = manager.getCondition(for: .batchImport)
+            unlockAlertItem = FeatureUnlockAlert(
+                feature: .batchImport,
+                condition: condition,
+                canUnlock: false,
+                message: "\(type)不足：当前 \(current)，需要 \(required)"
+            )
+        }
+    }
+
+    private func postOpenedNotificationIfNeeded() {
+        guard !hasPostedOpenNotification else { return }
+        hasPostedOpenNotification = true
+        NotificationCenter.default.post(name: .batchImportViewOpened, object: nil)
     }
 
     private func loadImages(from items: [PhotosPickerItem]) {
