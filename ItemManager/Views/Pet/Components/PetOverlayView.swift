@@ -27,6 +27,7 @@ struct PetOverlayView: View {
     @State private var showingAnalysisResult: Bool = false
     @State private var capturedImage: UIImage?
     @State private var analysisResult: PetAIAnalysisResult?
+    @State private var lastLoggedHitRectSignature: String?
     
     // MARK: - 轨迹效果状态
     
@@ -115,6 +116,12 @@ struct PetOverlayView: View {
         let shouldHide = guideManager.isRunningAnimation ||
             (guideManager.currentStep == .pointing && guideManager.showPointingVideo)
         let petPosition = calculatePosition(geometry: geometry)
+        let hitRect = CGRect(
+            x: petPosition.x - (catWidth + 28) / 2,
+            y: petPosition.y - (catWidth + 44) / 2,
+            width: catWidth + 28,
+            height: catWidth + 44
+        )
 
         ZStack {
             PetImageView(
@@ -134,6 +141,20 @@ struct PetOverlayView: View {
                 .position(petPosition)
                 .gesture(dragGesture(in: geometry))
                 .allowsHitTesting(!(isHiddenForSnapshot || shouldHide))
+        }
+        .onAppear {
+            logHitRectIfNeeded(
+                position: petPosition,
+                hitRect: hitRect,
+                shouldHide: shouldHide
+            )
+        }
+        .onChange(of: interactionManager.state) { _, _ in
+            logHitRectIfNeeded(
+                position: petPosition,
+                hitRect: hitRect,
+                shouldHide: shouldHide
+            )
         }
     }
     
@@ -182,6 +203,10 @@ struct PetOverlayView: View {
         if case .dragging = gestureHandler.state {
             // 如果 interactionManager 还没有进入拖拽状态，则开始拖拽
             if interactionManager.state != .dragging {
+                print(
+                    "[PetOverlay] startDragging loc=(\(Int(value.location.x.rounded())),\(Int(value.location.y.rounded()))) " +
+                    "state=\(String(describing: interactionManager.state))"
+                )
                 interactionManager.startDragging(at: value.location)
             }
             // Vision线检测
@@ -213,6 +238,9 @@ struct PetOverlayView: View {
     
     private func handleTap(at location: CGPoint) {
         guard interactionManager.state == .idle else { return }
+        print(
+            "[PetOverlay] tap loc=(\(Int(location.x.rounded())),\(Int(location.y.rounded())))"
+        )
         HapticEngineManager.shared.playUIFeedback(intensity: 0.5, sharpness: 0.5, fallbackStyle: .medium)
         
         // 执行传入的 action（切换到萌宠对话 Tab）
@@ -349,6 +377,33 @@ struct PetOverlayView: View {
         case .idle, .analyzing:
             return .easeOut(duration: 0.3)
         }
+    }
+
+    private func logHitRectIfNeeded(position: CGPoint, hitRect: CGRect, shouldHide: Bool) {
+#if DEBUG
+        let signature = [
+            Int(position.x.rounded()),
+            Int(position.y.rounded()),
+            Int(hitRect.minX.rounded()),
+            Int(hitRect.minY.rounded()),
+            Int(hitRect.width.rounded()),
+            Int(hitRect.height.rounded()),
+            shouldHide ? 1 : 0,
+            isHiddenForSnapshot ? 1 : 0
+        ]
+        .map(String.init)
+        .joined(separator: ":")
+
+        guard signature != lastLoggedHitRectSignature else { return }
+        lastLoggedHitRectSignature = signature
+
+        print(
+            "[PetOverlay] hitRect pos=(\(Int(position.x.rounded())),\(Int(position.y.rounded()))) " +
+            "rect=(x=\(Int(hitRect.minX.rounded())),y=\(Int(hitRect.minY.rounded())) " +
+            "w=\(Int(hitRect.width.rounded())),h=\(Int(hitRect.height.rounded()))) " +
+            "shouldHide=\(shouldHide) snapshotHidden=\(isHiddenForSnapshot)"
+        )
+#endif
     }
     
     // MARK: - 截图功能

@@ -140,6 +140,7 @@ struct BookShelfView: View {
                     onBack: {
                         navigationPath.removeLast()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            NotificationCenter.default.post(name: .ootdReturnedToShelfFromDetail, object: nil)
                             notifyOotdShelfGuideState()
                         }
                     }

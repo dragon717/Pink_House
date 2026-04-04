@@ -552,6 +552,43 @@ final class AppFirstLaunchGuideManager: ObservableObject {
         )
     }
 
+    func normalizedTopCenterSegmentedControlFrame(
+        _ frame: CGRect,
+        fallback: CGRect,
+        containerSize: CGSize,
+        safeAreaTop: CGFloat
+    ) -> CGRect {
+        let fallbackNormalized = CGRect(
+            x: min(max(fallback.minX, 12), max(12, containerSize.width - fallback.width - 12)),
+            y: max(fallback.minY, safeAreaTop + 8),
+            width: min(max(fallback.width, 120), containerSize.width - 24),
+            height: max(fallback.height, 30)
+        )
+
+        guard frame.width > 0, frame.height > 0,
+              frame.minX.isFinite, frame.minY.isFinite,
+              frame.width.isFinite, frame.height.isFinite else {
+            return fallbackNormalized
+        }
+
+        let looksReasonable =
+            frame.width >= 100 &&
+            frame.height >= 28 &&
+            frame.minY >= safeAreaTop + 4 &&
+            frame.minY <= safeAreaTop + 90 &&
+            frame.maxY <= safeAreaTop + 150 &&
+            abs(frame.midX - containerSize.width / 2) <= max(48, containerSize.width * 0.18)
+
+        guard looksReasonable else { return fallbackNormalized }
+
+        let width = min(max(frame.width, 120), min(containerSize.width - 24, 260))
+        let height = min(max(frame.height, 30), 40)
+        let x = min(max(frame.midX - width / 2, 12), max(12, containerSize.width - width - 12))
+        let y = min(max(frame.minY, safeAreaTop + 6), safeAreaTop + 96)
+
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
     private var currentWindowSafeAreaTop: CGFloat {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -1449,9 +1486,14 @@ struct FeatureExperienceGuideOverlay: View {
         let preUnlockBound = content
             .onReceive(NotificationCenter.default.publisher(for: .ootdBookShelfOpened)) { notification in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                guideManager.resetGuideTargetFrames([
+                    .ootdDetailBackButton,
+                    .ootdDetailMoreMenuButton
+                ])
                 spaceBookGuideLocation = .ootdShelf
                 hasNonDefaultSpaceBooksForGuide = notification.userInfo?["hasNonDefaultBooks"] as? Bool ?? hasNonDefaultSpaceBooksForGuide
                 hasSpaceBookPagesForGuide = notification.userInfo?["hasPages"] as? Bool ?? hasSpaceBookPagesForGuide
+                print("[Guide][SpaceBook] ootdBookShelfOpened step=\(spaceBookGuideStep) location=\(spaceBookGuideLocation) hasBooks=\(hasNonDefaultSpaceBooksForGuide) hasPages=\(hasSpaceBookPagesForGuide)")
                 if spaceBookGuideStep == .preUnlockStep1_clickWardrobeOotdEntry {
                     let nextStep: SpaceBookGuideStep = shouldSkipPreUnlockStep2()
                         ? .preUnlockStep3_clickOotdBook
@@ -1478,6 +1520,7 @@ struct FeatureExperienceGuideOverlay: View {
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 spaceBookGuideLocation = .ootdPlanarDetail
                 hasSpaceBookPagesForGuide = notification.userInfo?["hasPages"] as? Bool ?? hasSpaceBookPagesForGuide
+                print("[Guide][SpaceBook] ootdBookDetailOpened step=\(spaceBookGuideStep) location=\(spaceBookGuideLocation) hasPages=\(hasSpaceBookPagesForGuide)")
                 if spaceBookGuideStep == .preUnlockStep1_clickWardrobeOotdEntry {
                     let nextStep: SpaceBookGuideStep
                     if !hasNonDefaultSpaceBooksForGuide {
@@ -1510,6 +1553,22 @@ struct FeatureExperienceGuideOverlay: View {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     spaceBookGuideStep = .preUnlockStep5_complete
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ootdReturnedToShelfFromDetail)) { _ in
+                guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
+                guideManager.resetGuideTargetFrames([
+                    .ootdDetailBackButton,
+                    .ootdDetailMoreMenuButton
+                ])
+                guideManager.requestGuideTargetRecapture()
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    spaceBookGuideLocation = .ootdShelf
+                    if FeatureUnlockManager.shared.isUnlocked(.spaceBook),
+                       spaceBookGuideStep.rawValue <= SpaceBookGuideStep.step2_switchToSpaceTab.rawValue {
+                        spaceBookGuideStep = .step2_switchToSpaceTab
+                    }
+                }
+                print("[Guide][SpaceBook] returnedToShelf step=\(spaceBookGuideStep) location=\(spaceBookGuideLocation)")
             }
 
         let postUnlockBound = preUnlockBound
@@ -1801,6 +1860,10 @@ struct FeatureExperienceGuideOverlay: View {
             .onChange(of: guideManager.guideTargetCaptureVersion) { _, _ in
                 guard guideManager.currentFeatureExperienceFeature == .spaceBook else { return }
                 syncSpaceBookGuideLocationFromVisibleTargets()
+                if spaceBookGuideStep == .step2_switchToSpaceTab {
+                    let tabsFrame = guideManager.guideTargetFrame(for: .spaceBookModeTabs)
+                    print("[Guide][SpaceBook] captureVersion step=\(spaceBookGuideStep) location=\(spaceBookGuideLocation) tabsFrame=\(String(describing: tabsFrame))")
+                }
 
                 if FeatureUnlockManager.shared.isUnlocked(.spaceBook),
                    spaceBookGuideStep == .step2_switchToSpaceTab,
@@ -2250,10 +2313,16 @@ struct FeatureExperienceGuideOverlay: View {
             width: 160,
             height: 32
         )
-        let targetFrame = aiGuideTargetFrame(
+        let rawTargetFrame = aiGuideTargetFrame(
             globalFrame: guideManager.guideTargetFrame(for: .spaceBookModeTabs),
             in: geometry,
             fallback: fallbackFrame
+        )
+        let targetFrame = guideManager.normalizedTopCenterSegmentedControlFrame(
+            rawTargetFrame,
+            fallback: fallbackFrame,
+            containerSize: geometry.size,
+            safeAreaTop: geometry.safeAreaInsets.top
         )
         return AnyView(highlightedRectGuideContent(
             frame: targetFrame,
@@ -2264,7 +2333,11 @@ struct FeatureExperienceGuideOverlay: View {
             totalSteps: spaceBookGuideStep.totalStepsInFlow,
             accent: .blue,
             actionTitle: nil,
-            onAction: nil
+            onAction: nil,
+            catPawPosition: CGPoint(
+                x: targetFrame.midX + targetFrame.width * 0.24,
+                y: targetFrame.midY
+            )
         ))
     }
 

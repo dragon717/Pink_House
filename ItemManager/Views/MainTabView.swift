@@ -146,11 +146,11 @@ struct ModernTabView: View {
     }
 
     private var shouldShowDiamondOrbitCat: Bool {
-        selectedTab != 3 && supportsBottomAccessoryCat && isBottomBarCompact && compactCenterPlatterFrame != nil
+        selectedTab != 1 && selectedTab != 3 && supportsBottomAccessoryCat && isBottomBarCompact && compactCenterPlatterFrame != nil
     }
 
     private var shouldShowFloatingOverlayCat: Bool {
-        selectedTab != 3 && !shouldShowDiamondOrbitCat
+        selectedTab != 1 && selectedTab != 3 && !shouldShowDiamondOrbitCat
     }
 
     private var bottomAccessoryPetId: String {
@@ -213,7 +213,7 @@ struct ModernTabView: View {
                         .position(x: orbitLayout.center.x, y: orbitLayout.center.y)
                 }
             }
-            // 进入萌宠对话页后不再显示悬浮宠物，避免与搜索/输入交互冲突
+            // 进入 House / 萌宠对话页后不再显示全局悬浮宠物，避免挡住房间热区或搜索/输入交互
             if shouldShowFloatingOverlayCat {
                 PetOverlayView(action: {
                     // 点击悬浮小猫：切换到萌宠对话 Tab
@@ -693,8 +693,8 @@ struct LegacyTabView: View {
         }
         .overlay {
             RewardBubbleView()
-            // 进入萌宠对话页后不再显示悬浮宠物，避免与搜索/输入交互冲突
-            if selectedTab != 3 {
+            // 进入 House / 萌宠对话页后不再显示全局悬浮宠物，避免挡住房间热区或搜索/输入交互
+            if selectedTab != 1 && selectedTab != 3 {
                 PetOverlayView(action: {
                     // 点击悬浮小猫：切换到萌宠对话 Tab 并自动展开搜索栏
                     withAnimation {
