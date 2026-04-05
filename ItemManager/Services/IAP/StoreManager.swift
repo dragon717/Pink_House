@@ -75,9 +75,11 @@ class StoreManager: ObservableObject {
         do {
             let allProductIDs = IAPProductType.allProductIDs
             let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+            let logPrefix = "[IAPFetch]"
 
-            print("[StoreManager] 开始获取商品，bundleID=\(bundleID)")
-            print("[StoreManager] 请求的商品ID: \(allProductIDs.joined(separator: ", "))")
+            print("\(logPrefix) ===== 商品拉取开始 =====")
+            print("\(logPrefix) bundleID=\(bundleID)")
+            print("\(logPrefix) requestedIDs=\(allProductIDs.joined(separator: ", "))")
 
             let products = try await Product.products(for: allProductIDs)
 
@@ -88,24 +90,30 @@ class StoreManager: ObservableObject {
                 p1.price < p2.price
             }
 
-            print("[StoreManager] 获取到 \(coinProducts.count) 个喵币商品")
+            print("\(logPrefix) matchedCount=\(coinProducts.count)")
 
             if coinProducts.isEmpty {
-                print("[StoreManager] Apple 未返回任何匹配的喵币商品")
+                print("\(logPrefix) result=EMPTY")
+                print("\(logPrefix) reasonHint=Apple 未返回任何匹配的喵币商品")
             } else {
                 for product in coinProducts {
-                    print("[StoreManager] 商品返回成功: id=\(product.id), name=\(product.displayName), price=\(product.displayPrice), type=\(product.type)")
+                    print("\(logPrefix) returnedProduct id=\(product.id) | name=\(product.displayName) | price=\(product.displayPrice) | type=\(product.type)")
                 }
             }
 
             let returnedIDs = Set(coinProducts.map(\.id))
             let missingIDs = allProductIDs.filter { !returnedIDs.contains($0) }
             if !missingIDs.isEmpty {
-                print("[StoreManager] 未返回的商品ID: \(missingIDs.joined(separator: ", "))")
+                print("\(logPrefix) missingIDs=\(missingIDs.joined(separator: ", "))")
+            } else {
+                print("\(logPrefix) missingIDs=none")
             }
 
+            print("\(logPrefix) ===== 商品拉取结束 =====")
+
         } catch {
-            print("[StoreManager] 获取商品失败: \(error)")
+            print("[IAPFetch] ===== 商品拉取失败 =====")
+            print("[IAPFetch] error=\(error)")
             lastError = .productRequestFailed(error.localizedDescription)
         }
     }

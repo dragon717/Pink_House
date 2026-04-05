@@ -22,6 +22,7 @@ class IAPViewModel: ObservableObject {
     @Published var successMessage: String = ""
     @Published var showErrorAlert: Bool = false
     @Published var errorMessage: String = ""
+    @Published var firstPurchaseStatusVersion: Int = 0
 
     // MARK: - Private Properties
     private var storeManager = StoreManager.shared
@@ -83,6 +84,7 @@ class IAPViewModel: ObservableObject {
         let status = PetDataManager.shared.status
         isVIP = status.vipStatus.isActive && !status.vipStatus.isExpired
         vipExpireDate = status.vipStatus.expireDate
+        firstPurchaseStatusVersion &+= 1
     }
 
     // MARK: - 更新商品展示数据
@@ -163,9 +165,16 @@ struct MeowCoinProductDisplay: Identifiable {
     let isPopular: Bool
     let isBestValue: Bool
     let tag: String?
+    let packageName: String
+    let packageDescription: String
+    let assetName: String
 
     var totalCoins: Int {
         coinAmount + bonusAmount
+    }
+
+    var firstDoubleCoins: Int {
+        coinAmount * 2
     }
 
     var displayTitle: String {
@@ -174,6 +183,14 @@ struct MeowCoinProductDisplay: Identifiable {
         } else {
             return "\(coinAmount) 喵币"
         }
+    }
+
+    var baseTitle: String {
+        "\(coinAmount) 喵币"
+    }
+
+    var firstDoubleTitle: String {
+        "\(firstDoubleCoins) 喵币"
     }
 
     var subtitle: String {
@@ -186,6 +203,10 @@ struct MeowCoinProductDisplay: Identifiable {
         } else {
             return ""
         }
+    }
+
+    var isBonusRateTag: Bool {
+        tag?.hasPrefix("+") == true
     }
 
     init(from product: Product, type: IAPProductType) {
@@ -203,6 +224,9 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+10%"
+            self.packageName = "喵币小钱包"
+            self.packageDescription = "一只轻巧的小钱包，装着 60 喵币，适合先给小猫存一笔零花。"
+            self.assetName = "meowcoin_60"
         case .meowCoin120:
             // 12元档：首次240，之后132（+10%）
             self.coinAmount = 120
@@ -210,6 +234,9 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+10%"
+            self.packageName = "喵币零食袋"
+            self.packageDescription = "一袋鼓鼓的零食袋，装着 120 喵币，刚好够添几样喜欢的小东西。"
+            self.assetName = "meowcoin_120"
         case .meowCoin300:
             // 30元档：首次600，之后330（+10%）
             self.coinAmount = 300
@@ -217,6 +244,9 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+10%"
+            self.packageName = "喵币鼓鼓袋"
+            self.packageDescription = "一袋沉甸甸的鼓鼓袋，装着 300 喵币，花起来更从容一些。"
+            self.assetName = "meowcoin_300"
         case .meowCoin500:
             // 50元档：首次1000，之后575（+15%）
             self.coinAmount = 500
@@ -224,6 +254,9 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = true
             self.isBestValue = false
             self.tag = "热门"
+            self.packageName = "喵币小宝宝箱"
+            self.packageDescription = "一只满满当当的小宝箱，装着 500 喵币，拿在手里都觉得底气足。"
+            self.assetName = "meowcoin_500"
         case .meowCoin1280:
             // 128元档：首次2560，之后1600（+25%）
             self.coinAmount = 1280
@@ -231,6 +264,9 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = true
             self.tag = "最划算"
+            self.packageName = "喵币大宝箱"
+            self.packageDescription = "一个闪闪发亮的大宝箱，装着 1280 喵币，一开箱就是满满收获。"
+            self.assetName = "mcoin_1280"
         case .meowCoin3280:
             // 328元档：首次6560，之后4428（+35%）
             self.coinAmount = 3280
@@ -238,12 +274,18 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = false
             self.isBestValue = false
             self.tag = "+35%"
+            self.packageName = "喵币藏宝库入场券"
+            self.packageDescription = "一座堆得满满的藏宝库，装着 3280 喵币，想把一整片小金库都搬回家。"
+            self.assetName = "mcoin_3280"
         default:
             self.coinAmount = 0
             self.bonusAmount = 0
             self.isPopular = false
             self.isBestValue = false
             self.tag = nil
+            self.packageName = ""
+            self.packageDescription = ""
+            self.assetName = ""
         }
     }
 }

@@ -122,7 +122,7 @@ struct MeowCoinStoreView: View {
             .padding(.horizontal)
 
             // 首次双倍活动横幅
-            FirstDoubleBanner()
+            FirstDoubleBanner(refreshToken: viewModel.firstPurchaseStatusVersion)
                 .padding(.horizontal)
 
             if viewModel.meowCoinProducts.isEmpty {
@@ -135,7 +135,10 @@ struct MeowCoinStoreView: View {
                     GridItem(.flexible())
                 ], spacing: 12) {
                     ForEach(viewModel.meowCoinProducts) { product in
-                        CoinProductCard(product: product) {
+                        CoinProductCard(
+                            product: product,
+                            refreshToken: viewModel.firstPurchaseStatusVersion
+                        ) {
                             Task {
                                 await viewModel.purchaseMeowCoin(product: product)
                             }
@@ -237,42 +240,55 @@ struct MeowCoinStoreView: View {
 
 // MARK: - 首次双倍活动横幅
 struct FirstDoubleBanner: View {
+    let refreshToken: Int
     @State private var hasFirstDouble = FirstDoubleBonusManager.shared.hasAnyFirstDoubleBonus()
 
+    private func refreshBannerState() {
+        hasFirstDouble = FirstDoubleBonusManager.shared.hasAnyFirstDoubleBonus()
+    }
+
     var body: some View {
-        if hasFirstDouble {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.title2)
-                    .foregroundStyle(.yellow)
+        Group {
+            if hasFirstDouble {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                        .foregroundStyle(.yellow)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("🎉 首充双倍活动")
-                        .font(.headline.bold())
-                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("🎉 首充双倍活动")
+                            .font(.headline.bold())
+                            .foregroundStyle(.primary)
 
-                    Text("首次购买任意档位，喵币数量翻倍！")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        Text("首次购买任意档位，喵币数量翻倍！")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
                 }
-
-                Spacer()
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [.yellow.opacity(0.2), .orange.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [.yellow.opacity(0.2), .orange.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
-                    )
-            )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                        )
+                )
+            }
+        }
+        .onAppear {
+            refreshBannerState()
+        }
+        .onChange(of: refreshToken) { _, _ in
+            refreshBannerState()
         }
     }
 }
@@ -280,6 +296,7 @@ struct FirstDoubleBanner: View {
 // MARK: - 喵币商品卡片
 struct CoinProductCard: View {
     let product: MeowCoinProductDisplay
+    let refreshToken: Int
     let onPurchase: () -> Void
     @State private var hasFirstDouble: Bool = false
 
@@ -291,8 +308,7 @@ struct CoinProductCard: View {
         Button(action: onPurchase) {
             VStack(spacing: 12) {
                 // 标签区域
-                HStack {
-                    // 首次双倍标签
+                HStack(alignment: .top) {
                     if hasFirstDouble {
                         Text("首充双倍")
                             .font(.caption2.bold())
@@ -305,10 +321,10 @@ struct CoinProductCard: View {
                             )
                     }
 
-                    Spacer()
+                    Spacer(minLength: 0)
 
-                    // 普通标签
-                    if let tag = product.tag {
+                    if let tag = product.tag,
+                       !(hasFirstDouble && product.isBonusRateTag) {
                         Text(tag)
                             .font(.caption2.bold())
                             .foregroundStyle(.white)
@@ -320,38 +336,39 @@ struct CoinProductCard: View {
                             )
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .top)
                 .frame(height: 22)
 
-                // 喵币图标和数量
-                VStack(spacing: 4) {
-                    Image(systemName: "pawprint.fill")
-                        .font(.title2)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.yellow, .orange],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                VStack(spacing: 8) {
+                    Image(product.assetName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 60)
+                        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 4)
 
-                    // 显示数量
-                    if hasFirstDouble {
-                        // 首次双倍显示
-                        VStack(spacing: 2) {
-                            Text("\(product.totalCoins * 2)")
-                                .font(.title2.bold())
-                                .foregroundStyle(.primary)
-
-                            Text("\(product.totalCoins)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .strikethrough()
-                        }
-                    } else {
-                        // 正常显示
-                        Text(product.displayTitle)
-                            .font(.headline)
+                    VStack(spacing: 2) {
+                        Text(product.packageName)
+                            .font(.subheadline.bold())
                             .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+
+                        if hasFirstDouble {
+                            VStack(spacing: 2) {
+                                Text(product.firstDoubleTitle)
+                                    .font(.title2.bold())
+                                    .foregroundStyle(.primary)
+
+                                Text(product.baseTitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .strikethrough()
+                            }
+                        } else {
+                            Text(product.displayTitle)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                        }
                     }
 
                     if !product.subtitle.isEmpty && !hasFirstDouble {
@@ -360,10 +377,10 @@ struct CoinProductCard: View {
                             .foregroundStyle(.green)
                     }
                 }
+                .frame(maxWidth: .infinity)
 
-                Spacer()
+                Spacer(minLength: 0)
 
-                // 价格按钮
                 Text(product.price)
                     .font(.subheadline.bold())
                     .foregroundStyle(.white)
@@ -375,24 +392,29 @@ struct CoinProductCard: View {
                     )
             }
             .padding(12)
-            .frame(height: 180)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 210, alignment: .top)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(uiColor: .secondarySystemBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                hasFirstDouble ? Color.red.opacity(0.5) :
-                                product.isBestValue ? Color.green.opacity(0.5) :
-                                product.isPopular ? Color.orange.opacity(0.5) :
-                                Color.clear,
-                                lineWidth: 2
-                            )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        hasFirstDouble ? Color.red.opacity(0.5) :
+                        product.isBestValue ? Color.green.opacity(0.5) :
+                        product.isPopular ? Color.orange.opacity(0.5) :
+                        Color.clear,
+                        lineWidth: 2
                     )
             )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(PlainButtonStyle())
         .onAppear {
+            updateFirstDoubleStatus()
+        }
+        .onChange(of: refreshToken) { _, _ in
             updateFirstDoubleStatus()
         }
     }
