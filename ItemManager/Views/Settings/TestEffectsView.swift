@@ -1,58 +1,70 @@
 
 import SwiftUI
 
+protocol LabGridDisplayable: Identifiable {
+    var title: String { get }
+    var icon: String { get }
+    var subtitle: String { get }
+}
+
 // MARK: - 实验室功能模块枚举
-enum LabModule: String, CaseIterable, Identifiable {
+enum LabModule: String, CaseIterable, LabGridDisplayable {
     case effects = "特效测试"
-    case iap = "支付测试"
-    case favoriteMenu = "菜单设置"
-    case notice = "公告管理"
-    case featureUnlock = "功能解锁"
-    case magicTasks = "魔法任务"
-    case checkIn = "签到打卡"
     case petReference = "萌宠参考"
-    case clearPetChat = "清除对话"
+    case admin = "管理员"
 
     var id: String { rawValue }
+    var title: String { rawValue }
 
     var icon: String {
         switch self {
         case .effects: return "sparkles"
-        case .iap: return "cart.fill"
-        case .favoriteMenu: return "star.fill"
-        case .notice: return "megaphone.fill"
-        case .featureUnlock: return "lock.open.fill"
-        case .magicTasks: return "wand.and.stars"
-        case .checkIn: return "checkmark.seal.fill"
         case .petReference: return "pawprint.fill"
-        case .clearPetChat: return "trash.circle.fill"
-        }
-    }
-
-    var iconColor: Color {
-        switch self {
-        case .effects: return .pink
-        case .iap: return .green
-        case .favoriteMenu: return .orange
-        case .notice: return .blue
-        case .featureUnlock: return .green
-        case .magicTasks: return .purple
-        case .checkIn: return .red
-        case .petReference: return .orange
-        case .clearPetChat: return .red
+        case .admin: return "person.crop.circle.badge.checkmark"
         }
     }
 
     var subtitle: String {
         switch self {
         case .effects: return "礼花 · 蝴蝶"
+        case .petReference: return "萌宠 · 互动 · AI"
+        case .admin: return "账号 · 公告 · 调试"
+        }
+    }
+}
+
+enum AdminLabModule: String, CaseIterable, LabGridDisplayable {
+    case iap = "支付测试"
+    case favoriteMenu = "菜单设置"
+    case noticeDiagnostics = "公告诊断"
+    case featureUnlock = "功能解锁"
+    case magicTasks = "魔法任务"
+    case checkIn = "签到打卡"
+    case clearPetChat = "清除对话"
+
+    var id: String { rawValue }
+    var title: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .iap: return "cart.fill"
+        case .favoriteMenu: return "star.fill"
+        case .noticeDiagnostics: return "megaphone.fill"
+        case .featureUnlock: return "lock.open.fill"
+        case .magicTasks: return "wand.and.stars"
+        case .checkIn: return "checkmark.seal.fill"
+        case .clearPetChat: return "trash.circle.fill"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
         case .iap: return "喵币 · 首充 · VIP"
         case .favoriteMenu: return "常用 · 清除"
-        case .notice: return "管理 · 预览"
+        case .noticeDiagnostics: return "环境 · 同步 · 权限"
         case .featureUnlock: return "解锁 · 显示"
         case .magicTasks: return "状态 · 重置"
         case .checkIn: return "记录 · 重置"
-        case .petReference: return "萌宠 · 互动 · AI"
         case .clearPetChat: return "萌宠 · 历史 · 清除"
         }
     }
@@ -91,7 +103,7 @@ struct TestEffectsView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        Text("选择实验模块进入测试")
+                        Text("用于特效预览、调试验证和管理员工具")
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
@@ -125,10 +137,10 @@ struct TestEffectsView: View {
 }
 
 // MARK: - 实验室豆腐块
-struct LabGridItem: View {
+struct LabGridItem<Module: LabGridDisplayable>: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
-    let module: LabModule
+    let module: Module
     let action: () -> Void
 
     var body: some View {
@@ -148,7 +160,7 @@ struct LabGridItem: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(module.rawValue)
+                    Text(module.title)
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
                         .lineLimit(1)
@@ -223,11 +235,78 @@ struct LabModuleDetailView: View {
                     switch module {
                     case .effects:
                         EffectsTestView()
+                    case .petReference:
+                        // 萌宠参考直接跳转到萌宠界面，不会走到这里
+                        EmptyView()
+                    case .admin:
+                        AdminToolsView()
+                    }
+                }
+            }
+            .navigationTitle(module.rawValue)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct AdminToolsView: View {
+    @State private var selectedModule: AdminLabModule? = nil
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Text("账号、公告、任务与调试工具")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                    .padding(.top, 20)
+
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(AdminLabModule.allCases) { module in
+                        LabGridItem(module: module) {
+                            selectedModule = module
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                Spacer(minLength: 50)
+            }
+        }
+        .sheet(item: $selectedModule) { module in
+            AdminLabModuleDetailView(module: module)
+        }
+    }
+}
+
+struct AdminLabModuleDetailView: View {
+    let module: AdminLabModule
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LiquidBackground()
+
+                Group {
+                    switch module {
                     case .iap:
                         IAPTestView()
                     case .favoriteMenu:
                         FavoriteMenuTestView()
-                    case .notice:
+                    case .noticeDiagnostics:
                         NoticeTestView()
                     case .featureUnlock:
                         FeatureUnlockSettingsView()
@@ -235,15 +314,12 @@ struct LabModuleDetailView: View {
                         MagicTasksTestView()
                     case .checkIn:
                         CheckInTestView()
-                    case .petReference:
-                        // 萌宠参考直接跳转到萌宠界面，不会走到这里
-                        EmptyView()
                     case .clearPetChat:
                         ClearPetChatTestView()
                     }
                 }
             }
-            .navigationTitle(module.rawValue)
+            .navigationTitle(module.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -490,7 +566,7 @@ struct NoticeTestView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("公告调试面板")
+                    Text("公告诊断面板")
                         .font(.headline)
                         .foregroundStyle(themeManager.primaryTextColor)
 

@@ -144,6 +144,46 @@ final class PetChatGuidanceEngineTests: XCTestCase {
 
         XCTAssertTrue(result.outerwears.contains(where: { $0.id == outerwear.id }))
     }
+
+    func testSemanticProfileInfersLengthMaterialSeasonAndOccasion() {
+        let clothing = Clothing(name: "古典茶会OP", types: "OP", colors: "酒红", length: "108cm")
+        clothing.tags = [Tag(name: "秋冬"), Tag(name: "茶会")]
+        clothing.note = "羊毛感长款，很适合正式场合"
+
+        let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+
+        XCTAssertEqual(profile.category, .dress)
+        XCTAssertEqual(profile.length, .long)
+        XCTAssertTrue(profile.materials.contains(.wool))
+        XCTAssertTrue(profile.seasons.contains(.winter) || profile.seasons.contains(.autumn))
+        XCTAssertTrue(profile.occasions.contains("茶会") || profile.occasions.contains("正式"))
+    }
+
+    func testWeatherSelectionPrefersRainSafeShoesInRain() {
+        let dress = Clothing(name: "莓果JSK", types: "JSK", colors: "粉色")
+        let rainBoots = Clothing(name: "防水雨靴", types: "鞋子", colors: "黑色")
+        rainBoots.note = "雨天稳妥"
+        let suedeShoes = Clothing(name: "奶白麂皮玛丽珍", types: "鞋子", colors: "白色")
+        suedeShoes.note = "晴天穿更合适"
+        let umbrella = Clothing(name: "透明晴雨伞", types: "配饰")
+
+        let weather = WeatherData(
+            temperature: 16,
+            apparentTemperature: 14,
+            condition: .moderateRain,
+            humidity: 88,
+            windSpeed: 5.0,
+            city: "上海",
+            updateTime: Date()
+        )
+
+        let result = PetChatGuidanceEngine.pickWeatherOutfitItems(
+            from: [dress, rainBoots, suedeShoes, umbrella],
+            weather: weather
+        )
+
+        XCTAssertEqual(result.shoes.first?.id, rainBoots.id)
+    }
     
     func testBuildWeatherAdviceContainsFeelsLikeAndOuterwearHint() {
         let outerwear = Clothing(name: "奶油开衫", types: "外套")
@@ -206,6 +246,21 @@ final class PetChatGuidanceEngineTests: XCTestCase {
         XCTAssertTrue(resolution.results.contains(where: { $0.id == cardigan.id }))
         XCTAssertTrue(resolution.matchedTerms.contains(where: { $0.contains("开衫") || $0.contains("披肩") || $0.contains("针织") }))
         XCTAssertTrue(resolution.suggestedPrompt.contains("标签"))
+    }
+
+    func testSearchResolutionCanUseLengthAndSemanticHints() {
+        let longDress = Clothing(name: "古典长OP", types: "OP", colors: "酒红", length: "108cm")
+        longDress.tags = [Tag(name: "秋冬"), Tag(name: "茶会")]
+        longDress.note = "羊毛感长款"
+        let shortDress = Clothing(name: "夏日短JSK", types: "JSK", colors: "蓝色", length: "88cm")
+        shortDress.note = "轻薄春夏"
+
+        let resolution = WardrobeContextManager.shared.resolveSearch(
+            query: "帮我找秋冬长款茶会裙",
+            clothings: [shortDress, longDress]
+        )
+
+        XCTAssertEqual(resolution.results.first?.id, longDress.id)
     }
 
     func testWardrobeContextBlockIncludesVocabularyLearning() {

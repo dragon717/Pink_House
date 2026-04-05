@@ -520,11 +520,11 @@ private struct PetCurrencyPanelWidget: View {
     private func actionCommandOption(for currency: PetCurrency) -> PetWidgetOption {
         switch currency {
         case .meowCoin:
-            return PetWidgetOption(title: "喵币充值", command: "pet_currency_action_meow")
+            return PetWidgetOption(title: "充值", command: "pet_currency_action_meow")
         case .fishCoin:
-            return PetWidgetOption(title: "鱼币兑换", command: "pet_currency_action_fish")
+            return PetWidgetOption(title: "兑换", command: "pet_currency_action_fish")
         case .boneCoin:
-            return PetWidgetOption(title: "骨头币兑换", command: "pet_currency_action_bone")
+            return PetWidgetOption(title: "兑换", command: "pet_currency_action_bone")
         }
     }
 }
@@ -652,11 +652,11 @@ private struct PetInventoryPanelWidget: View {
     private func currencyActionOption(for currency: PetCurrency) -> PetWidgetOption {
         switch currency {
         case .meowCoin:
-            return PetWidgetOption(title: "喵币充值", command: "pet_currency_action_meow")
+            return PetWidgetOption(title: "充值", command: "pet_currency_action_meow")
         case .fishCoin:
-            return PetWidgetOption(title: "鱼币兑换", command: "pet_currency_action_fish")
+            return PetWidgetOption(title: "兑换", command: "pet_currency_action_fish")
         case .boneCoin:
-            return PetWidgetOption(title: "骨头币兑换", command: "pet_currency_action_bone")
+            return PetWidgetOption(title: "兑换", command: "pet_currency_action_bone")
         }
     }
 }
@@ -790,11 +790,11 @@ private struct PetShopPanelWidget: View {
     private func currencyActionOption(for currency: PetCurrency) -> PetWidgetOption {
         switch currency {
         case .meowCoin:
-            return PetWidgetOption(title: "喵币充值", command: "pet_currency_action_meow")
+            return PetWidgetOption(title: "充值", command: "pet_currency_action_meow")
         case .fishCoin:
-            return PetWidgetOption(title: "鱼币兑换", command: "pet_currency_action_fish")
+            return PetWidgetOption(title: "兑换", command: "pet_currency_action_fish")
         case .boneCoin:
-            return PetWidgetOption(title: "骨头币兑换", command: "pet_currency_action_bone")
+            return PetWidgetOption(title: "兑换", command: "pet_currency_action_bone")
         }
     }
 }

@@ -60,7 +60,8 @@ private func petChatStatusSubtitle(for status: PetStatus, kind: PetStatusPanelKi
     case .hydration:
         return "这是我现在的饮水状态，要不要马上喂我喝一点呀？"
     case .hygiene:
-        return "这是我现在的清洁状态，要不要顺手帮我洗香香？"
+        let cleaning = petCleaningContext(for: status)
+        return "这是我现在的清洁状态，帮\(cleaning.petName)洗香香要花\(cleaning.cost)\(cleaning.currency.rawValue)，要不要现在就洗？"
     case .mood:
         return "这是我现在的心情，我单独给你看看。"
     case .intimacy:
@@ -68,7 +69,7 @@ private func petChatStatusSubtitle(for status: PetStatus, kind: PetStatusPanelKi
     }
 }
 
-private func petChatStatusOptions(for kind: PetStatusPanelKind) -> [PetWidgetOption] {
+private func petChatStatusOptions(for status: PetStatus, kind: PetStatusPanelKind) -> [PetWidgetOption] {
     switch kind {
     case .all:
         return [
@@ -89,8 +90,9 @@ private func petChatStatusOptions(for kind: PetStatusPanelKind) -> [PetWidgetOpt
             PetWidgetOption(title: "顺便看看我的饱食", command: "pet_status_hunger", icon: "fork.knife.circle.fill")
         ]
     case .hygiene:
+        let cleaning = petCleaningContext(for: status)
         return [
-            PetWidgetOption(title: "给我洗香香", command: "pet_clean_now", icon: "sparkles"),
+            PetWidgetOption(title: "给我洗香香（\(cleaning.cost)\(cleaning.currency.rawValue)）", command: "pet_clean_now", icon: "sparkles"),
             PetWidgetOption(title: "看看我的全部状态", command: "pet_status_all", icon: "rectangle.stack.fill")
         ]
     case .mood:
@@ -111,7 +113,7 @@ func makeStatusPanelWidget(status: PetStatus, kind: PetStatusPanelKind, feedback
         type: .statusPanel,
         title: kind == .all ? "我的状态总览" : "我的\(kind.title)",
         subtitle: feedback ?? petChatStatusSubtitle(for: status, kind: kind),
-        options: petChatStatusOptions(for: kind),
+        options: petChatStatusOptions(for: status, kind: kind),
         metrics: petChatStatusMetrics(for: status, kind: kind)
     )
 }

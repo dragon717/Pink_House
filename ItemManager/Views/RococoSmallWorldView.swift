@@ -322,9 +322,7 @@ struct RococoSmallWorldView: View {
         .alert("功能未解锁", isPresented: $showUnlockAlert) {
             if let dest = lockedDestination,
                let feature = dest.featureItem {
-                let condition = featureManager.getCondition(for: feature)
-                // 兑换码解锁的功能只显示"我知道啦～"按钮
-                if condition.type == UnlockConditionType.redeemCode.rawValue {
+                if feature.isComingSoonFeature {
                     Button("我知道啦～", role: .cancel) { }
                 } else {
                     Button("取消", role: .cancel) { }

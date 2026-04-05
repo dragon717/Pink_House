@@ -245,13 +245,18 @@ struct PetBottomPanel: View {
                     Text("20")
                         .font(.caption)
                         .fontWeight(.bold)
-                    Image(systemName: "fish.circle.fill")
-                        .font(.caption2)
+                    if viewModel.currentPet == .maomao {
+                        Text("🦴")
+                            .font(.caption2)
+                    } else {
+                        Image(systemName: "fish.circle.fill")
+                            .font(.caption2)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.blue.opacity(0.1))
-                .foregroundColor(.blue)
+                .background((viewModel.currentPet == .maomao ? Color.brown : Color.blue).opacity(0.1))
+                .foregroundColor(viewModel.currentPet == .maomao ? .brown : .blue)
                 .clipShape(Capsule())
             }
             // .disabled(viewModel.currentState != .idle) // 移除禁用，改为点击提示

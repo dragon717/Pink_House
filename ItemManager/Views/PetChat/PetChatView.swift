@@ -1504,6 +1504,20 @@ struct PetChatView: View {
         )
     }
 
+    private func handlePetCleanNow(messageID: UUID) {
+        let result = cleanPetStatusNow()
+        switch result.fundingDestination {
+        case .meowCoinStore:
+            showingMeowCoinStore = true
+        case .currencyExchange(let direction):
+            preferredExchangeDirection = direction
+            showingCurrencyExchangeSheet = true
+        case nil:
+            break
+        }
+        refreshPanel(for: "pet_clean_now", messageID: messageID, feedback: result.feedback)
+    }
+
     private func handleThemeConversationIntent(_ text: String) -> Bool {
         guard let result = PetThemeConversationEngine.handleIfNeeded(userText: text, themeManager: themeManager) else {
             return false
@@ -1572,12 +1586,7 @@ struct PetChatView: View {
         case "pet_currency_bone":
             refreshPanel(for: "pet_currency_bone", messageID: messageID)
         case "pet_currency_action_meow":
-#if DEBUG
-            _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 100)
-            messages.append(PetChatMessage(text: "🛠️ Debug：已添加 100 喵币", isUser: false, isAIGenerated: true))
-#else
             showingMeowCoinStore = true
-#endif
         case "pet_currency_action_fish":
             preferredExchangeDirection = .fishToBone
             showingCurrencyExchangeSheet = true
@@ -1615,14 +1624,9 @@ struct PetChatView: View {
         case "pet_topup":
             handleMeowCoinTopUpIntent()
         case "pet_clean_now":
-            refreshPanel(for: "pet_clean_now", messageID: messageID, feedback: cleanPetStatusNow())
+            handlePetCleanNow(messageID: messageID)
         case "open_meow_store":
-#if DEBUG
-            _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 100)
-            messages.append(PetChatMessage(text: "🛠️ Debug：已添加 100 喵币", isUser: false, isAIGenerated: true))
-#else
             showingMeowCoinStore = true
-#endif
         case "open_vip_center":
             showingVIPCenter = true
         case "open_money_counting":
@@ -2112,21 +2116,22 @@ struct PetChatView: View {
         }
 
         isThinking = true
-        let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(from: clothings, stylePreference: stylePreference)
 
         Task { @MainActor in
             let weather = await fetchCurrentWeather()
+            let selection = PetChatGuidanceEngine.pickWeatherOutfitItems(
+                from: clothings,
+                weather: weather,
+                stylePreference: stylePreference
+            )
+            let baseAdvice = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
             let responseText: String
-            if let stylePreference = stylePreference {
-                if stylePreference.contains("甜美") {
-                    responseText = "好哒~这就给你搭配一套甜美的风格！"
-                } else if stylePreference.contains("防雨") {
-                    responseText = "没问题~这就给你搭配一套更稳妥防雨的！"
-                } else {
-                    responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
-                }
+            if let stylePreference = stylePreference, stylePreference.contains("甜美") {
+                responseText = "好哒~我会按甜美方向，再结合天气稳稳地帮你挑。\n\(baseAdvice)"
+            } else if let stylePreference = stylePreference, stylePreference.contains("防雨") {
+                responseText = "没问题~我会优先挑更稳妥防雨的单品。\n\(baseAdvice)"
             } else {
-                responseText = PetChatGuidanceEngine.buildWeatherAdvice(weather: weather, selection: selection)
+                responseText = baseAdvice
             }
             let items = selection.combinedItems
             let widgets = PetChatWidgetFactory.weatherGuidanceWidgets(weather: weather, selection: selection)

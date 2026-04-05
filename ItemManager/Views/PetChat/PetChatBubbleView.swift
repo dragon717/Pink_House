@@ -368,6 +368,10 @@ struct PetChatBubble: View {
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
                 bubbleText(expandsToBubbleWidth: !embeddedQuickOptionWidgets.isEmpty)
 
+                if let results = message.searchResults, !results.isEmpty {
+                    inlineSearchResults(results)
+                }
+
                 if !embeddedQuickOptionWidgets.isEmpty {
                     PetGenerativeWidgetHost(widgets: embeddedQuickOptionWidgets) { option in
                         onWidgetAction(option, message.id)
@@ -375,6 +379,17 @@ struct PetChatBubble: View {
                     .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
                 }
             }
+        }
+    }
+
+    private func inlineSearchResults(_ results: [Clothing]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("可选单品")
+                .font(.caption)
+                .foregroundStyle(themeManager.secondaryTextColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            clothingCarousel(results, onTap: onSearchResultTap)
         }
     }
 

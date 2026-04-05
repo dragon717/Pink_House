@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 struct VIPCenterView: View {
     @ObservedObject private var vipManager = VIPManager.shared
@@ -15,10 +16,8 @@ struct VIPCenterView: View {
     @State private var infoAlertTitle = ""
     @State private var infoAlertMessage = ""
 
-    @State private var showingVIPRedeemAlert = false
-    @State private var vipCodeInput = ""
-    @State private var showingRedeemResultAlert = false
-    @State private var redeemResultMessage = ""
+    @State private var showingOfferCodeInfoAlert = false
+    @State private var showingOfferCodeRedemption = false
 
     @State private var showTrialPopup = false
     @State private var hasCheckedTrialOnAppear = false
@@ -162,19 +161,13 @@ struct VIPCenterView: View {
         } message: {
             Text(infoAlertMessage)
         }
-        .alert("VIP 兑换", isPresented: $showingVIPRedeemAlert) {
-            TextField("请输入兑换码", text: $vipCodeInput)
+        .alert("使用 App Store 优惠码", isPresented: $showingOfferCodeInfoAlert) {
             Button("取消", role: .cancel) { }
-            Button("兑换") {
-                redeemVIPCode()
+            Button("继续") {
+                showingOfferCodeRedemption = true
             }
         } message: {
-            Text("输入神秘代码获取奖励")
-        }
-        .alert("兑换结果", isPresented: $showingRedeemResultAlert) {
-            Button("确定", role: .cancel) { }
-        } message: {
-            Text(redeemResultMessage)
+            Text("优惠码由 Apple 官方提供，仅适用于本 App 在 App Store 中提供的内购项目。点击“继续”后，将打开 Apple 系统兑换界面。兑换成功后，符合条件的商品会自动到账；管理员入口、实验室权限和其他内部功能不通过优惠码开放。")
         }
         .overlay {
             if showTrialPopup {
@@ -214,6 +207,14 @@ struct VIPCenterView: View {
         }
         .onDisappear {
             AppFirstLaunchGuideManager.shared.resetGuideTargetFrames([.aiAnalysisVIPTrialConfirmButton])
+        }
+        .offerCodeRedemption(isPresented: $showingOfferCodeRedemption) { result in
+            if case .failure = result {
+                presentInfoAlert(
+                    title: "暂时无法打开",
+                    message: "无法打开 App Store 优惠码兑换界面，请稍后重试。"
+                )
+            }
         }
     }
 
@@ -459,10 +460,9 @@ struct VIPCenterView: View {
                 }
 
                 Button {
-                    vipCodeInput = ""
-                    showingVIPRedeemAlert = true
+                    showingOfferCodeInfoAlert = true
                 } label: {
-                    Label("使用兑换码", systemImage: "gift")
+                    Label("兑换 App Store 优惠码", systemImage: "gift")
                 }
             } label: {
                 floatingActionButton(icon: "ellipsis")
@@ -946,46 +946,6 @@ struct VIPCenterView: View {
         infoAlertTitle = title
         infoAlertMessage = message
         showInfoAlert = true
-    }
-
-    private func redeemVIPCode() {
-        let code = vipCodeInput.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let featureResult = FeatureUnlockManager.shared.redeemCode(code)
-        if featureResult.success {
-            redeemResultMessage = featureResult.message
-            showingRedeemResultAlert = true
-            return
-        }
-
-        if code == "太子爷" {
-            let key = "HasRedeemedVIP_Prince"
-            if UserDefaults.standard.bool(forKey: key) {
-                redeemResultMessage = "您已经领取过该奖励啦！"
-                showingRedeemResultAlert = true
-            } else {
-                UserDefaults.standard.set(true, forKey: key)
-                _ = PetDataManager.shared.updateCurrency(type: .meowCoin, delta: 666)
-                _ = PetDataManager.shared.updateCurrency(type: .fishCoin, delta: 88888)
-                redeemResultMessage = "兑换成功！\n获得 666 喵币\n88888 鱼币"
-                showingRedeemResultAlert = true
-            }
-            return
-        }
-
-        if code == "adminmuniao" {
-            UserDefaults.standard.set(true, forKey: "LabEntryEnabled")
-            redeemResultMessage = "实验室入口已开启！\n请前往「我的」页面查看"
-            showingRedeemResultAlert = true
-            return
-        }
-
-        if featureResult.feature != nil {
-            redeemResultMessage = featureResult.message
-        } else {
-            redeemResultMessage = "兑换码无效"
-        }
-        showingRedeemResultAlert = true
     }
 }
 

@@ -374,20 +374,7 @@ class WardrobeContextManager {
     }
     
     private func buildSearchableText(for clothing: Clothing) -> String {
-        let accessoryItems = clothing.accessoryItems?.map(\.name).joined(separator: ",") ?? ""
-        let tagNames = clothing.tags?.map(\.name).joined(separator: ",") ?? ""
-        return [
-            clothing.name,
-            clothing.types,
-            clothing.colors,
-            clothing.accessories,
-            accessoryItems,
-            clothing.note,
-            clothing.brand?.name ?? "",
-            tagNames
-        ]
-        .joined(separator: ",")
-        .lowercased()
+        ClothingSemanticAnalyzer.searchableText(for: clothing)
     }
     
     private func containsAny(in text: String, hints: [String]) -> Bool {
@@ -570,6 +557,7 @@ class WardrobeContextManager {
     private func buildItemPayload(for clothing: Clothing) -> [String: Any] {
         var features: [String] = []
         let brand = clothing.brand?.name ?? "未知品牌"
+        let semantic = ClothingSemanticAnalyzer.profile(for: clothing)
         features.append("品牌:\(brand)")
         
         if !clothing.types.isEmpty {
@@ -582,6 +570,9 @@ class WardrobeContextManager {
         if !clothing.colors.isEmpty {
             features.append("颜色:\(clothing.colors)")
         }
+        if !clothing.length.isEmpty {
+            features.append("衣长:\(clothing.length)")
+        }
         if !clothing.condition.isEmpty {
             features.append("状态:\(clothing.condition)")
         }
@@ -593,7 +584,8 @@ class WardrobeContextManager {
         if !clothing.note.isEmpty {
             features.append("备注:\(String(clothing.note.prefix(24)))")
         }
-        features = Array(features.prefix(5))
+        features.append(contentsOf: semantic.featureBadges)
+        features = Array(features.uniqued().prefix(7))
         
         let accessoryCandidates = collectAccessories(for: clothing)
         let accessoryPayload = accessoryCandidates.prefix(6).map { name in
@@ -755,6 +747,7 @@ class WardrobeContextManager {
 
     private func explicitTerms(for clothing: Clothing) -> [String] {
         let rawTerms = queryTokens(clothing.types) +
+            queryTokens(clothing.length) +
             queryTokens(clothing.accessories) +
             queryTokens(clothing.note) +
             (clothing.tags?.map(\.name) ?? []) +
@@ -877,10 +870,12 @@ class WardrobeContextManager {
         let lowerName = clothing.name.lowercased()
         let lowerBrand = clothing.brand?.name.lowercased() ?? ""
         let lowerTypes = clothing.types.lowercased()
+        let lowerLength = clothing.length.lowercased()
         let lowerAccessories = clothing.accessories.lowercased()
         let lowerNote = clothing.note.lowercased()
         let lowerTags = (clothing.tags?.map(\.name).joined(separator: ",") ?? "").lowercased()
         let lowerAccessoryItems = (clothing.accessoryItems?.map(\.name).joined(separator: ",") ?? "").lowercased()
+        let semanticText = ClothingSemanticAnalyzer.profile(for: clothing).featureTokens.joined(separator: ",").lowercased()
 
         var score = 0
 
@@ -894,6 +889,9 @@ class WardrobeContextManager {
             if lowerTypes.contains(term) {
                 score += 5
             }
+            if lowerLength.contains(term) {
+                score += 5
+            }
             if lowerAccessories.contains(term) || lowerAccessoryItems.contains(term) {
                 score += 4
             }
@@ -903,9 +901,12 @@ class WardrobeContextManager {
             if lowerNote.contains(term) {
                 score += 2
             }
+            if semanticText.contains(term) {
+                score += 4
+            }
         }
 
-        if lowerName.contains(query) || lowerTags.contains(query) || lowerTypes.contains(query) {
+        if lowerName.contains(query) || lowerTags.contains(query) || lowerTypes.contains(query) || lowerLength.contains(query) || semanticText.contains(query) {
             score += 4
         }
 

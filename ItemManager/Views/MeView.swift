@@ -28,6 +28,8 @@ struct MeView: View {
     @State private var showingCloudSyncSheet = false
     @State private var showMagicTasks = false
     @State private var navigationDestination: String? = nil
+    @State private var isAdminUser = false
+    @State private var isCheckingAdmin = true
 
     // Grid Layout
     private let columns = [
@@ -35,13 +37,8 @@ struct MeView: View {
         GridItem(.flexible(), spacing: 16)
     ]
     
-    // 实验室入口是否显示（Debug 模式或通过兑换码开启）
-    private var shouldShowLabEntry: Bool {
-        #if DEBUG
-        return true
-        #else
-        return UserDefaults.standard.bool(forKey: "LabEntryEnabled")
-        #endif
+    private var shouldShowAdminEntries: Bool {
+        !isCheckingAdmin && isAdminUser
     }
     
     // MARK: - 魔法任务卡片背景（适配主题色）
@@ -167,19 +164,6 @@ struct MeView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
 
-                        // 联网设置（已解锁时才显示）
-                        if FeatureUnlockManager.shared.isUnlocked(.networkCommunity) {
-                            NavigationLink(destination: NetworkSettingsView()) {
-                                SettingsGridItem(
-                                    title: "联网设置",
-                                    subtitle: "社区 · 分享 · 追根溯源",
-                                    icon: "network",
-                                    iconColor: .cyan
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-
                         // 彩蛋设置
                         EasterEggSettingsCard()
 
@@ -237,12 +221,21 @@ struct MeView: View {
                         .buttonStyle(PlainButtonStyle())
                         .captureGuideTarget(.systemSettingsEntry)
                         
-                        // 开发测试 (仅 Debug 或通过兑换码开启)
-                        if shouldShowLabEntry {
+                        if shouldShowAdminEntries {
+                            NavigationLink(destination: NoticeAdminView()) {
+                                SettingsGridItem(
+                                    title: "公告管理",
+                                    subtitle: "发布 · 编辑 · 云端同步",
+                                    icon: "megaphone.fill",
+                                    iconColor: .blue
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
                             NavigationLink(destination: TestEffectsView()) {
                                 SettingsGridItem(
                                     title: "实验室",
-                                    subtitle: "特效测试 · 公告管理",
+                                    subtitle: "特效 · 调试 · 管理员",
                                     icon: "flask.fill",
                                     iconColor: .green
                                 )
@@ -302,6 +295,7 @@ struct MeView: View {
             if authManager.isAuthenticated {
                 cloudManager.fetchLatestBackupMetadata()
             }
+            refreshAdminAccess()
         }
         .onReceive(NotificationCenter.default.publisher(for: .showMagicTasks)) { _ in
             showMagicTasks = true
@@ -406,6 +400,18 @@ struct MeView: View {
     }
     
     // MARK: - Import Logic
+    private func refreshAdminAccess() {
+        isCheckingAdmin = true
+
+        Task {
+            let hasAdminAccess = await NoticeCloudKitService.shared.isAdmin()
+            await MainActor.run {
+                isAdminUser = hasAdminAccess
+                isCheckingAdmin = false
+            }
+        }
+    }
+
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):

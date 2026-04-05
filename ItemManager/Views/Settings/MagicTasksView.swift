@@ -84,29 +84,6 @@ struct MagicTasksView: View {
                         }
                     }
 
-                    // 兑换码提示
-                    Section {
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 8) {
-                                Image(systemName: "key.fill")
-                                    .font(.title2)
-                                    .foregroundColor(themeManager.accentTextColor)
-
-                                Text("有兑换码？")
-                                    .font(.headline)
-                                    .foregroundColor(themeManager.primaryTextColor)
-
-                                Text("前往 VIP 中心输入兑换码\n直接解锁隐藏功能")
-                                    .font(.caption)
-                                    .foregroundColor(themeManager.secondaryTextColor)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.vertical, 16)
-                            Spacer()
-                        }
-                    }
-                    .listRowBackground(themeManager.cardBackgroundColor.opacity(colorScheme == .dark ? 0.3 : 0.15))
                 }
                 .scrollContentBackground(.hidden) // 隐藏List默认背景
             }

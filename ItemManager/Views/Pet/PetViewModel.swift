@@ -37,6 +37,29 @@ enum FloatingTextStyle: Equatable {
     }
 }
 
+enum PetFundingSheetDestination: Identifiable, Equatable {
+    case meowCoinStore
+    case currencyExchange(PetCurrencyExchangeDirection)
+
+    var id: String {
+        switch self {
+        case .meowCoinStore:
+            return "meowCoinStore"
+        case .currencyExchange(let direction):
+            return "currencyExchange:\(direction.rawValue)"
+        }
+    }
+}
+
+struct PetFundingPrompt: Identifiable {
+    let id = UUID()
+    let currency: PetCurrency
+    let title: String
+    let message: String
+    let actionTitle: String
+    let destination: PetFundingSheetDestination
+}
+
 class PetViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var currentState: PetState = .idle
@@ -47,6 +70,8 @@ class PetViewModel: ObservableObject {
     @Published var floatingTexts: [FloatingTextData] = []
     @Published var recognizedSpeechText: String = ""
     @Published var isAIMode: Bool = false // 是否开启 AI 对话模式
+    @Published var presentedFundingSheet: PetFundingSheetDestination?
+    @Published var presentedFundingPrompt: PetFundingPrompt?
     
     // MARK: - Behavior
     var currentBehavior: PetBehavior = DefaultPetBehavior(character: .naicha)
@@ -725,7 +750,7 @@ class PetViewModel: ObservableObject {
         }
         
         guard canAfford else {
-            showFloatingText("余额不足", style: .warning)
+            presentShopFundingPrompt(for: item.petCurrency, itemName: item.name)
             return
         }
         
@@ -735,7 +760,7 @@ class PetViewModel: ObservableObject {
             status.fishCoin -= finalPrice
         case .meowCoin:
             guard StoreManager.spendMeowCoins(finalPrice, in: &status) else {
-                showFloatingText("余额不足", style: .warning)
+                presentFundingFlow(for: .meowCoin)
                 return
             }
         case .boneCoin:
@@ -1014,12 +1039,34 @@ class PetViewModel: ObservableObject {
             return
         }
         
-        // 检查鱼币是否足够
         let cost = 20
-        if status.fishCoin >= cost {
-            // 扣除鱼币
-            status.fishCoin -= cost
-            showFloatingText("-\(cost)", style: .fishCoin)
+        let cleaningCurrency: PetCurrency = currentPet == .maomao ? .boneCoin : .fishCoin
+
+        let canAffordCleaning: Bool
+        switch cleaningCurrency {
+        case .fishCoin:
+            canAffordCleaning = status.fishCoin >= cost
+        case .boneCoin:
+            canAffordCleaning = status.boneCoin >= cost
+        case .meowCoin:
+            canAffordCleaning = status.meowCoin >= cost
+        }
+
+        if canAffordCleaning {
+            switch cleaningCurrency {
+            case .fishCoin:
+                status.fishCoin -= cost
+                showFloatingText("-\(cost)", style: .fishCoin)
+            case .boneCoin:
+                status.boneCoin -= cost
+                showFloatingText("-\(cost)", style: .boneCoin)
+            case .meowCoin:
+                guard StoreManager.spendMeowCoins(cost, in: &status) else {
+                    presentFundingFlow(for: .meowCoin)
+                    return
+                }
+                showFloatingText("-\(cost)", style: .meowCoin)
+            }
             
             // 更新状态
             let oldHygiene = status.hygiene
@@ -1061,8 +1108,7 @@ class PetViewModel: ObservableObject {
             }
             showFloatingText("心情 +10", style: .mood)
         } else {
-            // 余额不足提示
-            showFloatingText("鱼币不足!", style: .warning)
+            presentFundingFlow(for: cleaningCurrency)
         }
     }
     
@@ -1185,7 +1231,7 @@ class PetViewModel: ObservableObject {
                 showFloatingText("-\(finalPrice)", style: .fishCoin)
                 return true
             } else {
-                showFloatingText("余额不足", style: .warning)
+                presentShopFundingPrompt(for: .fishCoin, itemName: item.name)
             }
         case .meowCoin:
             if StoreManager.spendMeowCoins(finalPrice, in: &status) {
@@ -1194,7 +1240,7 @@ class PetViewModel: ObservableObject {
                 showFloatingText("-\(finalPrice)", style: .meowCoin)
                 return true
             } else {
-                showFloatingText("余额不足", style: .warning)
+                presentShopFundingPrompt(for: .meowCoin, itemName: item.name)
             }
         case .boneCoin:
             if status.boneCoin >= finalPrice {
@@ -1204,10 +1250,73 @@ class PetViewModel: ObservableObject {
                 showFloatingText("-\(finalPrice)", style: .boneCoin)
                 return true
             } else {
-                showFloatingText("余额不足", style: .warning)
+                presentShopFundingPrompt(for: .boneCoin, itemName: item.name)
             }
         }
         return false
+    }
+
+    private func presentShopFundingPrompt(for currency: PetCurrency, itemName: String) {
+        presentedFundingSheet = nil
+        presentedFundingPrompt = makeFundingPrompt(for: currency, itemName: itemName)
+    }
+
+    private func presentFundingFlow(for currency: PetCurrency) {
+        presentedFundingPrompt = nil
+        switch currency {
+        case .meowCoin:
+            showFloatingText("喵币不足", style: .warning)
+            presentedFundingSheet = .meowCoinStore
+        case .fishCoin:
+            showFloatingText("鱼币不足", style: .warning)
+            presentedFundingSheet = .currencyExchange(.boneToFish)
+        case .boneCoin:
+            showFloatingText("骨头币不足", style: .warning)
+            presentedFundingSheet = .currencyExchange(.fishToBone)
+        }
+    }
+
+    private func makeFundingPrompt(for currency: PetCurrency, itemName: String) -> PetFundingPrompt {
+        switch currency {
+        case .meowCoin:
+            return PetFundingPrompt(
+                currency: .meowCoin,
+                title: "喵币不够啦",
+                message: "想把\(itemName)带回家，还差一点喵币。先去充值一下，再回来继续逛萌宠商店吧。",
+                actionTitle: "去充喵币",
+                destination: .meowCoinStore
+            )
+        case .fishCoin:
+            return PetFundingPrompt(
+                currency: .fishCoin,
+                title: "鱼币不够啦",
+                message: "想买\(itemName)，还差一点鱼币。先把骨头币换成鱼币，再回来继续挑吧。",
+                actionTitle: "去换鱼币",
+                destination: .currencyExchange(.boneToFish)
+            )
+        case .boneCoin:
+            return PetFundingPrompt(
+                currency: .boneCoin,
+                title: "骨头币不够啦",
+                message: "想买\(itemName)，还差一点骨头币。先把鱼币换成骨头币，再回来继续挑吧。",
+                actionTitle: "去换骨头币",
+                destination: .currencyExchange(.fishToBone)
+            )
+        }
+    }
+
+    func dismissFundingPrompt() {
+        presentedFundingPrompt = nil
+    }
+
+    func continueFundingPromptFlow() {
+        guard let destination = presentedFundingPrompt?.destination else { return }
+        presentedFundingPrompt = nil
+        presentedFundingSheet = destination
+    }
+
+    func dismissFundingSheet() {
+        presentedFundingSheet = nil
     }
     
     // 货币兑换：鱼币 -> 骨头币

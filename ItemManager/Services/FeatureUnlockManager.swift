@@ -11,7 +11,7 @@ enum UnlockConditionType: String, CaseIterable, Identifiable {
     case clothingCount = "clothingCount"  // 衣物数量解锁
     case loginDays = "loginDays"          // 登录天数解锁
     case petLevel = "petLevel"            // 萌宠等级解锁
-    case redeemCode = "redeemCode"        // 兑换码解锁（VIP界面输入）
+    case redeemCode = "redeemCode"        // 兼容历史数据
     case manual = "manual"                // 手动控制（运营活动/限时开放）
     
     var id: String { rawValue }
@@ -24,7 +24,7 @@ enum UnlockConditionType: String, CaseIterable, Identifiable {
         case .clothingCount: return "收集解锁"
         case .loginDays: return "签到解锁"
         case .petLevel: return "萌宠等级"
-        case .redeemCode: return "兑换码解锁"
+        case .redeemCode: return "限时开放"
         case .manual: return "体验完成任务"
         }
     }
@@ -37,7 +37,7 @@ enum UnlockConditionType: String, CaseIterable, Identifiable {
         case .clothingCount: return "tshirt.fill"
         case .loginDays: return "calendar.badge.clock"
         case .petLevel: return "pawprint.fill"
-        case .redeemCode: return "key.fill"
+        case .redeemCode: return "sparkles"
         case .manual: return "sparkles"
         }
     }
@@ -78,9 +78,6 @@ struct UnlockCondition: Codable, Equatable {
         UnlockCondition(type: "manual", requiredValue: 0, description: description)
     }
     
-    static func redeemCode(_ code: String, description: String) -> UnlockCondition {
-        UnlockCondition(type: "redeemCode", requiredValue: 0, description: description)
-    }
 }
 
 // MARK: - 业务系统/功能项定义
@@ -234,14 +231,11 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .calendar:
             return .clothingCount(10)
         case .bigWorld:
-            // 世界书：在VIP界面兑换码输入 "vip世界书" 解锁
-            return .redeemCode("vip世界书", description: "仍在认真开发和内测中，敬请期待～")
+            return .manual(description: "仍在认真开发和内测中，敬请期待～")
         case .perler:
-            // 拼豆工坊：在VIP界面兑换码输入 "vip拼豆工坊" 解锁
-            return .redeemCode("vip拼豆工坊", description: "仍在认真开发和内测中，敬请期待～")
+            return .manual(description: "仍在认真开发和内测中，敬请期待～")
         case .dressStock:
-            // 裙装股市：在VIP界面兑换码输入 "vip裙装股市" 解锁
-            return .redeemCode("vip裙装股市", description: "仍在认真开发和内测中，敬请期待～")
+            return .manual(description: "仍在认真开发和内测中，敬请期待～")
         case .dataBackup, .cloudSync:
             return .free()
         case .batchImport:
@@ -255,11 +249,9 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         case .customColorPersonalization:
             return .manual(description: "体验客制化配色和个性化功能")
         case .networkCommunity:
-            // 联网设置：在VIP界面兑换码输入 "vip联网" 解锁
-            return .redeemCode("vip联网", description: "仍在认真开发和内测中，敬请期待～")
+            return .manual(description: "功能暂未开放，敬请期待～")
         case .magicTasks:
-            // 魔法任务：在VIP界面兑换码输入 "vip魔法任务" 解锁
-            return .redeemCode("vip魔法任务", description: "仍在认真开发和内测中，敬请期待～")
+            return .free()
         case .filterClassic:
             return .manual(description: "体验个性化偏好功能")
         case .privacyDisplay:
@@ -284,10 +276,30 @@ enum FeatureItem: String, CaseIterable, Identifiable {
         switch self {
         case .bigWorld, .perler, .dressStock:
             return true // 世界书、拼豆工坊、裙装股市默认隐藏
-        case .networkCommunity, .magicTasks:
-            return false  // 联网社区和魔法任务默认显示
+        case .networkCommunity:
+            return true
+        case .magicTasks:
+            return false
         case .filterClassic, .privacyDisplay, .tagBrandFieldDisplay, .spaceBook, .batchEdit, .localFileBackupRestore, .exportCSV, .cloudFileBackupRestore, .customColorPersonalization:
             return false  // 这些功能默认显示，作为魔法任务可获取鱼币
+        default:
+            return false
+        }
+    }
+
+    var isPublicUnlockTask: Bool {
+        switch self {
+        case .bigWorld, .perler, .dressStock, .networkCommunity:
+            return false
+        default:
+            return true
+        }
+    }
+
+    var isComingSoonFeature: Bool {
+        switch self {
+        case .bigWorld, .perler, .dressStock, .networkCommunity:
+            return true
         default:
             return false
         }
@@ -481,13 +493,13 @@ final class FeatureUnlockManager: ObservableObject {
             if unlockConditions[feature.rawValue] == nil {
                 unlockConditions[feature.rawValue] = defaultCondition
             } else if feature == .pet {
-                // 萌宠改为默认开启：兼容历史用户旧的兑换码配置
+                // 萌宠改为默认开启：兼容历史用户旧配置
                 unlockConditions[feature.rawValue] = defaultCondition
             } else if feature == .themeCustomize {
                 // 魔法配色的喵币任务改为“累计消费”，强制覆盖旧版本的即时扣费文案/配置
                 unlockConditions[feature.rawValue] = defaultCondition
-            } else if defaultCondition.type == UnlockConditionType.redeemCode.rawValue {
-                // 对于兑换码解锁的功能，强制更新描述文字（用于文案调整）
+            } else if [.bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks].contains(feature) {
+                // 对已下线/调整为正式能力的功能，强制覆盖历史条件配置
                 unlockConditions[feature.rawValue] = defaultCondition
             }
             
@@ -637,8 +649,7 @@ final class FeatureUnlockManager: ObservableObject {
             return (false, condition.description)
             
         case .redeemCode:
-            // 兑换码解锁，需要在VIP界面输入正确兑换码
-            // 这里返回false，实际解锁逻辑在 redeemCode 方法中处理
+            // 历史数据兼容：当前版本不再提供该解锁入口
             return (false, condition.description)
         }
     }
@@ -767,10 +778,8 @@ final class FeatureUnlockManager: ObservableObject {
     func getLockableFeatures() -> [FeatureItem] {
         return FeatureItem.allCases.filter {
             let condition = getCondition(for: $0)
-            // 免费功能和兑换码功能不在魔法任务界面显示
-            // 兑换码功能需要在VIP界面输入兑换码解锁
             return condition.type != UnlockConditionType.free.rawValue &&
-                   condition.type != UnlockConditionType.redeemCode.rawValue
+                   $0.isPublicUnlockTask
         }
     }
     
@@ -821,47 +830,6 @@ final class FeatureUnlockManager: ObservableObject {
         UserDefaults.standard.set(days, forKey: "loginDays")
     }
     
-    // MARK: - 兑换码解锁
-    
-    /// 验证兑换码并解锁对应功能
-    /// - Parameter code: 用户输入的兑换码
-    /// - Returns: (是否成功, 解锁的功能, 提示信息)
-    func redeemCode(_ code: String) -> (success: Bool, feature: FeatureItem?, message: String) {
-        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-
-        // 定义兑换码与功能的映射
-        let codeMapping: [String: FeatureItem] = [
-            "vip世界书": .bigWorld,
-            "vip拼豆工坊": .perler,
-            "vip裙装股市": .dressStock,
-            "vip联网": .networkCommunity,
-            "vip魔法任务": .magicTasks
-        ]
-
-        // 查找对应的功能
-        guard let feature = codeMapping[trimmedCode] else {
-            return (false, nil, "兑换码无效，请检查后重试")
-        }
-
-        // 检查是否已解锁
-        if isUnlocked(feature) {
-            return (false, feature, "\(feature.displayName) 已经解锁了")
-        }
-
-        // 执行解锁
-        performUnlock(feature, by: "redeemCode:\(trimmedCode)")
-
-        // 解锁后自动显示
-        setVisible(feature, visible: true)
-
-        return (true, feature, "\(feature.displayName) 解锁成功！")
-    }
-
-    /// 获取所有兑换码解锁的功能列表
-    func getRedeemCodeFeatures() -> [FeatureItem] {
-        return [.bigWorld, .perler, .dressStock, .networkCommunity, .magicTasks]
-    }
-    
     // MARK: - 启动时刷新进度
     
     /// 刷新所有魔法任务的进度数据
@@ -905,10 +873,6 @@ final class FeatureUnlockManager: ObservableObject {
         for feature in lockableFeatures {
             // 跳过已解锁的功能
             guard !isUnlocked(feature) else { continue }
-            
-            // 跳过兑换码解锁的功能（需要手动输入兑换码）
-            let condition = getCondition(for: feature)
-            guard condition.type != UnlockConditionType.redeemCode.rawValue else { continue }
             
             // 检查是否满足解锁条件
             let check = checkUnlockCondition(feature)
@@ -1219,7 +1183,7 @@ struct FeatureRow: View {
         case .manual:
             return "活动"
         case .redeemCode:
-            return "兑换码"
+            return "限时"
         }
     }
 }

@@ -6,7 +6,7 @@ struct PetCurrencyExchangeSheet: View {
     @ObservedObject private var petDataManager = PetDataManager.shared
 
     @State private var direction: PetCurrencyExchangeDirection
-    @State private var exchangeAmount: Double = 1000
+    @State private var exchangeAmount: Double = 1
     @State private var showAmountInput = false
     @State private var inputAmountText = ""
     @State private var resultMessage: String?
@@ -67,17 +67,28 @@ struct PetCurrencyExchangeSheet: View {
                             .background(Color.secondary.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
+                    .disabled(!hasExchangeableBalance)
 
-                    Slider(value: $exchangeAmount, in: 1000...100000, step: 1000)
-                        .tint(themeManager.accentTextColor)
+                    if showsSlider {
+                        Slider(value: $exchangeAmount, in: sliderRange, step: sliderStep)
+                            .tint(themeManager.accentTextColor)
 
-                    HStack {
-                        Text("1000")
-                        Spacer()
-                        Text("100000")
+                        HStack {
+                            Text("\(Int(sliderRange.lowerBound))")
+                            Spacer()
+                            Text("\(Int(sliderRange.upperBound))")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    } else if hasExchangeableBalance {
+                        Text("当前最多可兑换 \(sourceBalance)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("当前没有可用于兑换的\(title(for: direction.sourceCurrency))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 24)
 
@@ -93,6 +104,8 @@ struct PetCurrencyExchangeSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .padding(.horizontal, 24)
+                .disabled(!hasExchangeableBalance)
+                .opacity(hasExchangeableBalance ? 1 : 0.5)
 
                 if let resultMessage {
                     Text(resultMessage)
@@ -128,7 +141,8 @@ struct PetCurrencyExchangeSheet: View {
                 Button("取消", role: .cancel) { }
                 Button("确定") {
                     if let value = Int(inputAmountText), value > 0 {
-                        exchangeAmount = Double(value)
+                        exchangeAmount = min(Double(value), maxExchangeAmount)
+                        clampExchangeAmount()
                     }
                 }
             }
@@ -137,7 +151,35 @@ struct PetCurrencyExchangeSheet: View {
             } message: {
                 Text(errorMessage)
             }
+            .onAppear {
+                clampExchangeAmount()
+            }
+            .onChange(of: direction) { _, _ in
+                clampExchangeAmount()
+            }
         }
+    }
+
+    private var sliderStep: Double {
+        guard sourceBalance > 1 else { return 1 }
+        if direction.sourceCurrency == .meowCoin { return 1 }
+        return sourceBalance >= 100 ? 100 : 1
+    }
+
+    private var sliderRange: ClosedRange<Double> {
+        1...Double(max(2, sourceBalance))
+    }
+
+    private var maxExchangeAmount: Double {
+        Double(max(1, sourceBalance))
+    }
+
+    private var hasExchangeableBalance: Bool {
+        sourceBalance > 0
+    }
+
+    private var showsSlider: Bool {
+        sourceBalance > 1
     }
 
     private var sourceBalance: Int {
@@ -186,10 +228,37 @@ struct PetCurrencyExchangeSheet: View {
             status.boneCoin -= amount
             status.fishCoin += amount
             resultMessage = "兑换成功：\(amount) 骨头币 → \(amount) 鱼币"
+        case .meowToFish:
+            guard StoreManager.spendMeowCoins(amount, in: &status) else {
+                presentError("喵币不足")
+                return
+            }
+            status.fishCoin += amount
+            resultMessage = "兑换成功：\(amount) 喵币 → \(amount) 鱼币"
+        case .meowToBone:
+            guard StoreManager.spendMeowCoins(amount, in: &status) else {
+                presentError("喵币不足")
+                return
+            }
+            status.boneCoin += amount
+            resultMessage = "兑换成功：\(amount) 喵币 → \(amount) 骨头币"
         }
 
         PetDataManager.shared.saveStatus(status)
         NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
+    }
+
+    private func clampExchangeAmount() {
+        guard hasExchangeableBalance else {
+            exchangeAmount = 0
+            return
+        }
+        let upper = maxExchangeAmount
+        if exchangeAmount > upper {
+            exchangeAmount = upper
+        } else if exchangeAmount < 1 {
+            exchangeAmount = 1
+        }
     }
 
     private func presentError(_ message: String) {

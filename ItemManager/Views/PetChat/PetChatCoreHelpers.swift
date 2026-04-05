@@ -132,6 +132,8 @@ enum PetEmbeddedPanelIntent {
 enum PetCurrencyExchangeDirection: String, CaseIterable, Identifiable {
     case fishToBone
     case boneToFish
+    case meowToFish
+    case meowToBone
 
     var id: String { rawValue }
 
@@ -139,6 +141,8 @@ enum PetCurrencyExchangeDirection: String, CaseIterable, Identifiable {
         switch self {
         case .fishToBone: return "鱼币 → 骨头币"
         case .boneToFish: return "骨头币 → 鱼币"
+        case .meowToFish: return "喵币 → 鱼币"
+        case .meowToBone: return "喵币 → 骨头币"
         }
     }
 
@@ -146,6 +150,7 @@ enum PetCurrencyExchangeDirection: String, CaseIterable, Identifiable {
         switch self {
         case .fishToBone: return .fishCoin
         case .boneToFish: return .boneCoin
+        case .meowToFish, .meowToBone: return .meowCoin
         }
     }
 
@@ -153,8 +158,20 @@ enum PetCurrencyExchangeDirection: String, CaseIterable, Identifiable {
         switch self {
         case .fishToBone: return .boneCoin
         case .boneToFish: return .fishCoin
+        case .meowToFish: return .fishCoin
+        case .meowToBone: return .boneCoin
         }
     }
+}
+
+enum PetChatFundingDestination {
+    case meowCoinStore
+    case currencyExchange(PetCurrencyExchangeDirection)
+}
+
+struct PetChatCleaningActionResult {
+    let feedback: String
+    let fundingDestination: PetChatFundingDestination?
 }
 
 private func normalizedPetChatIntentText(_ text: String) -> String {
@@ -374,6 +391,22 @@ func displayName(for pet: PetCharacter, in status: PetStatus) -> String {
         .replacingOccurrences(of: "\"", with: "")
         .trimmingCharacters(in: .whitespacesAndNewlines)
     return customName.isEmpty ? pet.displayName : customName
+}
+
+func petCleaningContext(for status: PetStatus) -> (pet: PetCharacter, petName: String, cost: Int, currency: PetCurrency, fundingDestination: PetChatFundingDestination) {
+    let pet = PetCharacter(rawValue: status.selectedPetId ?? "") ?? .naicha
+    let cost = 20
+    let currency: PetCurrency = pet == .maomao ? .boneCoin : .fishCoin
+    let fundingDestination: PetChatFundingDestination
+    switch currency {
+    case .meowCoin:
+        fundingDestination = .meowCoinStore
+    case .fishCoin:
+        fundingDestination = .currencyExchange(.boneToFish)
+    case .boneCoin:
+        fundingDestination = .currencyExchange(.fishToBone)
+    }
+    return (pet, displayName(for: pet, in: status), cost, currency, fundingDestination)
 }
 
 private func currencyAmount(for type: PetCurrency, status: PetStatus) -> Int {
@@ -983,15 +1016,45 @@ func consumePetItemResult(itemId: String) -> PetItemCommandResult {
     return PetItemCommandResult(feedback: "我把\(item.name)吃掉啦，肚子舒服多了。", feedAnimation: animation)
 }
 
-func cleanPetStatusNow() -> String {
+func cleanPetStatusNow() -> PetChatCleaningActionResult {
     var status = PetDataManager.shared.status
+    let context = petCleaningContext(for: status)
     let oldValue = status.hygiene
     guard oldValue < 100 else {
-        return "我已经香香的啦，不用再洗啦。"
+        return PetChatCleaningActionResult(
+            feedback: "\(context.petName)已经香香的啦，这次先不用花\(context.cost)\(context.currency.rawValue)。",
+            fundingDestination: nil
+        )
+    }
+
+    let balance = currencyAmount(for: context.currency, status: status)
+    guard balance >= context.cost else {
+        let feedback: String
+        switch context.currency {
+        case .fishCoin:
+            feedback = "给\(context.petName)洗香香要花\(context.cost)鱼币，我现在鱼币还不够，先带你去换一点。"
+        case .boneCoin:
+            feedback = "给\(context.petName)洗香香要花\(context.cost)骨头币，我现在骨头币还不够，先带你去换一点。"
+        case .meowCoin:
+            feedback = "给\(context.petName)洗香香要花\(context.cost)喵币，我现在喵币还不够，先带你去充值。"
+        }
+        return PetChatCleaningActionResult(feedback: feedback, fundingDestination: context.fundingDestination)
+    }
+
+    switch context.currency {
+    case .fishCoin:
+        status.fishCoin -= context.cost
+    case .boneCoin:
+        status.boneCoin -= context.cost
+    case .meowCoin:
+        _ = StoreManager.spendMeowCoins(context.cost, in: &status)
     }
     status.hygiene = 100
     status.mood = min(100, status.mood + 10)
     status.intimacy = min(100, status.intimacy + 1)
     PetDataManager.shared.saveStatus(status)
-    return "我已经洗香香啦，清洁度补满了。"
+    return PetChatCleaningActionResult(
+        feedback: "\(context.petName)已经洗香香啦，花掉\(context.cost)\(context.currency.rawValue)，清洁度补满了。",
+        fundingDestination: nil
+    )
 }

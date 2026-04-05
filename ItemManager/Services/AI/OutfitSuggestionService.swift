@@ -93,56 +93,47 @@ class OutfitSuggestionService {
         }
         
         // 根据风格和场景对裙装进行评分排序
+        let rankingContext = OutfitRecommendationContext(
+            style: style,
+            occasion: occasion,
+            season: OutfitRecommendationKnowledgeBase.inferredSeason(from: nil)
+        )
         let scoredClothings = availableClothings.map { clothing in
-            (clothing: clothing, score: calculateOutfitScore(clothing: clothing, style: style, occasion: occasion))
+            (clothing: clothing, score: calculateOutfitScore(clothing: clothing, context: rankingContext))
         }.sorted { $0.score > $1.score }
         
         // 从高评分的裙装中选择
         var result: [Clothing] = []
-        var usedCategories = Set<String>()
         
         // 先按类别分组
-        let grouped = Dictionary(grouping: scoredClothings) { item -> String in
-            let clothing = item.clothing
-            let text = searchableText(for: clothing)
-            if matchesAny(text, keywords: ["jsk", "op", "sk", "裙", "连衣", "吊带", "半裙"]) {
-                return "裙装"
-            } else if matchesAny(text, keywords: ["外套", "开衫", "罩衫", "针织", "披肩", "披风", "小外套", "短外套", "大衣", "斗篷", "风衣", "夹克", "西装", "西服", "毛衣", "卫衣", "上衣", "衬衫", "内搭", "打底", "马甲", "背心"]) {
-                return "外套"
-            } else if matchesAny(text, keywords: ["鞋", "皮鞋", "高跟", "玛丽珍", "乐福", "靴", "凉鞋", "单鞋"]) {
-                return "鞋子"
-            } else {
-                return "配饰"
-            }
+        let grouped = Dictionary(grouping: scoredClothings) { item -> OutfitSemanticCategory in
+            ClothingSemanticAnalyzer.profile(for: item.clothing).category
         }
         
         // 优先选择裙装（选择评分最高的）
-        if let dresses = grouped["裙装"], !dresses.isEmpty {
+        if let dresses = grouped[.dress], !dresses.isEmpty {
             let bestDress = dresses.max { $0.score < $1.score }!.clothing
             result.append(bestDress)
-            usedCategories.insert("裙装")
         }
         
         // 选择外套（选择评分最高的且与裙装颜色和谐的）
-        if let tops = grouped["外套"], !tops.isEmpty {
+        if let tops = grouped[.outerwear], !tops.isEmpty {
             let sortedTops = tops.sorted { $0.score > $1.score }
             if let bestTop = sortedTops.first?.clothing {
                 result.append(bestTop)
-                usedCategories.insert("外套")
             }
         }
         
         // 选择鞋子（选择评分最高的）
-        if let shoes = grouped["鞋子"], !shoes.isEmpty {
+        if let shoes = grouped[.shoes], !shoes.isEmpty {
             let sortedShoes = shoes.sorted { $0.score > $1.score }
             if let bestShoe = sortedShoes.first?.clothing {
                 result.append(bestShoe)
-                usedCategories.insert("鞋子")
             }
         }
         
         // 选择配饰（选择评分最高的 1-2 个）
-        if let accessories = grouped["配饰"], !accessories.isEmpty {
+        if let accessories = grouped[.accessory], !accessories.isEmpty {
             let sortedAccessories = accessories.sorted { $0.score > $1.score }
             result.append(contentsOf: sortedAccessories.prefix(2).map { $0.clothing })
         }
@@ -172,55 +163,13 @@ class OutfitSuggestionService {
     }
     
     /// 根据风格和场景计算裙装评分
-    private func calculateOutfitScore(clothing: Clothing, style: String, occasion: String) -> Int {
-        var score = 0
-        let text = searchableText(for: clothing)
-        
-        // 风格关键词匹配
-        let styleKeywords = getStyleKeywords(style)
-        let matchedStyleKeywords = styleKeywords.filter { matchesAny(text, keywords: [$0]) }
-        score += matchedStyleKeywords.count * 30
-        
-        // 场景关键词匹配
-        let occasionKeywords = getOccasionKeywords(occasion)
-        let matchedOccasionKeywords = occasionKeywords.filter { matchesAny(text, keywords: [$0]) }
-        score += matchedOccasionKeywords.count * 25
-        
-        // 颜色匹配（根据风格偏好的颜色）
-        let preferredColors = getPreferredColors(style)
-        let matchedColors = preferredColors.filter { matchesAny(text, keywords: [$0]) }
-        score += matchedColors.count * 20
-        
-        // 新品优先（按创建时间）
-        let daysSinceCreation = Date().timeIntervalSince(clothing.createdAt) / 86400
-        if daysSinceCreation < 7 {
-            score += 15
-        } else if daysSinceCreation < 30 {
-            score += 5
-        }
-        
-        // 基础加分
-        score += 10
-        
-        return score
+    private func calculateOutfitScore(clothing: Clothing, context: OutfitRecommendationContext) -> Int {
+        OutfitRecommendationScorer.score(clothing, in: context)
     }
     
     /// 获取裙装的可搜索文本
     private func searchableText(for clothing: Clothing) -> String {
-        let tagNames = clothing.tags?.map(\.name).joined(separator: ",") ?? ""
-        let accessoryNames = clothing.accessoryItems?.map(\.name).joined(separator: ",") ?? ""
-
-        return [
-            clothing.name,
-            clothing.types,
-            clothing.colors,
-            clothing.note,
-            clothing.accessories,
-            tagNames,
-            accessoryNames
-        ]
-        .joined(separator: ",")
-        .lowercased()
+        ClothingSemanticAnalyzer.searchableText(for: clothing)
     }
     
     /// 检查文本是否包含任意关键词
@@ -316,17 +265,24 @@ class OutfitSuggestionService {
     /// 构建搭配专用Prompt
     private func buildOutfitPrompt(query: String, wardrobeSummary: String, candidatesJSON: String) -> String {
         let roleSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
+        let season = OutfitRecommendationKnowledgeBase.inferredSeason(from: nil).displayName
         return """
         需求：\(query)
+
+        当前季节：\(season)
+
+        衣橱摘要：
+        \(wardrobeSummary)
 
         候选单品：
         \(candidatesJSON)
 
         请从候选中选2-4件搭配：
         - 按品类（裙装/外套/鞋子/配饰）筛选
+        - 结合候选里的长度/材质/季节/场合特征，优先选更符合当前季节和Lo裙语境的
         - 优先同色系/近色系，主色1-2种，不超3种
         - 优先JSK/OP，鞋子同色或黑白灰米棕
-        - 用候选单品的标签/类型词汇
+        - 用候选单品的标签/类型词汇，不要编造不存在的单品
 
         返回JSON：
         {
@@ -461,12 +417,26 @@ class OutfitSuggestionService {
         
         // 最小兜底：保障至少有两件可展示
         if selected.count < 2 {
-            for clothing in clothings.prefix(4) {
+            let fallbackContext = OutfitRecommendationContext(
+                query: suggestion.description,
+                style: suggestion.style,
+                occasion: suggestion.occasion,
+                season: OutfitRecommendationKnowledgeBase.inferredSeason(from: nil)
+            )
+            let rankedFallback = clothings
+                .filter { !seen.contains($0.id) }
+                .sorted {
+                    let lhs = OutfitRecommendationScorer.score($0, in: fallbackContext)
+                    let rhs = OutfitRecommendationScorer.score($1, in: fallbackContext)
+                    if lhs == rhs {
+                        return $0.createdAt > $1.createdAt
+                    }
+                    return lhs > rhs
+                }
+            for clothing in rankedFallback {
+                guard selected.count < 2 else { break }
                 if seen.insert(clothing.id).inserted {
                     selected.append(clothing)
-                }
-                if selected.count >= 2 {
-                    break
                 }
             }
         }
@@ -770,79 +740,41 @@ enum OutfitColorHarmonyEngine {
     }
 
     private static func colorFamilies(for clothing: Clothing) -> Set<OutfitColorFamily> {
-        let text = searchableText(for: clothing)
-        var families = Set<OutfitColorFamily>()
-
-        if matchesAny(text, keywords: ["多色", "彩色", "拼色", "撞色", "multicolor"]) {
-            families.insert(.multicolor)
-        }
-        if matchesAny(text, keywords: ["白", "米白", "奶白", "奶油", "象牙", "香槟", "灰", "黑", "银", "米色", "杏色", "beige", "cream", "white", "black", "grey", "gray"]) {
-            families.insert(.neutral)
-        }
-        if matchesAny(text, keywords: ["金", "银", "metal", "metallic"]) {
-            families.insert(.metallic)
-        }
-        if matchesAny(text, keywords: ["粉", "樱", "蜜桃", "桃", "rose", "pink"]) {
-            families.insert(.pink)
-        }
-        if matchesAny(text, keywords: ["酒红", "红", "莓", "绯", "赤", "burgundy", "red"]) {
-            families.insert(.red)
-        }
-        if matchesAny(text, keywords: ["橙", "杏黄", "珊瑚", "orange", "coral"]) {
-            families.insert(.orange)
-        }
-        if matchesAny(text, keywords: ["黄", "鹅黄", "柠檬", "yellow"]) {
-            families.insert(.yellow)
-        }
-        if matchesAny(text, keywords: ["若草", "薄荷", "牛油果", "绿", "mint", "green"]) {
-            families.insert(.green)
-        }
-        if matchesAny(text, keywords: ["萨克斯", "sax", "绀", "藏青", "海军蓝", "天蓝", "水蓝", "蓝", "blue", "navy"]) {
-            families.insert(.blue)
-        }
-        if matchesAny(text, keywords: ["薰衣草", "丁香", "紫", "lavender", "purple"]) {
-            families.insert(.purple)
-        }
-        if matchesAny(text, keywords: ["棕", "咖", "巧克力", "驼", "卡其", "brown", "camel", "khaki"]) {
-            families.insert(.brown)
-        }
-
-        return families
+        let semanticFamilies = ClothingSemanticAnalyzer.profile(for: clothing).colorFamilies
+        return Set(semanticFamilies.compactMap { family in
+            switch family {
+            case .pink: return .pink
+            case .red: return .red
+            case .orange: return .orange
+            case .yellow: return .yellow
+            case .green: return .green
+            case .blue: return .blue
+            case .purple: return .purple
+            case .brown: return .brown
+            case .neutral: return .neutral
+            case .metallic: return .metallic
+            case .multicolor: return .multicolor
+            }
+        })
     }
 
     private static func pieceCategory(for clothing: Clothing) -> OutfitPieceCategory {
-        let text = searchableText(for: clothing)
-
-        if matchesAny(text, keywords: ["jsk", "op", "sk", "裙", "连衣", "吊带", "半裙"]) {
+        switch ClothingSemanticAnalyzer.profile(for: clothing).category {
+        case .dress:
             return .dress
-        }
-        if matchesAny(text, keywords: ["外套", "开衫", "罩衫", "针织", "披肩", "披风", "小外套", "短外套", "大衣", "斗篷", "风衣", "夹克", "西装", "西服", "毛衣", "卫衣", "上衣", "衬衫", "内搭", "打底", "马甲", "背心"]) {
+        case .outerwear:
             return .outerwear
-        }
-        if matchesAny(text, keywords: ["鞋", "皮鞋", "高跟", "玛丽珍", "乐福", "靴", "凉鞋", "单鞋"]) {
+        case .shoes:
             return .shoes
-        }
-        if matchesAny(text, keywords: ["发带", "kc", "头饰", "胸针", "包", "袜", "手袖", "腰带", "项链", "耳环", "手链", "发夹", "配饰", "小物"]) {
+        case .accessory, .umbrella:
             return .accessory
+        case .other:
+            return .other
         }
-        return .other
     }
 
     private static func searchableText(for clothing: Clothing) -> String {
-        let tagNames = clothing.tags?.map(\.name).joined(separator: ",") ?? ""
-        let accessoryNames = clothing.accessoryItems?.map(\.name).joined(separator: ",") ?? ""
-
-        return [
-            clothing.name,
-            clothing.types,
-            clothing.colors,
-            clothing.note,
-            clothing.accessories,
-            tagNames,
-            accessoryNames
-        ]
-        .joined(separator: ",")
-        .lowercased()
+        ClothingSemanticAnalyzer.searchableText(for: clothing)
     }
 
     private static func matchesAny(_ text: String, keywords: [String]) -> Bool {
