@@ -830,6 +830,7 @@ struct FeatureExperienceGuideOverlay: View {
     @State var cloudFileBackupRestoreGuideStep: CloudFileBackupRestoreGuideStep = .step1_returnToMe
     @State var themeScrollStepStartedAt: Date? = nil
     @State var customColorScrollStepStartedAt: Date? = nil
+    @State var customColorPersonalizationScrollStepStartedAt: Date? = nil
     @State var customColorPersonalizationGuideStep: CustomColorPersonalizationGuideStep = .step1_returnToMe
     @State var personalPreferenceGuideStep: PersonalPreferenceGuideStep = .step1_returnToMe
     @State var privacyDisplayGuideStep: PrivacyDisplayGuideStep = .step1_returnToMe
@@ -1218,6 +1219,10 @@ struct FeatureExperienceGuideOverlay: View {
                 }
                 if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
                    customColorPersonalizationGuideStep.rawValue < CustomColorPersonalizationGuideStep.step4_switchToCustomTab.rawValue {
+                    logCustomColorGuide(
+                        "received magicColorSettingsOpened colorMode=\(themeManager.colorSchemeMode.rawValue) " +
+                        "personalizationFrame=\(guideDebugFrameDescription(guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)))"
+                    )
                     withAnimation(.easeInOut(duration: 0.3)) {
                         customColorPersonalizationGuideStep = .step4_switchToCustomTab
                     }
@@ -1228,15 +1233,14 @@ struct FeatureExperienceGuideOverlay: View {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 customColorPersonalizationGuideStep = .step5_scrollToPersonalization
                             }
+                            beginCustomColorPersonalizationScrollStep()
                             // 如果个性化入口已经可见，直接跳到说明步骤
-                            if let frame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry),
-                               isGuideTargetVisibleOnScreen(frame) {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    guard customColorPersonalizationGuideStep == .step5_scrollToPersonalization else { return }
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        customColorPersonalizationGuideStep = .step6_personalizationExplanation
-                                    }
-                                }
+                            let frame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)
+                            if logCustomColorVisibilityCheck(
+                                label: "magicColorSettingsOpened.personalizationAfterEnteringCustomTab",
+                                frame: frame
+                            ) {
+                                advanceCustomColorGuideToPersonalizationExplanationWithMinimumDwell()
                             }
                         }
                     }
@@ -1254,18 +1258,21 @@ struct FeatureExperienceGuideOverlay: View {
                 if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
                    customColorPersonalizationGuideStep == .step4_switchToCustomTab,
                    mode == ColorSchemeMode.custom.rawValue {
+                    logCustomColorGuide(
+                        "received magicColorModeChanged mode=\(mode) " +
+                        "personalizationFrame=\(guideDebugFrameDescription(guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)))"
+                    )
                     withAnimation(.easeInOut(duration: 0.3)) {
                         customColorPersonalizationGuideStep = .step5_scrollToPersonalization
                     }
+                    beginCustomColorPersonalizationScrollStep()
                     // 如果个性化入口已经可见，直接跳到说明步骤
-                    if let frame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry),
-                       isGuideTargetVisibleOnScreen(frame) {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            guard customColorPersonalizationGuideStep == .step5_scrollToPersonalization else { return }
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                customColorPersonalizationGuideStep = .step6_personalizationExplanation
-                            }
-                        }
+                    let frame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)
+                    if logCustomColorVisibilityCheck(
+                        label: "magicColorModeChanged.personalizationAfterModeSwitch",
+                        frame: frame
+                    ) {
+                        advanceCustomColorGuideToPersonalizationExplanationWithMinimumDwell()
                     }
                 }
             }
@@ -1811,6 +1818,15 @@ struct FeatureExperienceGuideOverlay: View {
                 }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .themeCustomizeEntry)) { _, frame in
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization {
+                    let visible = logCustomColorVisibilityCheck(
+                        label: "themeCustomizeEntry.onChange",
+                        frame: frame
+                    )
+                    logCustomColorGuide(
+                        "themeCustomizeEntry frameChanged newFrame=\(guideDebugFrameDescription(frame)) visible=\(visible)"
+                    )
+                }
                 if guideManager.currentFeatureExperienceFeature == .themeCustomize,
                    themeCustomizeGuideStep == .step2_scrollToThemeEntry,
                    frame != nil {
@@ -1823,13 +1839,24 @@ struct FeatureExperienceGuideOverlay: View {
                 }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)) { _, frame in
+                if guideManager.currentFeatureExperienceFeature == .customColorPersonalization {
+                    let visible = logCustomColorVisibilityCheck(
+                        label: "themeCustomPersonalizationEntry.onChange",
+                        frame: frame
+                    )
+                    logCustomColorGuide(
+                        "themeCustomPersonalizationEntry frameChanged newFrame=\(guideDebugFrameDescription(frame)) visible=\(visible)"
+                    )
+                }
                 if guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
                    customColorPersonalizationGuideStep == .step5_scrollToPersonalization,
                    let frame,
-                   isGuideTargetVisibleOnScreen(frame) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        customColorPersonalizationGuideStep = .step6_personalizationExplanation
-                    }
+                   logCustomColorVisibilityCheck(
+                    label: "themeCustomPersonalizationEntry.step5AutoAdvance",
+                    frame: frame
+                   ) {
+                    logCustomColorGuide("step5 visible on frame change; scheduling minimum dwell before step6")
+                    advanceCustomColorGuideToPersonalizationExplanationWithMinimumDwell()
                 }
             }
             .onChange(of: guideManager.guideTargetFrame(for: .favoriteMenuSettingsEntry)) { _, frame in

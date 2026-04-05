@@ -2,6 +2,48 @@ import SwiftUI
 
 #if !WIDGET_EXTENSION
 extension FeatureExperienceGuideOverlay {
+    func guideDebugFrameDescription(_ frame: CGRect?) -> String {
+        guard let frame else { return "nil" }
+        return String(
+            format: "(x:%.1f,y:%.1f,w:%.1f,h:%.1f,maxY:%.1f)",
+            frame.minX,
+            frame.minY,
+            frame.width,
+            frame.height,
+            frame.maxY
+        )
+    }
+
+    func logCustomColorGuide(_ message: String) {
+        let screenBounds = UIScreen.main.bounds
+        print(
+            "[Guide][CustomColor] step=\(customColorPersonalizationGuideStep.rawValue) " +
+            "title=\(customColorPersonalizationGuideStep.title) " +
+            "tab=\(guideManager.lastKnownHomeTab) " +
+            "screen=\(Int(screenBounds.width))x\(Int(screenBounds.height)) " +
+            "\(message)"
+        )
+    }
+
+    func logCustomColorVisibilityCheck(label: String, frame: CGRect?) -> Bool {
+        guard let frame else {
+            logCustomColorGuide("\(label) visibilityCheck frame=nil visible=false")
+            return false
+        }
+
+        let visibleBounds = UIScreen.main.bounds.insetBy(dx: 0, dy: 120)
+        let visible = frame.width > 1 &&
+        frame.height > 1 &&
+        frame.maxY > visibleBounds.minY &&
+        frame.minY < visibleBounds.maxY
+
+        logCustomColorGuide(
+            "\(label) visibilityCheck frame=\(guideDebugFrameDescription(frame)) " +
+            "visibleBounds=\(guideDebugFrameDescription(visibleBounds)) visible=\(visible)"
+        )
+        return visible
+    }
+
     enum WardrobeGuideStep2Target {
         case manualCreate
         case batchImport
@@ -144,6 +186,7 @@ extension FeatureExperienceGuideOverlay {
         didBrowseAwayFromNaichaInAIAnalysisGuide = false
         themeScrollStepStartedAt = nil
         customColorScrollStepStartedAt = nil
+        customColorPersonalizationScrollStepStartedAt = nil
         isSpaceBookCreationPromptVisible = false
         isOotdBookCreationPromptVisible = false
         guideKeyboardOverlap = 0
@@ -396,13 +439,24 @@ extension FeatureExperienceGuideOverlay {
         guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization else { return }
         guard customColorPersonalizationGuideStep == .step1_returnToMe else { return }
 
+        let existingThemeEntryFrame = guideManager.guideTargetFrame(for: .themeCustomizeEntry)
+        logCustomColorGuide(
+            "advanceFromReturnStep existingThemeEntryFrame=\(guideDebugFrameDescription(existingThemeEntryFrame))"
+        )
+
         customColorScrollStepStartedAt = Date()
         withAnimation(.easeInOut(duration: 0.3)) {
             customColorPersonalizationGuideStep = .step2_scrollToThemeEntry
         }
 
-        if guideManager.guideTargetFrame(for: .themeCustomizeEntry) != nil {
+        if existingThemeEntryFrame != nil {
+            _ = logCustomColorVisibilityCheck(
+                label: "advanceFromReturnStep.themeEntryAlreadyCaptured",
+                frame: existingThemeEntryFrame
+            )
             advanceCustomColorGuideToClickStepWithMinimumDwell()
+        } else {
+            logCustomColorGuide("advanceFromReturnStep theme entry not captured yet; waiting for onChange")
         }
     }
 
@@ -487,13 +541,84 @@ extension FeatureExperienceGuideOverlay {
 
         let elapsed = Date().timeIntervalSince(start)
         let remaining = max(0, minimumDwell - elapsed)
+        let themeEntryFrame = guideManager.guideTargetFrame(for: .themeCustomizeEntry)
+        let isVisible = logCustomColorVisibilityCheck(
+            label: "advanceToClick.minimumDwellScheduled",
+            frame: themeEntryFrame
+        )
+        logCustomColorGuide(
+            String(
+                format: "advanceToClick schedule elapsed=%.2f remaining=%.2f themeEntryVisible=%@",
+                elapsed,
+                remaining,
+                String(isVisible)
+            )
+        )
         DispatchQueue.main.asyncAfter(deadline: .now() + remaining) {
             guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
                   customColorPersonalizationGuideStep == .step2_scrollToThemeEntry else { return }
+            let latestFrame = guideManager.guideTargetFrame(for: .themeCustomizeEntry)
+            let latestVisible = logCustomColorVisibilityCheck(
+                label: "advanceToClick.minimumDwellCompleted",
+                frame: latestFrame
+            )
+            logCustomColorGuide(
+                "advanceToClick promotingToStep3 latestThemeEntryFrame=\(guideDebugFrameDescription(latestFrame)) " +
+                "latestVisible=\(latestVisible)"
+            )
             withAnimation(.easeInOut(duration: 0.3)) {
                 customColorPersonalizationGuideStep = .step3_clickThemeEntry
             }
             customColorScrollStepStartedAt = nil
+        }
+    }
+
+    func beginCustomColorPersonalizationScrollStep() {
+        customColorPersonalizationScrollStepStartedAt = Date()
+        logCustomColorGuide("entered step5 scrollToPersonalization")
+    }
+
+    func advanceCustomColorGuideToPersonalizationExplanationWithMinimumDwell(minimumDwell: TimeInterval = 1.2) {
+        guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization else { return }
+        guard customColorPersonalizationGuideStep == .step5_scrollToPersonalization else { return }
+
+        let start = customColorPersonalizationScrollStepStartedAt ?? Date()
+        if customColorPersonalizationScrollStepStartedAt == nil {
+            customColorPersonalizationScrollStepStartedAt = start
+        }
+
+        let elapsed = Date().timeIntervalSince(start)
+        let remaining = max(0, minimumDwell - elapsed)
+        let personalizationFrame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)
+        let isVisible = logCustomColorVisibilityCheck(
+            label: "advanceToPersonalization.minimumDwellScheduled",
+            frame: personalizationFrame
+        )
+        logCustomColorGuide(
+            String(
+                format: "advanceToPersonalization schedule elapsed=%.2f remaining=%.2f personalizationVisible=%@",
+                elapsed,
+                remaining,
+                String(isVisible)
+            )
+        )
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + remaining) {
+            guard guideManager.currentFeatureExperienceFeature == .customColorPersonalization,
+                  customColorPersonalizationGuideStep == .step5_scrollToPersonalization else { return }
+            let latestFrame = guideManager.guideTargetFrame(for: .themeCustomPersonalizationEntry)
+            let latestVisible = logCustomColorVisibilityCheck(
+                label: "advanceToPersonalization.minimumDwellCompleted",
+                frame: latestFrame
+            )
+            logCustomColorGuide(
+                "advanceToPersonalization promotingToStep6 latestPersonalizationFrame=\(guideDebugFrameDescription(latestFrame)) " +
+                "latestVisible=\(latestVisible)"
+            )
+            withAnimation(.easeInOut(duration: 0.3)) {
+                customColorPersonalizationGuideStep = .step6_personalizationExplanation
+            }
+            customColorPersonalizationScrollStepStartedAt = nil
         }
     }
 
