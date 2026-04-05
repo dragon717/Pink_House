@@ -133,7 +133,7 @@ struct ShopItemView: View {
     
     var body: some View {
         Button(action: action) {
-            VStack {
+            VStack(spacing: 6) {
                 Image(item.icon)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -166,15 +166,11 @@ struct ShopItemView: View {
                 }
 
                 if let discountBadge {
-                    Text(discountBadge)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule()
-                                .fill(Color.pink.opacity(0.85))
-                        )
+                    DiscountBadgeView(
+                        text: discountBadge,
+                        style: .capsuleGlow,
+                        size: .small
+                    )
                 }
             }
             .frame(width: 80)

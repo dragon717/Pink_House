@@ -568,8 +568,9 @@ private func shopOptions(limit: Int? = nil) -> [PetWidgetOption] {
     
     return visibleItems.map { item in
         let currencyName = item.petCurrency.rawValue
+        let finalPrice = VIPManager.shared.petShopPrice(for: item.price)
         return PetWidgetOption(
-            title: "\(item.name) · \(item.price)\(currencyName)",
+            title: "\(item.name) · \(finalPrice)\(currencyName)",
             command: "buy_item:\(item.id)",
             icon: item.icon
         )
@@ -889,22 +890,23 @@ func purchasePetItemResult(itemId: String, autoFeedWhenPossible: Bool = true) ->
     }
 
     var status = PetDataManager.shared.status
+    let finalPrice = VIPManager.shared.petShopPrice(for: item.price)
     switch item.petCurrency {
     case .fishCoin:
-        guard status.fishCoin >= item.price else {
+        guard status.fishCoin >= finalPrice else {
             return PetItemCommandResult(feedback: "我的鱼币不够啦，先帮我攒一点再来买\(item.name)吧。", feedAnimation: nil)
         }
-        status.fishCoin -= item.price
+        status.fishCoin -= finalPrice
     case .meowCoin:
-        guard status.meowCoin >= item.price else {
+        guard status.meowCoin >= finalPrice else {
             return PetItemCommandResult(feedback: "我的喵币不够啦，先帮我充一点再来买\(item.name)吧。", feedAnimation: nil)
         }
-        _ = StoreManager.spendMeowCoins(item.price, in: &status)
+        _ = StoreManager.spendMeowCoins(finalPrice, in: &status)
     case .boneCoin:
-        guard status.boneCoin >= item.price else {
+        guard status.boneCoin >= finalPrice else {
             return PetItemCommandResult(feedback: "我的骨头币不够啦，这个币种更适合毛毛用喔。", feedAnimation: nil)
         }
-        status.boneCoin -= item.price
+        status.boneCoin -= finalPrice
     }
 
     status.inventory[item.id, default: 0] += 1

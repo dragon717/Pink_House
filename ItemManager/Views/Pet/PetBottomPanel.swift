@@ -563,20 +563,44 @@ struct ShopView: View {
             
             // Content
             ScrollView(.vertical, showsIndicators: true) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
-                    ForEach(displayedItems) { item in
-                        ShopItemView(
-                            item: item,
-                            displayPrice: viewModel.priceForPetShopItem(item),
-                            originalPrice: VIPManager.shared.isVIP ? item.price : nil,
-                            discountBadge: VIPManager.shared.isVIP ? VIPManager.petShopDiscountText : nil
-                        ) {
-                            guard !shouldSuppressPurchaseTap(for: item.id) else { return }
-                            buy(item)
+                VStack(alignment: .leading, spacing: 14) {
+                    if VIPManager.shared.isVIP {
+                        HStack(spacing: 10) {
+                            DiscountBadgeView(
+                                text: VIPManager.petShopDiscountText,
+                                style: .capsuleGlow,
+                                size: .small
+                            )
+                            Text("VIP 萌宠商店专享 6 折优惠")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            Spacer()
                         }
-                        .onDrag {
-                            markDragStarted(for: item.id)
-                            return NSItemProvider(object: "shop:\(item.id)" as NSString)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(.regularMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                        )
+                    }
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 20) {
+                        ForEach(displayedItems) { item in
+                            ShopItemView(
+                                item: item,
+                                displayPrice: viewModel.priceForPetShopItem(item),
+                                originalPrice: VIPManager.shared.isVIP ? item.price : nil,
+                                discountBadge: VIPManager.shared.isVIP ? VIPManager.petShopDiscountText : nil
+                            ) {
+                                guard !shouldSuppressPurchaseTap(for: item.id) else { return }
+                                buy(item)
+                            }
+                            .onDrag {
+                                markDragStarted(for: item.id)
+                                return NSItemProvider(object: "shop:\(item.id)" as NSString)
+                            }
                         }
                     }
                 }

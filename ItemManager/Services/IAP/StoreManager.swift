@@ -74,6 +74,11 @@ class StoreManager: ObservableObject {
 
         do {
             let allProductIDs = IAPProductType.allProductIDs
+            let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+
+            print("[StoreManager] 开始获取商品，bundleID=\(bundleID)")
+            print("[StoreManager] 请求的商品ID: \(allProductIDs.joined(separator: ", "))")
+
             let products = try await Product.products(for: allProductIDs)
 
             coinProducts = products.filter { product in
@@ -84,6 +89,20 @@ class StoreManager: ObservableObject {
             }
 
             print("[StoreManager] 获取到 \(coinProducts.count) 个喵币商品")
+
+            if coinProducts.isEmpty {
+                print("[StoreManager] Apple 未返回任何匹配的喵币商品")
+            } else {
+                for product in coinProducts {
+                    print("[StoreManager] 商品返回成功: id=\(product.id), name=\(product.displayName), price=\(product.displayPrice), type=\(product.type)")
+                }
+            }
+
+            let returnedIDs = Set(coinProducts.map(\.id))
+            let missingIDs = allProductIDs.filter { !returnedIDs.contains($0) }
+            if !missingIDs.isEmpty {
+                print("[StoreManager] 未返回的商品ID: \(missingIDs.joined(separator: ", "))")
+            }
 
         } catch {
             print("[StoreManager] 获取商品失败: \(error)")

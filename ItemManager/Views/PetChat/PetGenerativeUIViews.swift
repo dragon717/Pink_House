@@ -702,7 +702,12 @@ private struct PetShopPanelWidget: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 80), spacing: 14)], spacing: 14) {
                         ForEach(widget.options) { option in
                             if let item = item(for: option.command) {
-                                ShopItemView(item: item) {
+                                ShopItemView(
+                                    item: item,
+                                    displayPrice: VIPManager.shared.petShopPrice(for: item.price),
+                                    originalPrice: VIPManager.shared.isVIP ? item.price : nil,
+                                    discountBadge: VIPManager.shared.isVIP ? VIPManager.petShopDiscountText : nil
+                                ) {
                                     onAction(option)
                                 }
                                 .padding(.vertical, 2)
