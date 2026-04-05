@@ -254,7 +254,7 @@ struct MeowCoinProductDisplay: Identifiable {
             self.isPopular = true
             self.isBestValue = false
             self.tag = "热门"
-            self.packageName = "喵币小宝宝箱"
+            self.packageName = "喵币小宝箱"
             self.packageDescription = "一只满满当当的小宝箱，装着 500 喵币，拿在手里都觉得底气足。"
             self.assetName = "meowcoin_500"
         case .meowCoin1280:
