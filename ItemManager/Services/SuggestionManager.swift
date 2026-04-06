@@ -33,7 +33,7 @@ class SuggestionManager {
         let brands = ["Angelic Pretty", "Baby, the Stars Shine Bright", "Innocent World", "Mary Magdalene", "Victorian Maiden", "Alice and the Pirates", "Metamorphose temps de fille", "Moi-même-Moitié", "Juliette et Justine", "Triple Fortune", "表面咒语", "Elpress L", "Honey Honey", "仲夏物语", "古典玩偶", "Lullaby", "NyaNya", "Precious Clove", "Soufflesong", "Tiny Garden"]
         
         // 常见类型
-        let types = ["JSK", "OP", "SK", "Blouse", "衬衫", "半裙", "背带裙", "连衣裙", "外套", "大衣", "斗篷", "南瓜裤", "撑"]
+        let types = ["JSK", "OP", "SK", "Blouse", "衬衫", "内搭", "短袖", "长袖", "上衣", "开衫", "半裙", "背带裙", "连衣裙", "外套", "大衣", "斗篷", "南瓜裤", "撑"]
         
         // 常见颜色
         let colors = ["粉色", "生成色", "白色", "黑色", "酒红", "绀色", "萨克斯蓝", "若草色", "薄荷绿", "薰衣草紫", "巧克力色", "咖啡色", "灰色", "米色", "多色"]

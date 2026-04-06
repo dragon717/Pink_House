@@ -243,7 +243,8 @@ private func isOutfitAugmentQuery(_ text: String) -> Bool {
 
 private func hasOutfitAugmentCategoryHint(_ text: String) -> Bool {
     containsAnyKeyword(text, keywords: [
-        "开衫", "外套", "罩衫", "披肩", "斗篷", "小外套", "内搭", "衬衫", "马甲",
+        "开衫", "外套", "罩衫", "披肩", "斗篷", "小外套",
+        "上衣", "内搭", "打底", "衬衫", "马甲", "短袖", "长袖", "t恤", "tee",
         "小物", "配饰", "头饰", "发带", "袜", "包", "鞋", "鞋子", "伞"
     ])
 }
@@ -324,16 +325,22 @@ func shouldTreatAsOutfitReplaceFollowUp(
 }
 
 func buildOutfitContinuationWidget(for suggestion: OutfitSuggestionData) -> PetWidgetData {
-    let existingCategories = Set(suggestion.clothings.map { ClothingSemanticAnalyzer.profile(for: $0).category })
+    let profiles = suggestion.clothings.map { ClothingSemanticAnalyzer.profile(for: $0) }
+    let hasTop = profiles.contains { $0.matches(category: .top) }
+    let hasOuterwear = profiles.contains { $0.category == .outerwear }
 
     var options = [
         PetWidgetOption(title: "+1", command: "ask:+1", icon: "plus.circle.fill"),
         PetWidgetOption(title: "换一件", command: "ask:换一件", icon: "arrow.triangle.2.circlepath")
     ]
 
-    if !existingCategories.contains(.outerwear) {
+    if !hasTop {
         options.append(
-            PetWidgetOption(title: "加一件开衫", command: "ask:加一件开衫", icon: "sparkles")
+            PetWidgetOption(title: "加一件上衣", command: "ask:加一件上衣", icon: "sparkles")
+        )
+    } else if !hasOuterwear {
+        options.append(
+            PetWidgetOption(title: "加一件轻薄开衫", command: "ask:加一件轻薄开衫", icon: "sparkles")
         )
     } else {
         options.append(

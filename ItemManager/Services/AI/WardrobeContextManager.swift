@@ -14,8 +14,8 @@ class WardrobeContextManager {
     private init() {}
     
     private let dressHints = ["jsk", "op", "sk", "裙", "连衣", "半裙", "吊带"]
-    private let outerwearHints = ["外套", "开衫", "罩衫", "斗篷", "披肩", "针织", "坎肩", "披风", "小外套", "短外套"]
-    private let topHints = ["上衣", "衬衫", "内搭", "打底", "马甲", "背心", "开衫", "罩衫", "针织", "坎肩", "披肩"]
+    private let outerwearHints = ["外套", "开衫", "罩衫", "斗篷", "披肩", "针织", "坎肩", "披风", "小外套", "短外套", "薄外套", "薄开衫"]
+    private let topHints = ["上衣", "衬衫", "内搭", "打底", "马甲", "背心", "短袖", "长袖", "t恤", "blouse", "tee"]
     private let shoeHints = ["鞋", "皮鞋", "玛丽珍", "乐福", "高跟", "靴", "凉鞋", "单鞋"]
     private let umbrellaHints = ["伞", "雨伞", "晴雨伞", "折叠伞", "防晒伞"]
     private let accessoryHints = ["小物", "配饰", "胸针", "项链", "发带", "发箍", "耳饰", "帽", "包", "袜", "手袖", "腰带"]
@@ -459,11 +459,8 @@ class WardrobeContextManager {
         }
 
         let dresses = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: dressHints) }
-        let outerwears = availableClothings.filter {
-            let searchable = buildSearchableText(for: $0)
-            return containsAny(in: searchable, hints: outerwearHints) ||
-                containsAny(in: searchable, hints: topHints)
-        }
+        let tops = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: topHints) }
+        let outerwears = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: outerwearHints) }
         let shoes = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: shoeHints) }
         let umbrellas = availableClothings.filter { containsAny(in: buildSearchableText(for: $0), hints: umbrellaHints) }
         let accessories = availableClothings.filter {
@@ -472,7 +469,8 @@ class WardrobeContextManager {
         }
 
         append(Array(dresses.prefix(4)), limit: 4)
-        append(Array(outerwears.prefix(3)), limit: 3)
+        append(Array(tops.prefix(3)), limit: 3)
+        append(Array(outerwears.prefix(2)), limit: 2)
         append(Array(shoes.prefix(2)), limit: 2)
         append(Array(umbrellas.prefix(2)), limit: 2)
         append(Array(accessories.prefix(2)), limit: 2)
@@ -508,9 +506,13 @@ class WardrobeContextManager {
         }
 
         let matchesDress: (Clothing) -> Bool = { self.containsAny(in: self.buildSearchableText(for: $0), hints: self.dressHints) }
+        let matchesTop: (Clothing) -> Bool = {
+            let searchable = self.buildSearchableText(for: $0)
+            return self.containsAny(in: searchable, hints: self.topHints)
+        }
         let matchesOuterwear: (Clothing) -> Bool = {
             let searchable = self.buildSearchableText(for: $0)
-            return self.containsAny(in: searchable, hints: self.outerwearHints) || self.containsAny(in: searchable, hints: self.topHints)
+            return self.containsAny(in: searchable, hints: self.outerwearHints)
         }
         let matchesShoe: (Clothing) -> Bool = { self.containsAny(in: self.buildSearchableText(for: $0), hints: self.shoeHints) }
         let matchesUmbrella: (Clothing) -> Bool = { self.containsAny(in: self.buildSearchableText(for: $0), hints: self.umbrellaHints) }
@@ -519,7 +521,10 @@ class WardrobeContextManager {
             return self.containsAny(in: searchable, hints: self.accessoryHints) || !(($0.accessoryItems ?? []).isEmpty)
         }
 
-        if requested.contains(.outerwear) || requested.contains(.top) {
+        if requested.contains(.top) {
+            append(limit: isOutfitLike ? 4 : 6, where: matchesTop)
+        }
+        if requested.contains(.outerwear) {
             append(limit: isOutfitLike ? 4 : 6, where: matchesOuterwear)
         }
         if requested.contains(.dress) {
@@ -538,15 +543,19 @@ class WardrobeContextManager {
         if isOutfitLike {
             if requested.isEmpty {
                 append(limit: 4, where: matchesDress)
-                append(limit: 3, where: matchesOuterwear)
+                append(limit: 3, where: matchesTop)
+                append(limit: 2, where: matchesOuterwear)
                 append(limit: 2, where: matchesShoe)
                 append(limit: 3, where: matchesAccessory)
             } else {
                 if !(requested.contains(.dress)) {
                     append(limit: 4, where: matchesDress)
                 }
-                if !(requested.contains(.outerwear) || requested.contains(.top)) {
-                    append(limit: 3, where: matchesOuterwear)
+                if !requested.contains(.top) {
+                    append(limit: 3, where: matchesTop)
+                }
+                if !requested.contains(.outerwear) {
+                    append(limit: 2, where: matchesOuterwear)
                 }
                 if !requested.contains(.shoe) {
                     append(limit: 2, where: matchesShoe)

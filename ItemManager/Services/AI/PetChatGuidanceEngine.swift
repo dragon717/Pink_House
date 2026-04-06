@@ -91,7 +91,13 @@ enum PetChatGuidanceEngine {
             return lhs > rhs
         }
 
-        let outerwears = selectItems(from: ordered, category: .outerwear, limit: 2)
+        let outerwears = {
+            let pickedOuterwears = selectItems(from: ordered, category: .outerwear, limit: 2)
+            if !pickedOuterwears.isEmpty {
+                return pickedOuterwears
+            }
+            return selectItems(from: ordered, category: .top, limit: 2)
+        }()
         var dresses = selectItems(from: ordered, category: .dress, limit: 3)
         let shoes = selectItems(from: ordered, category: .shoes, limit: 2)
         let umbrellas = selectItems(from: ordered, category: .umbrella, limit: 2)
@@ -160,7 +166,8 @@ enum PetChatGuidanceEngine {
         var parts: [String] = []
 
         if let outerwear = selection.outerwears.first {
-            parts.append("外套：\(outerwear.name)")
+            let profile = ClothingSemanticAnalyzer.profile(for: outerwear)
+            parts.append("\(profile.matches(category: .top) && profile.category == .top ? "上衣" : "上装")：\(outerwear.name)")
         }
         if let dress = selection.dresses.first {
             parts.append("裙子：\(dress.name)")

@@ -1570,7 +1570,7 @@ struct PetChatViewLegacy: View {
 
         let directSearchHints = [
             "帮我找", "我想找", "找", "搜索", "查一下", "查查",
-            "开衫", "外套", "罩衫", "披肩", "内搭", "马甲", "衬衫"
+            "开衫", "外套", "罩衫", "披肩", "上衣", "内搭", "短袖", "长袖", "马甲", "衬衫"
         ]
         return directSearchHints.contains { title.contains($0) }
     }
@@ -1839,7 +1839,7 @@ struct PetChatViewLegacy: View {
                     isThinking = false
                     messages.append(
                         PetChatMessage(
-                            text: localizedCatchphraseText("（翻翻衣橱）这套里我暂时没找到更合适的可加单品喵，要不要直接说想加开衫、小物、鞋子，或者我重新给你搭一套？"),
+                            text: localizedCatchphraseText("（翻翻衣橱）这套里我暂时没找到更合适的可加单品喵，要不要直接说想加上衣、轻薄开衫、小物、鞋子，或者我重新给你搭一套？"),
                             isUser: false,
                             isAIGenerated: true
                         )
@@ -1903,7 +1903,7 @@ struct PetChatViewLegacy: View {
                     isThinking = false
                     messages.append(
                         PetChatMessage(
-                            text: localizedCatchphraseText("（翻翻衣橱）这套里我暂时没找到更合适的可替换单品喵。你可以直接说“换主裙/换开衫/换鞋子/换浅色小物”，我继续帮你细调~"),
+                            text: localizedCatchphraseText("（翻翻衣橱）这套里我暂时没找到更合适的可替换单品喵。你可以直接说“换主裙/换上衣/换轻薄开衫/换鞋子/换浅色小物”，我继续帮你细调~"),
                             isUser: false,
                             isAIGenerated: true
                         )

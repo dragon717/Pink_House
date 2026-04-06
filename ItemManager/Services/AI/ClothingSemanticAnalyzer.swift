@@ -3,6 +3,7 @@ import Foundation
 enum OutfitSemanticCategory: String {
     case dress
     case outerwear
+    case top
     case shoes
     case umbrella
     case accessory
@@ -12,10 +13,32 @@ enum OutfitSemanticCategory: String {
         switch self {
         case .dress: return "裙装"
         case .outerwear: return "外搭"
+        case .top: return "上衣"
         case .shoes: return "鞋履"
         case .umbrella: return "伞具"
         case .accessory: return "配饰"
         case .other: return "其他"
+        }
+    }
+}
+
+enum OutfitSemanticRole: String, Hashable {
+    case outerwear
+    case top
+}
+
+enum OutfitTopSubtype: String, Hashable {
+    case inner
+    case shortSleeve
+    case longSleeve
+    case shirt
+
+    var displayName: String {
+        switch self {
+        case .inner: return "内搭"
+        case .shortSleeve: return "短袖"
+        case .longSleeve: return "长袖"
+        case .shirt: return "衬衫"
         }
     }
 }
@@ -101,6 +124,8 @@ enum OutfitSemanticColorFamily: String, Hashable {
 struct OutfitSemanticProfile {
     let searchableText: String
     let category: OutfitSemanticCategory
+    let semanticRoles: Set<OutfitSemanticRole>
+    let topSubtype: OutfitTopSubtype?
     let length: OutfitLengthCategory
     let warmthLevel: Int
     let rainSafetyLevel: Int
@@ -111,9 +136,36 @@ struct OutfitSemanticProfile {
     let colorFamilies: Set<OutfitSemanticColorFamily>
     let styleHints: Set<String>
 
+    var actsAsTop: Bool {
+        semanticRoles.contains(.top)
+    }
+
+    var actsAsOuterwear: Bool {
+        semanticRoles.contains(.outerwear)
+    }
+
+    var displayCategoryName: String {
+        if category == .top, let topSubtype {
+            return topSubtype.displayName
+        }
+        return category.displayName
+    }
+
+    func matches(category desiredCategory: OutfitSemanticCategory) -> Bool {
+        switch desiredCategory {
+        case .top:
+            return category == .top || (category == .outerwear && actsAsTop)
+        default:
+            return category == desiredCategory
+        }
+    }
+
     var featureTokens: [String] {
         var tokens: [String] = [category.displayName, "衣长:\(length.rawValue)", "保暖:\(warmthLevel)"]
 
+        if let topSubtype {
+            tokens.append("上衣细分:\(topSubtype.displayName)")
+        }
         if !materials.isEmpty {
             tokens.append("材质:\(materials.map(\.rawValue).sorted().joined(separator: "、"))")
         }
@@ -211,7 +263,9 @@ enum ClothingSemanticAnalyzer {
 
     static func profile(for clothing: Clothing) -> OutfitSemanticProfile {
         let text = searchableText(for: clothing)
+        let semanticRoles = detectSemanticRoles(in: text)
         let category = detectCategory(from: text)
+        let topSubtype = detectTopSubtype(in: text)
         let length = detectLength(from: clothing, text: text, category: category)
         let materials = detectMaterials(in: text)
         let colorFamilies = detectColorFamilies(in: text)
@@ -235,6 +289,8 @@ enum ClothingSemanticAnalyzer {
         return OutfitSemanticProfile(
             searchableText: text,
             category: category,
+            semanticRoles: semanticRoles,
+            topSubtype: topSubtype,
             length: length,
             warmthLevel: warmthLevel,
             rainSafetyLevel: rainSafetyLevel,
@@ -247,6 +303,34 @@ enum ClothingSemanticAnalyzer {
         )
     }
 
+    private static let outerwearKeywords = [
+        "外套", "开衫", "罩衫", "披肩", "披风", "小外套", "短外套",
+        "大衣", "斗篷", "风衣", "夹克", "西装", "西服", "毛衣", "卫衣",
+        "防晒衣", "空调衫", "薄外套", "薄开衫", "bolero"
+    ]
+
+    private static let topKeywords = [
+        "上衣", "衬衫", "内搭", "打底", "背心", "短袖", "长袖",
+        "t恤", "tee", "blouse", "马甲"
+    ]
+
+    private static let cardiganDualRoleKeywords = [
+        "开衫", "罩衫", "披肩", "薄开衫", "空调衫", "bolero"
+    ]
+
+    private static func detectSemanticRoles(in text: String) -> Set<OutfitSemanticRole> {
+        var roles = Set<OutfitSemanticRole>()
+
+        if text.containsAnyKeyword(outerwearKeywords) {
+            roles.insert(.outerwear)
+        }
+        if text.containsAnyKeyword(topKeywords) || text.containsAnyKeyword(cardiganDualRoleKeywords) {
+            roles.insert(.top)
+        }
+
+        return roles
+    }
+
     private static func detectCategory(from text: String) -> OutfitSemanticCategory {
         if text.containsAnyKeyword(["雨伞", "晴雨伞", "折叠伞", "防晒伞", "伞"]) {
             return .umbrella
@@ -254,12 +338,12 @@ enum ClothingSemanticAnalyzer {
         if text.containsAnyKeyword(["jsk", "op", "sk", "裙", "连衣", "吊带", "半裙"]) {
             return .dress
         }
-        if text.containsAnyKeyword([
-            "外套", "开衫", "罩衫", "针织", "披肩", "披风", "小外套", "短外套",
-            "大衣", "斗篷", "风衣", "夹克", "西装", "西服", "毛衣", "卫衣",
-            "上衣", "衬衫", "内搭", "打底", "马甲", "背心", "bolero"
-        ]) {
+        let semanticRoles = detectSemanticRoles(in: text)
+        if semanticRoles.contains(.outerwear) {
             return .outerwear
+        }
+        if semanticRoles.contains(.top) {
+            return .top
         }
         if text.containsAnyKeyword(["鞋", "皮鞋", "高跟", "玛丽珍", "乐福", "靴", "凉鞋", "单鞋", "雨靴"]) {
             return .shoes
@@ -273,13 +357,35 @@ enum ClothingSemanticAnalyzer {
         return .other
     }
 
+    private static func detectTopSubtype(in text: String) -> OutfitTopSubtype? {
+        if text.containsAnyKeyword(["内搭", "打底"]) {
+            return .inner
+        }
+        if text.containsAnyKeyword(["短袖", "短t", "短tee"]) {
+            return .shortSleeve
+        }
+        if text.containsAnyKeyword(["长袖", "长t"]) {
+            return .longSleeve
+        }
+        if text.containsAnyKeyword(["衬衫", "blouse", "shirt"]) {
+            return .shirt
+        }
+        return nil
+    }
+
     private static func detectLength(
         from clothing: Clothing,
         text: String,
         category: OutfitSemanticCategory
     ) -> OutfitLengthCategory {
         let explicit = clothing.length.lowercased()
-        let combined = [explicit, text].joined(separator: ",")
+        var combined = [explicit, text].joined(separator: ",")
+
+        if category == .top {
+            for sleeveKeyword in ["短袖", "长袖", "无袖", "半袖", "短t", "长t"] {
+                combined = combined.replacingOccurrences(of: sleeveKeyword, with: "")
+            }
+        }
 
         if combined.containsAnyKeyword(["拖地", "及地", "曳地"]) {
             return .floor
@@ -287,7 +393,7 @@ enum ClothingSemanticAnalyzer {
         if combined.containsAnyKeyword(["超短", "迷你", "mini"]) {
             return .extraShort
         }
-        if combined.containsAnyKeyword(["短款", "短裙", "短"]) && category != .outerwear {
+        if combined.containsAnyKeyword(["短款", "短裙", "短"]) && category != .outerwear && category != .top {
             return .short
         }
         if combined.containsAnyKeyword(["长款", "长裙", "及踝", "过膝", "及小腿"]) {
@@ -656,6 +762,13 @@ enum OutfitRecommendationScorer {
         let requestedSeasons = OutfitRecommendationKnowledgeBase.requestedSeasons(in: context.query)
         let lowerQuery = context.query.lowercased()
         let targetsSummer = requestedSeasons.contains(.summer) || (requestedSeasons.isEmpty && context.season == .summer)
+        let explicitlyRequestedOuterwear = lowerQuery.containsAnyKeyword([
+            "外套", "开衫", "罩衫", "披肩", "防晒", "防晒衣", "空调衫", "薄外套", "薄开衫", "小外套", "背心", "马甲"
+        ])
+        let explicitWarmOuterwear = lowerQuery.containsAnyKeyword([
+            "大衣", "厚外套", "保暖", "秋冬", "冬季", "呢子", "毛呢", "羽绒", "棉服", "夹克", "风衣", "卫衣", "毛衣"
+        ])
+        let text = profile.searchableText
 
         if !requestedSeasons.isEmpty {
             if !profile.seasons.isEmpty, requestedSeasons.isDisjoint(with: profile.seasons) {
@@ -670,10 +783,6 @@ enum OutfitRecommendationScorer {
         }
 
         if targetsSummer, profile.category == .outerwear {
-            let text = profile.searchableText
-            let explicitlyRequestedOuterwear = lowerQuery.containsAnyKeyword([
-                "外套", "开衫", "罩衫", "披肩", "防晒", "防晒衣", "空调衫", "薄外套", "薄开衫", "小外套", "背心", "马甲"
-            ])
             let lightweightOuterwear = isLightweightOuterwear(profile: profile, text: text)
             let heavyOuterwear = isHeavyOuterwear(profile: profile, text: text)
 
@@ -699,6 +808,22 @@ enum OutfitRecommendationScorer {
 
         let feelsLike = weather.feelsLikeTemperature
         let isRainy = rainy(weather)
+
+        if profile.category == .outerwear && !explicitWarmOuterwear {
+            let lightweightOuterwear = isLightweightOuterwear(profile: profile, text: text)
+            let heavyOuterwear = isHeavyOuterwear(profile: profile, text: text)
+
+            if feelsLike >= 20, heavyOuterwear {
+                return false
+            }
+
+            if feelsLike >= 23,
+               !profile.actsAsTop,
+               !explicitlyRequestedOuterwear,
+               !lightweightOuterwear {
+                return false
+            }
+        }
 
         if isRainy && profile.category == .shoes && profile.rainSafetyLevel == 0 {
             return false
@@ -739,6 +864,12 @@ enum OutfitRecommendationScorer {
         if profile.category == .dress && text.containsAnyKeyword(["jsk", "op", "sk"]) {
             score += 12
         }
+        if lowerQuery.containsAnyKeyword(["上衣", "内搭", "打底", "短袖", "长袖", "衬衫"]) && profile.matches(category: .top) {
+            score += profile.category == .top ? 22 : 12
+        }
+        if lowerQuery.containsAnyKeyword(["开衫", "外套", "罩衫", "披肩", "小外套"]) && profile.category == .outerwear {
+            score += 18
+        }
 
         if profile.seasons.contains(context.season) {
             score += 18
@@ -774,6 +905,20 @@ enum OutfitRecommendationScorer {
                 score -= 18
             }
         }
+        if profile.category == .top {
+            switch profile.topSubtype {
+            case .inner:
+                score += 10
+            case .shortSleeve:
+                score += (context.weather?.feelsLikeTemperature ?? 0) >= 24 ? 16 : 8
+            case .longSleeve:
+                score += (context.weather?.feelsLikeTemperature ?? 0) >= 24 ? 4 : 10
+            case .shirt:
+                score += 6
+            case nil:
+                break
+            }
+        }
 
         let seasonColors = OutfitRecommendationKnowledgeBase.preferredColors(for: context.season)
         if text.containsAnyKeyword(seasonColors) {
@@ -801,6 +946,9 @@ enum OutfitRecommendationScorer {
             case 18..<25:
                 if (1...3).contains(profile.warmthLevel) {
                     score += 14
+                }
+                if profile.category == .outerwear && isHeavyOuterwear(profile: profile, text: text) {
+                    score -= 30
                 }
             case 25..<30:
                 score += profile.warmthLevel <= 2 ? 16 : -16

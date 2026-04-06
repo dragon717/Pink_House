@@ -56,7 +56,7 @@ struct OOTDCutoutListView: View {
     // 完全隐藏状态
     @State private var isCompletelyHidden = false
     
-    private let categories = ["全部", "裙装", "外套", "鞋子", "袜子", "玩偶", "小物", "未分类"]
+    private let categories = ["全部", "裙装", "外套", "上衣", "鞋子", "袜子", "玩偶", "小物", "未分类"]
     // For picker (exclude "全部")
     private var selectableCategories: [String] {
         categories.filter { $0 != "全部" }
@@ -67,6 +67,7 @@ struct OOTDCutoutListView: View {
         case "全部": return "square.grid.2x2.fill"
         case "裙装": return "frock.fill"
         case "外套": return "jacket.fill"
+        case "上衣": return "tshirt.fill"
         case "鞋子": return "shoe.fill"
         case "袜子": return "sun.min.fill" // 暂替代
         case "玩偶": return "teddybear.fill"
@@ -109,7 +110,10 @@ struct OOTDCutoutListView: View {
                     if selectedCategory == "裙装" && (nameInfo.contains("裙") || nameInfo.contains("jsk") || nameInfo.contains("op") || nameInfo.contains("dress")) {
                         return true
                     }
-                    if selectedCategory == "外套" && (nameInfo.contains("外套") || nameInfo.contains("上衣") || nameInfo.contains("开衫") || nameInfo.contains("shirt") || nameInfo.contains("top")) {
+                    if selectedCategory == "外套" && (nameInfo.contains("外套") || nameInfo.contains("开衫") || nameInfo.contains("罩衫") || nameInfo.contains("披肩") || nameInfo.contains("cardigan") || nameInfo.contains("bolero")) {
+                        return true
+                    }
+                    if selectedCategory == "上衣" && (nameInfo.contains("上衣") || nameInfo.contains("内搭") || nameInfo.contains("打底") || nameInfo.contains("短袖") || nameInfo.contains("长袖") || nameInfo.contains("衬衫") || nameInfo.contains("shirt") || nameInfo.contains("blouse") || nameInfo.contains("tee") || nameInfo.contains("top")) {
                         return true
                     }
                     if selectedCategory == "袜子" && (nameInfo.contains("袜") || nameInfo.contains("sock")) {
@@ -125,7 +129,7 @@ struct OOTDCutoutListView: View {
                 
                 // 特殊处理 "未分类"
                 if selectedCategory == "未分类" {
-                    let standardCategories = ["裙装", "外套", "鞋子", "袜子", "玩偶", "小物"]
+                    let standardCategories = ["裙装", "外套", "上衣", "鞋子", "袜子", "玩偶", "小物"]
                     if standardCategories.contains(item.category) { return false }
                     if let _ = CutoutService.shared.standardizeCategory(item.category) {
                         return false
