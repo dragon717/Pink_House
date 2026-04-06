@@ -72,7 +72,7 @@ struct WardrobeSettingsView: View {
             
             // MARK: - 业务提醒
             AdaptiveSection(header: "业务提醒") {
-                NavigationLink(destination: NotificationSettingsView()) {
+                NavigationLink(destination: DepositNotificationView()) {
                     Label("心愿尾款设置", systemImage: "bell.badge")
                 }
                 .adaptiveRow(showDivider: false)

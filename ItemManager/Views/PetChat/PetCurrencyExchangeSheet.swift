@@ -24,7 +24,7 @@ struct PetCurrencyExchangeSheet: View {
                     Text("货币兑换")
                         .font(.title2)
                         .fontWeight(.bold)
-                    Text("汇率 1:1")
+                    Text(exchangeRateDescription)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -56,10 +56,10 @@ struct PetCurrencyExchangeSheet: View {
                     .foregroundStyle(.secondary)
 
                     Button {
-                        inputAmountText = "\(Int(exchangeAmount))"
+                        inputAmountText = "\(exchangeAmountValue)"
                         showAmountInput = true
                     } label: {
-                        Text("兑换数量: \(Int(exchangeAmount))")
+                        Text("兑换数量: \(exchangeAmountValue)")
                             .font(.headline)
                             .foregroundStyle(themeManager.primaryTextColor)
                             .padding(.horizontal, 12)
@@ -81,13 +81,23 @@ struct PetCurrencyExchangeSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     } else if hasExchangeableBalance {
-                        Text("当前最多可兑换 \(sourceBalance)")
+                        Text("当前最多可兑换 \(maxExchangeableSourceAmount)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if sourceBalance > 0 {
+                        Text("目标货币已接近上限，暂时无法继续兑换")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
                         Text("当前没有可用于兑换的\(title(for: direction.sourceCurrency))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+
+                    if hasExchangeableBalance {
+                        Text("预计到账 \(convertedTargetAmount(for: exchangeAmountValue) ?? 0) \(title(for: direction.targetCurrency))")
+                            .font(.caption)
+                            .foregroundStyle(themeManager.secondaryTextColor)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -155,31 +165,32 @@ struct PetCurrencyExchangeSheet: View {
                 clampExchangeAmount()
             }
             .onChange(of: direction) { _, _ in
+                resultMessage = nil
                 clampExchangeAmount()
             }
         }
     }
 
     private var sliderStep: Double {
-        guard sourceBalance > 1 else { return 1 }
+        guard maxExchangeableSourceAmount > 1 else { return 1 }
         if direction.sourceCurrency == .meowCoin { return 1 }
-        return sourceBalance >= 100 ? 100 : 1
+        return maxExchangeableSourceAmount >= 100 ? 100 : 1
     }
 
     private var sliderRange: ClosedRange<Double> {
-        1...Double(max(2, sourceBalance))
+        1...Double(max(2, maxExchangeableSourceAmount))
     }
 
     private var maxExchangeAmount: Double {
-        Double(max(1, sourceBalance))
+        Double(max(1, maxExchangeableSourceAmount))
     }
 
     private var hasExchangeableBalance: Bool {
-        sourceBalance > 0
+        maxExchangeableSourceAmount > 0
     }
 
     private var showsSlider: Bool {
-        sourceBalance > 1
+        maxExchangeableSourceAmount > 1
     }
 
     private var sourceBalance: Int {
@@ -188,6 +199,38 @@ struct PetCurrencyExchangeSheet: View {
 
     private var targetBalance: Int {
         amount(for: direction.targetCurrency)
+    }
+
+    private var exchangeAmountValue: Int {
+        max(0, Int(exchangeAmount))
+    }
+
+    private var exchangeRateDescription: String {
+        switch direction {
+        case .fishToBone, .boneToFish:
+            return "汇率 1:1"
+        case .meowToFish:
+            return "1 喵币 = 1000 鱼币"
+        case .meowToBone:
+            return "1 喵币 = 1000 骨头币"
+        }
+    }
+
+    private var maxExchangeableSourceAmount: Int {
+        guard sourceBalance > 0 else { return 0 }
+
+        let targetHeadroom = Int.max - targetBalance
+        guard targetHeadroom > 0 else { return 0 }
+
+        let maxByTarget: Int
+        switch direction {
+        case .fishToBone, .boneToFish:
+            maxByTarget = targetHeadroom
+        case .meowToFish, .meowToBone:
+            maxByTarget = targetHeadroom / 1000
+        }
+
+        return max(0, min(sourceBalance, maxByTarget))
     }
 
     private func amount(for currency: PetCurrency) -> Int {
@@ -207,45 +250,85 @@ struct PetCurrencyExchangeSheet: View {
     }
 
     private func performExchange() {
-        let amount = Int(exchangeAmount)
-        guard amount > 0 else { return }
+        let sourceAmount = min(exchangeAmountValue, maxExchangeableSourceAmount)
+        guard sourceAmount > 0 else {
+            presentError("当前数量无法兑换")
+            return
+        }
+
+        guard let targetAmount = convertedTargetAmount(for: sourceAmount) else {
+            presentError("兑换数量过大，请减少后重试")
+            return
+        }
 
         var status = petDataManager.status
         switch direction {
         case .fishToBone:
-            guard status.fishCoin >= amount else {
+            guard status.fishCoin >= sourceAmount else {
                 presentError("鱼币不足")
                 return
             }
-            status.fishCoin -= amount
-            status.boneCoin += amount
-            resultMessage = "兑换成功：\(amount) 鱼币 → \(amount) 骨头币"
+            let (newBoneCoin, overflow) = status.boneCoin.addingReportingOverflow(targetAmount)
+            guard !overflow else {
+                presentError("骨头币数量过大，暂时无法继续兑换")
+                return
+            }
+            status.fishCoin -= sourceAmount
+            status.boneCoin = newBoneCoin
+            resultMessage = "兑换成功：\(sourceAmount) 鱼币 → \(targetAmount) 骨头币"
         case .boneToFish:
-            guard status.boneCoin >= amount else {
+            guard status.boneCoin >= sourceAmount else {
                 presentError("骨头币不足")
                 return
             }
-            status.boneCoin -= amount
-            status.fishCoin += amount
-            resultMessage = "兑换成功：\(amount) 骨头币 → \(amount) 鱼币"
+            let (newFishCoin, overflow) = status.fishCoin.addingReportingOverflow(targetAmount)
+            guard !overflow else {
+                presentError("鱼币数量过大，暂时无法继续兑换")
+                return
+            }
+            status.boneCoin -= sourceAmount
+            status.fishCoin = newFishCoin
+            resultMessage = "兑换成功：\(sourceAmount) 骨头币 → \(targetAmount) 鱼币"
         case .meowToFish:
-            guard StoreManager.spendMeowCoins(amount, in: &status) else {
+            let (newFishCoin, overflow) = status.fishCoin.addingReportingOverflow(targetAmount)
+            guard !overflow else {
+                presentError("鱼币数量过大，暂时无法继续兑换")
+                return
+            }
+            guard StoreManager.spendMeowCoins(sourceAmount, in: &status) else {
                 presentError("喵币不足")
                 return
             }
-            status.fishCoin += amount
-            resultMessage = "兑换成功：\(amount) 喵币 → \(amount) 鱼币"
+            status.fishCoin = newFishCoin
+            resultMessage = "兑换成功：\(sourceAmount) 喵币 → \(targetAmount) 鱼币"
         case .meowToBone:
-            guard StoreManager.spendMeowCoins(amount, in: &status) else {
+            let (newBoneCoin, overflow) = status.boneCoin.addingReportingOverflow(targetAmount)
+            guard !overflow else {
+                presentError("骨头币数量过大，暂时无法继续兑换")
+                return
+            }
+            guard StoreManager.spendMeowCoins(sourceAmount, in: &status) else {
                 presentError("喵币不足")
                 return
             }
-            status.boneCoin += amount
-            resultMessage = "兑换成功：\(amount) 喵币 → \(amount) 骨头币"
+            status.boneCoin = newBoneCoin
+            resultMessage = "兑换成功：\(sourceAmount) 喵币 → \(targetAmount) 骨头币"
         }
 
         PetDataManager.shared.saveStatus(status)
         NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
+    }
+
+    private func convertedTargetAmount(for sourceAmount: Int) -> Int? {
+        guard sourceAmount > 0 else { return 0 }
+
+        switch direction {
+        case .fishToBone, .boneToFish:
+            return sourceAmount
+        case .meowToFish, .meowToBone:
+            let (result, overflow) = sourceAmount.multipliedReportingOverflow(by: 1000)
+            return overflow ? nil : result
+        }
     }
 
     private func clampExchangeAmount() {

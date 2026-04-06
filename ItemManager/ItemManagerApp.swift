@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import BackgroundTasks
 import CloudKit
+import os
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     static var orientationLock = UIInterfaceOrientationMask.all
@@ -89,10 +90,6 @@ struct ItemManagerApp: App {
         // Ensure NotificationManager is initialized to set the delegate
         _ = NotificationManager.shared
         _ = WardrobeNavigationStyle.normalizeStoredPreference()
-        
-        // 预热 RealityKit 渲染引擎，避免 Object Capture 时的材质加载错误
-        // 这会在 App 启动时预加载 engine:throttleGhosted.rematerial 等内部资源
-        RealityKitHelper.warmUp()
     }
     
     var body: some Scene {
@@ -115,8 +112,10 @@ struct MainContentView: View {
     @State private var showDailyCheckIn = false
     @State private var didStartLaunchFlow = false
     @State private var hasCompletedLaunchPresentation = false
+    @State private var hasScheduledDeferredLaunchMaintenance = false
     @State private var pendingFirstLaunchGuideAfterCheckIn = false
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
+    private let launchLogger = AppLogger.category("LaunchFlow")
     
     var body: some View {
         ZStack {
@@ -174,7 +173,7 @@ struct MainContentView: View {
             print("iCloud 同步状态: \(migrationManager.isCloudSyncEnabled ? "已启用" : "未启用")")
             print("迁移完成状态: \(migrationManager.isMigrationCompleted ? "已完成" : "未完成")")
             
-            print("🚀 [LaunchFlow] 启动初始化任务")
+            launchLogger.info("launch_start low_memory=\(NotificationManager.Config.isLowMemoryDevice)")
             
             Task {
                 await runStartupInitialization()
@@ -191,7 +190,7 @@ struct MainContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background || newPhase == .inactive {
                 Task {
-                    await SharedPersistence.shared.syncWidgetData()
+                    await SharedPersistence.shared.syncWidgetData(reason: "scene-background")
                     // 调度裙装股市后台任务
                     TaskDispatcher.shared.scheduleBackgroundTask()
                 }
@@ -199,6 +198,13 @@ struct MainContentView: View {
                 // 从后台回到前台时检查是否需要打卡
                 checkAndShowDailyCheckIn()
                 startDeferredFirstLaunchGuideIfNeeded()
+                Task {
+                    await NotificationManager.shared.reconcileDeliveredNotifications(modelContext: modelContext)
+                    await syncDepositNotificationsIfNeeded(reason: "foreground")
+                    await MainActor.run {
+                        NotificationManager.shared.updateApplicationBadge()
+                    }
+                }
             }
         }
         .onChange(of: showDailyCheckIn) { _, isPresented in
@@ -209,15 +215,17 @@ struct MainContentView: View {
     
     // MARK: - 启动初始化（不阻塞开屏消失）
     @MainActor
-    private func runStartupInitialization() async {
-        PetHistoryResetManager.shared.applyForcedResetIfNeeded()
+    private func syncDepositNotificationsIfNeeded(reason: String) async {
+        await NotificationManager.shared.refreshAllKnownDepositNotifications(
+            modelContext: modelContext,
+            reason: reason
+        )
+    }
 
-        // 0. Preload Spatial Assets (iOS 26+ only)
-        // 仅在支持的系统上预加载，避免旧设备浪费资源
-        if #available(iOS 26.0, *) {
-            SpatialAssetManager.shared.preload(imageName: "small_world_bg_normal", extension: "png")
-            SpatialAssetManager.shared.preload(imageName: "small_world_bg_sun", extension: "png")
-        }
+    @MainActor
+    private func runStartupInitialization() async {
+        let startedAt = Date()
+        PetHistoryResetManager.shared.applyForcedResetIfNeeded()
         
         // 0.5 Migrate 3D models from Clothing to Model3D
         await Model3DMigrationService.shared.migrateIfNeeded(modelContainer: SharedPersistence.shared.sharedModelContainer)
@@ -261,11 +269,8 @@ struct MainContentView: View {
         
         // 0.11 预加载本周穿搭色（可选优化，低内存设备建议注释掉）
         // await DailyCheckInManager.shared.preloadWeekOutfitColors()
-
-        // 2. Perform heavy initialization tasks
-        // Optimized syncWidgetData (now async to offload image processing)
-        await SharedPersistence.shared.syncWidgetData()
-        print("✅ [LaunchFlow] 初始化任务完成")
+        let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        launchLogger.info("launch_critical_init_finish duration_ms=\(durationMs)")
     }
     
     @MainActor
@@ -273,10 +278,11 @@ struct MainContentView: View {
         guard !hasCompletedLaunchPresentation else { return }
         hasCompletedLaunchPresentation = true
         
-        print("🚀 [LaunchFlow] 结束开屏，触发源: \(trigger)")
+        launchLogger.info("splash_finish trigger=\(trigger, privacy: .public)")
         withAnimation(.easeOut(duration: 0.5)) {
             showSplash = false
         }
+        scheduleDeferredLaunchMaintenanceIfNeeded(trigger: trigger)
         
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 300_000_000) // 等待 0.3 秒确保动画完成
@@ -304,6 +310,59 @@ struct MainContentView: View {
 
         pendingFirstLaunchGuideAfterCheckIn = false
         guideManager.startGuide()
+    }
+
+    @MainActor
+    private func scheduleDeferredLaunchMaintenanceIfNeeded(trigger: String) {
+        guard !hasScheduledDeferredLaunchMaintenance else { return }
+        hasScheduledDeferredLaunchMaintenance = true
+
+        let delayNanoseconds: UInt64 = NotificationManager.Config.isLowMemoryDevice
+            ? 1_600_000_000
+            : 1_000_000_000
+
+        Task(priority: .background) {
+            try? await Task.sleep(nanoseconds: delayNanoseconds)
+            await performDeferredLaunchMaintenance(trigger: trigger)
+        }
+    }
+
+    @MainActor
+    private func performDeferredLaunchMaintenance(trigger: String) async {
+        let notificationStartedAt = Date()
+        await NotificationManager.shared.reconcileDeliveredNotifications(modelContext: modelContext)
+        await syncDepositNotificationsIfNeeded(reason: "launch-deferred")
+        NotificationManager.shared.updateApplicationBadge()
+        let notificationDurationMs = Int(Date().timeIntervalSince(notificationStartedAt) * 1000)
+        launchLogger.info("deferred_notification_finish trigger=\(trigger, privacy: .public) duration_ms=\(notificationDurationMs)")
+
+        Task(priority: .background) {
+            await SharedPersistence.shared.syncWidgetData(reason: "launch-deferred")
+        }
+
+        guard !NotificationManager.Config.isLowMemoryDevice else {
+            launchLogger.info("deferred_warmup_skip low_memory=true")
+            return
+        }
+
+        if #available(iOS 26.0, *) {
+            Task.detached(priority: .background) {
+                let preloadStartedAt = Date()
+                await MainActor.run {
+                    SpatialAssetManager.shared.preload(imageName: "small_world_bg_normal", extension: "png")
+                    SpatialAssetManager.shared.preload(imageName: "small_world_bg_sun", extension: "png")
+                }
+                let preloadDurationMs = Int(Date().timeIntervalSince(preloadStartedAt) * 1000)
+                AppLogger.category("LaunchFlow").info("spatial_preload_finish duration_ms=\(preloadDurationMs)")
+            }
+        }
+
+        Task.detached(priority: .background) {
+            let warmupStartedAt = Date()
+            RealityKitHelper.warmUp()
+            let warmupDurationMs = Int(Date().timeIntervalSince(warmupStartedAt) * 1000)
+            AppLogger.category("LaunchFlow").info("realitykit_warmup_finish duration_ms=\(warmupDurationMs)")
+        }
     }
     
     // MARK: - 检查并显示每日打卡

@@ -1,6 +1,13 @@
 import SwiftUI
 
 extension ThemeManager {
+    private struct ThemeUndoSnapshot: Codable {
+        let themeColorConfig: ThemeColorConfig
+        let petChatSkinTheme: PetChatSkinTheme
+    }
+
+    private var lastThemeSnapshotKey: String { "theme_last_snapshot_v1" }
+
     @discardableResult
     func saveCurrentThemeAsSet(named rawName: String?) -> UserCustomTheme {
         var newConfig = themeColorConfig
@@ -62,6 +69,45 @@ extension ThemeManager {
     func restoreDefaultThemeSet() {
         applyThemePreset(CustomColorPresets.monicaPink)
         petChatSkinTheme = .classic
+    }
+
+    func captureThemeSnapshot() {
+        let snapshot = ThemeUndoSnapshot(
+            themeColorConfig: themeColorConfig,
+            petChatSkinTheme: petChatSkinTheme
+        )
+
+        guard let data = try? JSONEncoder().encode(snapshot) else {
+            return
+        }
+
+        UserDefaults.standard.set(data, forKey: lastThemeSnapshotKey)
+    }
+
+    var canRestoreLastThemeSnapshot: Bool {
+        UserDefaults.standard.data(forKey: lastThemeSnapshotKey) != nil
+    }
+
+    @discardableResult
+    func restoreLastThemeSnapshot() -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: lastThemeSnapshotKey),
+              let snapshot = try? JSONDecoder().decode(ThemeUndoSnapshot.self, from: data) else {
+            return false
+        }
+
+        let currentSnapshot = ThemeUndoSnapshot(
+            themeColorConfig: themeColorConfig,
+            petChatSkinTheme: petChatSkinTheme
+        )
+
+        themeColorConfig = snapshot.themeColorConfig
+        petChatSkinTheme = snapshot.petChatSkinTheme
+
+        if let currentData = try? JSONEncoder().encode(currentSnapshot) {
+            UserDefaults.standard.set(currentData, forKey: lastThemeSnapshotKey)
+        }
+
+        return true
     }
 
     func applyThemePreset(_ preset: ThemePreset) {

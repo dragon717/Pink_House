@@ -38,27 +38,53 @@ class OutfitSuggestionService {
     func processOutfitRequest(
         query: String,
         clothings: [Clothing],
-        context: ModelContext
+        context: ModelContext,
+        weather: WeatherData? = nil
     ) async throws -> ([Clothing], String, String, String) {
-        // 过滤掉心愿尾款的裙装（只从非心愿尾款中选择）
-        let availableClothings = clothings.filter { !$0.isDepositPlan }
+        // 只从已到手、当前可穿的单品里推荐。
+        let availableClothings = OutfitRecommendability.recommendableClothings(from: clothings)
         
         // 检查是否有足够的非心愿尾款裙装
         guard availableClothings.count >= 2 else {
             throw OutfitSuggestionError.insufficientNonDepositItems
         }
+
+        let suggestionContext = OutfitRecommendationContext(
+            query: query,
+            weather: weather,
+            season: OutfitRecommendationKnowledgeBase.inferredSeason(from: weather, query: query),
+            prioritizeWeather: weather != nil
+        )
+        let eligibleClothings = availableClothings.filter { OutfitRecommendationScorer.isEligible($0, in: suggestionContext) }
+        let promptClothings = eligibleClothings.isEmpty ? availableClothings : eligibleClothings
         
         // 1. 调用 AI 获取搭配建议
         let suggestion = try await fetchOutfitSuggestionFromAI(
             query: query,
-            clothings: availableClothings
+            clothings: promptClothings,
+            weather: weather
         )
 
         // 2. 获取推荐的裙装
-        let matchedClothings = matchSelectedClothings(suggestion: suggestion, clothings: availableClothings)
-        let selectedClothings = OutfitColorHarmonyEngine.refineSelection(
+        let matchedClothings = matchSelectedClothings(suggestion: suggestion, clothings: promptClothings)
+        let colorRefined = OutfitColorHarmonyEngine.refineSelection(
             matchedClothings,
-            within: availableClothings
+            within: promptClothings
+        )
+        let recommendationContext = OutfitRecommendationContext(
+            query: query,
+            style: suggestion.style,
+            occasion: suggestion.occasion,
+            weather: weather,
+            season: OutfitRecommendationKnowledgeBase.inferredSeason(from: weather, query: query),
+            prioritizeWeather: weather != nil
+        )
+        let selectedClothings = reconcileSelection(
+            preferred: colorRefined,
+            fallbackPool: promptClothings,
+            context: recommendationContext,
+            minimumCount: 2,
+            maximumCount: 4
         )
 
         guard !selectedClothings.isEmpty else {
@@ -82,10 +108,11 @@ class OutfitSuggestionService {
         style: String,
         occasion: String,
         clothings: [Clothing],
-        context: ModelContext
+        context: ModelContext,
+        weather: WeatherData? = nil
     ) async throws -> [Clothing] {
-        // 过滤掉心愿尾款的裙装（只从非心愿尾款中选择）
-        let availableClothings = clothings.filter { !$0.isDepositPlan }
+        // 只从已到手、当前可穿的单品里推荐。
+        let availableClothings = OutfitRecommendability.recommendableClothings(from: clothings)
         
         // 检查是否有足够的非心愿尾款裙装
         guard availableClothings.count >= 2 else {
@@ -96,9 +123,13 @@ class OutfitSuggestionService {
         let rankingContext = OutfitRecommendationContext(
             style: style,
             occasion: occasion,
-            season: OutfitRecommendationKnowledgeBase.inferredSeason(from: nil)
+            weather: weather,
+            season: OutfitRecommendationKnowledgeBase.inferredSeason(from: weather),
+            prioritizeWeather: weather != nil
         )
-        let scoredClothings = availableClothings.map { clothing in
+        let eligible = availableClothings.filter { OutfitRecommendationScorer.isEligible($0, in: rankingContext) }
+        let rankingPool = eligible.isEmpty ? availableClothings : eligible
+        let scoredClothings = rankingPool.map { clothing in
             (clothing: clothing, score: calculateOutfitScore(clothing: clothing, context: rankingContext))
         }.sorted { $0.score > $1.score }
         
@@ -148,12 +179,12 @@ class OutfitSuggestionService {
         
         // 如果还是不足，随机选择补充
         if result.count < 2 {
-            let remaining = availableClothings.filter { !result.contains($0) }
+            let remaining = rankingPool.filter { !result.contains($0) }
             result.append(contentsOf: remaining.shuffled().prefix(2 - result.count))
         }
         
         // 使用颜色和谐引擎优化
-        result = OutfitColorHarmonyEngine.refineSelection(result, within: availableClothings)
+        result = OutfitColorHarmonyEngine.refineSelection(result, within: rankingPool)
         
         guard result.count >= 2 else {
             throw OutfitSuggestionError.insufficientItems
@@ -161,10 +192,275 @@ class OutfitSuggestionService {
         
         return result
     }
+
+    func extendOutfit(
+        baseSuggestion: OutfitSuggestionData,
+        query: String,
+        clothings: [Clothing],
+        weather: WeatherData? = nil
+    ) throws -> ([Clothing], String) {
+        let baseClothings = baseSuggestion.clothings
+        guard !baseClothings.isEmpty else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+
+        let baseIDs = Set(baseClothings.map(\.id))
+        let season = inferredContinuationSeason(
+            query: query,
+            baseSuggestion: baseSuggestion,
+            baseClothings: baseClothings,
+            weather: weather
+        )
+        let context = OutfitRecommendationContext(
+            query: query,
+            style: baseSuggestion.style,
+            occasion: baseSuggestion.occasion,
+            weather: weather,
+            season: season,
+            prioritizeWeather: weather != nil
+        )
+        let desiredCategories = preferredAugmentCategories(
+            from: query,
+            baseClothings: baseClothings,
+            season: season
+        )
+        let desiredColors = preferredAugmentColors(from: query)
+        let baseProfiles = baseClothings.map { ClothingSemanticAnalyzer.profile(for: $0) }
+        let existingCategories = Set(baseProfiles.map(\.category))
+        let existingColors = baseProfiles.reduce(into: Set<OutfitSemanticColorFamily>()) { partialResult, profile in
+            partialResult.formUnion(profile.colorFamilies)
+        }
+        let explicitCategories = Set(preferredReplaceCategories(from: query))
+
+        let candidates = OutfitRecommendability
+            .recommendableClothings(from: clothings)
+            .filter { !baseIDs.contains($0.id) }
+
+        guard !candidates.isEmpty else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+        let eligibleCandidates = candidates.filter { OutfitRecommendationScorer.isEligible($0, in: context) }
+        let rankingPoolBase = eligibleCandidates.isEmpty ? candidates : eligibleCandidates
+        let rankingPool = try constrainAugmentCandidates(
+            rankingPoolBase,
+            query: query,
+            explicitCategories: explicitCategories
+        )
+
+        let ordered = rankingPool.sorted { lhs, rhs in
+            let left = augmentScore(
+                clothing: lhs,
+                context: context,
+                desiredCategories: desiredCategories,
+                desiredColors: desiredColors,
+                existingCategories: existingCategories,
+                existingColors: existingColors
+            )
+            let right = augmentScore(
+                clothing: rhs,
+                context: context,
+                desiredCategories: desiredCategories,
+                desiredColors: desiredColors,
+                existingCategories: existingCategories,
+                existingColors: existingColors
+            )
+
+            if left == right {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return left > right
+        }
+
+        guard let picked = ordered.first else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+
+        let updatedClothings = baseClothings + [picked]
+        let response = buildAugmentResponse(
+            picked: picked,
+            updatedClothings: updatedClothings,
+            style: baseSuggestion.style,
+            occasion: baseSuggestion.occasion,
+            query: query
+        )
+        return (updatedClothings, response)
+    }
+
+    func replaceOutfitItem(
+        baseSuggestion: OutfitSuggestionData,
+        query: String,
+        clothings: [Clothing],
+        weather: WeatherData? = nil
+    ) throws -> ([Clothing], String) {
+        let baseClothings = baseSuggestion.clothings
+        guard !baseClothings.isEmpty else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+
+        let explicitCategories = preferredReplaceCategories(from: query)
+        let hasExplicitCategory = !explicitCategories.isEmpty
+        let (replaceIndex, removedItem) = resolveReplacementTarget(
+            from: baseClothings,
+            explicitCategories: explicitCategories
+        )
+
+        let remainingClothings = baseClothings.enumerated()
+            .filter { $0.offset != replaceIndex }
+            .map(\.element)
+        let removedProfile = ClothingSemanticAnalyzer.profile(for: removedItem)
+        let desiredCategories = dedupeCategories(
+            explicitCategories + [removedProfile.category, .outerwear, .accessory, .shoes, .umbrella, .dress, .other]
+        )
+        let desiredColors = preferredAugmentColors(from: query)
+        let season = inferredContinuationSeason(
+            query: query,
+            baseSuggestion: baseSuggestion,
+            baseClothings: baseClothings,
+            weather: weather
+        )
+        let context = OutfitRecommendationContext(
+            query: query,
+            style: baseSuggestion.style,
+            occasion: baseSuggestion.occasion,
+            weather: weather,
+            season: season,
+            prioritizeWeather: weather != nil
+        )
+        let existingProfiles = remainingClothings.map { ClothingSemanticAnalyzer.profile(for: $0) }
+        let existingCategories = Set(existingProfiles.map(\.category))
+        let existingColors = existingProfiles.reduce(into: Set<OutfitSemanticColorFamily>()) { partialResult, profile in
+            partialResult.formUnion(profile.colorFamilies)
+        }
+        let baseIDs = Set(baseClothings.map(\.id))
+        let candidates = OutfitRecommendability
+            .recommendableClothings(from: clothings)
+            .filter { !baseIDs.contains($0.id) }
+
+        guard !candidates.isEmpty else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+        let eligibleCandidates = candidates.filter { OutfitRecommendationScorer.isEligible($0, in: context) }
+        let rankingPoolBase = eligibleCandidates.isEmpty ? candidates : eligibleCandidates
+        let rankingPool = try constrainReplaceCandidates(
+            rankingPoolBase,
+            query: query,
+            explicitCategories: Set(explicitCategories)
+        )
+
+        let allowDressReplacement = hasExplicitCategory
+            ? explicitCategories.contains(.dress)
+            : removedProfile.category == .dress
+        let ordered = rankingPool.sorted { lhs, rhs in
+            let left = replacementScore(
+                clothing: lhs,
+                context: context,
+                removedCategory: removedProfile.category,
+                desiredCategories: desiredCategories,
+                desiredColors: desiredColors,
+                existingCategories: existingCategories,
+                existingColors: existingColors,
+                hasExplicitCategory: hasExplicitCategory,
+                allowDressReplacement: allowDressReplacement
+            )
+            let right = replacementScore(
+                clothing: rhs,
+                context: context,
+                removedCategory: removedProfile.category,
+                desiredCategories: desiredCategories,
+                desiredColors: desiredColors,
+                existingCategories: existingCategories,
+                existingColors: existingColors,
+                hasExplicitCategory: hasExplicitCategory,
+                allowDressReplacement: allowDressReplacement
+            )
+
+            if left == right {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return left > right
+        }
+
+        guard let picked = ordered.first else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+
+        var updatedClothings = baseClothings
+        updatedClothings[replaceIndex] = picked
+        let response = buildReplaceResponse(
+            removed: removedItem,
+            picked: picked,
+            updatedClothings: updatedClothings,
+            style: baseSuggestion.style,
+            occasion: baseSuggestion.occasion,
+            query: query
+        )
+        return (updatedClothings, response)
+    }
     
     /// 根据风格和场景计算裙装评分
     private func calculateOutfitScore(clothing: Clothing, context: OutfitRecommendationContext) -> Int {
         OutfitRecommendationScorer.score(clothing, in: context)
+    }
+
+    private func reconcileSelection(
+        preferred: [Clothing],
+        fallbackPool: [Clothing],
+        context: OutfitRecommendationContext,
+        minimumCount: Int,
+        maximumCount: Int
+    ) -> [Clothing] {
+        let pool = dedupeClothings(fallbackPool)
+        let eligiblePool = pool.filter { OutfitRecommendationScorer.isEligible($0, in: context) }
+        let basePool = eligiblePool.isEmpty ? pool : eligiblePool
+        let baseIDs = Set(basePool.map(\.id))
+
+        var result = dedupeClothings(
+            preferred.filter { baseIDs.contains($0.id) && OutfitRecommendationScorer.isEligible($0, in: context) }
+        )
+        var used = Set(result.map(\.id))
+
+        if result.count < minimumCount {
+            let candidates = basePool
+                .filter { !used.contains($0.id) }
+                .sorted { lhs, rhs in
+                    let left = OutfitRecommendationScorer.score(lhs, in: context)
+                    let right = OutfitRecommendationScorer.score(rhs, in: context)
+                    if left == right {
+                        return lhs.createdAt > rhs.createdAt
+                    }
+                    return left > right
+                }
+
+            for item in candidates where result.count < maximumCount {
+                if used.insert(item.id).inserted {
+                    result.append(item)
+                }
+                if result.count >= minimumCount {
+                    break
+                }
+            }
+        }
+
+        if result.count > maximumCount {
+            result = Array(
+                result.sorted { lhs, rhs in
+                    let left = OutfitRecommendationScorer.score(lhs, in: context)
+                    let right = OutfitRecommendationScorer.score(rhs, in: context)
+                    if left == right {
+                        return lhs.createdAt > rhs.createdAt
+                    }
+                    return left > right
+                }
+                .prefix(maximumCount)
+            )
+        }
+
+        return result
+    }
+
+    private func dedupeClothings(_ clothings: [Clothing]) -> [Clothing] {
+        var seen = Set<UUID>()
+        return clothings.filter { seen.insert($0.id).inserted }
     }
     
     /// 获取裙装的可搜索文本
@@ -226,12 +522,475 @@ class OutfitSuggestionService {
         }
     }
 
+    private func preferredAugmentCategories(
+        from query: String,
+        baseClothings: [Clothing],
+        season: Season
+    ) -> [OutfitSemanticCategory] {
+        let lower = query.lowercased()
+        let existingCategories = Set(baseClothings.map { ClothingSemanticAnalyzer.profile(for: $0).category })
+        var categories: [OutfitSemanticCategory] = []
+
+        if matchesAny(lower, keywords: ["开衫", "外套", "罩衫", "披肩", "斗篷", "小外套", "内搭", "衬衫", "马甲"]) {
+            categories.append(.outerwear)
+        }
+        if matchesAny(lower, keywords: ["小物", "配饰", "头饰", "发带", "包", "袜", "手袖"]) {
+            categories.append(.accessory)
+        }
+        if matchesAny(lower, keywords: ["鞋", "鞋子", "玛丽珍", "凉鞋", "单鞋", "靴"]) {
+            categories.append(.shoes)
+        }
+        if matchesAny(lower, keywords: ["伞", "雨伞", "晴雨伞"]) {
+            categories.append(.umbrella)
+        }
+        if matchesAny(lower, keywords: ["裙", "jsk", "op", "sk"]) {
+            categories.append(.dress)
+        }
+
+        if categories.isEmpty {
+            let isGenericPlusOne = matchesAny(lower, keywords: [
+                "+1", "＋1", "加1", "加一", "加一件", "再来一件", "补一件", "添一件"
+            ])
+            if isGenericPlusOne {
+                // 对“+1”默认先补轻量单品，避免直接补冬季重外搭。
+                if !existingCategories.contains(.accessory) { categories.append(.accessory) }
+                if !existingCategories.contains(.shoes) { categories.append(.shoes) }
+                if !existingCategories.contains(.outerwear) { categories.append(.outerwear) }
+            } else if season == .summer {
+                if !existingCategories.contains(.accessory) { categories.append(.accessory) }
+                if !existingCategories.contains(.shoes) { categories.append(.shoes) }
+                if !existingCategories.contains(.outerwear) { categories.append(.outerwear) }
+            } else {
+                if !existingCategories.contains(.outerwear) { categories.append(.outerwear) }
+                if !existingCategories.contains(.accessory) { categories.append(.accessory) }
+                if !existingCategories.contains(.shoes) { categories.append(.shoes) }
+            }
+        }
+
+        categories.append(contentsOf: [.outerwear, .accessory, .shoes, .umbrella, .dress, .other])
+        return dedupeCategories(categories)
+    }
+
+    private func inferredContinuationSeason(
+        query: String,
+        baseSuggestion: OutfitSuggestionData,
+        baseClothings: [Clothing],
+        weather: WeatherData?
+    ) -> Season {
+        let explicitSeasons = OutfitRecommendationKnowledgeBase.requestedSeasons(in: query)
+        if !explicitSeasons.isEmpty {
+            return OutfitRecommendationKnowledgeBase.inferredSeason(from: weather, query: query)
+        }
+
+        let baseHintText = [
+            baseSuggestion.description,
+            baseSuggestion.style,
+            baseSuggestion.occasion,
+            baseClothings.map(\.name).joined(separator: " "),
+            baseClothings.map(\.note).joined(separator: " ")
+        ]
+        .joined(separator: " ")
+        let hintedSeasons = OutfitRecommendationKnowledgeBase.requestedSeasons(in: baseHintText)
+        if !hintedSeasons.isEmpty {
+            return OutfitRecommendationKnowledgeBase.inferredSeason(from: weather, query: baseHintText)
+        }
+
+        if weather != nil {
+            return OutfitRecommendationKnowledgeBase.inferredSeason(from: weather, query: query)
+        }
+
+        var seasonFrequency: [Season: Int] = [:]
+        for clothing in baseClothings {
+            let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+            for season in profile.seasons {
+                seasonFrequency[season, default: 0] += 1
+            }
+        }
+
+        if let maxCount = seasonFrequency.values.max(), maxCount > 0 {
+            let candidates = seasonFrequency
+                .filter { $0.value == maxCount }
+                .map(\.key)
+            for season in [Season.summer, .spring, .autumn, .winter] where candidates.contains(season) {
+                return season
+            }
+        }
+
+        return OutfitRecommendationKnowledgeBase.inferredSeason(from: weather, query: query)
+    }
+
+    private func preferredAugmentColors(from query: String) -> Set<OutfitSemanticColorFamily> {
+        let lower = query.lowercased()
+        var result = Set<OutfitSemanticColorFamily>()
+
+        if matchesAny(lower, keywords: ["粉", "樱", "蜜桃", "桃", "玫瑰", "pink"]) { result.insert(.pink) }
+        if matchesAny(lower, keywords: ["红", "酒红", "莓", "red"]) { result.insert(.red) }
+        if matchesAny(lower, keywords: ["橙", "珊瑚", "orange"]) { result.insert(.orange) }
+        if matchesAny(lower, keywords: ["黄", "鹅黄", "奶油黄", "yellow"]) { result.insert(.yellow) }
+        if matchesAny(lower, keywords: ["绿", "薄荷", "抹茶", "green"]) { result.insert(.green) }
+        if matchesAny(lower, keywords: ["蓝", "天蓝", "水蓝", "藏青", "blue", "navy"]) { result.insert(.blue) }
+        if matchesAny(lower, keywords: ["紫", "薰衣草", "lavender", "purple"]) { result.insert(.purple) }
+        if matchesAny(lower, keywords: ["棕", "咖", "奶茶", "brown", "camel", "khaki"]) { result.insert(.brown) }
+        if matchesAny(lower, keywords: ["白", "米白", "杏", "灰", "黑", "银", "neutral"]) { result.insert(.neutral) }
+        if matchesAny(lower, keywords: ["金", "银", "metal", "metallic"]) { result.insert(.metallic) }
+        if matchesAny(lower, keywords: ["彩色", "拼色", "撞色", "multicolor"]) { result.insert(.multicolor) }
+
+        return result
+    }
+
+    private func constrainAugmentCandidates(
+        _ candidates: [Clothing],
+        query: String,
+        explicitCategories: Set<OutfitSemanticCategory>
+    ) throws -> [Clothing] {
+        var pool = candidates
+        let explicitWarm = isExplicitWarmOuterwearRequest(query)
+
+        if explicitCategories.count == 1, explicitCategories.contains(.outerwear) {
+            pool = pool.filter { ClothingSemanticAnalyzer.profile(for: $0).category == .outerwear }
+        }
+
+        if !explicitWarm {
+            // 非明确保暖语义时，重外搭不进入补件候选（即使点击 +1 也不补大衣）。
+            let filtered = pool.filter { clothing in
+                let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+                guard profile.category == .outerwear else { return true }
+                return !isHeavyOuterwear(profile: profile, text: profile.searchableText)
+            }
+            if !filtered.isEmpty {
+                pool = filtered
+            }
+        }
+
+        if isExplicitLightOuterwearRequest(query) {
+            let lightOuterwear = pool.filter { clothing in
+                let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+                let text = profile.searchableText
+                return profile.category == .outerwear
+                    && isLightweightOuterwear(profile: profile, text: text)
+                    && !isHeavyOuterwear(profile: profile, text: text)
+            }
+            guard !lightOuterwear.isEmpty else {
+                throw OutfitSuggestionError.noItemsAvailable
+            }
+            return lightOuterwear
+        }
+
+        if isExplicitWarmOuterwearRequest(query) {
+            let warmOuterwear = pool.filter { clothing in
+                let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+                let text = profile.searchableText
+                return profile.category == .outerwear
+                    && isHeavyOuterwear(profile: profile, text: text)
+            }
+            guard !warmOuterwear.isEmpty else {
+                throw OutfitSuggestionError.noItemsAvailable
+            }
+            return warmOuterwear
+        }
+
+        guard !pool.isEmpty else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+        return pool
+    }
+
+    private func constrainReplaceCandidates(
+        _ candidates: [Clothing],
+        query: String,
+        explicitCategories: Set<OutfitSemanticCategory>
+    ) throws -> [Clothing] {
+        var pool = candidates
+        let explicitWarm = isExplicitWarmOuterwearRequest(query)
+
+        if explicitCategories.count == 1, explicitCategories.contains(.outerwear) {
+            pool = pool.filter { ClothingSemanticAnalyzer.profile(for: $0).category == .outerwear }
+        }
+
+        if !explicitWarm {
+            // 非明确保暖语义时，替换也不回退到重外搭。
+            let filtered = pool.filter { clothing in
+                let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+                guard profile.category == .outerwear else { return true }
+                return !isHeavyOuterwear(profile: profile, text: profile.searchableText)
+            }
+            if !filtered.isEmpty {
+                pool = filtered
+            }
+        }
+
+        if isExplicitLightOuterwearRequest(query) {
+            let lightOuterwear = pool.filter { clothing in
+                let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+                let text = profile.searchableText
+                return profile.category == .outerwear
+                    && isLightweightOuterwear(profile: profile, text: text)
+                    && !isHeavyOuterwear(profile: profile, text: text)
+            }
+            guard !lightOuterwear.isEmpty else {
+                throw OutfitSuggestionError.noItemsAvailable
+            }
+            return lightOuterwear
+        }
+
+        if isExplicitWarmOuterwearRequest(query) {
+            let warmOuterwear = pool.filter { clothing in
+                let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+                let text = profile.searchableText
+                return profile.category == .outerwear
+                    && isHeavyOuterwear(profile: profile, text: text)
+            }
+            guard !warmOuterwear.isEmpty else {
+                throw OutfitSuggestionError.noItemsAvailable
+            }
+            return warmOuterwear
+        }
+
+        guard !pool.isEmpty else {
+            throw OutfitSuggestionError.noItemsAvailable
+        }
+        return pool
+    }
+
+    private func isExplicitLightOuterwearRequest(_ query: String) -> Bool {
+        let lower = query.lowercased()
+        return matchesAny(lower, keywords: [
+            "开衫", "薄开衫", "薄外套", "轻薄", "防晒", "防晒衣", "罩衫", "空调衫", "背心", "马甲", "坎肩"
+        ])
+    }
+
+    private func isExplicitWarmOuterwearRequest(_ query: String) -> Bool {
+        let lower = query.lowercased()
+        return matchesAny(lower, keywords: [
+            "大衣", "厚外套", "保暖", "秋冬", "冬季", "呢子", "毛呢", "羽绒", "棉服", "夹克", "风衣", "卫衣", "毛衣"
+        ])
+    }
+
+    private func isLightweightOuterwear(profile: OutfitSemanticProfile, text: String) -> Bool {
+        matchesAny(text, keywords: [
+            "薄", "轻薄", "透气", "防晒", "薄针织", "罩衫", "空调", "短外套", "短款开衫", "薄开衫", "背心", "马甲", "坎肩"
+        ]) || profile.warmthLevel <= 1
+    }
+
+    private func isHeavyOuterwear(profile: OutfitSemanticProfile, text: String) -> Bool {
+        matchesAny(text, keywords: [
+            "大衣", "斗篷", "风衣", "夹克", "卫衣", "毛衣", "西装", "西服", "羽绒", "棉服", "毛呢", "呢子", "加厚", "秋冬"
+        ]) || profile.warmthLevel >= 3
+    }
+
+    private func preferredReplaceCategories(from query: String) -> [OutfitSemanticCategory] {
+        let lower = query.lowercased()
+        var categories: [OutfitSemanticCategory] = []
+
+        if matchesAny(lower, keywords: ["开衫", "外套", "罩衫", "披肩", "斗篷", "小外套", "内搭", "衬衫", "马甲"]) {
+            categories.append(.outerwear)
+        }
+        if matchesAny(lower, keywords: ["小物", "配饰", "头饰", "发带", "包", "袜", "手袖", "kc"]) {
+            categories.append(.accessory)
+        }
+        if matchesAny(lower, keywords: ["鞋", "鞋子", "玛丽珍", "凉鞋", "单鞋", "靴"]) {
+            categories.append(.shoes)
+        }
+        if matchesAny(lower, keywords: ["伞", "雨伞", "晴雨伞"]) {
+            categories.append(.umbrella)
+        }
+        if matchesAny(lower, keywords: ["主裙", "裙", "jsk", "op", "sk"]) {
+            categories.append(.dress)
+        }
+
+        return dedupeCategories(categories)
+    }
+
+    private func resolveReplacementTarget(
+        from baseClothings: [Clothing],
+        explicitCategories: [OutfitSemanticCategory]
+    ) -> (Int, Clothing) {
+        let profiles = baseClothings.map { ClothingSemanticAnalyzer.profile(for: $0) }
+
+        if let explicitCategory = explicitCategories.first,
+           let explicitIndex = profiles.lastIndex(where: { $0.category == explicitCategory }) {
+            return (explicitIndex, baseClothings[explicitIndex])
+        }
+
+        let preferredOrder: [OutfitSemanticCategory] = [.outerwear, .accessory, .shoes, .umbrella, .other, .dress]
+        for category in preferredOrder {
+            if let index = profiles.lastIndex(where: { $0.category == category }) {
+                return (index, baseClothings[index])
+            }
+        }
+
+        let fallbackIndex = max(0, baseClothings.count - 1)
+        return (fallbackIndex, baseClothings[fallbackIndex])
+    }
+
+    private func augmentScore(
+        clothing: Clothing,
+        context: OutfitRecommendationContext,
+        desiredCategories: [OutfitSemanticCategory],
+        desiredColors: Set<OutfitSemanticColorFamily>,
+        existingCategories: Set<OutfitSemanticCategory>,
+        existingColors: Set<OutfitSemanticColorFamily>
+    ) -> Int {
+        let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+        var score = calculateOutfitScore(clothing: clothing, context: context)
+
+        if let desiredIndex = desiredCategories.firstIndex(of: profile.category) {
+            score += max(8, 32 - desiredIndex * 6)
+        }
+
+        if !desiredColors.isEmpty, !profile.colorFamilies.isDisjoint(with: desiredColors) {
+            score += 18
+        } else if !existingColors.isEmpty, !profile.colorFamilies.isDisjoint(with: existingColors) {
+            score += 12
+        }
+
+        if profile.category == .dress, existingCategories.contains(.dress), !matchesAny(context.query.lowercased(), keywords: ["裙", "jsk", "op", "sk"]) {
+            score -= 18
+        }
+
+        if profile.category == .outerwear, !existingCategories.contains(.outerwear) {
+            score += 10
+        }
+        if profile.category == .accessory, !existingCategories.contains(.accessory) {
+            score += 8
+        }
+        if profile.category == .shoes, !existingCategories.contains(.shoes) {
+            score += 6
+        }
+
+        return score
+    }
+
+    private func replacementScore(
+        clothing: Clothing,
+        context: OutfitRecommendationContext,
+        removedCategory: OutfitSemanticCategory,
+        desiredCategories: [OutfitSemanticCategory],
+        desiredColors: Set<OutfitSemanticColorFamily>,
+        existingCategories: Set<OutfitSemanticCategory>,
+        existingColors: Set<OutfitSemanticColorFamily>,
+        hasExplicitCategory: Bool,
+        allowDressReplacement: Bool
+    ) -> Int {
+        let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+        let lowerQuery = context.query.lowercased()
+        var score = calculateOutfitScore(clothing: clothing, context: context)
+
+        if profile.category == removedCategory {
+            score += 24
+        }
+        if let desiredIndex = desiredCategories.firstIndex(of: profile.category) {
+            score += max(10, 34 - desiredIndex * 7)
+        } else if hasExplicitCategory {
+            score -= 22
+        }
+
+        if !desiredColors.isEmpty {
+            if !profile.colorFamilies.isDisjoint(with: desiredColors) {
+                score += 16
+            } else {
+                score -= 8
+            }
+        } else if !existingColors.isEmpty, !profile.colorFamilies.isDisjoint(with: existingColors) {
+            score += 10
+        }
+
+        if profile.category == .dress, !allowDressReplacement {
+            score -= 24
+        }
+        if profile.category != removedCategory, !hasExplicitCategory {
+            score -= 6
+        }
+
+        if !existingCategories.contains(profile.category) {
+            score += 8
+        }
+
+        if matchesAny(lowerQuery, keywords: ["浅色", "淡色", "轻盈", "清爽"]),
+           !profile.colorFamilies.isDisjoint(with: Set([.neutral, .pink, .blue, .yellow])) {
+            score += 8
+        }
+        if matchesAny(lowerQuery, keywords: ["深色", "暗色", "沉稳"]),
+           !profile.colorFamilies.isDisjoint(with: Set([.neutral, .brown, .blue, .purple, .red])) {
+            score += 8
+        }
+        if matchesAny(lowerQuery, keywords: ["防雨", "下雨", "雨天"]), profile.rainSafetyLevel >= 2 {
+            score += 14
+        }
+
+        return score
+    }
+
+    private func buildAugmentResponse(
+        picked: Clothing,
+        updatedClothings: [Clothing],
+        style: String,
+        occasion: String,
+        query: String
+    ) -> String {
+        let profile = ClothingSemanticAnalyzer.profile(for: picked)
+        let totalCount = updatedClothings.count
+        let categoryText = profile.category.displayName
+        let tone: String
+
+        if matchesAny(query.lowercased(), keywords: ["浅色", "淡色", "清淡"]) {
+            tone = "这样整体会更轻一点"
+        } else if matchesAny(query.lowercased(), keywords: ["开衫", "外套", "罩衫"]) {
+            tone = "层次感会更完整"
+        } else if profile.category == .accessory {
+            tone = "细节会更精致"
+        } else {
+            tone = "这套会更顺手一些"
+        }
+
+        return localizedCatchphraseText("（点点搭配魔法）已经帮你在这套\(style)\(occasion)搭配里补上「\(picked.name)」这件\(categoryText)啦，\(tone)~ 现在一共\(totalCount)件。")
+    }
+
+    private func buildReplaceResponse(
+        removed: Clothing,
+        picked: Clothing,
+        updatedClothings: [Clothing],
+        style: String,
+        occasion: String,
+        query: String
+    ) -> String {
+        let removedProfile = ClothingSemanticAnalyzer.profile(for: removed)
+        let pickedProfile = ClothingSemanticAnalyzer.profile(for: picked)
+        let lowerQuery = query.lowercased()
+        let actionText: String
+
+        if removedProfile.category == pickedProfile.category {
+            actionText = "把「\(removed.name)」换成了「\(picked.name)」"
+        } else {
+            actionText = "把「\(removed.name)」替换成了「\(picked.name)」这件\(pickedProfile.category.displayName)"
+        }
+
+        let tone: String
+        if matchesAny(lowerQuery, keywords: ["浅色", "淡色", "清爽"]) {
+            tone = "这样整体会更清爽轻盈"
+        } else if matchesAny(lowerQuery, keywords: ["防雨", "下雨", "雨天"]) {
+            tone = "这样在雨天会更稳妥"
+        } else if pickedProfile.category == .dress {
+            tone = "主裙氛围会更集中"
+        } else {
+            tone = "搭配节奏会更顺"
+        }
+
+        return localizedCatchphraseText("（点点搭配魔法）已经\(actionText)啦，\(tone)~ 这套\(style)\(occasion)搭配现在还是\(updatedClothings.count)件。")
+    }
+
+    private func dedupeCategories(_ categories: [OutfitSemanticCategory]) -> [OutfitSemanticCategory] {
+        var seen = Set<OutfitSemanticCategory>()
+        return categories.filter { seen.insert($0).inserted }
+    }
+
     // MARK: - 私有方法
 
     /// 从AI获取搭配建议
     private func fetchOutfitSuggestionFromAI(
         query: String,
-        clothings: [Clothing]
+        clothings: [Clothing],
+        weather: WeatherData?
     ) async throws -> OutfitSuggestionResponse {
         let summary = WardrobeContextManager.shared.generateWardrobeSummary(
             clothings: clothings,
@@ -247,7 +1006,8 @@ class OutfitSuggestionService {
         let prompt = buildOutfitPrompt(
             query: query,
             wardrobeSummary: summary,
-            candidatesJSON: candidatesJSON
+            candidatesJSON: candidatesJSON,
+            weather: weather
         )
 
         // 调用AI服务
@@ -263,13 +1023,27 @@ class OutfitSuggestionService {
     }
 
     /// 构建搭配专用Prompt
-    private func buildOutfitPrompt(query: String, wardrobeSummary: String, candidatesJSON: String) -> String {
+    private func buildOutfitPrompt(
+        query: String,
+        wardrobeSummary: String,
+        candidatesJSON: String,
+        weather: WeatherData?
+    ) -> String {
         let roleSuffix = currentCharacter == .maomao ? "汪~" : "喵~"
-        let season = OutfitRecommendationKnowledgeBase.inferredSeason(from: nil).displayName
+        let season = OutfitRecommendationKnowledgeBase
+            .inferredSeason(from: weather, query: query)
+            .displayName
+        let weatherLine: String
+        if let weather {
+            weatherLine = "当前天气：\(weather.city)，\(weather.condition.rawValue)，\(Int(weather.temperature.rounded()))°C，体感\(Int(weather.feelsLikeTemperature.rounded()))°C，风速\(String(format: "%.1f", weather.windSpeed))m/s"
+        } else {
+            weatherLine = "当前天气：未获取到实时天气，先按季节推断"
+        }
         return """
         需求：\(query)
 
         当前季节：\(season)
+        \(weatherLine)
 
         衣橱摘要：
         \(wardrobeSummary)
@@ -280,6 +1054,7 @@ class OutfitSuggestionService {
         请从候选中选2-4件搭配：
         - 按品类（裙装/外套/鞋子/配饰）筛选
         - 结合候选里的长度/材质/季节/场合特征，优先选更符合当前季节和Lo裙语境的
+        - 温度偏高（≥24°C）时避免厚重大衣、毛呢、棉服、羽绒类外搭
         - 优先同色系/近色系，主色1-2种，不超3种
         - 优先JSK/OP，鞋子同色或黑白灰米棕
         - 用候选单品的标签/类型词汇，不要编造不存在的单品
@@ -799,7 +1574,7 @@ enum OutfitSuggestionError: Error, LocalizedError {
         case .insufficientItems:
             return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（蹭蹭）主人衣橱里的裙子还不够呢，至少要有 2 件才能帮我搭配喵~")
         case .insufficientNonDepositItems:
-            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（蹭蹭）主人衣橱里已经到手的裙子还不够呢~ 至少要有 2 件才能智能搭配喵！那些还没补尾款的不算哦~")
+            return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（蹭蹭）主人衣橱里现在已经到手、能直接穿的单品还不够呢~ 至少要有 2 件才能智能搭配喵！心愿尾款和还没发货的先不算哦~")
         case .invalidJSONFormat:
             return PetDataManager.shared.getCurrentPetCharacter().localizedCatchphraseText("（挠头）我刚刚有点晕，没听懂主人的意思，可以再说一次喵？")
         case .parseError:

@@ -167,7 +167,7 @@ struct VIPCenterView: View {
                 showingOfferCodeRedemption = true
             }
         } message: {
-            Text("优惠码由 Apple 官方提供，仅适用于本 App 在 App Store 中提供的内购项目。点击“继续”后，将打开 Apple 系统兑换界面。兑换成功后，符合条件的商品会自动到账；管理员入口、实验室权限和其他内部功能不通过优惠码开放。")
+            Text("优惠码仅适用于本 App 在 App Store 中提供的内购项目。")
         }
         .overlay {
             if showTrialPopup {

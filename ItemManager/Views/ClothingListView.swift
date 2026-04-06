@@ -262,15 +262,15 @@ struct ClothingListView: View {
         }
         
         modelContext.insert(newItem)
-        
-        // Schedule notification for the copy
-        NotificationManager.shared.scheduleNotification(for: newItem)
-        
-        // Sync widget
-        Task { await SharedPersistence.shared.syncWidgetData() }
-        
-        // 更新衣物数量缓存，用于魔法任务进度实时显示
-        updateClothingCountCache()
+
+        do {
+            try modelContext.save()
+            NotificationManager.shared.scheduleNotification(for: newItem, modelContext: modelContext)
+            Task { await SharedPersistence.shared.syncWidgetData(reason: "clothing-list-duplicate") }
+            updateClothingCountCache()
+        } catch {
+            print("ClothingListView: Failed to save duplicated clothing: \(error)")
+        }
     }
     
     /// 处理列表滑动删除
@@ -291,6 +291,13 @@ struct ClothingListView: View {
         
         do {
             try modelContext.save()
+            Task { @MainActor in
+                await NotificationManager.shared.refreshAllKnownDepositNotifications(
+                    modelContext: modelContext,
+                    force: true,
+                    reason: "list-delete"
+                )
+            }
             
             // Sync widget
             Task { await SharedPersistence.shared.syncWidgetData() }

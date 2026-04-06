@@ -691,7 +691,9 @@ class BackupService {
             }
             
             // Pet Status
-            let petStatusData = UserDefaults.standard.data(forKey: "PetStatus_Data")
+            let petStatusData = await MainActor.run {
+                PetDataManager.shared.exportStatusDataForBackup()
+            }
             
             // Chat History (JSON only)
             var chatHistoryData: Data? = nil
@@ -2539,12 +2541,7 @@ class BackupService {
     private func restorePetStatus(manifest: BackupManifest) {
         if let petData = manifest.petStatusData {
             print("Restore: Restoring Pet Status...")
-            UserDefaults.standard.set(petData, forKey: "PetStatus_Data")
-            
-            // Force reload data manager
-            DispatchQueue.main.async {
-                PetDataManager.shared.reloadFromDisk()
-            }
+            _ = PetDataManager.shared.restoreFromBackupData(petData)
         }
     }
     

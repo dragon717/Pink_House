@@ -519,7 +519,15 @@ enum ClothingSemanticAnalyzer {
 }
 
 enum OutfitRecommendationKnowledgeBase {
-    static func inferredSeason(from weather: WeatherData?, referenceDate: Date = Date()) -> Season {
+    static func inferredSeason(
+        from weather: WeatherData?,
+        query: String? = nil,
+        referenceDate: Date = Date()
+    ) -> Season {
+        if let explicitSeason = primaryRequestedSeason(in: query) {
+            return explicitSeason
+        }
+
         let month = Calendar.current.component(.month, from: referenceDate)
 
         if let weather {
@@ -548,6 +556,48 @@ enum OutfitRecommendationKnowledgeBase {
         case 9...11: return .autumn
         default: return .winter
         }
+    }
+
+    private static func primaryRequestedSeason(in text: String?) -> Season? {
+        guard let normalized = text?.lowercased(), !normalized.isEmpty else {
+            return nil
+        }
+
+        if normalized.containsAnyKeyword(["春", "春天", "春季", "春日", "春夏"]) {
+            return .spring
+        }
+        if normalized.containsAnyKeyword(["夏", "夏天", "夏季", "夏日", "盛夏", "春夏"]) {
+            return .summer
+        }
+        if normalized.containsAnyKeyword(["秋", "秋天", "秋季", "秋日", "秋冬", "初秋"]) {
+            return .autumn
+        }
+        if normalized.containsAnyKeyword(["冬", "冬天", "冬季", "冬日", "严冬", "秋冬"]) {
+            return .winter
+        }
+
+        return nil
+    }
+
+    static func requestedSeasons(in text: String?) -> Set<Season> {
+        guard let text = text?.lowercased(), !text.isEmpty else {
+            return []
+        }
+
+        var seasons = Set<Season>()
+        if text.containsAnyKeyword(["春", "春天", "春季", "春日", "春夏"]) {
+            seasons.insert(.spring)
+        }
+        if text.containsAnyKeyword(["夏", "夏天", "夏季", "夏日", "盛夏", "春夏"]) {
+            seasons.insert(.summer)
+        }
+        if text.containsAnyKeyword(["秋", "秋天", "秋季", "秋日", "秋冬", "初秋"]) {
+            seasons.insert(.autumn)
+        }
+        if text.containsAnyKeyword(["冬", "冬天", "冬季", "冬日", "严冬", "秋冬"]) {
+            seasons.insert(.winter)
+        }
+        return seasons
     }
 
     static func preferredColors(for season: Season) -> [String] {
@@ -603,6 +653,45 @@ enum OutfitRecommendationKnowledgeBase {
 enum OutfitRecommendationScorer {
     static func isEligible(_ clothing: Clothing, in context: OutfitRecommendationContext) -> Bool {
         let profile = ClothingSemanticAnalyzer.profile(for: clothing)
+        let requestedSeasons = OutfitRecommendationKnowledgeBase.requestedSeasons(in: context.query)
+        let lowerQuery = context.query.lowercased()
+        let targetsSummer = requestedSeasons.contains(.summer) || (requestedSeasons.isEmpty && context.season == .summer)
+
+        if !requestedSeasons.isEmpty {
+            if !profile.seasons.isEmpty, requestedSeasons.isDisjoint(with: profile.seasons) {
+                return false
+            }
+        }
+
+        if targetsSummer,
+           profile.warmthLevel >= 3,
+           (profile.category == .dress || profile.category == .outerwear) {
+            return false
+        }
+
+        if targetsSummer, profile.category == .outerwear {
+            let text = profile.searchableText
+            let explicitlyRequestedOuterwear = lowerQuery.containsAnyKeyword([
+                "外套", "开衫", "罩衫", "披肩", "防晒", "防晒衣", "空调衫", "薄外套", "薄开衫", "小外套", "背心", "马甲"
+            ])
+            let lightweightOuterwear = isLightweightOuterwear(profile: profile, text: text)
+            let heavyOuterwear = isHeavyOuterwear(profile: profile, text: text)
+
+            // 夏季下不推荐冬季大衣类重外搭，即使用户只说“+1”或“加外套”也优先轻外搭。
+            if heavyOuterwear {
+                return false
+            }
+            // 未明确要求外搭时，只允许轻外搭进入候选池。
+            if !explicitlyRequestedOuterwear && !lightweightOuterwear {
+                return false
+            }
+        }
+
+        if requestedSeasons.contains(.winter),
+           profile.warmthLevel <= 1,
+           (profile.category == .dress || profile.category == .outerwear) {
+            return false
+        }
 
         guard let weather = context.weather, context.prioritizeWeather else {
             return true
@@ -628,6 +717,7 @@ enum OutfitRecommendationScorer {
         let profile = ClothingSemanticAnalyzer.profile(for: clothing)
         let text = profile.searchableText
         let lowerQuery = context.query.lowercased()
+        let requestedSeasons = OutfitRecommendationKnowledgeBase.requestedSeasons(in: lowerQuery)
         var score = 10
 
         for token in queryTokens(lowerQuery) where !token.isEmpty {
@@ -654,6 +744,35 @@ enum OutfitRecommendationScorer {
             score += 18
         } else if !profile.seasons.isEmpty {
             score -= 6
+        }
+
+        if !requestedSeasons.isEmpty {
+            if !profile.seasons.isEmpty {
+                if !requestedSeasons.isDisjoint(with: profile.seasons) {
+                    score += 16
+                } else {
+                    score -= 18
+                }
+            } else if requestedSeasons.contains(.summer) {
+                score += profile.warmthLevel <= 2 ? 10 : -12
+            } else if requestedSeasons.contains(.winter) {
+                score += profile.warmthLevel >= 3 ? 10 : -10
+            } else if requestedSeasons.contains(.autumn) || requestedSeasons.contains(.spring) {
+                if (1...3).contains(profile.warmthLevel) {
+                    score += 8
+                }
+            }
+        }
+
+        if context.season == .summer, profile.category == .outerwear {
+            let text = profile.searchableText
+            if isHeavyOuterwear(profile: profile, text: text) {
+                score -= 42
+            } else if isLightweightOuterwear(profile: profile, text: text) {
+                score += 12
+            } else {
+                score -= 18
+            }
         }
 
         let seasonColors = OutfitRecommendationKnowledgeBase.preferredColors(for: context.season)
@@ -729,6 +848,18 @@ enum OutfitRecommendationScorer {
         default:
             return false
         }
+    }
+
+    private static func isLightweightOuterwear(profile: OutfitSemanticProfile, text: String) -> Bool {
+        text.containsAnyKeyword([
+            "薄", "轻薄", "透气", "防晒", "薄针织", "罩衫", "空调", "短外套", "短款开衫", "薄开衫", "背心", "马甲", "坎肩"
+        ]) || profile.warmthLevel <= 1
+    }
+
+    private static func isHeavyOuterwear(profile: OutfitSemanticProfile, text: String) -> Bool {
+        text.containsAnyKeyword([
+            "大衣", "斗篷", "风衣", "夹克", "卫衣", "毛衣", "西装", "西服", "羽绒", "棉服", "毛呢", "呢子", "加厚", "秋冬"
+        ]) || profile.warmthLevel >= 3
     }
 
     private static func queryTokens(_ query: String) -> [String] {

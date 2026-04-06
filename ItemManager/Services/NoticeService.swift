@@ -13,6 +13,7 @@ class NoticeService: ObservableObject {
     static let shared = NoticeService()
 
     @Published var notices: [Notice] = []
+    @Published var managedNotices: [Notice] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var isSyncing = false
@@ -39,15 +40,14 @@ class NoticeService: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // 从本地 SwiftData 获取
             let descriptor = FetchDescriptor<Notice>(
-                predicate: #Predicate { $0.isActive == true },
-                sortBy: [SortDescriptor(\.priority, order: .reverse),
-                         SortDescriptor(\.updatedAt, order: .reverse),
-                         SortDescriptor(\.createdAt, order: .reverse)]
+                sortBy: [
+                    SortDescriptor(\.updatedAt, order: .reverse),
+                    SortDescriptor(\.createdAt, order: .reverse)
+                ]
             )
-            notices = try context.fetch(descriptor)
-
+            let fetched = try context.fetch(descriptor)
+            refreshCollections(from: fetched)
         } catch {
             errorMessage = "获取公告失败: \(error.localizedDescription)"
         }
@@ -92,11 +92,27 @@ class NoticeService: ObservableObject {
     // MARK: - 创建公告
     func createNotice(
         title: String,
+        summary: String? = nil,
         content: String,
         mediaURL: String? = nil,
         builtinMediaName: String? = nil,
         mediaType: Notice.MediaType = .none,
-        priority: Int = 0
+        priority: Int = 0,
+        status: Notice.Status = .draft,
+        channel: Notice.Channel = .inbox,
+        severity: Notice.Severity = .info,
+        isPinned: Bool = false,
+        requiresAck: Bool = false,
+        isSilent: Bool = false,
+        publishAt: Date? = nil,
+        startAt: Date? = nil,
+        endAt: Date? = nil,
+        audience: String = "all",
+        minAppVersion: String? = nil,
+        maxAppVersion: String? = nil,
+        actionType: Notice.ActionType = .none,
+        actionTarget: String? = nil,
+        actionLabel: String? = nil
     ) async -> Notice? {
         guard let context = modelContext else {
             print("❌ 创建公告失败: modelContext 为 nil")
@@ -114,38 +130,69 @@ class NoticeService: ObservableObject {
         print("📝 开始创建公告: title=\(title)")
 
         // 检查重复
-        let existing = notices.first { $0.title == title && $0.content == content }
+        let existing = managedNotices.first { $0.title == title && $0.content == content }
         if existing != nil {
             print("⚠️ 相同内容的公告已存在")
             errorMessage = "相同内容的公告已存在"
             return nil
         }
 
+        guard validateNoticeInput(
+            status: status,
+            channel: channel,
+            severity: severity,
+            actionType: actionType,
+            actionTarget: actionTarget,
+            publishAt: publishAt,
+            startAt: startAt,
+            endAt: endAt
+        ) else {
+            return nil
+        }
+
         let notice = Notice(
             title: title,
+            summary: summary,
             content: content,
             mediaURL: mediaURL,
             builtinMediaName: builtinMediaName,
             mediaType: mediaType,
-            priority: priority
+            priority: priority,
+            displayPriority: priority,
+            status: status,
+            channel: channel,
+            severity: severity,
+            isPinned: isPinned,
+            requiresAck: requiresAck,
+            isSilent: isSilent,
+            publishAt: publishAt,
+            startAt: startAt,
+            endAt: endAt,
+            audience: audience,
+            minAppVersion: minAppVersion,
+            maxAppVersion: maxAppVersion,
+            actionType: actionType,
+            actionTarget: actionTarget,
+            actionLabel: actionLabel
         )
+        notice.applyLifecycleDefaults()
 
-        // 先保存到本地
         context.insert(notice)
 
         do {
             try context.save()
             print("✅ 公告本地保存成功")
 
-            // 发布到 CloudKit
             let published = await cloudKitService.publishNotice(notice)
             if published {
                 print("✅ 公告已发布到云端")
-                // 保存云端返回的 recordName
                 try context.save()
             } else {
-                print("⚠️ 公告本地保存但云端发布失败")
+                context.delete(notice)
+                try context.save()
+                print("⚠️ 公告创建已回滚，避免留下本地孤儿记录")
                 errorMessage = cloudKitService.syncError ?? "云端发布失败"
+                return nil
             }
 
             await fetchNotices()
@@ -170,13 +217,26 @@ class NoticeService: ObservableObject {
         }
 
         errorMessage = nil
-        notice.version += 1
+        guard validateNoticeInput(
+            status: notice.status,
+            channel: notice.channel,
+            severity: notice.severity,
+            actionType: notice.actionType,
+            actionTarget: notice.actionTarget,
+            publishAt: notice.publishAt,
+            startAt: notice.startAt,
+            endAt: notice.endAt
+        ) else {
+            return
+        }
+        notice.revision += 1
+        notice.version = notice.revision
         notice.updatedAt = Date()
+        notice.applyLifecycleDefaults(now: notice.updatedAt)
 
         do {
             try context.save()
 
-            // 同步更新到 CloudKit
             let updated = await cloudKitService.updateCloudNotice(notice)
             if updated {
                 print("✅ 公告已更新到云端")
@@ -202,15 +262,16 @@ class NoticeService: ObservableObject {
         }
 
         errorMessage = nil
-        // 软删除：标记为不活跃
-        notice.isActive = false
-        notice.version += 1
+        notice.status = .archived
+        notice.archivedAt = Date()
+        notice.revision += 1
+        notice.version = notice.revision
         notice.updatedAt = Date()
+        notice.applyLifecycleDefaults(now: notice.updatedAt)
 
         do {
             try context.save()
 
-            // 同步删除到 CloudKit
             let deactivated = await cloudKitService.deactivateCloudNotice(notice)
             if deactivated {
                 print("✅ 公告已从云端停用")
@@ -269,5 +330,103 @@ class NoticeService: ObservableObject {
     // MARK: - 手动触发同步
     func manualSync() async {
         await syncFromCloudKit()
+    }
+
+    func latestEligibleModalNotice() -> Notice? {
+        notices.first { $0.isEligibleForModal() }
+    }
+
+    private func validateNoticeInput(
+        status: Notice.Status,
+        channel: Notice.Channel,
+        severity: Notice.Severity,
+        actionType: Notice.ActionType,
+        actionTarget: String?,
+        publishAt: Date?,
+        startAt: Date?,
+        endAt: Date?
+    ) -> Bool {
+        if channel == .modal && severity != .critical {
+            errorMessage = "只有 critical 公告可以配置为弹窗"
+            return false
+        }
+
+        if actionType != .none && (actionTarget?.isEmpty ?? true) {
+            errorMessage = "配置动作后必须填写动作目标"
+            return false
+        }
+
+        if let startAt, let endAt, endAt < startAt {
+            errorMessage = "结束时间不能早于开始时间"
+            return false
+        }
+
+        if status == .scheduled && publishAt == nil && startAt == nil {
+            errorMessage = "定时公告必须设置发布时间或开始时间"
+            return false
+        }
+
+        return true
+    }
+
+    private func refreshCollections(from notices: [Notice]) {
+        let normalized = notices.map { notice -> Notice in
+            notice.normalizeLegacyFields()
+            return notice
+        }
+
+        managedNotices = normalized.sorted(by: sortForAdmin)
+        self.notices = managedNotices
+            .filter { $0.isVisibleInInbox() }
+            .sorted(by: sortForUser)
+    }
+
+    private func sortForUser(_ lhs: Notice, _ rhs: Notice) -> Bool {
+        if lhs.isPinned != rhs.isPinned {
+            return lhs.isPinned && !rhs.isPinned
+        }
+
+        let severityOrder: [Notice.Severity: Int] = [
+            .critical: 3,
+            .important: 2,
+            .info: 1
+        ]
+
+        let lhsSeverity = severityOrder[lhs.severity] ?? 0
+        let rhsSeverity = severityOrder[rhs.severity] ?? 0
+        if lhsSeverity != rhsSeverity {
+            return lhsSeverity > rhsSeverity
+        }
+
+        if lhs.displayPriority != rhs.displayPriority {
+            return lhs.displayPriority > rhs.displayPriority
+        }
+
+        if lhs.effectivePublishAt != rhs.effectivePublishAt {
+            return lhs.effectivePublishAt > rhs.effectivePublishAt
+        }
+
+        return lhs.updatedAt > rhs.updatedAt
+    }
+
+    private func sortForAdmin(_ lhs: Notice, _ rhs: Notice) -> Bool {
+        let statusOrder: [Notice.Status: Int] = [
+            .draft: 0,
+            .scheduled: 1,
+            .published: 2,
+            .archived: 3
+        ]
+
+        let lhsOrder = statusOrder[lhs.status] ?? 99
+        let rhsOrder = statusOrder[rhs.status] ?? 99
+        if lhsOrder != rhsOrder {
+            return lhsOrder < rhsOrder
+        }
+
+        if lhs.updatedAt != rhs.updatedAt {
+            return lhs.updatedAt > rhs.updatedAt
+        }
+
+        return lhs.createdAt > rhs.createdAt
     }
 }

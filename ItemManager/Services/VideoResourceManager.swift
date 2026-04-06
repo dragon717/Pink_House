@@ -61,7 +61,6 @@ class VideoResourceManager {
         if !subdirectory.isEmpty {
             let subPath = "\(sourceBasePath)/\(subdirectory)/\(videoName).mov"
             if FileManager.default.fileExists(atPath: subPath) {
-                print("VideoResourceManager: Found video in source directory: \(subPath)")
                 return URL(fileURLWithPath: subPath)
             }
         }
@@ -69,7 +68,6 @@ class VideoResourceManager {
         // 检查根目录（用于新手引导视频等直接放在asserts目录下的视频）
         let rootPath = "\(sourceBasePath)/\(videoName).mov"
         if FileManager.default.fileExists(atPath: rootPath) {
-            print("VideoResourceManager: Found video in source root directory: \(rootPath)")
             return URL(fileURLWithPath: rootPath)
         }
         
@@ -90,25 +88,21 @@ class VideoResourceManager {
         
         // 尝试在子目录中查找 mov 文件
         if let url = Bundle.main.url(forResource: videoName, withExtension: "mov", subdirectory: subdirectory) {
-            print("VideoResourceManager: Found video in Bundle: \(url.lastPathComponent)")
             return url
         }
         
         // 尝试在根目录中查找 mov 文件（用于新手引导视频）
         if let url = Bundle.main.url(forResource: videoName, withExtension: "mov", subdirectory: bundleSubdirectory) {
-            print("VideoResourceManager: Found video in Bundle root: \(url.lastPathComponent)")
             return url
         }
         
         // 回退到 mp4
         if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4", subdirectory: subdirectory) {
-            print("VideoResourceManager: Found video in Bundle (mp4): \(url.lastPathComponent)")
             return url
         }
         
         // 在根目录中查找 mp4
         if let url = Bundle.main.url(forResource: videoName, withExtension: "mp4", subdirectory: bundleSubdirectory) {
-            print("VideoResourceManager: Found video in Bundle root (mp4): \(url.lastPathComponent)")
             return url
         }
         

@@ -254,8 +254,8 @@ struct VirtualCurrencyView: View {
     // 媒体状态管理器 - 参考金豆银珠
     @StateObject private var mediaStateManager = MediaStateManager.shared
 
-    // 从 PetStatus 获取货币数据
-    @State private var petStatus: PetStatus?
+    @ObservedObject private var petDataManager = PetDataManager.shared
+    @State private var presentedDestination: VirtualCurrencyDestination?
 
     var body: some View {
         GeometryReader { geometry in
@@ -273,20 +273,29 @@ struct VirtualCurrencyView: View {
                         VirtualCoinCard(
                             coinType: .meowCoin,
                             name: "喵币",
-                            amount: petStatus?.meowCoin ?? 0
-                        )
+                            amount: petDataManager.status.meowCoin,
+                            actionTitle: "点按充值"
+                        ) {
+                            presentedDestination = .meowCoinStore
+                        }
 
                         VirtualCoinCard(
                             coinType: .fishCoin,
                             name: "鱼币",
-                            amount: petStatus?.fishCoin ?? 0
-                        )
+                            amount: petDataManager.status.fishCoin,
+                            actionTitle: "点按兑换"
+                        ) {
+                            presentedDestination = .currencyExchange(.meowToFish)
+                        }
 
                         VirtualCoinCard(
                             coinType: .boneCoin,
                             name: "骨头币",
-                            amount: petStatus?.boneCoin ?? 0
-                        )
+                            amount: petDataManager.status.boneCoin,
+                            actionTitle: "点按兑换"
+                        ) {
+                            presentedDestination = .currencyExchange(.meowToBone)
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 16)
@@ -297,30 +306,29 @@ struct VirtualCurrencyView: View {
                 // 上层物理容器 - 只在激活时显示
                 if isActive {
                     VirtualCoinPhysicsContainer(
-                        meowCoinCount: petStatus?.meowCoin ?? 0,
-                        fishCoinCount: petStatus?.fishCoin ?? 0,
-                        boneCoinCount: petStatus?.boneCoin ?? 0
+                        meowCoinCount: petDataManager.status.meowCoin,
+                        fishCoinCount: petDataManager.status.fishCoin,
+                        boneCoinCount: petDataManager.status.boneCoin
                     )
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .allowsHitTesting(false)
                 }
             }
         }
-        .onAppear {
-            loadPetStatus()
+        .sheet(item: $presentedDestination) { destination in
+            switch destination {
+            case .meowCoinStore:
+                MeowCoinStoreView()
+            case .currencyExchange(let preferredDirection):
+                PetCurrencyExchangeSheet(preferredDirection: preferredDirection)
+                    .presentationDetents([.medium])
+            }
         }
         .onChange(of: isActive) { _, newValue in
             if !newValue {
                 // 当 Tab 不再激活时停止音效
                 SoundManager.shared.stopAllSounds()
             }
-        }
-    }
-
-    private func loadPetStatus() {
-        if let data = UserDefaults.standard.data(forKey: "PetStatus_Data"),
-           let status = try? JSONDecoder().decode(PetStatus.self, from: data) {
-            petStatus = status
         }
     }
 }
@@ -367,6 +375,20 @@ enum VirtualCoinType {
             return [Color.yellow, Color.orange.opacity(0.6)]
         case .boneCoin:
             return [Color(hex: "CD7F32"), Color(hex: "8B4513")]
+        }
+    }
+}
+
+private enum VirtualCurrencyDestination: Identifiable, Equatable {
+    case meowCoinStore
+    case currencyExchange(PetCurrencyExchangeDirection)
+
+    var id: String {
+        switch self {
+        case .meowCoinStore:
+            return "meowCoinStore"
+        case .currencyExchange(let direction):
+            return "currencyExchange:\(direction.rawValue)"
         }
     }
 }
@@ -789,50 +811,72 @@ struct VirtualCoinCard: View {
     let coinType: VirtualCoinType
     let name: String
     let amount: Int
+    let actionTitle: String
+    let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            coinType.iconContainer
-                .frame(width: 56, height: 56)
+        Button(action: action) {
+            HStack(spacing: 16) {
+                coinType.iconContainer
+                    .frame(width: 56, height: 56)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(name)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.secondary)
 
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    LiquidRollingNumber(
-                        value: Double(amount),
-                        exchangeRateToCNY: 1.0,
-                        fixedTier: getTierForAmount(amount)
-                    )
-                    .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        LiquidRollingNumber(
+                            value: Double(amount),
+                            exchangeRateToCNY: 1.0,
+                            fixedTier: getTierForAmount(amount)
+                        )
+                        .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    }
+
+                    Text(actionTitle)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(coinType.gradientColors[0].opacity(0.9))
                 }
-            }
 
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(uiColor: .secondarySystemBackground).opacity(0.6))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            coinType.gradientColors[0].opacity(0.3),
-                            coinType.gradientColors[1].opacity(0.1)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
+                Spacer()
+
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                coinType.gradientColors[0].opacity(0.95),
+                                coinType.gradientColors[1].opacity(0.75)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(uiColor: .secondarySystemBackground).opacity(0.6))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                coinType.gradientColors[0].opacity(0.3),
+                                coinType.gradientColors[1].opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
                 )
-        )
+        }
+        .buttonStyle(.plain)
     }
 
     private func getTierForAmount(_ amount: Int) -> WealthTier {

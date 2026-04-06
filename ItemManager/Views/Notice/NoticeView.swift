@@ -8,6 +8,17 @@ import AVKit
 struct NoticeView: View {
     let notice: Notice
     @State private var isExpanded = false
+
+    private var badgeColor: Color {
+        switch notice.severity {
+        case .info:
+            return .blue
+        case .important:
+            return .orange
+        case .critical:
+            return .red
+        }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -61,6 +72,16 @@ struct NoticeView: View {
     // MARK: - 文字区域
     private var textSection: some View {
         VStack(alignment: .center, spacing: 8) {
+            HStack(spacing: 6) {
+                NoticeBadge(text: notice.severity.rawValue.uppercased(), color: badgeColor)
+                if notice.requiresAck {
+                    NoticeBadge(text: "ACK", color: .orange)
+                }
+                if notice.isPinned {
+                    NoticeBadge(text: "PIN", color: .pink)
+                }
+            }
+
             // 标题
             Text(notice.title)
                 .font(.headline)
@@ -68,6 +89,14 @@ struct NoticeView: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .center)
+
+            if let summary = notice.summary, !summary.isEmpty {
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+            }
             
             // 内容 (可滚动)
             ScrollView(.vertical, showsIndicators: true) {
@@ -80,7 +109,7 @@ struct NoticeView: View {
             .frame(maxHeight: NoticeConfig.textMaxHeight)
             
             // 时间
-            Text(notice.createdAt, style: .date)
+            Text(notice.effectivePublishAt, style: .date)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -106,6 +135,63 @@ struct NoticeView: View {
     }
 }
 
+struct NoticeBadge: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+}
+
+struct NoticeDetailView: View {
+    let notice: Notice
+    @StateObject private var readStatusService = NoticeReadStatusService.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                NoticeView(notice: notice)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(notice.title)
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text(notice.effectivePublishAt, style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(notice.content)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+
+                    if notice.requiresAck, !readStatusService.hasAcknowledgedNotice(notice) {
+                        Button("我已知晓") {
+                            readStatusService.markAsAcknowledged(notice)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.vertical)
+        }
+        .navigationTitle("公告详情")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            readStatusService.markAsRead(notice)
+        }
+    }
+}
+
 // MARK: - 公告列表视图
 struct NoticeListView: View {
     @StateObject private var service = NoticeService.shared
@@ -115,12 +201,16 @@ struct NoticeListView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 ForEach(service.notices, id: \.id) { notice in
-                    NoticeView(notice: notice)
-                        .padding(.horizontal)
+                    NavigationLink(destination: NoticeDetailView(notice: notice)) {
+                        NoticeView(notice: notice)
+                            .padding(.horizontal)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.vertical)
         }
+        .navigationTitle("公告中心")
         .onAppear {
             service.setup(with: modelContext)
         }

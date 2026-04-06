@@ -1023,6 +1023,7 @@ struct ClothingEditView: View {
         
         // 特殊逻辑：如果类型包含"小物"，则该物品名称也加入小物索引
         SuggestionManager.shared.addAccessoryNameIfTypeContainsAccessory(name: name, types: finalTypes)
+        var notificationTarget: Clothing?
         
         if let c = clothing {
             // Update
@@ -1118,9 +1119,7 @@ struct ClothingEditView: View {
             if let oldPriceChartPath, !oldPriceChartPath.isEmpty, oldPriceChartPath != c.priceChartImagePath {
                 ImageManager.shared.deleteImage(fileName: oldPriceChartPath, context: modelContext)
             }
-            
-            // Update notification
-            NotificationManager.shared.scheduleNotification(for: c)
+            notificationTarget = c
         } else {
             // Create
             AppLogger.info("Creating new clothing: \(name)")
@@ -1172,9 +1171,7 @@ struct ClothingEditView: View {
             newClothing.updatedAt = now
             newClothing.lastModified = now
             modelContext.insert(newClothing)
-            
-            // Schedule notification
-            NotificationManager.shared.scheduleNotification(for: newClothing)
+            notificationTarget = newClothing
             
             // Trigger Reward for adding new clothing
             RewardManager.shared.triggerReward(type: .addClothing)
@@ -1183,7 +1180,10 @@ struct ClothingEditView: View {
         // Save context and sync widget
         do {
             try modelContext.save()
-            Task { await SharedPersistence.shared.syncWidgetData() }
+            if let notificationTarget {
+                NotificationManager.shared.scheduleNotification(for: notificationTarget, modelContext: modelContext)
+            }
+            Task { await SharedPersistence.shared.syncWidgetData(reason: "clothing-edit-save") }
             
             // 更新衣物数量缓存，用于魔法任务进度实时显示
             updateClothingCountCache()

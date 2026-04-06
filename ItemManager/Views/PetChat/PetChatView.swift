@@ -973,6 +973,24 @@ struct PetChatView: View {
             return
         }
 
+        if shouldTreatAsOutfitReplaceFollowUp(
+            query: text,
+            recentMessages: messages,
+            dialogueTurns: 2
+        ) {
+            handleOutfitReplace(text)
+            return
+        }
+
+        if shouldTreatAsOutfitAugmentFollowUp(
+            query: text,
+            recentMessages: messages,
+            dialogueTurns: 2
+        ) {
+            handleOutfitAugment(text)
+            return
+        }
+
         if handleEmbeddedPanelIntent(text) {
             return
         }
@@ -1525,8 +1543,33 @@ struct PetChatView: View {
         if result.shouldAnimate {
             triggerThemeSwitchAnimation()
         }
-        let reply = PetChatMessage(text: localizedCatchphraseText(result.reply), isUser: false, isAIGenerated: true)
+        let reply = PetChatMessage(
+            text: localizedCatchphraseText(result.reply),
+            isUser: false,
+            isAIGenerated: true,
+            widgets: result.widgets.isEmpty ? nil : result.widgets
+        )
         messages.append(reply)
+        return true
+    }
+
+    private func handleThemeQuickAction(_ command: String) -> Bool {
+        guard let result = PetThemeConversationEngine.handleQuickAction(command: command, themeManager: themeManager) else {
+            return false
+        }
+
+        if result.shouldAnimate {
+            triggerThemeSwitchAnimation()
+        }
+
+        messages.append(
+            PetChatMessage(
+                text: localizedCatchphraseText(result.reply),
+                isUser: false,
+                isAIGenerated: true,
+                widgets: result.widgets.isEmpty ? nil : result.widgets
+            )
+        )
         return true
     }
 
@@ -1563,6 +1606,10 @@ struct PetChatView: View {
 
     private func handleWidgetAction(_ option: PetWidgetOption, messageID: UUID) {
         if handleInlineYarnBallShortcut(option, messageID: messageID) {
+            return
+        }
+
+        if handleThemeQuickAction(option.command) {
             return
         }
 
@@ -2110,6 +2157,134 @@ struct PetChatView: View {
         messages.append(message)
     }
 
+    private func handleOutfitAugment(_ text: String) {
+        if guardPremiumFeature(.outfitSuggestion) {
+            return
+        }
+
+        guard let latestSuggestion = latestRecentOutfitSuggestion(in: messages, dialogueTurns: 2) else {
+            handleOutfitSuggestion(text)
+            return
+        }
+
+        isThinking = true
+
+        Task {
+            do {
+                let weather = await fetchCurrentWeather()
+                let (updatedClothings, responseText) = try await withTimeout(seconds: 12) {
+                    try OutfitSuggestionService.shared.extendOutfit(
+                        baseSuggestion: latestSuggestion,
+                        query: text,
+                        clothings: self.clothings,
+                        weather: weather
+                    )
+                }
+
+                await MainActor.run {
+                    isThinking = false
+                    let suggestionData = OutfitSuggestionData(
+                        clothings: updatedClothings,
+                        description: responseText,
+                        style: latestSuggestion.style,
+                        occasion: latestSuggestion.occasion,
+                        layoutInfos: nil
+                    )
+                    PetConversationMemoryStore.shared.recordOutfitSelection(
+                        clothings: updatedClothings,
+                        role: activePetRole()
+                    )
+
+                    messages.append(
+                        PetChatMessage(
+                            text: responseText,
+                            isUser: false,
+                            type: .outfitSuggestion,
+                            isAIGenerated: true,
+                            outfitSuggestion: suggestionData,
+                            widgets: [buildOutfitContinuationWidget(for: suggestionData)]
+                        )
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    isThinking = false
+                    messages.append(
+                        PetChatMessage(
+                            text: localizedCatchphraseText("（翻翻衣橱）这套里我暂时没找到更合适的可加单品喵，要不要直接说想加开衫、小物、鞋子，或者我重新给你搭一套？"),
+                            isUser: false,
+                            isAIGenerated: true
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private func handleOutfitReplace(_ text: String) {
+        if guardPremiumFeature(.outfitSuggestion) {
+            return
+        }
+
+        guard let latestSuggestion = latestRecentOutfitSuggestion(in: messages, dialogueTurns: 2) else {
+            handleOutfitSuggestion(text)
+            return
+        }
+
+        isThinking = true
+
+        Task {
+            do {
+                let weather = await fetchCurrentWeather()
+                let (updatedClothings, responseText) = try await withTimeout(seconds: 12) {
+                    try OutfitSuggestionService.shared.replaceOutfitItem(
+                        baseSuggestion: latestSuggestion,
+                        query: text,
+                        clothings: self.clothings,
+                        weather: weather
+                    )
+                }
+
+                await MainActor.run {
+                    isThinking = false
+                    let suggestionData = OutfitSuggestionData(
+                        clothings: updatedClothings,
+                        description: responseText,
+                        style: latestSuggestion.style,
+                        occasion: latestSuggestion.occasion,
+                        layoutInfos: nil
+                    )
+                    PetConversationMemoryStore.shared.recordOutfitSelection(
+                        clothings: updatedClothings,
+                        role: activePetRole()
+                    )
+
+                    messages.append(
+                        PetChatMessage(
+                            text: responseText,
+                            isUser: false,
+                            type: .outfitSuggestion,
+                            isAIGenerated: true,
+                            outfitSuggestion: suggestionData,
+                            widgets: [buildOutfitContinuationWidget(for: suggestionData)]
+                        )
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    isThinking = false
+                    messages.append(
+                        PetChatMessage(
+                            text: localizedCatchphraseText("（翻翻衣橱）这套里我暂时没找到更合适的可替换单品喵。你可以直接说“换主裙/换开衫/换鞋子/换浅色小物”，我继续帮你细调~"),
+                            isUser: false,
+                            isAIGenerated: true
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     private func handleWeatherOutfitGuidance(stylePreference: String? = nil) {
         if guardPremiumFeature(.weatherGuidance) {
             return
@@ -2168,7 +2343,7 @@ struct PetChatView: View {
             return await weatherService.fetchWeatherForCity(cachedCity)
         }
 
-        return nil
+        return weatherService.currentWeather
     }
 
     private func promptWealthCountingNavigation() {
@@ -2280,12 +2455,14 @@ struct PetChatView: View {
 
         Task {
             do {
+                let weather = await fetchCurrentWeather()
                 // 添加超时机制，防止卡住
                 let (selectedClothings, responseText, style, occasion) = try await withTimeout(seconds: 30) {
                     try await OutfitSuggestionService.shared.processOutfitRequest(
                         query: text,
                         clothings: self.clothings,
-                        context: self.modelContext
+                        context: self.modelContext,
+                        weather: weather
                     )
                 }
 
@@ -2308,7 +2485,8 @@ struct PetChatView: View {
                         text: localizedCatchphraseText(responseText),
                         isUser: false,
                         type: .outfitSuggestion,
-                        outfitSuggestion: suggestionData
+                        outfitSuggestion: suggestionData,
+                        widgets: [buildOutfitContinuationWidget(for: suggestionData)]
                     )
                     messages.append(message)
                 }
@@ -2355,13 +2533,15 @@ struct PetChatView: View {
 
         Task {
             do {
+                let weather = await fetchCurrentWeather()
                 // 添加超时机制
                 let selectedClothings = try await withTimeout(seconds: 15) {
                     try await OutfitSuggestionService.shared.createQuickOutfit(
                         style: style,
                         occasion: occasion,
                         clothings: self.clothings,
-                        context: self.modelContext
+                        context: self.modelContext,
+                        weather: weather
                     )
                 }
 
@@ -2384,7 +2564,8 @@ struct PetChatView: View {
                         text: localizedCatchphraseText("（眼睛发亮）为你准备了一套\(style)风\(occasion)搭配，快来看看吧喵~"),
                         isUser: false,
                         type: .outfitSuggestion,
-                        outfitSuggestion: suggestionData
+                        outfitSuggestion: suggestionData,
+                        widgets: [buildOutfitContinuationWidget(for: suggestionData)]
                     )
                     messages.append(message)
                 }

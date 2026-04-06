@@ -9,7 +9,12 @@ import Foundation
 import os
 
 struct AppLogger {
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.pinkhouse.itemmanager", category: "General")
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.pinkhouse.itemmanager"
+    private static let logger = Logger(subsystem: subsystem, category: "General")
+
+    static func category(_ category: String) -> Logger {
+        Logger(subsystem: subsystem, category: category)
+    }
     
     static func log(_ message: String, type: OSLogType = .default) {
         logger.log(level: type, "\(message)")

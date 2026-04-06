@@ -1,8 +1,17 @@
 import Foundation
 import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
+
+extension Notification.Name {
+    static let petStatusDidUpdateExternally = Notification.Name("PetStatusDidUpdateExternally")
+}
 
 class PetDataManager: ObservableObject {
     static let shared = PetDataManager()
+    static let fullReloadUserInfoKey = "reloadAll"
+    static let updateSourceUserInfoKey = "source"
     
     @Published var status: PetStatus {
         didSet {
@@ -11,43 +20,36 @@ class PetDataManager: ObservableObject {
     }
     
     private let statusKey = "PetStatus_Data"
+    private let statusModifiedAtKey = "PetStatus_LastModified"
+    private let cloudStore = NSUbiquitousKeyValueStore.default
+    private let persistenceQueue = DispatchQueue(label: "PetDataManager.persistence")
     
     private init() {
         self.status = PetDataManager.loadStatusFromDisk()
+        setupObservers()
+        synchronizeCloudSnapshotIfNeeded(reason: "launch")
     }
     
     // MARK: - Persistence
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
     
     func reloadFromDisk() {
         self.status = PetDataManager.loadStatusFromDisk()
-        // Notify listeners that status has been forcefully reloaded from disk
-        NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
+        postExternalUpdate(fullReload: true, source: "diskReload")
     }
     
     static func loadStatusFromDisk() -> PetStatus {
         let statusKey = "PetStatus_Data"
         guard let data = UserDefaults.standard.data(forKey: statusKey) else {
             print("PetDataManager: No saved data found. Creating new status.")
-            return PetStatus()
+            return sanitizeStatus(PetStatus())
         }
         
         do {
-            var decoded = try JSONDecoder().decode(PetStatus.self, from: data)
-            
-            // 数据清理：只保留在新配置中存在的物品，遗弃老数据
-            // 注意：这里依赖 PetConfigManager，确保它已初始化
-            var validInv: [String: Int] = [:]
-            for (key, count) in decoded.inventory {
-                if PetConfigManager.shared.getItem(byId: key) != nil {
-                    validInv[key] = count
-                }
-            }
-            decoded.inventory = validInv
-            
-            // 确保 ownedPetIds 至少包含 selectedPetId
-            if let selected = decoded.selectedPetId, !decoded.ownedPetIds.contains(selected) {
-                decoded.ownedPetIds.append(selected)
-            }
+            let decoded = try decodeStatus(from: data)
             
             print("PetDataManager: Successfully loaded status. Pet: \(decoded.petName ?? "unnamed")")
             return decoded
@@ -58,48 +60,47 @@ class PetDataManager: ObservableObject {
             UserDefaults.standard.set(data, forKey: backupKey)
             print("PetDataManager: Corrupted data backed up to key: \(backupKey)")
             
-            return PetStatus()
+            return sanitizeStatus(PetStatus())
         }
     }
     
     func saveStatus(_ newStatus: PetStatus? = nil) {
         if let newStatus = newStatus {
-            self.status = newStatus
+            self.status = Self.sanitizeStatus(newStatus)
+        } else {
+            self.status = Self.sanitizeStatus(self.status)
         }
         
         let statusToSave = self.status
+        let modifiedAt = Date()
         
-        // 异步保存，避免阻塞主线程
-        // 针对小内存设备优化：将序列化和IO操作移出主线程
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let self = self else { return }
-            if let encoded = try? JSONEncoder().encode(statusToSave) {
-                UserDefaults.standard.set(encoded, forKey: self.statusKey)
-                
-                // Auto backup check (daily)
-                self.checkAutoBackup()
-            }
+        guard let encoded = try? JSONEncoder().encode(statusToSave) else {
+            print("PetDataManager: Failed to encode status for save.")
+            return
         }
+
+        writeSnapshot(encoded, modifiedAt: modifiedAt, mirrorToCloud: true)
     }
     
     // MARK: - Backup & Restore
     
     private let lastBackupDateKey = "PetStatus_LastBackupDate"
     
-    private func checkAutoBackup() {
+    private func checkAutoBackup(using encoded: Data) {
         let lastBackup = UserDefaults.standard.double(forKey: lastBackupDateKey)
         let now = Date().timeIntervalSince1970
         // Backup every 24 hours (86400 seconds)
         if now - lastBackup > 86400 {
-            backupStatus()
+            backupStatus(using: encoded)
             UserDefaults.standard.set(now, forKey: lastBackupDateKey)
         }
     }
     
-    func backupStatus() {
+    func backupStatus(using encoded: Data? = nil) {
         let backupKey = "\(statusKey)_backup_\(Int(Date().timeIntervalSince1970))"
-        if let encoded = try? JSONEncoder().encode(status) {
-            UserDefaults.standard.set(encoded, forKey: backupKey)
+        let payload = encoded ?? exportStatusDataForBackup()
+        if let payload {
+            UserDefaults.standard.set(payload, forKey: backupKey)
             
             // Maintain backup history (keep last 5)
             cleanUpOldBackups()
@@ -116,19 +117,7 @@ class PetDataManager: ObservableObject {
     
     func restoreFromBackup(key: String) -> Bool {
         guard let data = UserDefaults.standard.data(forKey: key) else { return false }
-        
-        do {
-            let decoded = try JSONDecoder().decode(PetStatus.self, from: data)
-            self.status = decoded
-            saveStatus()
-            
-            // Notify listeners (like PetViewModel) to reload
-            NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
-            return true
-        } catch {
-            print("PetDataManager: Failed to restore backup: \(error)")
-            return false
-        }
+        return replaceStatusFromExternalData(data, source: "petBackupRestore", mirrorToCloud: true)
     }
     
     private func cleanUpOldBackups() {
@@ -190,8 +179,224 @@ class PetDataManager: ObservableObject {
         saveStatus()
         
         // Important: Notify PetViewModel to refresh UI
-        NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
+        postExternalUpdate(fullReload: false, source: "currencyUpdate")
         
         return getCurrency(type: type)
+    }
+
+    // MARK: - External Sync / Backup APIs
+
+    func exportStatusDataForBackup() -> Data? {
+        let sanitized = Self.sanitizeStatus(status)
+        return try? JSONEncoder().encode(sanitized)
+    }
+
+    @discardableResult
+    func restoreFromBackupData(_ data: Data) -> Bool {
+        replaceStatusFromExternalData(data, source: "backupRestore", mirrorToCloud: true)
+    }
+
+    @discardableResult
+    func replaceStatusFromExternalData(_ data: Data, source: String, mirrorToCloud: Bool) -> Bool {
+        do {
+            let decoded = try Self.decodeStatus(from: data)
+            let modifiedAt = Date()
+            self.status = decoded
+            guard let encoded = try? JSONEncoder().encode(decoded) else {
+                print("PetDataManager: Failed to re-encode external status from \(source).")
+                return false
+            }
+            writeSnapshot(encoded, modifiedAt: modifiedAt, mirrorToCloud: mirrorToCloud)
+            postExternalUpdate(fullReload: true, source: source)
+            return true
+        } catch {
+            print("PetDataManager: Failed to apply external status from \(source): \(error)")
+            return false
+        }
+    }
+
+    // MARK: - Cloud Mirror
+
+    private func setupObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleCloudStoreDidChange(_:)),
+            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloudStore
+        )
+#if canImport(UIKit)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+#endif
+    }
+
+    @objc private func handleCloudStoreDidChange(_ notification: Notification) {
+        guard isCloudRealtimeSyncEnabled else { return }
+
+        if let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String],
+           !changedKeys.contains(statusKey),
+           !changedKeys.contains(statusModifiedAtKey) {
+            return
+        }
+
+        synchronizeCloudSnapshotIfNeeded(reason: "cloudStoreDidChange")
+    }
+
+    @objc private func handleAppWillEnterForeground() {
+        synchronizeCloudSnapshotIfNeeded(reason: "foreground")
+    }
+
+    private var isCloudRealtimeSyncEnabled: Bool {
+        SwiftDataMigrationManager.shared.isCloudSyncEnabled
+    }
+
+    private func synchronizeCloudSnapshotIfNeeded(reason: String) {
+        guard isCloudRealtimeSyncEnabled else { return }
+
+        cloudStore.synchronize()
+
+        let localData = UserDefaults.standard.data(forKey: statusKey)
+        let remoteData = cloudStore.data(forKey: statusKey)
+        let localModifiedAt = storedModifiedAt(in: UserDefaults.standard)
+        let remoteModifiedAt = storedModifiedAt(in: cloudStore)
+
+        switch (localData, remoteData) {
+        case (nil, nil):
+            return
+        case let (local?, nil):
+            let timestamp = localModifiedAt ?? Date()
+            writeCloudSnapshot(local, modifiedAt: timestamp)
+        case let (nil, remote?):
+            _ = replaceStatusFromCloudData(remote, modifiedAt: remoteModifiedAt ?? Date(), reason: reason)
+        case let (local?, remote?):
+            let localTimestamp = localModifiedAt ?? .distantPast
+            let remoteTimestamp = remoteModifiedAt ?? .distantPast
+
+            if remoteTimestamp > localTimestamp {
+                _ = replaceStatusFromCloudData(remote, modifiedAt: remoteTimestamp, reason: reason)
+            } else if localTimestamp > remoteTimestamp || local != remote {
+                writeCloudSnapshot(local, modifiedAt: localModifiedAt ?? Date())
+            }
+        }
+    }
+
+    @discardableResult
+    private func replaceStatusFromCloudData(_ data: Data, modifiedAt: Date, reason: String) -> Bool {
+        do {
+            let decoded = try Self.decodeStatus(from: data)
+            self.status = decoded
+            guard let encoded = try? JSONEncoder().encode(decoded) else {
+                print("PetDataManager: Failed to re-encode cloud status.")
+                return false
+            }
+            writeSnapshot(encoded, modifiedAt: modifiedAt, mirrorToCloud: false)
+            postExternalUpdate(fullReload: true, source: "cloudSync:\(reason)")
+            return true
+        } catch {
+            print("PetDataManager: Failed to decode cloud status: \(error)")
+            return false
+        }
+    }
+
+    // MARK: - Helpers
+
+    private static func decodeStatus(from data: Data) throws -> PetStatus {
+        let decoded = try JSONDecoder().decode(PetStatus.self, from: data)
+        return sanitizeStatus(decoded)
+    }
+
+    private static func sanitizeStatus(_ rawStatus: PetStatus) -> PetStatus {
+        var sanitized = rawStatus
+
+        sanitized.hunger = sanitized.hunger.clamped(to: 0...100)
+        sanitized.hygiene = sanitized.hygiene.clamped(to: 0...100)
+        sanitized.energy = sanitized.energy.clamped(to: 0...100)
+        sanitized.mood = sanitized.mood.clamped(to: 0...100)
+        sanitized.intimacy = sanitized.intimacy.clamped(to: 0...100)
+
+        sanitized.meowCoin = max(0, sanitized.meowCoin)
+        sanitized.fishCoin = max(0, sanitized.fishCoin)
+        sanitized.boneCoin = max(0, sanitized.boneCoin)
+        sanitized.dailyFishCoinEarned = max(0, min(PetStatus.dailyFishCoinLimit, sanitized.dailyFishCoinEarned))
+        sanitized.currentJobEarnedFishCoin = max(0, sanitized.currentJobEarnedFishCoin)
+
+        var validInv: [String: Int] = [:]
+        for (key, count) in sanitized.inventory where count > 0 {
+            if PetConfigManager.shared.getItem(byId: key) != nil {
+                validInv[key] = count
+            }
+        }
+        sanitized.inventory = validInv
+
+        var uniqueOwnedPetIds: [String] = []
+        for petId in sanitized.ownedPetIds where !uniqueOwnedPetIds.contains(petId) {
+            uniqueOwnedPetIds.append(petId)
+        }
+        sanitized.ownedPetIds = uniqueOwnedPetIds
+        sanitized.ownedPetIds.removeAll { $0.isEmpty }
+
+        if let selected = sanitized.selectedPetId, !selected.isEmpty {
+            if !sanitized.ownedPetIds.contains(selected) {
+                sanitized.ownedPetIds.append(selected)
+            }
+        } else if let firstOwned = sanitized.ownedPetIds.first {
+            sanitized.selectedPetId = firstOwned
+        }
+
+        return sanitized
+    }
+
+    private func writeSnapshot(_ encoded: Data, modifiedAt: Date, mirrorToCloud: Bool) {
+        persistenceQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            UserDefaults.standard.set(encoded, forKey: self.statusKey)
+            UserDefaults.standard.set(modifiedAt.timeIntervalSince1970, forKey: self.statusModifiedAtKey)
+
+            if mirrorToCloud && self.isCloudRealtimeSyncEnabled {
+                self.writeCloudSnapshot(encoded, modifiedAt: modifiedAt)
+            }
+
+            self.checkAutoBackup(using: encoded)
+        }
+    }
+
+    private func writeCloudSnapshot(_ encoded: Data, modifiedAt: Date) {
+        cloudStore.set(encoded, forKey: statusKey)
+        cloudStore.set(modifiedAt.timeIntervalSince1970, forKey: statusModifiedAtKey)
+        cloudStore.synchronize()
+    }
+
+    private func storedModifiedAt(in defaults: UserDefaults) -> Date? {
+        let timestamp = defaults.double(forKey: statusModifiedAtKey)
+        guard timestamp > 0 else { return nil }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    private func storedModifiedAt(in cloudStore: NSUbiquitousKeyValueStore) -> Date? {
+        let timestamp = cloudStore.double(forKey: statusModifiedAtKey)
+        guard timestamp > 0 else { return nil }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    private func postExternalUpdate(fullReload: Bool, source: String) {
+        NotificationCenter.default.post(
+            name: .petStatusDidUpdateExternally,
+            object: nil,
+            userInfo: [
+                Self.fullReloadUserInfoKey: fullReload,
+                Self.updateSourceUserInfoKey: source
+            ]
+        )
+    }
+}
+
+private extension Comparable {
+    func clamped(to limits: ClosedRange<Self>) -> Self {
+        min(max(self, limits.lowerBound), limits.upperBound)
     }
 }

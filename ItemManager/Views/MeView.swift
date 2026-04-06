@@ -220,12 +220,12 @@ struct MeView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         .captureGuideTarget(.systemSettingsEntry)
-                        
+
                         if shouldShowAdminEntries {
                             NavigationLink(destination: NoticeAdminView()) {
                                 SettingsGridItem(
                                     title: "公告管理",
-                                    subtitle: "发布 · 编辑 · 云端同步",
+                                    subtitle: "草稿 · 发布 · 云端同步",
                                     icon: "megaphone.fill",
                                     iconColor: .blue
                                 )

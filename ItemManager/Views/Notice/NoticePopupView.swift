@@ -322,44 +322,42 @@ class NoticePopupManager: ObservableObject {
     // 检查公告是否已展示过
     func hasShownNotice(_ notice: Notice) -> Bool {
         print("📢 hasShownNotice: notice.id=\(notice.id), createdAt=\(notice.createdAt), lastResetTime=\(String(describing: lastResetTime))")
-        let hasShown = readStatusService.hasReadNotice(notice)
+        let hasShown = readStatusService.presentationCount(for: notice) > 0 || readStatusService.hasReadNotice(notice)
         print("📢 hasShown: \(hasShown)")
         return hasShown
     }
 
-    // 标记公告为已展示
-    func markNoticeAsShown(_ notice: Notice) {
-        readStatusService.markAsRead(notice)
+    func canShowNotice(_ notice: Notice) -> Bool {
+        readStatusService.shouldShowModal(for: notice)
     }
 
-    // 尝试展示公告（只展示未展示过的）
     func tryShowNotice(_ notice: Notice) {
         print("📢 tryShowNotice called for: \(notice.title)")
-        guard !hasShownNotice(notice) else {
-            print("📢 公告已展示过，跳过")
+        guard canShowNotice(notice) else {
+            print("📢 公告不满足弹窗条件，跳过")
             return
         }
 
         print("📢 显示公告弹窗")
         currentNotice = notice
         isShowing = true
-        markNoticeAsShown(notice)
+        readStatusService.markAsPresented(notice)
     }
 
-    // 尝试展示最新公告
     func tryShowLatestNotice() {
         print("📢 tryShowLatestNotice called, notices count: \(service.notices.count)")
-        guard let latestNotice = service.notices.first else {
+        guard let latestNotice = service.latestEligibleModalNotice() else {
             print("📢 没有公告可显示")
             return
         }
         print("📢 最新公告: \(latestNotice.title), id: \(latestNotice.id)")
-        print("📢 hasShownNotice: \(hasShownNotice(latestNotice))")
         tryShowNotice(latestNotice)
     }
 
-    // 关闭弹窗
-    func dismiss() {
+    func dismissCurrentNotice() {
+        if let notice = currentNotice {
+            readStatusService.markAsDismissed(notice)
+        }
         isShowing = false
         currentNotice = nil
     }
@@ -375,6 +373,7 @@ class NoticePopupManager: ObservableObject {
 // MARK: - 公告弹窗修饰符
 struct NoticePopupModifier: ViewModifier {
     static let lastAttemptedNoticeKey = "lastAttemptedNoticeKey"
+    private static let minimumModalDelay: TimeInterval = 30
 
     @StateObject private var manager = NoticePopupManager.shared
     @StateObject private var service = NoticeService.shared
@@ -382,6 +381,7 @@ struct NoticePopupModifier: ViewModifier {
     @Environment(\.modelContext) private var modelContext
     @State private var hasSyncedReadStatus = false
     @State private var sessionAttemptedNoticeKey: String?
+    @State private var firstAppearAt = Date()
 
     func body(content: Content) -> some View {
         ZStack {
@@ -389,12 +389,13 @@ struct NoticePopupModifier: ViewModifier {
 
             if manager.isShowing, let notice = manager.currentNotice {
                 NoticePopupView(notice: notice) {
-                    manager.dismiss()
+                    manager.dismissCurrentNotice()
                 }
             }
         }
         .onAppear {
             print("📢 NoticePopupModifier onAppear")
+            firstAppearAt = Date()
             service.setup(with: modelContext)
             syncReadStatus()
         }
@@ -409,7 +410,7 @@ struct NoticePopupModifier: ViewModifier {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             Task {
-                await service.syncIfNeeded(force: true)
+                await service.syncIfNeeded()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .noticeReadHistoryDidReset)) { _ in
@@ -429,7 +430,8 @@ struct NoticePopupModifier: ViewModifier {
 
     private func attemptShowLatestNoticeIfNeeded() {
         guard hasSyncedReadStatus, !service.isSyncing else { return }
-        guard let latestNotice = service.notices.first else { return }
+        guard Date().timeIntervalSince(firstAppearAt) >= Self.minimumModalDelay else { return }
+        guard let latestNotice = service.latestEligibleModalNotice() else { return }
 
         let latestNoticeKey = latestNotice.readTrackingKey
         if sessionAttemptedNoticeKey == latestNoticeKey {

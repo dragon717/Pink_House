@@ -218,9 +218,11 @@ class WardrobeContextManager {
         let tokens = rankingTerms(for: lowerQuery, clothings: clothings)
         let focus = detectFocus(from: lowerQuery)
         let requestedCategories = requestedCategories(for: lowerQuery)
+        let requestedSeasons = OutfitRecommendationKnowledgeBase.requestedSeasons(in: lowerQuery)
         
         let scored = clothings.map { clothing -> (Clothing, Int) in
             let searchable = buildSearchableText(for: clothing)
+            let profile = ClothingSemanticAnalyzer.profile(for: clothing)
             var score = 0
             
             for token in tokens where !token.isEmpty {
@@ -255,6 +257,19 @@ class WardrobeContextManager {
             if requestedCategories.contains(.accessory) {
                 if containsAny(in: searchable, hints: accessoryHints) || !(clothing.accessoryItems ?? []).isEmpty {
                     score += 5
+                }
+            }
+            if !requestedSeasons.isEmpty {
+                if !profile.seasons.isEmpty {
+                    if !requestedSeasons.isDisjoint(with: profile.seasons) {
+                        score += 8
+                    } else {
+                        score -= 6
+                    }
+                } else if requestedSeasons.contains(.summer), profile.warmthLevel <= 2 {
+                    score += 6
+                } else if requestedSeasons.contains(.winter), profile.warmthLevel >= 3 {
+                    score += 6
                 }
             }
             if clothing.isDepositPlan, (query.contains("尾款") || query.contains("定金")) {
@@ -427,8 +442,8 @@ class WardrobeContextManager {
     }
 
     private func assembleWeatherOutfitItems(from sortedClothings: [Clothing]) -> [Clothing] {
-        // 过滤掉心愿尾款的裙装（只从已到手单品中选择）
-        let availableClothings = sortedClothings.filter { !$0.isDepositPlan }
+        // 只从已到手、当前可穿的单品里做天气搭配。
+        let availableClothings = OutfitRecommendability.recommendableClothings(from: sortedClothings)
 
         var pickedIDs = Set<UUID>()
         var result: [Clothing] = []

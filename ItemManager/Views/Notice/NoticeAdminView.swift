@@ -11,8 +11,27 @@ struct NoticeAdminView: View {
 
     // 表单状态
     @State private var title = ""
+    @State private var summary = ""
     @State private var content = ""
     @State private var priority = 0
+    @State private var status: Notice.Status = .draft
+    @State private var channel: Notice.Channel = .inbox
+    @State private var severity: Notice.Severity = .info
+    @State private var isPinned = false
+    @State private var requiresAck = false
+    @State private var isSilent = false
+    @State private var audience = "all"
+    @State private var minAppVersion = ""
+    @State private var maxAppVersion = ""
+    @State private var actionType: Notice.ActionType = .none
+    @State private var actionTarget = ""
+    @State private var actionLabel = ""
+    @State private var publishAt = Date()
+    @State private var startAt = Date()
+    @State private var endAt = Date()
+    @State private var hasPublishAt = false
+    @State private var hasStartAt = false
+    @State private var hasEndAt = false
     @State private var mediaType: Notice.MediaType = .none
     @State private var selectedImageName: String?  // 内置图片名称
     @State private var selectedImageData: Data?
@@ -133,6 +152,9 @@ struct NoticeAdminView: View {
     private var adminForm: some View {
         Form {
             contentSection
+            deliverySection
+            scheduleSection
+            actionConfigSection
             prioritySection
             mediaSection
             actionSection
@@ -144,6 +166,7 @@ struct NoticeAdminView: View {
     private var contentSection: some View {
         Section("公告内容") {
             TextField("标题", text: $title)
+            TextField("摘要（列表可选）", text: $summary)
 
             TextEditor(text: $content)
                 .frame(minHeight: 100)
@@ -151,6 +174,69 @@ struct NoticeAdminView: View {
                     placeholderOverlay,
                     alignment: .topLeading
                 )
+        }
+    }
+
+    private var deliverySection: some View {
+        Section("投放规则") {
+            Picker("状态", selection: $status) {
+                ForEach(Notice.Status.allCases, id: \.self) { value in
+                    Text(label(for: value)).tag(value)
+                }
+            }
+
+            Picker("渠道", selection: $channel) {
+                ForEach(Notice.Channel.allCases, id: \.self) { value in
+                    Text(label(for: value)).tag(value)
+                }
+            }
+
+            Picker("等级", selection: $severity) {
+                ForEach(Notice.Severity.allCases, id: \.self) { value in
+                    Text(label(for: value)).tag(value)
+                }
+            }
+
+            Toggle("置顶", isOn: $isPinned)
+            Toggle("需要确认", isOn: $requiresAck)
+            Toggle("静默投放", isOn: $isSilent)
+            TextField("受众", text: $audience)
+            TextField("最低可见版本", text: $minAppVersion)
+            TextField("最高可见版本", text: $maxAppVersion)
+        }
+    }
+
+    private var scheduleSection: some View {
+        Section("时间窗") {
+            Toggle("设置发布时间", isOn: $hasPublishAt)
+            if hasPublishAt {
+                DatePicker("发布时间", selection: $publishAt)
+            }
+
+            Toggle("设置开始时间", isOn: $hasStartAt)
+            if hasStartAt {
+                DatePicker("开始时间", selection: $startAt)
+            }
+
+            Toggle("设置结束时间", isOn: $hasEndAt)
+            if hasEndAt {
+                DatePicker("结束时间", selection: $endAt)
+            }
+        }
+    }
+
+    private var actionConfigSection: some View {
+        Section("动作") {
+            Picker("动作类型", selection: $actionType) {
+                ForEach(Notice.ActionType.allCases, id: \.self) { value in
+                    Text(label(for: value)).tag(value)
+                }
+            }
+
+            if actionType != .none {
+                TextField("动作目标", text: $actionTarget)
+                TextField("按钮文案", text: $actionLabel)
+            }
         }
     }
 
@@ -277,7 +363,7 @@ struct NoticeAdminView: View {
                         .tint(.white)
                         .padding(.trailing, 8)
                 }
-                Text(editingNotice == nil ? "发布公告" : "更新公告")
+                Text(submitButtonTitle)
                     .fontWeight(.semibold)
                 Spacer()
             }
@@ -314,11 +400,11 @@ struct NoticeAdminView: View {
     // MARK: - 现有公告列表区域
     private var existingNoticesSection: some View {
         Section("现有公告") {
-            if service.notices.isEmpty {
+            if service.managedNotices.isEmpty {
                 Text("暂无公告")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(service.notices, id: \.id) { notice in
+                ForEach(service.managedNotices, id: \.id) { notice in
                     NoticeAdminRow(
                         notice: notice,
                         onEdit: { startEdit(notice) },
@@ -334,11 +420,27 @@ struct NoticeAdminView: View {
         let builtinMediaName = selectedImageName
         let tempNotice = Notice(
             title: title,
+            summary: summary.isEmpty ? nil : summary,
             content: content,
             mediaURL: builtinMediaName.map { Notice.builtinMediaURLString(for: $0) },
             builtinMediaName: builtinMediaName,
             mediaType: selectedImageName != nil ? .image : mediaType,
-            priority: priority
+            priority: priority,
+            status: status,
+            channel: channel,
+            severity: severity,
+            isPinned: isPinned,
+            requiresAck: requiresAck,
+            isSilent: isSilent,
+            publishAt: hasPublishAt ? publishAt : nil,
+            startAt: hasStartAt ? startAt : nil,
+            endAt: hasEndAt ? endAt : nil,
+            audience: audience,
+            minAppVersion: normalizedOptional(minAppVersion),
+            maxAppVersion: normalizedOptional(maxAppVersion),
+            actionType: actionType,
+            actionTarget: normalizedOptional(actionTarget),
+            actionLabel: normalizedOptional(actionLabel)
         )
         previewNotice = tempNotice
         showPreview = true
@@ -362,8 +464,25 @@ struct NoticeAdminView: View {
             if let editing = editingNotice {
                 print("📝 更新现有公告...")
                 editing.title = title
+                editing.summary = normalizedOptional(summary)
                 editing.content = content
+                editing.displayPriority = priority
                 editing.priority = priority
+                editing.status = status
+                editing.channel = channel
+                editing.severity = severity
+                editing.isPinned = isPinned
+                editing.requiresAck = requiresAck
+                editing.isSilent = isSilent
+                editing.publishAt = hasPublishAt ? publishAt : nil
+                editing.startAt = hasStartAt ? startAt : nil
+                editing.endAt = hasEndAt ? endAt : nil
+                editing.audience = audience
+                editing.minAppVersion = normalizedOptional(minAppVersion)
+                editing.maxAppVersion = normalizedOptional(maxAppVersion)
+                editing.actionType = actionType
+                editing.actionTarget = normalizedOptional(actionTarget)
+                editing.actionLabel = normalizedOptional(actionLabel)
 
                 // 如果有选择新的内置图片，更新 mediaURL
                 if let imageName = selectedImageName {
@@ -396,24 +515,40 @@ struct NoticeAdminView: View {
 
                 let notice = await service.createNotice(
                     title: title,
+                    summary: normalizedOptional(summary),
                     content: content,
                     mediaURL: mediaURL,
                     builtinMediaName: builtinMediaName,
                     mediaType: actualMediaType,
-                    priority: priority
+                    priority: priority,
+                    status: status,
+                    channel: channel,
+                    severity: severity,
+                    isPinned: isPinned,
+                    requiresAck: requiresAck,
+                    isSilent: isSilent,
+                    publishAt: hasPublishAt ? publishAt : nil,
+                    startAt: hasStartAt ? startAt : nil,
+                    endAt: hasEndAt ? endAt : nil,
+                    audience: audience,
+                    minAppVersion: normalizedOptional(minAppVersion),
+                    maxAppVersion: normalizedOptional(maxAppVersion),
+                    actionType: actionType,
+                    actionTarget: normalizedOptional(actionTarget),
+                    actionLabel: normalizedOptional(actionLabel)
                 )
 
                 if notice != nil {
-                    alertMessage = "公告已发布"
+                    alertMessage = createSuccessMessage
                 } else if let error = service.errorMessage {
                     alertMessage = error
                 } else {
-                    alertMessage = "发布公告失败"
+                    alertMessage = "保存公告失败"
                 }
             }
 
             showAlert = true
-            if alertMessage == "公告已发布" || alertMessage == "公告已更新" {
+            if alertMessage == createSuccessMessage || alertMessage == "公告已更新" {
                 resetForm()
             }
         }
@@ -423,8 +558,27 @@ struct NoticeAdminView: View {
     private func startEdit(_ notice: Notice) {
         editingNotice = notice
         title = notice.title
+        summary = notice.summary ?? ""
         content = notice.content
-        priority = notice.priority
+        priority = notice.displayPriority
+        status = notice.status
+        channel = notice.channel
+        severity = notice.severity
+        isPinned = notice.isPinned
+        requiresAck = notice.requiresAck
+        isSilent = notice.isSilent
+        audience = notice.audience
+        minAppVersion = notice.minAppVersion ?? ""
+        maxAppVersion = notice.maxAppVersion ?? ""
+        actionType = notice.actionType
+        actionTarget = notice.actionTarget ?? ""
+        actionLabel = notice.actionLabel ?? ""
+        hasPublishAt = notice.publishAt != nil
+        publishAt = notice.publishAt ?? Date()
+        hasStartAt = notice.startAt != nil
+        startAt = notice.startAt ?? notice.publishAt ?? Date()
+        hasEndAt = notice.endAt != nil
+        endAt = notice.endAt ?? notice.startAt ?? Date()
         mediaType = notice.mediaType
 
         // 处理图片
@@ -464,11 +618,101 @@ struct NoticeAdminView: View {
     private func resetForm() {
         editingNotice = nil
         title = ""
+        summary = ""
         content = ""
         priority = 0
+        status = .draft
+        channel = .inbox
+        severity = .info
+        isPinned = false
+        requiresAck = false
+        isSilent = false
+        audience = "all"
+        minAppVersion = ""
+        maxAppVersion = ""
+        actionType = .none
+        actionTarget = ""
+        actionLabel = ""
+        publishAt = Date()
+        startAt = Date()
+        endAt = Date()
+        hasPublishAt = false
+        hasStartAt = false
+        hasEndAt = false
         mediaType = .none
         selectedImageName = nil
         selectedImageData = nil
+    }
+
+    private var submitButtonTitle: String {
+        if editingNotice != nil {
+            return "更新公告"
+        }
+
+        switch status {
+        case .draft:
+            return "保存草稿"
+        case .scheduled:
+            return "创建定时公告"
+        case .published:
+            return "发布公告"
+        case .archived:
+            return "保存为归档"
+        }
+    }
+
+    private var createSuccessMessage: String {
+        switch status {
+        case .draft:
+            return "草稿已保存"
+        case .scheduled:
+            return "定时公告已创建"
+        case .published:
+            return "公告已发布"
+        case .archived:
+            return "归档公告已保存"
+        }
+    }
+
+    private func normalizedOptional(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func label(for status: Notice.Status) -> String {
+        switch status {
+        case .draft: return "草稿"
+        case .scheduled: return "定时"
+        case .published: return "已发布"
+        case .archived: return "已归档"
+        }
+    }
+
+    private func label(for channel: Notice.Channel) -> String {
+        switch channel {
+        case .inbox: return "公告中心"
+        case .banner: return "横幅"
+        case .modal: return "弹窗"
+        case .mixed: return "多渠道"
+        }
+    }
+
+    private func label(for severity: Notice.Severity) -> String {
+        switch severity {
+        case .info: return "普通"
+        case .important: return "重要"
+        case .critical: return "关键"
+        }
+    }
+
+    private func label(for actionType: Notice.ActionType) -> String {
+        switch actionType {
+        case .none: return "无动作"
+        case .deeplink: return "Deeplink"
+        case .tab: return "Tab"
+        case .page: return "页面"
+        case .externalURL: return "外链"
+        }
     }
 }
 
@@ -477,6 +721,15 @@ struct NoticeAdminRow: View {
     let notice: Notice
     let onEdit: () -> Void
     let onDelete: () -> Void
+
+    private var statusLabel: String {
+        switch notice.status {
+        case .draft: return "草稿"
+        case .scheduled: return "定时"
+        case .published: return "已发布"
+        case .archived: return "已归档"
+        }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -494,7 +747,7 @@ struct NoticeAdminRow: View {
 
                     Spacer()
 
-                    Text("P\(notice.priority)")
+                    Text(statusLabel)
                         .font(.caption)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)

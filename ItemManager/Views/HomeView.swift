@@ -65,6 +65,7 @@ struct HomeView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
+    @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
     @Query(sort: \Tag.name) private var tags: [Tag]
     @Query(sort: \Brand.name) private var brands: [Brand]
@@ -118,6 +119,8 @@ struct HomeView: View {
     @State private var depositStatusFilter: DepositStatusFilter = .all
     @State private var depositSearchText = ""
     @State private var showingDepositNotificationSheet = false
+    @State private var notificationTargetClothing: Clothing?
+    @State private var navigateToNotificationDetail = false
     @AppStorage("UserPreference_DepositDisplayMode") private var depositDisplayMode: DepositDisplayMode = .detail
     
     // View Layout Management
@@ -296,6 +299,15 @@ struct HomeView: View {
                     DepositNotificationView()
                 }
             }
+            .navigationDestination(isPresented: $navigateToNotificationDetail) {
+                if let clothing = notificationTargetClothing {
+                    ClothingDetailView(clothing: clothing)
+                }
+            }
+            .onReceive(tabNavigationManager.$navigateToClothingID) { clothingID in
+                guard let clothingID else { return }
+                openNotificationClothingDetail(clothingID)
+            }
             .alert(item: $batchImportUnlockAlert) { alert in
                 if alert.canUnlock {
                     return Alert(
@@ -314,6 +326,28 @@ struct HomeView: View {
                     )
                 }
             }
+        }
+    }
+
+    private func openNotificationClothingDetail(_ clothingID: UUID) {
+        let presentDetail = {
+            guard let clothing = allClothings.first(where: { $0.id == clothingID }) else { return }
+            notificationTargetClothing = clothing
+            navigateToNotificationDetail = false
+
+            DispatchQueue.main.async {
+                navigateToNotificationDetail = true
+                tabNavigationManager.navigateToClothingID = nil
+            }
+        }
+
+        if selectedTab != .depositPlan {
+            selectedTab = .depositPlan
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                presentDetail()
+            }
+        } else {
+            presentDetail()
         }
     }
     

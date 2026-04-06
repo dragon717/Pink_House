@@ -528,7 +528,7 @@ struct PetStatus: Codable {
     // 工作系统
     var currentJob: PetJob = .none
     var jobStartTime: Date?
-    var currentJobEarnedFishCoin: Int = 0 // 本次打工累计赚取的鱼币 (非存档属性，仅用于显示)
+    var currentJobEarnedFishCoin: Int = 0 // 本次打工累计赚取的鱼币（需要持久化，避免备份/恢复或跨端同步后丢失）
     
     // 衰减速率 (每秒减少多少)
     static let hungerDecayRate: Double = 10.0 / 3600.0 // 每小时减少10点
@@ -626,6 +626,7 @@ struct PetStatus: Codable {
         try container.encode(inventory, forKey: .inventory)
         try container.encode(currentJob, forKey: .currentJob)
         try container.encodeIfPresent(jobStartTime, forKey: .jobStartTime)
+        try container.encode(currentJobEarnedFishCoin, forKey: .currentJobEarnedFishCoin)
         try container.encode(vipStatus, forKey: .vipStatus)
     }
 }

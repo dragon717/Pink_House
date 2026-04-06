@@ -28,6 +28,7 @@ class TabNavigationManager: ObservableObject {
     @Published var navigateToTab: Int?
     @Published var navigateToHomeTab: HomeTab?
     @Published var navigateToSmallWorld: SmallWorldDestination?
+    @Published var navigateToClothingID: UUID?
     
     // 记录进入House前的来源，用于智能返回
     // 当用户从Tab 0（衣橱/心愿尾款）跳转到House时，记录当时的HomeTab
@@ -51,6 +52,12 @@ class TabNavigationManager: ObservableObject {
             navigateToTab = 0
             navigateToHomeTab = homeTab
         }
+    }
+
+    func navigateToDepositNotificationClothing(_ clothingID: UUID) {
+        navigateToTab = 0
+        navigateToHomeTab = .depositPlan
+        navigateToClothingID = clothingID
     }
     
     // 记录从Tab 0进入House时的HomeTab状态
@@ -79,5 +86,6 @@ class TabNavigationManager: ObservableObject {
         navigateToTab = nil
         navigateToHomeTab = nil
         navigateToSmallWorld = nil
+        navigateToClothingID = nil
     }
 }

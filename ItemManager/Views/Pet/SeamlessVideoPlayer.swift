@@ -214,7 +214,6 @@ class SeamlessVideoPlayerView: UIView {
 
             // 视频没变，但循环状态可能变了
             if self.isLooping != isLooping {
-                print("SeamlessPlayer: Loop state changed to \(isLooping)")
                 self.isLooping = isLooping
                 updateLoopingState(isLooping: isLooping)
             }
@@ -235,7 +234,6 @@ class SeamlessVideoPlayerView: UIView {
         // 再次检查（以防 findVideoURL 期间状态变化，或者为了处理 URL 相同的情况）
         // 虽然上面已经 check 过了名字，但这里处理 URL 逻辑
         if let currentURL = self.currentVideoURL, let new = newURL, currentURL == new {
-            print("SeamlessPlayer: Video name changed but URL is same. Ignoring reload. (\(videoName))")
             self.currentVideoName = videoName
             shouldReload = false
         } else {
@@ -243,7 +241,6 @@ class SeamlessVideoPlayerView: UIView {
         }
         
         if shouldReload {
-            print("SeamlessPlayer: Switching video to \(videoName)")
             self.currentVideoName = videoName
             self.currentVideoURL = newURL
             self.isLooping = isLooping // 记录新视频的循环状态
@@ -251,7 +248,6 @@ class SeamlessVideoPlayerView: UIView {
         } else {
             // 视频没变 (URL 相同)
             if self.isLooping != isLooping {
-                print("SeamlessPlayer: Loop state changed to \(isLooping)")
                 self.isLooping = isLooping
                 updateLoopingState(isLooping: isLooping)
             }
@@ -396,8 +392,6 @@ class SeamlessVideoPlayerView: UIView {
         }
         guard activeLayer !== context.layer else { return } // 已经切过了
         
-        print("SeamlessPlayer: Performing switch")
-        
         // 0. 确保新 Layer 在最上层
         context.layer.zPosition = 10
         applyMirror(to: context.layer, mirrored: self.isMirrored)
@@ -511,11 +505,7 @@ class SeamlessVideoPlayerView: UIView {
         
         setupFinishObserver(for: currentItem, isLooping: isLooping)
         
-        if isLooping {
-            print("SeamlessPlayer: Loop enabled (Manual Seek)")
-        } else {
-             print("SeamlessPlayer: Loop disabled (Manual Seek)")
-             
+        if !isLooping {
              // 检查是否已经播完
              let currentTime = currentItem.currentTime().seconds
              let duration = currentItem.duration.seconds
@@ -562,12 +552,10 @@ class SeamlessVideoPlayerView: UIView {
             // 更稳妥的做法是直接读取 self.isLooping
             
             if self.isLooping {
-                print("SeamlessPlayer: Loop triggered (Manual Seek)")
                 // 手动循环
                 self.activePlayer?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
                 self.play(player: self.activePlayer)
             } else {
-                print("SeamlessPlayer: Finished playing (End)")
                 self.onFinished?()
             }
         }
@@ -603,7 +591,6 @@ class SeamlessVideoPlayerView: UIView {
             let fallbackName = "\(prefix)_idle"
             if fallbackName != name {
                 if let url = VideoResourceManager.shared.findVideoURL(name: String(fallbackName)) {
-                    print("SeamlessPlayer: Fallback found: \(fallbackName)")
                     return url
                 }
             }

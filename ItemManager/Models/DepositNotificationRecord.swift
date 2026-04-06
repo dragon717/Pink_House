@@ -55,7 +55,7 @@ final class DepositNotificationRecord {
 final class DepositNotificationSettings {
     var id: UUID = UUID()
     var isEnabled: Bool = false
-    var selectedDays: [Int] = [0]
+    var selectedDays: [Int] = [0, 1, 3, 7, 15, 30]
     var notificationHour: Int = 9
     var notificationMinute: Int = 0
     var lastModified: Date = Date()
@@ -63,7 +63,7 @@ final class DepositNotificationSettings {
     init() {
         self.id = UUID()
         self.isEnabled = false
-        self.selectedDays = [0]
+        self.selectedDays = [0, 1, 3, 7, 15, 30]
         self.notificationHour = 9
         self.notificationMinute = 0
         self.lastModified = Date()

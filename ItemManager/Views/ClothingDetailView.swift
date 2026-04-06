@@ -217,6 +217,14 @@ struct ClothingDetailView: View {
                 // 记录删除到 DeleteTracker，防止iCloud同步覆盖
                 DeleteTracker.shared.recordDeletedClothing(id: clothing.id)
 
+                Task { @MainActor in
+                    await NotificationManager.shared.refreshAllKnownDepositNotifications(
+                        modelContext: modelContext,
+                        force: true,
+                        reason: "detail-delete"
+                    )
+                }
+
                 Task { await SharedPersistence.shared.syncWidgetData() }
                 
                 // 更新衣物数量缓存，用于魔法任务进度实时显示
@@ -263,6 +271,7 @@ struct ClothingDetailView: View {
     private func confirmPayment() {
         // Cancel notification since it's no longer a deposit plan
         NotificationManager.shared.cancelNotification(for: clothing)
+        NotificationManager.shared.handlePaymentConfirmed(for: clothing.id, modelContext: modelContext)
         
         // Calculate total price if currently 0
         if clothing.price == 0 {
@@ -275,6 +284,14 @@ struct ClothingDetailView: View {
         clothing.finalPaymentEndDate = nil
         // Try to save context (though it autosaves usually)
         try? modelContext.save()
+        Task { @MainActor in
+            await NotificationManager.shared.refreshAllKnownDepositNotifications(
+                modelContext: modelContext,
+                force: true,
+                reason: "payment-confirmed"
+            )
+        }
+        NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
         Task { await SharedPersistence.shared.syncWidgetData() }
         
         // Trigger Celebration Effect
@@ -352,18 +369,16 @@ struct ClothingDetailView: View {
         
         modelContext.insert(newClothing)
         
-        // Schedule notification for the copy
-        NotificationManager.shared.scheduleNotification(for: newClothing)
-        
         do {
             try modelContext.save()
+            NotificationManager.shared.scheduleNotification(for: newClothing, modelContext: modelContext)
             // 更新衣物数量缓存，用于魔法任务进度实时显示
             updateClothingCountCache()
         } catch {
             print("ClothingDetailView: Failed to save duplicated clothing: \(error)")
         }
         
-        Task { await SharedPersistence.shared.syncWidgetData() }
+        Task { await SharedPersistence.shared.syncWidgetData(reason: "clothing-detail-duplicate") }
         
         dismiss()
     }

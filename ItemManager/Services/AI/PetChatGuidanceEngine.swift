@@ -71,12 +71,12 @@ enum PetChatGuidanceEngine {
         weather: WeatherData? = nil,
         stylePreference: String? = nil
     ) -> WeatherWardrobeSelection {
-        let availableClothings = clothings.filter { !$0.isDepositPlan }
+        let availableClothings = OutfitRecommendability.recommendableClothings(from: clothings)
         let context = OutfitRecommendationContext(
             query: stylePreference ?? "",
             style: stylePreference,
             weather: weather,
-            season: OutfitRecommendationKnowledgeBase.inferredSeason(from: weather),
+            season: OutfitRecommendationKnowledgeBase.inferredSeason(from: weather, query: stylePreference),
             prioritizeWeather: true
         )
 

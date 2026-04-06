@@ -78,7 +78,10 @@ class NoticeCloudKitService: ObservableObject {
             let predicate = NSPredicate(value: true)
             let query = CKQuery(recordType: Notice.recordType, predicate: predicate)
             query.sortDescriptors = [
-                NSSortDescriptor(key: "priority", ascending: false),
+                NSSortDescriptor(key: "isPinned", ascending: false),
+                NSSortDescriptor(key: "severity", ascending: false),
+                NSSortDescriptor(key: "displayPriority", ascending: false),
+                NSSortDescriptor(key: "publishAt", ascending: false),
                 NSSortDescriptor(key: "updatedAt", ascending: false),
                 NSSortDescriptor(key: "createdAt", ascending: false)
             ]
@@ -180,6 +183,10 @@ class NoticeCloudKitService: ObservableObject {
             // 更新本地公告的 recordName
             notice.recordName = savedRecord.recordID.recordName
             notice.creatorID = savedRecord.creatorUserRecordID?.recordName
+            notice.createdBy = notice.createdBy ?? savedRecord.creatorUserRecordID?.recordName
+            if notice.status == .published {
+                notice.publishedBy = notice.publishedBy ?? savedRecord.creatorUserRecordID?.recordName
+            }
 
             print("✅ 公告发布成功: \(notice.title)")
             return true
@@ -208,6 +215,13 @@ class NoticeCloudKitService: ObservableObject {
         defer { isSyncing = false }
 
         do {
+            if let currentRecordID = try? await container.userRecordID() {
+                let currentUserID = currentRecordID.recordName
+                notice.updatedBy = currentUserID
+                if notice.status == .published {
+                    notice.publishedBy = notice.publishedBy ?? currentUserID
+                }
+            }
             let recordID = CKRecord.ID(recordName: recordName)
             let record = try await database.record(for: recordID)
             applyNotice(notice, to: record)
@@ -240,6 +254,9 @@ class NoticeCloudKitService: ObservableObject {
         defer { isSyncing = false }
 
         do {
+            if let currentRecordID = try? await container.userRecordID() {
+                notice.updatedBy = currentRecordID.recordName
+            }
             let recordID = CKRecord.ID(recordName: recordName)
             let record = try await database.record(for: recordID)
 
@@ -319,30 +336,82 @@ class NoticeCloudKitService: ObservableObject {
     // MARK: - 更新本地公告
     private func updateLocalNotice(_ local: Notice, from cloud: Notice) {
         local.title = cloud.title
+        local.summary = cloud.summary
         local.content = cloud.content
+        local.locale = cloud.locale
         local.mediaURL = cloud.mediaURL
         local.cloudKitMediaURL = cloud.cloudKitMediaURL
         local.builtinMediaName = cloud.builtinMediaName
         local.mediaType = cloud.mediaType
+        local.status = cloud.status
+        local.channel = cloud.channel
+        local.severity = cloud.severity
+        local.displayPriority = cloud.displayPriority
         local.priority = cloud.priority
+        local.isPinned = cloud.isPinned
+        local.requiresAck = cloud.requiresAck
+        local.isSilent = cloud.isSilent
+        local.publishAt = cloud.publishAt
+        local.startAt = cloud.startAt
+        local.endAt = cloud.endAt
+        local.archivedAt = cloud.archivedAt
+        local.audience = cloud.audience
+        local.minAppVersion = cloud.minAppVersion
+        local.maxAppVersion = cloud.maxAppVersion
+        local.actionType = cloud.actionType
+        local.actionTarget = cloud.actionTarget
+        local.actionLabel = cloud.actionLabel
+        local.environment = cloud.environment
+        local.revision = cloud.revision
+        local.rollbackFrom = cloud.rollbackFrom
         local.isActive = cloud.isActive
         local.createdAt = cloud.createdAt
         local.updatedAt = cloud.updatedAt
         local.version = cloud.version
         local.recordName = cloud.recordName
         local.creatorID = cloud.creatorID
+        local.createdBy = cloud.createdBy
+        local.updatedBy = cloud.updatedBy
+        local.publishedBy = cloud.publishedBy
+        local.normalizeLegacyFields()
     }
 
     private func applyNotice(_ notice: Notice, to record: CKRecord) {
+        notice.applyLifecycleDefaults()
         record["id"] = notice.id.uuidString
         record["title"] = notice.title
+        record["summary"] = notice.summary
         record["content"] = notice.content
+        record["locale"] = notice.locale
         record["mediaType"] = notice.mediaType.rawValue
+        record["status"] = notice.status.rawValue
+        record["channel"] = notice.channel.rawValue
+        record["severity"] = notice.severity.rawValue
+        record["displayPriority"] = notice.displayPriority
         record["priority"] = notice.priority
+        record["isPinned"] = notice.isPinned
+        record["requiresAck"] = notice.requiresAck
+        record["isSilent"] = notice.isSilent
         record["isActive"] = notice.isActive
+        record["publishAt"] = notice.publishAt
+        record["startAt"] = notice.startAt
+        record["endAt"] = notice.endAt
+        record["archivedAt"] = notice.archivedAt
+        record["audience"] = notice.audience
+        record["minAppVersion"] = notice.minAppVersion
+        record["maxAppVersion"] = notice.maxAppVersion
+        record["actionType"] = notice.actionType.rawValue
+        record["actionTarget"] = notice.actionTarget
+        record["actionLabel"] = notice.actionLabel
+        record["environment"] = notice.environment.rawValue
+        record["revision"] = notice.revision
         record["createdAt"] = notice.createdAt
         record["updatedAt"] = notice.updatedAt
         record["version"] = notice.version
+        record["rollbackFrom"] = notice.rollbackFrom
+        record["createdBy"] = notice.createdBy
+        record["updatedBy"] = notice.updatedBy
+        record["publishedBy"] = notice.publishedBy
         record[Notice.builtinMediaNameField] = notice.builtinMediaName
 
         if let mediaURL = notice.mediaURL,

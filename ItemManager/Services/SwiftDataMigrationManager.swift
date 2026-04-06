@@ -100,7 +100,9 @@ class SwiftDataMigrationManager: ObservableObject {
             StoredImage.self,
             PerlerBeadPattern.self,
             Notice.self,
-            ClothingImageSyncRecord.self
+            ClothingImageSyncRecord.self,
+            DepositNotificationRecord.self,
+            DepositNotificationSettings.self
         ])
         #endif
     }

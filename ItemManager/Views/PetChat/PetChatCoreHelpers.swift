@@ -234,6 +234,27 @@ private func hasOutfitReferenceInQuery(_ text: String) -> Bool {
     ])
 }
 
+private func isOutfitAugmentQuery(_ text: String) -> Bool {
+    containsAnyKeyword(text, keywords: [
+        "+1", "＋1", "加1", "加一", "加一件", "再来一件", "再加一件",
+        "补一件", "添一件", "配一件", "加个", "加一个", "再来个", "再配个"
+    ])
+}
+
+private func hasOutfitAugmentCategoryHint(_ text: String) -> Bool {
+    containsAnyKeyword(text, keywords: [
+        "开衫", "外套", "罩衫", "披肩", "斗篷", "小外套", "内搭", "衬衫", "马甲",
+        "小物", "配饰", "头饰", "发带", "袜", "包", "鞋", "鞋子", "伞"
+    ])
+}
+
+private func isOutfitReplaceQuery(_ text: String) -> Bool {
+    containsAnyKeyword(text, keywords: [
+        "换一件", "换1件", "换个", "换一个", "换一下", "重换一件",
+        "重新换", "换掉", "替换一下", "替换一件"
+    ])
+}
+
 func recentPetConversationMessages(_ messages: [PetChatMessage], dialogueTurns: Int = 2) -> [PetChatMessage] {
     guard dialogueTurns > 0, !messages.isEmpty else { return [] }
 
@@ -254,6 +275,77 @@ func recentPetConversationMessages(_ messages: [PetChatMessage], dialogueTurns: 
 func latestRecentOutfitSuggestion(in messages: [PetChatMessage], dialogueTurns: Int = 2) -> OutfitSuggestionData? {
     let window = recentPetConversationMessages(messages, dialogueTurns: dialogueTurns)
     return window.reversed().compactMap(\.outfitSuggestion).first
+}
+
+func shouldTreatAsOutfitAugmentFollowUp(
+    query: String,
+    recentMessages: [PetChatMessage],
+    dialogueTurns: Int = 2
+) -> Bool {
+    let normalized = normalizedPetChatIntentText(query)
+    guard !normalized.isEmpty else { return false }
+    guard latestRecentOutfitSuggestion(in: recentMessages, dialogueTurns: dialogueTurns) != nil else {
+        return false
+    }
+
+    if isOutfitAugmentQuery(normalized) {
+        return true
+    }
+
+    if hasOutfitAugmentCategoryHint(normalized),
+       containsAnyKeyword(normalized, keywords: ["加", "补", "再来", "再配", "搭配里", "放到搭配", "放进搭配"]) {
+        return true
+    }
+
+    return false
+}
+
+func shouldTreatAsOutfitReplaceFollowUp(
+    query: String,
+    recentMessages: [PetChatMessage],
+    dialogueTurns: Int = 2
+) -> Bool {
+    let normalized = normalizedPetChatIntentText(query)
+    guard !normalized.isEmpty else { return false }
+    guard latestRecentOutfitSuggestion(in: recentMessages, dialogueTurns: dialogueTurns) != nil else {
+        return false
+    }
+
+    if isOutfitReplaceQuery(normalized) {
+        return true
+    }
+
+    if hasOutfitAugmentCategoryHint(normalized),
+       containsAnyKeyword(normalized, keywords: ["换", "替换", "重配", "重新来", "不要这件"]) {
+        return true
+    }
+
+    return false
+}
+
+func buildOutfitContinuationWidget(for suggestion: OutfitSuggestionData) -> PetWidgetData {
+    let existingCategories = Set(suggestion.clothings.map { ClothingSemanticAnalyzer.profile(for: $0).category })
+
+    var options = [
+        PetWidgetOption(title: "+1", command: "ask:+1", icon: "plus.circle.fill"),
+        PetWidgetOption(title: "换一件", command: "ask:换一件", icon: "arrow.triangle.2.circlepath")
+    ]
+
+    if !existingCategories.contains(.outerwear) {
+        options.append(
+            PetWidgetOption(title: "加一件开衫", command: "ask:加一件开衫", icon: "sparkles")
+        )
+    } else {
+        options.append(
+            PetWidgetOption(title: "换个浅色小物", command: "ask:换一个浅色小物", icon: "sparkles")
+        )
+    }
+
+    return PetWidgetData(
+        type: .quickOptions,
+        title: "继续这套搭配",
+        options: options
+    )
 }
 
 func buildOutfitPriceSummary(clothings: [Clothing], detailLimit: Int = 6) -> String? {

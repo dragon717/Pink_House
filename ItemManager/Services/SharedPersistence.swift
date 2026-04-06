@@ -10,10 +10,23 @@ import SwiftData
 import WidgetKit
 import SwiftUI
 import CoreData
+import os
+
+private enum SharedPersistencePerformanceConfig {
+    static let lowMemoryThresholdBytes: UInt64 = 3_500_000_000
+
+    static var isLowMemoryDevice: Bool {
+        ProcessInfo.processInfo.physicalMemory <= lowMemoryThresholdBytes
+    }
+}
 
 @MainActor
 class SharedContainer {
     static let shared = SharedContainer()
+    private let widgetLogger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.pinkhouse.itemmanager",
+        category: "WidgetSync"
+    )
     
     // 使用 MigrationManager 创建 ModelContainer，支持本地和 iCloud 双模式
     let container: ModelContainer
@@ -93,7 +106,9 @@ class SharedContainer {
                     StoredImage.self,
                     PerlerBeadPattern.self,
                     Notice.self,
-                    ClothingImageSyncRecord.self
+                    ClothingImageSyncRecord.self,
+                    DepositNotificationRecord.self,
+                    DepositNotificationSettings.self
                 ])
                 #endif
                 let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
@@ -179,7 +194,8 @@ class SharedContainer {
     // 同步数据给小组件
     // 这个方法应该在数据发生变化时调用（如添加、修改、删除衣物后）
     @MainActor
-    func syncWidgetData() async {
+    func syncWidgetData(reason: String = "default") async {
+        let startedAt = Date()
         let context = sharedModelContainer.mainContext
         
         do {
@@ -215,7 +231,8 @@ class SharedContainer {
             
             // 3. Recent Items & Image Processing (Optimized)
             // Extract DTOs for background processing
-            let recentClothings = Array(clothings.prefix(5))
+            let recentItemLimit = SharedPersistencePerformanceConfig.isLowMemoryDevice ? 3 : 5
+            let recentClothings = Array(clothings.prefix(recentItemLimit))
             let recentDTOs = recentClothings.map { clothing in
                 ClothingWidgetDataDTO(
                     id: clothing.id,
@@ -252,7 +269,7 @@ class SharedContainer {
             
             // 获取 widgetImagesDirectory 路径（在主线程）
             guard let widgetImagesDir = WidgetDataManager.shared.widgetImagesDirectory else {
-                print("SharedContainer: Widget images directory not available")
+                widgetLogger.error("sync_abort reason=\(reason) widget_directory_missing=true")
                 return
             }
             
@@ -277,10 +294,11 @@ class SharedContainer {
             
             WidgetDataManager.shared.save(data: widgetData)
             WidgetCenter.shared.reloadAllTimelines()
-            print("SharedContainer: Widget data synced and timeline reloaded.")
+            let durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+            widgetLogger.info("sync_finish reason=\(reason) duration_ms=\(durationMs) clothing_count=\(clothings.count) deposit_plan_count=\(depositPlans.count) recent_item_limit=\(recentItemLimit) low_memory=\(SharedPersistencePerformanceConfig.isLowMemoryDevice)")
             
         } catch {
-            print("SharedContainer: Failed to fetch data for widget sync: \(error)")
+            widgetLogger.error("sync_failed reason=\(reason) error=\(error.localizedDescription)")
         }
     }
     

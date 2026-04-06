@@ -433,8 +433,13 @@ class PetViewModel: ObservableObject {
     }
 
     private func setupNotificationObserver() {
-        NotificationCenter.default.addObserver(forName: Notification.Name("PetStatusDidUpdateExternally"), object: nil, queue: .main) { [weak self] _ in
-            self?.reloadStatus()
+        NotificationCenter.default.addObserver(forName: .petStatusDidUpdateExternally, object: nil, queue: .main) { [weak self] notification in
+            let shouldReloadAll = notification.userInfo?[PetDataManager.fullReloadUserInfoKey] as? Bool ?? false
+            if shouldReloadAll {
+                self?.reloadEntireStatus()
+            } else {
+                self?.reloadStatus()
+            }
         }
     }
     
@@ -446,6 +451,21 @@ class PetViewModel: ObservableObject {
         self.status.meowCoin = newStatus.meowCoin
         self.status.boneCoin = newStatus.boneCoin
         // 也可以选择完全重载，视需求而定
+    }
+
+    func reloadEntireStatus() {
+        let newStatus = PetDataManager.shared.status
+        let previousPet = currentPet
+
+        self.status = newStatus
+
+        let refreshedPet = currentPet
+        if refreshedPet != previousPet {
+            self.currentBehavior = Self.getBehavior(for: refreshedPet)
+            setupAIService()
+            self.currentVideoFileName = getCharacterVideoName(action: currentVideoName)
+            NotificationCenter.default.post(name: Notification.Name("PetDidSwitch"), object: nil)
+        }
     }
     
     private func setupAudioBindings() {
@@ -1321,13 +1341,20 @@ class PetViewModel: ObservableObject {
     
     // 货币兑换：鱼币 -> 骨头币
     func exchangeFishToBone(amount: Int) -> Bool {
+        guard amount > 0 else { return false }
         guard status.fishCoin >= amount else {
             showFloatingText("鱼币不足", style: .warning)
             return false
         }
+
+        let (newBoneCoin, overflow) = status.boneCoin.addingReportingOverflow(amount)
+        guard !overflow else {
+            showFloatingText("骨头币过多", style: .warning)
+            return false
+        }
         
         status.fishCoin -= amount
-        status.boneCoin += amount // 1:1 汇率
+        status.boneCoin = newBoneCoin // 1:1 汇率
         saveStatus()
         
         showFloatingText("-\(amount)", style: .fishCoin)
@@ -1337,13 +1364,20 @@ class PetViewModel: ObservableObject {
     
     // 货币兑换：骨头币 -> 鱼币 (可选，虽然需求没明确说要换回去，但通常互通是双向的)
     func exchangeBoneToFish(amount: Int) -> Bool {
+        guard amount > 0 else { return false }
         guard status.boneCoin >= amount else {
             showFloatingText("骨头币不足", style: .warning)
             return false
         }
+
+        let (newFishCoin, overflow) = status.fishCoin.addingReportingOverflow(amount)
+        guard !overflow else {
+            showFloatingText("鱼币过多", style: .warning)
+            return false
+        }
         
         status.boneCoin -= amount
-        status.fishCoin += amount // 1:1 汇率
+        status.fishCoin = newFishCoin // 1:1 汇率
         saveStatus()
         
         showFloatingText("-\(amount)", style: .boneCoin)

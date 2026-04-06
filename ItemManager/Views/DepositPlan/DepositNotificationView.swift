@@ -7,12 +7,15 @@
 
 import SwiftUI
 import SwiftData
+import UserNotifications
+import os
 
 struct DepositNotificationView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    private let logger = AppLogger.category("DepositNotificationView")
 
     @AppStorage(NotificationManager.Keys.isDepositNotificationEnabled) private var isEnabled = false
     @State private var selectedDays: Set<Int> = []
@@ -20,8 +23,12 @@ struct DepositNotificationView: View {
     @State private var isExpanded = false
     @State private var showPermissionAlert = false
     @State private var showClearReadConfirmation = false
+    @State private var testAlertMessage: String?
+    @State private var debugSnapshot: NotificationDebugSnapshot?
+    @State private var settingsSyncTask: Task<Void, Never>?
 
     @Query(filter: #Predicate<Clothing> { $0.isDepositPlan == true && $0.deletedAt == nil }) private var depositPlans: [Clothing]
+    @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == false }, sort: \DepositNotificationRecord.scheduledDate, order: .forward) private var pendingRecords: [DepositNotificationRecord]
     @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == true }, sort: \DepositNotificationRecord.actualDate, order: .reverse) private var triggeredRecords: [DepositNotificationRecord]
 
     private var palette: MagicThemePalette {
@@ -38,6 +45,28 @@ struct DepositNotificationView: View {
         triggeredRecords.filter { $0.isRead }.count
     }
 
+    private var pendingDisplayRecords: [DepositNotificationRecord] {
+        Array(pendingRecords.prefix(NotificationManager.Config.pendingSectionLimit))
+    }
+
+    private var capturedPendingCount: Int {
+        pendingRecords.filter { $0.source == "captured" || $0.source == "local" }.count
+    }
+
+    private var scheduledPendingCount: Int {
+        pendingRecords.filter { $0.source == "scheduled" }.count
+    }
+
+    private var testTargetClothing: Clothing? {
+        depositPlans
+            .sorted { lhs, rhs in
+                let lhsDate = lhs.finalPaymentDate ?? .distantFuture
+                let rhsDate = rhs.finalPaymentDate ?? .distantFuture
+                return lhsDate < rhsDate
+            }
+            .first
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -46,6 +75,9 @@ struct DepositNotificationView: View {
                     .padding(.horizontal, 16)
 
                 // 历史补款记录
+                pendingSection
+                    .padding(.horizontal, 16)
+
                 historySection
                     .padding(.horizontal, 16)
             }
@@ -63,8 +95,20 @@ struct DepositNotificationView: View {
         }
         .onAppear {
             loadSettings()
+            Task {
+                logger.info("view_appear deposit_plan_count=\(depositPlans.count)")
+                await NotificationManager.shared.reconcileDeliveredNotifications(modelContext: modelContext)
+                await NotificationManager.shared.refreshDepositNotifications(
+                    clothings: depositPlans,
+                    modelContext: modelContext,
+                    force: false,
+                    reason: "notification-view-appear"
+                )
+                await refreshDebugSnapshot()
+            }
             // 进入页面时限制历史记录数量
             NotificationManager.shared.enforceHistoryLimit(modelContext: modelContext)
+            NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
         }
         .alert("需要通知权限", isPresented: $showPermissionAlert) {
             Button("去设置", role: .none) {
@@ -83,6 +127,21 @@ struct DepositNotificationView: View {
             Button("取消", role: .cancel) { }
         } message: {
             Text("确定要清除所有已读的通知记录吗？此操作不可撤销。")
+        }
+        .alert(
+            "测试通知",
+            isPresented: Binding(
+                get: { testAlertMessage != nil },
+                set: { newValue in
+                    if !newValue {
+                        testAlertMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text(testAlertMessage ?? "")
         }
     }
 
@@ -163,7 +222,7 @@ struct DepositNotificationView: View {
                     .foregroundStyle(palette.secondaryText)
 
                 FlowLayout(spacing: 6) {
-                    ForEach([0, 1, 3, 7, 15, 30], id: \.self) { day in
+                    ForEach(NotificationManager.Config.supportedReminderDays, id: \.self) { day in
                         dayChip(day: day)
                     }
                 }
@@ -184,8 +243,89 @@ struct DepositNotificationView: View {
                         handleSettingsChange(enabled: isEnabled)
                     }
             }
+
+            #if DEBUG
+            VStack(alignment: .leading, spacing: 8) {
+                Text("测试工具")
+                    .font(.system(size: 13))
+                    .foregroundStyle(palette.secondaryText)
+
+                Button {
+                    sendTestNotification()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "paperplane.fill")
+                        Text("发送 5 秒测试通知")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(testTargetClothing == nil ? palette.secondaryText.opacity(0.35) : palette.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .disabled(testTargetClothing == nil)
+
+                Text(testTargetClothing.map { "将使用「\($0.name)」作为测试目标。正式通知发送时间可直接用上方时间选择器修改。" } ?? "请先创建至少一条心愿尾款记录，再发送测试通知。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.secondaryText)
+            }
+
+            diagnosticsPanel
+            #endif
         }
         .padding(.top, 6)
+    }
+
+    private var diagnosticsPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("通知诊断")
+                    .font(.system(size: 13))
+                    .foregroundStyle(palette.secondaryText)
+
+                Spacer()
+
+                Button("刷新") {
+                    Task {
+                        await refreshDebugSnapshot()
+                    }
+                }
+                .font(.system(size: 11, weight: .semibold))
+
+                Button("重新同步") {
+                    Task {
+                        await NotificationManager.shared.refreshDepositNotifications(
+                            clothings: depositPlans,
+                            modelContext: modelContext,
+                            force: true,
+                            reason: "manual"
+                        )
+                        await refreshDebugSnapshot()
+                    }
+                }
+                .font(.system(size: 11, weight: .semibold))
+            }
+
+            if let snapshot = debugSnapshot {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("权限状态：\(authorizationText(snapshot.authorizationStatus))")
+                    Text("系统待发送：总 \(snapshot.pendingCount) / 补款 \(snapshot.depositPendingCount)")
+                    Text("系统已送达：总 \(snapshot.deliveredCount) / 补款 \(snapshot.depositDeliveredCount)")
+                    Text("待提醒记录：\(snapshot.pendingRecordCount)（系统 \(snapshot.depositPendingCount) / 站内 \(snapshot.capturedRecordCount)，上限 \(snapshot.scheduledSystemLimit)）")
+                    Text("App Icon 红点：\(snapshot.applicationBadgeCount)")
+                    Text("App 内未读：\(unreadCount)")
+                    Text("设备模式：\(snapshot.isMemoryConstrained ? "小内存保护" : "标准")")
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(palette.secondaryText)
+            } else {
+                Text("正在读取系统通知状态…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.secondaryText)
+            }
+        }
     }
 
     // MARK: - 提醒天数芯片
@@ -208,6 +348,40 @@ struct DepositNotificationView: View {
     }
 
     // MARK: - 历史补款记录（已发送的提醒）
+
+    private var pendingSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("待提醒")
+                    .font(.headline)
+
+                Spacer()
+
+                Text("系统 \(scheduledPendingCount) / 站内 \(capturedPendingCount)")
+                    .font(.caption)
+                    .foregroundStyle(palette.secondaryText)
+            }
+
+            if pendingDisplayRecords.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 32))
+                        .foregroundStyle(palette.secondaryText.opacity(0.5))
+                    Text("暂无待提醒记录")
+                        .font(.subheadline)
+                        .foregroundStyle(palette.secondaryText)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(pendingDisplayRecords) { record in
+                        PendingNotificationRecordRow(record: record)
+                    }
+                }
+            }
+        }
+    }
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -316,11 +490,13 @@ struct DepositNotificationView: View {
 
     private func toggleDay(_ day: Int) {
         if selectedDays.contains(day) {
+            guard selectedDays.count > 1 else { return }
             selectedDays.remove(day)
         } else {
             selectedDays.insert(day)
         }
         NotificationManager.shared.daysBeforeList = Array(selectedDays)
+        selectedDays = Set(NotificationManager.shared.daysBeforeList)
         handleSettingsChange(enabled: isEnabled)
     }
 
@@ -343,7 +519,14 @@ struct DepositNotificationView: View {
     }
 
     private func handleSettingsChange(enabled: Bool) {
-        Task {
+        settingsSyncTask?.cancel()
+        let selectedDaysText = selectedDays.sorted().map(String.init).joined(separator: ",")
+        logger.info("settings_change_enqueued enabled=\(enabled) selected_days=\(selectedDaysText, privacy: .public)")
+        settingsSyncTask = Task {
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            guard !Task.isCancelled else { return }
+            logger.info("settings_change_apply enabled=\(enabled) deposit_plan_count=\(depositPlans.count)")
+
             if enabled {
                 let status = await NotificationManager.shared.checkAuthorizationStatus()
                 if status == .notDetermined {
@@ -363,7 +546,67 @@ struct DepositNotificationView: View {
                 }
             }
 
-            await NotificationManager.shared.rescheduleAllNotifications(clothings: depositPlans, modelContext: modelContext)
+            await NotificationManager.shared.refreshDepositNotifications(
+                clothings: depositPlans,
+                modelContext: modelContext,
+                force: false,
+                reason: "settings-change"
+            )
+            await refreshDebugSnapshot()
+        }
+    }
+
+    private func sendTestNotification() {
+        guard let clothing = testTargetClothing else {
+            testAlertMessage = "请先创建一条用于测试的心愿尾款记录。建议新建一条“通知测试裙”，避免影响正式数据。"
+            return
+        }
+
+        Task {
+            logger.info("send_test_notification target=\(clothing.name, privacy: .public)")
+            let status = await NotificationManager.shared.checkAuthorizationStatus()
+            if status == .notDetermined {
+                let granted = try? await NotificationManager.shared.requestAuthorization()
+                if granted != true {
+                    await MainActor.run {
+                        showPermissionAlert = true
+                    }
+                    return
+                }
+            } else if status == .denied {
+                await MainActor.run {
+                    showPermissionAlert = true
+                }
+                return
+            }
+
+            do {
+                try await NotificationManager.shared.scheduleTestNotification(for: clothing)
+                await refreshDebugSnapshot()
+                await MainActor.run {
+                    testAlertMessage = "已为「\(clothing.name)」安排 5 秒测试通知。请切到桌面或锁屏等待弹出，然后点击通知验证是否直达详情页。"
+                }
+            } catch {
+                await MainActor.run {
+                    testAlertMessage = "测试通知发送失败：\(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func refreshDebugSnapshot() async {
+        debugSnapshot = await NotificationManager.shared.debugSnapshot()
+    }
+
+    private func authorizationText(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "未决定"
+        case .denied: return "已拒绝"
+        case .authorized: return "已允许"
+        case .provisional: return "临时允许"
+        case .ephemeral: return "临时会话"
+        @unknown default: return "未知"
         }
     }
 }
@@ -474,6 +717,7 @@ struct NotificationRecordRow: View {
             if !record.isRead {
                 record.markAsRead()
                 try? modelContext.save()
+                NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
             }
         }
     }
@@ -501,6 +745,58 @@ struct NotificationRecordRow: View {
         case 30: return "30 天"
         default: return "提前\(day)天"
         }
+    }
+}
+
+struct PendingNotificationRecordRow: View {
+    let record: DepositNotificationRecord
+
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var palette: MagicThemePalette {
+        MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var isCapturedOnly: Bool {
+        record.source == "captured" || record.source == "local"
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(isCapturedOnly ? palette.secondaryText.opacity(0.45) : palette.cardAccent)
+                .frame(width: 6, height: 6)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(record.clothingName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Text(formatDate(record.scheduledDate))
+                    .font(.caption)
+                    .foregroundStyle(palette.secondaryText)
+            }
+
+            Spacer()
+
+            Text(isCapturedOnly ? "仅站内" : "系统通知")
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background((isCapturedOnly ? palette.secondaryText : palette.accent).opacity(0.14))
+                .foregroundStyle(isCapturedOnly ? palette.secondaryText : palette.accent)
+                .clipShape(Capsule())
+        }
+        .padding(10)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(10)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd HH:mm"
+        return formatter.string(from: date)
     }
 }
 

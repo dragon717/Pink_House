@@ -10,6 +10,22 @@ import Combine
 @MainActor
 class NoticeReadStatusService: ObservableObject {
     static let shared = NoticeReadStatusService()
+
+    enum UserState: String, Codable {
+        case unseen
+        case read
+        case acknowledged
+        case dismissed
+    }
+
+    struct StateSnapshot: Codable {
+        var state: UserState = .unseen
+        var readAt: Date? = nil
+        var acknowledgedAt: Date? = nil
+        var dismissedAt: Date? = nil
+        var presentationCount: Int = 0
+        var lastPresentedAt: Date? = nil
+    }
     
     private let container = CKContainer(identifier: "iCloud.bugod2.ItemManager")
     private var database: CKDatabase {
@@ -18,6 +34,7 @@ class NoticeReadStatusService: ObservableObject {
     
     // 本地缓存（内存）
     private var localReadStatus: Set<String> = []
+    private var localStates: [String: StateSnapshot] = [:]
     private var localResetTime: Date?
     
     // 同步状态
@@ -26,6 +43,7 @@ class NoticeReadStatusService: ObservableObject {
     
     // UserDefaults 作为本地备用存储
     private let shownNoticeIDsKey = "shownNoticeIDs"
+    private let noticeStatesKey = "noticeUserStates"
     private let lastResetTimeKey = "noticeLastResetTime"
     private let lastSyncTimeKey = "noticeReadStatusLastSync"
     
@@ -39,16 +57,45 @@ class NoticeReadStatusService: ObservableObject {
         if let ids = UserDefaults.standard.stringArray(forKey: shownNoticeIDsKey) {
             localReadStatus = Set(ids)
         }
+        if let data = UserDefaults.standard.data(forKey: noticeStatesKey),
+           let states = try? JSONDecoder().decode([String: StateSnapshot].self, from: data) {
+            localStates = states
+        }
         localResetTime = UserDefaults.standard.object(forKey: lastResetTimeKey) as? Date
     }
     
     private func saveToUserDefaults() {
         UserDefaults.standard.set(Array(localReadStatus), forKey: shownNoticeIDsKey)
+        if let data = try? JSONEncoder().encode(localStates) {
+            UserDefaults.standard.set(data, forKey: noticeStatesKey)
+        }
         UserDefaults.standard.set(localResetTime, forKey: lastResetTimeKey)
+    }
+
+    private func stateKey(for notice: Notice) -> String {
+        notice.recordName ?? notice.id.uuidString
+    }
+
+    func state(for notice: Notice) -> UserState {
+        if let resetTime = localResetTime, max(notice.createdAt, notice.updatedAt) > resetTime {
+            return .unseen
+        }
+
+        let key = stateKey(for: notice)
+        if let snapshot = localStates[key] {
+            return snapshot.state
+        }
+
+        return hasReadNotice(notice) ? .read : .unseen
     }
     
     // MARK: - 检查公告是否已读
     func hasReadNotice(_ notice: Notice) -> Bool {
+        let key = stateKey(for: notice)
+        if let snapshot = localStates[key] {
+            return snapshot.state == .read || snapshot.state == .acknowledged
+        }
+
         // 如果重置过，只检查重置时间之后的记录
         if let resetTime = localResetTime {
             if max(notice.createdAt, notice.updatedAt) > resetTime {
@@ -67,30 +114,74 @@ class NoticeReadStatusService: ObservableObject {
 
         return false
     }
-    
-    // MARK: - 标记公告为已读
-    func markAsRead(_ notice: Notice) {
-        var changed = false
 
-        let keys = [notice.readTrackingKey] + notice.legacyReadTrackingKeys
-        for key in keys where !localReadStatus.contains(key) {
-            localReadStatus.insert(key)
-            changed = true
+    func hasAcknowledgedNotice(_ notice: Notice) -> Bool {
+        localStates[stateKey(for: notice)]?.state == .acknowledged
+    }
+
+    func presentationCount(for notice: Notice) -> Int {
+        localStates[stateKey(for: notice)]?.presentationCount ?? 0
+    }
+
+    func shouldShowModal(for notice: Notice) -> Bool {
+        guard notice.isEligibleForModal() else { return false }
+
+        let currentState = state(for: notice)
+        if currentState == .read || currentState == .acknowledged || currentState == .dismissed {
+            return false
         }
 
-        if changed {
-            saveToUserDefaults()
-            
-            // 同步到 CloudKit
-            Task {
-                await syncReadStatusToCloud(notice: notice)
+        let snapshot = localStates[stateKey(for: notice)]
+        if (snapshot?.presentationCount ?? 0) >= 1 {
+            return false
+        }
+
+        let todayPresentations = localStates.values.filter { snapshot in
+            guard let lastPresentedAt = snapshot.lastPresentedAt else { return false }
+            return Calendar.current.isDateInToday(lastPresentedAt)
+        }.count
+
+        return todayPresentations < 1
+    }
+
+    // MARK: - 标记公告为已读
+    func markAsRead(_ notice: Notice) {
+        updateState(for: notice) { snapshot in
+            if snapshot.state != .acknowledged {
+                snapshot.state = .read
             }
+            snapshot.readAt = snapshot.readAt ?? Date()
+        }
+    }
+
+    func markAsAcknowledged(_ notice: Notice) {
+        updateState(for: notice) { snapshot in
+            snapshot.state = .acknowledged
+            snapshot.acknowledgedAt = Date()
+            snapshot.readAt = snapshot.readAt ?? Date()
+        }
+    }
+
+    func markAsDismissed(_ notice: Notice) {
+        updateState(for: notice) { snapshot in
+            if snapshot.state == .unseen {
+                snapshot.state = .dismissed
+            }
+            snapshot.dismissedAt = Date()
+        }
+    }
+
+    func markAsPresented(_ notice: Notice) {
+        updateState(for: notice) { snapshot in
+            snapshot.presentationCount += 1
+            snapshot.lastPresentedAt = Date()
         }
     }
     
     // MARK: - 重置已读历史
     func resetReadHistory() {
         localReadStatus.removeAll()
+        localStates.removeAll()
         localResetTime = Date()
         saveToUserDefaults()
         
@@ -106,17 +197,23 @@ class NoticeReadStatusService: ObservableObject {
     }
     
     // MARK: - 同步已读状态到 CloudKit
-    private func syncReadStatusToCloud(notice: Notice) async {
+    private func syncReadStatusToCloud(notice: Notice, snapshot: StateSnapshot) async {
         guard await checkAccountStatus() else { return }
         
         do {
-            let record = CKRecord(recordType: "NoticeReadStatus")
+            let recordID = CKRecord.ID(recordName: "NoticeReadStatus_\(stateKey(for: notice))")
+            let record = CKRecord(recordType: "NoticeReadStatus", recordID: recordID)
             record["readKey"] = notice.readTrackingKey
             record["noticeID"] = notice.id.uuidString
             record["recordName"] = notice.recordName
             record["version"] = notice.version
             record["updatedAt"] = notice.updatedAt
-            record["readAt"] = Date()
+            record["state"] = snapshot.state.rawValue
+            record["readAt"] = snapshot.readAt
+            record["acknowledgedAt"] = snapshot.acknowledgedAt
+            record["dismissedAt"] = snapshot.dismissedAt
+            record["presentationCount"] = snapshot.presentationCount
+            record["lastPresentedAt"] = snapshot.lastPresentedAt
             record["title"] = notice.title
             
             try await database.save(record)
@@ -193,6 +290,7 @@ class NoticeReadStatusService: ObservableObject {
             let (results, _) = try await database.records(matching: query, inZoneWith: nil)
             
             var cloudReadStatus: Set<String> = []
+            var cloudStates: [String: StateSnapshot] = [:]
             for (_, result) in results {
                 if case .success(let record) = result {
                     if let readKey = record["readKey"] as? String {
@@ -204,6 +302,18 @@ class NoticeReadStatusService: ObservableObject {
                     if let recordName = record["recordName"] as? String {
                         cloudReadStatus.insert(recordName)
                     }
+
+                    let key = (record["recordName"] as? String) ?? (record["noticeID"] as? String) ?? record.recordID.recordName
+                    let stateRaw = record["state"] as? String
+                    let snapshot = StateSnapshot(
+                        state: UserState(rawValue: stateRaw ?? "") ?? .read,
+                        readAt: record["readAt"] as? Date,
+                        acknowledgedAt: record["acknowledgedAt"] as? Date,
+                        dismissedAt: record["dismissedAt"] as? Date,
+                        presentationCount: record["presentationCount"] as? Int ?? 0,
+                        lastPresentedAt: record["lastPresentedAt"] as? Date
+                    )
+                    cloudStates[key] = snapshot
                 }
             }
             
@@ -216,14 +326,17 @@ class NoticeReadStatusService: ObservableObject {
                 // 云端重置时间更新，使用云端数据
                 localResetTime = cloudResetTime
                 localReadStatus = cloudReadStatus
+                localStates = cloudStates
                 print("📢 使用云端重置时间和已读状态")
             } else if cloudReset == localReset && cloudReset > 0 {
                 // 重置时间相同，合并数据
                 localReadStatus.formUnion(cloudReadStatus)
+                mergeCloudStates(cloudStates)
                 print("📢 合并本地和云端已读状态")
             } else if localReset == 0 && cloudReset == 0 {
                 // 都没有重置过，合并数据
                 localReadStatus.formUnion(cloudReadStatus)
+                mergeCloudStates(cloudStates)
                 print("📢 合并本地和云端已读状态（无重置记录）")
             }
             // 如果本地重置时间更新，保留本地数据
@@ -243,6 +356,40 @@ class NoticeReadStatusService: ObservableObject {
             return status == .available
         } catch {
             return false
+        }
+    }
+
+    private func updateState(
+        for notice: Notice,
+        mutation: (inout StateSnapshot) -> Void
+    ) {
+        let key = stateKey(for: notice)
+        var snapshot = localStates[key] ?? StateSnapshot()
+        mutation(&snapshot)
+        localStates[key] = snapshot
+
+        let keys = [notice.readTrackingKey] + notice.legacyReadTrackingKeys + [key]
+        for rawKey in keys where snapshot.state != .unseen {
+            localReadStatus.insert(rawKey)
+        }
+
+        saveToUserDefaults()
+
+        Task {
+            await syncReadStatusToCloud(notice: notice, snapshot: snapshot)
+        }
+    }
+
+    private func mergeCloudStates(_ cloudStates: [String: StateSnapshot]) {
+        for (key, cloudSnapshot) in cloudStates {
+            guard let localSnapshot = localStates[key] else {
+                localStates[key] = cloudSnapshot
+                continue
+            }
+
+            if (cloudSnapshot.lastPresentedAt ?? .distantPast) > (localSnapshot.lastPresentedAt ?? .distantPast) {
+                localStates[key] = cloudSnapshot
+            }
         }
     }
 }
