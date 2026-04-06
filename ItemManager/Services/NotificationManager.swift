@@ -515,6 +515,14 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    @MainActor
+    func deleteRecord(_ record: DepositNotificationRecord, modelContext: ModelContext) {
+        removeNotificationsForRecord(record)
+        modelContext.delete(record)
+        try? modelContext.save()
+        updateApplicationBadge(modelContext: modelContext)
+    }
+
     /// 用户确认已付尾款后：已触发的提醒标记为已读，未触发的待提醒直接清理。
     @MainActor
     func handlePaymentConfirmed(for clothingID: UUID, modelContext: ModelContext) {
@@ -822,6 +830,14 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         var stats = PendingRequestSyncStats()
         stats.removed = identifiers.count
         return stats
+    }
+
+    private func removeNotificationsForRecord(_ record: DepositNotificationRecord) {
+        let center = UNUserNotificationCenter.current()
+        let baseIdentifier = "\(record.clothingID.uuidString)_\(record.daysBefore)"
+        let identifiers = [baseIdentifier, "\(baseIdentifier)_catchup"]
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        center.removeDeliveredNotifications(withIdentifiers: identifiers)
     }
 
     private func hasSchedulingPermission(_ status: UNAuthorizationStatus) -> Bool {

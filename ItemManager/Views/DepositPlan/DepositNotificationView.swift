@@ -26,6 +26,8 @@ struct DepositNotificationView: View {
     @State private var testAlertMessage: String?
     @State private var debugSnapshot: NotificationDebugSnapshot?
     @State private var settingsSyncTask: Task<Void, Never>?
+    @State private var isHistoryExpanded = true
+    @State private var isPendingExpanded = false
 
     @Query(filter: #Predicate<Clothing> { $0.isDepositPlan == true && $0.deletedAt == nil }) private var depositPlans: [Clothing]
     @Query(filter: #Predicate<DepositNotificationRecord> { $0.isTriggered == false }, sort: \DepositNotificationRecord.scheduledDate, order: .forward) private var pendingRecords: [DepositNotificationRecord]
@@ -67,6 +69,19 @@ struct DepositNotificationView: View {
             .first
     }
 
+    private var groupedTriggeredRecords: [(record: DepositNotificationRecord, records: [DepositNotificationRecord])] {
+        let grouped = Dictionary(grouping: triggeredRecords) { $0.clothingID }
+        return grouped.values
+            .compactMap { records in
+                guard let leadRecord = records.max(by: { ($0.actualDate ?? $0.scheduledDate) < ($1.actualDate ?? $1.scheduledDate) }) else {
+                    return nil
+                }
+                let sortedRecords = records.sorted { ($0.actualDate ?? $0.scheduledDate) > ($1.actualDate ?? $1.scheduledDate) }
+                return (leadRecord, sortedRecords)
+            }
+            .sorted { ($0.record.actualDate ?? $0.record.scheduledDate) > ($1.record.actualDate ?? $1.record.scheduledDate) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -74,11 +89,10 @@ struct DepositNotificationView: View {
                 settingsSummarySection
                     .padding(.horizontal, 16)
 
-                // 历史补款记录
-                pendingSection
+                historySection
                     .padding(.horizontal, 16)
 
-                historySection
+                pendingSection
                     .padding(.horizontal, 16)
             }
             .padding(.vertical, 16)
@@ -351,32 +365,35 @@ struct DepositNotificationView: View {
 
     private var pendingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("待提醒")
-                    .font(.headline)
-
-                Spacer()
-
-                Text("系统 \(scheduledPendingCount) / 站内 \(capturedPendingCount)")
-                    .font(.caption)
-                    .foregroundStyle(palette.secondaryText)
+            sectionHeader(
+                title: "待提醒",
+                summary: "系统 \(scheduledPendingCount) / 站内 \(capturedPendingCount)",
+                isExpanded: isPendingExpanded
+            ) {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    isPendingExpanded.toggle()
+                }
             }
 
-            if pendingDisplayRecords.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 32))
-                        .foregroundStyle(palette.secondaryText.opacity(0.5))
-                    Text("暂无待提醒记录")
-                        .font(.subheadline)
-                        .foregroundStyle(palette.secondaryText)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(pendingDisplayRecords) { record in
-                        PendingNotificationRecordRow(record: record)
+            if isPendingExpanded {
+                if pendingDisplayRecords.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 32))
+                            .foregroundStyle(palette.secondaryText.opacity(0.5))
+                        Text("暂无待提醒记录")
+                            .font(.subheadline)
+                            .foregroundStyle(palette.secondaryText)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(pendingDisplayRecords) { record in
+                            PendingNotificationRecordRow(record: record) {
+                                openClothingDetail(record.clothingID)
+                            }
+                        }
                     }
                 }
             }
@@ -385,71 +402,54 @@ struct DepositNotificationView: View {
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // 标题栏：标题 + 数量 + 操作按钮
-            HStack {
-                Text("已发送提醒")
-                    .font(.headline)
-
-                Spacer()
-
-                // 显示未读/总数
-                HStack(spacing: 4) {
-                    if unreadCount > 0 {
-                        Text("\(unreadCount) 未读")
-                            .font(.caption)
-                            .foregroundStyle(palette.cardAccent)
-                    }
-                    Text("/ \(triggeredRecords.count) 条")
-                        .font(.caption)
-                        .foregroundStyle(palette.secondaryText)
+            sectionHeader(
+                title: "已发送提醒",
+                summary: unreadCount > 0 ? "\(unreadCount) 未读 / \(triggeredRecords.count) 条" : "\(triggeredRecords.count) 条",
+                isExpanded: isHistoryExpanded
+            ) {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    isHistoryExpanded.toggle()
                 }
             }
 
-            // 操作按钮栏
-            if !triggeredRecords.isEmpty {
-                HStack(spacing: 12) {
-                    // 一键已读按钮
-                    if unreadCount > 0 {
-                        Button {
-                            NotificationManager.shared.markAllTriggeredAsRead(modelContext: modelContext)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle")
-                                Text("一键已读")
+            if isHistoryExpanded {
+                if unreadCount > 0 || readCount > 0 {
+                    HStack(spacing: 12) {
+                        if unreadCount > 0 {
+                            largeActionButton(
+                                title: "一键已读",
+                                systemImage: "checkmark.circle.fill",
+                                foreground: .white,
+                                background: palette.accent
+                            ) {
+                                NotificationManager.shared.markAllTriggeredAsRead(modelContext: modelContext)
                             }
-                            .font(.caption)
-                            .foregroundStyle(palette.accent)
                         }
-                    }
 
-                    Spacer()
-
-                    // 一键清除已读按钮
-                    if readCount > 0 {
-                        Button {
-                            showClearReadConfirmation = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                Text("清除已读")
+                        if readCount > 0 {
+                            largeActionButton(
+                                title: "一键清除",
+                                systemImage: "trash.fill",
+                                foreground: palette.secondaryText,
+                                background: palette.secondaryText.opacity(0.16)
+                            ) {
+                                showClearReadConfirmation = true
                             }
-                            .font(.caption)
-                            .foregroundStyle(palette.secondaryText)
                         }
                     }
                 }
-            }
 
-            if triggeredRecords.isEmpty {
-                emptyStateView
-            } else {
-                // 按裙装分组显示
-                let groupedRecords = Dictionary(grouping: triggeredRecords) { $0.clothingName }
-                ForEach(Array(groupedRecords.keys.sorted()), id: \.self) { clothingName in
-                    if let records = groupedRecords[clothingName] {
+                if triggeredRecords.isEmpty {
+                    emptyStateView
+                } else {
+                    ForEach(groupedTriggeredRecords, id: \.record.clothingID) { groupedRecord in
                         TriggeredNotificationCard(
-                            clothingName: clothingName,
-                            records: records.sorted { ($0.actualDate ?? Date()) > ($1.actualDate ?? Date()) }
+                            clothingName: groupedRecord.record.clothingName,
+                            clothingID: groupedRecord.record.clothingID,
+                            records: groupedRecord.records,
+                            onOpenDetail: {
+                                openClothingDetail(groupedRecord.record.clothingID)
+                            }
                         )
                     }
                 }
@@ -516,6 +516,63 @@ struct DepositNotificationView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+
+    private func openClothingDetail(_ clothingID: UUID) {
+        TabNavigationManager.shared.navigateToDepositNotificationClothing(clothingID)
+        dismiss()
+    }
+
+    @ViewBuilder
+    private func largeActionButton(
+        title: String,
+        systemImage: String,
+        foreground: Color,
+        background: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                Text(title)
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func sectionHeader(
+        title: String,
+        summary: String,
+        isExpanded: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(palette.secondaryText)
+
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(palette.secondaryText)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func handleSettingsChange(enabled: Bool) {
@@ -615,11 +672,12 @@ struct DepositNotificationView: View {
 
 struct TriggeredNotificationCard: View {
     let clothingName: String
+    let clothingID: UUID
     let records: [DepositNotificationRecord]
+    let onOpenDetail: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.modelContext) private var modelContext
 
     private var palette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
@@ -629,9 +687,14 @@ struct TriggeredNotificationCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // 裙装名称
             HStack {
-                Text(clothingName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                Button(action: onOpenDetail) {
+                    Text(clothingName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
 
                 Spacer()
 
@@ -643,7 +706,7 @@ struct TriggeredNotificationCard: View {
             // 已发送的提醒列表
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(records) { record in
-                    NotificationRecordRow(record: record)
+                    NotificationRecordRow(record: record, onOpenDetail: onOpenDetail)
                 }
             }
         }
@@ -657,6 +720,7 @@ struct TriggeredNotificationCard: View {
 
 struct NotificationRecordRow: View {
     let record: DepositNotificationRecord
+    let onOpenDetail: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -667,58 +731,59 @@ struct NotificationRecordRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            // 未读指示器
-            if !record.isRead {
-                Circle()
-                    .fill(palette.cardAccent)
-                    .frame(width: 6, height: 6)
-            } else {
-                Circle()
-                    .fill(Color.clear)
-                    .frame(width: 6, height: 6)
-            }
-
-            // 提醒时间
-            VStack(alignment: .leading, spacing: 2) {
-                Text(formatDate(record.scheduledDate))
-                    .font(.subheadline)
-                    .fontWeight(record.isRead ? .regular : .medium)
-
-                HStack(spacing: 4) {
-                    // 来源标记
-                    if record.source == "apple" {
-                        Image(systemName: "apple.logo")
-                            .font(.system(size: 8))
-                    }
-                    Text(formatActualTime(record.actualDate))
-                        .font(.caption)
-                        .foregroundStyle(palette.secondaryText)
+        ReminderSwipeRow(
+            onOpen: {
+                if !record.isRead {
+                    record.markAsRead()
+                    try? modelContext.save()
+                    NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
                 }
+                onOpenDetail()
+            },
+            onDelete: {
+                NotificationManager.shared.deleteRecord(record, modelContext: modelContext)
             }
+) {
+            HStack(spacing: 8) {
+                if !record.isRead {
+                    Circle()
+                        .fill(palette.cardAccent)
+                        .frame(width: 6, height: 6)
+                } else {
+                    Circle()
+                        .fill(Color.clear)
+                        .frame(width: 6, height: 6)
+                }
 
-            Spacer()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(formatDate(record.scheduledDate))
+                        .font(.subheadline)
+                        .fontWeight(record.isRead ? .regular : .medium)
 
-            // 提前天数标签
-            Text(dayText(for: record.daysBefore))
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(record.isRead ? palette.secondaryText.opacity(0.1) : palette.accent.opacity(0.15))
-                .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
-                .clipShape(Capsule())
-        }
-        .padding(8)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground))
-        .cornerRadius(8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // 点击标记为已读
-            if !record.isRead {
-                record.markAsRead()
-                try? modelContext.save()
-                NotificationManager.shared.updateApplicationBadge(modelContext: modelContext)
+                    HStack(spacing: 4) {
+                        if record.source == "apple" {
+                            Image(systemName: "apple.logo")
+                                .font(.system(size: 8))
+                        }
+                        Text(formatActualTime(record.actualDate))
+                            .font(.caption)
+                            .foregroundStyle(palette.secondaryText)
+                    }
+                }
+
+                Spacer()
+
+                Text(dayText(for: record.daysBefore))
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(record.isRead ? palette.secondaryText.opacity(0.1) : palette.accent.opacity(0.15))
+                    .foregroundStyle(record.isRead ? palette.secondaryText : palette.accent)
+                    .clipShape(Capsule())
             }
+            .padding(8)
+            .background(Color(uiColor: .tertiarySystemGroupedBackground))
+            .cornerRadius(8)
         }
     }
 
@@ -750,6 +815,7 @@ struct NotificationRecordRow: View {
 
 struct PendingNotificationRecordRow: View {
     let record: DepositNotificationRecord
+    let onOpenDetail: () -> Void
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -763,40 +829,108 @@ struct PendingNotificationRecordRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(isCapturedOnly ? palette.secondaryText.opacity(0.45) : palette.cardAccent)
-                .frame(width: 6, height: 6)
+        Button(action: onOpenDetail) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(isCapturedOnly ? palette.secondaryText.opacity(0.45) : palette.cardAccent)
+                    .frame(width: 6, height: 6)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(record.clothingName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(record.clothingName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .multilineTextAlignment(.leading)
 
-                Text(formatDate(record.scheduledDate))
+                    Text(formatDate(record.scheduledDate))
+                        .font(.caption)
+                        .foregroundStyle(palette.secondaryText)
+                }
+
+                Spacer()
+
+                Text(isCapturedOnly ? "仅站内" : "系统通知")
                     .font(.caption)
-                    .foregroundStyle(palette.secondaryText)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background((isCapturedOnly ? palette.secondaryText : palette.accent).opacity(0.14))
+                    .foregroundStyle(isCapturedOnly ? palette.secondaryText : palette.accent)
+                    .clipShape(Capsule())
             }
-
-            Spacer()
-
-            Text(isCapturedOnly ? "仅站内" : "系统通知")
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background((isCapturedOnly ? palette.secondaryText : palette.accent).opacity(0.14))
-                .foregroundStyle(isCapturedOnly ? palette.secondaryText : palette.accent)
-                .clipShape(Capsule())
+            .padding(10)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .cornerRadius(10)
         }
-        .padding(10)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(10)
+        .buttonStyle(.plain)
     }
 
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM/dd HH:mm"
         return formatter.string(from: date)
+    }
+}
+
+private struct ReminderSwipeRow<Content: View>: View {
+    let onOpen: () -> Void
+    let onDelete: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @State private var settledOffset: CGFloat = 0
+    @GestureState private var dragOffset: CGFloat = 0
+
+    private let deleteWidth: CGFloat = 92
+
+    private var currentOffset: CGFloat {
+        max(-deleteWidth, min(0, settledOffset + dragOffset))
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Button(role: .destructive) {
+                withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                    settledOffset = 0
+                }
+                onDelete()
+            } label: {
+                VStack(spacing: 6) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 16, weight: .bold))
+                    Text("删除")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(width: deleteWidth)
+                .frame(maxHeight: .infinity)
+                .background(Color.red.opacity(0.88))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+
+            content()
+                .offset(x: currentOffset)
+                .gesture(
+                    DragGesture(minimumDistance: 10)
+                        .updating($dragOffset) { value, state, _ in
+                            let proposed = settledOffset + value.translation.width
+                            state = max(-deleteWidth, min(0, proposed)) - settledOffset
+                        }
+                        .onEnded { value in
+                            let proposed = settledOffset + value.translation.width
+                            withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                                settledOffset = proposed < (-deleteWidth * 0.45) ? -deleteWidth : 0
+                            }
+                        }
+                )
+                .onTapGesture {
+                    if settledOffset != 0 {
+                        withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                            settledOffset = 0
+                        }
+                    } else {
+                        onOpen()
+                    }
+                }
+        }
     }
 }
 
