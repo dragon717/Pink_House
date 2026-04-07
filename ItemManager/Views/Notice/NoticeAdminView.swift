@@ -38,10 +38,12 @@ struct NoticeAdminView: View {
 
     // 编辑模式
     @State private var editingNotice: Notice?
+    @State private var showAdvancedConfig = false
 
     // 提示
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var pendingDeleteNotice: Notice?
 
     // 预览
     @State private var showPreview = false
@@ -82,6 +84,20 @@ struct NoticeAdminView: View {
                 Button("确定", role: .cancel) {}
             } message: {
                 Text(alertMessage)
+            }
+            .alert(
+                "确认删除公告",
+                isPresented: pendingDeleteBinding,
+                presenting: pendingDeleteNotice
+            ) { notice in
+                Button("取消", role: .cancel) {
+                    pendingDeleteNotice = nil
+                }
+                Button("确认删除", role: .destructive) {
+                    performDeleteNotice(notice)
+                }
+            } message: { notice in
+                Text("“\(notice.title)” 会被标记为删除并从“现有公告”列表中隐藏。")
             }
             .overlay {
                 if showPreview, let notice = previewNotice {
@@ -151,22 +167,24 @@ struct NoticeAdminView: View {
     // MARK: - 表单内容
     private var adminForm: some View {
         Form {
-            contentSection
-            deliverySection
-            scheduleSection
-            actionConfigSection
-            prioritySection
-            mediaSection
-            actionSection
+            quickModalSection
+            advancedConfigToggleSection
+            if showAdvancedConfig {
+                advancedSummarySection
+                deliverySection
+                scheduleSection
+                actionConfigSection
+                prioritySection
+                mediaSection
+                actionSection
+            }
             existingNoticesSection
         }
     }
 
-    // MARK: - 公告内容区域
-    private var contentSection: some View {
-        Section("公告内容") {
+    private var quickModalSection: some View {
+        Section(showAdvancedConfig ? "基础内容" : "快捷发弹窗公告") {
             TextField("标题", text: $title)
-            TextField("摘要（列表可选）", text: $summary)
 
             TextEditor(text: $content)
                 .frame(minHeight: 100)
@@ -174,6 +192,60 @@ struct NoticeAdminView: View {
                     placeholderOverlay,
                     alignment: .topLeading
                 )
+
+            quickImagePickerRow
+
+            if hasSelectedImage {
+                imagePreview
+            }
+
+            if !showAdvancedConfig {
+                if editingNotice == nil {
+                    Text("只填标题、正文、内置图片，系统会自动按“已发布 + 弹窗 + 关键”处理。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    quickSubmitButton
+                    quickPreviewButton
+                } else {
+                    Text("当前正在编辑已有公告，下面按钮会按当前配置更新，不会强制改成快捷弹窗。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    submitButton
+                    previewButton
+                    cancelEditButton
+                }
+            }
+        }
+    }
+
+    private var advancedConfigToggleSection: some View {
+        Section {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showAdvancedConfig.toggle()
+                }
+            } label: {
+                HStack {
+                    Text(showAdvancedConfig ? "收起高级配置" : "切换到高级配置")
+                    Spacer()
+                    Image(systemName: showAdvancedConfig ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !showAdvancedConfig {
+                Text("高级配置里可以补摘要、定时、动作、版本范围、优先级和媒体类型。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var advancedSummarySection: some View {
+        Section("详细介绍") {
+            TextField("摘要（列表可选）", text: $summary)
         }
     }
 
@@ -325,6 +397,25 @@ struct NoticeAdminView: View {
         }
     }
 
+    private var quickImagePickerRow: some View {
+        Button {
+            mediaType = .image
+            showBuiltinImagePicker = true
+        } label: {
+            HStack {
+                Text("选择内置图片")
+                Spacer()
+                if hasSelectedImage {
+                    Text(selectedImageName ?? "已选择")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Image(systemName: hasSelectedImage ? "checkmark.circle.fill" : "photo.on.rectangle")
+                    .foregroundStyle(hasSelectedImage ? .green : .secondary)
+            }
+        }
+    }
+
     @ViewBuilder
     private var imagePreview: some View {
         if let imageName = selectedImageName {
@@ -355,7 +446,9 @@ struct NoticeAdminView: View {
     }
 
     private var submitButton: some View {
-        Button(action: submitNotice) {
+        Button {
+            submitNotice(using: .standard)
+        } label: {
             HStack {
                 Spacer()
                 if service.isSyncing {
@@ -371,8 +464,29 @@ struct NoticeAdminView: View {
         .disabled(title.isEmpty || content.isEmpty || service.isSyncing)
     }
 
+    private var quickSubmitButton: some View {
+        Button {
+            submitNotice(using: .quickModal)
+        } label: {
+            HStack {
+                Spacer()
+                if service.isSyncing {
+                    ProgressView()
+                        .tint(.white)
+                        .padding(.trailing, 8)
+                }
+                Text("发布弹窗公告")
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+        }
+        .disabled(title.isEmpty || content.isEmpty || !hasSelectedBuiltinImage || service.isSyncing)
+    }
+
     private var previewButton: some View {
-        Button(action: previewCurrentNotice) {
+        Button {
+            previewCurrentNotice(using: .standard)
+        } label: {
             HStack {
                 Spacer()
                 Text("预览效果")
@@ -381,6 +495,20 @@ struct NoticeAdminView: View {
             }
         }
         .disabled(title.isEmpty || content.isEmpty)
+    }
+
+    private var quickPreviewButton: some View {
+        Button {
+            previewCurrentNotice(using: .quickModal)
+        } label: {
+            HStack {
+                Spacer()
+                Text("预览弹窗效果")
+                    .foregroundStyle(.blue)
+                Spacer()
+            }
+        }
+        .disabled(title.isEmpty || content.isEmpty || !hasSelectedBuiltinImage)
     }
 
     @ViewBuilder
@@ -400,13 +528,14 @@ struct NoticeAdminView: View {
     // MARK: - 现有公告列表区域
     private var existingNoticesSection: some View {
         Section("现有公告") {
-            if service.managedNotices.isEmpty {
+            if visibleManagedNotices.isEmpty {
                 Text("暂无公告")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(service.managedNotices, id: \.id) { notice in
+                ForEach(visibleManagedNotices, id: \.id) { notice in
                     NoticeAdminRow(
                         notice: notice,
+                        sourceDisplay: sourceDisplay(for: notice),
                         onEdit: { startEdit(notice) },
                         onDelete: { deleteNotice(notice) }
                     )
@@ -416,38 +545,49 @@ struct NoticeAdminView: View {
     }
 
     // MARK: - 预览当前公告
-    private func previewCurrentNotice() {
+    private func previewCurrentNotice(using mode: NoticeSubmissionMode) {
         let builtinMediaName = selectedImageName
+        let previewStatus: Notice.Status = mode == .quickModal ? .published : status
+        let previewChannel: Notice.Channel = mode == .quickModal ? .modal : channel
+        let previewSeverity: Notice.Severity = mode == .quickModal ? .critical : severity
+        let previewPriority: Int = mode == .quickModal ? 0 : priority
+        let previewPublishAt: Date? = mode == .quickModal ? nil : (hasPublishAt ? publishAt : nil)
+        let previewStartAt: Date? = mode == .quickModal ? nil : (hasStartAt ? startAt : nil)
+        let previewEndAt: Date? = mode == .quickModal ? nil : (hasEndAt ? endAt : nil)
+        let previewActionType: Notice.ActionType = mode == .quickModal ? .none : actionType
+        let previewActionTarget: String? = mode == .quickModal ? nil : normalizedOptional(actionTarget)
+        let previewActionLabel: String? = mode == .quickModal ? nil : normalizedOptional(actionLabel)
+        let previewMediaType: Notice.MediaType = builtinMediaName != nil ? .image : (mode == .quickModal ? .none : mediaType)
         let tempNotice = Notice(
             title: title,
-            summary: summary.isEmpty ? nil : summary,
+            summary: mode == .quickModal ? nil : normalizedOptional(summary),
             content: content,
             mediaURL: builtinMediaName.map { Notice.builtinMediaURLString(for: $0) },
             builtinMediaName: builtinMediaName,
-            mediaType: selectedImageName != nil ? .image : mediaType,
-            priority: priority,
-            status: status,
-            channel: channel,
-            severity: severity,
-            isPinned: isPinned,
-            requiresAck: requiresAck,
-            isSilent: isSilent,
-            publishAt: hasPublishAt ? publishAt : nil,
-            startAt: hasStartAt ? startAt : nil,
-            endAt: hasEndAt ? endAt : nil,
-            audience: audience,
-            minAppVersion: normalizedOptional(minAppVersion),
-            maxAppVersion: normalizedOptional(maxAppVersion),
-            actionType: actionType,
-            actionTarget: normalizedOptional(actionTarget),
-            actionLabel: normalizedOptional(actionLabel)
+            mediaType: previewMediaType,
+            priority: previewPriority,
+            status: previewStatus,
+            channel: previewChannel,
+            severity: previewSeverity,
+            isPinned: mode == .quickModal ? false : isPinned,
+            requiresAck: mode == .quickModal ? false : requiresAck,
+            isSilent: mode == .quickModal ? false : isSilent,
+            publishAt: previewPublishAt,
+            startAt: previewStartAt,
+            endAt: previewEndAt,
+            audience: mode == .quickModal ? "all" : audience,
+            minAppVersion: mode == .quickModal ? nil : normalizedOptional(minAppVersion),
+            maxAppVersion: mode == .quickModal ? nil : normalizedOptional(maxAppVersion),
+            actionType: previewActionType,
+            actionTarget: previewActionTarget,
+            actionLabel: previewActionLabel
         )
         previewNotice = tempNotice
         showPreview = true
     }
 
     // MARK: - 提交公告
-    private func submitNotice() {
+    private func submitNotice(using mode: NoticeSubmissionMode) {
         Task {
             print("🚀 提交公告...")
             print("   标题: \(title)")
@@ -510,36 +650,54 @@ struct NoticeAdminView: View {
                     actualMediaType = .image
                 } else {
                     mediaURL = nil
-                    actualMediaType = mediaType
+                    actualMediaType = mode == .quickModal ? .none : mediaType
                 }
+
+                let noticeStatus: Notice.Status = mode == .quickModal ? .published : status
+                let noticeChannel: Notice.Channel = mode == .quickModal ? .modal : channel
+                let noticeSeverity: Notice.Severity = mode == .quickModal ? .critical : severity
+                let noticePriority: Int = mode == .quickModal ? 0 : priority
+                let noticeSummary: String? = mode == .quickModal ? nil : normalizedOptional(summary)
+                let noticePublishAt: Date? = mode == .quickModal ? nil : (hasPublishAt ? publishAt : nil)
+                let noticeStartAt: Date? = mode == .quickModal ? nil : (hasStartAt ? startAt : nil)
+                let noticeEndAt: Date? = mode == .quickModal ? nil : (hasEndAt ? endAt : nil)
+                let noticeAudience: String = mode == .quickModal ? "all" : audience
+                let noticeMinAppVersion: String? = mode == .quickModal ? nil : normalizedOptional(minAppVersion)
+                let noticeMaxAppVersion: String? = mode == .quickModal ? nil : normalizedOptional(maxAppVersion)
+                let noticeActionType: Notice.ActionType = mode == .quickModal ? .none : actionType
+                let noticeActionTarget: String? = mode == .quickModal ? nil : normalizedOptional(actionTarget)
+                let noticeActionLabel: String? = mode == .quickModal ? nil : normalizedOptional(actionLabel)
+                let noticePinned = mode == .quickModal ? false : isPinned
+                let noticeRequiresAck = mode == .quickModal ? false : requiresAck
+                let noticeSilent = mode == .quickModal ? false : isSilent
 
                 let notice = await service.createNotice(
                     title: title,
-                    summary: normalizedOptional(summary),
+                    summary: noticeSummary,
                     content: content,
                     mediaURL: mediaURL,
                     builtinMediaName: builtinMediaName,
                     mediaType: actualMediaType,
-                    priority: priority,
-                    status: status,
-                    channel: channel,
-                    severity: severity,
-                    isPinned: isPinned,
-                    requiresAck: requiresAck,
-                    isSilent: isSilent,
-                    publishAt: hasPublishAt ? publishAt : nil,
-                    startAt: hasStartAt ? startAt : nil,
-                    endAt: hasEndAt ? endAt : nil,
-                    audience: audience,
-                    minAppVersion: normalizedOptional(minAppVersion),
-                    maxAppVersion: normalizedOptional(maxAppVersion),
-                    actionType: actionType,
-                    actionTarget: normalizedOptional(actionTarget),
-                    actionLabel: normalizedOptional(actionLabel)
+                    priority: noticePriority,
+                    status: noticeStatus,
+                    channel: noticeChannel,
+                    severity: noticeSeverity,
+                    isPinned: noticePinned,
+                    requiresAck: noticeRequiresAck,
+                    isSilent: noticeSilent,
+                    publishAt: noticePublishAt,
+                    startAt: noticeStartAt,
+                    endAt: noticeEndAt,
+                    audience: noticeAudience,
+                    minAppVersion: noticeMinAppVersion,
+                    maxAppVersion: noticeMaxAppVersion,
+                    actionType: noticeActionType,
+                    actionTarget: noticeActionTarget,
+                    actionLabel: noticeActionLabel
                 )
 
                 if notice != nil {
-                    alertMessage = createSuccessMessage
+                    alertMessage = mode == .quickModal ? "弹窗公告已发布" : createSuccessMessage
                 } else if let error = service.errorMessage {
                     alertMessage = error
                 } else {
@@ -548,7 +706,7 @@ struct NoticeAdminView: View {
             }
 
             showAlert = true
-            if alertMessage == createSuccessMessage || alertMessage == "公告已更新" {
+            if alertMessage == createSuccessMessage || alertMessage == "公告已更新" || alertMessage == "弹窗公告已发布" {
                 resetForm()
             }
         }
@@ -557,6 +715,7 @@ struct NoticeAdminView: View {
     // MARK: - 开始编辑
     private func startEdit(_ notice: Notice) {
         editingNotice = notice
+        showAdvancedConfig = true
         title = notice.title
         summary = notice.summary ?? ""
         content = notice.content
@@ -609,14 +768,24 @@ struct NoticeAdminView: View {
 
     // MARK: - 删除公告
     private func deleteNotice(_ notice: Notice) {
+        pendingDeleteNotice = notice
+    }
+
+    private func performDeleteNotice(_ notice: Notice) {
+        pendingDeleteNotice = nil
         Task {
             await service.deleteNotice(notice)
+            if let error = service.errorMessage {
+                alertMessage = error
+                showAlert = true
+            }
         }
     }
 
     // MARK: - 重置表单
     private func resetForm() {
         editingNotice = nil
+        showAdvancedConfig = false
         title = ""
         summary = ""
         content = ""
@@ -679,6 +848,41 @@ struct NoticeAdminView: View {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    private var hasSelectedImage: Bool {
+        selectedImageName != nil || selectedImageData != nil
+    }
+
+    private var hasSelectedBuiltinImage: Bool {
+        selectedImageName != nil
+    }
+
+    private var visibleManagedNotices: [Notice] {
+        service.managedNotices.filter { $0.status != .archived }
+    }
+
+    private var pendingDeleteBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDeleteNotice != nil },
+            set: { newValue in
+                if !newValue {
+                    pendingDeleteNotice = nil
+                }
+            }
+        )
+    }
+
+    private func sourceDisplay(for notice: Notice) -> NoticeSourceDisplay {
+        if service.wasFetchedFromCloudThisRun(notice) {
+            return NoticeSourceDisplay(text: "本次已从云同步", tint: .green)
+        }
+
+        if notice.recordName != nil {
+            return NoticeSourceDisplay(text: "本地缓存", tint: .orange)
+        }
+
+        return NoticeSourceDisplay(text: "仅本地未同步", tint: .red)
+    }
+
     private func label(for status: Notice.Status) -> String {
         switch status {
         case .draft: return "草稿"
@@ -716,9 +920,20 @@ struct NoticeAdminView: View {
     }
 }
 
+private enum NoticeSubmissionMode {
+    case quickModal
+    case standard
+}
+
+struct NoticeSourceDisplay {
+    let text: String
+    let tint: Color
+}
+
 // MARK: - 公告管理行
 struct NoticeAdminRow: View {
     let notice: Notice
+    let sourceDisplay: NoticeSourceDisplay
     let onEdit: () -> Void
     let onDelete: () -> Void
 
@@ -754,6 +969,14 @@ struct NoticeAdminRow: View {
                         .background(Color.blue.opacity(0.2))
                         .clipShape(Capsule())
                 }
+
+                Text(sourceDisplay.text)
+                    .font(.caption)
+                    .foregroundStyle(sourceDisplay.tint)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(sourceDisplay.tint.opacity(0.14))
+                    .clipShape(Capsule())
 
                 Text(notice.content)
                     .font(.subheadline)

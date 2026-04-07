@@ -267,20 +267,7 @@ class NoticeReadStatusService: ObservableObject {
         
         do {
             // 1. 检查是否有重置记录
-            let resetPredicate = NSPredicate(value: true)
-            let resetQuery = CKQuery(recordType: "NoticeReadStatusReset", predicate: resetPredicate)
-            resetQuery.sortDescriptors = [NSSortDescriptor(key: "resetAt", ascending: false)]
-            
-            let (resetResults, _) = try await database.records(matching: resetQuery, inZoneWith: nil)
-            var cloudResetTime: Date?
-            
-            for (_, result) in resetResults {
-                if case .success(let record) = result,
-                   let resetAt = record["resetAt"] as? Date {
-                    cloudResetTime = resetAt
-                    break // 只取最新的重置时间
-                }
-            }
+            let cloudResetTime = try await fetchLatestResetTimeIfAvailable()
             
             // 2. 获取云端已读状态
             let predicate = NSPredicate(value: true)
@@ -390,6 +377,26 @@ class NoticeReadStatusService: ObservableObject {
             if (cloudSnapshot.lastPresentedAt ?? .distantPast) > (localSnapshot.lastPresentedAt ?? .distantPast) {
                 localStates[key] = cloudSnapshot
             }
+        }
+    }
+
+    private func fetchLatestResetTimeIfAvailable() async throws -> Date? {
+        do {
+            let resetPredicate = NSPredicate(value: true)
+            let resetQuery = CKQuery(recordType: "NoticeReadStatusReset", predicate: resetPredicate)
+            resetQuery.sortDescriptors = [NSSortDescriptor(key: "resetAt", ascending: false)]
+
+            let (resetResults, _) = try await database.records(matching: resetQuery, inZoneWith: nil)
+            for (_, result) in resetResults {
+                if case .success(let record) = result,
+                   let resetAt = record["resetAt"] as? Date {
+                    return resetAt
+                }
+            }
+            return nil
+        } catch let error as CKError where error.code == .unknownItem {
+            print("📢 未配置 NoticeReadStatusReset 记录类型，按无重置记录继续")
+            return nil
         }
     }
 }

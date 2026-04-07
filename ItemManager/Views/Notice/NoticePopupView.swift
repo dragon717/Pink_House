@@ -308,6 +308,7 @@ class NoticePopupManager: ObservableObject {
 
     @Published var currentNotice: Notice?
     @Published var isShowing = false
+    @Published private(set) var isAdminPreviewMode = false
 
     private let readStatusService = NoticeReadStatusService.shared
     private let service = NoticeService.shared
@@ -344,6 +345,13 @@ class NoticePopupManager: ObservableObject {
         readStatusService.markAsPresented(notice)
     }
 
+    func showAdminPreview(_ notice: Notice) {
+        print("📢 以管理员验证模式显示公告弹窗: \(notice.title)")
+        currentNotice = notice
+        isShowing = true
+        isAdminPreviewMode = true
+    }
+
     func tryShowLatestNotice() {
         print("📢 tryShowLatestNotice called, notices count: \(service.notices.count)")
         guard let latestNotice = service.latestEligibleModalNotice() else {
@@ -356,16 +364,22 @@ class NoticePopupManager: ObservableObject {
 
     func dismissCurrentNotice() {
         if let notice = currentNotice {
-            readStatusService.markAsDismissed(notice)
+            if isAdminPreviewMode {
+                print("📢 管理员验证模式关闭公告，不记录已读/展示状态")
+            } else {
+                readStatusService.markAsDismissed(notice)
+            }
         }
         isShowing = false
         currentNotice = nil
+        isAdminPreviewMode = false
     }
 
     // 重置所有展示记录（用于测试）
     func resetShownHistory() {
         readStatusService.resetReadHistory()
         UserDefaults.standard.removeObject(forKey: NoticePopupModifier.lastAttemptedNoticeKey)
+        UserDefaults.standard.removeObject(forKey: NoticePopupModifier.lastAdminPreviewedNoticeKey)
         NotificationCenter.default.post(name: .noticeReadHistoryDidReset, object: nil)
     }
 }
@@ -373,6 +387,7 @@ class NoticePopupManager: ObservableObject {
 // MARK: - 公告弹窗修饰符
 struct NoticePopupModifier: ViewModifier {
     static let lastAttemptedNoticeKey = "lastAttemptedNoticeKey"
+    static let lastAdminPreviewedNoticeKey = "lastAdminPreviewedNoticeKey"
     private static let minimumModalDelay: TimeInterval = 30
 
     @StateObject private var manager = NoticePopupManager.shared
@@ -382,6 +397,8 @@ struct NoticePopupModifier: ViewModifier {
     @State private var hasSyncedReadStatus = false
     @State private var sessionAttemptedNoticeKey: String?
     @State private var firstAppearAt = Date()
+    @State private var isAdminUser = false
+    @State private var hasResolvedAdminState = false
 
     func body(content: Content) -> some View {
         ZStack {
@@ -397,11 +414,16 @@ struct NoticePopupModifier: ViewModifier {
             print("📢 NoticePopupModifier onAppear")
             firstAppearAt = Date()
             service.setup(with: modelContext)
-            syncReadStatus()
+            resolveAdminStateAndBootstrap()
         }
         .onChange(of: service.notices) { _, newNotices in
             print("📢 service.notices changed: count=\(newNotices.count), hasSyncedReadStatus=\(hasSyncedReadStatus), isSyncing=\(service.isSyncing)")
             attemptShowLatestNoticeIfNeeded()
+        }
+        .onChange(of: service.isSyncing) { _, isSyncing in
+            if !isSyncing {
+                attemptShowLatestNoticeIfNeeded()
+            }
         }
         .onChange(of: manager.isShowing) { _, isShowing in
             if isShowing {
@@ -428,15 +450,52 @@ struct NoticePopupModifier: ViewModifier {
         }
     }
 
+    private func resolveAdminStateAndBootstrap() {
+        Task {
+            let isAdmin = await service.isAdmin()
+            await MainActor.run {
+                isAdminUser = isAdmin
+                hasResolvedAdminState = true
+                if isAdmin {
+                    hasSyncedReadStatus = true
+                    print("📢 当前管理员账号，启用公告验证模式（不记录已读/展示状态）")
+                } else {
+                    syncReadStatus()
+                }
+                attemptShowLatestNoticeIfNeeded()
+            }
+        }
+    }
+
     private func attemptShowLatestNoticeIfNeeded() {
-        guard hasSyncedReadStatus, !service.isSyncing else { return }
-        guard Date().timeIntervalSince(firstAppearAt) >= Self.minimumModalDelay else { return }
+        guard hasResolvedAdminState else { return }
+        guard !service.isSyncing else { return }
         guard let latestNotice = service.latestEligibleModalNotice() else { return }
 
         let latestNoticeKey = latestNotice.readTrackingKey
         if sessionAttemptedNoticeKey == latestNoticeKey {
             return
         }
+
+        if isAdminUser {
+            let lastAdminPreviewedNoticeKey = UserDefaults.standard.string(forKey: Self.lastAdminPreviewedNoticeKey)
+            if lastAdminPreviewedNoticeKey == latestNoticeKey {
+                sessionAttemptedNoticeKey = latestNoticeKey
+                print("📢 管理员已验证过当前公告版本，跳过重复弹窗: \(latestNotice.title)")
+                return
+            }
+
+            sessionAttemptedNoticeKey = latestNoticeKey
+            UserDefaults.standard.set(latestNoticeKey, forKey: Self.lastAdminPreviewedNoticeKey)
+            print("📢 管理员命中可验证弹窗: \(latestNotice.title)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                manager.showAdminPreview(latestNotice)
+            }
+            return
+        }
+
+        guard hasSyncedReadStatus else { return }
+        guard Date().timeIntervalSince(firstAppearAt) >= Self.minimumModalDelay else { return }
 
         let lastAttemptedNoticeKey = UserDefaults.standard.string(forKey: Self.lastAttemptedNoticeKey)
         if lastAttemptedNoticeKey == latestNoticeKey, manager.hasShownNotice(latestNotice) {

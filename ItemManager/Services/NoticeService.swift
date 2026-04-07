@@ -59,18 +59,15 @@ class NoticeService: ObservableObject {
         errorMessage = nil
 
         isSyncing = true
-        defer {
-            isSyncing = false
-            // 同步完成后刷新本地列表
-            Task {
-                await fetchNotices()
-            }
-        }
 
         await cloudKitService.syncNotices(with: context)
         if let syncError = cloudKitService.syncError {
             errorMessage = syncError
         }
+
+        // 在结束同步标记前先刷新本地列表，避免弹窗判断拿到旧数据。
+        await fetchNotices()
+        isSyncing = false
     }
 
     func syncIfNeeded(force: Bool = false) async {
@@ -262,6 +259,19 @@ class NoticeService: ObservableObject {
         }
 
         errorMessage = nil
+
+        // 仅本地未同步的公告直接本地删除，避免残留在列表里。
+        if notice.recordName == nil {
+            context.delete(notice)
+            do {
+                try context.save()
+                await fetchNotices()
+            } catch {
+                errorMessage = "删除公告失败: \(error.localizedDescription)"
+            }
+            return
+        }
+
         notice.status = .archived
         notice.archivedAt = Date()
         notice.revision += 1
@@ -275,6 +285,10 @@ class NoticeService: ObservableObject {
             let deactivated = await cloudKitService.deactivateCloudNotice(notice)
             if deactivated {
                 print("✅ 公告已从云端停用")
+            } else if cloudKitService.lastDeleteFailedBecauseMissingRecord {
+                context.delete(notice)
+                try context.save()
+                print("🧹 云端记录缺失，已清理本地缓存公告")
             } else {
                 print("⚠️ 公告本地停用但云端同步失败")
             }
@@ -334,6 +348,10 @@ class NoticeService: ObservableObject {
 
     func latestEligibleModalNotice() -> Notice? {
         notices.first { $0.isEligibleForModal() }
+    }
+
+    func wasFetchedFromCloudThisRun(_ notice: Notice) -> Bool {
+        cloudKitService.lastFetchedNoticeIdentifiers.contains(notice.stableIdentifier)
     }
 
     private func validateNoticeInput(

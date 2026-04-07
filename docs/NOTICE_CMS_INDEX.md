@@ -1,6 +1,6 @@
 # 公告系统文档索引
 
-> 更新时间：2026-04-06  
+> 更新时间：2026-04-07  
 > 用途：汇总 Notice CMS 相关文档，作为产品、研发、测试和上线协同时的统一入口。
 
 ## 1. 总览文档
@@ -60,6 +60,9 @@
 - [NOTICE_CMS_CLOUDKIT_SCHEMA_CHECKLIST.md](/Users/muniao/Library/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/docs/NOTICE_CMS_CLOUDKIT_SCHEMA_CHECKLIST.md)
   说明：CloudKit Schema、索引和环境部署清单
 
+- [NOTICE_CMS_MODAL_DEBUG_CHECKLIST.md](/Users/muniao/Library/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/docs/NOTICE_CMS_MODAL_DEBUG_CHECKLIST.md)
+  说明：当前阶段 `modal` 弹窗专项排查清单
+
 - [NOTICE_CMS_RELEASE_SOP.md](/Users/muniao/Library/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/docs/NOTICE_CMS_RELEASE_SOP.md)
   说明：发布 / 下线 / 回滚 SOP
 
@@ -98,8 +101,9 @@
 
 1. `NOTICE_CMS_TEST_MATRIX.md`
 2. `NOTICE_CMS_CLOUDKIT_SCHEMA_CHECKLIST.md`
-3. `NOTICE_CMS_RELEASE_SOP.md`
-4. `NOTICE_CMS_RELEASE_ACCEPTANCE.md`
+3. `NOTICE_CMS_MODAL_DEBUG_CHECKLIST.md`
+4. `NOTICE_CMS_RELEASE_SOP.md`
+5. `NOTICE_CMS_RELEASE_ACCEPTANCE.md`
 
 ---
 

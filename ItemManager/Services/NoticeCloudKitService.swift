@@ -10,16 +10,75 @@ import Combine
 
 @MainActor
 class NoticeCloudKitService: ObservableObject {
+    private final class RecordPageCollector: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage: [CKRecord] = []
+
+        func append(_ record: CKRecord) {
+            lock.lock()
+            storage.append(record)
+            lock.unlock()
+        }
+
+        var records: [CKRecord] {
+            lock.lock()
+            let snapshot = storage
+            lock.unlock()
+            return snapshot
+        }
+    }
+
     static let shared = NoticeCloudKitService()
 
     private let container = CKContainer(identifier: "iCloud.bugod2.ItemManager")
     private var database: CKDatabase {
         return container.publicCloudDatabase
     }
+    private let noticeDesiredKeys = [
+        "id",
+        "title",
+        "summary",
+        "content",
+        "locale",
+        "mediaType",
+        "status",
+        "channel",
+        "severity",
+        "displayPriority",
+        "priority",
+        "isPinned",
+        "requiresAck",
+        "isSilent",
+        "isActive",
+        "publishAt",
+        "startAt",
+        "endAt",
+        "archivedAt",
+        "audience",
+        "minAppVersion",
+        "maxAppVersion",
+        "actionType",
+        "actionTarget",
+        "actionLabel",
+        "environment",
+        "revision",
+        "createdAt",
+        "updatedAt",
+        "version",
+        "rollbackFrom",
+        "createdBy",
+        "updatedBy",
+        "publishedBy",
+        Notice.builtinMediaNameField,
+        "mediaAsset"
+    ]
 
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: String?
+    @Published private(set) var lastFetchedNoticeIdentifiers: Set<String> = []
+    @Published private(set) var lastFetchSucceeded = false
+    @Published private(set) var lastDeleteFailedBecauseMissingRecord = false
 
     // 管理员 iCloud IDs - 只有这些用户可以发布公告
     private let adminIDs: [String] = [
@@ -58,6 +117,7 @@ class NoticeCloudKitService: ObservableObject {
     func fetchCloudNotices() async -> [Notice] {
         isSyncing = true
         syncError = nil
+        lastFetchSucceeded = false
         defer { isSyncing = false }
 
         do {
@@ -65,6 +125,7 @@ class NoticeCloudKitService: ObservableObject {
             let accountStatus = try await container.accountStatus()
             guard accountStatus == .available else {
                 print("📢 iCloud 账户不可用，状态: \(accountStatus)")
+                lastFetchedNoticeIdentifiers = []
                 return []
             }
             
@@ -75,32 +136,21 @@ class NoticeCloudKitService: ObservableObject {
             print("📢 当前运行环境: Production (发布版)")
             #endif
 
-            let predicate = NSPredicate(value: true)
-            let query = CKQuery(recordType: Notice.recordType, predicate: predicate)
-            query.sortDescriptors = [
-                NSSortDescriptor(key: "isPinned", ascending: false),
-                NSSortDescriptor(key: "severity", ascending: false),
-                NSSortDescriptor(key: "displayPriority", ascending: false),
-                NSSortDescriptor(key: "publishAt", ascending: false),
-                NSSortDescriptor(key: "updatedAt", ascending: false),
-                NSSortDescriptor(key: "createdAt", ascending: false)
-            ]
-
-            let (results, _) = try await database.records(matching: query, inZoneWith: nil)
+            let records = try await fetchNoticeRecordsWithFallback()
 
             var notices: [Notice] = []
-            for (_, result) in results {
-                switch result {
-                case .success(let record):
-                    if let notice = Notice(from: record) {
-                        notices.append(notice)
-                    }
-                case .failure(let error):
-                    print("⚠️ 获取公告记录失败: \(error)")
+            for record in records {
+                if let notice = Notice(from: record) {
+                    notices.append(notice)
+                } else {
+                    print("⚠️ 公告记录缺少必要字段，已跳过: \(record.recordID.recordName)")
                 }
             }
+            notices.sort(by: sortCloudNotices)
 
             lastSyncDate = Date()
+            lastFetchSucceeded = true
+            lastFetchedNoticeIdentifiers = Set(notices.map(\.stableIdentifier))
             print("✅ 成功拉取 \(notices.count) 条云端公告")
             for notice in notices {
                 print("   📋 公告标题: \(notice.title)")
@@ -109,13 +159,141 @@ class NoticeCloudKitService: ObservableObject {
 
         } catch let error as CKError {
             // 处理 CloudKit 特定错误
+            lastFetchedNoticeIdentifiers = []
             handleCloudKitError(error, operation: "拉取公告")
             return []
         } catch {
+            lastFetchedNoticeIdentifiers = []
             syncError = "同步失败: \(error.localizedDescription)"
             print("❌ 拉取云端公告失败: \(error)")
             return []
         }
+    }
+
+    private func fetchNoticeRecordsWithFallback() async throws -> [CKRecord] {
+        do {
+            return try await performNoticeQuery(
+                includeSortDescriptors: true,
+                predicate: NSPredicate(format: "createdAt > %@", Date(timeIntervalSince1970: 0) as NSDate)
+            )
+        } catch let error as CKError where error.code == .invalidArguments {
+            print("⚠️ 公告排序查询失败，降级为业务字段查询 + 本地排序: \(error.localizedDescription)")
+            do {
+                return try await performNoticeQuery(
+                    includeSortDescriptors: false,
+                    predicate: NSPredicate(format: "createdAt > %@", Date(timeIntervalSince1970: 0) as NSDate)
+                )
+            } catch let fallbackError as CKError where fallbackError.code == .invalidArguments {
+                print("⚠️ 公告 createdAt 查询仍失败，尝试切换到 title 查询: \(fallbackError.localizedDescription)")
+                return try await performNoticeQuery(
+                    includeSortDescriptors: false,
+                    predicate: NSPredicate(format: "title != %@", "")
+                )
+            }
+        }
+    }
+
+    private func performNoticeQuery(includeSortDescriptors: Bool, predicate: NSPredicate) async throws -> [CKRecord] {
+        let query = CKQuery(recordType: Notice.recordType, predicate: predicate)
+        if includeSortDescriptors {
+            query.sortDescriptors = [
+                NSSortDescriptor(key: "isPinned", ascending: false),
+                NSSortDescriptor(key: "severity", ascending: false),
+                NSSortDescriptor(key: "displayPriority", ascending: false),
+                NSSortDescriptor(key: "publishAt", ascending: false),
+                NSSortDescriptor(key: "updatedAt", ascending: false),
+                NSSortDescriptor(key: "createdAt", ascending: false)
+            ]
+        }
+
+        return try await fetchAllRecords(query: query)
+    }
+
+    private func fetchAllRecords(query: CKQuery) async throws -> [CKRecord] {
+        var collected: [CKRecord] = []
+        var cursor: CKQueryOperation.Cursor?
+
+        repeat {
+            let page = try await fetchRecordPage(query: cursor == nil ? query : nil, cursor: cursor)
+            collected.append(contentsOf: page.records)
+            cursor = page.cursor
+        } while cursor != nil
+
+        return collected
+    }
+
+    private func fetchRecordPage(
+        query: CKQuery?,
+        cursor: CKQueryOperation.Cursor?
+    ) async throws -> (records: [CKRecord], cursor: CKQueryOperation.Cursor?) {
+        try await withCheckedThrowingContinuation { continuation in
+            let collector = RecordPageCollector()
+            let operation: CKQueryOperation
+            if let cursor {
+                operation = CKQueryOperation(cursor: cursor)
+            } else if let query {
+                operation = CKQueryOperation(query: query)
+            } else {
+                continuation.resume(throwing: NSError(
+                    domain: "NoticeCloudKitService",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "公告查询参数无效"]
+                ))
+                return
+            }
+
+            operation.desiredKeys = noticeDesiredKeys
+            operation.resultsLimit = CKQueryOperation.maximumResults
+            operation.recordMatchedBlock = { _, result in
+                switch result {
+                case .success(let record):
+                    collector.append(record)
+                case .failure(let error):
+                    print("⚠️ 获取公告记录失败: \(error)")
+                }
+            }
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success(let nextCursor):
+                    continuation.resume(returning: (collector.records, nextCursor))
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            database.add(operation)
+        }
+    }
+
+    private func sortCloudNotices(_ lhs: Notice, _ rhs: Notice) -> Bool {
+        if lhs.isPinned != rhs.isPinned {
+            return lhs.isPinned && !rhs.isPinned
+        }
+
+        let severityOrder: [Notice.Severity: Int] = [
+            .critical: 3,
+            .important: 2,
+            .info: 1
+        ]
+        let lhsSeverity = severityOrder[lhs.severity] ?? 0
+        let rhsSeverity = severityOrder[rhs.severity] ?? 0
+        if lhsSeverity != rhsSeverity {
+            return lhsSeverity > rhsSeverity
+        }
+
+        if lhs.displayPriority != rhs.displayPriority {
+            return lhs.displayPriority > rhs.displayPriority
+        }
+
+        if lhs.effectivePublishAt != rhs.effectivePublishAt {
+            return lhs.effectivePublishAt > rhs.effectivePublishAt
+        }
+
+        if lhs.updatedAt != rhs.updatedAt {
+            return lhs.updatedAt > rhs.updatedAt
+        }
+
+        return lhs.createdAt > rhs.createdAt
     }
     
     // MARK: - 处理 CloudKit 错误
@@ -251,6 +429,7 @@ class NoticeCloudKitService: ObservableObject {
 
         isSyncing = true
         syncError = nil
+        lastDeleteFailedBecauseMissingRecord = false
         defer { isSyncing = false }
 
         do {
@@ -266,6 +445,11 @@ class NoticeCloudKitService: ObservableObject {
             print("✅ 公告已停用: \(notice.title)")
             return true
 
+        } catch let error as CKError where error.code == .unknownItem {
+            lastDeleteFailedBecauseMissingRecord = true
+            syncError = "删除失败: 云端记录不存在"
+            print("⚠️ 云端公告记录不存在，视为陈旧本地缓存: \(notice.title)")
+            return false
         } catch {
             syncError = "删除失败: \(error.localizedDescription)"
             print("❌ 停用公告失败: \(error)")
@@ -279,6 +463,10 @@ class NoticeCloudKitService: ObservableObject {
 
         // 1. 拉取云端公告
         let cloudNotices = await fetchCloudNotices()
+        guard lastFetchSucceeded else {
+            print("⚠️ 本次云端公告拉取失败，跳过本地合并，保留现有缓存")
+            return
+        }
 
         // 2. 获取本地公告
         let localDescriptor = FetchDescriptor<Notice>(
@@ -317,12 +505,26 @@ class NoticeCloudKitService: ObservableObject {
         for cloudNotice in cloudNotices {
             if let recordName = cloudNotice.recordName,
                let localNotice = localDict[recordName] {
-                // 更新本地公告
-                updateLocalNotice(localNotice, from: cloudNotice)
+                if shouldPreserveLocalArchivedNotice(localNotice, over: cloudNotice) {
+                    print("🛡️ 保留本地删除状态，暂不使用云端旧版本覆盖: \(localNotice.title)")
+                } else {
+                    // 更新本地公告
+                    updateLocalNotice(localNotice, from: cloudNotice)
+                }
             } else {
                 // 插入新公告
                 context.insert(cloudNotice)
             }
+        }
+
+        let cloudRecordNames = Set(cloudNotices.compactMap(\.recordName))
+        let staleCloudCaches = localNotices.filter { notice in
+            guard let recordName = notice.recordName else { return false }
+            return !cloudRecordNames.contains(recordName)
+        }
+        for staleNotice in staleCloudCaches {
+            print("🧹 清理已不在云端的本地缓存公告: \(staleNotice.title)")
+            context.delete(staleNotice)
         }
 
         // 保存上下文
@@ -374,6 +576,12 @@ class NoticeCloudKitService: ObservableObject {
         local.updatedBy = cloud.updatedBy
         local.publishedBy = cloud.publishedBy
         local.normalizeLegacyFields()
+    }
+
+    private func shouldPreserveLocalArchivedNotice(_ local: Notice, over cloud: Notice) -> Bool {
+        guard local.status == .archived else { return false }
+        guard cloud.status != .archived else { return false }
+        return local.updatedAt >= cloud.updatedAt
     }
 
     private func applyNotice(_ notice: Notice, to record: CKRecord) {
