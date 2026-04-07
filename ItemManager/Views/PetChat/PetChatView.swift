@@ -411,6 +411,16 @@ struct PetChatView: View {
                             .transition(.opacity)
                             .zIndex(110)
                     }
+
+                    if let prompt = adoptionViewModel.presentedFundingPrompt {
+                        PetShopFundingPromptOverlay(
+                            prompt: prompt,
+                            onDismiss: { adoptionViewModel.dismissFundingPrompt() },
+                            onPrimaryAction: handleFundingPromptPrimaryAction
+                        )
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        .zIndex(115)
+                    }
                 }
             }
             .overlay(alignment: .top) {
@@ -469,6 +479,7 @@ struct PetChatView: View {
                 showingPurchaseSuccessToast = false
                 broadcastFloatingPetOverlayState(false)
             }
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: adoptionViewModel.presentedFundingPrompt?.id)
             .onChange(of: messages.count) { _, _ in
                 PetChatTranscriptStore.save(messages: messages)
             }
@@ -1604,6 +1615,38 @@ struct PetChatView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: hideWorkItem)
     }
 
+    private func canAffordShopItem(_ item: PetItemDefinition) -> Bool {
+        let status = PetDataManager.shared.status
+        let finalPrice = VIPManager.shared.petShopPrice(for: item.price)
+        switch item.petCurrency {
+        case .meowCoin:
+            return status.meowCoin >= finalPrice
+        case .fishCoin:
+            return status.fishCoin >= finalPrice
+        case .boneCoin:
+            return status.boneCoin >= finalPrice
+        }
+    }
+
+    private func presentFundingPromptIfNeeded(for itemId: String) {
+        guard let item = PetConfigManager.shared.getItem(byId: itemId) else { return }
+        guard !canAffordShopItem(item) else { return }
+        adoptionViewModel.presentFundingPrompt(for: item.petCurrency, itemName: item.name)
+    }
+
+    private func handleFundingPromptPrimaryAction() {
+        guard let destination = adoptionViewModel.presentedFundingPrompt?.destination else { return }
+        adoptionViewModel.dismissFundingPrompt()
+
+        switch destination {
+        case .meowCoinStore:
+            showingMeowCoinStore = true
+        case .currencyExchange(let direction):
+            preferredExchangeDirection = direction
+            showingCurrencyExchangeSheet = true
+        }
+    }
+
     private func handleWidgetAction(_ option: PetWidgetOption, messageID: UUID) {
         if handleInlineYarnBallShortcut(option, messageID: messageID) {
             return
@@ -1700,6 +1743,7 @@ struct PetChatView: View {
                 refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("buy_item:") {
                 let rawId = String(option.command.dropFirst("buy_item:".count))
+                presentFundingPromptIfNeeded(for: rawId)
                 let beforeCount = PetDataManager.shared.status.inventory[rawId, default: 0]
                 let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: false)
                 let afterCount = PetDataManager.shared.status.inventory[rawId, default: 0]
@@ -1713,6 +1757,7 @@ struct PetChatView: View {
                 refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("drag_shop_item:") {
                 let rawId = String(option.command.dropFirst("drag_shop_item:".count))
+                presentFundingPromptIfNeeded(for: rawId)
                 let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
                 if let animation = result.feedAnimation {
                     triggerFeedAnimation(animation)
@@ -1727,6 +1772,7 @@ struct PetChatView: View {
                 refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("shop:") {
                 let rawId = String(option.command.dropFirst("shop:".count))
+                presentFundingPromptIfNeeded(for: rawId)
                 let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
                 if let animation = result.feedAnimation {
                     triggerFeedAnimation(animation)

@@ -1281,6 +1281,10 @@ class PetViewModel: ObservableObject {
         presentedFundingPrompt = makeFundingPrompt(for: currency, itemName: itemName)
     }
 
+    func presentFundingPrompt(for currency: PetCurrency, itemName: String) {
+        presentShopFundingPrompt(for: currency, itemName: itemName)
+    }
+
     private func presentFundingFlow(for currency: PetCurrency) {
         presentedFundingPrompt = nil
         switch currency {

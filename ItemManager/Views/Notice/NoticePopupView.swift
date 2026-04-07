@@ -495,16 +495,28 @@ struct NoticePopupModifier: ViewModifier {
         }
 
         guard hasSyncedReadStatus else { return }
-        guard Date().timeIntervalSince(firstAppearAt) >= Self.minimumModalDelay else { return }
+
+        let wasFetchedFromCloudThisRun = service.wasFetchedFromCloudThisRun(latestNotice)
+        let hasShownBefore = manager.hasShownNotice(latestNotice)
+        let shouldBypassMinimumDelay = wasFetchedFromCloudThisRun && !hasShownBefore
+
+        if !shouldBypassMinimumDelay,
+           Date().timeIntervalSince(firstAppearAt) < Self.minimumModalDelay {
+            return
+        }
 
         let lastAttemptedNoticeKey = UserDefaults.standard.string(forKey: Self.lastAttemptedNoticeKey)
-        if lastAttemptedNoticeKey == latestNoticeKey, manager.hasShownNotice(latestNotice) {
+        if lastAttemptedNoticeKey == latestNoticeKey, hasShownBefore {
             sessionAttemptedNoticeKey = latestNoticeKey
             return
         }
 
         sessionAttemptedNoticeKey = latestNoticeKey
         UserDefaults.standard.set(latestNoticeKey, forKey: Self.lastAttemptedNoticeKey)
+
+        if shouldBypassMinimumDelay {
+            print("📢 普通用户命中新同步公告，跳过冷启动延迟: \(latestNotice.title)")
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             manager.tryShowNotice(latestNotice)

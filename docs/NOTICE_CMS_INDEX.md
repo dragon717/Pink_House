@@ -63,6 +63,9 @@
 - [NOTICE_CMS_MODAL_DEBUG_CHECKLIST.md](/Users/muniao/Library/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/docs/NOTICE_CMS_MODAL_DEBUG_CHECKLIST.md)
   说明：当前阶段 `modal` 弹窗专项排查清单
 
+- [NOTICE_CMS_RUNTIME_BEST_PRACTICES.md](/Users/muniao/Library%20/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/docs/NOTICE_CMS_RUNTIME_BEST_PRACTICES.md)
+  说明：当前公告运行链路、问题定位思路与最佳实践沉淀
+
 - [NOTICE_CMS_RELEASE_SOP.md](/Users/muniao/Library/Mobile%20Documents/com~apple~CloudDocs/游戏/github/Pink_House/docs/NOTICE_CMS_RELEASE_SOP.md)
   说明：发布 / 下线 / 回滚 SOP
 

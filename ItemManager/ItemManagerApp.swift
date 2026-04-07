@@ -105,6 +105,8 @@ struct ItemManagerApp: App {
 
 // 主内容视图，处理启动逻辑
 struct MainContentView: View {
+    private static let lastAutoShownDailyCheckInDateKey = "dailyCheckIn.lastAutoShownDate"
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSplash = true
@@ -368,15 +370,31 @@ struct MainContentView: View {
     // MARK: - 检查并显示每日打卡
     private func checkAndShowDailyCheckIn() {
         guard !showDailyCheckIn else { return }
+        guard !hasAutoShownDailyCheckInToday() else { return }
 
         // 检查今天是否已经打卡
         if !DailyCheckInManager.shared.hasCheckedInToday {
             // 延迟一点显示，让主界面先加载完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 guard !showDailyCheckIn, !DailyCheckInManager.shared.hasCheckedInToday else { return }
+                guard !hasAutoShownDailyCheckInToday() else { return }
+                markDailyCheckInAutoShownToday()
                 showDailyCheckIn = true
             }
         }
+    }
+
+    private func hasAutoShownDailyCheckInToday() -> Bool {
+        guard let lastShownDate = UserDefaults.standard.object(
+            forKey: Self.lastAutoShownDailyCheckInDateKey
+        ) as? Date else {
+            return false
+        }
+        return Calendar.current.isDateInToday(lastShownDate)
+    }
+
+    private func markDailyCheckInAutoShownToday() {
+        UserDefaults.standard.set(Date(), forKey: Self.lastAutoShownDailyCheckInDateKey)
     }
 }
 

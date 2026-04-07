@@ -11,6 +11,24 @@ import Combine
 class NoticeReadStatusService: ObservableObject {
     static let shared = NoticeReadStatusService()
 
+    private final class RecordPageCollector: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage: [CKRecord] = []
+
+        func append(_ record: CKRecord) {
+            lock.lock()
+            storage.append(record)
+            lock.unlock()
+        }
+
+        var records: [CKRecord] {
+            lock.lock()
+            let snapshot = storage
+            lock.unlock()
+            return snapshot
+        }
+    }
+
     enum UserState: String, Codable {
         case unseen
         case read
@@ -46,6 +64,17 @@ class NoticeReadStatusService: ObservableObject {
     private let noticeStatesKey = "noticeUserStates"
     private let lastResetTimeKey = "noticeLastResetTime"
     private let lastSyncTimeKey = "noticeReadStatusLastSync"
+    private let readStatusDesiredKeys = [
+        "readKey",
+        "noticeID",
+        "state",
+        "readAt",
+        "acknowledgedAt",
+        "dismissedAt",
+        "presentationCount",
+        "lastPresentedAt",
+        "title"
+    ]
     
     private init() {
         // 从 UserDefaults 加载本地数据
@@ -229,15 +258,11 @@ class NoticeReadStatusService: ObservableObject {
         
         do {
             // 删除所有已读状态记录
-            let predicate = NSPredicate(value: true)
-            let query = CKQuery(recordType: "NoticeReadStatus", predicate: predicate)
-            
-            let (results, _) = try await database.records(matching: query, inZoneWith: nil)
-            
-            for (_, result) in results {
-                if case .success(let record) = result {
-                    try await database.deleteRecord(withID: record.recordID)
-                }
+            let query = CKQuery(recordType: "NoticeReadStatus", predicate: NSPredicate(value: true))
+            let records = try await fetchAllRecords(query: query, desiredKeys: [])
+
+            for record in records {
+                try await database.deleteRecord(withID: record.recordID)
             }
             
             // 创建重置标记记录
@@ -270,38 +295,30 @@ class NoticeReadStatusService: ObservableObject {
             let cloudResetTime = try await fetchLatestResetTimeIfAvailable()
             
             // 2. 获取云端已读状态
-            let predicate = NSPredicate(value: true)
-            let query = CKQuery(recordType: "NoticeReadStatus", predicate: predicate)
-            query.sortDescriptors = [NSSortDescriptor(key: "readAt", ascending: false)]
-            
-            let (results, _) = try await database.records(matching: query, inZoneWith: nil)
+            let query = CKQuery(recordType: "NoticeReadStatus", predicate: NSPredicate(value: true))
+            let records = try await fetchAllRecords(query: query, desiredKeys: readStatusDesiredKeys)
             
             var cloudReadStatus: Set<String> = []
             var cloudStates: [String: StateSnapshot] = [:]
-            for (_, result) in results {
-                if case .success(let record) = result {
-                    if let readKey = record["readKey"] as? String {
-                        cloudReadStatus.insert(readKey)
-                    }
-                    if let noticeID = record["noticeID"] as? String {
-                        cloudReadStatus.insert(noticeID)
-                    }
-                    if let recordName = record["recordName"] as? String {
-                        cloudReadStatus.insert(recordName)
-                    }
-
-                    let key = (record["recordName"] as? String) ?? (record["noticeID"] as? String) ?? record.recordID.recordName
-                    let stateRaw = record["state"] as? String
-                    let snapshot = StateSnapshot(
-                        state: UserState(rawValue: stateRaw ?? "") ?? .read,
-                        readAt: record["readAt"] as? Date,
-                        acknowledgedAt: record["acknowledgedAt"] as? Date,
-                        dismissedAt: record["dismissedAt"] as? Date,
-                        presentationCount: record["presentationCount"] as? Int ?? 0,
-                        lastPresentedAt: record["lastPresentedAt"] as? Date
-                    )
-                    cloudStates[key] = snapshot
+            for record in records {
+                if let readKey = record["readKey"] as? String {
+                    cloudReadStatus.insert(readKey)
                 }
+                if let noticeID = record["noticeID"] as? String {
+                    cloudReadStatus.insert(noticeID)
+                }
+
+                let key = stateKey(from: record)
+                let stateRaw = record["state"] as? String
+                let snapshot = StateSnapshot(
+                    state: UserState(rawValue: stateRaw ?? "") ?? .read,
+                    readAt: record["readAt"] as? Date,
+                    acknowledgedAt: record["acknowledgedAt"] as? Date,
+                    dismissedAt: record["dismissedAt"] as? Date,
+                    presentationCount: record["presentationCount"] as? Int ?? 0,
+                    lastPresentedAt: record["lastPresentedAt"] as? Date
+                )
+                cloudStates[key] = snapshot
             }
             
             // 3. 合并本地和云端数据
@@ -382,14 +399,15 @@ class NoticeReadStatusService: ObservableObject {
 
     private func fetchLatestResetTimeIfAvailable() async throws -> Date? {
         do {
-            let resetPredicate = NSPredicate(value: true)
-            let resetQuery = CKQuery(recordType: "NoticeReadStatusReset", predicate: resetPredicate)
-            resetQuery.sortDescriptors = [NSSortDescriptor(key: "resetAt", ascending: false)]
-
-            let (resetResults, _) = try await database.records(matching: resetQuery, inZoneWith: nil)
-            for (_, result) in resetResults {
-                if case .success(let record) = result,
-                   let resetAt = record["resetAt"] as? Date {
+            let resetQuery = CKQuery(recordType: "NoticeReadStatusReset", predicate: NSPredicate(value: true))
+            let resetRecords = try await fetchAllRecords(query: resetQuery, desiredKeys: ["resetAt"])
+                .sorted { lhs, rhs in
+                    let lhsDate = lhs["resetAt"] as? Date ?? .distantPast
+                    let rhsDate = rhs["resetAt"] as? Date ?? .distantPast
+                    return lhsDate > rhsDate
+                }
+            for record in resetRecords {
+                if let resetAt = record["resetAt"] as? Date {
                     return resetAt
                 }
             }
@@ -397,6 +415,80 @@ class NoticeReadStatusService: ObservableObject {
         } catch let error as CKError where error.code == .unknownItem {
             print("📢 未配置 NoticeReadStatusReset 记录类型，按无重置记录继续")
             return nil
+        }
+    }
+
+    private func stateKey(from record: CKRecord) -> String {
+        let prefix = "NoticeReadStatus_"
+        if record.recordID.recordName.hasPrefix(prefix) {
+            return String(record.recordID.recordName.dropFirst(prefix.count))
+        }
+
+        if let noticeID = record["noticeID"] as? String, !noticeID.isEmpty {
+            return noticeID
+        }
+
+        return record.recordID.recordName
+    }
+
+    private func fetchAllRecords(query: CKQuery, desiredKeys: [String]? = nil) async throws -> [CKRecord] {
+        var collected: [CKRecord] = []
+        var cursor: CKQueryOperation.Cursor?
+
+        repeat {
+            let page = try await fetchRecordPage(
+                query: cursor == nil ? query : nil,
+                cursor: cursor,
+                desiredKeys: desiredKeys
+            )
+            collected.append(contentsOf: page.records)
+            cursor = page.cursor
+        } while cursor != nil
+
+        return collected
+    }
+
+    private func fetchRecordPage(
+        query: CKQuery?,
+        cursor: CKQueryOperation.Cursor?,
+        desiredKeys: [String]? = nil
+    ) async throws -> (records: [CKRecord], cursor: CKQueryOperation.Cursor?) {
+        try await withCheckedThrowingContinuation { continuation in
+            let collector = RecordPageCollector()
+            let operation: CKQueryOperation
+            if let cursor {
+                operation = CKQueryOperation(cursor: cursor)
+            } else if let query {
+                operation = CKQueryOperation(query: query)
+            } else {
+                continuation.resume(throwing: NSError(
+                    domain: "NoticeReadStatusService",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "已读状态查询参数无效"]
+                ))
+                return
+            }
+
+            operation.desiredKeys = desiredKeys
+            operation.resultsLimit = CKQueryOperation.maximumResults
+            operation.recordMatchedBlock = { _, result in
+                switch result {
+                case .success(let record):
+                    collector.append(record)
+                case .failure(let error):
+                    print("⚠️ 获取已读状态记录失败: \(error)")
+                }
+            }
+            operation.queryResultBlock = { result in
+                switch result {
+                case .success(let nextCursor):
+                    continuation.resume(returning: (collector.records, nextCursor))
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            database.add(operation)
         }
     }
 }
