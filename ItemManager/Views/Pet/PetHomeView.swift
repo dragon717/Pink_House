@@ -224,7 +224,7 @@ struct PetHomeView: View {
                         MeowCoinStoreView()
                     case .currencyExchange(let preferredDirection):
                         PetCurrencyExchangeSheet(preferredDirection: preferredDirection)
-                            .presentationDetents([.medium])
+                            .presentationDetents([.medium, .large])
                     }
                 }
                 .sheet(isPresented: $showJobSelection) {

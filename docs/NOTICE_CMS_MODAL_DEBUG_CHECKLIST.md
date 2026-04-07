@@ -212,6 +212,12 @@
 2. 杀端后重启，也要等首屏稳定后再评估
 3. 管理员为验证发布结果，可在同步完成后立即验证一次
 
+补充：
+
+1. 普通用户若命中“本次新同步到的新 `modal` 公告，且当前版本此前未展示过”，也可以跳过这 30 秒延迟
+2. 若本次展示是为了承接这条新同步公告，也可同时跳过“今日全局 modal 次数上限”
+3. 这两个放行只针对“新同步且当前版本未展示过”的公告，不是给所有普通用户公告统一开绿灯
+
 ### D2. 回前台规则
 
 回前台时应按这个顺序：
@@ -256,30 +262,52 @@
 
 当前用户状态会直接影响 modal：
 
-1. `read` 不再弹
-2. `acknowledged` 不再弹
-3. `dismissed` 不再弹
-4. 同公告 `presentationCount >= 1` 不再弹
+1. 当前版本已 `read`，不再弹
+2. 当前版本已 `acknowledged`，不再弹
+3. 当前版本已 `dismissed`，不再弹
+4. 当前版本 `presentationCount >= 1`，不再弹
 5. 当日已达 modal 上限，不再弹
+
+注意：
+
+1. 这里说的“当前版本”，不是只看公告 `id`
+2. 必须结合当前版本对应的 `readTrackingKey / snapshot` 判断
+3. 旧版本的 `dismissed / presentationCount` 不能默认直接拦截新版本
 
 ### E1. 重点检查项
 
 1. `state`
 2. `presentationCount`
 3. `lastPresentedAt`
-4. 当日是否已有其他 modal 展示
+4. `readTrackingKey` 是否已切到当前版本
+5. 当前命中的 snapshot 是否真属于当前公告版本
+6. 当日是否已有其他 modal 展示
 
 ### E2. 常见误判
 
 1. 用户以为“我没看到”，但实际上已进入 `dismissed`
 2. 同公告昨天弹过并被记录，今天仍因节流规则不再弹
 3. 旧已读 key 被兼容命中，导致公告直接视为已读
-4. 管理员验证过一次后，误以为再次杀端也应该继续自动弹
+4. 旧版本 `dismissed / presentationCount` 误伤了新版本，表现为“云端已拉到，但就是不弹”
+5. 管理员验证过一次后，误以为再次杀端也应该继续自动弹
 
 补充：
 
 1. 管理员验证模式不污染用户状态
 2. 但会记录“本条公告版本已完成管理员验证”，用于避免每次启动重复弹
+
+### E3. 新日志怎么直接对位
+
+如果已经进入 `tryShowNotice`，优先看下面几条日志：
+
+1. `公告不满足 modal 基础规则`
+   - 说明问题还在公告字段本身，例如 `status / severity / channel / 时间窗 / 版本范围`
+2. `公告因用户状态被拦截`
+   - 说明当前版本命中了 `read / acknowledged / dismissed`
+3. `公告因当前版本已展示过被拦截`
+   - 说明当前版本的 `presentationCount` 或展示快照已经命中
+4. `公告因今日全局弹窗次数上限被拦截`
+   - 说明本次不是“新同步且允许放行”的场景，或放行参数没有走通
 
 ---
 
@@ -312,6 +340,12 @@
 3. D 段是否仍在 30 秒窗口内
 4. E 段是否已被标记为 `dismissed/read`
 
+补充：
+
+1. 若日志已出现“本次新同步公告，跳过冷启动延迟”，则不要再把问题先归因到 30 秒窗口
+2. 这时应优先查该公告是否真的命中 `latestEligibleModalNotice()`
+3. 若随后已进入 `tryShowNotice`，就直接根据 E3 的精细日志判断是“字段不合法”“用户状态拦截”“当前版本已展示”还是“全局次数上限”
+
 ### 9.2 管理页能看到公告，但用户侧不弹
 
 优先排查：
@@ -337,22 +371,34 @@
 2. 相关 Schema 是否只在 Development 存在
 3. 文档里的 `NoticeUserState` 与代码里的 record type 是否已统一
 
+### 9.5 日志出现 `recordName is not marked queryable`
+
+优先排查：
+
+1. 是不是 `NoticeReadStatus` 私有状态同步在依赖 `recordName` 查询
+2. 当前实现是否仍在使用 `database.records(matching:)` 直接查整表
+3. 是否已改成 `CKQueryOperation + desiredKeys + 本地映射 state key`
+
 ---
 
 ## 10. 当前阶段执行 TODO
 
 ### P0 阻塞项
 
-- [ ] 定位并修复 `拉取公告 失败: 参数无效`
-- [ ] 核对 `Notice` 查询排序字段与 Dashboard 索引配置
-- [ ] 补齐 Development 环境缺失的公告相关 Record Type / 字段 / 索引
-- [ ] 验证合法 `critical + modal` 公告可在规则命中时展示
-- [ ] 验证 modal 到详情、详情到 `read / acknowledged` 的状态闭环
+- [x] 将公告主数据查询改为“排序失败降级 + 本地排序”
+- [x] 为管理页现有公告增加来源标记
+- [x] 管理员验证模式改为“不污染已读状态，且同版本只验证一次”
+- [x] 普通用户新同步公告支持跳过固定冷启动延迟
+- [x] 普通用户新同步且当前版本未展示过的公告，可按需跳过当日全局 modal 次数上限
+- [x] 已读 / dismissed / 展示次数判断改为优先绑定当前公告版本，避免旧版本状态误伤新版本
+- [ ] 持续核对 `Notice` 查询排序字段与 Dashboard 索引配置
+- [ ] 持续验证合法 `critical + modal` 公告可在规则命中时展示
+- [ ] 持续验证 modal 到详情、详情到 `read / acknowledged` 的状态闭环
 
 ### P1 非阻塞但应尽快补齐
 
-- [ ] 核对 `NoticeReadStatus` 与 `NoticeReadStatusReset` 的 Private DB Schema
-- [ ] 明确诊断页中“现有公告”是否需要标记来源
+- [x] `NoticeReadStatus` 拉取改为 `CKQueryOperation`，避开 `recordName` 查询依赖
+- [ ] 持续核对 `NoticeReadStatus` 与 `NoticeReadStatusReset` 的 Private DB Schema
 - [ ] 在诊断文档中统一 `NoticeUserState` 与当前代码 record type 名称
 - [ ] 为 banner 接入前预留互斥验证项
 

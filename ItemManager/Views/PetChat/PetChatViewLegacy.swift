@@ -240,7 +240,7 @@ struct PetChatViewLegacy: View {
             }
             .sheet(isPresented: $showingCurrencyExchangeSheet) {
                 PetCurrencyExchangeSheet(preferredDirection: preferredExchangeDirection)
-                    .presentationDetents([.medium])
+                    .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showingInitialAdoptionSheet) {
                 NavigationStack {

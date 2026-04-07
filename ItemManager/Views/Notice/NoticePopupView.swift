@@ -328,13 +328,25 @@ class NoticePopupManager: ObservableObject {
         return hasShown
     }
 
-    func canShowNotice(_ notice: Notice) -> Bool {
-        readStatusService.shouldShowModal(for: notice)
+    func canShowNotice(
+        _ notice: Notice,
+        bypassDailyPresentationLimit: Bool = false
+    ) -> Bool {
+        readStatusService.shouldShowModal(
+            for: notice,
+            bypassDailyPresentationLimit: bypassDailyPresentationLimit
+        )
     }
 
-    func tryShowNotice(_ notice: Notice) {
+    func tryShowNotice(
+        _ notice: Notice,
+        bypassDailyPresentationLimit: Bool = false
+    ) {
         print("📢 tryShowNotice called for: \(notice.title)")
-        guard canShowNotice(notice) else {
+        guard canShowNotice(
+            notice,
+            bypassDailyPresentationLimit: bypassDailyPresentationLimit
+        ) else {
             print("📢 公告不满足弹窗条件，跳过")
             return
         }
@@ -519,7 +531,10 @@ struct NoticePopupModifier: ViewModifier {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            manager.tryShowNotice(latestNotice)
+            manager.tryShowNotice(
+                latestNotice,
+                bypassDailyPresentationLimit: shouldBypassMinimumDelay
+            )
         }
     }
 }

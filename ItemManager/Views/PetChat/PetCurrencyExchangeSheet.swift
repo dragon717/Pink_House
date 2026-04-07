@@ -19,111 +19,168 @@ struct PetCurrencyExchangeSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                VStack(spacing: 8) {
-                    Text("货币兑换")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text(exchangeRateDescription)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 20)
+            GeometryReader { geometry in
+                let layout = ExchangeSheetLayout(containerWidth: geometry.size.width)
 
-                Picker("兑换方向", selection: $direction) {
-                    ForEach(PetCurrencyExchangeDirection.allCases) { item in
-                        Text(item.title).tag(item)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 20)
-
-                HStack(spacing: 20) {
-                    currencyBadge(for: direction.sourceCurrency)
-                    Image(systemName: "arrow.right")
-                        .font(.title3)
-                        .foregroundStyle(themeManager.tertiaryTextColor)
-                    currencyBadge(for: direction.targetCurrency)
-                }
-
-                VStack(spacing: 10) {
-                    HStack {
-                        Text("\(title(for: direction.sourceCurrency))余额：\(sourceBalance)")
-                        Spacer()
-                        Text("\(title(for: direction.targetCurrency))余额：\(targetBalance)")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                    Button {
-                        inputAmountText = "\(exchangeAmountValue)"
-                        showAmountInput = true
-                    } label: {
-                        Text("兑换数量: \(exchangeAmountValue)")
-                            .font(.headline)
-                            .foregroundStyle(themeManager.primaryTextColor)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.secondary.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .disabled(!hasExchangeableBalance)
-
-                    if showsSlider {
-                        Slider(value: $exchangeAmount, in: sliderRange, step: sliderStep)
-                            .tint(themeManager.accentTextColor)
-
-                        HStack {
-                            Text("\(Int(sliderRange.lowerBound))")
-                            Spacer()
-                            Text("\(Int(sliderRange.upperBound))")
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: layout.sectionSpacing) {
+                        VStack(spacing: 8) {
+                            Text("货币兑换")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            Text(exchangeRateDescription)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    } else if hasExchangeableBalance {
-                        Text("当前最多可兑换 \(maxExchangeableSourceAmount)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if sourceBalance > 0 {
-                        Text("目标货币已接近上限，暂时无法继续兑换")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("当前没有可用于兑换的\(title(for: direction.sourceCurrency))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        .padding(.top, 20)
+
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: layout.directionButtonMinimumWidth), spacing: 8)],
+                            spacing: 8
+                        ) {
+                            ForEach(PetCurrencyExchangeDirection.allCases) { item in
+                                Button {
+                                    direction = item
+                                } label: {
+                                    Text(item.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(direction == item ? Color.white : themeManager.primaryTextColor)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 12)
+                                        .background(direction == item ? themeManager.accentTextColor : Color.secondary.opacity(0.12))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.82)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 18) {
+                                exchangeBadgeCard(for: direction.sourceCurrency, layout: layout)
+
+                                Image(systemName: "arrow.right")
+                                    .font(.title3)
+                                    .foregroundStyle(themeManager.tertiaryTextColor)
+
+                                exchangeBadgeCard(for: direction.targetCurrency, layout: layout)
+                            }
+
+                            VStack(spacing: 14) {
+                                exchangeBadgeCard(for: direction.sourceCurrency, layout: layout)
+
+                                Image(systemName: "arrow.down")
+                                    .font(.title3)
+                                    .foregroundStyle(themeManager.tertiaryTextColor)
+
+                                exchangeBadgeCard(for: direction.targetCurrency, layout: layout)
+                            }
+                        }
+
+                        VStack(spacing: 12) {
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 12) {
+                                    balanceCard(
+                                        title: "\(title(for: direction.sourceCurrency))余额",
+                                        amount: sourceBalance,
+                                        layout: layout
+                                    )
+                                    balanceCard(
+                                        title: "\(title(for: direction.targetCurrency))余额",
+                                        amount: targetBalance,
+                                        layout: layout
+                                    )
+                                }
+
+                                VStack(spacing: 8) {
+                                    balanceCard(
+                                        title: "\(title(for: direction.sourceCurrency))余额",
+                                        amount: sourceBalance,
+                                        layout: layout
+                                    )
+                                    balanceCard(
+                                        title: "\(title(for: direction.targetCurrency))余额",
+                                        amount: targetBalance,
+                                        layout: layout
+                                    )
+                                }
+                            }
+
+                            Button {
+                                inputAmountText = "\(exchangeAmountValue)"
+                                showAmountInput = true
+                            } label: {
+                                Text("兑换数量: \(exchangeAmountValue)")
+                                    .font(.headline)
+                                    .foregroundStyle(themeManager.primaryTextColor)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.secondary.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .disabled(!hasExchangeableBalance)
+
+                            if showsSlider {
+                                Slider(value: $exchangeAmount, in: sliderRange, step: sliderStep)
+                                    .tint(themeManager.accentTextColor)
+
+                                HStack {
+                                    Text("\(Int(sliderRange.lowerBound))")
+                                    Spacer()
+                                    Text("\(Int(sliderRange.upperBound))")
+                                }
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            } else if hasExchangeableBalance {
+                                Text("当前最多可兑换 \(maxExchangeableSourceAmount)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if sourceBalance > 0 {
+                                Text("目标货币已接近上限，暂时无法继续兑换")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("当前没有可用于兑换的\(title(for: direction.sourceCurrency))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            if hasExchangeableBalance {
+                                Text("预计到账 \(convertedTargetAmount(for: exchangeAmountValue) ?? 0) \(title(for: direction.targetCurrency))")
+                                    .font(.caption)
+                                    .foregroundStyle(themeManager.secondaryTextColor)
+                            }
+                        }
+
+                        Button {
+                            performExchange()
+                        } label: {
+                            Text(direction.title)
+                                .fontWeight(.bold)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(actionButtonColor)
+                                .foregroundStyle(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .disabled(!hasExchangeableBalance)
+                        .opacity(hasExchangeableBalance ? 1 : 0.5)
+
+                        if let resultMessage {
+                            Text(resultMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
-
-                    if hasExchangeableBalance {
-                        Text("预计到账 \(convertedTargetAmount(for: exchangeAmountValue) ?? 0) \(title(for: direction.targetCurrency))")
-                            .font(.caption)
-                            .foregroundStyle(themeManager.secondaryTextColor)
-                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .padding(.horizontal, layout.horizontalPadding)
+                    .padding(.bottom, 24)
+                    .frame(minHeight: geometry.size.height, alignment: .top)
                 }
-                .padding(.horizontal, 24)
-
-                Button {
-                    performExchange()
-                } label: {
-                    Text(direction.title)
-                        .fontWeight(.bold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(direction == .fishToBone ? Color.brown : Color.orange)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .padding(.horizontal, 24)
-                .disabled(!hasExchangeableBalance)
-                .opacity(hasExchangeableBalance ? 1 : 0.5)
-
-                if let resultMessage {
-                    Text(resultMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -213,6 +270,17 @@ struct PetCurrencyExchangeSheet: View {
             return "1 喵币 = 1000 鱼币"
         case .meowToBone:
             return "1 喵币 = 1000 骨头币"
+        }
+    }
+
+    private var actionButtonColor: Color {
+        switch direction.targetCurrency {
+        case .meowCoin:
+            return .yellow
+        case .fishCoin:
+            return .orange
+        case .boneCoin:
+            return Color(hex: "A56A2A")
         }
     }
 
@@ -317,6 +385,7 @@ struct PetCurrencyExchangeSheet: View {
 
         PetDataManager.shared.saveStatus(status)
         NotificationCenter.default.post(name: Notification.Name("PetStatusDidUpdateExternally"), object: nil)
+        clampExchangeAmount()
     }
 
     private func convertedTargetAmount(for sourceAmount: Int) -> Int? {
@@ -350,29 +419,93 @@ struct PetCurrencyExchangeSheet: View {
     }
 
     @ViewBuilder
-    private func currencyBadge(for currency: PetCurrency) -> some View {
-        VStack(spacing: 6) {
-            switch currency {
-            case .meowCoin:
-                Image(systemName: "pawprint.circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundColor(.yellow)
-            case .fishCoin:
-                Image(systemName: "fish.circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundColor(.orange)
-            case .boneCoin:
-                ZStack {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 36))
-                        .foregroundColor(Color(hex: "CD7F32"))
-                    Text("🦴")
-                        .font(.system(size: 20))
-                }
-            }
+    private func exchangeBadgeCard(for currency: PetCurrency, layout: ExchangeSheetLayout) -> some View {
+        VStack(spacing: 10) {
+            currencyBadge(for: currency, layout: layout)
             Text(title(for: currency))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    @ViewBuilder
+    private func currencyBadge(for currency: PetCurrency, layout: ExchangeSheetLayout) -> some View {
+        VStack(spacing: 6) {
+            switch currency {
+            case .meowCoin:
+                Image(systemName: "pawprint.circle.fill")
+                    .font(.system(size: layout.iconSize))
+                    .foregroundColor(.yellow)
+            case .fishCoin:
+                Image(systemName: "fish.circle.fill")
+                    .font(.system(size: layout.iconSize))
+                    .foregroundColor(.orange)
+            case .boneCoin:
+                ZStack {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: layout.iconSize))
+                        .foregroundColor(Color(hex: "CD7F32"))
+                    Text("🦴")
+                        .font(.system(size: layout.emojiSize))
+                }
+            }
+        }
+    }
+
+    private func balanceCard(title: String, amount: Int, layout: ExchangeSheetLayout) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text("\(amount)")
+                .font(layout.balanceAmountFont)
+                .fontWeight(.semibold)
+                .foregroundStyle(themeManager.primaryTextColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private struct ExchangeSheetLayout {
+    let containerWidth: CGFloat
+
+    var horizontalPadding: CGFloat {
+        if containerWidth < 360 { return 16 }
+        if containerWidth < 520 { return 20 }
+        return 24
+    }
+
+    var sectionSpacing: CGFloat {
+        containerWidth < 420 ? 18 : 24
+    }
+
+    var directionButtonMinimumWidth: CGFloat {
+        if containerWidth < 420 { return 128 }
+        if containerWidth < 560 { return 140 }
+        return 150
+    }
+
+    var iconSize: CGFloat {
+        containerWidth < 420 ? 32 : 36
+    }
+
+    var emojiSize: CGFloat {
+        containerWidth < 420 ? 18 : 20
+    }
+
+    var balanceAmountFont: Font {
+        containerWidth < 420 ? .headline : .title3
     }
 }

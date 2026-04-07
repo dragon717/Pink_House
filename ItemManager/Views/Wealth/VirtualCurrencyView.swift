@@ -321,7 +321,7 @@ struct VirtualCurrencyView: View {
                 MeowCoinStoreView()
             case .currencyExchange(let preferredDirection):
                 PetCurrencyExchangeSheet(preferredDirection: preferredDirection)
-                    .presentationDetents([.medium])
+                    .presentationDetents([.medium, .large])
             }
         }
         .onChange(of: isActive) { _, newValue in

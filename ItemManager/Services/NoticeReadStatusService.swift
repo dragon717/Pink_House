@@ -120,8 +120,7 @@ class NoticeReadStatusService: ObservableObject {
     
     // MARK: - 检查公告是否已读
     func hasReadNotice(_ notice: Notice) -> Bool {
-        let key = stateKey(for: notice)
-        if let snapshot = localStates[key] {
+        if let snapshot = currentSnapshot(for: notice) {
             return snapshot.state == .read || snapshot.state == .acknowledged
         }
 
@@ -145,24 +144,36 @@ class NoticeReadStatusService: ObservableObject {
     }
 
     func hasAcknowledgedNotice(_ notice: Notice) -> Bool {
-        localStates[stateKey(for: notice)]?.state == .acknowledged
+        currentSnapshot(for: notice)?.state == .acknowledged
     }
 
     func presentationCount(for notice: Notice) -> Int {
-        localStates[stateKey(for: notice)]?.presentationCount ?? 0
+        currentSnapshot(for: notice)?.presentationCount ?? 0
     }
 
-    func shouldShowModal(for notice: Notice) -> Bool {
-        guard notice.isEligibleForModal() else { return false }
-
-        let currentState = state(for: notice)
-        if currentState == .read || currentState == .acknowledged || currentState == .dismissed {
+    func shouldShowModal(
+        for notice: Notice,
+        bypassDailyPresentationLimit: Bool = false
+    ) -> Bool {
+        guard notice.isEligibleForModal() else {
+            print("📢 公告不满足 modal 基础规则: \(notice.title)")
             return false
         }
 
-        let snapshot = localStates[stateKey(for: notice)]
-        if (snapshot?.presentationCount ?? 0) >= 1 {
+        let currentState = state(for: notice)
+        if currentState == .read || currentState == .acknowledged || currentState == .dismissed {
+            print("📢 公告因用户状态被拦截: \(notice.title), state=\(currentState.rawValue)")
             return false
+        }
+
+        let snapshot = currentSnapshot(for: notice)
+        if (snapshot?.presentationCount ?? 0) >= 1 {
+            print("📢 公告因当前版本已展示过被拦截: \(notice.title)")
+            return false
+        }
+
+        if bypassDailyPresentationLimit {
+            return true
         }
 
         let todayPresentations = localStates.values.filter { snapshot in
@@ -170,6 +181,9 @@ class NoticeReadStatusService: ObservableObject {
             return Calendar.current.isDateInToday(lastPresentedAt)
         }.count
 
+        if todayPresentations >= 1 {
+            print("📢 公告因今日全局弹窗次数上限被拦截: \(notice.title)")
+        }
         return todayPresentations < 1
     }
 
@@ -382,6 +396,34 @@ class NoticeReadStatusService: ObservableObject {
         Task {
             await syncReadStatusToCloud(notice: notice, snapshot: snapshot)
         }
+    }
+
+    private func currentSnapshot(for notice: Notice) -> StateSnapshot? {
+        guard let snapshot = localStates[stateKey(for: notice)] else {
+            return nil
+        }
+
+        if snapshotAppearsToBeForCurrentNoticeVersion(snapshot, notice: notice) {
+            return snapshot
+        }
+
+        return nil
+    }
+
+    private func snapshotAppearsToBeForCurrentNoticeVersion(
+        _ snapshot: StateSnapshot,
+        notice: Notice
+    ) -> Bool {
+        if localReadStatus.contains(notice.readTrackingKey) {
+            return true
+        }
+
+        // 没有命中当前版本的 readTrackingKey，说明这个状态大概率属于旧版本记录。
+        if snapshot.state == .dismissed || snapshot.presentationCount > 0 {
+            return false
+        }
+
+        return true
     }
 
     private func mergeCloudStates(_ cloudStates: [String: StateSnapshot]) {
