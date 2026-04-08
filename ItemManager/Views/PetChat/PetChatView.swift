@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 import UIKit
+import Combine
 
 // MARK: - 组件文件索引（按职责拆分）
 // 核心页面：
@@ -97,6 +98,8 @@ struct PetChatView: View {
     }
 
     private let historyUnlockThreshold: CGFloat = 72
+    private let petDialogueAmbientTimer = Timer.publish(every: 6.0, on: .main, in: .common).autoconnect()
+    private let petDialogueGroomingChance: Double = 0.07
 
     private var visibleMessages: [PetChatMessage] {
         if isHistoryUnlocked {
@@ -151,6 +154,10 @@ struct PetChatView: View {
 
     private var petDialogueResolvedVideoName: String {
         resolvedPetDialogueVideoName(for: petDialogueAction)
+    }
+
+    private var petDialogueVideoLoops: Bool {
+        shouldLoopPetDialogueAction(petDialogueAction)
     }
 
     private func localizedCatchphraseText(_ text: String) -> String {
@@ -226,11 +233,15 @@ struct PetChatView: View {
             ),
             petName: petAI.petName,
             assistantExpressionVideoName: petDialogueResolvedVideoName,
+            assistantExpressionVideoLooping: petDialogueVideoLoops,
             onExpressionTouchBegan: { location, size in
                 startPetDialogueTouching(at: location, in: size)
             },
             onExpressionTouchEnded: {
                 stopPetDialogueTouching()
+            },
+            onExpressionVideoFinished: {
+                handlePetDialogueVideoFinished()
             },
             onCardTap: handleClothingTap,
             onSearchResultTap: handleClothingTap,
@@ -497,6 +508,7 @@ struct PetChatView: View {
                 DispatchQueue.main.async {
                     broadcastFloatingPetOverlayState()
                 }
+                syncPetDialogueAmbientAction(force: true)
             }
             .onChange(of: guideManager.currentFeatureExperienceFeature?.rawValue) { _, _ in
                 ensureGuideEmbeddedOptionMessageIfNeeded(forceRefreshForCurrentGuideSession: true)
@@ -537,6 +549,9 @@ struct PetChatView: View {
                 DispatchQueue.main.async {
                     broadcastFloatingPetOverlayState()
                 }
+            }
+            .onReceive(petDialogueAmbientTimer) { _ in
+                syncPetDialogueAmbientAction()
             }
             // iOS26+ 悬浮按钮 - 使用 safeAreaInset 确保跟随键盘移动（仅 iPhone）
             .safeAreaInset(edge: .bottom) {
@@ -1989,10 +2004,10 @@ struct PetChatView: View {
                 Spacer()
                 SeamlessVideoPlayer(
                     videoName: petDialogueResolvedVideoName,
-                    isLooping: true,
+                    isLooping: petDialogueVideoLoops,
                     isMuted: true,
                     volume: 0,
-                    onFinished: nil
+                    onFinished: { handlePetDialogueVideoFinished() }
                 )
                 .frame(width: stageSize, height: stageSize)
                 .contentShape(Rectangle())
@@ -2020,6 +2035,57 @@ struct PetChatView: View {
         withAnimation(.easeOut(duration: 0.12)) {
             petDialogueAction = action
         }
+    }
+
+    private func shouldLoopPetDialogueAction(_ action: String) -> Bool {
+        switch action {
+        case "idle", "sleeping":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func idleLikePetDialogueAction() -> String {
+        let status = PetDataManager.shared.status
+        return petChatShouldShowSleepyExpression(status: status) ? "sleeping" : "idle"
+    }
+
+    private func syncPetDialogueAmbientAction(force: Bool = false) {
+        guard !isPetDialogueTouching else { return }
+
+        let targetIdleAction = idleLikePetDialogueAction()
+        if petDialogueAction == "sleeping", targetIdleAction != "sleeping" {
+            setPetDialogueAction("idle")
+            return
+        }
+
+        if petDialogueAction != "idle" && petDialogueAction != "sleeping" {
+            return
+        }
+
+        if petDialogueAction != targetIdleAction {
+            setPetDialogueAction(targetIdleAction)
+            return
+        }
+
+        if force {
+            return
+        }
+
+        guard targetIdleAction == "idle" else { return }
+        guard Double.random(in: 0...1) < petDialogueGroomingChance else { return }
+
+        let pet = PetDataManager.shared.getCurrentPetCharacter()
+        let groomingAction = firstAvailablePetDialogueAction(["grooming"], pet: pet)
+        if groomingAction != "idle" {
+            setPetDialogueAction(groomingAction)
+        }
+    }
+
+    private func handlePetDialogueVideoFinished() {
+        guard !shouldLoopPetDialogueAction(petDialogueAction) else { return }
+        setPetDialogueAction("idle")
     }
 
     private func resolvedPetDialogueVideoName(for action: String) -> String {
@@ -2067,15 +2133,6 @@ struct PetChatView: View {
         if duration < 0.3 {
             applyPetDialogueTouchFeedback(for: touchedAction)
         }
-
-        let workItem = DispatchWorkItem {
-            withAnimation(.easeIn(duration: 0.15)) {
-                petDialogueAction = "idle"
-            }
-            petDialogueTouchReleaseWorkItem = nil
-        }
-        petDialogueTouchReleaseWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
 
     private func petDialogueTouchAction(isUpper: Bool, mood: Double, pet: PetCharacter) -> String {
@@ -2140,29 +2197,51 @@ struct PetChatView: View {
     }
 
     private var petTouchFeedbackOverlay: some View {
-        ZStack {
-            ForEach(adoptionViewModel.floatingTexts) { textData in
-                StyledFloatingText(text: textData.text, style: textData.style)
-                    .transition(
-                        .asymmetric(
-                            insertion: .scale(scale: 0.5, anchor: .bottom)
-                                .combined(with: .opacity)
-                                .combined(with: .offset(y: 40)),
-                            removal: .opacity.animation(.easeOut(duration: 0.8))
-                                .combined(with: .scale(scale: 1.5).animation(.easeOut(duration: 0.8)))
-                                .combined(with: .offset(y: -40).animation(.easeOut(duration: 0.8)))
+        GeometryReader { proxy in
+            ZStack {
+                ForEach(adoptionViewModel.floatingTexts) { textData in
+                    let clampedOffset = clampedPetTouchFeedbackOffset(for: textData, in: proxy.size)
+                    StyledFloatingText(text: textData.text, style: textData.style)
+                        .transition(
+                            .asymmetric(
+                                insertion: .scale(scale: 0.5, anchor: .bottom)
+                                    .combined(with: .opacity)
+                                    .combined(with: .offset(y: 40)),
+                                removal: .opacity.animation(.easeOut(duration: 0.8))
+                                    .combined(with: .scale(scale: 1.5).animation(.easeOut(duration: 0.8)))
+                                    .combined(with: .offset(y: -40).animation(.easeOut(duration: 0.8)))
+                            )
                         )
-                    )
-                    .zIndex(Double(textData.id.hashValue))
-                    .offset(
-                        x: -min(120, UIScreen.main.bounds.width * 0.26) + textData.offset.width,
-                        y: -min(210, UIScreen.main.bounds.height * 0.28) + textData.offset.height
-                    )
+                        .zIndex(Double(textData.id.hashValue))
+                        .offset(x: clampedOffset.width, y: clampedOffset.height)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: adoptionViewModel.floatingTexts.count)
+    }
+
+    private func clampedPetTouchFeedbackOffset(for textData: FloatingTextData, in containerSize: CGSize) -> CGSize {
+        let rawX = -min(120, containerSize.width * 0.26) + textData.offset.width
+        let rawY = -min(210, containerSize.height * 0.28) + textData.offset.height
+
+        let estimatedHalfWidth = min(170, max(72, CGFloat(textData.text.count) * 8.0))
+        let horizontalPadding = estimatedHalfWidth + 12
+        let topPadding: CGFloat = 92
+        let bottomPadding: CGFloat = 170
+
+        let halfWidth = containerSize.width / 2
+        let halfHeight = containerSize.height / 2
+        let minX = -halfWidth + horizontalPadding
+        let maxX = halfWidth - horizontalPadding
+        let minY = -halfHeight + topPadding
+        let maxY = halfHeight - bottomPadding
+
+        return CGSize(
+            width: min(max(rawX, minX), maxX),
+            height: min(max(rawY, minY), maxY)
+        )
     }
 
     // 创建消息气泡视图
@@ -2174,11 +2253,15 @@ struct PetChatView: View {
             message: message,
             petName: petAI.petName,
             assistantExpressionVideoName: expressionVideoName,
+            assistantExpressionVideoLooping: petDialogueVideoLoops,
             onExpressionTouchBegan: { location, size in
                 startPetDialogueTouching(at: location, in: size)
             },
             onExpressionTouchEnded: {
                 stopPetDialogueTouching()
+            },
+            onExpressionVideoFinished: {
+                handlePetDialogueVideoFinished()
             },
             onCardTap: handleClothingTap,
             onSearchResultTap: handleClothingTap,

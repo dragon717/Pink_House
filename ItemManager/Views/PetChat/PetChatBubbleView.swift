@@ -4,8 +4,10 @@ struct PetChatBubble: View {
     let message: PetChatMessage
     let petName: String
     let assistantExpressionVideoName: String?
+    let assistantExpressionVideoLooping: Bool
     let onExpressionTouchBegan: ((CGPoint, CGSize) -> Void)?
     let onExpressionTouchEnded: (() -> Void)?
+    let onExpressionVideoFinished: (() -> Void)?
     let onCardTap: (Clothing) -> Void
     let onSearchResultTap: (Clothing) -> Void
     let onOutfitTap: (OutfitSuggestionData) -> Void
@@ -15,8 +17,10 @@ struct PetChatBubble: View {
         message: PetChatMessage,
         petName: String,
         assistantExpressionVideoName: String? = nil,
+        assistantExpressionVideoLooping: Bool = true,
         onExpressionTouchBegan: ((CGPoint, CGSize) -> Void)? = nil,
         onExpressionTouchEnded: (() -> Void)? = nil,
+        onExpressionVideoFinished: (() -> Void)? = nil,
         onCardTap: @escaping (Clothing) -> Void,
         onSearchResultTap: @escaping (Clothing) -> Void,
         onOutfitTap: @escaping (OutfitSuggestionData) -> Void,
@@ -25,8 +29,10 @@ struct PetChatBubble: View {
         self.message = message
         self.petName = petName
         self.assistantExpressionVideoName = assistantExpressionVideoName
+        self.assistantExpressionVideoLooping = assistantExpressionVideoLooping
         self.onExpressionTouchBegan = onExpressionTouchBegan
         self.onExpressionTouchEnded = onExpressionTouchEnded
+        self.onExpressionVideoFinished = onExpressionVideoFinished
         self.onCardTap = onCardTap
         self.onSearchResultTap = onSearchResultTap
         self.onOutfitTap = onOutfitTap
@@ -331,10 +337,10 @@ struct PetChatBubble: View {
         let expressionSize: CGFloat = 116
         return SeamlessVideoPlayer(
             videoName: videoName,
-            isLooping: true,
+            isLooping: assistantExpressionVideoLooping,
             isMuted: true,
             volume: 0,
-            onFinished: nil
+            onFinished: onExpressionVideoFinished
         )
         .frame(width: expressionSize, height: expressionSize)
         .contentShape(Rectangle())
