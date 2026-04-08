@@ -172,6 +172,7 @@ enum PetChatFundingDestination {
 struct PetChatCleaningActionResult {
     let feedback: String
     let fundingDestination: PetChatFundingDestination?
+    let petVideoAction: String?
 }
 
 private func normalizedPetChatIntentText(_ text: String) -> String {
@@ -796,6 +797,17 @@ struct PetFeedAnimationPayload: Equatable {
 struct PetItemCommandResult {
     let feedback: String
     let feedAnimation: PetFeedAnimationPayload?
+    let petVideoAction: String?
+
+    init(
+        feedback: String,
+        feedAnimation: PetFeedAnimationPayload?,
+        petVideoAction: String? = nil
+    ) {
+        self.feedback = feedback
+        self.feedAnimation = feedAnimation
+        self.petVideoAction = petVideoAction
+    }
 }
 
 struct PetDirectFeedIntent {
@@ -816,6 +828,24 @@ private func isFeedableItem(_ item: PetItemDefinition) -> Bool {
 
 private func isQuickUsePetItem(_ item: PetItemDefinition) -> Bool {
     isFeedableItem(item) || item.isToy || item.id == "energyPill"
+}
+
+private func petVideoActionForConsumedItem(_ item: PetItemDefinition) -> String? {
+    if item.isDrink {
+        if item.id == "goatMilk" {
+            return "drinking_milk"
+        }
+        return "drinking_glass"
+    }
+
+    if item.category == "food" {
+        if item.id == "cannedFood" {
+            return "eating_cannedFood"
+        }
+        return "eating_catFood"
+    }
+
+    return nil
 }
 
 func shopGuidanceText(for item: PetItemDefinition) -> String {
@@ -925,6 +955,17 @@ func detectDirectPlayIntent(from text: String) -> PetDirectPlayIntent? {
     return PetDirectPlayIntent(preferredItemId: preferredToy?.id ?? (normalized.contains("玩") ? "yarnBall" : nil))
 }
 
+func detectDirectPettingIntent(from text: String) -> Bool {
+    let normalized = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalized.isEmpty else { return false }
+
+    let pettingKeywords = [
+        "摸摸", "摸头", "摸一下", "拍拍", "拍头", "揉揉", "揉肚子",
+        "挠挠", "撸", "rua", "抱抱", "蹭蹭"
+    ]
+    return pettingKeywords.contains { normalized.contains($0) }
+}
+
 func resolveDirectFeedItem(intent: PetDirectFeedIntent, status: PetStatus) -> PetItemDefinition? {
     let feedableItems = PetConfigManager.shared.items.filter(isFeedableItem)
     guard !feedableItems.isEmpty else { return nil }
@@ -1018,7 +1059,7 @@ func resolveDirectUseItem(intent: PetDirectUseIntent, status: PetStatus) -> PetI
 
 func purchasePetItemResult(itemId: String, autoFeedWhenPossible: Bool = true) -> PetItemCommandResult {
     guard let item = PetConfigManager.shared.getItem(byId: itemId) else {
-        return PetItemCommandResult(feedback: "这个东西我暂时没找到，稍后再帮我看看吧。", feedAnimation: nil)
+        return PetItemCommandResult(feedback: "这个东西我暂时没找到，稍后再帮我看看吧。", feedAnimation: nil, petVideoAction: nil)
     }
 
     var status = PetDataManager.shared.status
@@ -1026,17 +1067,17 @@ func purchasePetItemResult(itemId: String, autoFeedWhenPossible: Bool = true) ->
     switch item.petCurrency {
     case .fishCoin:
         guard status.fishCoin >= finalPrice else {
-            return PetItemCommandResult(feedback: "我的鱼币不够啦，先帮我攒一点再来买\(item.name)吧。", feedAnimation: nil)
+            return PetItemCommandResult(feedback: "我的鱼币不够啦，先帮我攒一点再来买\(item.name)吧。", feedAnimation: nil, petVideoAction: nil)
         }
         status.fishCoin -= finalPrice
     case .meowCoin:
         guard status.meowCoin >= finalPrice else {
-            return PetItemCommandResult(feedback: "我的喵币不够啦，先帮我充一点再来买\(item.name)吧。", feedAnimation: nil)
+            return PetItemCommandResult(feedback: "我的喵币不够啦，先帮我充一点再来买\(item.name)吧。", feedAnimation: nil, petVideoAction: nil)
         }
         _ = StoreManager.spendMeowCoins(finalPrice, in: &status)
     case .boneCoin:
         guard status.boneCoin >= finalPrice else {
-            return PetItemCommandResult(feedback: "我的骨头币不够啦，这个币种更适合毛毛用喔。", feedAnimation: nil)
+            return PetItemCommandResult(feedback: "我的骨头币不够啦，这个币种更适合毛毛用喔。", feedAnimation: nil, petVideoAction: nil)
         }
         status.boneCoin -= finalPrice
     }
@@ -1048,28 +1089,29 @@ func purchasePetItemResult(itemId: String, autoFeedWhenPossible: Bool = true) ->
         let consumeResult = consumePetItemResult(itemId: item.id)
         return PetItemCommandResult(
             feedback: "买好就马上给我用啦～\(consumeResult.feedback)",
-            feedAnimation: consumeResult.feedAnimation
+            feedAnimation: consumeResult.feedAnimation,
+            petVideoAction: consumeResult.petVideoAction
         )
     }
 
     var refreshed = PetDataManager.shared.status
     refreshed.intimacy = min(100, refreshed.intimacy + 1)
     PetDataManager.shared.saveStatus(refreshed)
-    return PetItemCommandResult(feedback: "买好啦，\(item.name)我已经收进背包啦。", feedAnimation: nil)
+    return PetItemCommandResult(feedback: "买好啦，\(item.name)我已经收进背包啦。", feedAnimation: nil, petVideoAction: nil)
 }
 
 func consumePetItemResult(itemId: String) -> PetItemCommandResult {
     guard let item = PetConfigManager.shared.getItem(byId: itemId) else {
-        return PetItemCommandResult(feedback: "这个道具我暂时没认出来。", feedAnimation: nil)
+        return PetItemCommandResult(feedback: "这个道具我暂时没认出来。", feedAnimation: nil, petVideoAction: nil)
     }
 
     var status = PetDataManager.shared.status
     guard let count = status.inventory[item.id], count > 0 else {
-        return PetItemCommandResult(feedback: "\(item.name)已经被我用完啦，要不要带我去商店补货？", feedAnimation: nil)
+        return PetItemCommandResult(feedback: "\(item.name)已经被我用完啦，要不要带我去商店补货？", feedAnimation: nil, petVideoAction: nil)
     }
 
     if item.id == "renameCard" {
-        return PetItemCommandResult(feedback: "改名项圈先留着吧，我得走专门的改名流程。", feedAnimation: nil)
+        return PetItemCommandResult(feedback: "改名项圈先留着吧，我得走专门的改名流程。", feedAnimation: nil, petVideoAction: nil)
     }
 
     status.inventory[item.id] = count - 1
@@ -1082,20 +1124,20 @@ func consumePetItemResult(itemId: String) -> PetItemCommandResult {
         PetDataManager.shared.saveStatus(status)
         let recovered = Int(status.energy - oldEnergy)
         let feedback = recovered > 0 ? "我精神回来啦，精力恢复了 \(recovered) 点。" : "我现在精力已经满满的啦。"
-        return PetItemCommandResult(feedback: feedback, feedAnimation: nil)
+        return PetItemCommandResult(feedback: feedback, feedAnimation: nil, petVideoAction: nil)
     }
 
     if item.isToy {
         let energyCost = Double(item.energyCost ?? 0)
         guard status.energy >= energyCost else {
             status.inventory[item.id] = count
-            return PetItemCommandResult(feedback: "我现在太累啦，不想玩\(item.name)。", feedAnimation: nil)
+            return PetItemCommandResult(feedback: "我现在太累啦，不想玩\(item.name)。", feedAnimation: nil, petVideoAction: nil)
         }
         status.energy = max(0, status.energy - energyCost)
         status.mood = min(100, status.mood + item.recoveryValue)
         status.intimacy = min(100, status.intimacy + 2)
         PetDataManager.shared.saveStatus(status)
-        return PetItemCommandResult(feedback: "我抱着\(item.name)玩得好开心呀，心情一下就变好了。", feedAnimation: nil)
+        return PetItemCommandResult(feedback: "我抱着\(item.name)玩得好开心呀，心情一下就变好了。", feedAnimation: nil, petVideoAction: nil)
     }
 
     let moodRecovery = item.recoveryValue * 0.2
@@ -1109,10 +1151,19 @@ func consumePetItemResult(itemId: String) -> PetItemCommandResult {
     PetDataManager.shared.saveStatus(status)
 
     let animation = isFeedableItem(item) ? feedAnimationPayload(for: item) : nil
+    let petVideoAction = petVideoActionForConsumedItem(item)
     if item.isDrink {
-        return PetItemCommandResult(feedback: "我把\(item.name)喝掉啦，感觉没那么渴了。", feedAnimation: animation)
+        return PetItemCommandResult(
+            feedback: "我把\(item.name)喝掉啦，感觉没那么渴了。",
+            feedAnimation: animation,
+            petVideoAction: petVideoAction
+        )
     }
-    return PetItemCommandResult(feedback: "我把\(item.name)吃掉啦，肚子舒服多了。", feedAnimation: animation)
+    return PetItemCommandResult(
+        feedback: "我把\(item.name)吃掉啦，肚子舒服多了。",
+        feedAnimation: animation,
+        petVideoAction: petVideoAction
+    )
 }
 
 func cleanPetStatusNow() -> PetChatCleaningActionResult {
@@ -1122,7 +1173,8 @@ func cleanPetStatusNow() -> PetChatCleaningActionResult {
     guard oldValue < 100 else {
         return PetChatCleaningActionResult(
             feedback: "\(context.petName)已经香香的啦，这次先不用花\(context.cost)\(context.currency.rawValue)。",
-            fundingDestination: nil
+            fundingDestination: nil,
+            petVideoAction: nil
         )
     }
 
@@ -1137,7 +1189,7 @@ func cleanPetStatusNow() -> PetChatCleaningActionResult {
         case .meowCoin:
             feedback = "给\(context.petName)洗香香要花\(context.cost)喵币，我现在喵币还不够，先带你去充值。"
         }
-        return PetChatCleaningActionResult(feedback: feedback, fundingDestination: context.fundingDestination)
+        return PetChatCleaningActionResult(feedback: feedback, fundingDestination: context.fundingDestination, petVideoAction: nil)
     }
 
     switch context.currency {
@@ -1151,9 +1203,22 @@ func cleanPetStatusNow() -> PetChatCleaningActionResult {
     status.hygiene = 100
     status.mood = min(100, status.mood + 10)
     status.intimacy = min(100, status.intimacy + 1)
+    let cleaningAction = petCleaningVideoAction(forMood: status.mood)
     PetDataManager.shared.saveStatus(status)
     return PetChatCleaningActionResult(
         feedback: "\(context.petName)已经洗香香啦，花掉\(context.cost)\(context.currency.rawValue)，清洁度补满了。",
-        fundingDestination: nil
+        fundingDestination: nil,
+        petVideoAction: cleaningAction
     )
+}
+
+private func petCleaningVideoAction(forMood mood: Double) -> String {
+    let random = Double.random(in: 0...1)
+    if mood < 50 {
+        return random < 0.6 ? "bathing_boring" : "bathing_happy"
+    }
+    if mood > 90 {
+        return random < 0.9 ? "bathing_happy" : "bathing_boring"
+    }
+    return random < 0.6 ? "bathing_happy" : "bathing_boring"
 }

@@ -365,19 +365,8 @@ class WardrobeContextManager {
     }
 
     func defaultSearchPrompt(clothings: [Clothing]) -> String {
-        let learnedTerms = Array(
-            learnedVocabularyTerms(from: clothings)
-                .values
-                .flatMap { $0 }
-                .uniqued()
-                .prefix(5)
-        )
-
-        if learnedTerms.isEmpty {
-            return "帮我按我衣橱里的标签、类型和备注找衣服，名字不完全一样也一起匹配"
-        }
-
-        return "帮我按我衣橱里的标签和类型找衣服，比如\(learnedTerms.joined(separator: "、"))，名字不完全一样也一起匹配"
+        _ = clothings
+        return "帮我找"
     }
     
     private func queryTokens(_ query: String) -> [String] {
@@ -937,13 +926,12 @@ class WardrobeContextManager {
         return score
     }
 
-    private func buildSuggestedPrompt(query: String, matchedTerms: [String]) -> String {
-        let trimmedTerms = Array(matchedTerms.prefix(5))
-        guard !trimmedTerms.isEmpty else {
-            return "帮我按我衣橱里的标签、类型、备注和小物一起找衣服，如果名字不完全一样也帮我匹配"
+    private func buildSuggestedPrompt(query: String, matchedTerms _: [String]) -> String {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return "帮我找"
         }
-
-        return "帮我找适合“\(query)”的单品，优先参考这些标签/类型：\(trimmedTerms.joined(separator: "、"))，如果名字不完全一样也结合备注和小物一起找"
+        return "帮我找\(normalized)"
     }
     
     // 生成单品详细描述 (用于拖拽识别后)

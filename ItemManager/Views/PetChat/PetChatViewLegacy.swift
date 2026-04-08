@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import CoreLocation
+import UIKit
 
 // MARK: - iOS 18以下版本
 struct PetChatViewLegacy: View {
@@ -43,6 +44,10 @@ struct PetChatViewLegacy: View {
     @State private var activeFeedAnimation: PetFeedAnimationPayload?
     @State private var feedAnimationNonce: Int = 0
     @State private var lastInjectedAIAnalysisGuideCaptureVersion: UInt = 0
+    @State private var petDialogueAction: String = "idle"
+    @State private var isPetDialogueTouching = false
+    @State private var petDialogueTouchReleaseWorkItem: DispatchWorkItem?
+    @State private var petDialogueTouchStartTime: Date?
 
     @StateObject private var greetingManager = DailyGreetingManager.shared
     @StateObject private var adoptionViewModel = PetViewModel(status: PetDataManager.shared.status)
@@ -66,6 +71,25 @@ struct PetChatViewLegacy: View {
 
     private var currentCharacter: PetCharacter {
         PetDataManager.shared.getCurrentPetCharacter()
+    }
+
+    private var latestAssistantMessageID: UUID? {
+        messages.last(where: { !$0.isUser })?.id
+    }
+
+    private var petDialogueStageSize: CGFloat {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return 260
+        }
+        return 188
+    }
+
+    private var petDialogueBottomPadding: CGFloat {
+        128
+    }
+
+    private var petDialogueResolvedVideoName: String {
+        resolvedPetDialogueVideoName(for: petDialogueAction)
     }
     
     // 菜单回调
@@ -217,6 +241,7 @@ struct PetChatViewLegacy: View {
                     // 底部输入区域（Legacy 版本使用萌宠对话框样式）
                     petDialogueInputArea
                 }
+
             }
             .navigationTitle("\(petAI.petName)的悄悄话")
             .navigationBarTitleDisplayMode(.inline)
@@ -294,6 +319,11 @@ struct PetChatViewLegacy: View {
                             .zIndex(110)
                     }
 
+                    if !adoptionViewModel.floatingTexts.isEmpty {
+                        petTouchFeedbackOverlay
+                            .zIndex(112)
+                    }
+
                     if let prompt = adoptionViewModel.presentedFundingPrompt {
                         PetShopFundingPromptOverlay(
                             prompt: prompt,
@@ -329,6 +359,10 @@ struct PetChatViewLegacy: View {
                 isThinkingLongWait = false
                 purchaseToastHideWorkItem?.cancel()
                 showingPurchaseSuccessToast = false
+                petDialogueTouchReleaseWorkItem?.cancel()
+                petDialogueTouchReleaseWorkItem = nil
+                isPetDialogueTouching = false
+                petDialogueTouchStartTime = nil
                 NotificationCenter.default.post(
                     name: .petChatSearchStateChanged,
                     object: nil,
@@ -597,9 +631,19 @@ struct PetChatViewLegacy: View {
 
     // 创建消息气泡视图（Legacy版本）
     private func legacyMessageBubble(for message: PetChatMessage) -> some View {
-        PetChatBubble(
+        let expressionVideoName: String? = (message.id == latestAssistantMessageID && !message.isUser)
+            ? petDialogueResolvedVideoName
+            : nil
+        return PetChatBubble(
             message: message,
             petName: petAI.petName,
+            assistantExpressionVideoName: expressionVideoName,
+            onExpressionTouchBegan: { location, size in
+                startPetDialogueTouching(at: location, in: size)
+            },
+            onExpressionTouchEnded: {
+                stopPetDialogueTouching()
+            },
             onCardTap: legacyHandleClothingTap,
             onSearchResultTap: legacyHandleClothingTap,
             onOutfitTap: legacyHandleOutfitTap,
@@ -735,6 +779,10 @@ struct PetChatViewLegacy: View {
             return
         }
 
+        if handleDirectPettingIntent(text) {
+            return
+        }
+
         if handleDirectFeedIntent(text) {
             return
         }
@@ -791,6 +839,16 @@ struct PetChatViewLegacy: View {
         routeIntent(decision.primaryIntent, rawText: text)
     }
 
+    private func handleDirectPettingIntent(_ text: String) -> Bool {
+        guard detectDirectPettingIntent(from: text) else {
+            return false
+        }
+
+        setPetDialogueAction("idle")
+        messages.append(PetChatMessage(text: "来摸摸我吧～我会乖乖待在这里。", isUser: false, isAIGenerated: true))
+        return true
+    }
+
     private func handleDirectFeedIntent(_ text: String) -> Bool {
         guard let intent = detectDirectFeedIntent(from: text) else {
             return false
@@ -804,12 +862,9 @@ struct PetChatViewLegacy: View {
 
         let inStock = currentStatus.inventory[targetItem.id, default: 0] > 0
         let result: PetItemCommandResult = inStock
-            ? consumePetItemResult(itemId: targetItem.id)
-            : purchasePetItemResult(itemId: targetItem.id, autoFeedWhenPossible: true)
+            ? consumePetItemResultAndApplyFeedback(itemId: targetItem.id)
+            : purchasePetItemResultAndApplyFeedback(itemId: targetItem.id, autoFeedWhenPossible: true)
 
-        if let animation = result.feedAnimation {
-            triggerFeedAnimation(animation)
-        }
         messages.append(PetChatMessage(text: result.feedback, isUser: false, isAIGenerated: true))
         return true
     }
@@ -825,10 +880,7 @@ struct PetChatViewLegacy: View {
         }
 
         if currentStatus.inventory[targetItem.id, default: 0] > 0 {
-            let result = consumePetItemResult(itemId: targetItem.id)
-            if let animation = result.feedAnimation {
-                triggerFeedAnimation(animation)
-            }
+            let result = consumePetItemResultAndApplyFeedback(itemId: targetItem.id)
             messages.append(PetChatMessage(text: "我已经从背包里把\(targetItem.name)拿出来啦～\(result.feedback)", isUser: false, isAIGenerated: true))
         } else {
             let guidance = shopGuidanceText(for: targetItem)
@@ -850,10 +902,7 @@ struct PetChatViewLegacy: View {
 
         if targetItem.isToy {
             if currentStatus.inventory[targetItem.id, default: 0] > 0 {
-                let result = consumePetItemResult(itemId: targetItem.id)
-                if let animation = result.feedAnimation {
-                    triggerFeedAnimation(animation)
-                }
+                let result = consumePetItemResultAndApplyFeedback(itemId: targetItem.id)
                 messages.append(PetChatMessage(text: "我已经从背包里把\(targetItem.name)拿出来啦～\(result.feedback)", isUser: false, isAIGenerated: true))
             } else {
                 let guidance = shopGuidanceText(for: targetItem)
@@ -865,14 +914,67 @@ struct PetChatViewLegacy: View {
 
         let inStock = currentStatus.inventory[targetItem.id, default: 0] > 0
         let result: PetItemCommandResult = inStock
-            ? consumePetItemResult(itemId: targetItem.id)
-            : purchasePetItemResult(itemId: targetItem.id, autoFeedWhenPossible: true)
+            ? consumePetItemResultAndApplyFeedback(itemId: targetItem.id)
+            : purchasePetItemResultAndApplyFeedback(itemId: targetItem.id, autoFeedWhenPossible: true)
 
+        messages.append(PetChatMessage(text: result.feedback, isUser: false, isAIGenerated: true))
+        return true
+    }
+
+    private func applyPetStatusFloatingTexts(before: PetStatus, after: PetStatus) {
+        let moodDelta = Int((after.mood - before.mood).rounded(.towardZero))
+        if moodDelta != 0 {
+            let sign = moodDelta > 0 ? "+" : ""
+            let style: FloatingTextStyle = moodDelta > 0 ? .mood : .warning
+            adoptionViewModel.showFloatingText("心情 \(sign)\(moodDelta)", style: style)
+        }
+
+        let meowDelta = after.meowCoin - before.meowCoin
+        if meowDelta != 0 {
+            let sign = meowDelta > 0 ? "+" : ""
+            adoptionViewModel.showFloatingText("\(sign)\(meowDelta)", style: .meowCoin)
+        }
+
+        let fishDelta = after.fishCoin - before.fishCoin
+        if fishDelta != 0 {
+            let sign = fishDelta > 0 ? "+" : ""
+            adoptionViewModel.showFloatingText("\(sign)\(fishDelta)", style: .fishCoin)
+        }
+
+        let boneDelta = after.boneCoin - before.boneCoin
+        if boneDelta != 0 {
+            let sign = boneDelta > 0 ? "+" : ""
+            adoptionViewModel.showFloatingText("\(sign)\(boneDelta)", style: .boneCoin)
+        }
+
+        adoptionViewModel.status = after
+    }
+
+    private func consumePetItemResultAndApplyFeedback(itemId: String) -> PetItemCommandResult {
+        let beforeStatus = PetDataManager.shared.status
+        let result = consumePetItemResult(itemId: itemId)
+        applyPetItemCommandResult(result)
+        let afterStatus = PetDataManager.shared.status
+        applyPetStatusFloatingTexts(before: beforeStatus, after: afterStatus)
+        return result
+    }
+
+    private func purchasePetItemResultAndApplyFeedback(itemId: String, autoFeedWhenPossible: Bool) -> PetItemCommandResult {
+        let beforeStatus = PetDataManager.shared.status
+        let result = purchasePetItemResult(itemId: itemId, autoFeedWhenPossible: autoFeedWhenPossible)
+        applyPetItemCommandResult(result)
+        let afterStatus = PetDataManager.shared.status
+        applyPetStatusFloatingTexts(before: beforeStatus, after: afterStatus)
+        return result
+    }
+
+    private func applyPetItemCommandResult(_ result: PetItemCommandResult) {
         if let animation = result.feedAnimation {
             triggerFeedAnimation(animation)
         }
-        messages.append(PetChatMessage(text: result.feedback, isUser: false, isAIGenerated: true))
-        return true
+        if let action = result.petVideoAction {
+            setPetDialogueAction(action)
+        }
     }
 
     private func triggerFeedAnimation(_ payload: PetFeedAnimationPayload) {
@@ -909,6 +1011,7 @@ struct PetChatViewLegacy: View {
         status.selectedPetId = target.id
         status.intimacy = min(100, status.intimacy + 2)
         PetDataManager.shared.saveStatus(status)
+        setPetDialogueAction("idle")
         messages.append(PetChatMessage(text: "好哒，已切换到\(targetName)管家模式～", isUser: false, isAIGenerated: true))
         return true
     }
@@ -1246,7 +1349,13 @@ struct PetChatViewLegacy: View {
     }
 
     private func handlePetCleanNow(messageID: UUID) {
+        let beforeStatus = PetDataManager.shared.status
         let result = cleanPetStatusNow()
+        let afterStatus = PetDataManager.shared.status
+        applyPetStatusFloatingTexts(before: beforeStatus, after: afterStatus)
+        if let action = result.petVideoAction {
+            setPetDialogueAction(action)
+        }
         switch result.fundingDestination {
         case .meowCoinStore:
             showingMeowCoinStore = true
@@ -1497,47 +1606,32 @@ struct PetChatViewLegacy: View {
         default:
             if option.command.hasPrefix("use_item:") {
                 let rawId = String(option.command.dropFirst("use_item:".count))
-                let result = consumePetItemResult(itemId: rawId)
-                if let animation = result.feedAnimation {
-                    triggerFeedAnimation(animation)
-                }
+                let result = consumePetItemResultAndApplyFeedback(itemId: rawId)
                 refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("buy_item:") {
                 let rawId = String(option.command.dropFirst("buy_item:".count))
                 presentFundingPromptIfNeeded(for: rawId)
                 let beforeCount = PetDataManager.shared.status.inventory[rawId, default: 0]
-                let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: false)
+                let result = purchasePetItemResultAndApplyFeedback(itemId: rawId, autoFeedWhenPossible: false)
                 let afterCount = PetDataManager.shared.status.inventory[rawId, default: 0]
                 if afterCount > beforeCount {
                     let itemName = PetConfigManager.shared.getItem(byId: rawId)?.name ?? "道具"
                     showPurchaseSuccessToast(itemName: itemName)
                 }
-                if let animation = result.feedAnimation {
-                    triggerFeedAnimation(animation)
-                }
                 refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("drag_shop_item:") {
                 let rawId = String(option.command.dropFirst("drag_shop_item:".count))
                 presentFundingPromptIfNeeded(for: rawId)
-                let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
-                if let animation = result.feedAnimation {
-                    triggerFeedAnimation(animation)
-                }
+                let result = purchasePetItemResultAndApplyFeedback(itemId: rawId, autoFeedWhenPossible: true)
                 refreshPanel(for: "pet_shop_panel", messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("inventory:") {
                 let rawId = String(option.command.dropFirst("inventory:".count))
-                let result = consumePetItemResult(itemId: rawId)
-                if let animation = result.feedAnimation {
-                    triggerFeedAnimation(animation)
-                }
+                let result = consumePetItemResultAndApplyFeedback(itemId: rawId)
                 refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else if option.command.hasPrefix("shop:") {
                 let rawId = String(option.command.dropFirst("shop:".count))
                 presentFundingPromptIfNeeded(for: rawId)
-                let result = purchasePetItemResult(itemId: rawId, autoFeedWhenPossible: true)
-                if let animation = result.feedAnimation {
-                    triggerFeedAnimation(animation)
-                }
+                let result = purchasePetItemResultAndApplyFeedback(itemId: rawId, autoFeedWhenPossible: true)
                 refreshPanel(for: option.command, messageID: messageID, feedback: result.feedback)
             } else
             if option.command.hasPrefix("switch_pet:") {
@@ -1551,6 +1645,7 @@ struct PetChatViewLegacy: View {
                     status.selectedPetId = pet.id
                     status.intimacy = min(100, status.intimacy + 2)
                     PetDataManager.shared.saveStatus(status)
+                    setPetDialogueAction("idle")
                     messages.append(PetChatMessage(text: "已切换到\(pet.displayName)管家模式，继续陪你～", isUser: false, isAIGenerated: true))
                 }
             } else if option.command.hasPrefix("adopt_pet:") {
@@ -1560,6 +1655,7 @@ struct PetChatViewLegacy: View {
                     if status.ownedPetIds.contains(pet.id) {
                         status.selectedPetId = pet.id
                         PetDataManager.shared.saveStatus(status)
+                        setPetDialogueAction("idle")
                         messages.append(PetChatMessage(text: "\(pet.displayName)已经在家里啦，已帮你切过去～", isUser: false, isAIGenerated: true))
                         return
                     }
@@ -1639,10 +1735,7 @@ struct PetChatViewLegacy: View {
 
         let status = PetDataManager.shared.status
         if status.inventory[yarnBall.id, default: 0] > 0 {
-            let result = consumePetItemResult(itemId: yarnBall.id)
-            if let animation = result.feedAnimation {
-                triggerFeedAnimation(animation)
-            }
+            let result = consumePetItemResultAndApplyFeedback(itemId: yarnBall.id)
             refreshPanel(
                 for: "pet_inventory_panel",
                 messageID: messageID,
@@ -1656,6 +1749,190 @@ struct PetChatViewLegacy: View {
             )
         }
         return true
+    }
+
+    private var petDialogueVideoStage: some View {
+        let stageSize = petDialogueStageSize
+        return VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                SeamlessVideoPlayer(
+                    videoName: petDialogueResolvedVideoName,
+                    isLooping: true,
+                    isMuted: true,
+                    volume: 0,
+                    onFinished: nil
+                )
+                .frame(width: stageSize, height: stageSize)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            startPetDialogueTouching(
+                                at: value.location,
+                                in: CGSize(width: stageSize, height: stageSize)
+                            )
+                        }
+                        .onEnded { _ in
+                            stopPetDialogueTouching()
+                        }
+                )
+            }
+            .padding(.trailing, 8)
+            .padding(.bottom, petDialogueBottomPadding)
+        }
+    }
+
+    private func setPetDialogueAction(_ action: String) {
+        petDialogueTouchReleaseWorkItem?.cancel()
+        petDialogueTouchReleaseWorkItem = nil
+        withAnimation(.easeOut(duration: 0.12)) {
+            petDialogueAction = action
+        }
+    }
+
+    private func resolvedPetDialogueVideoName(for action: String) -> String {
+        let pet = PetDataManager.shared.getCurrentPetCharacter()
+        let candidate = "\(pet.id)_\(action)"
+        if VideoResourceManager.shared.isVideoAvailable(name: candidate) {
+            return candidate
+        }
+
+        if action.hasPrefix("bathing_") {
+            let happyFallback = "\(pet.id)_bathing_happy"
+            if VideoResourceManager.shared.isVideoAvailable(name: happyFallback) {
+                return happyFallback
+            }
+        }
+
+        let petIdle = "\(pet.id)_idle"
+        if VideoResourceManager.shared.isVideoAvailable(name: petIdle) {
+            return petIdle
+        }
+        return "naicha_idle"
+    }
+
+    private func startPetDialogueTouching(at location: CGPoint, in size: CGSize) {
+        petDialogueTouchReleaseWorkItem?.cancel()
+        petDialogueTouchReleaseWorkItem = nil
+        guard !isPetDialogueTouching else { return }
+        isPetDialogueTouching = true
+        petDialogueTouchStartTime = Date()
+
+        let isUpper = location.y < size.height / 2
+        let mood = PetDataManager.shared.status.mood
+        let pet = PetDataManager.shared.getCurrentPetCharacter()
+        let action = petDialogueTouchAction(isUpper: isUpper, mood: mood, pet: pet)
+        setPetDialogueAction(action)
+    }
+
+    private func stopPetDialogueTouching() {
+        guard isPetDialogueTouching else { return }
+        isPetDialogueTouching = false
+        let duration = Date().timeIntervalSince(petDialogueTouchStartTime ?? Date())
+        petDialogueTouchStartTime = nil
+        let touchedAction = petDialogueAction
+
+        if duration < 0.3 {
+            applyPetDialogueTouchFeedback(for: touchedAction)
+        }
+
+        let workItem = DispatchWorkItem {
+            withAnimation(.easeIn(duration: 0.15)) {
+                petDialogueAction = "idle"
+            }
+            petDialogueTouchReleaseWorkItem = nil
+        }
+        petDialogueTouchReleaseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
+    private func petDialogueTouchAction(isUpper: Bool, mood: Double, pet: PetCharacter) -> String {
+        let random = Double.random(in: 0...1)
+        if isUpper {
+            if mood < 50 {
+                if random < 0.6 {
+                    return firstAvailablePetDialogueAction(["angry_click", "enjoy_click"], pet: pet)
+                }
+                return firstAvailablePetDialogueAction(["enjoy_click", "angry_click"], pet: pet)
+            }
+            if random < 0.9 {
+                return firstAvailablePetDialogueAction(["enjoy_click", "angry_click"], pet: pet)
+            }
+            return firstAvailablePetDialogueAction(["angry_click", "enjoy_click"], pet: pet)
+        }
+
+        if mood < 50 {
+            if random < 0.6 {
+                return firstAvailablePetDialogueAction(["angry_click", "rolling"], pet: pet)
+            }
+            return firstAvailablePetDialogueAction(["rolling", "angry_click"], pet: pet)
+        }
+        if random < 0.9 {
+            return firstAvailablePetDialogueAction(["rolling", "angry_click"], pet: pet)
+        }
+        return firstAvailablePetDialogueAction(["angry_click", "rolling"], pet: pet)
+    }
+
+    private func firstAvailablePetDialogueAction(_ actions: [String], pet: PetCharacter) -> String {
+        for action in actions {
+            let videoName = "\(pet.id)_\(action)"
+            if VideoResourceManager.shared.isVideoAvailable(name: videoName) {
+                return action
+            }
+        }
+        return "idle"
+    }
+
+    private func applyPetDialogueTouchFeedback(for action: String) {
+        let moodIncrease = 5.0
+        var status = PetDataManager.shared.status
+        status.mood = min(100, status.mood + moodIncrease)
+        PetDataManager.shared.saveStatus(status)
+        adoptionViewModel.status = status
+        adoptionViewModel.showFloatingText("心情 +\(Int(moodIncrease))", style: .mood)
+
+        if action == "angry_click" {
+            adoptionViewModel.showFloatingText("别碰我！", style: .warning)
+            Task { @MainActor in
+                PetVoiceManager.shared.speak("别碰我！", for: currentCharacter.aiRole)
+            }
+            return
+        }
+
+        let interactions = ["蹭蹭~", "喵~", "主人最好了", "好舒服喵", "还要摸摸"]
+        let randomText = interactions.randomElement() ?? "喵~"
+        let localizedText = currentCharacter.localizedCatchphraseText(randomText)
+        Task { @MainActor in
+            PetVoiceManager.shared.speak(localizedText, for: currentCharacter.aiRole)
+        }
+    }
+
+    private var petTouchFeedbackOverlay: some View {
+        ZStack {
+            ForEach(adoptionViewModel.floatingTexts) { textData in
+                StyledFloatingText(text: textData.text, style: textData.style)
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.5, anchor: .bottom)
+                                .combined(with: .opacity)
+                                .combined(with: .offset(y: 40)),
+                            removal: .opacity.animation(.easeOut(duration: 0.8))
+                                .combined(with: .scale(scale: 1.5).animation(.easeOut(duration: 0.8)))
+                                .combined(with: .offset(y: -40).animation(.easeOut(duration: 0.8)))
+                        )
+                    )
+                    .zIndex(Double(textData.id.hashValue))
+                    .offset(
+                        x: -min(120, UIScreen.main.bounds.width * 0.26) + textData.offset.width,
+                        y: -min(210, UIScreen.main.bounds.height * 0.28) + textData.offset.height
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: adoptionViewModel.floatingTexts.count)
     }
 
     private func handleWardrobeStatistics() {
@@ -1749,18 +2026,14 @@ struct PetChatViewLegacy: View {
             let responseText: String
             if resolution.results.isEmpty {
                 if resolution.normalizedQuery.isEmpty {
-                    responseText = localizedCatchphraseText("我先把你衣橱里的标签和类型记住啦～你可以直接试试这句：\(resolution.suggestedPrompt)")
+                    responseText = localizedCatchphraseText("想找什么就直接告诉我吧，比如：\(resolution.suggestedPrompt)")
                 } else {
-                    let learnedTerms = resolution.matchedTerms.joined(separator: "、")
                     responseText = localizedCatchphraseText(
-                        learnedTerms.isEmpty
-                        ? "喵… 没找到完全对得上的单品。你可以试试这样问我：\(resolution.suggestedPrompt)"
-                        : "喵… 没找到完全同名的，但我已经按你常用的词「\(learnedTerms)」学着找了。你可以试试这样问我：\(resolution.suggestedPrompt)"
+                        "喵… 这次还没找到合适的。你可以试试这样问我：\(resolution.suggestedPrompt)"
                     )
                 }
             } else {
-                let termSuffix = resolution.matchedTerms.isEmpty ? "" : "，还顺着你常用的词「\(resolution.matchedTerms.joined(separator: "、"))」一起找了"
-                responseText = "（眼睛发亮）找到\(resolution.results.count)件相关的单品\(termSuffix)，主人快看看~"
+                responseText = "（眼睛发亮）找到\(resolution.results.count)件相关的单品，主人快看看~"
             }
             
             let message = PetChatMessage(

@@ -3,10 +3,35 @@ import SwiftUI
 struct PetChatBubble: View {
     let message: PetChatMessage
     let petName: String
+    let assistantExpressionVideoName: String?
+    let onExpressionTouchBegan: ((CGPoint, CGSize) -> Void)?
+    let onExpressionTouchEnded: (() -> Void)?
     let onCardTap: (Clothing) -> Void
     let onSearchResultTap: (Clothing) -> Void
     let onOutfitTap: (OutfitSuggestionData) -> Void
     let onWidgetAction: (PetWidgetOption, UUID) -> Void
+
+    init(
+        message: PetChatMessage,
+        petName: String,
+        assistantExpressionVideoName: String? = nil,
+        onExpressionTouchBegan: ((CGPoint, CGSize) -> Void)? = nil,
+        onExpressionTouchEnded: (() -> Void)? = nil,
+        onCardTap: @escaping (Clothing) -> Void,
+        onSearchResultTap: @escaping (Clothing) -> Void,
+        onOutfitTap: @escaping (OutfitSuggestionData) -> Void,
+        onWidgetAction: @escaping (PetWidgetOption, UUID) -> Void
+    ) {
+        self.message = message
+        self.petName = petName
+        self.assistantExpressionVideoName = assistantExpressionVideoName
+        self.onExpressionTouchBegan = onExpressionTouchBegan
+        self.onExpressionTouchEnded = onExpressionTouchEnded
+        self.onCardTap = onCardTap
+        self.onSearchResultTap = onSearchResultTap
+        self.onOutfitTap = onOutfitTap
+        self.onWidgetAction = onWidgetAction
+    }
 
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
@@ -54,7 +79,9 @@ struct PetChatBubble: View {
                     .padding(.leading, 4)
                 }
 
-                if let expressionImageName = standaloneExpressionImageName {
+                if let expressionVideoName = standaloneExpressionVideoName {
+                    standaloneExpressionVideoView(videoName: expressionVideoName)
+                } else if let expressionImageName = standaloneExpressionImageName {
                     standaloneExpressionView(imageName: expressionImageName)
                 }
                 
@@ -280,6 +307,14 @@ struct PetChatBubble: View {
         return resolvedBubbleImageName(from: speakerPetCharacter.chatExpressionImageName(for: meaning))
     }
 
+    private var standaloneExpressionVideoName: String? {
+        guard !message.isUser, message.type == .text || message.type == .thinking else {
+            return nil
+        }
+        guard let assistantExpressionVideoName else { return nil }
+        return assistantExpressionVideoName
+    }
+
     @ViewBuilder
     private func standaloneExpressionView(imageName: String) -> some View {
         if let image = UIImage(named: imageName) {
@@ -290,6 +325,29 @@ struct PetChatBubble: View {
                 .padding(.leading, 4)
                 .transition(.opacity.combined(with: .scale))
         }
+    }
+
+    private func standaloneExpressionVideoView(videoName: String) -> some View {
+        let expressionSize: CGFloat = 116
+        return SeamlessVideoPlayer(
+            videoName: videoName,
+            isLooping: true,
+            isMuted: true,
+            volume: 0,
+            onFinished: nil
+        )
+        .frame(width: expressionSize, height: expressionSize)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    onExpressionTouchBegan?(value.location, CGSize(width: expressionSize, height: expressionSize))
+                }
+                .onEnded { _ in
+                    onExpressionTouchEnded?()
+                }
+        )
+        .padding(.leading, 4)
     }
 
     @ViewBuilder
