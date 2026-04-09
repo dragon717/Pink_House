@@ -4,6 +4,7 @@ import StoreKit
 struct VIPCenterView: View {
     @ObservedObject private var vipManager = VIPManager.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     @State private var showingPurchaseAlert = false
     @State private var alertMessage = ""
@@ -645,23 +646,38 @@ struct VIPCenterView: View {
 
     private var agreementSection: some View {
         VStack(spacing: 8) {
-            Button {
-                hasAcceptedVIPAgreements.toggle()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: hasAcceptedVIPAgreements ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(hasAcceptedVIPAgreements ? visualTheme.accentColor : Color.white.opacity(0.74))
-                    Text("请阅读并同意")
-                        .foregroundStyle(Color.white.opacity(0.62))
-                    Text("会员协议")
-                        .foregroundStyle(.white)
-                    Text("使用协议")
-                        .foregroundStyle(.white)
+            HStack(spacing: 6) {
+                Button {
+                    hasAcceptedVIPAgreements.toggle()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: hasAcceptedVIPAgreements ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(hasAcceptedVIPAgreements ? visualTheme.accentColor : Color.white.opacity(0.74))
+                        Text("请阅读并同意")
+                            .foregroundStyle(Color.white.opacity(0.62))
+                    }
                 }
-                .font(.system(size: 10, weight: .medium))
+                .buttonStyle(.plain)
+
+                Button("会员协议") {
+                    openURL(LegalLinks.vipAgreementURL)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .underline()
+
+                Text("和")
+                    .foregroundStyle(Color.white.opacity(0.62))
+
+                Button("使用协议") {
+                    openURL(LegalLinks.userAgreementURL)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .underline()
             }
-            .buttonStyle(.plain)
+            .font(.system(size: 10, weight: .medium))
 
             Text("VIP 为喵币兑换型权益，不自动续费。")
                 .font(.system(size: 9, weight: .medium))

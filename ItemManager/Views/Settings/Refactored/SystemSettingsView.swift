@@ -80,6 +80,11 @@ struct SystemSettingsView: View {
                     Label("隐私与系统权限", systemImage: "hand.raised")
                 }
                 .adaptiveRow()
+
+                NavigationLink(destination: LegalAndContactView()) {
+                    Label("关于与协议", systemImage: "doc.text")
+                }
+                .adaptiveRow()
                 
                 Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -418,6 +423,91 @@ private struct SystemSettingsBackupConfirmationDialog: View {
             )
             .padding(.horizontal, 24)
             .captureGuideTarget(.localBackupConfirmationDialog)
+        }
+    }
+}
+
+struct LegalAndContactView: View {
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        AdaptiveSettingsView(title: "关于与协议") {
+            AdaptiveSection(header: "协议中心") {
+                Button {
+                    openURL(LegalLinks.privacyURL)
+                } label: {
+                    Label("隐私政策", systemImage: "hand.raised")
+                }
+                .adaptiveRow()
+
+                Button {
+                    openURL(LegalLinks.userAgreementURL)
+                } label: {
+                    Label("用户协议", systemImage: "doc.text")
+                }
+                .adaptiveRow()
+
+                Button {
+                    openURL(LegalLinks.vipAgreementURL)
+                } label: {
+                    Label("会员协议", systemImage: "crown")
+                }
+                .adaptiveRow()
+
+                Button {
+                    openURL(LegalLinks.contactURL)
+                } label: {
+                    Label("联系我们（网页）", systemImage: "link")
+                }
+                .adaptiveRow(showDivider: false)
+            }
+
+            AdaptiveSection(header: "联系我们") {
+                HStack {
+                    Label("小红书", systemImage: "person.crop.circle")
+                    Spacer()
+                    Text(LegalLinks.xiaohongshuHandle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .adaptiveRow()
+
+                HStack {
+                    Label("小红书号", systemImage: "number")
+                    Spacer()
+                    Text(LegalLinks.xiaohongshuID)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .adaptiveRow()
+
+                Button {
+                    openURL(LegalLinks.supportEmailURL)
+                } label: {
+                    Label("邮箱：huangsangmuniao@126.com", systemImage: "envelope")
+                }
+                .adaptiveRow(showDivider: false)
+            }
+
+            AdaptiveSection(header: "备案与版权") {
+                HStack {
+                    Label("备案号", systemImage: "doc.plaintext")
+                    Spacer()
+                    Text(LegalLinks.icpText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .adaptiveRow()
+
+                HStack {
+                    Label("版权", systemImage: "c.circle")
+                    Spacer()
+                    Text(LegalLinks.copyrightText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .adaptiveRow(showDivider: false)
+            }
         }
     }
 }

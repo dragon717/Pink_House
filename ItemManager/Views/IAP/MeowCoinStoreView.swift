@@ -6,6 +6,7 @@ import SwiftUI
 struct MeowCoinStoreView: View {
     @StateObject private var viewModel = IAPViewModel.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
@@ -219,7 +220,7 @@ struct MeowCoinStoreView: View {
                     .foregroundStyle(.secondary)
 
                 Button("用户服务协议") {
-                    // 打开用户协议
+                    openURL(LegalLinks.userAgreementURL)
                 }
                 .font(.caption)
 
@@ -228,7 +229,7 @@ struct MeowCoinStoreView: View {
                     .foregroundStyle(.secondary)
 
                 Button("隐私政策") {
-                    // 打开隐私政策
+                    openURL(LegalLinks.privacyURL)
                 }
                 .font(.caption)
             }

@@ -221,6 +221,16 @@ struct MeView: View {
                         .buttonStyle(PlainButtonStyle())
                         .captureGuideTarget(.systemSettingsEntry)
 
+                        NavigationLink(destination: LegalAndContactView()) {
+                            SettingsGridItem(
+                                title: "联系我们",
+                                subtitle: "协议 · 备案 · 邮箱",
+                                icon: "envelope.fill",
+                                iconColor: .mint
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
                         if shouldShowAdminEntries {
                             NavigationLink(destination: NoticeAdminView()) {
                                 SettingsGridItem(

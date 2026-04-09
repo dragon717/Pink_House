@@ -20,3 +20,16 @@ enum HomeTab {
     case depositPlan
 }
 
+enum LegalLinks {
+    static let privacyURL = URL(string: "https://sangsang.online/privacy/")!
+    static let userAgreementURL = URL(string: "https://sangsang.online/user-agreement/")!
+    static let vipAgreementURL = URL(string: "https://sangsang.online/vip-agreement/")!
+    static let contactURL = URL(string: "https://sangsang.online/contact/")!
+    static let supportEmailURL = URL(string: "mailto:huangsangmuniao@126.com")!
+
+    static let xiaohongshuHandle = "@少女心愿（衣橱管家）"
+    static let xiaohongshuID = "3621744284"
+
+    static let icpText = "沪ICP备2026008696号-1A"
+    static let copyrightText = "© 2026 桑桑桑 Inc."
+}
