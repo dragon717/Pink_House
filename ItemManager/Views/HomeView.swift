@@ -287,8 +287,7 @@ struct HomeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .guideRequestWardrobeManualCreate)) { _ in
                 guard selectedTab == .wardrobe else { return }
-                continueFromDraft = false
-                showingAddSheet = true
+                presentWardrobeManualCreate()
             }
             .onReceive(NotificationCenter.default.publisher(for: .guideRequestWardrobeBatchImport)) { _ in
                 guard selectedTab == .wardrobe else { return }
@@ -1197,6 +1196,9 @@ struct HomeView: View {
 
     private func presentWardrobeManualCreate() {
         notifyWardrobeAddMenuOpened()
+        // 手动创建是一次“重新开始”动作，只在入口点击时清理旧草稿；
+        // 前后台切换导致的编辑页重建不应再次清空。
+        draftManager.clearDraft()
         continueFromDraft = false
         showingAddSheet = true
     }

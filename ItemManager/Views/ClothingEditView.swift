@@ -547,11 +547,6 @@ struct ClothingEditView: View {
                 print("ClothingEditView: Found draft with \(draft.imagePaths.count) images")
                 // 恢复草稿
                 restoreFromDraft(draft)
-            } else if !continueFromDraft {
-                // 用户选择"手动创建"，需要清除草稿并重新开始
-                print("ClothingEditView: Creating new item (manual creation), clearing draft")
-                draftManager.clearDraft()
-                resetAllStates()
             } else {
                 print("ClothingEditView: No draft found to restore")
             }
