@@ -5,6 +5,7 @@ import UIKit
 struct VIPCenterView: View {
     @ObservedObject private var vipManager = VIPManager.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var showingPurchaseAlert = false
     @State private var alertMessage = ""
@@ -30,6 +31,23 @@ struct VIPCenterView: View {
 
     private var selectedPlan: VIPPlan {
         vipManager.availablePlans.first(where: { $0.id == selectedPlanID }) ?? vipManager.availablePlans[0]
+    }
+
+    private var typographyScale: CGFloat {
+        guard horizontalSizeClass == .compact else { return 1.0 }
+        let screenHeight = UIScreen.main.bounds.height
+        switch screenHeight {
+        case ...852:
+            return 0.84
+        case ...932:
+            return 0.88
+        default:
+            return 0.92
+        }
+    }
+
+    private func scaledFont(_ baseSize: CGFloat) -> CGFloat {
+        max(8.5, baseSize * typographyScale)
     }
 
     private var heroSubtitle: String {
@@ -406,9 +424,9 @@ struct VIPCenterView: View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 Text("少女心愿")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: scaledFont(18), weight: .semibold))
                 Text("VIP")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: scaledFont(12), weight: .bold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(visualTheme.accentColor.opacity(0.18)))
@@ -480,12 +498,12 @@ struct VIPCenterView: View {
     private var heroSection: some View {
         VStack(spacing: 14) {
             Text(vipManager.isVIP ? "守护少女每一份美好" : "给你的心愿一份更尊贵的守护")
-                .font(.system(size: 26, weight: .bold))
+                .font(.system(size: scaledFont(26), weight: .bold))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 
             Text(heroSubtitle)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: scaledFont(14), weight: .medium))
                 .foregroundStyle(visualTheme.secondaryTextColor)
                 .multilineTextAlignment(.center)
 
@@ -495,15 +513,15 @@ struct VIPCenterView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         Image(systemName: vipManager.isVIP ? "checkmark.seal.fill" : "sparkles")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: scaledFont(18), weight: .bold))
                             .foregroundStyle(visualTheme.primaryGlassStyle.iconTint)
                         Text(statusTitle)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: scaledFont(16), weight: .semibold))
                             .foregroundStyle(.white)
                     }
 
                     Text(statusDescription)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: scaledFont(13), weight: .medium))
                         .foregroundStyle(Color.white.opacity(0.74))
                         .multilineTextAlignment(.center)
 
@@ -518,7 +536,7 @@ struct VIPCenterView: View {
             .frame(height: 154)
 
             Text("会员权益")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: scaledFont(16), weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.76))
                 .padding(.top, 4)
         }
@@ -561,11 +579,11 @@ struct VIPCenterView: View {
                         HStack(alignment: .top, spacing: 8) {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(plan.title)
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(.system(size: scaledFont(17), weight: .bold))
                                     .foregroundStyle(.white)
 
                                 Text(plan.subtitle)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(.system(size: scaledFont(12), weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.7))
                             }
 
@@ -597,16 +615,16 @@ struct VIPCenterView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("兑换\(selectedPlan.title)会员")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: scaledFont(18), weight: .bold))
                         Text("开通后立即生效，可叠加有效期")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: scaledFont(12), weight: .medium))
                             .foregroundStyle(Color.black.opacity(0.68))
                     }
 
                     Spacer()
 
                     Text("\(selectedPlan.meowCoins)喵币")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: scaledFont(16), weight: .bold))
                 }
                 .foregroundStyle(Color.black.opacity(0.92))
                 .padding(.horizontal, 18)
@@ -636,7 +654,7 @@ struct VIPCenterView: View {
                 showCoinStore = true
             } label: {
                 Text("喵币不足？前往商店获取喵币")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: scaledFont(12), weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.72))
                     .underline()
             }
@@ -652,7 +670,7 @@ struct VIPCenterView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: hasAcceptedVIPAgreements ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: scaledFont(11), weight: .semibold))
                             .foregroundStyle(hasAcceptedVIPAgreements ? visualTheme.accentColor : Color.white.opacity(0.74))
                         Text("请阅读并同意")
                             .foregroundStyle(Color.white.opacity(0.62))
@@ -677,10 +695,10 @@ struct VIPCenterView: View {
                 .foregroundStyle(.white)
                 .underline()
             }
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: scaledFont(10), weight: .medium))
 
             Text("VIP 为喵币兑换型权益，不自动续费。")
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: scaledFont(9), weight: .medium))
                 .foregroundStyle(Color.white.opacity(0.5))
                 .multilineTextAlignment(.center)
         }
@@ -752,17 +770,17 @@ struct VIPCenterView: View {
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: benefit.icon)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: scaledFont(22), weight: .bold))
                     .foregroundStyle((benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
 
                 Spacer(minLength: 0)
 
                 Text(benefit.title)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: scaledFont(16), weight: .bold))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.leading)
 
-                benefitSubtitleView(for: benefit, fontSize: 11)
+                benefitSubtitleView(for: benefit, fontSize: scaledFont(11))
             }
             .padding(14)
             .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
@@ -782,14 +800,14 @@ struct VIPCenterView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: benefit.icon)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: scaledFont(20), weight: .bold))
                     .foregroundStyle((benefit.preferredGlassStyle ?? visualTheme.secondaryGlassStyle).iconTint)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(benefit.title)
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: scaledFont(17), weight: .bold))
                         .foregroundStyle(.white)
-                    benefitSubtitleView(for: benefit, fontSize: 12)
+                    benefitSubtitleView(for: benefit, fontSize: scaledFont(12))
                 }
                 Spacer()
             }
@@ -815,7 +833,7 @@ struct VIPCenterView: View {
                         .stroke(Color.white.opacity(0.14), lineWidth: 1)
                 )
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: scaledFont(14), weight: .bold))
                 .foregroundStyle(.white)
         }
         .frame(width: 42, height: 42)
@@ -824,7 +842,7 @@ struct VIPCenterView: View {
 
     private func heroTag(text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: scaledFont(11), weight: .bold))
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
