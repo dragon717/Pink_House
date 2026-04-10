@@ -86,10 +86,14 @@ struct PetChatBubble: View {
                 }
 
                 if let expressionVideoName = standaloneExpressionVideoName {
-                    standaloneExpressionMediaView(
-                        videoName: expressionVideoName,
-                        imageName: standaloneExpressionImageName ?? defaultPetExpressionImageName
-                    )
+                    if let expressionImageName = standaloneExpressionImageName {
+                        standaloneExpressionMediaView(
+                            videoName: expressionVideoName,
+                            imageName: expressionImageName
+                        )
+                    } else {
+                        standaloneExpressionVideoView(videoName: expressionVideoName)
+                    }
                 } else if let expressionImageName = standaloneExpressionImageName {
                     standaloneExpressionView(imageName: expressionImageName)
                 }
