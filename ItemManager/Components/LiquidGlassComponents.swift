@@ -55,23 +55,9 @@ struct LiquidBackground: View {
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
                 }
-            } else {
-                // 2. Decorative Orbs (Only for solid color background)
-                // These add depth to the solid color
-                Circle()
-                    .fill(Color.pink.opacity(0.3))
-                    .frame(width: 300, height: 300)
-                    .blur(radius: 60)
-                    .offset(x: -100, y: -200)
-                
-                Circle()
-                    .fill(Color.blue.opacity(0.2))
-                    .frame(width: 250, height: 250)
-                    .blur(radius: 60)
-                    .offset(x: 100, y: 150)
             }
             
-            // 3. Blur Layer (Material Overlay)
+            // 2. Blur Layer (Material Overlay)
             if themeManager.isBlurEnabled {
                 Rectangle()
                     .foregroundStyle(.ultraThinMaterial)
@@ -140,5 +126,4 @@ extension View {
         modifier(OutlinedText())
     }
 }
-
 

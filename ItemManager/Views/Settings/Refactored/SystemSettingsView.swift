@@ -428,34 +428,32 @@ private struct SystemSettingsBackupConfirmationDialog: View {
 }
 
 struct LegalAndContactView: View {
-    @Environment(\.openURL) private var openURL
-
     var body: some View {
         AdaptiveSettingsView(title: "关于与协议") {
             AdaptiveSection(header: "协议中心") {
                 Button {
-                    openURL(LegalLinks.privacyURL)
+                    openExternalURL(LegalLinks.privacyURL)
                 } label: {
                     Label("隐私政策", systemImage: "hand.raised")
                 }
                 .adaptiveRow()
 
                 Button {
-                    openURL(LegalLinks.userAgreementURL)
+                    openExternalURL(LegalLinks.userAgreementURL)
                 } label: {
                     Label("用户协议", systemImage: "doc.text")
                 }
                 .adaptiveRow()
 
                 Button {
-                    openURL(LegalLinks.vipAgreementURL)
+                    openExternalURL(LegalLinks.vipAgreementURL)
                 } label: {
                     Label("会员协议", systemImage: "crown")
                 }
                 .adaptiveRow()
 
                 Button {
-                    openURL(LegalLinks.contactURL)
+                    openExternalURL(LegalLinks.contactURL)
                 } label: {
                     Label("联系我们（网页）", systemImage: "link")
                 }
@@ -482,7 +480,7 @@ struct LegalAndContactView: View {
                 .adaptiveRow()
 
                 Button {
-                    openURL(LegalLinks.supportEmailURL)
+                    openExternalURL(LegalLinks.supportEmailURL)
                 } label: {
                     Label("邮箱：huangsangmuniao@126.com", systemImage: "envelope")
                 }
@@ -509,5 +507,11 @@ struct LegalAndContactView: View {
                 .adaptiveRow(showDivider: false)
             }
         }
+    }
+
+    private func openExternalURL(_ url: URL) {
+#if canImport(UIKit)
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+#endif
     }
 }

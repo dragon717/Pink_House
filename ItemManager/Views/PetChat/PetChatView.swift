@@ -152,7 +152,7 @@ struct PetChatView: View {
         return 136
     }
 
-    private var petDialogueResolvedVideoName: String {
+    private var petDialogueResolvedVideoName: String? {
         resolvedPetDialogueVideoName(for: petDialogueAction)
     }
 
@@ -2002,27 +2002,34 @@ struct PetChatView: View {
             Spacer()
             HStack {
                 Spacer()
-                SeamlessVideoPlayer(
-                    videoName: petDialogueResolvedVideoName,
-                    isLooping: petDialogueVideoLoops,
-                    isMuted: true,
-                    volume: 0,
-                    onFinished: { handlePetDialogueVideoFinished() }
-                )
-                .frame(width: stageSize, height: stageSize)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            startPetDialogueTouching(
-                                at: value.location,
-                                in: CGSize(width: stageSize, height: stageSize)
-                            )
-                        }
-                        .onEnded { _ in
-                            stopPetDialogueTouching()
-                        }
-                )
+                if let videoName = petDialogueResolvedVideoName {
+                    SeamlessVideoPlayer(
+                        videoName: videoName,
+                        isLooping: petDialogueVideoLoops,
+                        isMuted: true,
+                        volume: 0,
+                        onFinished: { handlePetDialogueVideoFinished() }
+                    )
+                    .frame(width: stageSize, height: stageSize)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                startPetDialogueTouching(
+                                    at: value.location,
+                                    in: CGSize(width: stageSize, height: stageSize)
+                                )
+                            }
+                            .onEnded { _ in
+                                stopPetDialogueTouching()
+                            }
+                    )
+                } else {
+                    Image(currentCharacter.happyImageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: stageSize * 0.62, height: stageSize * 0.62)
+                }
             }
             .padding(.trailing, 8)
             .padding(.bottom, petDialogueBottomPadding)
@@ -2088,7 +2095,7 @@ struct PetChatView: View {
         setPetDialogueAction("idle")
     }
 
-    private func resolvedPetDialogueVideoName(for action: String) -> String {
+    private func resolvedPetDialogueVideoName(for action: String) -> String? {
         let pet = PetDataManager.shared.getCurrentPetCharacter()
         let candidate = "\(pet.id)_\(action)"
         if VideoResourceManager.shared.isVideoAvailable(name: candidate) {
@@ -2106,7 +2113,7 @@ struct PetChatView: View {
         if VideoResourceManager.shared.isVideoAvailable(name: petIdle) {
             return petIdle
         }
-        return "naicha_idle"
+        return nil
     }
 
     private func startPetDialogueTouching(at location: CGPoint, in size: CGSize) {

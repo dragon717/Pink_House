@@ -86,7 +86,10 @@ struct PetChatBubble: View {
                 }
 
                 if let expressionVideoName = standaloneExpressionVideoName {
-                    standaloneExpressionVideoView(videoName: expressionVideoName)
+                    standaloneExpressionMediaView(
+                        videoName: expressionVideoName,
+                        imageName: standaloneExpressionImageName ?? defaultPetExpressionImageName
+                    )
                 } else if let expressionImageName = standaloneExpressionImageName {
                     standaloneExpressionView(imageName: expressionImageName)
                 }
@@ -354,6 +357,14 @@ struct PetChatBubble: View {
                 }
         )
         .padding(.leading, 4)
+    }
+
+    @ViewBuilder
+    private func standaloneExpressionMediaView(videoName: String, imageName: String) -> some View {
+        HStack(alignment: .center, spacing: 2) {
+            standaloneExpressionVideoView(videoName: videoName)
+            standaloneExpressionView(imageName: imageName)
+        }
     }
 
     @ViewBuilder

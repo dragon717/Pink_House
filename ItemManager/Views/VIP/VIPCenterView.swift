@@ -1,10 +1,10 @@
 import SwiftUI
 import StoreKit
+import UIKit
 
 struct VIPCenterView: View {
     @ObservedObject private var vipManager = VIPManager.shared
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
 
     @State private var showingPurchaseAlert = false
     @State private var alertMessage = ""
@@ -661,7 +661,7 @@ struct VIPCenterView: View {
                 .buttonStyle(.plain)
 
                 Button("会员协议") {
-                    openURL(LegalLinks.vipAgreementURL)
+                    openExternalURL(LegalLinks.vipAgreementURL)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
@@ -671,7 +671,7 @@ struct VIPCenterView: View {
                     .foregroundStyle(Color.white.opacity(0.62))
 
                 Button("使用协议") {
-                    openURL(LegalLinks.userAgreementURL)
+                    openExternalURL(LegalLinks.userAgreementURL)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
@@ -740,6 +740,10 @@ struct VIPCenterView: View {
                     )
             )
             .shadow(color: isSelected ? visualTheme.glowColor.opacity(0.12) : .clear, radius: 10, x: 0, y: 6)
+    }
+
+    private func openExternalURL(_ url: URL) {
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 
     private func benefitCard(for benefit: VIPBenefit) -> some View {

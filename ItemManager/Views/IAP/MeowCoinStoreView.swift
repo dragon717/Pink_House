@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 喵币商店页面
 // 用户购买喵币的主要界面
@@ -6,7 +7,6 @@ import SwiftUI
 struct MeowCoinStoreView: View {
     @StateObject private var viewModel = IAPViewModel.shared
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
@@ -220,7 +220,7 @@ struct MeowCoinStoreView: View {
                     .foregroundStyle(.secondary)
 
                 Button("用户服务协议") {
-                    openURL(LegalLinks.userAgreementURL)
+                    openExternalURL(LegalLinks.userAgreementURL)
                 }
                 .font(.caption)
 
@@ -229,13 +229,17 @@ struct MeowCoinStoreView: View {
                     .foregroundStyle(.secondary)
 
                 Button("隐私政策") {
-                    openURL(LegalLinks.privacyURL)
+                    openExternalURL(LegalLinks.privacyURL)
                 }
                 .font(.caption)
             }
         }
         .padding(.horizontal)
         .padding(.top, 8)
+    }
+
+    private func openExternalURL(_ url: URL) {
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 }
 

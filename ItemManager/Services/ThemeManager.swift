@@ -85,7 +85,7 @@ class ThemeManager {
     }
     
     // MARK: - Card Settings
-    var cardStyle: CardStyle = .transparent {
+    var cardStyle: CardStyle = .solid {
         didSet {
             UserDefaults.standard.set(cardStyle.rawValue, forKey: "theme_card_style")
         }
@@ -215,7 +215,7 @@ class ThemeManager {
     }
 
     // MARK: - Color Settings
-    var backgroundColorHex: String = "#FFE6EF" { // 默认莫妮卡粉背景色
+    var backgroundColorHex: String = "#F4DADB" { // 默认浅樱粉背景色
         didSet {
             UserDefaults.standard.set(backgroundColorHex, forKey: "theme_background_color")
             updateAdaptivePalette()
@@ -453,7 +453,7 @@ class ThemeManager {
 
     /// 当前应用版本号（用于强制重置默认主题）
     private static let appVersionKey = "app_theme_version"
-    private static let targetVersion = "1.0.2" // 目标版本号，当版本变化时触发重置
+    private static let targetVersion = "1.0.3" // 目标版本号，当版本变化时触发重置
 
     /// 检查并根据版本号应用默认主题
     private func checkAndApplyVersionBasedDefaultTheme() {
@@ -481,10 +481,11 @@ class ThemeManager {
         let hasCustomImageBackground = (backgroundStyle == .image && backgroundImage != nil)
         
         if !hasCustomImageBackground {
-            // 用户没有自定义图片背景，才应用莫妮卡粉主题
-            // 重置背景色为莫妮卡粉
-            self.backgroundColorHex = "#FFE6EF"
+            // 用户没有自定义图片背景，才应用默认柔和粉白主题
+            self.backgroundColorHex = "#F4DADB"
             self.backgroundStyle = .color
+            self.isBlurEnabled = false
+            self.cardStyle = .solid
 
             // 重置为客制化配色模式，设置莫妮卡粉主题
             var newConfig = themeColorConfig

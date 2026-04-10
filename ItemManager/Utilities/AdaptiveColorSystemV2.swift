@@ -244,14 +244,14 @@ struct CustomColorConfig: Codable {
         currentCustom: UserCustomTheme(
             id: "custom_current",
             name: "自定义",
-            textPrimaryRGBA: ColorRGBA(r: 0.55, g: 0.35, b: 0.45),
-            textSecondaryRGBA: ColorRGBA(r: 0.70, g: 0.50, b: 0.60),
-            textTertiaryRGBA: ColorRGBA(r: 0.80, g: 0.65, b: 0.72),
-            textAccentRGBA: ColorRGBA(r: 0.95, g: 0.45, b: 0.65),
+            textPrimaryRGBA: ColorRGBA(r: 0.369, g: 0.337, b: 0.353),
+            textSecondaryRGBA: ColorRGBA(r: 0.541, g: 0.502, b: 0.525),
+            textTertiaryRGBA: ColorRGBA(r: 0.714, g: 0.667, b: 0.690),
+            textAccentRGBA: ColorRGBA(r: 0.851, g: 0.663, b: 0.737),
             cardConfig: CardColorConfig(
-                backgroundRGBA: ColorRGBA(r: 1.0, g: 0.90, b: 0.94),
-                accentRGBA: ColorRGBA(r: 1.0, g: 0.65, b: 0.75),
-                secondaryRGBA: ColorRGBA(r: 1.0, g: 0.85, b: 0.90),
+                backgroundRGBA: ColorRGBA(r: 0.988, g: 0.980, b: 0.984),
+                accentRGBA: ColorRGBA(r: 0.878, g: 0.722, b: 0.784),
+                secondaryRGBA: ColorRGBA(r: 0.980, g: 0.976, b: 0.980),
                 depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0),
                 finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71)
             ),
@@ -322,14 +322,14 @@ enum CustomColorPresets {
     static let monicaPink = ThemePreset(
         id: "monica_pink",
         name: "莫妮卡粉",
-        textPrimaryRGBA: ColorRGBA(r: 0.55, g: 0.35, b: 0.45),
-        textSecondaryRGBA: ColorRGBA(r: 0.70, g: 0.50, b: 0.60),
-        textTertiaryRGBA: ColorRGBA(r: 0.80, g: 0.65, b: 0.72),
-        textAccentRGBA: ColorRGBA(r: 0.95, g: 0.45, b: 0.65),
+        textPrimaryRGBA: ColorRGBA(r: 0.369, g: 0.337, b: 0.353),
+        textSecondaryRGBA: ColorRGBA(r: 0.541, g: 0.502, b: 0.525),
+        textTertiaryRGBA: ColorRGBA(r: 0.714, g: 0.667, b: 0.690),
+        textAccentRGBA: ColorRGBA(r: 0.851, g: 0.663, b: 0.737),
         cardConfig: CardColorConfig(
-            backgroundRGBA: ColorRGBA(r: 1.0, g: 0.90, b: 0.94),
-            accentRGBA: ColorRGBA(r: 1.0, g: 0.65, b: 0.75),
-            secondaryRGBA: ColorRGBA(r: 1.0, g: 0.85, b: 0.90),
+            backgroundRGBA: ColorRGBA(r: 0.988, g: 0.980, b: 0.984),
+            accentRGBA: ColorRGBA(r: 0.878, g: 0.722, b: 0.784),
+            secondaryRGBA: ColorRGBA(r: 0.980, g: 0.976, b: 0.980),
             depositRGBA: ColorRGBA(r: 1.0, g: 0.84, b: 0.0),
             finalPaymentRGBA: ColorRGBA(r: 1.0, g: 0.41, b: 0.71)
         ),
