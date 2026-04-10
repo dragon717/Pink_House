@@ -66,7 +66,15 @@ struct ModernTabView: View {
     @State private var lastLoggedOrbitLayoutSignature: String?
 
     private let bottomAccessoryCatConfig = BottomAccessoryCatDiamondOrbitConfig()
-    private let tabBarStateTicker = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
+    // Reduce probe frequency to lower main-thread pressure during fast list scrolling.
+    private let tabBarStateTicker = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
+    private var isBottomCatProbeLoggingEnabled: Bool {
+#if DEBUG
+        UserDefaults.standard.bool(forKey: "debug.bottom_cat.probe_logging")
+#else
+        false
+#endif
+    }
     
     // MARK: - 动态 Tab 标题和图标
     private var smallWorldTabTitle: String {
@@ -296,9 +304,9 @@ struct ModernTabView: View {
     private func refreshCompactTabBarState() {
         let probeStart = CFAbsoluteTimeGetCurrent()
 
-        guard supportsBottomAccessoryCat, selectedTab != 3 else {
+        guard supportsBottomAccessoryCat, selectedTab != 1, selectedTab != 3 else {
             let signature = "disabled-tab-\(selectedTab)"
-            if lastLoggedCompactSignature != signature {
+            if isBottomCatProbeLoggingEnabled, lastLoggedCompactSignature != signature {
                 print("[BottomCat] probe disabled, selectedTab=\(selectedTab), supportsBottomAccessoryCat=\(supportsBottomAccessoryCat)")
                 lastLoggedCompactSignature = signature
             }
@@ -321,33 +329,35 @@ struct ModernTabView: View {
             frameText = "nil"
         }
         let signature = "compact=\(isBottomBarCompact)-frame=\(frameText)"
-        if lastLoggedCompactSignature != signature {
+        if isBottomCatProbeLoggingEnabled, lastLoggedCompactSignature != signature {
             print("[BottomCat] compactState changed -> compact=\(isBottomBarCompact), frame=\(frameText), showDiamond=\(shouldShowDiamondOrbitCat)")
             lastLoggedCompactSignature = signature
         }
 
-        let snapshots = TabBarItemAnchorResolver.tabBarDebugSnapshots()
-        let layoutSignature = snapshots
-            .map {
-                String(
-                    format: "d%ld %@:(%.1f,%.1f,%.1f,%.1f) a=%.2f h=%@",
-                    $0.depth,
-                    $0.className,
-                    $0.frame.minX,
-                    $0.frame.minY,
-                    $0.frame.width,
-                    $0.frame.height,
-                    $0.alpha,
-                    $0.isHidden ? "Y" : "N"
-                )
+        if isBottomCatProbeLoggingEnabled {
+            let snapshots = TabBarItemAnchorResolver.tabBarDebugSnapshots()
+            let layoutSignature = snapshots
+                .map {
+                    String(
+                        format: "d%ld %@:(%.1f,%.1f,%.1f,%.1f) a=%.2f h=%@",
+                        $0.depth,
+                        $0.className,
+                        $0.frame.minX,
+                        $0.frame.minY,
+                        $0.frame.width,
+                        $0.frame.height,
+                        $0.alpha,
+                        $0.isHidden ? "Y" : "N"
+                    )
+                }
+                .joined(separator: " | ")
+            if !layoutSignature.isEmpty, layoutSignature != lastLoggedTabBarLayoutSignature {
+                print("[BottomCat] tabBar subviews -> \(layoutSignature)")
+                lastLoggedTabBarLayoutSignature = layoutSignature
             }
-            .joined(separator: " | ")
-        if !layoutSignature.isEmpty, layoutSignature != lastLoggedTabBarLayoutSignature {
-            print("[BottomCat] tabBar subviews -> \(layoutSignature)")
-            lastLoggedTabBarLayoutSignature = layoutSignature
         }
 
-        if isBottomBarCompact, let frame = compactCenterPlatterFrame {
+        if isBottomCatProbeLoggingEnabled, isBottomBarCompact, let frame = compactCenterPlatterFrame {
             let orbitLayout = diamondOrbitLayout(frame: frame)
             let orbitSignature = String(
                 format: "anchor=(%.1f,%.1f) center=(%.1f,%.1f) size=(%.1f,%.1f) normalizedCenter=(%.3f,%.3f)",
@@ -367,7 +377,7 @@ struct ModernTabView: View {
         }
 
         let elapsedMs = (CFAbsoluteTimeGetCurrent() - probeStart) * 1000
-        if elapsedMs >= 6 {
+        if isBottomCatProbeLoggingEnabled, elapsedMs >= 6 {
             print(
                 String(
                     format: "[BottomCat] slow probe %.2fms, selectedTab=%d, compact=%@",

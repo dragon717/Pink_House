@@ -139,21 +139,21 @@ struct WardrobeView: View {
     }
     
     @ViewBuilder
-    private func clothingItemView(clothing: Clothing) -> some View {
+    private func clothingItemView(clothing: Clothing, firstFilteredID: UUID?) -> some View {
         if viewLayout == .grid6 {
-            guideSelectionAnchor(for: clothing) {
+            guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
                 ClothingThumbnail(clothing: clothing)
             }
         } else {
-            guideSelectionAnchor(for: clothing) {
+            guideSelectionAnchor(for: clothing, firstFilteredID: firstFilteredID) {
                 ClothingCard(clothing: clothing)
             }
         }
     }
 
     @ViewBuilder
-    private func guideSelectionAnchor<Content: View>(for clothing: Clothing, @ViewBuilder content: () -> Content) -> some View {
-        if clothing.id == filteredClothings.first?.id {
+    private func guideSelectionAnchor<Content: View>(for clothing: Clothing, firstFilteredID: UUID?, @ViewBuilder content: () -> Content) -> some View {
+        if clothing.id == firstFilteredID {
             content()
                 .captureGuideTarget(.wardrobeSelectionCard)
         } else {
@@ -260,6 +260,7 @@ struct WardrobeView: View {
                     }
                 } else {
                     saveOrder()
+                    visibleItemIDs.removeAll()
                     if !(isSelectionMode && (sortOption == .custom || isEditing)) {
                         editableClothings = []
                     }
@@ -272,6 +273,9 @@ struct WardrobeView: View {
                     }
                 } else {
                     selectedItemIDs.removeAll()
+                    if !isEditing {
+                        visibleItemIDs.removeAll()
+                    }
                     if (sortOption == .custom || isEditing) && !isEditing {
                         saveOrder()
                         editableClothings = []
@@ -611,12 +615,15 @@ struct WardrobeView: View {
             }
     }
 
-    private var displayedClothings: [Clothing] {
-        (isEditing || (isSelectionMode && sortOption == .custom)) ? editableClothings : filteredClothings
+    private var isReorderTrackingEnabled: Bool {
+        isEditing || (isSelectionMode && sortOption == .custom)
     }
 
     private var gridWardrobeView: some View {
         ScrollViewReader { proxy in
+            let filtered = filteredClothings
+            let displayed = isReorderTrackingEnabled ? editableClothings : filtered
+            let firstFilteredID = filtered.first?.id
             ZStack {
                 ScrollView {
                     VStack(spacing: 8) {
@@ -624,8 +631,8 @@ struct WardrobeView: View {
                             .padding(.horizontal, viewLayout == .grid6 ? 2 : 16)
 
                         LazyVGrid(columns: gridColumns, spacing: viewLayout == .grid6 ? 2 : 16) {
-                            ForEach(displayedClothings) { clothing in
-                                wardrobeGridCell(for: clothing)
+                            ForEach(displayed) { clothing in
+                                wardrobeGridCell(for: clothing, firstFilteredID: firstFilteredID)
                             }
                         }
                         .animation(isEditing ? .default : nil, value: editableClothings)
@@ -661,10 +668,10 @@ struct WardrobeView: View {
     }
 
     @ViewBuilder
-    private func wardrobeGridCell(for clothing: Clothing) -> some View {
+    private func wardrobeGridCell(for clothing: Clothing, firstFilteredID: UUID?) -> some View {
         if isSelectionMode {
             ZStack(alignment: .topTrailing) {
-                clothingItemView(clothing: clothing)
+                clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
 
                 Image(systemName: selectedItemIDs.contains(clothing.id) ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
@@ -677,8 +684,16 @@ struct WardrobeView: View {
             .onTapGesture {
                 toggleSelection(clothing.id)
             }
-            .onAppear { visibleItemIDs.insert(clothing.id) }
-            .onDisappear { visibleItemIDs.remove(clothing.id) }
+            .onAppear {
+                if isReorderTrackingEnabled {
+                    visibleItemIDs.insert(clothing.id)
+                }
+            }
+            .onDisappear {
+                if isReorderTrackingEnabled {
+                    visibleItemIDs.remove(clothing.id)
+                }
+            }
             .onDrag {
                 guard sortOption == .custom || isEditing else { return NSItemProvider() }
                 self.draggingItem = clothing
@@ -687,11 +702,19 @@ struct WardrobeView: View {
             .onDrop(of: [UTType.text], delegate: DropViewDelegate(item: clothing, items: $editableClothings, draggingItem: $draggingItem, isEditing: sortOption == .custom || isEditing, selectedItemIDs: selectedItemIDs))
         } else if isEditing {
             ZStack(alignment: .topTrailing) {
-                clothingItemView(clothing: clothing)
+                clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
             }
             .contentShape(Rectangle())
-            .onAppear { visibleItemIDs.insert(clothing.id) }
-            .onDisappear { visibleItemIDs.remove(clothing.id) }
+            .onAppear {
+                if isReorderTrackingEnabled {
+                    visibleItemIDs.insert(clothing.id)
+                }
+            }
+            .onDisappear {
+                if isReorderTrackingEnabled {
+                    visibleItemIDs.remove(clothing.id)
+                }
+            }
             .onDrag {
                 self.draggingItem = clothing
                 return NSItemProvider(object: clothing.id.uuidString as NSString)
@@ -700,7 +723,7 @@ struct WardrobeView: View {
         } else {
             NavigationLink(destination: ClothingDetailView(clothing: clothing)) {
                 ZStack(alignment: .topTrailing) {
-                    clothingItemView(clothing: clothing)
+                    clothingItemView(clothing: clothing, firstFilteredID: firstFilteredID)
                 }
             }
             .buttonStyle(.plain)
@@ -732,8 +755,16 @@ struct WardrobeView: View {
                     Label("删除", systemImage: "trash")
                 }
             }
-            .onAppear { visibleItemIDs.insert(clothing.id) }
-            .onDisappear { visibleItemIDs.remove(clothing.id) }
+            .onAppear {
+                if isReorderTrackingEnabled {
+                    visibleItemIDs.insert(clothing.id)
+                }
+            }
+            .onDisappear {
+                if isReorderTrackingEnabled {
+                    visibleItemIDs.remove(clothing.id)
+                }
+            }
         }
     }
     

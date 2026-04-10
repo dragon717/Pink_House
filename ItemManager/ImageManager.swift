@@ -21,6 +21,9 @@ class ImageManager {
     
     // Cache
     private let memoryCache = NSCache<NSString, UIImage>()
+    private var cachedImagesDirectory: URL?
+    private var cachedICloudAvailability: Bool?
+    private var hasLoggedICloudUnavailable = false
     
     // Memory Optimization Config
     @AppStorage("useAggressiveMemoryOptimization") private var useAggressiveMemoryOptimization = true {
@@ -100,6 +103,10 @@ class ImageManager {
     
     /// iCloud Documents 目录（用于自动同步图片）
     var imagesDirectory: URL {
+        if let cached = cachedImagesDirectory {
+            return cached
+        }
+
         // 使用 iCloud Documents 实现图片自动同步
         // 优先使用 iCloud Documents，如果不可用则回退到本地 Documents
         let fileManager = FileManager.default
@@ -116,15 +123,26 @@ class ImageManager {
                 } catch {
                     print("❌ 创建 iCloud Images 目录失败: \(error)")
                     // 回退到本地存储
-                    return localImagesDirectory
+                    let fallback = localImagesDirectory
+                    cachedImagesDirectory = fallback
+                    cachedICloudAvailability = false
+                    return fallback
                 }
             }
+            cachedImagesDirectory = imagesDirectory
+            cachedICloudAvailability = true
             return imagesDirectory
         }
         
         // 回退到本地 Documents
-        print("⚠️ 图片保存云端失败 iCloud 不可用，使用本地存储")
-        return localImagesDirectory
+        if !hasLoggedICloudUnavailable {
+            print("⚠️ 图片保存云端失败 iCloud 不可用，使用本地存储")
+            hasLoggedICloudUnavailable = true
+        }
+        let fallback = localImagesDirectory
+        cachedImagesDirectory = fallback
+        cachedICloudAvailability = false
+        return fallback
     }
     
     /// 本地 Documents 目录（回退使用）
@@ -142,7 +160,12 @@ class ImageManager {
     
     /// 检查 iCloud 是否可用
     var isICloudAvailable: Bool {
-        return FileManager.default.url(forUbiquityContainerIdentifier: nil) != nil
+        if let cached = cachedICloudAvailability {
+            return cached
+        }
+        let available = FileManager.default.url(forUbiquityContainerIdentifier: nil) != nil
+        cachedICloudAvailability = available
+        return available
     }
     
     /// 确保文件上传到 iCloud
