@@ -266,7 +266,7 @@ extension Landmark {
             type: .glacier,
             coordinate: CLLocationCoordinate2D(latitude: 64.9631, longitude: -19.0208),
             description: "在千年蓝冰的环抱中，品尝热可可与马卡龙的甜蜜",
-            teaPartyTheme: "冰雪奇缘·蓝白洛丽塔",
+            teaPartyTheme: "冰雪奇缘·蓝白茶会风",
             imageName: "landmark_glacier",
             badgeName: "极地之星",
             badgeDescription: "在冰川深处参加茶会的勇者",
@@ -280,7 +280,7 @@ extension Landmark {
             type: .canyon,
             coordinate: CLLocationCoordinate2D(latitude: 36.1069, longitude: -112.1129),
             description: "悬崖边的下午茶，与落日共舞的华丽时刻",
-            teaPartyTheme: "西部玫瑰·红棕洛丽塔",
+            teaPartyTheme: "西部玫瑰·红棕茶会风",
             imageName: "landmark_canyon",
             badgeName: "孤高蔷薇",
             badgeDescription: "在峡谷之巅绽放的玫瑰",
@@ -294,7 +294,7 @@ extension Landmark {
             type: .oasis,
             coordinate: CLLocationCoordinate2D(latitude: 23.4162, longitude: 25.6628),
             description: "棕榈影下的波斯地毯，泉水声中的甜点心语",
-            teaPartyTheme: "沙漠玫瑰·金绿洛丽塔",
+            teaPartyTheme: "沙漠玫瑰·金绿茶会风",
             imageName: "landmark_oasis",
             badgeName: "沙海蜃楼",
             badgeDescription: "在沙漠中找到绿洲的旅人",
@@ -308,7 +308,7 @@ extension Landmark {
             type: .prairie,
             coordinate: CLLocationCoordinate2D(latitude: 46.8625, longitude: 103.8467),
             description: "漫山遍野的小碎花，风车转动中的野餐时光",
-            teaPartyTheme: "草原牧歌·田园洛丽塔",
+            teaPartyTheme: "草原牧歌·田园茶会风",
             imageName: "landmark_prairie",
             badgeName: "原野牧歌",
             badgeDescription: "在草原上自由歌唱的精灵",
@@ -322,7 +322,7 @@ extension Landmark {
             type: .aurora,
             coordinate: CLLocationCoordinate2D(latitude: 69.6492, longitude: 18.9553),
             description: "在舞动极光下，与星辰共饮花茶",
-            teaPartyTheme: "极光幻想·紫绿洛丽塔",
+            teaPartyTheme: "极光幻想·紫绿茶会风",
             imageName: "landmark_aurora",
             badgeName: "极光舞者",
             badgeDescription: "与极光共舞的幸运儿",
@@ -336,7 +336,7 @@ extension Landmark {
             type: .castle,
             coordinate: CLLocationCoordinate2D(latitude: 47.6160, longitude: 1.5170),
             description: "文艺复兴的华丽殿堂，皇室般的下午茶体验",
-            teaPartyTheme: "皇家宫廷·古典洛丽塔",
+            teaPartyTheme: "皇家宫廷·古典茶会风",
             imageName: "landmark_castle",
             badgeName: "宫廷贵族",
             badgeDescription: "在古堡中品味优雅的贵族",
@@ -349,8 +349,8 @@ extension Landmark {
             subtitle: "樱花纷飞茶会",
             type: .sakura,
             coordinate: CLLocationCoordinate2D(latitude: 34.9671, longitude: 135.7727),
-            description: "飘落的樱花瓣中，和服与洛丽塔的优雅邂逅",
-            teaPartyTheme: "和风樱花·和风洛丽塔",
+            description: "飘落的樱花瓣中，和风美学与茶会礼服的优雅邂逅",
+            teaPartyTheme: "和风樱花·和风茶会风",
             imageName: "landmark_sakura",
             badgeName: "樱花姬",
             badgeDescription: "在樱花雨中起舞的公主",
@@ -364,7 +364,7 @@ extension Landmark {
             type: .lavender,
             coordinate: CLLocationCoordinate2D(latitude: 43.9352, longitude: 6.0679),
             description: "紫色花海中的浪漫午后，法式优雅的极致体验",
-            teaPartyTheme: "紫色梦幻·法式洛丽塔",
+            teaPartyTheme: "紫色梦幻·法式茶会风",
             imageName: "landmark_lavender",
             badgeName: "紫色梦境",
             badgeDescription: "在薰衣草田中沉醉的诗人",
@@ -376,10 +376,10 @@ extension Landmark {
 // MARK: - AI 飞行叙事
 struct FlightNarrative {
     static let boardingMessages: [String] = [
-        "欢迎乘坐洛丽塔专机，您的茶会礼裙已准备就绪",
+        "欢迎乘坐茶会专机，您的茶会礼裙已准备就绪",
         "请系好安全带，我们即将启程前往梦幻之地",
         "今天的航班将带您穿越云海，抵达奇妙的茶会现场",
-        "洛丽塔专机即将起飞，请确认您的蕾丝边安全带"
+        "茶会专机即将起飞，请确认您的蕾丝边安全带"
     ]
     
     static func inFlightMessages(to landmark: Landmark) -> [String] {

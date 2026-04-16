@@ -76,7 +76,7 @@ final class DailyCheckInManager: ObservableObject {
     // 内存管理：缓存清理定时器
     private var cacheCleanupTimer: Timer?
     
-    // 2025年Lolita流行色
+    // 2025年裙装流行色
     private let trendyColors2025 = [
         "莫兰迪粉", "雾霾蓝", "奶油白", "薄荷绿", "浅鹅黄",
         "薰衣草紫", "珊瑚粉", "香槟金", "珍珠白", "樱花粉",
@@ -1244,7 +1244,7 @@ final class DailyCheckInManager: ObservableObject {
         let styles = ["甜美", "优雅", "复古", "清新", "浪漫"]
         parts.append(styles.randomElement()!)
         
-        return parts.joined(separator: "") + "的Lolita配色"
+        return parts.joined(separator: "") + "的今日裙装配色"
     }
 }
 
@@ -1277,7 +1277,7 @@ extension PetAIService {
         let locationInfo = location.isEmpty ? "位置未知" : "位置：\(location)"
 
         let prompt = """
-        请为Lolita风格穿搭推荐今日穿搭色。
+        请为茶会风穿搭推荐今日穿搭色。
 
         当前信息：
         - 季节：\(season.displayName)
@@ -1296,7 +1296,7 @@ extension PetAIService {
         }
 
         要求：
-        1. 颜色名称使用中文，要优雅有诗意，符合Lolita风格
+        1. 颜色名称使用中文，要优雅有诗意，符合茶会风格
         2. 十六进制格式必须是 #RRGGBB
         3. 推荐3个颜色，要协调搭配
         4. 考虑季节、天气因素

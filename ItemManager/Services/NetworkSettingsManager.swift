@@ -117,9 +117,9 @@ final class QuizManager: ObservableObject {
     let questions: [QuizQuestion] = [
         QuizQuestion(
             question: "少女衣橱是一款什么类型的应用？",
-            options: ["游戏", "Lolita裙装管理工具", "社交软件", "购物平台"],
+            options: ["游戏", "裙装管理工具", "社交软件", "购物平台"],
             correctAnswer: 1,
-            explanation: "少女衣橱是一款专为Lolita爱好者设计的裙装管理工具。"
+            explanation: "少女衣橱是一款专注裙装收纳与穿搭记录的管理工具。"
         ),
         QuizQuestion(
             question: "在少女衣橱中，'心愿尾款'功能是用来做什么的？",

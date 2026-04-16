@@ -123,7 +123,7 @@ struct ImmersiveFlightView: View {
     }
 }
 
-// MARK: - Lo 裙设计理念
+// MARK: - 梦幻裙装设计理念
 struct LolitaDesignPhilosophy {
     static let quotes = [
         "每一针一线，都是对美好生活的向往",
@@ -131,7 +131,7 @@ struct LolitaDesignPhilosophy {
         "在繁复的褶皱中，藏着对细节的执着",
         "裙摆飞扬的瞬间，是自由与优雅的共舞",
         "精致的不仅是衣裳，更是对生活的态度",
-        "每一次穿上 Lo 裙，都是与自己的浪漫约会",
+        "每一次穿上梦幻裙装，都是与自己的浪漫约会",
         "在快节奏的世界里，慢下来做一场关于美的梦"
     ]
     
@@ -313,7 +313,7 @@ struct AirplaneWindowView: View {
                             .offset(x: -1)
                     }
 
-                    // Lo 裙设计理念文字
+                    // 梦幻裙装设计理念文字
                     VStack(spacing: 12) {
                         Text("✦ 茶会物语 ✦")
                             .font(.system(size: 14, weight: .medium))
