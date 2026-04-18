@@ -2,6 +2,13 @@ import Foundation
 import StoreKit
 import Combine
 
+struct IAPPurchaseSuccessContext: Identifiable, Equatable {
+    let id = UUID()
+    let attemptID: String?
+    let source: String
+    let message: String
+}
+
 // MARK: - StoreManager
 // StoreKit 2 支付管理类，处理所有内购相关逻辑
 // 包括商品获取、购买流程、交易验证等
@@ -17,23 +24,28 @@ class StoreManager: ObservableObject {
     @Published var lastError: IAPError?                   // 最后一次错误
     @Published var purchaseSuccess: Bool = false          // 购买成功标志
     @Published var purchaseSuccessMessage: String = ""    // 购买成功消息
+    @Published var purchaseSuccessContext: IAPPurchaseSuccessContext?
 
     // 交易更新监听器
     private var transactionListener: Task<Void, Error>?
+    private var storefrontListener: Task<Void, Never>?
 
     // 已处理的交易ID集合（防止重复处理）
     private var processedTransactionIDs: Set<String> = []
+    private var lastObservedStorefrontSignature: String?
 
     // MARK: - Initialization
     private init() {
         // 启动交易监听器，处理未完成交易和外部交易
         startTransactionListener()
+        startStorefrontListener()
         // 加载已处理的交易ID
         loadProcessedTransactions()
     }
 
     deinit {
         transactionListener?.cancel()
+        storefrontListener?.cancel()
     }
 
     // MARK: - 交易监听器
@@ -92,6 +104,82 @@ class StoreManager: ObservableObject {
         }
     }
 
+    private func startStorefrontListener() {
+        storefrontListener?.cancel()
+        storefrontListener = Task { [weak self] in
+            guard let self = self else { return }
+
+            let currentStorefront = await Storefront.current
+            await self.handleObservedStorefront(
+                currentStorefront,
+                source: "current",
+                shouldRefreshProducts: false
+            )
+
+            for await storefront in Storefront.updates {
+                if Task.isCancelled { break }
+                await self.handleObservedStorefront(
+                    storefront,
+                    source: "updates",
+                    shouldRefreshProducts: true
+                )
+            }
+        }
+    }
+
+    private func handleObservedStorefront(
+        _ storefront: Storefront?,
+        source: String,
+        shouldRefreshProducts: Bool
+    ) async {
+        let fields = storefrontFields(from: storefront)
+        let signature = storefrontSignature(from: storefront)
+        let previousSignature = lastObservedStorefrontSignature
+        let previousFields = storefrontFields(fromSignature: previousSignature)
+
+        if previousSignature == nil {
+            lastObservedStorefrontSignature = signature
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "storefront_observed_initial",
+                fields: fields.merging(["source": source]) { _, new in new }
+            )
+            return
+        }
+
+        guard previousSignature != signature else {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "storefront_update_ignored_same_value",
+                fields: fields.merging(["source": source]) { _, new in new }
+            )
+            return
+        }
+
+        lastObservedStorefrontSignature = signature
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "storefront_changed",
+            level: .notice,
+            fields: [
+                "source": source,
+                "previousStorefrontCountryCode": previousFields["storefrontCountryCode"] ?? "nil",
+                "previousStorefrontCurrency": previousFields["storefrontCurrency"] ?? "nil",
+                "previousStorefrontID": previousFields["storefrontID"] ?? "nil"
+            ].merging(fields) { _, new in new }
+        )
+
+        guard shouldRefreshProducts else { return }
+
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "storefront_refreshing_products",
+            level: .notice,
+            fields: fields.merging(["source": source]) { _, new in new }
+        )
+        await fetchProducts()
+    }
+
     // MARK: - 获取商品信息
     // 从 App Store 获取商品信息
     // 需要在 App Store Connect 中预先配置商品
@@ -107,13 +195,14 @@ class StoreManager: ObservableObject {
             print("\(logPrefix) ===== 商品拉取开始 =====")
             print("\(logPrefix) bundleID=\(bundleID)")
             print("\(logPrefix) requestedIDs=\(allProductIDs.joined(separator: ", "))")
+            let fetchStorefrontFields = await currentStorefrontFields()
             await IAPDiagnosticStore.shared.record(
                 category: .flow,
                 name: "product_fetch_started",
                 fields: [
                     "bundleID": bundleID,
                     "requestedIDs": allProductIDs.joined(separator: ",")
-                ]
+                ].merging(fetchStorefrontFields) { _, new in new }
             )
 
             let products = try await Product.products(for: allProductIDs)
@@ -145,6 +234,7 @@ class StoreManager: ObservableObject {
             }
 
             print("\(logPrefix) ===== 商品拉取结束 =====")
+            let fetchFinishedStorefrontFields = await currentStorefrontFields()
             await IAPDiagnosticStore.shared.record(
                 category: .flow,
                 name: "product_fetch_finished",
@@ -152,7 +242,7 @@ class StoreManager: ObservableObject {
                 fields: [
                     "matchedCount": String(coinProducts.count),
                     "missingIDs": missingIDs.joined(separator: ",").isEmpty ? "none" : missingIDs.joined(separator: ",")
-                ]
+                ].merging(fetchFinishedStorefrontFields) { _, new in new }
             )
 
         } catch {
@@ -231,10 +321,12 @@ class StoreManager: ObservableObject {
                         "isFirstDouble": String(isFirstDouble)
                     ]
                 )
-                await showPurchaseSuccessMessage(
+                await publishPurchaseSuccess(
                     isFirstDouble
                     ? "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
-                    : "成功获得 \(deliveredCoins) 喵币"
+                    : "成功获得 \(deliveredCoins) 喵币",
+                    attemptID: attemptID,
+                    source: "test_mode"
                 )
                 return .success(transaction: nil, product: product)
 
@@ -263,12 +355,15 @@ class StoreManager: ObservableObject {
             // }
 
             // 发起购买请求
+            let purchaseStorefrontFields = await currentStorefrontFields()
             await IAPDiagnosticStore.shared.record(
                 category: .flow,
                 name: "purchase_invoking_storekit",
                 attemptID: attemptID,
                 productID: product.id,
-                fields: ["optionsCount": String(options.count)]
+                fields: [
+                    "optionsCount": String(options.count)
+                ].merging(purchaseStorefrontFields) { _, new in new }
             )
             let result = try await product.purchase(options: options)
 
@@ -282,7 +377,13 @@ class StoreManager: ObservableObject {
                     attemptID: attemptID,
                     productID: transaction.productID,
                     transactionID: String(transaction.id),
-                    fields: ["purchaseDate": transaction.purchaseDate.ISO8601Format()]
+                    fields: [
+                        "purchaseDate": transaction.purchaseDate.ISO8601Format(),
+                        "transactionEnvironment": String(describing: transaction.environment),
+                        "transactionStorefrontCountryCode": transaction.storefront.countryCode,
+                        "transactionStorefrontCurrency": transaction.storefront.currency?.identifier ?? "nil",
+                        "transactionStorefrontID": transaction.storefront.id
+                    ]
                 )
 
                 // 检查是否已处理
@@ -434,6 +535,15 @@ class StoreManager: ObservableObject {
             FirstDoubleBonusManager.shared.markFirstPurchaseCompleted(for: transaction.productID)
         }
 
+        let successMessage: String
+        if isFirstDouble {
+            successMessage = "🎉 首充双倍！获得 \(totalAmount) 喵币"
+        } else if bonus > 0 {
+            successMessage = "成功获得 \(totalAmount) 喵币（含赠送 \(bonus)）"
+        } else {
+            successMessage = "成功获得 \(totalAmount) 喵币"
+        }
+
         // 更新用户喵币余额
         await MainActor.run {
             let previousAccountBalance = Self.loadMeowCoinAccount().balance
@@ -482,23 +592,13 @@ class StoreManager: ObservableObject {
                 )
             }
 
-            // 显示成功消息
-            purchaseSuccess = true
-            if isFirstDouble {
-                // 首次双倍提示
-                purchaseSuccessMessage = "🎉 首充双倍！获得 \(totalAmount) 喵币"
-            } else if bonus > 0 {
-                purchaseSuccessMessage = "成功获得 \(totalAmount) 喵币（含赠送 \(bonus)）"
-            } else {
-                purchaseSuccessMessage = "成功获得 \(totalAmount) 喵币"
-            }
-
-            // 3秒后清除成功标志
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                self.purchaseSuccess = false
-                self.purchaseSuccessMessage = ""
-            }
         }
+
+        await publishPurchaseSuccess(
+            successMessage,
+            attemptID: attemptID,
+            source: source
+        )
 
         // 记录购买历史
         let record = IAPPurchaseRecord(
@@ -703,22 +803,83 @@ class StoreManager: ObservableObject {
         )
     }
 
-    private func showPurchaseSuccessMessage(_ message: String) async {
+    private func publishPurchaseSuccess(_ message: String, attemptID: String?, source: String) async {
         await MainActor.run {
-            purchaseSuccess = true
             purchaseSuccessMessage = message
+            let context = IAPPurchaseSuccessContext(
+                attemptID: attemptID,
+                source: source,
+                message: message
+            )
+            purchaseSuccessContext = context
+            purchaseSuccess = true
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .flow,
-                    name: "purchase_success_toast_shown",
-                    fields: ["message": message]
+                    name: "purchase_success_state_published",
+                    level: source == "transaction_updates" ? .notice : .info,
+                    attemptID: attemptID,
+                    fields: [
+                        "message": message,
+                        "source": source
+                    ]
                 )
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 self.purchaseSuccess = false
                 self.purchaseSuccessMessage = ""
+                if self.purchaseSuccessContext == context {
+                    self.purchaseSuccessContext = nil
+                }
             }
         }
+    }
+
+    private func currentStorefrontFields() async -> [String: String] {
+        let storefront = await Storefront.current
+        return storefrontFields(from: storefront)
+    }
+
+    private func storefrontFields(from storefront: Storefront?) -> [String: String] {
+        guard let storefront else {
+            return [
+                "storefrontCountryCode": "nil",
+                "storefrontCurrency": "nil",
+                "storefrontID": "nil"
+            ]
+        }
+
+        return [
+            "storefrontCountryCode": storefront.countryCode,
+            "storefrontCurrency": storefront.currency?.identifier ?? "nil",
+            "storefrontID": storefront.id
+        ]
+    }
+
+    private func storefrontSignature(from storefront: Storefront?) -> String {
+        let fields = storefrontFields(from: storefront)
+        return [
+            fields["storefrontCountryCode"] ?? "nil",
+            fields["storefrontCurrency"] ?? "nil",
+            fields["storefrontID"] ?? "nil"
+        ].joined(separator: "|")
+    }
+
+    private func storefrontFields(fromSignature signature: String?) -> [String: String] {
+        guard let signature else {
+            return [
+                "storefrontCountryCode": "nil",
+                "storefrontCurrency": "nil",
+                "storefrontID": "nil"
+            ]
+        }
+
+        let components = signature.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        return [
+            "storefrontCountryCode": components.indices.contains(0) ? components[0] : "nil",
+            "storefrontCurrency": components.indices.contains(1) ? components[1] : "nil",
+            "storefrontID": components.indices.contains(2) ? components[2] : "nil"
+        ]
     }
 }

@@ -93,7 +93,7 @@ actor IAPDiagnosticStore {
     }
 
     func exportSnapshot() throws -> URL {
-        let exportDirectory = try ensureDiagnosticsDirectory()
+        let exportDirectory = try ensureShareExportDirectory()
         let timestamp = Self.exportTimestampFormatter.string(from: Date())
         let exportURL = exportDirectory.appendingPathComponent("iap_diagnostics_export_\(timestamp).jsonl")
         let event = IAPDiagnosticEvent(
@@ -180,6 +180,13 @@ actor IAPDiagnosticStore {
     private func persistentLogURL() throws -> URL {
         let directory = try ensureDiagnosticsDirectory()
         return directory.appendingPathComponent("iap_diagnostics.jsonl")
+    }
+
+    private func ensureShareExportDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DiagnosticsExports", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
     private static func baseFields() -> [String: String] {
