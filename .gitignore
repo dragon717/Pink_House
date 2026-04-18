@@ -15,4 +15,15 @@ asserts/*.ttf
 asserts/*.mp3
 
 .codepilot-uploads/*
-
+xcuserdata/
+*.mode1v3
+*.mode2v3
+*.pbuser
+*.perspectivev3
+*.xcuserstate
+project.xcworkspace/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.build/

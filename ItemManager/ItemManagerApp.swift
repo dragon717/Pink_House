@@ -176,8 +176,10 @@ struct MainContentView: View {
             print("迁移完成状态: \(migrationManager.isMigrationCompleted ? "已完成" : "未完成")")
             
             launchLogger.info("launch_start low_memory=\(NotificationManager.Config.isLowMemoryDevice)")
+            CloudSyncManager.shared.checkNetworkPermission()
             
             Task {
+                await SharedPersistence.shared.syncWidgetData(reason: "launch-start")
                 await runStartupInitialization()
             }
             
