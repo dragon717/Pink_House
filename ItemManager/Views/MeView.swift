@@ -7,6 +7,7 @@ import CloudKit
 // MARK: - 设置功能导航目的地
 enum SettingsNavigationDestination: String, Identifiable {
     case themeCustomize = "themeCustomize"
+    case themeSkinStore = "themeSkinStore"
     case widgetCustomize = "widgetCustomize"
     case batchImport = "batchImport"
 
@@ -170,7 +171,17 @@ struct MeView: View {
                         // 马上来财设置
                         WealthHapticsSettingsCard()
 
-                        // 主题配色
+                        // 主题
+                        NavigationLink(destination: ThemeSkinStoreView()) {
+                            SettingsGridItem(
+                                title: "主题",
+                                subtitle: "主题商店 · 已购主题",
+                                icon: "sparkles.rectangle.stack.fill",
+                                iconColor: .pink
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
                         NavigationLink(destination: MagicColorSettingsView()) {
                             SettingsGridItem(
                                 title: "主题配色",
@@ -266,6 +277,8 @@ struct MeView: View {
             switch destination {
             case "themeCustomize":
                 MagicColorSettingsView()
+            case "themeSkinStore":
+                ThemeSkinStoreView()
             case "customColorPersonalization":
                 MagicColorSettingsViewWithCustomTab()
             case "widgetCustomize":
@@ -327,6 +340,9 @@ struct MeView: View {
     // MARK: - 隐藏的 NavigationLink 用于编程导航
     private var hiddenNavigationLinks: some View {
         Group {
+            NavigationLink(destination: ThemeSkinStoreView(), tag: "themeSkinStore", selection: $navigationDestination) {
+                EmptyView()
+            }
             NavigationLink(destination: MagicColorSettingsViewWithMagicTab(), tag: "themeCustomize", selection: $navigationDestination) {
                 EmptyView()
             }

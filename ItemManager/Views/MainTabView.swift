@@ -54,6 +54,7 @@ struct ModernTabView: View {
     @Binding var isPlayingOpeningAnimation: Bool
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
@@ -146,6 +147,14 @@ struct ModernTabView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
+    private var themedTabBarDescriptor: ThemeSkinDescriptor? {
+        resolveTabBarDescriptor(for: .tabBarMain)
+    }
+
+    private var themedTabItemDescriptor: ThemeSkinDescriptor? {
+        resolveTabBarDescriptor(for: .tabBarItem)
+    }
+
     private var supportsBottomAccessoryCat: Bool {
         if #available(iOS 26.0, *), UIDevice.current.userInterfaceIdiom == .phone {
             return true
@@ -167,8 +176,15 @@ struct ModernTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            Tab("衣橱", systemImage: "cabinet.fill", value: 0) {
+            Tab(value: 0) {
                 WardrobeTabContent(homeTabSelection: $homeTabSelection)
+            } label: {
+                ThemeSkinModernTabLabel(
+                    descriptor: themedTabItemDescriptor,
+                    title: "衣橱",
+                    systemImage: "cabinet.fill",
+                    isSelected: selectedTab == 0
+                )
             }
 
             Tab(value: 1) {
@@ -179,7 +195,12 @@ struct ModernTabView: View {
                     isPlayingOpeningAnimation: $isPlayingOpeningAnimation
                 )
             } label: {
-                Label(smallWorldTabTitle, systemImage: smallWorldTabIcon)
+                ThemeSkinModernTabLabel(
+                    descriptor: themedTabItemDescriptor,
+                    title: smallWorldTabTitle,
+                    systemImage: smallWorldTabIcon,
+                    isSelected: selectedTab == 1
+                )
                     .background {
                         Color.clear
                             .captureGuideTarget(.homeHouseTab)
@@ -187,14 +208,26 @@ struct ModernTabView: View {
                     }
             }
 
-            Tab("我", systemImage: "face.smiling", value: 2) {
+            Tab(value: 2) {
                 MeTabContent()
+            } label: {
+                ThemeSkinModernTabLabel(
+                    descriptor: themedTabItemDescriptor,
+                    title: "我",
+                    systemImage: "face.smiling",
+                    isSelected: selectedTab == 2
+                )
             }
 
             Tab(value: 3, role: .search) {
                 PetChatView(searchText: $searchText)
             } label: {
-                Label("萌宠对话", systemImage: "bubble.left.and.bubble.right.fill")
+                ThemeSkinModernTabLabel(
+                    descriptor: themedTabItemDescriptor,
+                    title: "萌宠对话",
+                    systemImage: "bubble.left.and.bubble.right.fill",
+                    isSelected: selectedTab == 3
+                )
                     .background {
                         Color.clear
                             .captureGuideTarget(.homePetChatTab)
@@ -213,6 +246,14 @@ struct ModernTabView: View {
             refreshCompactTabBarState()
         }
         .overlay {
+            GeometryReader { proxy in
+                ThemeSkinTabBarBackdrop(
+                    descriptor: themedTabBarDescriptor,
+                    safeAreaBottom: proxy.safeAreaInsets.bottom
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .allowsHitTesting(false)
+            }
             RewardBubbleView()
             if #available(iOS 26.0, *) {
                 if shouldShowDiamondOrbitCat, let compactCenterPlatterFrame {
@@ -292,6 +333,14 @@ struct ModernTabView: View {
                 userInfo: ["tab": tabName]
             )
         }
+    }
+
+    private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
+        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
+              descriptor.assetNamespace == "girl_closet" else {
+            return nil
+        }
+        return descriptor
     }
     
     private var isSimulationActive: Bool {
@@ -679,6 +728,7 @@ struct LegacyTabView: View {
     @Binding var isPlayingOpeningAnimation: Bool
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @ObservedObject private var petDataManager = PetDataManager.shared
     @StateObject private var mediaStateManager = MediaStateManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
@@ -688,6 +738,14 @@ struct LegacyTabView: View {
 
     private var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
+    }
+
+    private var themedTabBarDescriptor: ThemeSkinDescriptor? {
+        resolveTabBarDescriptor(for: .tabBarMain)
+    }
+
+    private var themedTabItemDescriptor: ThemeSkinDescriptor? {
+        resolveTabBarDescriptor(for: .tabBarItem)
     }
 
     var body: some View {
@@ -836,20 +894,28 @@ struct LegacyTabView: View {
                     )
                 }
                 .frame(height: 56)
-                // 白色背景，适配暗黑模式，椭圆胶囊形状
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            Capsule()
-                                .fill(magicPalette.navigationBackground.opacity(colorScheme == .dark ? 0.78 : 0.88))
+                .background {
+                    if themedTabBarDescriptor != nil {
+                        ThemeSkinTabBarBackdrop(
+                            descriptor: themedTabBarDescriptor,
+                            safeAreaBottom: 0,
+                            horizontalPadding: 0,
+                            bottomPadding: 0
                         )
-                        .overlay(
-                            Capsule()
-                                .stroke(magicPalette.quickOptionStroke.opacity(0.55), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: -2)
-                )
+                    } else {
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                Capsule()
+                                    .fill(magicPalette.navigationBackground.opacity(colorScheme == .dark ? 0.78 : 0.88))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(magicPalette.quickOptionStroke.opacity(0.55), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: -2)
+                    }
+                }
                 .padding(.horizontal, 16)
                 // 往下挪，紧贴底部（减小安全区域间距）
                 .padding(.bottom, safeAreaBottom > 0 ? 2 : 4)
@@ -874,16 +940,14 @@ struct LegacyTabView: View {
                 }
             }
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? magicPalette.accent : magicPalette.secondaryText)
-
-                Text(title)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? magicPalette.accent : magicPalette.secondaryText)
-            }
-            .frame(maxWidth: .infinity)
+            ThemeSkinLegacyTabLabel(
+                descriptor: themedTabItemDescriptor,
+                title: title,
+                systemImage: icon,
+                isSelected: isSelected,
+                selectedColor: magicPalette.accent,
+                inactiveColor: magicPalette.secondaryText
+            )
             .captureGuideTarget(index == 1 ? .homeHouseTab : nil)
             .overlay {
                 Color.clear
@@ -892,6 +956,14 @@ struct LegacyTabView: View {
                     .captureGuideTarget(index == 3 ? .homePetChatTab : nil)
             }
         }
+    }
+
+    private func resolveTabBarDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
+        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
+              descriptor.assetNamespace == "girl_closet" else {
+            return nil
+        }
+        return descriptor
     }
 
     private var smallWorldTabTitle: String {

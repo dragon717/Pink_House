@@ -1439,84 +1439,81 @@ struct WardrobeStatsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Main Stats
-            HStack(spacing: 0) {
-                statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
+        WardrobeThemeStatsCardContainer {
+            VStack(spacing: 12) {
+                // Main Stats
+                HStack(spacing: 0) {
+                    statItem(title: "总件数/款", value: "\(totalCount)/\(styleCount)", isVisible: $showCountAndStyle)
 
-                Divider()
+                    Divider()
 
-                statItem(title: "裙装价值", value: "¥\(formatValue(dressValue))", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
+                    statItem(title: "裙装价值", value: "¥\(formatValue(dressValue))", isVisible: $showDressValue, valueColor: Color(hex: "FF9800"))
 
-                Divider()
+                    Divider()
 
-                statItem(title: "总价值", value: "¥\(formatValue(totalValue))", isVisible: $showTotalValue)
-            }
+                    statItem(title: "总价值", value: "¥\(formatValue(totalValue))", isVisible: $showTotalValue)
+                }
 
-            // Bottom Actions - 三个功能入口
-            HStack(spacing: 8) {
-                // 今日穿搭色按钮 - 使用主题强调色
-                Button {
-                    showDailyCheckIn = true
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 20))
-                        Text("今日穿搭色")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        LinearGradient(
-                            colors: [palette.accent.opacity(0.15), palette.accent.opacity(0.05)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                // Bottom Actions - 三个功能入口
+                HStack(spacing: 8) {
+                    // 今日穿搭色按钮 - 使用主题强调色
+                    Button {
+                        showDailyCheckIn = true
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 20))
+                            Text("今日穿搭色")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            LinearGradient(
+                                colors: [palette.accent.opacity(0.15), palette.accent.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .foregroundStyle(palette.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                // 穿搭手帐按钮 - 使用主题强调色
-                Button {
-                    tabNavigationManager.navigate(to: .smallWorld(.ootd))
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "book.closed.fill")
-                            .font(.system(size: 20))
-                        Text("穿搭手帐")
-                            .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(palette.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(palette.accent.opacity(0.1))
-                    .foregroundStyle(palette.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .captureGuideTarget(.wardrobeOotdEntry)
 
-                // 详细统计按钮 - 使用主题次要色
-                NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "chart.bar.fill")
-                            .font(.system(size: 20))
-                        Text("详细统计")
-                            .font(.system(size: 11, weight: .medium))
+                    // 穿搭手帐按钮 - 使用主题强调色
+                    Button {
+                        tabNavigationManager.navigate(to: .smallWorld(.ootd))
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "book.closed.fill")
+                                .font(.system(size: 20))
+                            Text("穿搭手帐")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(palette.accent.opacity(0.1))
+                        .foregroundStyle(palette.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(palette.secondary.opacity(0.1))
-                    .foregroundStyle(palette.secondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .captureGuideTarget(.wardrobeOotdEntry)
+
+                    // 详细统计按钮 - 使用主题次要色
+                    NavigationLink(destination: WardrobeStatisticsDetailView(clothings: clothings, filterDescription: filterDescription, onClearFilter: onClearFilter)) {
+                        VStack(spacing: 4) {
+                            Image(systemName: "chart.bar.fill")
+                                .font(.system(size: 20))
+                            Text("详细统计")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(palette.secondary.opacity(0.1))
+                        .foregroundStyle(palette.secondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background {
-            CardBackgroundView(cornerRadius: 16)
         }
         .sheet(isPresented: $showDailyCheckIn) {
             DailyCheckInView()

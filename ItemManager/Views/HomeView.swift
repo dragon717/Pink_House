@@ -64,6 +64,7 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @StateObject private var guideManager = AppFirstLaunchGuideManager.shared
     @StateObject private var tabNavigationManager = TabNavigationManager.shared
     @Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }) private var allClothings: [Clothing]
@@ -153,6 +154,26 @@ struct HomeView: View {
     private var magicPalette: MagicThemePalette {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
+
+    private var themedTopBarGroupDescriptor: ThemeSkinDescriptor? {
+        themeDescriptor(for: .topBarMain)
+    }
+
+    private var themedTopBarSegmentDescriptor: ThemeSkinDescriptor? {
+        themeDescriptor(for: .topBarSegment)
+    }
+
+    private var themedTopBarButtonDescriptor: ThemeSkinDescriptor? {
+        themeDescriptor(for: .topBarIconButton)
+    }
+
+    private var themedTopBarAddButtonDescriptor: ThemeSkinDescriptor? {
+        themeDescriptor(for: .topBarAddButton, fallbackIfUnsupported: .topBarIconButton)
+    }
+
+    private var themedSearchEntryDescriptor: ThemeSkinDescriptor? {
+        themeDescriptor(for: .searchBar)
+    }
     
     var body: some View {
         NavigationStack {
@@ -219,23 +240,55 @@ struct HomeView: View {
             .toolbar {
                 if effectiveWardrobeNavigationStyle == .classic {
                     ToolbarItem(placement: .topBarLeading) {
-                        tabSwitcher
+                        HomeThemeSkinToolbarShell(
+                            descriptor: themedTopBarSegmentDescriptor,
+                            style: .segment,
+                            horizontalPadding: 10,
+                            verticalPadding: 7
+                        ) {
+                            tabSwitcher
+                        }
                     }
                     
                     ToolbarItem(placement: .topBarTrailing) {
-                        classicActionButtons
+                        HomeThemeSkinToolbarShell(
+                            descriptor: themedTopBarGroupDescriptor,
+                            horizontalPadding: 10,
+                            verticalPadding: 7
+                        ) {
+                            classicActionButtons
+                        }
                     }
                 } else {
                     ToolbarItem(placement: .topBarLeading) {
-                        fashionLeadingButtons
+                        HomeThemeSkinToolbarShell(
+                            descriptor: themedTopBarGroupDescriptor,
+                            horizontalPadding: 10,
+                            verticalPadding: 7
+                        ) {
+                            fashionLeadingButtons
+                        }
                     }
 
                     ToolbarItem(placement: .principal) {
-                        fashionTabSwitcher
+                        HomeThemeSkinToolbarShell(
+                            descriptor: themedTopBarSegmentDescriptor,
+                            style: .segment,
+                            horizontalPadding: 10,
+                            verticalPadding: 7
+                        ) {
+                            fashionTabSwitcher
+                        }
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
-                        fashionTrailingButtons
+                        HomeThemeSkinToolbarShell(
+                            descriptor: themedTopBarGroupDescriptor,
+                            horizontalPadding: 10,
+                            verticalPadding: 7
+                        ) {
+                            fashionTrailingButtons
+                        }
                     }
                 }
             }
@@ -492,9 +545,11 @@ struct HomeView: View {
                 isSelectionMode = false
             }
         } label: {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(magicPalette.accent)
+            HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(magicPalette.accent)
+            }
         }
         .captureGuideTarget(.wardrobeDoneSelectionButton)
     }
@@ -505,14 +560,16 @@ struct HomeView: View {
                 isEditing = false
             }
         } label: {
-            if #available(iOS 26.0, *) {
-                Image(systemName: "list.number.badge.ellipsis")
-                    .font(.system(size: 18))
-                    .foregroundStyle(magicPalette.accent)
-            } else {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(magicPalette.accent)
+            HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
+                if #available(iOS 26.0, *) {
+                    Image(systemName: "list.number.badge.ellipsis")
+                        .font(.system(size: 18))
+                        .foregroundStyle(magicPalette.accent)
+                } else {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(magicPalette.accent)
+                }
             }
         }
     }
@@ -521,20 +578,22 @@ struct HomeView: View {
         Button {
             showingDepositNotificationSheet = true
         } label: {
-            ZStack {
-                Image(systemName: unreadNotificationCount > 0 ? "bell.badge" : "bell")
-                    .font(.system(size: 14))
-                    .foregroundStyle(magicPalette.navigationForeground)
+            HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
+                ZStack {
+                    Image(systemName: unreadNotificationCount > 0 ? "bell.badge" : "bell")
+                        .font(.system(size: 14))
+                        .foregroundStyle(magicPalette.navigationForeground)
 
-                if unreadNotificationCount > 0 {
-                    Text("\(min(unreadNotificationCount, 99))")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(magicPalette.cardAccent)
-                        .clipShape(Capsule())
-                        .offset(x: 8, y: -6)
+                    if unreadNotificationCount > 0 {
+                        Text("\(min(unreadNotificationCount, 99))")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 1)
+                            .background(magicPalette.cardAccent)
+                            .clipShape(Capsule())
+                            .offset(x: 8, y: -6)
+                    }
                 }
             }
         }
@@ -575,9 +634,11 @@ struct HomeView: View {
                 }
             }
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 14))
-                .foregroundStyle(magicPalette.navigationForeground)
+            HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 14))
+                    .foregroundStyle(magicPalette.navigationForeground)
+            }
         }
     }
     
@@ -615,10 +676,12 @@ struct HomeView: View {
     
     // 筛选按钮标签
     private var filterButtonLabel: some View {
-        Image(systemName: "line.3.horizontal.decrease.circle")
-            .font(.system(size: 14))
-            .foregroundStyle(magicPalette.navigationForeground)
-            .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+        HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 14))
+                .foregroundStyle(magicPalette.navigationForeground)
+                .symbolVariant(selectedTagIDs.isEmpty && selectedBrandIDs.isEmpty && selectedTypes.isEmpty && selectedColors.isEmpty && selectedSizes.isEmpty && selectedLengths.isEmpty && selectedConditions.isEmpty && selectedAccessories.isEmpty ? .none : .fill)
+        }
     }
     
     // 经典筛选菜单
@@ -1065,9 +1128,11 @@ struct HomeView: View {
                 }
             }
         } label: {
-            Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
-                .font(.system(size: 14))
-                .foregroundStyle(magicPalette.navigationForeground)
+            HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
+                Image(systemName: selectedTab == .wardrobe ? viewLayout.icon : depositDisplayMode.icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(magicPalette.navigationForeground)
+            }
         }
     }
 
@@ -1086,10 +1151,12 @@ struct HomeView: View {
     }
 
     private var moreMenuIcon: some View {
-        Image(systemName: "ellipsis.circle")
-            .font(.system(size: 14))
-            .foregroundStyle(magicPalette.navigationForeground)
-            .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
+        HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 14))
+                .foregroundStyle(magicPalette.navigationForeground)
+                .captureGuideToolbarIconTarget(.wardrobeMoreMenuButton)
+        }
     }
 
     @ViewBuilder
@@ -1097,7 +1164,11 @@ struct HomeView: View {
         Button {
             openWardrobeSearch()
         } label: {
-            Label("搜索", systemImage: "magnifyingglass")
+            HomeThemeSkinSearchMenuLabel(
+                descriptor: themedSearchEntryDescriptor,
+                title: "搜索",
+                systemImage: "magnifyingglass"
+            )
         }
 
         if selectedTab == .wardrobe {
@@ -1334,10 +1405,35 @@ struct HomeView: View {
     }
 
     private var addButtonIcon: some View {
-        Image(systemName: "plus")
-            .font(.system(size: 14))
-            .foregroundStyle(magicPalette.navigationForeground)
-            .captureGuideToolbarIconTarget(.wardrobeAddButton)
+        HomeThemeSkinToolbarIconShell(descriptor: themedTopBarAddButtonDescriptor) {
+            Image(systemName: "plus")
+                .font(.system(size: 14))
+                .foregroundStyle(magicPalette.navigationForeground)
+                .captureGuideToolbarIconTarget(.wardrobeAddButton)
+        }
+    }
+
+    private func themeDescriptor(
+        for slot: ThemeSkinSlot,
+        fallbackIfUnsupported fallbackSlot: ThemeSkinSlot? = nil
+    ) -> ThemeSkinDescriptor? {
+        if let descriptor = resolveThemeDescriptor(for: slot) {
+            return descriptor
+        }
+
+        guard !themeSkinManager.isSlotSupported(slot), let fallbackSlot else {
+            return nil
+        }
+
+        return resolveThemeDescriptor(for: fallbackSlot)
+    }
+
+    private func resolveThemeDescriptor(for slot: ThemeSkinSlot) -> ThemeSkinDescriptor? {
+        guard let descriptor = themeSkinManager.activeThemeDescriptor(for: slot, state: .default),
+              descriptor.assetNamespace == "girl_closet" else {
+            return nil
+        }
+        return descriptor
     }
 
     private func presentBatchImport() {

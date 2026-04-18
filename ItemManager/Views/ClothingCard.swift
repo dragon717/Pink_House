@@ -33,6 +33,7 @@ struct ClothingCard: View, Equatable {
     
     let clothing: Clothing
     
+    @ObservedObject private var themeSkinManager = ThemeSkinManager.shared
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.containerPalette) private var palette
@@ -46,163 +47,198 @@ struct ClothingCard: View, Equatable {
     @AppStorage("privacyShowOriginalPrice") private var showOriginalPrice = true
     @State private var image: UIImage?
     @State private var isHovering = false
+
+    private var wardrobeThemeDescriptor: ThemeSkinDescriptor? {
+        themeSkinManager.descriptor(for: .wardrobeItemCard)
+    }
+
+    private var isGirlClosetThemed: Bool {
+        WardrobeThemeSkinSupport.isGirlClosetDescriptor(wardrobeThemeDescriptor)
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Image Area
-            ZStack(alignment: .topTrailing) {
-                // Background Fill
-                Group {
-                    switch themeManager.skirtFillMode {
-                    case .transparent:
-                        if colorScheme == .dark {
-                            Color.black.opacity(0.2)
-                        } else {
-                            Color.white.opacity(0.4)
-                        }
-                    case .fullyTransparent:
-                        Color.clear
-                    case .tinted:
-                        if colorScheme == .dark {
-                            themeManager.cardTintColor.opacity(0.15)
-                        } else {
-                            themeManager.cardTintColor.opacity(0.3)
-                        }
-                    case .solid:
-                        if colorScheme == .dark {
-                            Color.black.opacity(0.6)
-                        } else {
-                            Color.white.opacity(0.8)
+        WardrobeThemeClothingCardContainer {
+            VStack(alignment: .leading, spacing: 0) {
+                // Image Area
+                ZStack(alignment: .topTrailing) {
+                    // Background Fill
+                    Group {
+                        switch themeManager.skirtFillMode {
+                        case .transparent:
+                            if colorScheme == .dark {
+                                Color.black.opacity(0.2)
+                            } else {
+                                Color.white.opacity(0.4)
+                            }
+                        case .fullyTransparent:
+                            Color.clear
+                        case .tinted:
+                            if colorScheme == .dark {
+                                themeManager.cardTintColor.opacity(0.15)
+                            } else {
+                                themeManager.cardTintColor.opacity(0.3)
+                            }
+                        case .solid:
+                            if colorScheme == .dark {
+                                Color.black.opacity(0.6)
+                            } else {
+                                Color.white.opacity(0.8)
+                            }
                         }
                     }
-                }
-                
-                if let uiImage = image {
-                    Color.clear
-                        .aspectRatio(1, contentMode: .fit)
-                        .overlay(
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                        )
-                        .clipped()
-                } else {
-                    // 使用支持主题配色的占位图
-                    ThemedPlaceholderView()
-                        .aspectRatio(1, contentMode: .fit)
-                }
-                
-                // 3D模型标签
-                if clothing.is3DModel, let typeDesc = clothing.model3DTypeDescription {
-                    Text(typeDesc)
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(Color.purple.opacity(0.9))
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .padding(8)
-                }
-                
-                if clothing.isDepositPlan {
-                    Text("心愿尾款")
-                        .font(.system(size: 10, weight: .medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(Color(hex: "5D4037").opacity(0.8)) // Dark brown
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .padding(8)
-                }
-                
-                if clothing.stock > 1 {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Text("x\(clothing.stock)")
+                    
+                    if let uiImage = image {
+                        Color.clear
+                            .aspectRatio(1, contentMode: .fit)
+                            .overlay(
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFit()
+                            )
+                            .clipped()
+                    } else {
+                        // 使用支持主题配色的占位图
+                        ThemedPlaceholderView()
+                            .aspectRatio(1, contentMode: .fit)
+                    }
+                    
+                    // 3D模型标签
+                    if clothing.is3DModel, let typeDesc = clothing.model3DTypeDescription {
+                        if isGirlClosetThemed {
+                            WardrobeThemeCornerBadge(
+                                text: typeDesc,
+                                tint: Color(hex: "9E86B8"),
+                                icon: "cube.transparent"
+                            )
+                            .padding(8)
+                        } else {
+                            Text(typeDesc)
                                 .font(.system(size: 10, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 4)
-                                .background(Color.black.opacity(0.6))
+                                .background(Color.purple.opacity(0.9))
                                 .foregroundStyle(.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                                 .padding(8)
                         }
                     }
-                }
-            }
-            // 图片区域圆角和阴影 - 增强层次感
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 4)
-            .padding(8) // 图片周围留白，突出悬浮感
-            .task {
-                if let imagePath = clothing.imagePaths.first {
-                    // Grid 2 (卡片): 文档建议 200x200 (Points)
-                    // 之前是 500x500，内存优化降级
-                    let size = CGSize(width: 200, height: 200)
-                    if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
-                        self.image = cached
-                        return
-                    }
-                    try? await Task.sleep(nanoseconds: 50_000_000)
-                    if Task.isCancelled { return }
-                    self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
-                } else {
-                    // 当图片被全部删除时，清空 image 以显示占位图
-                    self.image = nil
-                }
-            }
-            
-            // Info Area
-            VStack(alignment: .leading, spacing: 0) {
-                Text(clothing.name)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1) // 限制单行，保持整齐
-                    .foregroundStyle(palette.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Spacer(minLength: 4) // 将价格信息推到底部，保持视觉对齐
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    if showOriginalPrice && clothing.originalPrice > 0 && !clothing.isDepositPlan {
-                        Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
-                            .font(.system(size: 10))
-                            .strikethrough()
-                            .foregroundStyle(palette.secondary)
+                    
+                    if clothing.isDepositPlan {
+                        if isGirlClosetThemed {
+                            WardrobeThemeCornerBadge(
+                                text: "心愿尾款",
+                                tint: Color(hex: "7A5A54"),
+                                icon: "heart.fill"
+                            )
+                            .padding(8)
+                        } else {
+                            Text("心愿尾款")
+                                .font(.system(size: 10, weight: .medium))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 4)
+                                .background(Color(hex: "5D4037").opacity(0.8))
+                                .foregroundStyle(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .padding(8)
+                        }
                     }
                     
-                    if showPrice {
-                        if clothing.isDepositPlan {
-                            // 注意：totalDeposit 和 totalBalance 已经包含了 stock 的乘法，所以这里直接使用
-                            let totalDeposit = clothing.totalDeposit
-                            let totalBalance = clothing.totalBalance
-                            // 紧凑显示的定金尾款
-                            HStack(spacing: 4) {
-                                Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
-                                Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                    if clothing.stock > 1 {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                if isGirlClosetThemed {
+                                    WardrobeThemeCornerBadge(
+                                        text: "x\(clothing.stock)",
+                                        tint: Color(hex: "8A5C6F"),
+                                        icon: "shippingbox.fill"
+                                    )
+                                    .padding(8)
+                                } else {
+                                    Text("x\(clothing.stock)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                        .background(Color.black.opacity(0.6))
+                                        .foregroundStyle(.white)
+                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        .padding(8)
+                                }
                             }
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(palette.accent)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        } else {
-                            let totalWithAccessories = clothing.inventoryTotalPrice
-                            Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(palette.primary)
                         }
                     }
                 }
+                // 图片区域圆角和阴影 - 增强层次感
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 4)
+                .padding(8)
+                .task {
+                    if let imagePath = clothing.imagePaths.first {
+                        // Grid 2 (卡片): 文档建议 200x200 (Points)
+                        // 之前是 500x500，内存优化降级
+                        let size = CGSize(width: 200, height: 200)
+                        if let cached = ImageManager.shared.cachedImage(fileName: imagePath, targetSize: size) {
+                            self.image = cached
+                            return
+                        }
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                        if Task.isCancelled { return }
+                        self.image = await ImageManager.shared.loadImageAsync(fileName: imagePath, targetSize: size)
+                    } else {
+                        // 当图片被全部删除时，清空 image 以显示占位图
+                        self.image = nil
+                    }
+                }
+                
+                // Info Area
+                VStack(alignment: .leading, spacing: 0) {
+                    if isGirlClosetThemed {
+                        WardrobeThemeCardTitle(title: clothing.name)
+                    } else {
+                        Text(clothing.name)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                            .foregroundStyle(palette.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    Spacer(minLength: 4)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        if showOriginalPrice && clothing.originalPrice > 0 && !clothing.isDepositPlan {
+                            Text("原价¥\(clothing.originalPrice, format: .number.precision(.fractionLength(0)))")
+                                .font(.system(size: 10))
+                                .strikethrough()
+                                .foregroundStyle(palette.secondary)
+                        }
+                        
+                        if showPrice {
+                            if clothing.isDepositPlan {
+                                let totalDeposit = clothing.totalDeposit
+                                let totalBalance = clothing.totalBalance
+                                HStack(spacing: 4) {
+                                    Text("定金¥\(totalDeposit, format: .number.precision(.fractionLength(0)))")
+                                    Text("尾款¥\(totalBalance, format: .number.precision(.fractionLength(0)))")
+                                }
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(palette.accent)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            } else {
+                                let totalWithAccessories = clothing.inventoryTotalPrice
+                                Text("¥\(totalWithAccessories, format: .number.precision(.fractionLength(2)))")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(palette.primary)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .frame(height: 60)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
-            .frame(height: 60) // 固定高度，确保网格整齐
         }
-        .background {
-            CardBackgroundView(cornerRadius: 16)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
         // 应用容器就近配色
         .containerAdaptiveColors(background: .ultraThinMaterial)
         // 卡片整体阴影和悬浮动画 - 针对低端设备优化阴影
