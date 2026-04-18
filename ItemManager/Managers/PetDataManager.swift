@@ -65,6 +65,7 @@ class PetDataManager: ObservableObject {
     }
     
     func saveStatus(_ newStatus: PetStatus? = nil) {
+        let previousStatus = self.status
         if let newStatus = newStatus {
             self.status = Self.sanitizeStatus(newStatus)
         } else {
@@ -77,6 +78,19 @@ class PetDataManager: ObservableObject {
         guard let encoded = try? JSONEncoder().encode(statusToSave) else {
             print("PetDataManager: Failed to encode status for save.")
             return
+        }
+
+        if previousStatus.meowCoin != statusToSave.meowCoin {
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .balance,
+                    name: "pet_status_save_meow_coin_changed",
+                    fields: [
+                        "previousMeowCoin": String(previousStatus.meowCoin),
+                        "newMeowCoin": String(statusToSave.meowCoin)
+                    ]
+                )
+            }
         }
 
         writeSnapshot(encoded, modifiedAt: modifiedAt, mirrorToCloud: true)
@@ -152,6 +166,7 @@ class PetDataManager: ObservableObject {
     
     @discardableResult
     func updateCurrency(type: PetCurrency, delta: Int) -> Int {
+        let previousValue = getCurrency(type: type)
         switch type {
         case .meowCoin:
             if delta < 0 {
@@ -177,10 +192,25 @@ class PetDataManager: ObservableObject {
         }
         
         saveStatus()
-        
+
         // Important: Notify PetViewModel to refresh UI
         postExternalUpdate(fullReload: false, source: "currencyUpdate")
-        
+
+        if type == .meowCoin {
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .balance,
+                    name: "pet_currency_updated",
+                    fields: [
+                        "delta": String(delta),
+                        "previousValue": String(previousValue),
+                        "newValue": String(status.meowCoin),
+                        "source": "currencyUpdate"
+                    ]
+                )
+            }
+        }
+
         return getCurrency(type: type)
     }
 
@@ -263,22 +293,89 @@ class PetDataManager: ObservableObject {
         let remoteData = cloudStore.data(forKey: statusKey)
         let localModifiedAt = storedModifiedAt(in: UserDefaults.standard)
         let remoteModifiedAt = storedModifiedAt(in: cloudStore)
+        let localMeowCoin = Self.meowCoin(from: localData)
+        let remoteMeowCoin = Self.meowCoin(from: remoteData)
 
         switch (localData, remoteData) {
         case (nil, nil):
             return
         case let (local?, nil):
             let timestamp = localModifiedAt ?? Date()
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .cloudSync,
+                    name: "cloud_sync_push_local_only",
+                    level: .notice,
+                    fields: [
+                        "reason": reason,
+                        "localModifiedAt": Self.format(localModifiedAt),
+                        "localMeowCoin": Self.format(localMeowCoin)
+                    ]
+                )
+            }
             writeCloudSnapshot(local, modifiedAt: timestamp)
         case let (nil, remote?):
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .cloudSync,
+                    name: "cloud_sync_apply_remote_only",
+                    level: .notice,
+                    fields: [
+                        "reason": reason,
+                        "remoteModifiedAt": Self.format(remoteModifiedAt),
+                        "remoteMeowCoin": Self.format(remoteMeowCoin)
+                    ]
+                )
+            }
             _ = replaceStatusFromCloudData(remote, modifiedAt: remoteModifiedAt ?? Date(), reason: reason)
         case let (local?, remote?):
             let localTimestamp = localModifiedAt ?? .distantPast
             let remoteTimestamp = remoteModifiedAt ?? .distantPast
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .cloudSync,
+                    name: "cloud_sync_compared",
+                    fields: [
+                        "reason": reason,
+                        "localModifiedAt": Self.format(localModifiedAt),
+                        "remoteModifiedAt": Self.format(remoteModifiedAt),
+                        "localMeowCoin": Self.format(localMeowCoin),
+                        "remoteMeowCoin": Self.format(remoteMeowCoin)
+                    ]
+                )
+            }
 
             if remoteTimestamp > localTimestamp {
+                Task {
+                    await IAPDiagnosticStore.shared.record(
+                        category: .cloudSync,
+                        name: "cloud_sync_remote_wins",
+                        level: .notice,
+                        fields: [
+                            "reason": reason,
+                            "localModifiedAt": Self.format(localModifiedAt),
+                            "remoteModifiedAt": Self.format(remoteModifiedAt),
+                            "localMeowCoin": Self.format(localMeowCoin),
+                            "remoteMeowCoin": Self.format(remoteMeowCoin)
+                        ]
+                    )
+                }
                 _ = replaceStatusFromCloudData(remote, modifiedAt: remoteTimestamp, reason: reason)
             } else if localTimestamp > remoteTimestamp || local != remote {
+                Task {
+                    await IAPDiagnosticStore.shared.record(
+                        category: .cloudSync,
+                        name: "cloud_sync_local_wins",
+                        level: .notice,
+                        fields: [
+                            "reason": reason,
+                            "localModifiedAt": Self.format(localModifiedAt),
+                            "remoteModifiedAt": Self.format(remoteModifiedAt),
+                            "localMeowCoin": Self.format(localMeowCoin),
+                            "remoteMeowCoin": Self.format(remoteMeowCoin)
+                        ]
+                    )
+                }
                 writeCloudSnapshot(local, modifiedAt: localModifiedAt ?? Date())
             }
         }
@@ -287,11 +384,25 @@ class PetDataManager: ObservableObject {
     @discardableResult
     private func replaceStatusFromCloudData(_ data: Data, modifiedAt: Date, reason: String) -> Bool {
         do {
+            let previousMeowCoin = self.status.meowCoin
             let decoded = try Self.decodeStatus(from: data)
             self.status = decoded
             guard let encoded = try? JSONEncoder().encode(decoded) else {
                 print("PetDataManager: Failed to re-encode cloud status.")
                 return false
+            }
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .cloudSync,
+                    name: "cloud_sync_status_replaced",
+                    level: .notice,
+                    fields: [
+                        "reason": reason,
+                        "previousMeowCoin": String(previousMeowCoin),
+                        "newMeowCoin": String(decoded.meowCoin),
+                        "modifiedAt": modifiedAt.ISO8601Format()
+                    ]
+                )
             }
             writeSnapshot(encoded, modifiedAt: modifiedAt, mirrorToCloud: false)
             postExternalUpdate(fullReload: true, source: "cloudSync:\(reason)")
@@ -348,6 +459,21 @@ class PetDataManager: ObservableObject {
         }
 
         return sanitized
+    }
+
+    private static func meowCoin(from data: Data?) -> Int? {
+        guard let data else { return nil }
+        return (try? decodeStatus(from: data))?.meowCoin
+    }
+
+    private static func format(_ date: Date?) -> String {
+        guard let date else { return "nil" }
+        return date.ISO8601Format()
+    }
+
+    private static func format(_ value: Int?) -> String {
+        guard let value else { return "nil" }
+        return String(value)
     }
 
     private func writeSnapshot(_ encoded: Data, modifiedAt: Date, mirrorToCloud: Bool) {

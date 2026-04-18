@@ -23,6 +23,14 @@ class IAPTestManager: ObservableObject {
             } else {
                 print("[IAPTestManager] 进入生产模式")
             }
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "iap_test_mode_changed",
+                    level: .notice,
+                    fields: ["isTestMode": String(isTestMode)]
+                )
+            }
         }
     }
 
@@ -45,6 +53,14 @@ class IAPTestManager: ObservableObject {
         // 读取保存的测试模式状态
         self.isTestMode = UserDefaults.standard.bool(forKey: "iap_test_mode")
         loadMockData()
+        Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "iap_test_mode_loaded",
+                level: .notice,
+                fields: ["isTestMode": String(self.isTestMode)]
+            )
+        }
     }
 
     // MARK: - 豆腐块功能
@@ -278,11 +294,27 @@ class IAPTestManager: ObservableObject {
 
         // 模拟网络错误
         if testConfig.simulateNetworkError {
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "iap_mock_payment_failed_network",
+                    level: .error,
+                    productID: productID
+                )
+            }
             return .failure("网络连接失败")
         }
 
         // 根据商品ID返回模拟结果
         guard let type = IAPProductType(rawValue: productID) else {
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "iap_mock_payment_invalid_product",
+                    level: .error,
+                    productID: productID
+                )
+            }
             return .failure("无效的商品ID")
         }
 
@@ -300,6 +332,18 @@ class IAPTestManager: ObservableObject {
             markFirstPurchaseCompleted(for: productID)
         }
         saveMockData()
+        Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "iap_mock_payment_succeeded",
+                productID: productID,
+                fields: [
+                    "finalAmount": String(finalAmount),
+                    "isFirstDouble": String(isFirstDouble),
+                    "mockBalance": String(mockBalance)
+                ]
+            )
+        }
 
         return .success(
             deliveredCoins: finalAmount,
