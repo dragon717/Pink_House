@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import MessageUI
 
 // MARK: - 喵币商店页面
 // 用户购买喵币的主要界面
@@ -8,9 +9,13 @@ struct MeowCoinStoreView: View {
     @StateObject private var viewModel = IAPViewModel.shared
     @Environment(\.dismiss) private var dismiss
     @State private var diagnosticShareItems: [Any] = []
+    @State private var diagnosticMailAttachments: [MailAttachment] = []
+    @State private var showDiagnosticMailComposer = false
     @State private var showDiagnosticShareSheet = false
     @State private var showDiagnosticAlert = false
     @State private var diagnosticAlertMessage = ""
+    @State private var shouldOpenDiagnosticShareAfterAlert = false
+    @State private var isPreparingDiagnosticFeedback = false
 
     var body: some View {
         NavigationStack {
@@ -42,6 +47,12 @@ struct MeowCoinStoreView: View {
             .navigationTitle("获取喵币")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("问题反馈") {
+                        exportDiagnostics()
+                    }
+                    .disabled(isPreparingDiagnosticFeedback)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") {
                         dismiss()
@@ -55,10 +66,25 @@ struct MeowCoinStoreView: View {
             } message: {
                 Text(viewModel.errorMessage)
             }
-            .alert("IAP 诊断", isPresented: $showDiagnosticAlert) {
-                Button("确定", role: .cancel) {}
+            .alert("问题反馈", isPresented: $showDiagnosticAlert) {
+                Button("确定", role: .cancel) {
+                    if shouldOpenDiagnosticShareAfterAlert {
+                        shouldOpenDiagnosticShareAfterAlert = false
+                        showDiagnosticShareSheet = true
+                    }
+                }
             } message: {
                 Text(diagnosticAlertMessage)
+            }
+            .sheet(isPresented: $showDiagnosticMailComposer) {
+                MailComposer(
+                    subject: diagnosticMailSubject,
+                    recipients: [LegalLinks.supportEmailAddress],
+                    messageBody: diagnosticMailBody,
+                    attachments: diagnosticMailAttachments
+                ) { result, error in
+                    handleDiagnosticMailResult(result: result, error: error)
+                }
             }
             .sheet(isPresented: $showDiagnosticShareSheet) {
                 ShareSheet(items: diagnosticShareItems)
@@ -116,12 +142,6 @@ struct MeowCoinStoreView: View {
                 )
         )
         .padding(.horizontal)
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 1.2)
-                .onEnded { _ in
-                    exportDiagnostics()
-                }
-        )
     }
 
     // MARK: - 喵币充值区域
@@ -262,19 +282,131 @@ struct MeowCoinStoreView: View {
     }
 
     private func exportDiagnostics() {
+        guard !isPreparingDiagnosticFeedback else { return }
+
+        isPreparingDiagnosticFeedback = true
         Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "diagnostics_feedback_requested",
+                level: .notice,
+                fields: ["channel": "mail_preferred"]
+            )
+
             do {
                 let exportedURL = try await viewModel.exportDiagnostics()
-                await MainActor.run {
-                    diagnosticShareItems = [exportedURL]
-                    showDiagnosticShareSheet = true
+
+                if MailComposer.canSendMail() {
+                    let attachment = try MailAttachment(
+                        fileURL: exportedURL,
+                        mimeType: "application/x-ndjson"
+                    )
+
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "diagnostics_feedback_mail_ready",
+                        level: .notice,
+                        fields: ["fileName": exportedURL.lastPathComponent]
+                    )
+
+                    await MainActor.run {
+                        diagnosticMailAttachments = [attachment]
+                        showDiagnosticMailComposer = true
+                        isPreparingDiagnosticFeedback = false
+                    }
+                } else {
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "diagnostics_feedback_mail_unavailable",
+                        level: .notice,
+                        fields: [
+                            "fallback": "share_sheet",
+                            "fileName": exportedURL.lastPathComponent
+                        ]
+                    )
+
+                    await MainActor.run {
+                        diagnosticShareItems = [exportedURL]
+                        diagnosticAlertMessage = "当前设备没有配置系统邮件账户，已改为打开文件分享。请将日志文件发送给开发者邮箱：\(LegalLinks.supportEmailAddress)"
+                        shouldOpenDiagnosticShareAfterAlert = true
+                        showDiagnosticAlert = true
+                        isPreparingDiagnosticFeedback = false
+                    }
                 }
             } catch {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "diagnostics_feedback_export_failed",
+                    level: .error,
+                    fields: ["error": error.localizedDescription]
+                )
+
                 await MainActor.run {
-                    diagnosticAlertMessage = "诊断日志导出失败：\(error.localizedDescription)"
+                    diagnosticAlertMessage = "问题反馈日志导出失败：\(error.localizedDescription)"
+                    shouldOpenDiagnosticShareAfterAlert = false
                     showDiagnosticAlert = true
+                    isPreparingDiagnosticFeedback = false
                 }
             }
+        }
+    }
+
+    private var diagnosticMailSubject: String {
+        "Pink House IAP 问题反馈"
+    }
+
+    private var diagnosticMailBody: String {
+        """
+        你好，开发者：
+
+        我遇到了应用内购买问题，已自动附带 IAP 诊断日志文件。
+
+        请补充以下信息：
+        - 触发时间：
+        - 商品档位：
+        - 是否弹出系统支付面板：
+        - 实际结果：
+        - 期望结果：
+
+        当前应用版本：\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown") (\(Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "unknown"))
+        """
+    }
+
+    private func handleDiagnosticMailResult(result: MFMailComposeResult, error: Error?) {
+        diagnosticMailAttachments = []
+        showDiagnosticMailComposer = false
+
+        Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "diagnostics_feedback_mail_finished",
+                level: error == nil ? .notice : .error,
+                fields: [
+                    "result": diagnosticMailResultText(result),
+                    "error": error?.localizedDescription ?? "none"
+                ]
+            )
+        }
+
+        if let error {
+            diagnosticAlertMessage = "邮件草稿打开失败：\(error.localizedDescription)"
+            shouldOpenDiagnosticShareAfterAlert = false
+            showDiagnosticAlert = true
+        }
+    }
+
+    private func diagnosticMailResultText(_ result: MFMailComposeResult) -> String {
+        switch result {
+        case .cancelled:
+            return "cancelled"
+        case .saved:
+            return "saved"
+        case .sent:
+            return "sent"
+        case .failed:
+            return "failed"
+        @unknown default:
+            return "unknown"
         }
     }
 }

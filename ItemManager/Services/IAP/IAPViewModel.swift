@@ -27,6 +27,7 @@ class IAPViewModel: ObservableObject {
     // MARK: - Private Properties
     private var storeManager = StoreManager.shared
     private var cancellables = Set<AnyCancellable>()
+    private var activePurchaseAttemptID: String?
 
     // MARK: - Initialization
     private init() {
@@ -45,14 +46,11 @@ class IAPViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$isPurchasing)
 
-        storeManager.$purchaseSuccess
+        storeManager.$purchaseSuccessContext
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] success in
-                if success {
-                    self?.showSuccessToast = true
-                    self?.successMessage = self?.storeManager.purchaseSuccessMessage ?? "购买成功"
-                    self?.loadUserData() // 刷新用户数据
-                }
+            .compactMap { $0 }
+            .sink { [weak self] context in
+                self?.handlePurchaseSuccessContext(context)
             }
             .store(in: &cancellables)
 
@@ -169,6 +167,7 @@ class IAPViewModel: ObservableObject {
             return
         }
 
+        activePurchaseAttemptID = attemptID
         let result = await storeManager.purchase(storeProduct, attemptID: attemptID)
         handlePurchaseResult(result, attemptID: attemptID, productID: product.id)
     }
@@ -188,6 +187,7 @@ class IAPViewModel: ObservableObject {
             }
             break
         case .pending:
+            activePurchaseAttemptID = nil
             showSuccessToast = true
             successMessage = "购买请求已提交，正在等待 App Store 处理。到账后会自动更新余额。"
             Task {
@@ -200,6 +200,7 @@ class IAPViewModel: ObservableObject {
                 )
             }
         case .cancelled:
+            activePurchaseAttemptID = nil
             // 用户取消，不显示错误
             Task {
                 await IAPDiagnosticStore.shared.record(
@@ -212,6 +213,7 @@ class IAPViewModel: ObservableObject {
             }
             break
         case .failed(let error):
+            activePurchaseAttemptID = nil
             showErrorAlert = true
             errorMessage = error.errorDescription ?? "购买失败"
             Task {
@@ -227,6 +229,44 @@ class IAPViewModel: ObservableObject {
                     ]
                 )
             }
+        }
+    }
+
+    private func handlePurchaseSuccessContext(_ context: IAPPurchaseSuccessContext) {
+        loadUserData()
+
+        let isCurrentAttempt = context.attemptID != nil && context.attemptID == activePurchaseAttemptID
+        guard isCurrentAttempt else {
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_success_toast_suppressed_unmatched_attempt",
+                    level: .notice,
+                    attemptID: context.attemptID,
+                    fields: [
+                        "activeAttemptID": activePurchaseAttemptID ?? "nil",
+                        "source": context.source,
+                        "message": context.message
+                    ]
+                )
+            }
+            return
+        }
+
+        showSuccessToast = true
+        successMessage = context.message
+        activePurchaseAttemptID = nil
+
+        Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_success_toast_presented",
+                attemptID: context.attemptID,
+                fields: [
+                    "source": context.source,
+                    "message": context.message
+                ]
+            )
         }
     }
 

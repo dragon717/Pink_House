@@ -2,6 +2,13 @@ import Foundation
 import StoreKit
 import Combine
 
+struct IAPPurchaseSuccessContext: Identifiable, Equatable {
+    let id = UUID()
+    let attemptID: String?
+    let source: String
+    let message: String
+}
+
 // MARK: - StoreManager
 // StoreKit 2 支付管理类，处理所有内购相关逻辑
 // 包括商品获取、购买流程、交易验证等
@@ -17,6 +24,7 @@ class StoreManager: ObservableObject {
     @Published var lastError: IAPError?                   // 最后一次错误
     @Published var purchaseSuccess: Bool = false          // 购买成功标志
     @Published var purchaseSuccessMessage: String = ""    // 购买成功消息
+    @Published var purchaseSuccessContext: IAPPurchaseSuccessContext?
 
     // 交易更新监听器
     private var transactionListener: Task<Void, Error>?
@@ -313,10 +321,12 @@ class StoreManager: ObservableObject {
                         "isFirstDouble": String(isFirstDouble)
                     ]
                 )
-                await showPurchaseSuccessMessage(
+                await publishPurchaseSuccess(
                     isFirstDouble
                     ? "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
-                    : "成功获得 \(deliveredCoins) 喵币"
+                    : "成功获得 \(deliveredCoins) 喵币",
+                    attemptID: attemptID,
+                    source: "test_mode"
                 )
                 return .success(transaction: nil, product: product)
 
@@ -525,6 +535,15 @@ class StoreManager: ObservableObject {
             FirstDoubleBonusManager.shared.markFirstPurchaseCompleted(for: transaction.productID)
         }
 
+        let successMessage: String
+        if isFirstDouble {
+            successMessage = "🎉 首充双倍！获得 \(totalAmount) 喵币"
+        } else if bonus > 0 {
+            successMessage = "成功获得 \(totalAmount) 喵币（含赠送 \(bonus)）"
+        } else {
+            successMessage = "成功获得 \(totalAmount) 喵币"
+        }
+
         // 更新用户喵币余额
         await MainActor.run {
             let previousAccountBalance = Self.loadMeowCoinAccount().balance
@@ -573,23 +592,13 @@ class StoreManager: ObservableObject {
                 )
             }
 
-            // 显示成功消息
-            purchaseSuccess = true
-            if isFirstDouble {
-                // 首次双倍提示
-                purchaseSuccessMessage = "🎉 首充双倍！获得 \(totalAmount) 喵币"
-            } else if bonus > 0 {
-                purchaseSuccessMessage = "成功获得 \(totalAmount) 喵币（含赠送 \(bonus)）"
-            } else {
-                purchaseSuccessMessage = "成功获得 \(totalAmount) 喵币"
-            }
-
-            // 3秒后清除成功标志
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                self.purchaseSuccess = false
-                self.purchaseSuccessMessage = ""
-            }
         }
+
+        await publishPurchaseSuccess(
+            successMessage,
+            attemptID: attemptID,
+            source: source
+        )
 
         // 记录购买历史
         let record = IAPPurchaseRecord(
@@ -794,21 +803,35 @@ class StoreManager: ObservableObject {
         )
     }
 
-    private func showPurchaseSuccessMessage(_ message: String) async {
+    private func publishPurchaseSuccess(_ message: String, attemptID: String?, source: String) async {
         await MainActor.run {
-            purchaseSuccess = true
             purchaseSuccessMessage = message
+            let context = IAPPurchaseSuccessContext(
+                attemptID: attemptID,
+                source: source,
+                message: message
+            )
+            purchaseSuccessContext = context
+            purchaseSuccess = true
             Task {
                 await IAPDiagnosticStore.shared.record(
                     category: .flow,
-                    name: "purchase_success_toast_shown",
-                    fields: ["message": message]
+                    name: "purchase_success_state_published",
+                    level: source == "transaction_updates" ? .notice : .info,
+                    attemptID: attemptID,
+                    fields: [
+                        "message": message,
+                        "source": source
+                    ]
                 )
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 self.purchaseSuccess = false
                 self.purchaseSuccessMessage = ""
+                if self.purchaseSuccessContext == context {
+                    self.purchaseSuccessContext = nil
+                }
             }
         }
     }
