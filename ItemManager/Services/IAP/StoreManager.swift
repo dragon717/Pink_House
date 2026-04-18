@@ -49,17 +49,44 @@ class StoreManager: ObservableObject {
 
                 do {
                     let transaction = try await self.checkVerified(result)
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "transaction_update_received",
+                        productID: transaction.productID,
+                        transactionID: String(transaction.id),
+                        fields: [
+                            "source": "transaction_updates",
+                            "purchaseDate": transaction.purchaseDate.ISO8601Format()
+                        ]
+                    )
 
                     // 检查是否已处理过
                     if await self.isTransactionProcessed(transaction.id) {
+                        await IAPDiagnosticStore.shared.record(
+                            category: .flow,
+                            name: "transaction_update_already_processed",
+                            level: .notice,
+                            productID: transaction.productID,
+                            transactionID: String(transaction.id),
+                            fields: ["source": "transaction_updates"]
+                        )
                         await transaction.finish()
                         continue
                     }
 
                     // 处理交易
-                    await self.processTransaction(transaction)
+                    await self.processTransaction(transaction, source: "transaction_updates", attemptID: nil)
                 } catch {
                     print("[StoreManager] 交易验证失败: \(error)")
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "transaction_update_verification_failed",
+                        level: .error,
+                        fields: [
+                            "source": "transaction_updates",
+                            "error": error.localizedDescription
+                        ]
+                    )
                 }
             }
         }
@@ -80,6 +107,14 @@ class StoreManager: ObservableObject {
             print("\(logPrefix) ===== 商品拉取开始 =====")
             print("\(logPrefix) bundleID=\(bundleID)")
             print("\(logPrefix) requestedIDs=\(allProductIDs.joined(separator: ", "))")
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "product_fetch_started",
+                fields: [
+                    "bundleID": bundleID,
+                    "requestedIDs": allProductIDs.joined(separator: ",")
+                ]
+            )
 
             let products = try await Product.products(for: allProductIDs)
 
@@ -110,10 +145,25 @@ class StoreManager: ObservableObject {
             }
 
             print("\(logPrefix) ===== 商品拉取结束 =====")
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "product_fetch_finished",
+                level: coinProducts.isEmpty ? .notice : .info,
+                fields: [
+                    "matchedCount": String(coinProducts.count),
+                    "missingIDs": missingIDs.joined(separator: ",").isEmpty ? "none" : missingIDs.joined(separator: ",")
+                ]
+            )
 
         } catch {
             print("[IAPFetch] ===== 商品拉取失败 =====")
             print("[IAPFetch] error=\(error)")
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "product_fetch_failed",
+                level: .error,
+                fields: ["error": error.localizedDescription]
+            )
             lastError = .productRequestFailed(error.localizedDescription)
         }
     }
@@ -125,23 +175,41 @@ class StoreManager: ObservableObject {
     //   - product: 要购买的商品
     // 返回:
     //   - IAPPurchaseResult: 购买结果
-    func purchase(_ product: Product) async -> IAPPurchaseResult {
+    func purchase(_ product: Product, attemptID: String) async -> IAPPurchaseResult {
         isPurchasing = true
         defer { isPurchasing = false }
 
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "purchase_requested",
+            attemptID: attemptID,
+            productID: product.id,
+            fields: [
+                "isTestMode": String(IAPTestManager.shared.isTestMode),
+                "displayPrice": product.displayPrice
+            ]
+        )
+
         // 测试模式：使用模拟支付
         if IAPTestManager.shared.isTestMode {
-            return await purchaseInTestMode(product: product)
+            return await purchaseInTestMode(product: product, attemptID: attemptID)
         }
 
         // 生产模式：正常Apple支付流程
-        return await purchaseInProductionMode(product: product)
+        return await purchaseInProductionMode(product: product, attemptID: attemptID)
     }
 
     // MARK: - 测试模式购买
-    private func purchaseInTestMode(product: Product) async -> IAPPurchaseResult {
+    private func purchaseInTestMode(product: Product, attemptID: String) async -> IAPPurchaseResult {
         // 模拟购买延迟
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "purchase_test_mode_started",
+            attemptID: attemptID,
+            productID: product.id
+        )
 
         guard let productType = IAPProductType(rawValue: product.id) else {
             return .failed(.productNotFound(product.id))
@@ -153,6 +221,16 @@ class StoreManager: ObservableObject {
 
             switch result {
             case .success(let deliveredCoins, _, let isFirstDouble):
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_test_mode_succeeded",
+                    attemptID: attemptID,
+                    productID: product.id,
+                    fields: [
+                        "deliveredCoins": String(deliveredCoins),
+                        "isFirstDouble": String(isFirstDouble)
+                    ]
+                )
                 await showPurchaseSuccessMessage(
                     isFirstDouble
                     ? "🎉 首充双倍！获得 \(deliveredCoins) 喵币"
@@ -161,13 +239,21 @@ class StoreManager: ObservableObject {
                 return .success(transaction: nil, product: product)
 
             case .failure(let error):
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_test_mode_failed",
+                    level: .error,
+                    attemptID: attemptID,
+                    productID: product.id,
+                    fields: ["error": error]
+                )
                 return .failed(.purchaseFailed(error))
             }
         }
     }
 
     // MARK: - 生产模式购买
-    private func purchaseInProductionMode(product: Product) async -> IAPPurchaseResult {
+    private func purchaseInProductionMode(product: Product, attemptID: String) async -> IAPPurchaseResult {
         do {
             // 准备购买选项
             var options: Set<Product.PurchaseOption> = []
@@ -177,42 +263,102 @@ class StoreManager: ObservableObject {
             // }
 
             // 发起购买请求
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_invoking_storekit",
+                attemptID: attemptID,
+                productID: product.id,
+                fields: ["optionsCount": String(options.count)]
+            )
             let result = try await product.purchase(options: options)
 
             switch result {
             case .success(let verification):
                 // 验证交易
                 let transaction = try await checkVerified(verification)
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_verification_succeeded",
+                    attemptID: attemptID,
+                    productID: transaction.productID,
+                    transactionID: String(transaction.id),
+                    fields: ["purchaseDate": transaction.purchaseDate.ISO8601Format()]
+                )
 
                 // 检查是否已处理
                 if isTransactionProcessed(transaction.id) {
+                    await IAPDiagnosticStore.shared.record(
+                        category: .flow,
+                        name: "purchase_duplicate_transaction",
+                        level: .notice,
+                        attemptID: attemptID,
+                        productID: transaction.productID,
+                        transactionID: String(transaction.id)
+                    )
                     await transaction.finish()
                     return .failed(.alreadyProcessed)
                 }
 
-                await processTransaction(transaction)
+                await processTransaction(transaction, source: "purchase_flow", attemptID: attemptID)
                 return .success(transaction: transaction, product: product)
 
             case .userCancelled:
                 print("[StoreManager] 用户取消购买")
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_cancelled",
+                    level: .notice,
+                    attemptID: attemptID,
+                    productID: product.id
+                )
                 return .cancelled
 
             case .pending:
                 print("[StoreManager] 购买等待中")
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_pending",
+                    level: .notice,
+                    attemptID: attemptID,
+                    productID: product.id
+                )
                 return .pending
 
             @unknown default:
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_unknown_result",
+                    level: .error,
+                    attemptID: attemptID,
+                    productID: product.id
+                )
                 return .failed(.purchaseFailed("未知状态"))
             }
 
         } catch let error as Product.PurchaseError {
             print("[StoreManager] 购买错误: \(error)")
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_storekit_error",
+                level: .error,
+                attemptID: attemptID,
+                productID: product.id,
+                fields: ["error": String(describing: error)]
+            )
             let iapError = IAPError.from(purchaseError: error)
             lastError = iapError
             return .failed(iapError)
 
         } catch {
             print("[StoreManager] 购买失败: \(error)")
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_failed",
+                level: .error,
+                attemptID: attemptID,
+                productID: product.id,
+                fields: ["error": error.localizedDescription]
+            )
             let iapError = IAPError.purchaseFailed(error.localizedDescription)
             lastError = iapError
             return .failed(iapError)
@@ -234,8 +380,19 @@ class StoreManager: ObservableObject {
     // MARK: - 处理交易
     // 处理已验证的交易
     // 包括：发放喵币、更新VIP状态、记录交易等
-    private func processTransaction(_ transaction: Transaction) async {
+    private func processTransaction(_ transaction: Transaction, source: String, attemptID: String?) async {
         print("[StoreManager] 处理交易: \(transaction.id)")
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "transaction_processing_started",
+            attemptID: attemptID,
+            productID: transaction.productID,
+            transactionID: String(transaction.id),
+            fields: [
+                "source": source,
+                "purchaseDate": transaction.purchaseDate.ISO8601Format()
+            ]
+        )
 
         // 标记为已处理
         markTransactionAsProcessed(transaction.id)
@@ -244,17 +401,25 @@ class StoreManager: ObservableObject {
         if let productType = IAPProductType(rawValue: transaction.productID) {
             switch productType {
             case .meowCoin60, .meowCoin120, .meowCoin300, .meowCoin500, .meowCoin1280, .meowCoin3280:
-                await deliverMeowCoins(for: transaction, productType: productType)
+                await deliverMeowCoins(for: transaction, productType: productType, attemptID: attemptID, source: source)
             }
         }
 
         // 完成交易
         await transaction.finish()
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "transaction_finished",
+            attemptID: attemptID,
+            productID: transaction.productID,
+            transactionID: String(transaction.id),
+            fields: ["source": source]
+        )
     }
 
     // MARK: - 发放喵币
     // 根据购买的商品发放相应数量的喵币（支持首次双倍活动）
-    private func deliverMeowCoins(for transaction: Transaction, productType: IAPProductType) async {
+    private func deliverMeowCoins(for transaction: Transaction, productType: IAPProductType, attemptID: String?, source: String) async {
         let (baseAmount, bonus) = getCoinAmount(for: productType)
 
         // 计算实际获得的喵币（考虑首次双倍）
@@ -271,6 +436,8 @@ class StoreManager: ObservableObject {
 
         // 更新用户喵币余额
         await MainActor.run {
+            let previousAccountBalance = Self.loadMeowCoinAccount().balance
+            let previousStatusBalance = PetDataManager.shared.status.meowCoin
             var account = Self.loadMeowCoinAccount()
             account.balance += totalAmount
             account.totalPurchased += totalAmount
@@ -280,8 +447,40 @@ class StoreManager: ObservableObject {
             // 同时更新 PetDataManager 中的喵币
             var status = PetDataManager.shared.status
             status.meowCoin = account.balance
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .balance,
+                    name: "balance_delivery_pre_save",
+                    attemptID: attemptID,
+                    productID: transaction.productID,
+                    transactionID: String(transaction.id),
+                    fields: [
+                        "source": source,
+                        "previousAccountBalance": String(previousAccountBalance),
+                        "previousStatusBalance": String(previousStatusBalance),
+                        "newAccountBalance": String(account.balance),
+                        "newStatusBalance": String(status.meowCoin),
+                        "deliveredAmount": String(totalAmount)
+                    ]
+                )
+            }
             PetDataManager.shared.saveStatus(status)
             Self.notifyPetStatusDidChange()
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .balance,
+                    name: "balance_delivery_post_save",
+                    attemptID: attemptID,
+                    productID: transaction.productID,
+                    transactionID: String(transaction.id),
+                    fields: [
+                        "source": source,
+                        "storedAccountBalance": String(Self.loadMeowCoinAccount().balance),
+                        "storedStatusBalance": String(PetDataManager.shared.status.meowCoin),
+                        "purchaseSuccessMessage": bonus > 0 ? "coin_delivery_with_bonus" : "coin_delivery"
+                    ]
+                )
+            }
 
             // 显示成功消息
             purchaseSuccess = true
@@ -314,6 +513,20 @@ class StoreManager: ObservableObject {
         savePurchaseRecord(record)
 
         print("[StoreManager] 发放喵币: \(totalAmount) (基础: \(baseAmount), 赠送: \(bonus), 首充双倍: \(isFirstDouble))")
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "coin_delivery_completed",
+            attemptID: attemptID,
+            productID: transaction.productID,
+            transactionID: String(transaction.id),
+            fields: [
+                "source": source,
+                "baseAmount": String(baseAmount),
+                "bonusAmount": String(bonus),
+                "totalAmount": String(totalAmount),
+                "isFirstDouble": String(isFirstDouble)
+            ]
+        )
     }
 
     // MARK: - 获取喵币数量
@@ -396,10 +609,25 @@ class StoreManager: ObservableObject {
         let inferredSpent = max(account.totalSpent, max(0, account.totalPurchased - actualBalance))
 
         if account.balance != actualBalance || account.totalSpent != inferredSpent {
+            let previousBalance = account.balance
+            let previousSpent = account.totalSpent
             account.balance = actualBalance
             account.totalSpent = inferredSpent
             account.lastUpdated = Date()
             saveMeowCoinAccount(account)
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .balance,
+                    name: "balance_synchronized_from_status",
+                    level: .notice,
+                    fields: [
+                        "previousAccountBalance": String(previousBalance),
+                        "actualStatusBalance": String(actualBalance),
+                        "previousTotalSpent": String(previousSpent),
+                        "newTotalSpent": String(inferredSpent)
+                    ]
+                )
+            }
         }
 
         return account
@@ -417,6 +645,7 @@ class StoreManager: ObservableObject {
     static func spendMeowCoins(_ amount: Int, in status: inout PetStatus) -> Bool {
         guard status.meowCoin >= amount else { return false }
 
+        let previousBalance = status.meowCoin
         status.meowCoin -= amount
 
         var account = synchronizedMeowCoinAccount()
@@ -424,6 +653,20 @@ class StoreManager: ObservableObject {
         account.totalSpent += amount
         account.lastUpdated = Date()
         saveMeowCoinAccount(account)
+        let newBalance = status.meowCoin
+        let totalSpent = account.totalSpent
+        Task {
+            await IAPDiagnosticStore.shared.record(
+                category: .balance,
+                name: "balance_spent",
+                fields: [
+                    "spentAmount": String(amount),
+                    "previousStatusBalance": String(previousBalance),
+                    "newStatusBalance": String(newBalance),
+                    "accountTotalSpent": String(totalSpent)
+                ]
+            )
+        }
 
         return true
     }
@@ -464,6 +707,13 @@ class StoreManager: ObservableObject {
         await MainActor.run {
             purchaseSuccess = true
             purchaseSuccessMessage = message
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_success_toast_shown",
+                    fields: ["message": message]
+                )
+            }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 self.purchaseSuccess = false

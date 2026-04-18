@@ -73,6 +73,13 @@ class IAPViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: .petStatusDidUpdateExternally)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.loadUserData()
+            }
+            .store(in: &cancellables)
+
     }
 
     // MARK: - 加载用户数据
@@ -102,32 +109,129 @@ class IAPViewModel: ObservableObject {
 
     // MARK: - 购买喵币
     func purchaseMeowCoin(product: MeowCoinProductDisplay) async {
-        guard let storeProduct = storeManager.coinProducts.first(where: { $0.id == product.id }) else {
-            showErrorAlert = true
-            errorMessage = "商品信息已过期，请刷新重试"
+        let attemptID = IAPDiagnosticStore.makeAttemptID()
+
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "purchase_tapped",
+            attemptID: attemptID,
+            productID: product.id,
+            fields: [
+                "displayPrice": product.price,
+                "currentBalance": String(currentBalance),
+                "uiIsPurchasing": String(isPurchasing)
+            ]
+        )
+
+        if isPurchasing || storeManager.isPurchasing {
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_tap_ignored_already_purchasing",
+                level: .notice,
+                attemptID: attemptID,
+                productID: product.id
+            )
             return
         }
 
-        let result = await storeManager.purchase(storeProduct)
-        handlePurchaseResult(result)
+        let canMakePurchases = storeManager.canMakePurchases()
+        await IAPDiagnosticStore.shared.record(
+            category: .flow,
+            name: "purchase_capability_checked",
+            attemptID: attemptID,
+            productID: product.id,
+            fields: ["canMakePurchases": String(canMakePurchases)]
+        )
+
+        guard canMakePurchases else {
+            showErrorAlert = true
+            errorMessage = "当前设备或账户无法发起购买，请检查系统购买限制后重试。"
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_blocked_cannot_make_payments",
+                level: .notice,
+                attemptID: attemptID,
+                productID: product.id
+            )
+            return
+        }
+
+        guard let storeProduct = storeManager.coinProducts.first(where: { $0.id == product.id }) else {
+            showErrorAlert = true
+            errorMessage = "商品信息已过期，请刷新重试"
+            await IAPDiagnosticStore.shared.record(
+                category: .flow,
+                name: "purchase_store_product_missing",
+                level: .error,
+                attemptID: attemptID,
+                productID: product.id
+            )
+            return
+        }
+
+        let result = await storeManager.purchase(storeProduct, attemptID: attemptID)
+        handlePurchaseResult(result, attemptID: attemptID, productID: product.id)
     }
 
     // MARK: - 处理购买结果
-    private func handlePurchaseResult(_ result: IAPPurchaseResult) {
+    private func handlePurchaseResult(_ result: IAPPurchaseResult, attemptID: String, productID: String) {
         switch result {
         case .success:
             // 成功消息通过 StoreManager 的 publisher 处理
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_result_success",
+                    attemptID: attemptID,
+                    productID: productID
+                )
+            }
             break
         case .pending:
             showSuccessToast = true
-            successMessage = "购买已提交，等待处理中..."
+            successMessage = "购买请求已提交，正在等待 App Store 处理。到账后会自动更新余额。"
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_result_pending",
+                    level: .notice,
+                    attemptID: attemptID,
+                    productID: productID
+                )
+            }
         case .cancelled:
             // 用户取消，不显示错误
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_result_cancelled",
+                    level: .notice,
+                    attemptID: attemptID,
+                    productID: productID
+                )
+            }
             break
         case .failed(let error):
             showErrorAlert = true
             errorMessage = error.errorDescription ?? "购买失败"
+            Task {
+                await IAPDiagnosticStore.shared.record(
+                    category: .flow,
+                    name: "purchase_result_failed",
+                    level: .error,
+                    attemptID: attemptID,
+                    productID: productID,
+                    fields: [
+                        "error": error.errorDescription ?? "unknown",
+                        "detailedError": error.detailedDescription
+                    ]
+                )
+            }
         }
+    }
+
+    func exportDiagnostics() async throws -> URL {
+        try await IAPDiagnosticStore.shared.exportSnapshot()
     }
 
     // MARK: - 检查购买能力

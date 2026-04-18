@@ -7,6 +7,10 @@ import UIKit
 struct MeowCoinStoreView: View {
     @StateObject private var viewModel = IAPViewModel.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var diagnosticShareItems: [Any] = []
+    @State private var showDiagnosticShareSheet = false
+    @State private var showDiagnosticAlert = false
+    @State private var diagnosticAlertMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -50,6 +54,14 @@ struct MeowCoinStoreView: View {
                 }
             } message: {
                 Text(viewModel.errorMessage)
+            }
+            .alert("IAP 诊断", isPresented: $showDiagnosticAlert) {
+                Button("确定", role: .cancel) {}
+            } message: {
+                Text(diagnosticAlertMessage)
+            }
+            .sheet(isPresented: $showDiagnosticShareSheet) {
+                ShareSheet(items: diagnosticShareItems)
             }
             .task {
                 await viewModel.fetchProducts()
@@ -104,6 +116,12 @@ struct MeowCoinStoreView: View {
                 )
         )
         .padding(.horizontal)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 1.2)
+                .onEnded { _ in
+                    exportDiagnostics()
+                }
+        )
     }
 
     // MARK: - 喵币充值区域
@@ -138,7 +156,8 @@ struct MeowCoinStoreView: View {
                     ForEach(viewModel.meowCoinProducts) { product in
                         CoinProductCard(
                             product: product,
-                            refreshToken: viewModel.firstPurchaseStatusVersion
+                            refreshToken: viewModel.firstPurchaseStatusVersion,
+                            isPurchasing: viewModel.isPurchasing
                         ) {
                             Task {
                                 await viewModel.purchaseMeowCoin(product: product)
@@ -241,6 +260,23 @@ struct MeowCoinStoreView: View {
     private func openExternalURL(_ url: URL) {
         UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
+
+    private func exportDiagnostics() {
+        Task {
+            do {
+                let exportedURL = try await viewModel.exportDiagnostics()
+                await MainActor.run {
+                    diagnosticShareItems = [exportedURL]
+                    showDiagnosticShareSheet = true
+                }
+            } catch {
+                await MainActor.run {
+                    diagnosticAlertMessage = "诊断日志导出失败：\(error.localizedDescription)"
+                    showDiagnosticAlert = true
+                }
+            }
+        }
+    }
 }
 
 // MARK: - 首次双倍活动横幅
@@ -302,6 +338,7 @@ struct FirstDoubleBanner: View {
 struct CoinProductCard: View {
     let product: MeowCoinProductDisplay
     let refreshToken: Int
+    let isPurchasing: Bool
     let onPurchase: () -> Void
     @State private var hasFirstDouble: Bool = false
 
@@ -416,6 +453,8 @@ struct CoinProductCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isPurchasing)
+        .opacity(isPurchasing ? 0.75 : 1.0)
         .onAppear {
             updateFirstDoubleStatus()
         }
