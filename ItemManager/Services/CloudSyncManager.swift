@@ -23,14 +23,11 @@ class CloudSyncManager: ObservableObject {
     // MARK: - Network Permission
     
     func checkNetworkPermission() {
-        // 检查当前网络权限状态
-        // check current network permission state
-        if cellularData.restrictedState == .notRestricted {
-            print("Network permission already granted. Fetching backup metadata...")
-            fetchLatestBackupMetadata()
-        } else {
-            print("Network permission state: \(cellularData.restrictedState.rawValue)")
-        }
+        let currentState = cellularData.restrictedState
+        print("Network permission state: \(currentState.rawValue)")
+        
+        // iCloud 元数据同步本身不应被蜂窝权限状态阻塞，尤其是在 Wi-Fi 或状态未知的启动阶段。
+        fetchLatestBackupMetadata()
         
         // 监听权限变化（例如用户刚刚点击了允许）
         // Monitor permission changes (e.g. user just tapped Allow)
