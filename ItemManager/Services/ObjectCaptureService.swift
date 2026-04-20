@@ -83,12 +83,17 @@ class ObjectCaptureService: ObservableObject {
     }
     
     func processImages(_ images: [UIImage]) async throws -> URL {
+        #if targetEnvironment(simulator)
+        throw ObjectCaptureError.notSupported
+        #else
         guard #available(iOS 18.0, *), Self.canUseOnDevicePhotogrammetry else {
             throw ObjectCaptureError.notSupported
         }
         return try await processImagesForObjectCapture(images, detail: .reduced)
+        #endif
     }
 
+    #if !targetEnvironment(simulator)
     @available(iOS 18.0, *)
     private func processImagesForObjectCapture(_ images: [UIImage], detail: PhotogrammetrySession.Request.Detail) async throws -> URL {
         guard images.count >= 10 else {
@@ -144,14 +149,20 @@ class ObjectCaptureService: ObservableObject {
         
         return modelURL
     }
-    
+    #endif
+
     func processImagesFromDirectory(_ imageDirectory: URL) async throws -> URL {
+        #if targetEnvironment(simulator)
+        throw ObjectCaptureError.notSupported
+        #else
         guard #available(iOS 18.0, *), Self.canUseOnDevicePhotogrammetry else {
             throw ObjectCaptureError.notSupported
         }
         return try await processImagesFromDirectoryForObjectCapture(imageDirectory, detail: .reduced)
+        #endif
     }
 
+    #if !targetEnvironment(simulator)
     @available(iOS 18.0, *)
     private func processImagesFromDirectoryForObjectCapture(_ imageDirectory: URL, detail: PhotogrammetrySession.Request.Detail) async throws -> URL {
         let modelID = UUID()
@@ -204,11 +215,13 @@ class ObjectCaptureService: ObservableObject {
             detail: detail
         )
     }
-    
+    #endif
+
     func processImagesWithFallback(_ images: [UIImage]) async throws -> URL {
         return try await processImages(images)
     }
     
+    #if !targetEnvironment(simulator)
     @available(iOS 18.0, *)
     private func performPhotogrammetry(
         imageDirectory: URL,
@@ -231,9 +244,8 @@ class ObjectCaptureService: ObservableObject {
         
         let outputURL = modelDir.appendingPathComponent("model.usdz")
         
-        var configuration = PhotogrammetrySession.Configuration()
-        configuration.isObjectMaskingEnabled = true
-        
+        let configuration = PhotogrammetrySession.Configuration()
+
         let session = try PhotogrammetrySession(
             input: imageDirectory,
             configuration: configuration
@@ -357,13 +369,16 @@ class ObjectCaptureService: ObservableObject {
             break
         }
     }
-    
+    #endif
+
     func cancelProcessing() {
         currentTask?.cancel()
+        #if !targetEnvironment(simulator)
         if #available(iOS 18.0, *),
            let session = photogrammetrySession as? PhotogrammetrySession {
             session.cancel()
         }
+        #endif
         currentTask = nil
         photogrammetrySession = nil
         stage = .idle
@@ -512,6 +527,7 @@ class ObjectCaptureService: ObservableObject {
     }
 }
 
+#if !targetEnvironment(simulator)
 @available(iOS 18.0, *)
 extension PhotogrammetrySession.Output.ProcessingStage {
     var processingStageString: String {
@@ -533,6 +549,7 @@ extension PhotogrammetrySession.Output.ProcessingStage {
         }
     }
 }
+#endif
 
 #else
 
