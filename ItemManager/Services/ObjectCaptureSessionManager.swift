@@ -3,6 +3,8 @@ import Combine
 import SwiftUI
 import RealityKit
 
+#if !targetEnvironment(simulator)
+
 @MainActor
 class ObjectCaptureSessionManager: ObservableObject {
 
@@ -320,3 +322,5 @@ class ObjectCaptureSessionManager: ObservableObject {
         print("[ObjectCapture] 已重置")
     }
 }
+
+#endif
