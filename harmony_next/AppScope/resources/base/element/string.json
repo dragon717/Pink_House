@@ -1,0 +1,12 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "少女心愿"
+    },
+    {
+      "name": "app_description",
+      "value": "少女心愿 HarmonyOS Next 原生版"
+    }
+  ]
+}

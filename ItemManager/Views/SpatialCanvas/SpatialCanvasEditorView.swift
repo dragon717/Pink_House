@@ -275,10 +275,16 @@ struct SpatialCanvasEditorView: View {
             )
         }
         .fullScreenCover(isPresented: $showingObjectCaptureScanner) {
-            ObjectCaptureScannerView { imageDirectory in
-                // 先关闭扫描界面，再处理图像
-                showingObjectCaptureScanner = false
-                processObjectCaptureDirectory(imageDirectory)
+            if #available(iOS 18.0, *) {
+                ObjectCaptureScannerView { imageDirectory in
+                    // 先关闭扫描界面，再处理图像
+                    showingObjectCaptureScanner = false
+                    processObjectCaptureDirectory(imageDirectory)
+                }
+            } else {
+                ObjectCaptureUnavailableView {
+                    showingObjectCaptureScanner = false
+                }
             }
         }
         .fileImporter(isPresented: $showingUSDZFilePicker, allowedContentTypes: [UTType(filenameExtension: "usdz") ?? .data], allowsMultipleSelection: false) { result in
@@ -543,7 +549,12 @@ struct SpatialCanvasEditorView: View {
             case .gallery:
                 showingImagePicker = true
             case .camera:
-                showingObjectCaptureScanner = true
+                if #available(iOS 18.0, *) {
+                    showingObjectCaptureScanner = true
+                } else {
+                    isProcessing3DGS = true
+                    processingStage = .failed("Object Capture 需要 iOS 18 或更高版本")
+                }
             case .usdzModel:
                 showingUSDZFilePicker = true
             case .light:
@@ -1312,6 +1323,32 @@ struct SpatialCanvasEditorView: View {
     }
 }
 
+private struct ObjectCaptureUnavailableView: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "camera.metering.matrix")
+                .font(.system(size: 56, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("Object Capture 需要 iOS 18 或更高版本")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text("你仍然可以在 iOS 17.4 使用相册导入或 USDZ 文件导入，3D 扫描会在 iOS 18+ 设备上保持原有流程。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button("返回") {
+                onDismiss()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+    }
+}
+
 // MARK: - 辅助类型
 
 
@@ -1535,5 +1572,3 @@ struct ModelCard: View {
 }
 
 // MARK: - 占位视图组件
-
-

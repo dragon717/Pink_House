@@ -1,0 +1,10 @@
+{
+  "name": "pink-house-harmony-next",
+  "version": "0.1.0",
+  "description": "HarmonyOS Next native client for Pink House.",
+  "main": "",
+  "author": "Pink House",
+  "license": "UNLICENSED",
+  "dependencies": {},
+  "devDependencies": {}
+}

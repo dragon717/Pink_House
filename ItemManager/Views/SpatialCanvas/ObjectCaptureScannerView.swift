@@ -4,6 +4,7 @@ import Foundation
 
 #if os(iOS)
 
+@available(iOS 18.0, *)
 struct ObjectCaptureScannerView: View {
 
     @StateObject private var sessionManager = ObjectCaptureSessionManager.shared
@@ -23,7 +24,7 @@ struct ObjectCaptureScannerView: View {
         ZStack {
             if isLowPowerMode {
                 lowPowerWarningView
-            } else if !ObjectCaptureSession.isSupported {
+            } else if !sessionManager.isSupported {
                 notSupportedView
             } else if let session = session {
                 ObjectCaptureView(session: session)
@@ -92,7 +93,7 @@ struct ObjectCaptureScannerView: View {
     }
 
     private func setupSession() {
-        guard ObjectCaptureSession.isSupported else {
+        guard sessionManager.isSupported else {
             showNotSupportedAlert = true
             return
         }

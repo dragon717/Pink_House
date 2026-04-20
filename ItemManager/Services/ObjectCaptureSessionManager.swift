@@ -30,15 +30,25 @@ class ObjectCaptureSessionManager: ObservableObject {
 
     private init() {}
 
+    private static var canUseOnDeviceObjectCapture: Bool {
+        guard #available(iOS 18.0, *) else { return false }
+#if targetEnvironment(simulator)
+        return false
+#else
+        return true
+#endif
+    }
+
     var isSupported: Bool {
-        ObjectCaptureSession.isSupported
+        guard Self.canUseOnDeviceObjectCapture else { return false }
+        return ObjectCaptureSession.isSupported
     }
 
     /// 准备 Object Capture Session
     /// 根据 Apple 官方文档，调用 start 后 session 会进入 ready 状态
     /// 然后需要调用 startDetecting() 进入 detecting 状态
     func prepareSession() -> ObjectCaptureSession? {
-        guard ObjectCaptureSession.isSupported else {
+        guard isSupported else {
             print("[ObjectCapture] 设备不支持 Object Capture")
             return nil
         }

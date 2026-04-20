@@ -1,0 +1,16 @@
+.gradle/
+build/
+local.properties
+
+*.iml
+.idea/
+
+# Signing credentials must stay local.
+keystore.properties
+*.jks
+*.keystore
+
+# Android build outputs
+captures/
+*.apk
+*.aab

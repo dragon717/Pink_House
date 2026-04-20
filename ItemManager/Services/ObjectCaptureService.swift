@@ -42,7 +42,6 @@ enum ObjectCaptureStage {
 
 #if os(iOS)
 
-@available(iOS 18.0, *)
 @MainActor
 class ObjectCaptureService: ObservableObject {
     
@@ -53,7 +52,7 @@ class ObjectCaptureService: ObservableObject {
     @Published var statusMessage: String = ""
     @Published var estimatedRemainingTime: TimeInterval?
     
-    private var photogrammetrySession: PhotogrammetrySession?
+    private var photogrammetrySession: Any?
     private var currentTask: Task<Void, Never>?
     
     // MARK: - 暂停/恢复状态
@@ -65,16 +64,33 @@ class ObjectCaptureService: ObservableObject {
     private var savedStatusMessage: String = ""
     
     private init() {}
+
+    private static var canUseOnDevicePhotogrammetry: Bool {
+        guard #available(iOS 18.0, *) else { return false }
+#if targetEnvironment(simulator)
+        return false
+#else
+        return true
+#endif
+    }
     
     var isSupported: Bool {
-        PhotogrammetrySession.isSupported
+        Self.canUseOnDevicePhotogrammetry
     }
     
     var canStartNewSession: Bool {
-        PhotogrammetrySession.isSupported && currentTask == nil
+        Self.canUseOnDevicePhotogrammetry && currentTask == nil
     }
     
-    func processImages(_ images: [UIImage], detail: PhotogrammetrySession.Request.Detail = .reduced) async throws -> URL {
+    func processImages(_ images: [UIImage]) async throws -> URL {
+        guard #available(iOS 18.0, *), Self.canUseOnDevicePhotogrammetry else {
+            throw ObjectCaptureError.notSupported
+        }
+        return try await processImagesForObjectCapture(images, detail: .reduced)
+    }
+
+    @available(iOS 18.0, *)
+    private func processImagesForObjectCapture(_ images: [UIImage], detail: PhotogrammetrySession.Request.Detail) async throws -> URL {
         guard images.count >= 10 else {
             throw ObjectCaptureError.insufficientImages
         }
@@ -129,7 +145,15 @@ class ObjectCaptureService: ObservableObject {
         return modelURL
     }
     
-    func processImagesFromDirectory(_ imageDirectory: URL, detail: PhotogrammetrySession.Request.Detail = .reduced) async throws -> URL {
+    func processImagesFromDirectory(_ imageDirectory: URL) async throws -> URL {
+        guard #available(iOS 18.0, *), Self.canUseOnDevicePhotogrammetry else {
+            throw ObjectCaptureError.notSupported
+        }
+        return try await processImagesFromDirectoryForObjectCapture(imageDirectory, detail: .reduced)
+    }
+
+    @available(iOS 18.0, *)
+    private func processImagesFromDirectoryForObjectCapture(_ imageDirectory: URL, detail: PhotogrammetrySession.Request.Detail) async throws -> URL {
         let modelID = UUID()
         
         // ObjectCaptureSession 创建的目录结构是:
@@ -182,9 +206,10 @@ class ObjectCaptureService: ObservableObject {
     }
     
     func processImagesWithFallback(_ images: [UIImage]) async throws -> URL {
-        return try await processImages(images, detail: .reduced)
+        return try await processImages(images)
     }
     
+    @available(iOS 18.0, *)
     private func performPhotogrammetry(
         imageDirectory: URL,
         modelID: UUID,
@@ -250,6 +275,7 @@ class ObjectCaptureService: ObservableObject {
         }
     }
     
+    @available(iOS 18.0, *)
     private func handleOutput(
         _ output: PhotogrammetrySession.Output,
         continuation: CheckedContinuation<URL, Error>,
@@ -334,7 +360,10 @@ class ObjectCaptureService: ObservableObject {
     
     func cancelProcessing() {
         currentTask?.cancel()
-        photogrammetrySession?.cancel()
+        if #available(iOS 18.0, *),
+           let session = photogrammetrySession as? PhotogrammetrySession {
+            session.cancel()
+        }
         currentTask = nil
         photogrammetrySession = nil
         stage = .idle
