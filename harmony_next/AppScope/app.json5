@@ -9,6 +9,6 @@
     "description": "$string:app_description",
     "minAPIVersion": 12,
     "targetAPIVersion": 14,
-    "apiReleaseType": "Release"
+    "apiReleaseType": "Release1"
   }
 }

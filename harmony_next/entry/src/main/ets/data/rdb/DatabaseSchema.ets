@@ -1,6 +1,19 @@
 import { AppConstants } from '../../core/constants/AppConstants';
 
-export const DatabaseSchema = {
+interface DatabaseDdlConfig {
+  wardrobeItems: string;
+  petStates: string;
+  walletTransactions: string;
+  iapOrders: string;
+}
+
+interface DatabaseSchemaConfig {
+  name: string;
+  version: number;
+  ddl: DatabaseDdlConfig;
+}
+
+export const DatabaseSchema: DatabaseSchemaConfig = {
   name: AppConstants.databaseName,
   version: AppConstants.databaseVersion,
   ddl: {

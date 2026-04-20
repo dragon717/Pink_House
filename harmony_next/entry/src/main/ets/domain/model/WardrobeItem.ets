@@ -18,7 +18,15 @@ export interface NewWardrobeItem {
   purchasedAt?: number;
 }
 
-export const WardrobeCategory = {
+interface WardrobeCategoryMap {
+  Tops: string;
+  Bottoms: string;
+  Dress: string;
+  Shoes: string;
+  Accessory: string;
+}
+
+export const WardrobeCategory: WardrobeCategoryMap = {
   Tops: '上衣',
   Bottoms: '下装',
   Dress: '连衣裙',

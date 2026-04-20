@@ -1,12 +1,5 @@
 {
   "apiType": "stageMode",
-  "buildOption": {
-    "arkOptions": {
-      "strictMode": {
-        "useNormalizedOHMUrl": true
-      }
-    }
-  },
   "targets": [
     {
       "name": "default"

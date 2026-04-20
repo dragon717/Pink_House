@@ -1,4 +1,30 @@
-export const AppTheme = {
+interface AppThemeColors {
+  background: string;
+  surface: string;
+  primary: string;
+  primarySoft: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+}
+
+interface AppThemeRadius {
+  card: number;
+  pill: number;
+}
+
+interface AppThemeSpacing {
+  page: number;
+  card: number;
+}
+
+interface AppThemeConfig {
+  color: AppThemeColors;
+  radius: AppThemeRadius;
+  spacing: AppThemeSpacing;
+}
+
+export const AppTheme: AppThemeConfig = {
   color: {
     background: '#FFF7FA',
     surface: '#FFFFFF',

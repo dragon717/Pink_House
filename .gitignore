@@ -16,3 +16,4 @@ asserts/*.mp3
 
 .codepilot-uploads/*
 
+.DS_Store
