@@ -1,6 +1,6 @@
 # 少女心愿 HarmonyOS Next 工程骨架
 
-这是 `docs/migration/harmony_next/PRD.md` 对应的 HarmonyOS Next 5 原生首批工程骨架。当前目标是让 DevEco Studio 可以接手继续开发，而不是完成业务功能。
+这是 `docs/migration/harmony_next/PRD.md` 对应的 HarmonyOS Next 5 原生首批工程。当前已从基础骨架推进到衣橱核心 MVP 第一轮：衣橱页接入 RDB/Repository/usecase 链路，具备列表、空态、按名称搜索、添加示例衣物和软删除能力。
 
 ## 技术选择
 
@@ -10,6 +10,13 @@
 - 本地存储：`@ohos.data.relationalStore` 预留 RDB schema，`@ohos.data.preferences` 预留轻量设置。
 - 产品分层：`core`、`domain`、`data`、`feature`，feature 首批包含 `wardrobe`、`pet`、`smallworld`、`wealth`、`vip`、`settings`。
 - 生态能力预留：HMS IAP、`reminderAgentManager`、和风天气 HTTPS/JWT、系统分享、字体注册、Service Card 数据源。
+
+## 衣橱 MVP 第一轮
+
+- 领域层：新增 `WardrobeItem` / `NewWardrobeItem` 模型、`WardrobeRepository` 接口，以及获取列表、搜索、添加示例衣物、软删除用例。
+- 数据层：新增 `WardrobeItemDao` 和 `RdbWardrobeRepository`，基于 `wardrobe_items` 支持未删除列表查询、插入示例数据、按名称 `LIKE` 搜索、`is_deleted` 软删除。
+- UI 层：`WardrobePage` 已替换占位壳，显示 RDB 列表、搜索输入框、空态、加载/错误状态、添加示例衣物按钮和单项移除按钮。
+- 当前策略：示例衣物先写入基础字段，图片导入、分类筛选、详情页、资产统计和备份兼容留到后续迭代。
 
 ## 目录说明
 
@@ -66,9 +73,10 @@ harmony_next/
 
 - 未接入真实 HMS IAP SDK；`HmsIapService` 仅保留接口与异常占位。
 - 未实现 `@ohos.reminderAgentManager`，当前只保留提醒通道枚举。
-- 未实现 RDB 迁移器与 DAO；当前只预留首批表结构。
+- 未实现通用 RDB 迁移器；当前先以 `CREATE TABLE IF NOT EXISTS` 确保首批表结构，并为衣橱补齐 DAO。
 - 未实现 Service Card/formExtensionAbility；当前只在 README 和 feature 页面预留数据源方向。
 - 未实现和风天气 JWT、定位降级、系统分享、字体注册和备份导入导出。
+- 衣橱尚未接入真实图片 URI、分类筛选、详情路由、批量导入和 iOS 备份字段映射。
 
 ## 本地构建状态
 

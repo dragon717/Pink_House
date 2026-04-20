@@ -32,7 +32,10 @@ android/
           navigation/
           ui/
         data/local/
+        data/repository/
         domain/model/
+        domain/repository/
+        domain/usecase/
         feature/
           wardrobe/
           pet/
@@ -123,9 +126,26 @@ keyPassword=your_key_password
 
 - `MainActivity` 使用 Compose 启动 `PinkHouseApp`。
 - `PinkHouseTheme` 提供 Material 3 浅色/深色基础配色。
-- 底部导航包含 `Wardrobe`、`Pet`、`World`、`Wealth`、`VIP`、`Settings` 六个占位入口。
+- 底部导航包含 `Wardrobe`、`Pet`、`World`、`Wealth`、`VIP`、`Settings` 六个入口。
 - `PinkHouseDatabase` 已建立 Room v1 数据库和 `wardrobe_item` 最小表。
 - `UserPreferencesDataStore` 已预留主题、衣橱视图模式、音效、震动、语言设置。
+
+## 衣橱 MVP 状态
+
+当前衣橱页已经从占位页推进到本地 Room 驱动的 MVP 雏形：
+
+- `WardrobeItemEntity` 与 `WardrobeItem` 已通过 mapper 转换，价格以 cents 存储、日期以 epoch day 存储、状态以枚举名存储。
+- `WardrobeItemDao` 支持观察未删除衣物、按名称模糊搜索、插入、批量插入、更新和软删除。
+- `WardrobeRepository` / `RoomWardrobeRepository` 已建立，业务入口通过 `GetWardrobeItems`、`AddSampleWardrobeItems` usecase 暴露。
+- 暂未引入 Hilt；`PinkHouseApplication` 持有简单 `AppContainer`，再传入 `PinkHouseApp` 和 `WardrobeRoute`。
+- `WardrobeRoute` 支持列表展示、空态、搜索输入框和“添加示例数据/衣物”按钮，可用于验证本地持久化链路。
+
+首次 Android Studio Sync 后重点关注：
+
+- Room KSP 是否生成 `app/schemas/` 下的 v1 schema，若生成需要纳入版本管理。
+- `collectAsStateWithLifecycle`、Material 3 Compose API 与当前 BOM 版本是否匹配。
+- 示例数据按钮当前每次点击都会追加一组测试衣物，后续接真实新增页时需要替换为表单或去重策略。
+- 当前搜索只按衣物名称模糊匹配，后续再扩展分类、品牌、颜色、标签和筛选。
 
 ## 后续开发注意
 

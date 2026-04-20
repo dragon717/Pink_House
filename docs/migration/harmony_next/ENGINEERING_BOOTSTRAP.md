@@ -9,6 +9,7 @@
 - 创建 ArkTS/ArkUI 首页壳，包含 feature 切换占位和里程碑占位。
 - 创建首批 feature 包目录：`wardrobe`、`pet`、`smallworld`、`wealth`、`vip`、`settings`。
 - 创建 `core/domain/data` 分层，预留 RDB、Preferences、HMS IAP、提醒和天气服务接口。
+- 衣橱核心 MVP 第一轮已接入 `wardrobe_items` RDB 链路：领域模型、仓储接口、RDB DAO、Repository、列表/搜索/添加示例/软删除用例和 `WardrobePage` MVP UI。
 - 新增 `harmony_next/README.md`，记录 DevEco Studio 开发、调试、打包、签名/Profile/AGC 注意事项。
 
 ## 边界
@@ -22,4 +23,5 @@
 
 - 用 DevEco Studio 5.0+ 打开 `harmony_next/` 并让 IDE 同步/补齐 Hvigor wrapper。
 - 完成首次编译后，根据实际 SDK API 校正 `build-profile.json5` 和 ArkTS import 细节。
-- M1 阶段优先补齐 RDB migration、DAO、Preferences repository 和隐私弹窗。
+- M1 阶段优先校验衣橱 RDB API 类型、补齐通用 migration、Preferences repository 和隐私弹窗。
+- 衣橱下一轮建议补真实图片 URI/权限、分类筛选、详情路由、资产统计，以及与 iOS 备份 DTO 的字段兼容映射。

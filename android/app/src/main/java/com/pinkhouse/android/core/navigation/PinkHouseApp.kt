@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.pinkhouse.android.core.di.AppContainer
 import com.pinkhouse.android.feature.pet.PetRoute
 import com.pinkhouse.android.feature.settings.SettingsRoute
 import com.pinkhouse.android.feature.smallworld.SmallWorldRoute
@@ -21,7 +22,7 @@ import com.pinkhouse.android.feature.wardrobe.WardrobeRoute
 import com.pinkhouse.android.feature.wealth.WealthRoute
 
 @Composable
-fun PinkHouseApp() {
+fun PinkHouseApp(appContainer: AppContainer) {
     val navController = rememberNavController()
     val destinations = AppDestination.entries
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -57,7 +58,12 @@ fun PinkHouseApp() {
             startDestination = AppDestination.Wardrobe.route,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(AppDestination.Wardrobe.route) { WardrobeRoute() }
+            composable(AppDestination.Wardrobe.route) {
+                WardrobeRoute(
+                    getWardrobeItems = appContainer.getWardrobeItems,
+                    addSampleWardrobeItems = appContainer.addSampleWardrobeItems,
+                )
+            }
             composable(AppDestination.Pet.route) { PetRoute() }
             composable(AppDestination.SmallWorld.route) { SmallWorldRoute() }
             composable(AppDestination.Wealth.route) { WealthRoute() }

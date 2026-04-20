@@ -9,9 +9,10 @@ import com.pinkhouse.android.core.ui.theme.PinkHouseTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val appContainer = (application as PinkHouseApplication).appContainer
         setContent {
             PinkHouseTheme {
-                PinkHouseApp()
+                PinkHouseApp(appContainer = appContainer)
             }
         }
     }
