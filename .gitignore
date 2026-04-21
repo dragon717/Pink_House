@@ -20,4 +20,6 @@ asserts/*.mp3
 
 harmony_next/entry/.preview/*
 harmony_next/entry/build/*
-harmony_next/.hvigor/cache/*
+harmony_next/.hvigor/*
+
+android/.codex-ide-cache-backup-*/*

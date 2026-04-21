@@ -6218,3 +6218,8 @@ Info: thread count is : 11
 [2026-04-21T01:49:30.565] [DEBUG] debug-file - Update task entry:default@PreviewArkTS output file:/Users/muniao/Downloads/Pink_House/harmony_next/entry/.preview/default/intermediates/loader_out/default/ets cache.
 [2026-04-21T01:49:30.566] [DEBUG] debug-file - Incremental task entry:default@PreviewArkTS post-execution cost:3 ms .
 [2026-04-21T01:49:30.570] [DEBUG] debug-file - hvigor build process will be closed.
+[2026-04-21T09:53:30.483] [DEBUG] debug-file - session manager: send message to worker process.
+[2026-04-21T09:53:30.487] [DEBUG] debug-file - session manager: send message to worker process.
+[2026-04-21T09:53:30.612] [DEBUG] debug-file - bad codeSnippet [object Object]
+[2026-04-21T09:53:30.629] [DEBUG] debug-file - watch worker: worker is ready to be terminated.
+[2026-04-21T09:53:30.630] [DEBUG] debug-file - Server currently has 0 watch-worker
