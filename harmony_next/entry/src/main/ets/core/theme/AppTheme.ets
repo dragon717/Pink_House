@@ -1,18 +1,25 @@
 interface AppThemeColors {
   background: string;
   backgroundLight: string;
+  backgroundDeep: string;
   surface: string;
   surfaceTint: string;
   surfaceMuted: string;
+  surfaceGlass: string;
 
   primary: string;
   primaryStrong: string;
   primarySoft: string;
   primaryPale: string;
   primaryHalo: string;
+  primaryMist: string;
 
   accent: string;
   accentSoft: string;
+  accentWarm: string;
+  houseBlue: string;
+  petOrange: string;
+  success: string;
 
   textPrimary: string;
   textSecondary: string;
@@ -25,7 +32,9 @@ interface AppThemeColors {
 
   overlayGlass: string;
   overlayGlassStrong: string;
+  overlayGlassMuted: string;
   shadowSoft: string;
+  shadowStrong: string;
 }
 
 interface AppThemeRadius {
@@ -62,46 +71,54 @@ interface AppThemeConfig {
 
 export const AppTheme: AppThemeConfig = {
   color: {
-    // 水彩粉底：纯色 + 近似绘制（不依赖图片）
-    background: '#F5D6DB',
-    backgroundLight: '#FAE6EA',
-    surface: '#FFFFFF',
-    surfaceTint: '#FFF4F7',
-    surfaceMuted: '#FBEEF1',
+    // Watercolor pink base, aligned with temp/design.
+    background: '#F3DDE5',
+    backgroundLight: '#FFF3F7',
+    backgroundDeep: '#EBC7D3',
+    surface: '#FFFDFD',
+    surfaceTint: '#FFF2F6',
+    surfaceMuted: '#F8E6ED',
+    surfaceGlass: 'rgba(255, 255, 255, 0.74)',
 
-    // 品牌粉：CTA / 胶囊 / 选中态
+    // Brand pink.
     primary: '#C97884',
-    primaryStrong: '#B85E6F',
-    primarySoft: '#FADEE2',
-    primaryPale: '#F7CAD1',
-    primaryHalo: '#F4B1BD',
+    primaryStrong: '#A65366',
+    primarySoft: '#F6D1DA',
+    primaryPale: '#FBE7ED',
+    primaryHalo: '#EAB2C1',
+    primaryMist: '#F2E3EA',
 
-    // 金色：价格 / 数字 / VIP
+    // Accent set used by VIP, House and pet states.
     accent: '#E4B248',
     accentSoft: '#F7E4A8',
+    accentWarm: '#F39B47',
+    houseBlue: '#7868E6',
+    petOrange: '#F0973D',
+    success: '#79AA72',
 
-    // 文本
-    textPrimary: '#3A2A30',
-    textSecondary: '#8C7179',
-    textTertiary: '#B89FA6',
+    // Text.
+    textPrimary: '#32232B',
+    textSecondary: '#7D7078',
+    textTertiary: '#B9A5AE',
     textOnPrimary: '#FFFFFF',
     textOnAccent: '#3A2A30',
 
-    // 边框
-    border: '#F0D4DA',
-    borderStrong: '#E5B8C0',
+    // Border and material overlays.
+    border: '#EAD5DE',
+    borderStrong: '#D6AEBB',
 
-    // 玻璃覆盖层（配合 backgroundBlurStyle 使用）
-    overlayGlass: 'rgba(255, 255, 255, 0.72)',
-    overlayGlassStrong: 'rgba(255, 255, 255, 0.88)',
-    shadowSoft: 'rgba(201, 120, 132, 0.18)'
+    overlayGlass: 'rgba(255, 255, 255, 0.66)',
+    overlayGlassStrong: 'rgba(255, 255, 255, 0.86)',
+    overlayGlassMuted: 'rgba(255, 244, 248, 0.58)',
+    shadowSoft: 'rgba(166, 83, 102, 0.16)',
+    shadowStrong: 'rgba(108, 70, 84, 0.20)'
   },
   radius: {
-    card: 22,
+    card: 16,
     cardLarge: 28,
-    chip: 14,
+    chip: 8,
     pill: 999,
-    tile: 18
+    tile: 8
   },
   spacing: {
     page: 18,

@@ -1,4 +1,5 @@
 import { AppTheme } from '../../core/theme/AppTheme';
+import { AppSymbol, AppSymbolName } from '../../core/theme/AppSymbols';
 import { GlassCard } from '../../core/theme/GlassComponents';
 
 /**
@@ -7,6 +8,9 @@ import { GlassCard } from '../../core/theme/GlassComponents';
  */
 @Component
 export struct MePage {
+  onOpenHouse: (destination: string) => void = () => {};
+  onOpenPet: () => void = () => {};
+
   @Builder
   private VipCard() {
     Column({ space: 10 }) {
@@ -51,11 +55,14 @@ export struct MePage {
   }
 
   @Builder
-  private EntryCard(title: string, subtitle: string, glyph: string) {
+  private EntryCard(title: string, subtitle: string, symbolName: string, onTap: () => void) {
     Row({ space: 12 }) {
       Stack() {
-        Text(glyph)
-          .fontSize(22)
+        AppSymbol({
+          name: symbolName,
+          iconSize: 24,
+          color: AppTheme.color.primary
+        })
       }
       .width(44)
       .height(44)
@@ -78,6 +85,7 @@ export struct MePage {
     .padding(14)
     .backgroundColor(AppTheme.color.surface)
     .borderRadius(AppTheme.radius.card)
+    .onClick(onTap)
   }
 
   build() {
@@ -92,20 +100,28 @@ export struct MePage {
 
         this.VipCard()
 
-        this.EntryCard('魔法任务', '完成任务解锁更多功能', '✦')
+        this.EntryCard('魔法任务', '完成任务解锁更多功能', AppSymbolName.Spark, () => {})
 
         Row({ space: 12 }) {
-          Column() { this.EntryCard('梦幻衣橱', '外观 · 随机 · 提醒', '👗') }
+          Column() { this.EntryCard('梦幻衣橱', '外观 · 随机 · 提醒', AppSymbolName.Wardrobe, () => {}) }
             .layoutWeight(1)
-          Column() { this.EntryCard('House', '场景与功能地图', '🏠') }
+          Column() {
+            this.EntryCard('House', '场景与功能地图', AppSymbolName.House, () => {
+              this.onOpenHouse('menu');
+            })
+          }
             .layoutWeight(1)
         }
         .width('100%')
 
         Row({ space: 12 }) {
-          Column() { this.EntryCard('智能萌宠', '陪伴 · 聊天 · 投喂', '🐾') }
+          Column() {
+            this.EntryCard('智能萌宠', '陪伴 · 聊天 · 投喂', AppSymbolName.Pet, () => {
+              this.onOpenPet();
+            })
+          }
             .layoutWeight(1)
-          Column() { this.EntryCard('备份资料', '云同步占位', '☁︎') }
+          Column() { this.EntryCard('备份资料', '本地导入导出', AppSymbolName.Import, () => {}) }
             .layoutWeight(1)
         }
         .width('100%')
