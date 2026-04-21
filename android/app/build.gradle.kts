@@ -101,3 +101,9 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+tasks.register("unitTestClasses") {
+    group = "verification"
+    description = "Compatibility task for IDEs that request :app:unitTestClasses."
+    dependsOn("compileDebugUnitTestKotlin", "compileDebugUnitTestJavaWithJavac")
+}
