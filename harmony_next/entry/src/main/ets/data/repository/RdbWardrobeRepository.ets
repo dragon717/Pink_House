@@ -36,6 +36,16 @@ export class RdbWardrobeRepository implements WardrobeRepository {
     await dao.softDeleteItem(id);
   }
 
+  async getDepositPlans(): Promise<WardrobeItem[]> {
+    const dao = await this.getDao();
+    return dao.queryDepositPlans();
+  }
+
+  async getDepositPlansByYear(year: number): Promise<WardrobeItem[]> {
+    const dao = await this.getDao();
+    return dao.queryDepositPlansByYear(year);
+  }
+
   private async getDao(): Promise<WardrobeItemDao> {
     const store = await rdbStoreProvider.getStore(this.context);
     return new WardrobeItemDao(store);

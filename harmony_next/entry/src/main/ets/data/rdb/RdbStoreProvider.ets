@@ -22,6 +22,14 @@ export class RdbStoreProvider {
   }
 
   private async ensureSchema(store: relationalStore.RdbStore): Promise<void> {
+    const currentVersion = store.version;
+    const targetVersion = DatabaseSchema.version;
+
+    if (currentVersion !== targetVersion) {
+      AppLogger.info(`RDB version ${currentVersion} -> ${targetVersion}, rebuilding wardrobe_items`);
+      await store.executeSql('DROP TABLE IF EXISTS wardrobe_items');
+    }
+
     const statements: string[] = [
       DatabaseSchema.ddl.wardrobeItems,
       DatabaseSchema.ddl.petStates,
@@ -31,6 +39,10 @@ export class RdbStoreProvider {
 
     for (const statement of statements) {
       await store.executeSql(statement);
+    }
+
+    if (currentVersion !== targetVersion) {
+      store.version = targetVersion;
     }
     AppLogger.info('RDB schema ensured');
   }
