@@ -76,7 +76,7 @@ export struct AppSymbol {
     } else if (this.name === AppSymbolName.Grid) {
       this.NativeGlyph($r('sys.symbol.square_grid_2x2'));
     } else if (this.name === AppSymbolName.More) {
-      this.NativeGlyph($r('sys.symbol.more'));
+      this.NativeGlyph($r('sys.symbol.ellipsis_circle'));
     } else if (this.name === AppSymbolName.Close) {
       this.NativeGlyph($r('sys.symbol.xmark'));
     } else if (this.name === AppSymbolName.Add) {

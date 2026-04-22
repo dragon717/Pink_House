@@ -29,6 +29,8 @@ export interface WardrobeItem {
   createdAt: number;
   updatedAt: number;
   isDeleted: boolean;
+
+  sortIndex: number;
 }
 
 export interface NewWardrobeItem {

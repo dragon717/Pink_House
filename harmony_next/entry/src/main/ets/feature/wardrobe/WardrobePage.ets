@@ -4,14 +4,32 @@ import { AppSymbol, AppSymbolName } from '../../core/theme/AppSymbols';
 import { GlassCard } from '../../core/theme/GlassComponents';
 import { AppLogger } from '../../core/utils/AppLogger';
 import { RdbWardrobeRepository } from '../../data/repository/RdbWardrobeRepository';
+import { wardrobePreferences } from '../../data/preferences/WardrobePreferences';
 import { totalBalance, totalDeposit, WardrobeItem } from '../../domain/model/WardrobeItem';
+import {
+  WardrobeSortOption,
+  WardrobeViewLayout,
+  WardrobeFilterState,
+  DefaultSortOption,
+  DefaultViewLayout,
+  createDefaultFilter,
+  isFilterActive,
+  countActiveFilters,
+  viewLayoutColumnCount,
+  isListMode
+} from '../../domain/model/WardrobeListOptions';
 import { SeriesAnalyzer, SeriesGroup } from '../../domain/service/SeriesAnalyzer';
 import { AddSampleWardrobeItemUseCase } from '../../domain/usecase/AddSampleWardrobeItemUseCase';
+import { BatchSoftDeleteWardrobeItemsUseCase } from '../../domain/usecase/BatchSoftDeleteWardrobeItemsUseCase';
 import { GetDepositPlansUseCase } from '../../domain/usecase/GetDepositPlansUseCase';
 import { GetWardrobeItemsUseCase } from '../../domain/usecase/GetWardrobeItemsUseCase';
+import { ReorderWardrobeItemsUseCase } from '../../domain/usecase/ReorderWardrobeItemsUseCase';
 import { SearchWardrobeItemsUseCase } from '../../domain/usecase/SearchWardrobeItemsUseCase';
 import { SoftDeleteWardrobeItemUseCase } from '../../domain/usecase/SoftDeleteWardrobeItemUseCase';
 import { WardrobeItemDetailPage, WardrobeDetailArgs } from './WardrobeItemDetailPage';
+import { SortSheet } from './toolbar/SortSheet';
+import { ViewLayoutSheet } from './toolbar/ViewLayoutSheet';
+import { FilterSheet } from './toolbar/FilterSheet';
 
 const DEPOSIT_MONTHS: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -26,7 +44,8 @@ export struct WardrobePage {
   @State private showCount: boolean = true;
   @State private showDressValue: boolean = false;
   @State private showTotalValue: boolean = false;
-  @State private showToolbarMenu: boolean = false;
+  @State private isSelectionMode: boolean = false;
+  @State private selectedItemIds: string[] = [];
   @State private depositViewMode: string = 'monthly';
   @State private selectedDepositYear: number = new Date().getFullYear();
   @State private selectedDepositMonth: number = 0;
@@ -34,12 +53,29 @@ export struct WardrobePage {
   @State private isDepositSelectorExpanded: boolean = false;
   @State private showDepositTotal: boolean = false;
   @State private showDepositYearStats: boolean = false;
+  @State private depositDisplayMode: string = 'detail';
+  @State private currentSort: WardrobeSortOption = DefaultSortOption;
+  @State private currentLayout: WardrobeViewLayout = DefaultViewLayout;
+  @State private filterState: WardrobeFilterState = createDefaultFilter();
+  @State private showSheet: boolean = false;
+  @State private activeSheet: string = '';
 
   private navPathStack: NavPathStack = new NavPathStack();
   onOpenHouse: (destination: string) => void = () => {};
 
   aboutToAppear(): void {
     this.loadItems();
+    this.loadPreferences();
+  }
+
+  private async loadPreferences(): Promise<void> {
+    try {
+      const ctx = getContext(this) as common.Context;
+      this.currentSort = await wardrobePreferences.getSortOption(ctx);
+      this.currentLayout = await wardrobePreferences.getViewLayout(ctx);
+    } catch (_e) {
+      // use defaults
+    }
   }
 
   private formatCurrency(value: number): string {
@@ -201,9 +237,23 @@ export struct WardrobePage {
         color: AppTheme.color.textPrimary
       })
     }
-    .width(34)
-    .height(44)
+    .width(40)
+    .height(40)
     .onClick(onTap)
+  }
+
+  @Builder
+  private RoundButtonWithMenu(symbolName: string, items: MenuElement[]) {
+    Stack() {
+      AppSymbol({
+        name: symbolName,
+        iconSize: 20,
+        color: AppTheme.color.textPrimary
+      })
+    }
+    .width(40)
+    .height(40)
+    .bindMenu(items)
   }
 
   @Builder
@@ -225,86 +275,162 @@ export struct WardrobePage {
     .justifyContent(FlexAlign.Center)
     .onClick(() => {
       this.selectedSegment = key;
-      this.showToolbarMenu = false;
+      this.exitSelectionMode();
     })
+  }
+
+  private openSheet(type: string): void {
+    AppLogger.info(`[Sheet] openSheet: type=${type}, showSheet was=${this.showSheet}`);
+    if (this.showSheet) {
+      this.showSheet = false;
+      setTimeout(() => {
+        this.activeSheet = type;
+        this.showSheet = true;
+        AppLogger.info(`[Sheet] delayed open: activeSheet=${this.activeSheet}`);
+      }, 100);
+    } else {
+      this.activeSheet = type;
+      this.showSheet = true;
+      AppLogger.info(`[Sheet] direct open: activeSheet=${this.activeSheet}`);
+    }
   }
 
   @Builder
   private TopBar() {
-    Column({ space: 6 }) {
-      Row({ space: 4 }) {
-        this.ModeButton('wardrobe', AppSymbolName.Wardrobe, '少女衣橱');
-        this.ModeButton('deposit', AppSymbolName.Deposit, '心愿尾款');
-
-        Blank()
-          .layoutWeight(1)
-
-        Row({ space: 2 }) {
-          this.RoundButton(AppSymbolName.Sort, () => {});
-          this.RoundButton(AppSymbolName.Filter, () => {});
-          this.RoundButton(AppSymbolName.Grid, () => {});
-          this.RoundButton(this.showToolbarMenu ? AppSymbolName.Close : AppSymbolName.More, () => {
-            this.showToolbarMenu = !this.showToolbarMenu;
-          });
-          this.RoundButton(AppSymbolName.Add, () => {
-            this.addSampleItem();
-          });
-        }
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.End)
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      if (this.showToolbarMenu) {
-        this.ToolbarMenu();
+    Row() {
+      if (this.isSelectionMode) {
+        this.SelectionTopBarContent();
+      } else {
+        this.DefaultTopBarContent();
       }
     }
     .width('100%')
+    .alignItems(VerticalAlign.Center)
     .padding({
       left: AppTheme.spacing.page,
       right: AppTheme.spacing.page,
       top: 8,
-      bottom: 4
+      bottom: 8
     })
     .backgroundColor(Color.Transparent)
   }
 
   @Builder
-  private MenuChip(label: string, symbolName: string, onTap: () => void) {
-    Row({ space: 6 }) {
-      AppSymbol({
-        name: symbolName,
-        iconSize: 17,
-        color: AppTheme.color.primary
-      })
-      Text(label)
-        .fontSize(AppTheme.font.caption)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(AppTheme.color.textPrimary)
-    }
-    .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-    .backgroundColor(AppTheme.color.overlayGlassStrong)
-    .borderRadius(AppTheme.radius.pill)
-    .border({ width: 1, color: AppTheme.color.border })
-    .onClick(onTap)
+  private DefaultTopBarContent() {
+    this.ModeButton('wardrobe', AppSymbolName.Wardrobe, '少女衣橱');
+    this.ModeButton('deposit', AppSymbolName.Deposit, '心愿尾款');
+
+    Blank().layoutWeight(1)
+
+    this.RoundButton(AppSymbolName.Sort, () => { this.openSheet('sort'); });
+    this.RoundButton(AppSymbolName.Filter, () => { this.openSheet('filter'); });
+    this.RoundButton(AppSymbolName.Grid, () => { this.openSheet('layout'); });
+    this.RoundButtonWithMenu(AppSymbolName.More, [
+      { value: '搜索', action: () => {} },
+      { value: '编辑', action: () => { this.enterSelectionMode(false); } },
+      { value: '调整顺序', action: () => { this.enterSelectionMode(true); } }
+    ]);
+    this.RoundButtonWithMenu(AppSymbolName.Add, [
+      { value: '手动创建', action: () => { this.addSampleItem(); } },
+      { value: '批量导入', action: () => {} }
+    ]);
   }
 
   @Builder
-  private ToolbarMenu() {
-    Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-      this.MenuChip('搜索', AppSymbolName.Search, () => {});
-      this.MenuChip('筛选', AppSymbolName.Filter, () => {});
-      this.MenuChip('编辑', AppSymbolName.Edit, () => {});
-      this.MenuChip('详细统计', AppSymbolName.Stats, () => {});
-      this.MenuChip('批量导入', AppSymbolName.Import, () => {});
-      this.MenuChip('穿搭手帐', AppSymbolName.Outfit, () => {
-        this.showToolbarMenu = false;
-        this.onOpenHouse('ootd');
-      });
+  private SelectionTopBarContent() {
+    Text('完成')
+      .fontSize(AppTheme.font.body)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(AppTheme.color.primary)
+      .padding({ left: 4, right: 12, top: 6, bottom: 6 })
+      .onClick(() => { this.exitSelectionMode(); })
+
+    Blank().layoutWeight(1)
+
+    Text(`已选 ${this.selectedItemIds.length} / ${this.items.length}`)
+      .fontSize(AppTheme.font.body)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(AppTheme.color.textPrimary)
+
+    Blank().layoutWeight(1)
+
+    Text(this.isAllSelected() ? '取消全选' : '全选')
+      .fontSize(AppTheme.font.body)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(AppTheme.color.primary)
+      .padding({ left: 12, right: 4, top: 6, bottom: 6 })
+      .onClick(() => { this.toggleSelectAll(); })
+  }
+
+  private enterSelectionMode(forceCustomSort: boolean): void {
+    if (forceCustomSort && this.currentSort !== WardrobeSortOption.Custom) {
+      this.currentSort = WardrobeSortOption.Custom;
+      this.persistSortOption();
+      this.loadItems();
     }
-    .width('100%')
-    .padding({ left: 4, right: 4, bottom: 2 })
+    this.isSelectionMode = true;
+    this.selectedItemIds = [];
+  }
+
+  private exitSelectionMode(): void {
+    this.isSelectionMode = false;
+    this.selectedItemIds = [];
+  }
+
+  private isAllSelected(): boolean {
+    return this.items.length > 0 && this.selectedItemIds.length === this.items.length;
+  }
+
+  private isItemSelected(id: string): boolean {
+    return this.selectedItemIds.indexOf(id) >= 0;
+  }
+
+  private toggleItemSelection(id: string): void {
+    const idx = this.selectedItemIds.indexOf(id);
+    if (idx >= 0) {
+      const next = this.selectedItemIds.slice();
+      next.splice(idx, 1);
+      this.selectedItemIds = next;
+    } else {
+      this.selectedItemIds = this.selectedItemIds.concat([id]);
+    }
+  }
+
+  private toggleSelectAll(): void {
+    if (this.isAllSelected()) {
+      this.selectedItemIds = [];
+    } else {
+      const ids: string[] = [];
+      for (let i = 0; i < this.items.length; i++) {
+        ids.push(this.items[i].id);
+      }
+      this.selectedItemIds = ids;
+    }
+  }
+
+  private async batchDeleteSelected(): Promise<void> {
+    if (this.selectedItemIds.length === 0) {
+      return;
+    }
+    try {
+      const repository = new RdbWardrobeRepository(getContext(this) as common.Context);
+      const useCase = new BatchSoftDeleteWardrobeItemsUseCase(repository);
+      await useCase.execute(this.selectedItemIds);
+      this.exitSelectionMode();
+      await this.loadItems();
+    } catch (error) {
+      this.handleError('batch delete wardrobe items failed', error);
+    }
+  }
+
+  private async persistCustomOrder(orderedIds: string[]): Promise<void> {
+    try {
+      const repository = new RdbWardrobeRepository(getContext(this) as common.Context);
+      const useCase = new ReorderWardrobeItemsUseCase(repository);
+      await useCase.execute(orderedIds);
+    } catch (error) {
+      this.handleError('reorder wardrobe items failed', error);
+    }
   }
 
   @Builder
@@ -475,6 +601,7 @@ export struct WardrobePage {
   private DepositPanel() {
     Column({ space: 12 }) {
       this.TotalDepositCard();
+      this.DepositDisplayModeToggle();
       this.DepositModeTabs();
       this.DepositSelector();
 
@@ -484,9 +611,38 @@ export struct WardrobePage {
         this.DepositEmptyState();
       } else {
         ForEach(this.depositVisibleItems(), (item: WardrobeItem) => {
-          this.DepositRow(item);
+          if (this.depositDisplayMode === 'simple') {
+            this.SimpleDepositRow(item);
+          } else {
+            this.DepositRow(item);
+          }
         }, (item: WardrobeItem) => item.id)
       }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private DepositDisplayModeToggle() {
+    Row() {
+      Blank().layoutWeight(1)
+      Row({ space: 6 }) {
+        AppSymbol({
+          name: this.depositDisplayMode === 'detail' ? AppSymbolName.Grid : AppSymbolName.Sort,
+          iconSize: 16,
+          color: AppTheme.color.textSecondary
+        })
+        Text(this.depositDisplayMode === 'detail' ? '详情' : '简略')
+          .fontSize(AppTheme.font.tiny)
+          .fontColor(AppTheme.color.textSecondary)
+      }
+      .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+      .backgroundColor(AppTheme.color.overlayGlassStrong)
+      .borderRadius(AppTheme.radius.pill)
+      .border({ width: 1, color: AppTheme.color.border })
+      .onClick(() => {
+        this.depositDisplayMode = this.depositDisplayMode === 'detail' ? 'simple' : 'detail';
+      })
     }
     .width('100%')
   }
@@ -524,7 +680,24 @@ export struct WardrobePage {
             .backgroundColor(AppTheme.color.primaryPale)
             .borderRadius(AppTheme.radius.pill)
             .onClick(() => {
-              this.showDepositTotal = !this.showDepositTotal;
+              if (!this.showDepositTotal) {
+                AlertDialog.show({
+                  title: '真的要解锁"钱包瘦身"副本吗？',
+                  message: '⚠️ 前方尾款大军已集结！\n温馨提示：看完请抱紧你的钱包，深呼吸是没用的，不如默念"美貌无价"！\n(｡•́ω•̀｡)',
+                  primaryButton: {
+                    value: '取消',
+                    action: () => {}
+                  },
+                  secondaryButton: {
+                    value: '我准备好了！',
+                    action: () => {
+                      this.showDepositTotal = true;
+                    }
+                  }
+                });
+              } else {
+                this.showDepositTotal = false;
+              }
             })
         }
         .width('100%')
@@ -925,6 +1098,31 @@ export struct WardrobePage {
   }
 
   @Builder
+  private SimpleDepositRow(item: WardrobeItem) {
+    Row({ space: 10 }) {
+      Text(item.name)
+        .fontSize(AppTheme.font.body)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(AppTheme.color.textPrimary)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
+      Text(this.formatDepositDate(item.finalPaymentDate))
+        .fontSize(AppTheme.font.tiny)
+        .fontColor(AppTheme.color.textSecondary)
+      Text(this.formatCurrency(totalBalance(item)))
+        .fontSize(AppTheme.font.body)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppTheme.color.primary)
+    }
+    .width('100%')
+    .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+    .backgroundColor(AppTheme.color.overlayGlassStrong)
+    .backgroundBlurStyle(BlurStyle.Thin)
+    .borderRadius(AppTheme.radius.card)
+  }
+
+  @Builder
   private ItemGrid() {
     if (this.isLoading) {
       this.LoadingState();
@@ -1077,6 +1275,87 @@ export struct WardrobePage {
   }
 
   @Builder
+  private SheetContent() {
+    Column() {
+      if (this.activeSheet === 'sort') {
+        SortSheet({
+          currentSort: $currentSort,
+          onClose: () => {
+            AppLogger.info('[Sheet] sort onClose');
+            this.showSheet = false;
+            this.persistSortOption();
+          }
+        })
+      } else if (this.activeSheet === 'layout') {
+        ViewLayoutSheet({
+          currentLayout: $currentLayout,
+          onClose: () => {
+            AppLogger.info('[Sheet] layout onClose');
+            this.showSheet = false;
+            this.persistViewLayout();
+          }
+        })
+      } else if (this.activeSheet === 'filter') {
+        FilterSheet({
+          filterState: $filterState,
+          candidateTypes: this.collectUniqueValues('types'),
+          candidateColors: this.collectUniqueValues('colors'),
+          candidateSizes: this.collectUniqueValues('sizes'),
+          candidateLengths: this.collectUniqueValues('length'),
+          candidateConditions: this.collectUniqueValues('condition'),
+          onClose: () => {
+            AppLogger.info('[Sheet] filter onClose');
+            this.showSheet = false;
+          }
+        })
+      } else {
+        Text('loading...')
+          .fontSize(AppTheme.font.body)
+          .fontColor(AppTheme.color.textTertiary)
+          .padding(40)
+      }
+    }
+    .width('100%')
+    .onAppear(() => {
+      AppLogger.info(`[Sheet] onAppear: activeSheet=${this.activeSheet}`);
+    })
+    .onDisAppear(() => {
+      AppLogger.info(`[Sheet] onDisAppear: activeSheet=${this.activeSheet}, showSheet=${this.showSheet}`);
+    })
+  }
+
+  private collectUniqueValues(field: string): string[] {
+    const values: string[] = [];
+    for (let i = 0; i < this.items.length; i++) {
+      const item = this.items[i];
+      let raw = '';
+      if (field === 'types') {
+        raw = item.types;
+      } else if (field === 'colors') {
+        raw = item.colors;
+      } else if (field === 'sizes') {
+        raw = item.sizes;
+      } else if (field === 'length') {
+        raw = item.length;
+      } else if (field === 'condition') {
+        raw = item.condition;
+      }
+      if (raw.length > 0 && values.indexOf(raw) < 0) {
+        values.push(raw);
+      }
+    }
+    return values;
+  }
+
+  private persistSortOption(): void {
+    wardrobePreferences.setSortOption(getContext(this) as common.Context, this.currentSort);
+  }
+
+  private persistViewLayout(): void {
+    wardrobePreferences.setViewLayout(getContext(this) as common.Context, this.currentLayout);
+  }
+
+  @Builder
   pageMap(name: string, param: object) {
     if (name === 'wardrobeItemDetail') {
       WardrobeItemDetailPage({ args: param as WardrobeDetailArgs })
@@ -1113,6 +1392,15 @@ export struct WardrobePage {
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)
     .navDestination(this.pageMap)
+    .bindSheet($$this.showSheet, this.SheetContent(), {
+      height: this.activeSheet === 'filter' ? SheetSize.MEDIUM : SheetSize.FIT_CONTENT,
+      dragBar: true,
+      backgroundColor: AppTheme.color.backgroundLight,
+      onDisappear: () => {
+        AppLogger.info(`[Sheet] bindSheet onDisappear: activeSheet=${this.activeSheet}`);
+        this.showSheet = false;
+      }
+    })
   }
 
   private async loadItems(): Promise<void> {

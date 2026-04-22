@@ -44,7 +44,8 @@ export const DatabaseSchema: DatabaseSchemaConfig = {
       final_payment_end_date INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      is_deleted INTEGER DEFAULT 0
+      is_deleted INTEGER DEFAULT 0,
+      sort_index INTEGER DEFAULT 0
     )`,
     tags: `CREATE TABLE IF NOT EXISTS tags (
       id TEXT PRIMARY KEY,

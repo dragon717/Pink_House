@@ -29,7 +29,8 @@ const SELECT_COLUMNS = `id, name, category,
     final_payment_date,
     final_payment_end_date,
     created_at, updated_at,
-    COALESCE(is_deleted, 0) AS is_deleted`;
+    COALESCE(is_deleted, 0) AS is_deleted,
+    COALESCE(sort_index, 0) AS sort_index`;
 
 interface WardrobeItemRow {
   id: string;
@@ -57,6 +58,7 @@ interface WardrobeItemRow {
   created_at: number;
   updated_at: number;
   is_deleted: number;
+  sort_index: number;
 }
 
 export class WardrobeItemDao {
@@ -134,7 +136,8 @@ export class WardrobeItemDao {
       finalPaymentEndDate: item.finalPaymentEndDate ?? null,
       createdAt: now,
       updatedAt: now,
-      isDeleted: false
+      isDeleted: false,
+      sortIndex: now
     };
     const values: relationalStore.ValuesBucket = this.toValuesBucket(wardrobeItem);
     await this.store.insert(TABLE_NAME, values);
@@ -305,8 +308,7 @@ export class WardrobeItemDao {
       case WardrobeSortOption.NameDesc:
         return 'ORDER BY name COLLATE NOCASE DESC';
       case WardrobeSortOption.Custom:
-        // harmony 暂无 sortIndex 字段，fallback 到创建倒序
-        return 'ORDER BY created_at DESC';
+        return 'ORDER BY sort_index ASC, created_at DESC';
       default:
         return 'ORDER BY created_at DESC';
     }
@@ -398,7 +400,8 @@ export class WardrobeItemDao {
       final_payment_end_date: this.readLongOrNull(resultSet, 'final_payment_end_date'),
       created_at: resultSet.getLong(resultSet.getColumnIndex('created_at')),
       updated_at: resultSet.getLong(resultSet.getColumnIndex('updated_at')),
-      is_deleted: resultSet.getLong(resultSet.getColumnIndex('is_deleted'))
+      is_deleted: resultSet.getLong(resultSet.getColumnIndex('is_deleted')),
+      sort_index: resultSet.getLong(resultSet.getColumnIndex('sort_index'))
     };
   }
 
@@ -436,7 +439,8 @@ export class WardrobeItemDao {
       finalPaymentEndDate: row.final_payment_end_date,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      isDeleted: row.is_deleted === 1
+      isDeleted: row.is_deleted === 1,
+      sortIndex: row.sort_index
     };
   }
 
@@ -466,9 +470,36 @@ export class WardrobeItemDao {
       final_payment_end_date: item.finalPaymentEndDate,
       created_at: item.createdAt,
       updated_at: item.updatedAt,
-      is_deleted: item.isDeleted ? 1 : 0
+      is_deleted: item.isDeleted ? 1 : 0,
+      sort_index: item.sortIndex
     };
     return bucket;
+  }
+
+  async reorderItems(orderedIds: string[]): Promise<void> {
+    const now = Date.now();
+    for (let i = 0; i < orderedIds.length; i++) {
+      await this.store.executeSql(
+        `UPDATE ${TABLE_NAME} SET sort_index = ?, updated_at = ? WHERE id = ?`,
+        [i, now, orderedIds[i]]
+      );
+    }
+  }
+
+  async softDeleteItems(ids: string[]): Promise<void> {
+    if (ids.length === 0) {
+      return;
+    }
+    const now = Date.now();
+    const placeholders = ids.map(() => '?').join(',');
+    const args: relationalStore.ValueType[] = [1, now];
+    for (const id of ids) {
+      args.push(id);
+    }
+    await this.store.executeSql(
+      `UPDATE ${TABLE_NAME} SET is_deleted = ?, updated_at = ? WHERE id IN (${placeholders})`,
+      args
+    );
   }
 
   private createId(now: number): string {

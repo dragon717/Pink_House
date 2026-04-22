@@ -6,24 +6,31 @@ interface HotspotSpec {
   readonly title: string;
   readonly symbolName: string;
   readonly destination: string;
-  readonly x: number;
-  readonly y: number;
-  readonly tint: string;
+  readonly xPct: number;
+  readonly yPct: number;
 }
 
+// iOS 房间图原始宽高比 1859:1593 ≈ 1.167:1
+// 两张图 VStack(spacing: -80pt) 堆叠，总高 ≈ 2 * imgH - overlap
+const ROOM_IMAGE_RATIO: number = 1593 / 1859;
+const ROOM_OVERLAP_RATIO: number = 0.06;
+
+// 热点坐标为占整个地图区域(两张图堆叠后)的百分比
+// 参考 iOS RococoSmallWorldView 的 hotspot rect/label position
 const HOUSE_HOTSPOTS: HotspotSpec[] = [
-  { title: '少女衣橱', symbolName: AppSymbolName.Wardrobe, destination: 'wardrobe', x: 58, y: 46, tint: '#FFFFFF' },
-  { title: '穿搭手帐', symbolName: AppSymbolName.Outfit, destination: 'ootd', x: 34, y: 242, tint: '#FFFFFF' },
-  { title: '马上来财', symbolName: AppSymbolName.Wealth, destination: 'wealth', x: 190, y: 238, tint: '#FFFFFF' },
-  { title: '心愿尾款', symbolName: AppSymbolName.Deposit, destination: 'deposit', x: 26, y: 452, tint: '#FFFFFF' },
-  { title: '梦裙日历', symbolName: AppSymbolName.Calendar, destination: 'calendar', x: 112, y: 544, tint: '#FFFFFF' },
-  { title: '拼豆工坊', symbolName: AppSymbolName.Perler, destination: 'perler', x: 246, y: 470, tint: '#FFFFFF' }
+  { title: '少女衣橱', symbolName: AppSymbolName.Wardrobe, destination: 'wardrobe', xPct: 0.52, yPct: 0.12 },
+  { title: '穿搭手帐', symbolName: AppSymbolName.Outfit, destination: 'ootd', xPct: 0.41, yPct: 0.42 },
+  { title: '马上来财', symbolName: AppSymbolName.Wealth, destination: 'wealth', xPct: 0.52, yPct: 0.44 },
+  { title: '心愿尾款', symbolName: AppSymbolName.Deposit, destination: 'deposit', xPct: 0.10, yPct: 0.66 },
+  { title: '梦裙日历', symbolName: AppSymbolName.Calendar, destination: 'calendar', xPct: 0.45, yPct: 0.82 },
+  { title: '拼豆工坊', symbolName: AppSymbolName.Perler, destination: 'perler', xPct: 0.78, yPct: 0.62 }
 ];
 
 @Component
 export struct SmallWorldPage {
   @Link destination: string;
   onOpenWardrobe: (segment: string) => void = () => {};
+  @State private mapWidth: number = 0;
 
   private destinationTitle(): string {
     switch (this.destination) {
@@ -106,6 +113,17 @@ export struct SmallWorldPage {
     .height(height)
   }
 
+  private roomImageHeight(): number {
+    const usableWidth = this.mapWidth > 0 ? this.mapWidth - 36 : 320;
+    return usableWidth * ROOM_IMAGE_RATIO;
+  }
+
+  private mapTotalHeight(): number {
+    const singleH = this.roomImageHeight();
+    const overlap = singleH * ROOM_OVERLAP_RATIO;
+    return singleH * 2 - overlap + 20;
+  }
+
   @Builder
   private Hotspot(item: HotspotSpec) {
     Row({ space: 6 }) {
@@ -124,7 +142,10 @@ export struct SmallWorldPage {
     .backgroundBlurStyle(BlurStyle.Thin)
     .borderRadius(AppTheme.radius.pill)
     .rotate({ angle: -22 })
-    .position({ x: item.x, y: item.y })
+    .position({
+      x: `${(item.xPct * 100).toFixed(1)}%`,
+      y: `${(item.yPct * 100).toFixed(1)}%`
+    })
     .onClick(() => {
       if (item.destination === 'wardrobe') {
         this.onOpenWardrobe('wardrobe');
@@ -140,14 +161,14 @@ export struct SmallWorldPage {
   private HouseMap() {
     Scroll() {
       Stack({ alignContent: Alignment.TopStart }) {
-        Column({ space: -54 }) {
+        Column({ space: -(this.roomImageHeight() * ROOM_OVERLAP_RATIO) }) {
           Image($r('app.media.small_world_rococo_1'))
             .width('100%')
-            .height(308)
+            .height(this.roomImageHeight())
             .objectFit(ImageFit.Contain)
           Image($r('app.media.small_world_rococo_2'))
             .width('100%')
-            .height(308)
+            .height(this.roomImageHeight())
             .objectFit(ImageFit.Contain)
         }
         .width('100%')
@@ -158,12 +179,18 @@ export struct SmallWorldPage {
         }, (item: HotspotSpec) => item.destination)
       }
       .width('100%')
-      .height(610)
+      .height(this.mapTotalHeight())
       .padding({ left: 18, right: 18, top: 10, bottom: 130 })
     }
     .width('100%')
     .height('100%')
     .scrollBar(BarState.Off)
+    .onAreaChange((_oldValue: Area, newValue: Area) => {
+      const w = newValue.width as number;
+      if (w > 0) {
+        this.mapWidth = w;
+      }
+    })
   }
 
   @Builder

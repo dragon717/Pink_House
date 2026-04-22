@@ -17,7 +17,7 @@ export class AppPreferences {
 
   async getBoolean(context: common.Context, key: PreferenceKeys, defaultValue: boolean): Promise<boolean> {
     const store = await this.getStore(context);
-    return store.get(key, defaultValue) as boolean;
+    return await store.get(key, defaultValue) as boolean;
   }
 
   async putBoolean(context: common.Context, key: PreferenceKeys, value: boolean): Promise<void> {
@@ -28,7 +28,7 @@ export class AppPreferences {
 
   async getString(context: common.Context, key: PreferenceKeys, defaultValue: string): Promise<string> {
     const store = await this.getStore(context);
-    return store.get(key, defaultValue) as string;
+    return await store.get(key, defaultValue) as string;
   }
 
   async putString(context: common.Context, key: PreferenceKeys, value: string): Promise<void> {
@@ -39,7 +39,7 @@ export class AppPreferences {
 
   async getNumber(context: common.Context, key: PreferenceKeys, defaultValue: number): Promise<number> {
     const store = await this.getStore(context);
-    return store.get(key, defaultValue) as number;
+    return await store.get(key, defaultValue) as number;
   }
 
   async putNumber(context: common.Context, key: PreferenceKeys, value: number): Promise<void> {
