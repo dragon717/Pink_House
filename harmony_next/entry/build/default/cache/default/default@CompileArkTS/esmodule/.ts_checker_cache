@@ -77,7 +77,8 @@
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.ability.featureAbility.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/folder_stack.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/nav_destination.d.ts",
-        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/navigation.d.ts"
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/navigation.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.picker.d.ts"
       ],
       "error": false
     },
@@ -91,7 +92,8 @@
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/wardrobe/WardrobePage.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/data/rdb/RdbStoreProvider.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/media/WardrobeImageStore.ets",
-        "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/wardrobe/ClothingEditPage.ets"
+        "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/wardrobe/ClothingEditPage.ets",
+        "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/data/dao/WardrobeItemDao.ets"
       ],
       "error": false
     },
@@ -170,7 +172,8 @@
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.data.preferences.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.fs.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.util.stream.d.ts",
-        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.events.emitter.d.ts"
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.events.emitter.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.picker.d.ts"
       ],
       "error": false
     },
@@ -661,7 +664,9 @@
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/action_sheet.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/alert_dialog.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/common.d.ts",
-        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/custom_dialog_controller.d.ts"
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/custom_dialog_controller.d.ts",
+        "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/wardrobe/WardrobePage.ets",
+        "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/wardrobe/ClothingEditPage.ets"
       ],
       "error": false
     },
@@ -976,7 +981,8 @@
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/application/AbilityStageContext.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/build-tools/ets-loader/declarations/common.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.print.d.ts",
-        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.photoAccessHelper.d.ts"
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.photoAccessHelper.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.picker.d.ts"
       ],
       "error": false
     },
@@ -1567,9 +1573,10 @@
       "error": false
     },
     "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/wardrobe/WardrobePage.ets": {
-      "mtimeMs": 1776879885662.441,
+      "mtimeMs": 1776883412717.839,
       "children": [
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.app.ability.common.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.promptAction.d.ts",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/theme/AppTheme.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/theme/AppSymbols.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/theme/GlassComponents.ets",
@@ -1598,7 +1605,8 @@
       ],
       "error": true,
       "errorCodes": [
-        28007
+        28007,
+        28040
       ]
     },
     "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/pet/PetPage.ets": {
@@ -1764,9 +1772,10 @@
       "error": false
     },
     "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/data/dao/WardrobeItemDao.ets": {
-      "mtimeMs": 1776861056366.4812,
+      "mtimeMs": 1776883584543.0652,
       "children": [
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.data.relationalStore.d.ts",
+        "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/utils/AppLogger.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/domain/model/WardrobeItem.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/domain/model/WardrobeListOptions.ets"
       ],
@@ -1779,7 +1788,7 @@
       ]
     },
     "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/data/rdb/RdbStoreProvider.ets": {
-      "mtimeMs": 1776827022367.9387,
+      "mtimeMs": 1776882461360.7058,
       "children": [
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.data.relationalStore.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.app.ability.common.d.ts",
@@ -2594,11 +2603,12 @@
       "error": false
     },
     "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/media/WardrobeImageStore.ets": {
-      "mtimeMs": 1776879636054.48,
+      "mtimeMs": 1776883813520.2788,
       "children": [
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.app.ability.common.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.fs.d.ts",
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.photoAccessHelper.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.picker.d.ts",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/utils/AppLogger.ets"
       ],
       "parent": [
@@ -2607,13 +2617,15 @@
       ],
       "error": true,
       "errorCodes": [
-        28040
+        28040,
+        28007
       ]
     },
     "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/feature/wardrobe/ClothingEditPage.ets": {
-      "mtimeMs": 1776879984388.6023,
+      "mtimeMs": 1776882376826.9817,
       "children": [
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.app.ability.common.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.promptAction.d.ts",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/theme/AppTheme.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/theme/GlassComponents.ets",
         "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/media/WardrobeImageStore.ets",
@@ -2625,7 +2637,8 @@
       ],
       "error": true,
       "errorCodes": [
-        28007
+        28007,
+        28040
       ]
     },
     "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.fs.d.ts": {
@@ -2657,6 +2670,18 @@
       ],
       "parent": [
         "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.util.stream.d.ts"
+      ],
+      "error": false
+    },
+    "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.file.picker.d.ts": {
+      "mtimeMs": 1776441985000,
+      "children": [
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.base.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/application/Context.d.ts",
+        "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/ets/api/@ohos.window.d.ts"
+      ],
+      "parent": [
+        "/Users/muniao/Downloads/Pink_House/harmony_next/entry/src/main/ets/core/media/WardrobeImageStore.ets"
       ],
       "error": false
     }

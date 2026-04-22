@@ -1,4 +1,5 @@
 import common from '@ohos.app.ability.common';
+import promptAction from '@ohos.promptAction';
 import { AppTheme } from '../../core/theme/AppTheme';
 import { GlassCard } from '../../core/theme/GlassComponents';
 import { WardrobeImageStore } from '../../core/media/WardrobeImageStore';
@@ -23,15 +24,18 @@ export struct ClothingEditPage {
   private async pickMainImage(): Promise<void> {
     AppLogger.info('[ClothingEditPage] main image tapped');
     try {
-      const uris = await WardrobeImageStore.pickImages(1);
+      const ctx = getContext(this) as common.Context;
+      const uris = await WardrobeImageStore.pickImages(ctx, 1);
       AppLogger.info(`[ClothingEditPage] main image picker result=${uris.length}`);
       if (uris.length > 0) {
-        const ctx = getContext(this) as common.Context;
         this.draft.draftImageUri = await WardrobeImageStore.persistPickedImage(ctx, uris[0]);
         AppLogger.info(`[ClothingEditPage] main image selected=${this.draft.draftImageUri}`);
+      } else {
+        promptAction.showToast({ message: '未选择图片' });
       }
     } catch (error) {
       AppLogger.error(`[ClothingEditPage] main image failed: ${JSON.stringify(error)}`);
+      promptAction.showToast({ message: '图片选择失败，请看 PinkHouse 日志' });
     }
   }
 
@@ -135,6 +139,7 @@ export struct ClothingEditPage {
                 .height(92)
                 .borderRadius(AppTheme.radius.chip)
                 .objectFit(ImageFit.Cover)
+                .onClick(() => { this.pickMainImage(); })
             } else {
               Column({ space: 6 }) {
                 Text('+')
@@ -150,6 +155,7 @@ export struct ClothingEditPage {
               .backgroundColor(AppTheme.color.surfaceTint)
               .borderRadius(AppTheme.radius.chip)
               .border({ width: 1, style: BorderStyle.Dashed, color: AppTheme.color.border })
+              .onClick(() => { this.pickMainImage(); })
             }
 
             Text(this.draft.draftImageUri.length > 0 ? '更换' : '添加')

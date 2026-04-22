@@ -21,26 +21,16 @@
     "IS_HVIGORFILE_TYPE_CHECK": false,
     "TASK_TIME": {
       "923fe53966c6cd9343e11af776cd4b05be315ea4b200b02e4d5dfb0f929b73bf": {
-        "PreBuild": 26909583,
-        "CreateModuleInfo": 727584,
-        "MergeProfile": 3392333,
-        "CreateBuildProfile": 1392750,
-        "PreCheckSyscap": 208458,
-        "GeneratePkgContextInfo": 3484375,
-        "ProcessProfile": 70006250,
-        "ProcessRouterMap": 2875708,
-        "ProcessShareConfig": 2271708,
-        "ProcessStartupConfig": 1197458,
-        "PreviewProcessResource": 1004833,
-        "GenerateLoaderJson": 8023125,
-        "PreviewCompileResource": 186846875,
-        "PreviewHookCompileResource": 186000,
-        "CopyPreviewProfile": 3514083,
-        "ReplacePreviewerPage": 169042,
-        "buildPreviewerResource": 120625,
-        "PreviewUpdateAssets": 751416,
-        "PreviewArkTS": 4517979958,
-        "PreviewBuild": 480792
+        "CreateModuleInfo": 259208,
+        "PreCheckSyscap": 101959,
+        "GeneratePkgContextInfo": 1664625,
+        "ProcessStartupConfig": 2610000,
+        "PreviewProcessResource": 6430750,
+        "PreviewHookCompileResource": 156083,
+        "ReplacePreviewerPage": 124542,
+        "buildPreviewerResource": 81417,
+        "PreviewArkTS": 6369052667,
+        "PreviewBuild": 166208
       }
     },
     "APIS": [
@@ -51,7 +41,7 @@
       "ENABLE_CPP_FUNCTION_LEVEL_INCREMENTAL": false
     },
     "CONFIG_PROPERTIES": {},
-    "TOTAL_TIME": 5276571875,
-    "BUILD_ID": "202604230211194910"
+    "TOTAL_TIME": 6574524792,
+    "BUILD_ID": "202604230254302140"
   }
 }

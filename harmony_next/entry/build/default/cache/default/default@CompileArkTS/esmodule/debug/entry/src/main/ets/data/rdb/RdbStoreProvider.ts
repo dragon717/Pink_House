@@ -12,6 +12,7 @@ export class RdbStoreProvider {
             name: DatabaseSchema.name,
             securityLevel: relationalStore.SecurityLevel.S1
         };
+        AppLogger.info(`[RDB] opening ${DatabaseSchema.name}, databaseDir=${context.databaseDir}`);
         const store = await relationalStore.getRdbStore(context, config);
         await this.ensureSchema(store);
         this.store = store;

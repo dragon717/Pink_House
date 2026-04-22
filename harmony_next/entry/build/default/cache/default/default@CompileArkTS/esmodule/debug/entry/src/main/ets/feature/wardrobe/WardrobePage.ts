@@ -34,6 +34,7 @@ interface WardrobePage_Params {
     onOpenHouse?: (destination: string) => void;
 }
 import type common from "@ohos:app.ability.common";
+import promptAction from "@ohos:promptAction";
 import { AppTheme } from "@bundle:com.pinkhouse.harmony/entry/ets/core/theme/AppTheme";
 import { AppSymbol, AppSymbolName } from "@bundle:com.pinkhouse.harmony/entry/ets/core/theme/AppSymbols";
 import { GlassCard } from "@bundle:com.pinkhouse.harmony/entry/ets/core/theme/GlassComponents";
@@ -616,7 +617,7 @@ export class WardrobePage extends ViewPU {
                         name: symbolName,
                         iconSize: 20,
                         color: AppTheme.color.textPrimary
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 242, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 243, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -655,7 +656,7 @@ export class WardrobePage extends ViewPU {
                         name: symbolName,
                         iconSize: 20,
                         color: AppTheme.color.textPrimary
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 256, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 257, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -695,7 +696,7 @@ export class WardrobePage extends ViewPU {
                         name: symbolName,
                         iconSize: 24,
                         color: this.selectedSegment === key ? AppTheme.color.primary : AppTheme.color.textTertiary
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 273, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 274, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -880,6 +881,22 @@ export class WardrobePage extends ViewPU {
     private isItemSelected(id: string): boolean {
         return this.selectedItemIds.indexOf(id) >= 0;
     }
+    private containsId(items: WardrobeItem[], id: string): boolean {
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].id === id) {
+                return true;
+            }
+        }
+        return false;
+    }
+    private containsAllIds(items: WardrobeItem[], ids: string[]): boolean {
+        for (let i = 0; i < ids.length; i++) {
+            if (!this.containsId(items, ids[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
     private toggleItemSelection(id: string): void {
         const idx = this.selectedItemIds.indexOf(id);
         if (idx >= 0) {
@@ -971,24 +988,34 @@ export class WardrobePage extends ViewPU {
             const repository = new RdbWardrobeRepository(getContext(this) as common.Context);
             const saved = await repository.addItem(item);
             AppLogger.info(`[Create] saved id=${saved.id}, image=${saved.imageUri}`);
+            this.selectedSegment = 'wardrobe';
+            const optimisticItems = [saved].concat(this.items.filter((existing: WardrobeItem) => existing.id !== saved.id));
+            this.items = optimisticItems;
+            AppLogger.info(`[Create] optimistic item count=${this.items.length}`);
             this.showSheet = false;
-            await this.loadItems();
+            promptAction.showToast({ message: `已保存：${saved.name}` });
+            await this.reloadItemsAfterMutation(optimisticItems, [saved.id], 'Create');
         }
         catch (error) {
             this.handleError('save manual clothing draft failed', error);
+            promptAction.showToast({ message: '保存失败，请看 PinkHouse 日志' });
         }
     }
     // ────────── 批量导入 Sheet ──────────
     private async pickMultipleImages(): Promise<void> {
         AppLogger.info('[BatchImport] add images tapped');
         try {
-            const pickedUris = await WardrobeImageStore.pickImages(20);
+            const pickedUris = await WardrobeImageStore.pickImages(getContext(this) as common.Context, 20);
             AppLogger.info(`[BatchImport] picker returned=${pickedUris.length}`);
             this.batchImageUris = this.batchImageUris.concat(pickedUris);
             AppLogger.info(`[Picker] multi total now=${this.batchImageUris.length}`);
+            if (pickedUris.length === 0) {
+                promptAction.showToast({ message: '未选择图片' });
+            }
         }
         catch (error) {
             AppLogger.error(`[BatchImport] picker failed: ${JSON.stringify(error)}`);
+            promptAction.showToast({ message: '图片选择失败，请看 PinkHouse 日志' });
         }
     }
     private removeBatchImage(index: number): void {
@@ -1009,15 +1036,17 @@ export class WardrobePage extends ViewPU {
             const ctx = getContext(this) as common.Context;
             let successCount = 0;
             const failedUris: string[] = [];
+            const savedItems: WardrobeItem[] = [];
             for (let i = 0; i < this.batchImageUris.length; i++) {
                 try {
                     const storedUri = await WardrobeImageStore.persistPickedImage(ctx, this.batchImageUris[i]);
-                    await repository.addItem({
+                    const saved = await repository.addItem({
                         name: `${seriesName} ${i + 1}`,
                         category: WardrobeCategory.Dress,
                         imageUri: storedUri,
                         purchasedAt: Date.now()
                     });
+                    savedItems.push(saved);
                     successCount++;
                 }
                 catch (error) {
@@ -1030,14 +1059,23 @@ export class WardrobePage extends ViewPU {
             if (failedUris.length === 0) {
                 this.batchSeriesName = '';
                 this.showSheet = false;
+                this.selectedSegment = 'wardrobe';
+                this.items = savedItems.concat(this.items.filter((item: WardrobeItem) => !this.containsId(savedItems, item.id)));
+                promptAction.showToast({ message: `已导入 ${successCount} 张图片` });
             }
             else {
                 this.errorMessage = `批量导入成功 ${successCount} 张，失败 ${failedUris.length} 张`;
+                promptAction.showToast({ message: this.errorMessage });
             }
-            await this.loadItems();
+            if (savedItems.length > 0) {
+                const expectedIds = savedItems.map((item: WardrobeItem) => item.id);
+                const fallbackItems = savedItems.concat(this.items.filter((item: WardrobeItem) => !this.containsId(savedItems, item.id)));
+                await this.reloadItemsAfterMutation(fallbackItems, expectedIds, 'BatchImport');
+            }
         }
         catch (error) {
             this.handleError('batch import failed', error);
+            promptAction.showToast({ message: '批量导入失败，请看 PinkHouse 日志' });
         }
         finally {
             this.isBatchImporting = false;
@@ -1127,7 +1165,7 @@ export class WardrobePage extends ViewPU {
                             Text.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 629, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 669, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -1291,7 +1329,7 @@ export class WardrobePage extends ViewPU {
                             If.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 652, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 692, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -1526,7 +1564,7 @@ export class WardrobePage extends ViewPU {
                         name: symbolName,
                         iconSize: 34,
                         color: AppTheme.color.primary
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 813, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 853, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -1579,7 +1617,7 @@ export class WardrobePage extends ViewPU {
                             Row.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 840, col: 5 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 880, col: 5 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -1744,7 +1782,7 @@ export class WardrobePage extends ViewPU {
                         name: this.depositDisplayMode === 'detail' ? AppSymbolName.Grid : AppSymbolName.Sort,
                         iconSize: 16,
                         color: AppTheme.color.textSecondary
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 927, col: 9 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 967, col: 9 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -1888,7 +1926,7 @@ export class WardrobePage extends ViewPU {
                             If.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 949, col: 5 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 989, col: 5 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -2030,7 +2068,7 @@ export class WardrobePage extends ViewPU {
                         name: symbolName,
                         iconSize: 23,
                         color: AppTheme.color.primary
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1020, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1060, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -2125,7 +2163,7 @@ export class WardrobePage extends ViewPU {
                         name: this.isDepositSelectorExpanded ? AppSymbolName.Close : AppSymbolName.More,
                         iconSize: 18,
                         color: AppTheme.color.textTertiary
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1080, col: 9 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1120, col: 9 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -2261,7 +2299,7 @@ export class WardrobePage extends ViewPU {
                             this.DepositStatColumn.bind(this)('待付尾款', this.showDepositYearStats ? this.formatCurrency(this.visibleDepositStats().amount) : '****', AppTheme.color.primary);
                             Row.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1158, col: 5 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1198, col: 5 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -2492,7 +2530,7 @@ export class WardrobePage extends ViewPU {
                                             name: this.depositViewMode === 'monthly' ? AppSymbolName.Calendar : AppSymbolName.Series,
                                             iconSize: 18,
                                             color: AppTheme.color.primary
-                                        }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1278, col: 11 });
+                                        }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1318, col: 11 });
                                         ViewPU.create(componentCall);
                                         let paramsLambda = () => {
                                             return {
@@ -2550,7 +2588,7 @@ export class WardrobePage extends ViewPU {
                             Row.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1275, col: 5 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1315, col: 5 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -2572,7 +2610,7 @@ export class WardrobePage extends ViewPU {
                                                 name: this.depositViewMode === 'monthly' ? AppSymbolName.Calendar : AppSymbolName.Series,
                                                 iconSize: 18,
                                                 color: AppTheme.color.primary
-                                            }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1278, col: 11 });
+                                            }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1318, col: 11 });
                                             ViewPU.create(componentCall);
                                             let paramsLambda = () => {
                                                 return {
@@ -2690,7 +2728,7 @@ export class WardrobePage extends ViewPU {
                             Text.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1326, col: 5 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1366, col: 5 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -3163,7 +3201,7 @@ export class WardrobePage extends ViewPU {
                             Text.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1630, col: 5 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1670, col: 5 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -3243,7 +3281,7 @@ export class WardrobePage extends ViewPU {
                             Text.pop();
                             Column.pop();
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1649, col: 5 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1689, col: 5 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -3319,7 +3357,7 @@ export class WardrobePage extends ViewPU {
                                         this.showSheet = false;
                                         this.persistSortOption();
                                     }
-                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1677, col: 9 });
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1717, col: 9 });
                                 ViewPU.create(componentCall);
                                 let paramsLambda = () => {
                                     return {
@@ -3352,7 +3390,7 @@ export class WardrobePage extends ViewPU {
                                         this.showSheet = false;
                                         this.persistViewLayout();
                                     }
-                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1686, col: 9 });
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1726, col: 9 });
                                 ViewPU.create(componentCall);
                                 let paramsLambda = () => {
                                     return {
@@ -3389,7 +3427,7 @@ export class WardrobePage extends ViewPU {
                                         AppLogger.info('[Sheet] filter onClose');
                                         this.showSheet = false;
                                     }
-                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1695, col: 9 });
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1735, col: 9 });
                                 ViewPU.create(componentCall);
                                 let paramsLambda = () => {
                                     return {
@@ -3433,7 +3471,7 @@ export class WardrobePage extends ViewPU {
                                         AppLogger.info('[Create] cancel tapped');
                                         this.showSheet = false;
                                     }
-                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1708, col: 9 });
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1748, col: 9 });
                                 ViewPU.create(componentCall);
                                 let paramsLambda = () => {
                                     return {
@@ -3515,7 +3553,7 @@ export class WardrobePage extends ViewPU {
                     {
                         this.observeComponentCreation2((elmtId, isInitialRender) => {
                             if (isInitialRender) {
-                                let componentCall = new WardrobeItemDetailPage(this, { args: param as WardrobeDetailArgs }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1769, col: 7 });
+                                let componentCall = new WardrobeItemDetailPage(this, { args: param as WardrobeDetailArgs }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/feature/wardrobe/WardrobePage.ets", line: 1809, col: 7 });
                                 ViewPU.create(componentCall);
                                 let paramsLambda = () => {
                                     return {
@@ -3663,6 +3701,20 @@ export class WardrobePage extends ViewPU {
         }
         finally {
             this.isLoading = false;
+        }
+    }
+    private async reloadItemsAfterMutation(fallbackItems: WardrobeItem[], expectedIds: string[], source: string): Promise<void> {
+        await new Promise<void>((resolve: () => void) => {
+            setTimeout(() => {
+                resolve();
+            }, 120);
+        });
+        await this.loadItems();
+        AppLogger.info(`[${source}] reloaded item count=${this.items.length}, expected=${expectedIds.join(',')}`);
+        if (!this.containsAllIds(this.items, expectedIds)) {
+            AppLogger.warn(`[${source}] reload did not return newly saved items; keeping optimistic UI. This is common in Preview RDB, verify persistence on emulator/device.`);
+            this.items = fallbackItems;
+            this.selectedSegment = 'wardrobe';
         }
     }
     private async searchItems(): Promise<void> {

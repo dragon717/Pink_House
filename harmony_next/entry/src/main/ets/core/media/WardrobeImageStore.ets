@@ -1,21 +1,45 @@
 import common from '@ohos.app.ability.common';
 import fs from '@ohos.file.fs';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import picker from '@ohos.file.picker';
 import { AppLogger } from '../utils/AppLogger';
 
 const WARDROBE_IMAGE_DIR = 'wardrobe_images';
 
 export class WardrobeImageStore {
-  static async pickImages(maxSelectNumber: number): Promise<string[]> {
+  static async pickImages(context: common.Context, maxSelectNumber: number): Promise<string[]> {
     AppLogger.info(`[WardrobeImageStore] pickImages start, max=${maxSelectNumber}`);
+    try {
+      return await WardrobeImageStore.pickImagesWithLegacyPicker(context, maxSelectNumber);
+    } catch (error) {
+      AppLogger.error(`[WardrobeImageStore] context file picker failed, trying PhotoAccessHelper picker: ${JSON.stringify(error)}`);
+      return await WardrobeImageStore.pickImagesWithPhotoAccessHelper(maxSelectNumber);
+    }
+  }
+
+  private static async pickImagesWithPhotoAccessHelper(maxSelectNumber: number): Promise<string[]> {
+    AppLogger.info('[WardrobeImageStore] PhotoAccessHelper picker invoking');
     const options = new photoAccessHelper.PhotoSelectOptions();
     options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
     options.maxSelectNumber = maxSelectNumber;
 
-    const picker = new photoAccessHelper.PhotoViewPicker();
-    const result = await picker.select(options);
+    const photoPicker = new photoAccessHelper.PhotoViewPicker();
+    const result = await photoPicker.select(options);
     const uris = result.photoUris ?? [];
-    AppLogger.info(`[WardrobeImageStore] pickImages result=${uris.length}`);
+    AppLogger.info(`[WardrobeImageStore] PhotoAccessHelper picker result=${uris.length}`);
+    return uris;
+  }
+
+  private static async pickImagesWithLegacyPicker(context: common.Context, maxSelectNumber: number): Promise<string[]> {
+    AppLogger.info(`[WardrobeImageStore] context file picker invoking, filesDir=${context.filesDir}`);
+    const options = new picker.PhotoSelectOptions();
+    options.MIMEType = picker.PhotoViewMIMETypes.IMAGE_TYPE;
+    options.maxSelectNumber = maxSelectNumber;
+
+    const photoPicker = new picker.PhotoViewPicker(context);
+    const result = await photoPicker.select(options);
+    const uris = result.photoUris ?? [];
+    AppLogger.info(`[WardrobeImageStore] legacy file picker result=${uris.length}`);
     return uris;
   }
 

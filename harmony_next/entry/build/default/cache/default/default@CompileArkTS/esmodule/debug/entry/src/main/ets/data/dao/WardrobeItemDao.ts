@@ -1,4 +1,5 @@
 import type relationalStore from "@ohos:data.relationalStore";
+import { AppLogger } from "@bundle:com.pinkhouse.harmony/entry/ets/core/utils/AppLogger";
 import { WardrobeCategory } from "@bundle:com.pinkhouse.harmony/entry/ets/domain/model/WardrobeItem";
 import type { NewWardrobeItem, WardrobeItem } from "@bundle:com.pinkhouse.harmony/entry/ets/domain/model/WardrobeItem";
 import { DepositStatusFilter, WardrobeSortOption } from "@bundle:com.pinkhouse.harmony/entry/ets/domain/model/WardrobeListOptions";
@@ -126,8 +127,15 @@ export class WardrobeItemDao {
             isDeleted: false,
             sortIndex: now
         };
-        const values: relationalStore.ValuesBucket = this.toValuesBucket(wardrobeItem);
-        await this.store.insert(TABLE_NAME, values);
+        await this.store.executeSql(`INSERT INTO ${TABLE_NAME} (
+        id, name, category, image_uri, price, brand_name, types, colors, sizes, length,
+        condition, note, original_price, deposit, balance, accessories_price, stock,
+        purchased_at, deposit_date, is_deposit_plan, final_payment_date, final_payment_end_date,
+        created_at, updated_at, is_deleted, sort_index
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, this.toInsertArgs(wardrobeItem));
+        const totalRows = await this.countRows(`SELECT COUNT(*) AS count FROM ${TABLE_NAME}`);
+        const activeRows = await this.countRows(`SELECT COUNT(*) AS count FROM ${TABLE_NAME} WHERE is_deleted = 0`);
+        AppLogger.info(`[WardrobeItemDao] insert success id=${wardrobeItem.id}, name=${wardrobeItem.name}, image=${wardrobeItem.imageUri}, totalRows=${totalRows}, activeRows=${activeRows}`);
         return wardrobeItem;
     }
     async insertSampleItem(): Promise<WardrobeItem> {
@@ -322,7 +330,20 @@ export class WardrobeItemDao {
         finally {
             resultSet.close();
         }
+        AppLogger.info(`[WardrobeItemDao] query rows=${items.length}`);
         return items;
+    }
+    private async countRows(sql: string, bindArgs: relationalStore.ValueType[] = []): Promise<number> {
+        const resultSet = await this.store.querySql(sql, bindArgs);
+        try {
+            if (resultSet.goToNextRow()) {
+                return resultSet.getLong(resultSet.getColumnIndex('count'));
+            }
+        }
+        finally {
+            resultSet.close();
+        }
+        return 0;
     }
     private readRow(resultSet: relationalStore.ResultSet): WardrobeItemRow {
         return {
@@ -391,36 +412,35 @@ export class WardrobeItemDao {
             sortIndex: row.sort_index
         };
     }
-    private toValuesBucket(item: WardrobeItem): relationalStore.ValuesBucket {
-        const bucket: relationalStore.ValuesBucket = {
-            id: item.id,
-            name: item.name,
-            category: item.category,
-            image_uri: item.imageUri,
-            price: item.price,
-            brand_name: item.brandName,
-            types: item.types,
-            colors: item.colors,
-            sizes: item.sizes,
-            length: item.length,
-            condition: item.condition,
-            note: item.note,
-            original_price: item.originalPrice,
-            deposit: item.deposit,
-            balance: item.balance,
-            accessories_price: item.accessoriesPrice,
-            stock: item.stock,
-            purchased_at: item.purchasedAt,
-            deposit_date: item.depositDate,
-            is_deposit_plan: item.isDepositPlan ? 1 : 0,
-            final_payment_date: item.finalPaymentDate,
-            final_payment_end_date: item.finalPaymentEndDate,
-            created_at: item.createdAt,
-            updated_at: item.updatedAt,
-            is_deleted: item.isDeleted ? 1 : 0,
-            sort_index: item.sortIndex
-        };
-        return bucket;
+    private toInsertArgs(item: WardrobeItem): relationalStore.ValueType[] {
+        return [
+            item.id,
+            item.name,
+            item.category,
+            item.imageUri,
+            item.price,
+            item.brandName,
+            item.types,
+            item.colors,
+            item.sizes,
+            item.length,
+            item.condition,
+            item.note,
+            item.originalPrice,
+            item.deposit,
+            item.balance,
+            item.accessoriesPrice,
+            item.stock,
+            item.purchasedAt,
+            item.depositDate,
+            item.isDepositPlan ? 1 : 0,
+            item.finalPaymentDate,
+            item.finalPaymentEndDate,
+            item.createdAt,
+            item.updatedAt,
+            item.isDeleted ? 1 : 0,
+            item.sortIndex
+        ];
     }
     async reorderItems(orderedIds: string[]): Promise<void> {
         const now = Date.now();
