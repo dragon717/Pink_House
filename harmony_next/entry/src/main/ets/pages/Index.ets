@@ -22,6 +22,7 @@ const MAIN_TABS: BottomTabItem[] = [
 @Component
 struct Index {
   @State private currentIndex: number = 0;
+  @State private wardrobeSegment: string = 'wardrobe';
   @State private smallWorldDestination: string = 'menu';
   @State private isPetOpen: boolean = false;
   private tabsController: TabsController = new TabsController();
@@ -50,7 +51,7 @@ struct Index {
     Tabs({ barPosition: BarPosition.End, index: this.currentIndex, controller: this.tabsController }) {
       TabContent() {
       WardrobePage({
-        selectedSegment: 'wardrobe',
+        selectedSegment: $wardrobeSegment,
         onOpenHouse: (destination: string) => {
           this.openHouse(destination);
         }
@@ -61,7 +62,9 @@ struct Index {
       TabContent() {
       SmallWorldPage({
         destination: $smallWorldDestination,
-        onOpenWardrobe: () => {
+        onOpenWardrobe: (segment: string) => {
+          this.wardrobeSegment = segment;
+          this.smallWorldDestination = 'menu';
           this.switchMainTab(0);
         }
       })
@@ -160,6 +163,12 @@ struct Index {
   }
 
   private openHouse(destination: string): void {
+    if (destination === 'wardrobe' || destination === 'deposit') {
+      this.wardrobeSegment = destination === 'deposit' ? 'deposit' : 'wardrobe';
+      this.smallWorldDestination = 'menu';
+      this.switchMainTab(0);
+      return;
+    }
     this.smallWorldDestination = destination;
     this.switchMainTab(1);
   }

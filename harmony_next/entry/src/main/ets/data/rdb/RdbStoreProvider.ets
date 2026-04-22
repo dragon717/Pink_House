@@ -26,12 +26,16 @@ export class RdbStoreProvider {
     const targetVersion = DatabaseSchema.version;
 
     if (currentVersion !== targetVersion) {
-      AppLogger.info(`RDB version ${currentVersion} -> ${targetVersion}, rebuilding wardrobe_items`);
+      AppLogger.info(`RDB version ${currentVersion} -> ${targetVersion}, rebuilding wardrobe_items + tags`);
       await store.executeSql('DROP TABLE IF EXISTS wardrobe_items');
+      await store.executeSql('DROP TABLE IF EXISTS tags');
+      await store.executeSql('DROP TABLE IF EXISTS wardrobe_item_tags');
     }
 
     const statements: string[] = [
       DatabaseSchema.ddl.wardrobeItems,
+      DatabaseSchema.ddl.tags,
+      DatabaseSchema.ddl.wardrobeItemTags,
       DatabaseSchema.ddl.petStates,
       DatabaseSchema.ddl.walletTransactions,
       DatabaseSchema.ddl.iapOrders

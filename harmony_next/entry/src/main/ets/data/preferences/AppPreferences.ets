@@ -25,6 +25,28 @@ export class AppPreferences {
     await store.put(key, value);
     await store.flush();
   }
+
+  async getString(context: common.Context, key: PreferenceKeys, defaultValue: string): Promise<string> {
+    const store = await this.getStore(context);
+    return store.get(key, defaultValue) as string;
+  }
+
+  async putString(context: common.Context, key: PreferenceKeys, value: string): Promise<void> {
+    const store = await this.getStore(context);
+    await store.put(key, value);
+    await store.flush();
+  }
+
+  async getNumber(context: common.Context, key: PreferenceKeys, defaultValue: number): Promise<number> {
+    const store = await this.getStore(context);
+    return store.get(key, defaultValue) as number;
+  }
+
+  async putNumber(context: common.Context, key: PreferenceKeys, value: number): Promise<void> {
+    const store = await this.getStore(context);
+    await store.put(key, value);
+    await store.flush();
+  }
 }
 
 export const appPreferences = new AppPreferences();

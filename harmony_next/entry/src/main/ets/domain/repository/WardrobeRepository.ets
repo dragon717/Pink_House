@@ -1,4 +1,8 @@
 import { NewWardrobeItem, WardrobeItem } from '../model/WardrobeItem';
+import {
+  WardrobeFilterState,
+  WardrobeSortOption
+} from '../model/WardrobeListOptions';
 
 export interface WardrobeRepository {
   getActiveItems(): Promise<WardrobeItem[]>;
@@ -8,4 +12,19 @@ export interface WardrobeRepository {
   softDeleteItem(id: string): Promise<void>;
   getDepositPlans(): Promise<WardrobeItem[]>;
   getDepositPlansByYear(year: number): Promise<WardrobeItem[]>;
+
+  // R1.5: 顶部导航栏统一查询
+  queryItems(
+    filter: WardrobeFilterState,
+    sort: WardrobeSortOption,
+    keyword: string
+  ): Promise<WardrobeItem[]>;
+
+  // Filter Sheet 候选值
+  queryDistinctBrandNames(): Promise<string[]>;
+  queryDistinctTypes(): Promise<string[]>;
+  queryDistinctColors(): Promise<string[]>;
+  queryDistinctSizes(): Promise<string[]>;
+  queryDistinctLengths(): Promise<string[]>;
+  queryDistinctConditions(): Promise<string[]>;
 }

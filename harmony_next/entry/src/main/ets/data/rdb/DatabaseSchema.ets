@@ -2,6 +2,8 @@ import { AppConstants } from '../../core/constants/AppConstants';
 
 interface DatabaseDdlConfig {
   wardrobeItems: string;
+  tags: string;
+  wardrobeItemTags: string;
   petStates: string;
   walletTransactions: string;
   iapOrders: string;
@@ -43,6 +45,17 @@ export const DatabaseSchema: DatabaseSchemaConfig = {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       is_deleted INTEGER DEFAULT 0
+    )`,
+    tags: `CREATE TABLE IF NOT EXISTS tags (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sort_index INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL
+    )`,
+    wardrobeItemTags: `CREATE TABLE IF NOT EXISTS wardrobe_item_tags (
+      item_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL,
+      PRIMARY KEY (item_id, tag_id)
     )`,
     petStates: `CREATE TABLE IF NOT EXISTS pet_states (
       id TEXT PRIMARY KEY,

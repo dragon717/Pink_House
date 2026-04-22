@@ -1,5 +1,10 @@
 import relationalStore from '@ohos.data.relationalStore';
 import { NewWardrobeItem, WardrobeCategory, WardrobeItem } from '../../domain/model/WardrobeItem';
+import {
+  DepositStatusFilter,
+  WardrobeFilterState,
+  WardrobeSortOption
+} from '../../domain/model/WardrobeListOptions';
 
 const TABLE_NAME = 'wardrobe_items';
 
@@ -66,7 +71,7 @@ export class WardrobeItemDao {
       FROM ${TABLE_NAME}
       WHERE is_deleted = 0
       ORDER BY created_at DESC`;
-    return this.queryItems(sql);
+    return this.executeQuery(sql);
   }
 
   async searchActiveItems(keyword: string): Promise<WardrobeItem[]> {
@@ -79,7 +84,7 @@ export class WardrobeItemDao {
       FROM ${TABLE_NAME}
       WHERE is_deleted = 0 AND name LIKE ?
       ORDER BY created_at DESC`;
-    return this.queryItems(sql, [`%${normalizedKeyword}%`]);
+    return this.executeQuery(sql, [`%${normalizedKeyword}%`]);
   }
 
   async queryDepositPlans(): Promise<WardrobeItem[]> {
@@ -87,7 +92,7 @@ export class WardrobeItemDao {
       FROM ${TABLE_NAME}
       WHERE is_deleted = 0 AND is_deposit_plan = 1
       ORDER BY (final_payment_date IS NULL), final_payment_date ASC, created_at DESC`;
-    return this.queryItems(sql);
+    return this.executeQuery(sql);
   }
 
   async queryDepositPlansByYear(year: number): Promise<WardrobeItem[]> {
@@ -99,7 +104,7 @@ export class WardrobeItemDao {
         AND final_payment_date IS NOT NULL
         AND final_payment_date >= ? AND final_payment_date < ?
       ORDER BY final_payment_date ASC, created_at DESC`;
-    return this.queryItems(sql, [start, end]);
+    return this.executeQuery(sql, [start, end]);
   }
 
   async insertItem(item: NewWardrobeItem): Promise<WardrobeItem> {
@@ -137,19 +142,33 @@ export class WardrobeItemDao {
   }
 
   async insertSampleItem(): Promise<WardrobeItem> {
-    const sampleNames: string[] = ['奶油针织开衫', '樱桃格纹半裙', '通勤玛丽珍鞋', '珍珠蝴蝶结发夹'];
+    const sampleNames: string[] = ['草莓天使 OP', '草莓天使 JSK', '仲夏物语半裙', '月光花园小物'];
     const sampleCategories: string[] = [
-      WardrobeCategory.Tops,
+      WardrobeCategory.Dress,
+      WardrobeCategory.Dress,
       WardrobeCategory.Bottoms,
-      WardrobeCategory.Shoes,
       WardrobeCategory.Accessory
     ];
     const index = Date.now() % sampleNames.length;
+    const finalPayment = new Date();
+    finalPayment.setMonth(finalPayment.getMonth() + index);
+    finalPayment.setDate(12 + index);
     return this.insertItem({
       name: sampleNames[index],
       category: sampleCategories[index],
-      price: 129 + index * 30,
-      purchasedAt: Date.now()
+      price: 260 + index * 88,
+      brandName: index < 2 ? '仲夏物语' : '少女心愿',
+      types: index === 3 ? '小物' : '裙装',
+      colors: '粉色,白色',
+      sizes: index < 2 ? 'M' : '均码',
+      deposit: 39 + index * 28,
+      balance: 160 + index * 96,
+      stock: 1,
+      purchasedAt: Date.now(),
+      depositDate: Date.now(),
+      isDepositPlan: true,
+      finalPaymentDate: finalPayment.getTime(),
+      finalPaymentEndDate: finalPayment.getTime() + 3 * 24 * 60 * 60 * 1000
     });
   }
 
@@ -158,7 +177,186 @@ export class WardrobeItemDao {
     await this.store.executeSql(sql, [Date.now(), id]);
   }
 
-  private async queryItems(sql: string, bindArgs: relationalStore.ValueType[] = []): Promise<WardrobeItem[]> {
+  /**
+   * 统一查询：filter + sort + keyword 三合一。
+   * tagItemIds 由上层（Repository）根据 filter.tagIds 预先查 tag 关联表获得；
+   *   - null 表示未启用 tag 筛选
+   *   - 空数组表示启用了 tag 筛选但无匹配（上层应直接返回空，不应调用这里）
+   */
+  async queryItems(
+    filter: WardrobeFilterState,
+    sort: WardrobeSortOption,
+    keyword: string,
+    tagItemIds: string[] | null
+  ): Promise<WardrobeItem[]> {
+    const clauses: string[] = ['is_deleted = 0'];
+    const args: relationalStore.ValueType[] = [];
+
+    const trimmedKeyword = keyword.trim();
+    if (trimmedKeyword.length > 0) {
+      clauses.push('name LIKE ?');
+      args.push(`%${trimmedKeyword}%`);
+    }
+
+    if (tagItemIds !== null) {
+      if (tagItemIds.length === 0) {
+        return [];
+      }
+      const placeholders = tagItemIds.map(() => '?').join(',');
+      clauses.push(`id IN (${placeholders})`);
+      for (const id of tagItemIds) {
+        args.push(id);
+      }
+    }
+
+    this.appendInClause(clauses, args, 'brand_name', filter.brandNames);
+    this.appendInClause(clauses, args, 'length', filter.lengths);
+    this.appendInClause(clauses, args, 'condition', filter.conditions);
+
+    this.appendCsvLikeClause(clauses, args, 'types', filter.types);
+    this.appendCsvLikeClause(clauses, args, 'colors', filter.colors);
+    this.appendCsvLikeClause(clauses, args, 'sizes', filter.sizes);
+
+    if (filter.depositStatus === DepositStatusFilter.Owned) {
+      clauses.push('is_deposit_plan = 0');
+    } else if (filter.depositStatus === DepositStatusFilter.DepositPlan) {
+      clauses.push('is_deposit_plan = 1');
+    }
+
+    const sql = `SELECT ${SELECT_COLUMNS}
+      FROM ${TABLE_NAME}
+      WHERE ${clauses.join(' AND ')}
+      ${this.orderByClause(sort)}`;
+
+    return this.executeQuery(sql, args);
+  }
+
+  async queryDistinctBrandNames(): Promise<string[]> {
+    return this.queryDistinctSingle('brand_name');
+  }
+
+  async queryDistinctLengths(): Promise<string[]> {
+    return this.queryDistinctSingle('length');
+  }
+
+  async queryDistinctConditions(): Promise<string[]> {
+    return this.queryDistinctSingle('condition');
+  }
+
+  async queryDistinctTypes(): Promise<string[]> {
+    return this.queryDistinctCsv('types');
+  }
+
+  async queryDistinctColors(): Promise<string[]> {
+    return this.queryDistinctCsv('colors');
+  }
+
+  async queryDistinctSizes(): Promise<string[]> {
+    return this.queryDistinctCsv('sizes');
+  }
+
+  private appendInClause(
+    clauses: string[],
+    args: relationalStore.ValueType[],
+    column: string,
+    values: string[]
+  ): void {
+    if (values.length === 0) {
+      return;
+    }
+    const placeholders = values.map(() => '?').join(',');
+    clauses.push(`${column} IN (${placeholders})`);
+    for (const v of values) {
+      args.push(v);
+    }
+  }
+
+  private appendCsvLikeClause(
+    clauses: string[],
+    args: relationalStore.ValueType[],
+    column: string,
+    values: string[]
+  ): void {
+    if (values.length === 0) {
+      return;
+    }
+    const ors: string[] = [];
+    for (const v of values) {
+      ors.push(`(',' || ${column} || ',') LIKE ?`);
+      args.push(`%,${v},%`);
+    }
+    clauses.push(`(${ors.join(' OR ')})`);
+  }
+
+  private orderByClause(sort: WardrobeSortOption): string {
+    switch (sort) {
+      case WardrobeSortOption.CreatedAtDesc:
+        return 'ORDER BY created_at DESC';
+      case WardrobeSortOption.PriceAsc:
+        return 'ORDER BY price ASC, created_at DESC';
+      case WardrobeSortOption.PriceDesc:
+        return 'ORDER BY price DESC, created_at DESC';
+      case WardrobeSortOption.PurchaseDateAsc:
+        return 'ORDER BY purchased_at ASC, created_at DESC';
+      case WardrobeSortOption.PurchaseDateDesc:
+        return 'ORDER BY purchased_at DESC, created_at DESC';
+      case WardrobeSortOption.NameAsc:
+        return 'ORDER BY name COLLATE NOCASE ASC';
+      case WardrobeSortOption.NameDesc:
+        return 'ORDER BY name COLLATE NOCASE DESC';
+      case WardrobeSortOption.Custom:
+        // harmony 暂无 sortIndex 字段，fallback 到创建倒序
+        return 'ORDER BY created_at DESC';
+      default:
+        return 'ORDER BY created_at DESC';
+    }
+  }
+
+  private async queryDistinctSingle(column: string): Promise<string[]> {
+    const sql = `SELECT DISTINCT ${column} AS val
+      FROM ${TABLE_NAME}
+      WHERE is_deleted = 0 AND ${column} IS NOT NULL AND ${column} != ''
+      ORDER BY val ASC`;
+    const resultSet = await this.store.querySql(sql);
+    const out: string[] = [];
+    try {
+      while (resultSet.goToNextRow()) {
+        out.push(resultSet.getString(resultSet.getColumnIndex('val')));
+      }
+    } finally {
+      resultSet.close();
+    }
+    return out;
+  }
+
+  private async queryDistinctCsv(column: string): Promise<string[]> {
+    const sql = `SELECT DISTINCT ${column} AS val
+      FROM ${TABLE_NAME}
+      WHERE is_deleted = 0 AND ${column} IS NOT NULL AND ${column} != ''`;
+    const resultSet = await this.store.querySql(sql);
+    const seen: Set<string> = new Set<string>();
+    try {
+      while (resultSet.goToNextRow()) {
+        const raw = resultSet.getString(resultSet.getColumnIndex('val'));
+        const parts = raw.split(',');
+        for (const p of parts) {
+          const trimmed = p.trim();
+          if (trimmed.length > 0) {
+            seen.add(trimmed);
+          }
+        }
+      }
+    } finally {
+      resultSet.close();
+    }
+    const out: string[] = [];
+    seen.forEach((v: string) => out.push(v));
+    out.sort();
+    return out;
+  }
+
+
+  private async executeQuery(sql: string, bindArgs: relationalStore.ValueType[] = []): Promise<WardrobeItem[]> {
     const resultSet = await this.store.querySql(sql, bindArgs);
     const items: WardrobeItem[] = [];
 

@@ -23,7 +23,7 @@ const HOUSE_HOTSPOTS: HotspotSpec[] = [
 @Component
 export struct SmallWorldPage {
   @Link destination: string;
-  onOpenWardrobe: () => void = () => {};
+  onOpenWardrobe: (segment: string) => void = () => {};
 
   private destinationTitle(): string {
     switch (this.destination) {
@@ -127,7 +127,9 @@ export struct SmallWorldPage {
     .position({ x: item.x, y: item.y })
     .onClick(() => {
       if (item.destination === 'wardrobe') {
-        this.onOpenWardrobe();
+        this.onOpenWardrobe('wardrobe');
+      } else if (item.destination === 'deposit') {
+        this.onOpenWardrobe('deposit');
       } else {
         this.destination = item.destination;
       }
@@ -138,39 +140,25 @@ export struct SmallWorldPage {
   private HouseMap() {
     Scroll() {
       Stack({ alignContent: Alignment.TopStart }) {
-        Column({ space: 46 }) {
-          Stack({ alignContent: Alignment.Center }) {
-            this.RoomBlock('少女衣橱', '#F7D7E1', 300);
-            Row({ space: 18 }) {
-              this.RoomBlock('卧室', '#F5C7D7', 220);
-              this.RoomBlock('梳妆间', '#F8E2CB', 220);
-            }
-            .width('92%')
-            .margin({ top: 46 })
-          }
-          .width('100%')
-          .height(360)
-
-          Stack({ alignContent: Alignment.Center }) {
-            this.RoomBlock('心愿屋', '#F4CCD8', 330);
-            Row({ space: 18 }) {
-              this.RoomBlock('日历角', '#F7E4C8', 240);
-              this.RoomBlock('工坊', '#EED5E8', 240);
-            }
-            .width('92%')
-            .margin({ top: 62 })
-          }
-          .width('100%')
-          .height(380)
+        Column({ space: -54 }) {
+          Image($r('app.media.small_world_rococo_1'))
+            .width('100%')
+            .height(308)
+            .objectFit(ImageFit.Contain)
+          Image($r('app.media.small_world_rococo_2'))
+            .width('100%')
+            .height(308)
+            .objectFit(ImageFit.Contain)
         }
         .width('100%')
+        .padding({ top: 10 })
 
         ForEach(HOUSE_HOTSPOTS, (item: HotspotSpec) => {
           this.Hotspot(item);
         }, (item: HotspotSpec) => item.destination)
       }
       .width('100%')
-      .height(790)
+      .height(610)
       .padding({ left: 18, right: 18, top: 10, bottom: 130 })
     }
     .width('100%')
@@ -204,7 +192,7 @@ export struct SmallWorldPage {
                   this.destination = 'menu';
                 });
                 this.ActionTile('去衣橱', AppSymbolName.Wardrobe, () => {
-                  this.onOpenWardrobe();
+                  this.onOpenWardrobe('wardrobe');
                 });
               }
               .width('100%')
