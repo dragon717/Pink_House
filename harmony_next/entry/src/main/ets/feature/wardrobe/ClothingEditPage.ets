@@ -1,8 +1,10 @@
+import common from '@ohos.app.ability.common';
 import { AppTheme } from '../../core/theme/AppTheme';
 import { GlassCard } from '../../core/theme/GlassComponents';
+import { WardrobeImageStore } from '../../core/media/WardrobeImageStore';
+import { AppLogger } from '../../core/utils/AppLogger';
 import { WardrobeCategory } from '../../domain/model/WardrobeItem';
 
-const CATEGORY_KEYS: string[] = Object.keys(WardrobeCategory);
 const CATEGORY_LABELS: string[] = Object.values(WardrobeCategory);
 
 @Component
@@ -18,6 +20,21 @@ export struct ClothingEditPage {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  private async pickMainImage(): Promise<void> {
+    AppLogger.info('[ClothingEditPage] main image tapped');
+    try {
+      const uris = await WardrobeImageStore.pickImages(1);
+      AppLogger.info(`[ClothingEditPage] main image picker result=${uris.length}`);
+      if (uris.length > 0) {
+        const ctx = getContext(this) as common.Context;
+        this.draft.draftImageUri = await WardrobeImageStore.persistPickedImage(ctx, uris[0]);
+        AppLogger.info(`[ClothingEditPage] main image selected=${this.draft.draftImageUri}`);
+      }
+    } catch (error) {
+      AppLogger.error(`[ClothingEditPage] main image failed: ${JSON.stringify(error)}`);
+    }
+  }
+
   @Builder
   private Header() {
     Row() {
@@ -28,7 +45,7 @@ export struct ClothingEditPage {
 
       Blank().layoutWeight(1)
 
-      Text('新建裙装')
+      Text('手动创建')
         .fontSize(AppTheme.font.titleMedium)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppTheme.color.textPrimary)
@@ -107,92 +124,101 @@ export struct ClothingEditPage {
         this.SectionTitle('裙装信息');
 
         Column({ space: 4 }) {
-          Text('图片')
+          Text('选择图片 (最多9张，第一张为主图)')
             .fontSize(AppTheme.font.caption)
             .fontColor(AppTheme.color.textSecondary)
-          Row() {
-            Column({ space: 6 }) {
-              Text('+')
-                .fontSize(32)
-                .fontColor(AppTheme.color.textTertiary)
-              Text('添加图片')
-                .fontSize(AppTheme.font.tiny)
-                .fontColor(AppTheme.color.textTertiary)
+
+          Row({ space: 12 }) {
+            if (this.draft.draftImageUri.length > 0) {
+              Image(this.draft.draftImageUri)
+                .width(92)
+                .height(92)
+                .borderRadius(AppTheme.radius.chip)
+                .objectFit(ImageFit.Cover)
+            } else {
+              Column({ space: 6 }) {
+                Text('+')
+                  .fontSize(32)
+                  .fontColor(AppTheme.color.textTertiary)
+                Text('主图')
+                  .fontSize(AppTheme.font.tiny)
+                  .fontColor(AppTheme.color.textTertiary)
+              }
+              .width(92)
+              .height(92)
+              .justifyContent(FlexAlign.Center)
+              .backgroundColor(AppTheme.color.surfaceTint)
+              .borderRadius(AppTheme.radius.chip)
+              .border({ width: 1, style: BorderStyle.Dashed, color: AppTheme.color.border })
             }
-            .width(88)
-            .height(88)
-            .justifyContent(FlexAlign.Center)
-            .backgroundColor(AppTheme.color.surfaceTint)
-            .borderRadius(AppTheme.radius.chip)
-            .border({ width: 1, style: BorderStyle.Dashed, color: AppTheme.color.border })
+
+            Text(this.draft.draftImageUri.length > 0 ? '更换' : '添加')
+              .fontSize(AppTheme.font.body)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.color.primary)
+              .padding({ left: 18, right: 18, top: 10, bottom: 10 })
+              .backgroundColor(AppTheme.color.primaryPale)
+              .borderRadius(AppTheme.radius.pill)
+              .onClick(() => { this.pickMainImage(); })
           }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
 
-        this.FormField('名称 *', '裙装名称', this.draft.draftName, (v: string) => {
+        this.FormField('裙装名称 *', '请输入裙装名称', this.draft.draftName, (v: string) => {
           this.draft.draftName = v;
         });
 
-        this.FormField('品牌', '品牌名称', this.draft.draftBrand, (v: string) => {
+        this.FormField('品牌名称', '品牌名称', this.draft.draftBrand, (v: string) => {
           this.draft.draftBrand = v;
         });
 
-        Row({ space: 10 }) {
-          Column({ space: 4 }) {
-            Text('类型')
-              .fontSize(AppTheme.font.caption)
-              .fontColor(AppTheme.color.textSecondary)
-            Text(this.draft.draftCategory.length > 0 ? this.draft.draftCategory : '选择类型')
-              .fontSize(AppTheme.font.body)
-              .fontColor(this.draft.draftCategory.length > 0 ? AppTheme.color.textPrimary : AppTheme.color.textTertiary)
-              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-              .width('100%')
-              .backgroundColor(AppTheme.color.surfaceTint)
-              .borderRadius(AppTheme.radius.chip)
-              .onClick(() => {
-                this.showCategoryPicker = !this.showCategoryPicker;
-              })
-          }
-          .layoutWeight(1)
-
-          Column({ space: 4 }) {
-            Text('颜色')
-              .fontSize(AppTheme.font.caption)
-              .fontColor(AppTheme.color.textSecondary)
-            TextInput({ text: this.draft.draftColors, placeholder: '颜色' })
-              .fontSize(AppTheme.font.body)
-              .fontColor(AppTheme.color.textPrimary)
-              .placeholderColor(AppTheme.color.textTertiary)
-              .backgroundColor(AppTheme.color.surfaceTint)
-              .borderRadius(AppTheme.radius.chip)
-              .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-              .width('100%')
-              .onChange((v: string) => { this.draft.draftColors = v; })
-          }
-          .layoutWeight(1)
+        Column({ space: 4 }) {
+          Text('分类')
+            .fontSize(AppTheme.font.caption)
+            .fontColor(AppTheme.color.textSecondary)
+          Text(this.draft.draftCategory.length > 0 ? this.draft.draftCategory : WardrobeCategory.Dress)
+            .fontSize(AppTheme.font.body)
+            .fontColor(AppTheme.color.textPrimary)
+            .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+            .width('100%')
+            .backgroundColor(AppTheme.color.surfaceTint)
+            .borderRadius(AppTheme.radius.chip)
+            .onClick(() => {
+              this.showCategoryPicker = !this.showCategoryPicker;
+            })
         }
         .width('100%')
 
         if (this.showCategoryPicker) {
-          Row({ space: 6 }) {
-            ForEach(CATEGORY_LABELS, (label: string, idx: number) => {
+          Flex({ wrap: FlexWrap.Wrap }) {
+            ForEach(CATEGORY_LABELS, (label: string) => {
               Text(label)
                 .fontSize(AppTheme.font.caption)
-                .fontWeight(this.draft.draftCategory === CATEGORY_KEYS[idx] ? FontWeight.Bold : FontWeight.Medium)
-                .fontColor(this.draft.draftCategory === CATEGORY_KEYS[idx] ? AppTheme.color.textOnPrimary : AppTheme.color.textPrimary)
+                .fontWeight(this.draft.draftCategory === label ? FontWeight.Bold : FontWeight.Medium)
+                .fontColor(this.draft.draftCategory === label ? AppTheme.color.textOnPrimary : AppTheme.color.textPrimary)
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                .backgroundColor(this.draft.draftCategory === CATEGORY_KEYS[idx] ? AppTheme.color.primaryStrong : AppTheme.color.surfaceTint)
+                .backgroundColor(this.draft.draftCategory === label ? AppTheme.color.primaryStrong : AppTheme.color.surfaceTint)
                 .borderRadius(AppTheme.radius.pill)
+                .margin({ right: 8, bottom: 8 })
                 .onClick(() => {
-                  this.draft.draftCategory = CATEGORY_KEYS[idx];
+                  this.draft.draftCategory = label;
                   this.showCategoryPicker = false;
                 })
             }, (label: string) => label)
           }
           .width('100%')
-          .justifyContent(FlexAlign.Start)
         }
+
+        this.FormField('类型 (逗号分隔，如: JSK,OP,SK,小物)', '例如: JSK, OP', this.draft.draftTypes, (v: string) => {
+          this.draft.draftTypes = v;
+        });
+
+        this.FormField('颜色', '颜色', this.draft.draftColors, (v: string) => {
+          this.draft.draftColors = v;
+        });
 
         Row({ space: 10 }) {
           Column() {
@@ -202,7 +228,7 @@ export struct ClothingEditPage {
           }
           .layoutWeight(1)
           Column() {
-            this.FormField('裙长', '裙长', this.draft.draftLength, (v: string) => {
+            this.FormField('衣长', '衣长', this.draft.draftLength, (v: string) => {
               this.draft.draftLength = v;
             });
           }
@@ -210,8 +236,12 @@ export struct ClothingEditPage {
         }
         .width('100%')
 
-        this.FormField('品相', '全新/95新/9新...', this.draft.draftCondition, (v: string) => {
+        this.FormField('状态', '全新/95新/9新...', this.draft.draftCondition, (v: string) => {
           this.draft.draftCondition = v;
+        });
+
+        this.FormField('小物', '发带、KC、胸针等', this.draft.draftAccessories, (v: string) => {
+          this.draft.draftAccessories = v;
         });
       }
       .width('100%')
@@ -225,7 +255,7 @@ export struct ClothingEditPage {
       Column({ space: 14 }) {
         this.SectionTitle('标签');
 
-        Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
+        Flex({ wrap: FlexWrap.Wrap }) {
           ForEach(this.draft.draftTags, (tag: string, idx: number) => {
             Row({ space: 4 }) {
               Text(tag)
@@ -242,6 +272,7 @@ export struct ClothingEditPage {
             .padding({ left: 10, right: 8, top: 5, bottom: 5 })
             .backgroundColor(AppTheme.color.primaryPale)
             .borderRadius(AppTheme.radius.pill)
+            .margin({ right: 8, bottom: 8 })
           }, (tag: string, idx: number) => `${tag}_${idx}`)
 
           Text('+ 添加标签')
@@ -252,6 +283,7 @@ export struct ClothingEditPage {
             .backgroundColor(AppTheme.color.surfaceTint)
             .borderRadius(AppTheme.radius.pill)
             .border({ width: 1, style: BorderStyle.Dashed, color: AppTheme.color.border })
+            .margin({ right: 8, bottom: 8 })
         }
         .width('100%')
       }
@@ -558,12 +590,13 @@ export struct ClothingEditPage {
 export class ClothingDraft {
   draftName: string = '';
   draftBrand: string = '';
-  draftCategory: string = '';
+  draftCategory: string = WardrobeCategory.Dress;
   draftColors: string = '';
   draftSizes: string = '';
   draftLength: string = '';
-  draftCondition: string = '';
+  draftCondition: string = '全新';
   draftTypes: string = '';
+  draftAccessories: string = '';
   draftNote: string = '';
   draftImageUri: string = '';
 

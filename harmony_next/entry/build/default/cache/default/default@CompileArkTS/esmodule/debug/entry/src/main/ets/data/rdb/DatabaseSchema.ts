@@ -1,6 +1,8 @@
 import { AppConstants } from "@bundle:com.pinkhouse.harmony/entry/ets/core/constants/AppConstants";
 interface DatabaseDdlConfig {
     wardrobeItems: string;
+    tags: string;
+    wardrobeItemTags: string;
     petStates: string;
     walletTransactions: string;
     iapOrders: string;
@@ -20,10 +22,38 @@ export const DatabaseSchema: DatabaseSchemaConfig = {
       category TEXT NOT NULL,
       image_uri TEXT,
       price REAL DEFAULT 0,
+      brand_name TEXT DEFAULT '',
+      types TEXT DEFAULT '',
+      colors TEXT DEFAULT '',
+      sizes TEXT DEFAULT '',
+      length TEXT DEFAULT '',
+      condition TEXT DEFAULT '全新',
+      note TEXT DEFAULT '',
+      original_price REAL DEFAULT 0,
+      deposit REAL DEFAULT 0,
+      balance REAL DEFAULT 0,
+      accessories_price REAL DEFAULT 0,
+      stock INTEGER DEFAULT 1,
       purchased_at INTEGER,
+      deposit_date INTEGER,
+      is_deposit_plan INTEGER DEFAULT 0,
+      final_payment_date INTEGER,
+      final_payment_end_date INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      is_deleted INTEGER DEFAULT 0
+      is_deleted INTEGER DEFAULT 0,
+      sort_index INTEGER DEFAULT 0
+    )`,
+        tags: `CREATE TABLE IF NOT EXISTS tags (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sort_index INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL
+    )`,
+        wardrobeItemTags: `CREATE TABLE IF NOT EXISTS wardrobe_item_tags (
+      item_id TEXT NOT NULL,
+      tag_id TEXT NOT NULL,
+      PRIMARY KEY (item_id, tag_id)
     )`,
         petStates: `CREATE TABLE IF NOT EXISTS pet_states (
       id TEXT PRIMARY KEY,

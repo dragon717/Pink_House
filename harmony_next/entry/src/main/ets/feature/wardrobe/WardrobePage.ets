@@ -2,10 +2,11 @@ import common from '@ohos.app.ability.common';
 import { AppTheme } from '../../core/theme/AppTheme';
 import { AppSymbol, AppSymbolName } from '../../core/theme/AppSymbols';
 import { GlassCard } from '../../core/theme/GlassComponents';
+import { WardrobeImageStore } from '../../core/media/WardrobeImageStore';
 import { AppLogger } from '../../core/utils/AppLogger';
 import { RdbWardrobeRepository } from '../../data/repository/RdbWardrobeRepository';
 import { wardrobePreferences } from '../../data/preferences/WardrobePreferences';
-import { totalBalance, totalDeposit, WardrobeItem } from '../../domain/model/WardrobeItem';
+import { NewWardrobeItem, totalBalance, totalDeposit, WardrobeCategory, WardrobeItem } from '../../domain/model/WardrobeItem';
 import {
   WardrobeSortOption,
   WardrobeViewLayout,
@@ -26,6 +27,7 @@ import { GetWardrobeItemsUseCase } from '../../domain/usecase/GetWardrobeItemsUs
 import { ReorderWardrobeItemsUseCase } from '../../domain/usecase/ReorderWardrobeItemsUseCase';
 import { SearchWardrobeItemsUseCase } from '../../domain/usecase/SearchWardrobeItemsUseCase';
 import { SoftDeleteWardrobeItemUseCase } from '../../domain/usecase/SoftDeleteWardrobeItemUseCase';
+import { ClothingDraft, ClothingEditPage } from './ClothingEditPage';
 import { WardrobeItemDetailPage, WardrobeDetailArgs } from './WardrobeItemDetailPage';
 import { SortSheet } from './toolbar/SortSheet';
 import { ViewLayoutSheet } from './toolbar/ViewLayoutSheet';
@@ -46,6 +48,12 @@ export struct WardrobePage {
   @State private showTotalValue: boolean = false;
   @State private isSelectionMode: boolean = false;
   @State private selectedItemIds: string[] = [];
+  @State private dragPreviewItem: WardrobeItem | null = null;
+
+  // 批量导入 的临时草稿
+  @State private batchSeriesName: string = '';
+  @State private batchImageUris: string[] = [];
+  @State private isBatchImporting: boolean = false;
   @State private depositViewMode: string = 'monthly';
   @State private selectedDepositYear: number = new Date().getFullYear();
   @State private selectedDepositMonth: number = 0;
@@ -253,6 +261,9 @@ export struct WardrobePage {
     }
     .width(40)
     .height(40)
+    .onClick(() => {
+      AppLogger.info(`[TopBar] menu button tapped: ${symbolName}, items=${items.length}`);
+    })
     .bindMenu(items)
   }
 
@@ -322,17 +333,50 @@ export struct WardrobePage {
 
     Blank().layoutWeight(1)
 
-    this.RoundButton(AppSymbolName.Sort, () => { this.openSheet('sort'); });
-    this.RoundButton(AppSymbolName.Filter, () => { this.openSheet('filter'); });
-    this.RoundButton(AppSymbolName.Grid, () => { this.openSheet('layout'); });
+    this.RoundButton(AppSymbolName.Sort, () => {
+      AppLogger.info('[TopBar] sort button tapped');
+      this.openSheet('sort');
+    });
+    this.RoundButton(AppSymbolName.Filter, () => {
+      AppLogger.info('[TopBar] filter button tapped');
+      this.openSheet('filter');
+    });
+    this.RoundButton(AppSymbolName.Grid, () => {
+      AppLogger.info('[TopBar] layout button tapped');
+      this.openSheet('layout');
+    });
     this.RoundButtonWithMenu(AppSymbolName.More, [
-      { value: '搜索', action: () => {} },
-      { value: '编辑', action: () => { this.enterSelectionMode(false); } },
-      { value: '调整顺序', action: () => { this.enterSelectionMode(true); } }
+      { value: '搜索', action: () => { AppLogger.info('[MoreMenu] 搜索 tapped'); } },
+      {
+        value: '编辑',
+        action: () => {
+          AppLogger.info('[MoreMenu] 编辑 tapped');
+          this.enterSelectionMode(false);
+        }
+      },
+      {
+        value: '调整顺序',
+        action: () => {
+          AppLogger.info('[MoreMenu] 调整顺序 tapped');
+          this.enterSelectionMode(true);
+        }
+      }
     ]);
     this.RoundButtonWithMenu(AppSymbolName.Add, [
-      { value: '手动创建', action: () => { this.addSampleItem(); } },
-      { value: '批量导入', action: () => {} }
+      {
+        value: '手动创建',
+        action: () => {
+          AppLogger.info('[AddMenu] 手动创建 tapped → openSheet(create)');
+          this.openSheet('create');
+        }
+      },
+      {
+        value: '批量导入',
+        action: () => {
+          AppLogger.info('[AddMenu] 批量导入 tapped → openSheet(batchImport)');
+          this.openSheet('batchImport');
+        }
+      }
     ]);
   }
 
@@ -428,9 +472,262 @@ export struct WardrobePage {
       const repository = new RdbWardrobeRepository(getContext(this) as common.Context);
       const useCase = new ReorderWardrobeItemsUseCase(repository);
       await useCase.execute(orderedIds);
+      AppLogger.info(`[Reorder] persisted ${orderedIds.length} ids`);
     } catch (error) {
       this.handleError('reorder wardrobe items failed', error);
     }
+  }
+
+  // ────────── 手动创建 Sheet ──────────
+
+  private async saveClothingDraft(draft: ClothingDraft): Promise<void> {
+    const name = draft.draftName.trim();
+    AppLogger.info(`[Create] save draft tapped, name="${name}", category=${draft.draftCategory}, image=${draft.draftImageUri}`);
+    if (name.length === 0) {
+      AppLogger.warn('[Create] save aborted: empty name');
+      return;
+    }
+
+    const noteParts: string[] = [];
+    if (draft.draftAccessories.trim().length > 0) {
+      noteParts.push(`小物：${draft.draftAccessories.trim()}`);
+    }
+    if (draft.draftNote.trim().length > 0) {
+      noteParts.push(draft.draftNote.trim());
+    }
+
+    const item: NewWardrobeItem = {
+      name: name,
+      category: draft.draftCategory.length > 0 ? draft.draftCategory : WardrobeCategory.Dress,
+      imageUri: draft.draftImageUri,
+      price: draft.draftPrice,
+      brandName: draft.draftBrand,
+      types: draft.draftTypes,
+      colors: draft.draftColors,
+      sizes: draft.draftSizes,
+      length: draft.draftLength,
+      condition: draft.draftCondition,
+      note: noteParts.join('\n'),
+      originalPrice: draft.draftOriginalPrice,
+      deposit: draft.draftDeposit,
+      balance: draft.draftBalance,
+      accessoriesPrice: draft.draftAccessoriesPrice,
+      stock: draft.draftStock,
+      purchasedAt: draft.draftPurchasedAt,
+      depositDate: draft.draftDepositDate > 0 ? draft.draftDepositDate : null,
+      isDepositPlan: draft.draftIsDepositPlan,
+      finalPaymentDate: draft.draftFinalPaymentDate > 0 ? draft.draftFinalPaymentDate : null,
+      finalPaymentEndDate: draft.draftFinalPaymentEndDate > 0 ? draft.draftFinalPaymentEndDate : null
+    };
+
+    try {
+      const repository = new RdbWardrobeRepository(getContext(this) as common.Context);
+      const saved = await repository.addItem(item);
+      AppLogger.info(`[Create] saved id=${saved.id}, image=${saved.imageUri}`);
+      this.showSheet = false;
+      await this.loadItems();
+    } catch (error) {
+      this.handleError('save manual clothing draft failed', error);
+    }
+  }
+
+  // ────────── 批量导入 Sheet ──────────
+
+  private async pickMultipleImages(): Promise<void> {
+    AppLogger.info('[BatchImport] add images tapped');
+    try {
+      const pickedUris = await WardrobeImageStore.pickImages(20);
+      AppLogger.info(`[BatchImport] picker returned=${pickedUris.length}`);
+      this.batchImageUris = this.batchImageUris.concat(pickedUris);
+      AppLogger.info(`[Picker] multi total now=${this.batchImageUris.length}`);
+    } catch (error) {
+      AppLogger.error(`[BatchImport] picker failed: ${JSON.stringify(error)}`);
+    }
+  }
+
+  private removeBatchImage(index: number): void {
+    AppLogger.info(`[BatchImport] remove index=${index}`);
+    const next = this.batchImageUris.slice();
+    next.splice(index, 1);
+    this.batchImageUris = next;
+  }
+
+  private async confirmBatchImport(): Promise<void> {
+    AppLogger.info(`[BatchImport] confirm tapped, count=${this.batchImageUris.length}, series="${this.batchSeriesName}"`);
+    if (this.batchImageUris.length === 0 || this.isBatchImporting) {
+      return;
+    }
+    const seriesName = this.batchSeriesName.trim().length > 0 ? this.batchSeriesName.trim() : '导入';
+    this.isBatchImporting = true;
+    try {
+      const repository = new RdbWardrobeRepository(getContext(this) as common.Context);
+      const ctx = getContext(this) as common.Context;
+      let successCount = 0;
+      const failedUris: string[] = [];
+      for (let i = 0; i < this.batchImageUris.length; i++) {
+        try {
+          const storedUri = await WardrobeImageStore.persistPickedImage(ctx, this.batchImageUris[i]);
+          await repository.addItem({
+            name: `${seriesName} ${i + 1}`,
+            category: WardrobeCategory.Dress,
+            imageUri: storedUri,
+            purchasedAt: Date.now()
+          });
+          successCount++;
+        } catch (error) {
+          failedUris.push(this.batchImageUris[i]);
+          AppLogger.error(`[BatchImport] item ${i} failed: ${JSON.stringify(error)}`);
+        }
+      }
+      AppLogger.info(`[BatchImport] saved ${successCount}/${this.batchImageUris.length}`);
+      this.batchImageUris = failedUris;
+      if (failedUris.length === 0) {
+        this.batchSeriesName = '';
+        this.showSheet = false;
+      } else {
+        this.errorMessage = `批量导入成功 ${successCount} 张，失败 ${failedUris.length} 张`;
+      }
+      await this.loadItems();
+    } catch (error) {
+      this.handleError('batch import failed', error);
+    } finally {
+      this.isBatchImporting = false;
+    }
+  }
+
+  @Builder
+  private BatchImportSheet() {
+    Column({ space: 16 }) {
+      Row() {
+        Text('取消')
+          .fontSize(AppTheme.font.body)
+          .fontColor(AppTheme.color.primary)
+          .onClick(() => {
+            AppLogger.info('[BatchImport] cancel tapped');
+            this.batchImageUris = [];
+            this.batchSeriesName = '';
+            this.showSheet = false;
+          })
+
+        Blank().layoutWeight(1)
+
+        Text('批量导入')
+          .fontSize(AppTheme.font.titleMedium)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.color.textPrimary)
+
+        Blank().layoutWeight(1)
+
+        Text('完成')
+          .fontSize(AppTheme.font.body)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.batchImageUris.length > 0 && !this.isBatchImporting ? AppTheme.color.primary : AppTheme.color.textTertiary)
+          .onClick(() => { this.confirmBatchImport(); })
+      }
+      .width('100%')
+
+      GlassCard({ innerPadding: 16, cornerRadius: AppTheme.radius.cardLarge }) {
+        Column({ space: 10 }) {
+          Text('基础信息')
+            .fontSize(AppTheme.font.titleMedium)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.color.textPrimary)
+
+          TextInput({ placeholder: '系列名称', text: this.batchSeriesName })
+            .height(46)
+            .fontSize(AppTheme.font.body)
+            .backgroundColor(AppTheme.color.surfaceTint)
+            .borderRadius(AppTheme.radius.chip)
+            .onChange((v: string) => { this.batchSeriesName = v; })
+
+          Text('每张图片将作为一个独立的裙装条目。裙装名称将设置为“系列名称 + 序号”。')
+            .fontSize(AppTheme.font.caption)
+            .fontColor(AppTheme.color.textSecondary)
+            .lineHeight(18)
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+      }
+
+      GlassCard({ innerPadding: 16, cornerRadius: AppTheme.radius.cardLarge }) {
+        Column({ space: 12 }) {
+          Row() {
+            Text(`选择图片 (${this.batchImageUris.length} 张)`)
+              .fontSize(AppTheme.font.titleMedium)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.color.textPrimary)
+            Blank().layoutWeight(1)
+            Text('添加图片')
+              .fontSize(AppTheme.font.caption)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.color.primary)
+              .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+              .backgroundColor(AppTheme.color.primaryPale)
+              .borderRadius(AppTheme.radius.pill)
+              .onClick(() => { this.pickMultipleImages(); })
+          }
+          .width('100%')
+
+          if (this.batchImageUris.length > 0) {
+            Grid() {
+              ForEach(this.batchImageUris, (uri: string, index?: number) => {
+                GridItem() {
+                  Stack({ alignContent: Alignment.TopEnd }) {
+                    Image(uri)
+                      .width('100%')
+                      .aspectRatio(1)
+                      .borderRadius(AppTheme.radius.card)
+                      .objectFit(ImageFit.Cover)
+                    Text('×')
+                      .fontSize(14)
+                      .fontColor(Color.White)
+                      .width(22)
+                      .height(22)
+                      .textAlign(TextAlign.Center)
+                      .backgroundColor('rgba(0,0,0,0.55)')
+                      .borderRadius(11)
+                      .margin({ top: 4, right: 4 })
+                      .onClick(() => { this.removeBatchImage(index ?? 0); })
+                  }
+                }
+              }, (uri: string, index?: number) => `${index}-${uri}`)
+            }
+            .columnsTemplate('1fr 1fr 1fr')
+            .columnsGap(6)
+            .rowsGap(6)
+            .width('100%')
+          } else {
+            Text('+ 添加图片')
+              .fontSize(AppTheme.font.body)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.color.primary)
+              .width('100%')
+              .height(110)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(AppTheme.color.primaryPale)
+              .borderRadius(AppTheme.radius.card)
+              .border({ width: 1, style: BorderStyle.Dashed, color: AppTheme.color.border })
+              .onClick(() => { this.pickMultipleImages(); })
+          }
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+      }
+
+      Text(this.isBatchImporting ? '正在导入...' : `确认导入 ${this.batchImageUris.length}`)
+        .fontSize(AppTheme.font.body)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppTheme.color.textOnPrimary)
+        .width('100%')
+        .height(46)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(this.batchImageUris.length > 0 && !this.isBatchImporting ? AppTheme.color.primary : AppTheme.color.textTertiary)
+        .borderRadius(AppTheme.radius.pill)
+        .onClick(() => { this.confirmBatchImport(); })
+    }
+    .padding(20)
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -1132,7 +1429,7 @@ export struct WardrobePage {
       this.EmptyState();
     } else {
       Grid() {
-        ForEach(this.items, (item: WardrobeItem) => {
+        ForEach(this.items, (item: WardrobeItem, index?: number) => {
           GridItem() {
             this.ItemCard(item);
           }
@@ -1142,37 +1439,123 @@ export struct WardrobePage {
       .columnsGap(10)
       .rowsGap(18)
       .width('100%')
+      .editMode(this.isSelectionMode && this.currentSort === WardrobeSortOption.Custom)
+      .supportAnimation(true)
+      .onItemDragStart((event: ItemDragInfo, itemIndex: number) => {
+        AppLogger.info(`[Reorder] drag start index=${itemIndex}`);
+        this.dragPreviewItem = this.items[itemIndex];
+        return this.DragPreview();
+      })
+      .onItemDrop((event: ItemDragInfo, itemIndex: number, insertIndex: number, isSuccess: boolean) => {
+        AppLogger.info(`[Reorder] drop from=${itemIndex} to=${insertIndex} ok=${isSuccess}`);
+        this.dragPreviewItem = null;
+        if (!isSuccess || itemIndex === insertIndex || insertIndex < 0) {
+          return;
+        }
+        this.handleReorderDrop(itemIndex, insertIndex);
+      })
     }
+  }
+
+  @Builder
+  private DragPreview() {
+    Column() {
+      if (this.dragPreviewItem !== null && this.dragPreviewItem.imageUri.length > 0) {
+        Image(this.dragPreviewItem.imageUri)
+          .width(96)
+          .height(96)
+          .objectFit(ImageFit.Cover)
+          .borderRadius(AppTheme.radius.card)
+      } else {
+        Text(this.dragPreviewItem !== null && this.dragPreviewItem.category.length > 0
+          ? this.dragPreviewItem.category.substring(0, 1)
+          : '衣')
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.color.primary)
+          .width(96)
+          .height(96)
+          .textAlign(TextAlign.Center)
+          .backgroundColor(AppTheme.color.primaryPale)
+          .borderRadius(AppTheme.radius.card)
+      }
+    }
+    .shadow({ radius: 18, color: AppTheme.color.shadowSoft, offsetX: 0, offsetY: 8 })
+  }
+
+  private handleReorderDrop(fromIdx: number, toIdx: number): void {
+    const next = this.items.slice();
+    if (fromIdx < 0 || fromIdx >= next.length) {
+      return;
+    }
+    const moved = next.splice(fromIdx, 1)[0];
+    const clamped = Math.max(0, Math.min(toIdx, next.length));
+    next.splice(clamped, 0, moved);
+    this.items = next;
+    const orderedIds: string[] = [];
+    for (let i = 0; i < next.length; i++) {
+      orderedIds.push(next[i].id);
+    }
+    this.persistCustomOrder(orderedIds);
   }
 
   @Builder
   private ItemCard(item: WardrobeItem) {
     Column({ space: 6 }) {
       Stack({ alignContent: Alignment.TopEnd }) {
-        Stack() {
-          Text(item.category.length > 0 ? item.category.substring(0, 1) : '衣')
-            .fontSize(32)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.color.primary)
+        // 主视觉：优先显示图片，缺图时回退到分类首字
+        if (item.imageUri.length > 0) {
+          Image(item.imageUri)
+            .width('100%')
+            .height(112)
+            .objectFit(ImageFit.Cover)
+            .alt($r('app.media.start_icon'))
+        } else {
+          Stack() {
+            Text(item.category.length > 0 ? item.category.substring(0, 1) : '衣')
+              .fontSize(32)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.color.primary)
+          }
+          .width('100%')
+          .height(112)
+          .linearGradient({
+            angle: 150,
+            colors: [
+              [AppTheme.color.primaryPale, 0.0],
+              [AppTheme.color.surface, 0.45],
+              [AppTheme.color.primarySoft, 1.0]
+            ]
+          })
         }
-        .width('100%')
-        .height(112)
-        .linearGradient({
-          angle: 150,
-          colors: [
-            [AppTheme.color.primaryPale, 0.0],
-            [AppTheme.color.surface, 0.45],
-            [AppTheme.color.primarySoft, 1.0]
-          ]
-        })
 
-        Text('心愿尾款')
-          .fontSize(AppTheme.font.tiny)
-          .fontColor(AppTheme.color.textOnPrimary)
-          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-          .backgroundColor('rgba(50, 35, 43, 0.68)')
-          .borderRadius(AppTheme.radius.chip)
-          .margin({ top: 10, right: 10 })
+        // 编辑模式：右上角勾选圈；非编辑模式：保留尾款小角标
+        if (this.isSelectionMode) {
+          Text(this.isItemSelected(item.id) ? '✓' : '')
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .width(24)
+            .height(24)
+            .textAlign(TextAlign.Center)
+            .backgroundColor(this.isItemSelected(item.id)
+              ? AppTheme.color.primary
+              : 'rgba(255,255,255,0.65)')
+            .borderRadius(12)
+            .border({
+              width: 1.5,
+              color: this.isItemSelected(item.id) ? AppTheme.color.primary : AppTheme.color.border
+            })
+            .margin({ top: 8, right: 8 })
+        } else {
+          Text('心愿尾款')
+            .fontSize(AppTheme.font.tiny)
+            .fontColor(AppTheme.color.textOnPrimary)
+            .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+            .backgroundColor('rgba(50, 35, 43, 0.68)')
+            .borderRadius(AppTheme.radius.chip)
+            .margin({ top: 10, right: 10 })
+        }
       }
       .width('100%')
       .borderRadius(AppTheme.radius.card)
@@ -1201,7 +1584,12 @@ export struct WardrobePage {
     .backgroundColor(AppTheme.color.overlayGlass)
     .backgroundBlurStyle(BlurStyle.Thin)
     .borderRadius(AppTheme.radius.card)
-    .border({ width: 1, color: AppTheme.color.border })
+    .border({
+      width: this.isSelectionMode && this.isItemSelected(item.id) ? 2 : 1,
+      color: this.isSelectionMode && this.isItemSelected(item.id)
+        ? AppTheme.color.primary
+        : AppTheme.color.border
+    })
     .shadow({
       radius: 14,
       color: AppTheme.color.shadowSoft,
@@ -1209,10 +1597,16 @@ export struct WardrobePage {
       offsetY: 6
     })
     .onClick(() => {
-      this.navPathStack.pushPathByName(
-        'wardrobeItemDetail',
-        new WardrobeDetailArgs(item.name, item.category, item.price)
-      );
+      if (this.isSelectionMode) {
+        AppLogger.info(`[ItemCard] selection toggle id=${item.id}`);
+        this.toggleItemSelection(item.id);
+      } else {
+        AppLogger.info(`[ItemCard] open detail id=${item.id}, name=${item.name}`);
+        this.navPathStack.pushPathByName(
+          'wardrobeItemDetail',
+          new WardrobeDetailArgs(item.name, item.category, item.price)
+        );
+      }
     })
   }
 
@@ -1235,11 +1629,13 @@ export struct WardrobePage {
   private EmptyState() {
     GlassCard({ innerPadding: 24, cornerRadius: AppTheme.radius.card }) {
       Column({ space: 10 }) {
-        Text('还没有衣物')
+        Text('衣橱还空着呢～')
           .fontSize(AppTheme.font.titleMedium)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.color.textPrimary)
-        Text(this.searchKeyword.length > 0 ? '没有找到匹配名称，换个关键词试试。' : '先添加一件示例衣物，验证 RDB 列表链路。')
+        Text(this.searchKeyword.length > 0
+          ? '没有找到匹配的衣物，换个关键词试试。'
+          : '点右上角「+」手动创建，或批量导入相册图片来点亮你的第一件梦裙。')
           .fontSize(AppTheme.font.caption)
           .fontColor(AppTheme.color.textSecondary)
       }
@@ -1308,6 +1704,18 @@ export struct WardrobePage {
             this.showSheet = false;
           }
         })
+      } else if (this.activeSheet === 'create') {
+        ClothingEditPage({
+          onSave: (draft: ClothingDraft) => {
+            this.saveClothingDraft(draft);
+          },
+          onCancel: () => {
+            AppLogger.info('[Create] cancel tapped');
+            this.showSheet = false;
+          }
+        })
+      } else if (this.activeSheet === 'batchImport') {
+        this.BatchImportSheet();
       } else {
         Text('loading...')
           .fontSize(AppTheme.font.body)
@@ -1362,29 +1770,73 @@ export struct WardrobePage {
     }
   }
 
+  @Builder
+  private SelectionBottomBar() {
+    Row({ space: 16 }) {
+      Text(`批量删除 (${this.selectedItemIds.length})`)
+        .fontSize(AppTheme.font.body)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.selectedItemIds.length > 0 ? AppTheme.color.textOnPrimary : AppTheme.color.textTertiary)
+        .layoutWeight(1)
+        .height(46)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(this.selectedItemIds.length > 0 ? AppTheme.color.primary : AppTheme.color.overlayGlassStrong)
+        .borderRadius(AppTheme.radius.pill)
+        .onClick(() => {
+          AppLogger.info(`[Selection] batch delete tapped, count=${this.selectedItemIds.length}`);
+          if (this.selectedItemIds.length === 0) {
+            return;
+          }
+          AlertDialog.show({
+            title: '确认删除所选衣物？',
+            message: `将移出衣橱 ${this.selectedItemIds.length} 件，可在回收站恢复。`,
+            primaryButton: { value: '取消', action: () => {} },
+            secondaryButton: {
+              value: '删除',
+              fontColor: AppTheme.color.primary,
+              action: () => { this.batchDeleteSelected(); }
+            }
+          });
+        })
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 10, bottom: 14 })
+    .backgroundColor(AppTheme.color.surface)
+    .backgroundBlurStyle(BlurStyle.Thin)
+    .border({ width: { top: 1 }, color: AppTheme.color.border })
+  }
+
   build() {
     Navigation(this.navPathStack) {
-      Column() {
-        this.TopBar();
+      Stack({ alignContent: Alignment.Bottom }) {
+        Column() {
+          this.TopBar();
 
-        Scroll() {
-          Column({ space: 16 }) {
-            this.SummaryPanel();
-            this.ContentArea();
+          Scroll() {
+            Column({ space: 16 }) {
+              this.SummaryPanel();
+              this.ContentArea();
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+            .padding({
+              left: AppTheme.spacing.page,
+              right: AppTheme.spacing.page,
+              top: 10,
+              bottom: this.isSelectionMode ? 96 : 126
+            })
           }
           .width('100%')
-          .alignItems(HorizontalAlign.Start)
-          .padding({
-            left: AppTheme.spacing.page,
-            right: AppTheme.spacing.page,
-            top: 10,
-            bottom: 126
-          })
+          .layoutWeight(1)
+          .scrollBar(BarState.Off)
+          .backgroundColor(Color.Transparent)
         }
         .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Off)
-        .backgroundColor(Color.Transparent)
+        .height('100%')
+
+        if (this.isSelectionMode) {
+          this.SelectionBottomBar();
+        }
       }
       .width('100%')
       .height('100%')
@@ -1393,7 +1845,8 @@ export struct WardrobePage {
     .mode(NavigationMode.Stack)
     .navDestination(this.pageMap)
     .bindSheet($$this.showSheet, this.SheetContent(), {
-      height: this.activeSheet === 'filter' ? SheetSize.MEDIUM : SheetSize.FIT_CONTENT,
+      height: (this.activeSheet === 'filter' || this.activeSheet === 'batchImport') ? SheetSize.MEDIUM :
+              (this.activeSheet === 'create') ? SheetSize.MEDIUM : SheetSize.FIT_CONTENT,
       dragBar: true,
       backgroundColor: AppTheme.color.backgroundLight,
       onDisappear: () => {

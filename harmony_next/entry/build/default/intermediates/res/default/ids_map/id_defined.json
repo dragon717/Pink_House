@@ -39,5 +39,21 @@
 			"type":	"profile",
 			"name":	"main_pages",
 			"id":	"0x01000009"
+		}, {
+			"type":	"media",
+			"name":	"house_design_8204",
+			"id":	"0x0100000A"
+		}, {
+			"type":	"media",
+			"name":	"pet_cat_peek",
+			"id":	"0x0100000B"
+		}, {
+			"type":	"media",
+			"name":	"small_world_rococo_1",
+			"id":	"0x0100000C"
+		}, {
+			"type":	"media",
+			"name":	"small_world_rococo_2",
+			"id":	"0x0100000D"
 		}]
 }

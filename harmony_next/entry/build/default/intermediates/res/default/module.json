@@ -16,8 +16,8 @@
 		"targetPatchAPIVersion":	0,
 		"appEnvironments":	[],
 		"bundleType":	"app",
-		"buildMode":	"release",
-		"debug":	false,
+		"buildMode":	"debug",
+		"debug":	true,
 		"iconId":	16777218,
 		"labelId":	16777217,
 		"descriptionId":	16777216

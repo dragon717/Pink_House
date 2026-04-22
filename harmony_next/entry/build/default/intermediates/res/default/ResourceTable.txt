@@ -6,5 +6,9 @@ color brand_primary 0x01000005
 color start_window_background 0x01000006
 color surface_warm 0x01000007
 media app_icon 0x01000002
+media house_design_8204 0x0100000a
+media pet_cat_peek 0x0100000b
+media small_world_rococo_1 0x0100000c
+media small_world_rococo_2 0x0100000d
 media start_icon 0x01000008
 profile main_pages 0x01000009
