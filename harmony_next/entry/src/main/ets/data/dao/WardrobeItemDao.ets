@@ -140,15 +140,11 @@ export class WardrobeItemDao {
       isDeleted: false,
       sortIndex: now
     };
-    await this.store.executeSql(
-      `INSERT INTO ${TABLE_NAME} (
-        id, name, category, image_uri, price, brand_name, types, colors, sizes, length,
-        condition, note, original_price, deposit, balance, accessories_price, stock,
-        purchased_at, deposit_date, is_deposit_plan, final_payment_date, final_payment_end_date,
-        created_at, updated_at, is_deleted, sort_index
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      this.toInsertArgs(wardrobeItem)
-    );
+    const rowId = await this.store.insert(TABLE_NAME, this.toBucket(wardrobeItem));
+    if (rowId < 0) {
+      throw new Error('insert wardrobe_items failed');
+    }
+    AppLogger.info('[WardrobeItemDao] insert rowId=' + rowId);
     const totalRows = await this.countRows(`SELECT COUNT(*) AS count FROM ${TABLE_NAME}`);
     const activeRows = await this.countRows(`SELECT COUNT(*) AS count FROM ${TABLE_NAME} WHERE is_deleted = 0`);
     AppLogger.info(`[WardrobeItemDao] insert success id=${wardrobeItem.id}, name=${wardrobeItem.name}, image=${wardrobeItem.imageUri}, totalRows=${totalRows}, activeRows=${activeRows}`);
@@ -187,8 +183,13 @@ export class WardrobeItemDao {
   }
 
   async softDeleteItem(id: string): Promise<void> {
-    const sql = `UPDATE ${TABLE_NAME} SET is_deleted = 1, updated_at = ? WHERE id = ?`;
-    await this.store.executeSql(sql, [Date.now(), id]);
+    const bucket: relationalStore.ValuesBucket = {
+      is_deleted: 1,
+      updated_at: Date.now()
+    };
+    const predicates = new relationalStore.RdbPredicates(TABLE_NAME);
+    predicates.equalTo('id', id);
+    await this.store.update(bucket, predicates);
   }
 
   /**
@@ -468,44 +469,47 @@ export class WardrobeItemDao {
     };
   }
 
-  private toInsertArgs(item: WardrobeItem): relationalStore.ValueType[] {
-    return [
-      item.id,
-      item.name,
-      item.category,
-      item.imageUri,
-      item.price,
-      item.brandName,
-      item.types,
-      item.colors,
-      item.sizes,
-      item.length,
-      item.condition,
-      item.note,
-      item.originalPrice,
-      item.deposit,
-      item.balance,
-      item.accessoriesPrice,
-      item.stock,
-      item.purchasedAt,
-      item.depositDate,
-      item.isDepositPlan ? 1 : 0,
-      item.finalPaymentDate,
-      item.finalPaymentEndDate,
-      item.createdAt,
-      item.updatedAt,
-      item.isDeleted ? 1 : 0,
-      item.sortIndex
-    ];
+  private toBucket(item: WardrobeItem): relationalStore.ValuesBucket {
+    return {
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      image_uri: item.imageUri,
+      price: item.price,
+      brand_name: item.brandName,
+      types: item.types,
+      colors: item.colors,
+      sizes: item.sizes,
+      length: item.length,
+      condition: item.condition,
+      note: item.note,
+      original_price: item.originalPrice,
+      deposit: item.deposit,
+      balance: item.balance,
+      accessories_price: item.accessoriesPrice,
+      stock: item.stock,
+      purchased_at: item.purchasedAt,
+      deposit_date: item.depositDate,
+      is_deposit_plan: item.isDepositPlan ? 1 : 0,
+      final_payment_date: item.finalPaymentDate,
+      final_payment_end_date: item.finalPaymentEndDate,
+      created_at: item.createdAt,
+      updated_at: item.updatedAt,
+      is_deleted: item.isDeleted ? 1 : 0,
+      sort_index: item.sortIndex
+    };
   }
 
   async reorderItems(orderedIds: string[]): Promise<void> {
     const now = Date.now();
     for (let i = 0; i < orderedIds.length; i++) {
-      await this.store.executeSql(
-        `UPDATE ${TABLE_NAME} SET sort_index = ?, updated_at = ? WHERE id = ?`,
-        [i, now, orderedIds[i]]
-      );
+      const bucket: relationalStore.ValuesBucket = {
+        sort_index: i,
+        updated_at: now
+      };
+      const predicates = new relationalStore.RdbPredicates(TABLE_NAME);
+      predicates.equalTo('id', orderedIds[i]);
+      await this.store.update(bucket, predicates);
     }
   }
 
@@ -513,16 +517,13 @@ export class WardrobeItemDao {
     if (ids.length === 0) {
       return;
     }
-    const now = Date.now();
-    const placeholders = ids.map(() => '?').join(',');
-    const args: relationalStore.ValueType[] = [1, now];
-    for (const id of ids) {
-      args.push(id);
-    }
-    await this.store.executeSql(
-      `UPDATE ${TABLE_NAME} SET is_deleted = ?, updated_at = ? WHERE id IN (${placeholders})`,
-      args
-    );
+    const bucket: relationalStore.ValuesBucket = {
+      is_deleted: 1,
+      updated_at: Date.now()
+    };
+    const predicates = new relationalStore.RdbPredicates(TABLE_NAME);
+    predicates.in('id', ids);
+    await this.store.update(bucket, predicates);
   }
 
   private createId(now: number): string {

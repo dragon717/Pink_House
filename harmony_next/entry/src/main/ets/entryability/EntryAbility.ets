@@ -3,6 +3,7 @@ import UIAbility from '@ohos.app.ability.UIAbility';
 import Want from '@ohos.app.ability.Want';
 import window from '@ohos.window';
 import { AppLogger } from '../core/utils/AppLogger';
+import { rdbStoreProvider } from '../data/rdb/RdbStoreProvider';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -23,7 +24,8 @@ export default class EntryAbility extends UIAbility {
     AppLogger.info('EntryAbility window destroyed');
   }
 
-  onDestroy(): void {
+  async onDestroy(): Promise<void> {
+    await rdbStoreProvider.close(this.context);
     AppLogger.info('EntryAbility destroyed');
   }
 }
