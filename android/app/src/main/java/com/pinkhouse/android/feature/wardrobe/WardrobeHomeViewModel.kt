@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pinkhouse.android.core.datastore.UserPreferencesDataStore
 import com.pinkhouse.android.core.media.WardrobeImageStore
+import com.pinkhouse.android.core.media.WardrobeTestMedia
+import com.pinkhouse.android.core.media.WardrobeTestMediaManager
 import com.pinkhouse.android.core.notification.DepositReminderScheduler
 import com.pinkhouse.android.domain.model.WardrobeAccessoryItem
 import com.pinkhouse.android.domain.model.WardrobeItem
@@ -165,6 +167,7 @@ class WardrobeHomeViewModel(
     private val batchSoftDeleteWardrobeItems: BatchSoftDeleteWardrobeItems,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val wardrobeImageStore: WardrobeImageStore,
+    private val wardrobeTestMediaManager: WardrobeTestMediaManager,
     private val depositReminderScheduler: DepositReminderScheduler,
 ) : ViewModel() {
     private val runtimeState = MutableStateFlow(WardrobeRuntimeState())
@@ -359,6 +362,18 @@ class WardrobeHomeViewModel(
 
     fun imageFilePath(fileName: String): String {
         return wardrobeImageStore.fileFor(fileName).absolutePath
+    }
+
+    fun availableTestMedia(): List<WardrobeTestMedia> {
+        return wardrobeTestMediaManager.availableMedia()
+    }
+
+    suspend fun importTestMedia(assetPath: String): String {
+        return wardrobeTestMediaManager.importMedia(assetPath)
+    }
+
+    suspend fun importAllTestMedia(): List<String> {
+        return wardrobeTestMediaManager.importAllMedia()
     }
 
     fun saveDraft(draft: WardrobeEditorDraft): Boolean {

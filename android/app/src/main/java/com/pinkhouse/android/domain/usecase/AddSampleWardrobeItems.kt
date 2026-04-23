@@ -1,5 +1,6 @@
 package com.pinkhouse.android.domain.usecase
 
+import com.pinkhouse.android.core.media.WardrobeTestMediaManager
 import com.pinkhouse.android.domain.model.WardrobeItem
 import com.pinkhouse.android.domain.model.WardrobeItemStatus
 import com.pinkhouse.android.domain.repository.WardrobeRepository
@@ -8,9 +9,15 @@ import java.time.LocalDate
 
 class AddSampleWardrobeItems(
     private val wardrobeRepository: WardrobeRepository,
+    private val wardrobeTestMediaManager: WardrobeTestMediaManager,
 ) {
     suspend operator fun invoke() {
-        wardrobeRepository.addItems(sampleItems)
+        val importedImages = wardrobeTestMediaManager.importAllMedia()
+        wardrobeRepository.addItems(
+            sampleItems.mapIndexed { index, item ->
+                item.copy(imagePaths = importedImages.getOrNull(index)?.let(::listOf).orEmpty())
+            },
+        )
     }
 
     private val sampleItems = listOf(
