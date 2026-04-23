@@ -18,14 +18,12 @@ class NoticeService: ObservableObject {
     @Published var errorMessage: String?
     @Published var isSyncing = false
 
-    private var modelContext: ModelContext?
     private let cloudKitService = NoticeCloudKitService.shared
 
     private init() {}
 
     // MARK: - 设置 ModelContext
-    func setup(with context: ModelContext) {
-        self.modelContext = context
+    func setup(with _: ModelContext) {
         Task {
             await fetchNotices()
             await syncIfNeeded()
@@ -34,40 +32,28 @@ class NoticeService: ObservableObject {
 
     // MARK: - 获取公告列表
     func fetchNotices() async {
-        guard let context = modelContext else { return }
-
         isLoading = true
         defer { isLoading = false }
 
-        do {
-            let descriptor = FetchDescriptor<Notice>(
-                sortBy: [
-                    SortDescriptor(\.updatedAt, order: .reverse),
-                    SortDescriptor(\.createdAt, order: .reverse)
-                ]
-            )
-            let fetched = try context.fetch(descriptor)
-            refreshCollections(from: fetched)
-        } catch {
-            errorMessage = "获取公告失败: \(error.localizedDescription)"
-        }
+        // Notice is operational content. Keep it in memory and avoid reading the
+        // legacy SwiftData cache, because old TestFlight installs can carry a
+        // pre-CMS Notice schema that aborts inside CoreData during fetch.
+        refreshCollections(from: managedNotices)
     }
 
     // MARK: - 从 CloudKit 同步
     func syncFromCloudKit() async {
-        guard let context = modelContext else { return }
         errorMessage = nil
 
         isSyncing = true
+        defer { isSyncing = false }
 
-        await cloudKitService.syncNotices(with: context)
-        if let syncError = cloudKitService.syncError {
+        let cloudNotices = await cloudKitService.fetchCloudNotices()
+        if cloudKitService.lastFetchSucceeded {
+            refreshCollections(from: cloudNotices)
+        } else if let syncError = cloudKitService.syncError {
             errorMessage = syncError
         }
-
-        // 在结束同步标记前先刷新本地列表，避免弹窗判断拿到旧数据。
-        await fetchNotices()
-        isSyncing = false
     }
 
     func syncIfNeeded(force: Bool = false) async {
@@ -111,12 +97,6 @@ class NoticeService: ObservableObject {
         actionTarget: String? = nil,
         actionLabel: String? = nil
     ) async -> Notice? {
-        guard let context = modelContext else {
-            print("❌ 创建公告失败: modelContext 为 nil")
-            errorMessage = "系统错误，请重试"
-            return nil
-        }
-
         // 检查管理员权限
         let isAdmin = await cloudKitService.isAdmin()
         guard isAdmin else {
@@ -174,38 +154,19 @@ class NoticeService: ObservableObject {
         )
         notice.applyLifecycleDefaults()
 
-        context.insert(notice)
-
-        do {
-            try context.save()
-            print("✅ 公告本地保存成功")
-
-            let published = await cloudKitService.publishNotice(notice)
-            if published {
-                print("✅ 公告已发布到云端")
-                try context.save()
-            } else {
-                context.delete(notice)
-                try context.save()
-                print("⚠️ 公告创建已回滚，避免留下本地孤儿记录")
-                errorMessage = cloudKitService.syncError ?? "云端发布失败"
-                return nil
-            }
-
-            await fetchNotices()
+        let published = await cloudKitService.publishNotice(notice)
+        if published {
+            print("✅ 公告已发布到云端")
+            await syncFromCloudKit()
             return notice
-
-        } catch {
-            print("❌ 保存公告失败: \(error)")
-            errorMessage = "保存公告失败: \(error.localizedDescription)"
-            return nil
         }
+
+        errorMessage = cloudKitService.syncError ?? "云端发布失败"
+        return nil
     }
 
     // MARK: - 更新公告
     func updateNotice(_ notice: Notice) async {
-        guard let context = modelContext else { return }
-
         // 检查管理员权限
         let isAdmin = await cloudKitService.isAdmin()
         guard isAdmin else {
@@ -231,26 +192,18 @@ class NoticeService: ObservableObject {
         notice.updatedAt = Date()
         notice.applyLifecycleDefaults(now: notice.updatedAt)
 
-        do {
-            try context.save()
-
-            let updated = await cloudKitService.updateCloudNotice(notice)
-            if updated {
-                print("✅ 公告已更新到云端")
-            } else {
-                print("⚠️ 公告本地更新但云端同步失败")
-            }
-
-            await fetchNotices()
-        } catch {
-            errorMessage = "更新公告失败: \(error.localizedDescription)"
+        let updated = await cloudKitService.updateCloudNotice(notice)
+        if updated {
+            print("✅ 公告已更新到云端")
+            await syncFromCloudKit()
+        } else {
+            print("⚠️ 公告云端更新失败")
+            errorMessage = cloudKitService.syncError ?? "更新公告失败"
         }
     }
 
     // MARK: - 删除公告 (软删除)
     func deleteNotice(_ notice: Notice) async {
-        guard let context = modelContext else { return }
-
         // 检查管理员权限
         let isAdmin = await cloudKitService.isAdmin()
         guard isAdmin else {
@@ -262,13 +215,7 @@ class NoticeService: ObservableObject {
 
         // 仅本地未同步的公告直接本地删除，避免残留在列表里。
         if notice.recordName == nil {
-            context.delete(notice)
-            do {
-                try context.save()
-                await fetchNotices()
-            } catch {
-                errorMessage = "删除公告失败: \(error.localizedDescription)"
-            }
+            removeFromCollections(notice)
             return
         }
 
@@ -279,30 +226,21 @@ class NoticeService: ObservableObject {
         notice.updatedAt = Date()
         notice.applyLifecycleDefaults(now: notice.updatedAt)
 
-        do {
-            try context.save()
-
-            let deactivated = await cloudKitService.deactivateCloudNotice(notice)
-            if deactivated {
-                print("✅ 公告已从云端停用")
-            } else if cloudKitService.lastDeleteFailedBecauseMissingRecord {
-                context.delete(notice)
-                try context.save()
-                print("🧹 云端记录缺失，已清理本地缓存公告")
-            } else {
-                print("⚠️ 公告本地停用但云端同步失败")
-            }
-
-            await fetchNotices()
-        } catch {
-            errorMessage = "删除公告失败: \(error.localizedDescription)"
+        let deactivated = await cloudKitService.deactivateCloudNotice(notice)
+        if deactivated {
+            print("✅ 公告已从云端停用")
+            await syncFromCloudKit()
+        } else if cloudKitService.lastDeleteFailedBecauseMissingRecord {
+            removeFromCollections(notice)
+            print("🧹 云端记录缺失，已清理内存缓存公告")
+        } else {
+            print("⚠️ 公告云端停用失败")
+            errorMessage = cloudKitService.syncError ?? "删除公告失败"
         }
     }
 
     // MARK: - 硬删除 (仅管理员使用)
     func hardDeleteNotice(_ notice: Notice) async {
-        guard let context = modelContext else { return }
-
         // 检查管理员权限
         let isAdmin = await cloudKitService.isAdmin()
         guard isAdmin else {
@@ -310,14 +248,7 @@ class NoticeService: ObservableObject {
             return
         }
 
-        context.delete(notice)
-
-        do {
-            try context.save()
-            await fetchNotices()
-        } catch {
-            errorMessage = "删除公告失败: \(error.localizedDescription)"
-        }
+        removeFromCollections(notice)
     }
 
     // MARK: - 检查用户是否为管理员
@@ -397,6 +328,12 @@ class NoticeService: ObservableObject {
         self.notices = managedNotices
             .filter { $0.isVisibleInInbox() }
             .sorted(by: sortForUser)
+    }
+
+    private func removeFromCollections(_ notice: Notice) {
+        let key = notice.stableIdentifier
+        managedNotices.removeAll { $0.stableIdentifier == key }
+        notices.removeAll { $0.stableIdentifier == key }
     }
 
     private func sortForUser(_ lhs: Notice, _ rhs: Notice) -> Bool {

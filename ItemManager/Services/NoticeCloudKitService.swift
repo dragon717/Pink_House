@@ -458,33 +458,19 @@ class NoticeCloudKitService: ObservableObject {
     }
 
     // MARK: - 同步本地和云端公告
-    func syncNotices(with context: ModelContext) async {
+    func syncNotices(with _: ModelContext) async {
         print("🔄 开始同步公告...")
 
-        // 1. 拉取云端公告
-        let cloudNotices = await fetchCloudNotices()
+        _ = await fetchCloudNotices()
         guard lastFetchSucceeded else {
-            print("⚠️ 本次云端公告拉取失败，跳过本地合并，保留现有缓存")
+            print("⚠️ 本次云端公告拉取失败，保留现有内存公告")
             return
         }
 
-        // 2. 获取本地公告
-        let localDescriptor = FetchDescriptor<Notice>(
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        guard let localNotices = try? context.fetch(localDescriptor) else {
-            print("❌ 获取本地公告失败")
-            return
-        }
-
-        // 3. 合并公告
-        await mergeNotices(
-            cloudNotices: cloudNotices,
-            localNotices: localNotices,
-            context: context
-        )
-
-        print("✅ 公告同步完成")
+        // Notice local SwiftData rows from older TestFlight schemas can abort
+        // during CoreData materialization, so runtime sync intentionally avoids
+        // merging into the legacy local cache.
+        print("✅ 公告云端拉取完成，本地 SwiftData 缓存已跳过")
     }
 
     // MARK: - 合并本地和云端公告
