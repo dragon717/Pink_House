@@ -102,16 +102,37 @@
 - 鸿蒙 MVP 用 DROP 重建丢数据；**Android 不准这么做**——必须写 `Migration`，老用户必须平滑升级。
 - 标签关系表 DAO 可提前建，UI 先不暴露。
 
-## 七、已知待办（非本迭代）
+## 七、M3 推进记录（Computer Use 对照）
+
+### 已落地
+
+- 使用 Computer Use 对照 iOS Simulator 与 Android Studio Pixel 模拟器：确认 iOS 衣橱首页/心愿尾款的顶部双分段、操作按钮组、统计卡、底部猫咪覆盖和空态结构。
+- 原项目资产已迁入 Android：`pink_splash.jpg`、`pink_house_logo.png`、`naicha_peeking.png`、`maomao_peeking.png`、宠物头像、小世界背景、财富背景、VIP 卡、喵金币、食物图、字体与 `open_dress.mp4`。
+- 开屏接入 Android SplashScreen API，Manifest 使用原项目 Logo，预 Android 12 窗口背景使用 `pink_splash_window.xml`。
+- Room 升级到 v3：补齐 `uuid`、`tagNamesJson`、`accessoryItemsJson`、`sizeChartImagePathsJson`、`priceChartImagePathsJson`，并生成 schema v3。
+- 数据层补齐详情与回收站能力：`observeItem`、`observeTrashedItems`、`restoreItems`、`permanentlyDeleteItems`、`purgeTrashedBefore`。
+- 衣橱 UI 补齐详情 Sheet、编辑 Sheet、批量导入 Sheet、回收站 Sheet、心愿尾款提醒 Sheet；详情点击、编辑保存、软删除、恢复、彻底删除进入本地闭环。
+- 搜索/筛选提取到 `WardrobeBusinessLogic`：支持深字段搜索、价格区间、无标签/无品牌/无小物等特殊筛选、月度/系列尾款聚合。
+- 本地尾款通知接入 `AlarmManager` + `BroadcastReceiver` + `NotificationCompat`，通知权限由尾款提醒 Sheet 触发。
+- 性能侧继续保持图片解码在 IO 线程；列表增加稳定 key，底部猫咪使用资源图；非衣橱 Tab 改为原资产骨架占位。
+
+### 本轮验证
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:testDebugUnitTest` 通过。
+- `adb shell am start -W` 普通冷启动成功，记录 `TotalTime: 3070ms`。
+- Computer Use 验证 Android 模拟器：衣橱首页、底部猫咪覆盖、详情 Sheet 可见且未出现 System UI ANR。
+
+## 八、已知待办（非本迭代）
 
 - 列表布局下的拖拽排序
-- 品牌 / 系列 / 标签 在手动创建 Sheet 中的录入 UI
-- `brand_series` 表的批量导入写入
-- 详情页编辑 / 删除 / 加入心愿单的全链路
+- 品牌 / 系列 / 标签 独立管理页
+- `brand_series` 表的批量导入写入与系列统计页
+- 尺码表 / 价格表 图片编辑入口
 - 心愿尾款分支的编辑模式
 - Sheet 切换时的 key 变更能否用 `remember(key)` 更优
 
-## 八、日志与可调试性
+## 九、日志与可调试性
 
 统一走 **Timber**（Application.onCreate 注册），tag 约定：
 
@@ -128,7 +149,7 @@
 
 Pixel 10 Pro Emulator 在 Android Studio 使用 `am start -D --suspend` 调试启动时，曾出现一次 `System UI isn't responding` 弹窗。adb 普通启动未复现 app 侧 ANR，logcat 显示 SystemUI 资源查询错误且无 `com.pinkhouse` 崩溃记录。排查时优先用不带 `-D --suspend` 的普通启动确认 app 启动链路，再看 `/data/anr` 是否指向 app 进程。
 
-## 九、与鸿蒙侧差异对照
+## 十、与鸿蒙侧差异对照
 
 | 维度 | 鸿蒙 Next | Android | 差异根源 |
 | --- | --- | --- | --- |

@@ -1,7 +1,9 @@
 package com.pinkhouse.android.feature.wardrobe
 
+import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -34,6 +36,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.Icons
@@ -91,6 +95,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -99,9 +104,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pinkhouse.android.core.di.AppContainer
+import com.pinkhouse.android.core.assets.PinkHouseAssets
 import com.pinkhouse.android.domain.model.WardrobeItem
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,6 +132,7 @@ fun WardrobeRoute(appContainer: AppContainer) {
                     batchSoftDeleteWardrobeItems = appContainer.batchSoftDeleteWardrobeItems,
                     userPreferencesDataStore = appContainer.userPreferencesDataStore,
                     wardrobeImageStore = appContainer.wardrobeImageStore,
+                    depositReminderScheduler = appContainer.depositReminderScheduler,
                 ) as T
             }
         }
@@ -135,7 +143,11 @@ fun WardrobeRoute(appContainer: AppContainer) {
 
     var showCreateSheet by rememberSaveable { mutableStateOf(false) }
     var showFilterSheet by rememberSaveable { mutableStateOf(false) }
+    var showRecycleBinSheet by rememberSaveable { mutableStateOf(false) }
+    var showDepositReminderSheet by rememberSaveable { mutableStateOf(false) }
+    var showBatchImportSheet by rememberSaveable { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingHardDeleteIds by rememberSaveable { mutableStateOf<List<Long>>(emptyList()) }
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
     var showLayoutMenu by rememberSaveable { mutableStateOf(false) }
     var showMoreMenu by rememberSaveable { mutableStateOf(false) }
@@ -179,7 +191,10 @@ fun WardrobeRoute(appContainer: AppContainer) {
                 onFilterClick = { showFilterSheet = true },
                 onSearchClick = { viewModel.setSearchVisible(true) },
                 onEditClick = { viewModel.enterSelectionMode() },
+                onRecycleBinClick = { showRecycleBinSheet = true },
+                onDepositReminderClick = { showDepositReminderSheet = true },
                 onAddManualClick = { showCreateSheet = true },
+                onBatchImportClick = { showBatchImportSheet = true },
             )
 
             if (uiState.isSelectionMode) {
@@ -209,6 +224,8 @@ fun WardrobeRoute(appContainer: AppContainer) {
                     onItemClick = { item ->
                         if (uiState.isSelectionMode) {
                             viewModel.toggleItemSelection(item.id)
+                        } else {
+                            viewModel.selectItem(item.id)
                         }
                     },
                 )
@@ -227,11 +244,23 @@ fun WardrobeRoute(appContainer: AppContainer) {
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
+
+        if (!uiState.isSelectionMode) {
+            ComposeImage(
+                painter = painterResource(PinkHouseAssets.naichaPeeking),
+                contentDescription = "naicha_peeking",
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .size(width = 112.dp, height = 70.dp),
+                contentScale = ContentScale.Fit,
+            )
+        }
     }
 
     if (showCreateSheet) {
-        CreateWardrobeItemSheet(
+        WardrobeItemEditorSheet(
             viewModel = viewModel,
+            existing = null,
             onDismiss = { showCreateSheet = false },
             onSaved = {
                 showCreateSheet = false
@@ -239,8 +268,18 @@ fun WardrobeRoute(appContainer: AppContainer) {
         )
     }
 
+    uiState.selectedItem?.let { item ->
+        WardrobeItemDetailSheet(
+            item = item,
+            viewModel = viewModel,
+            onDismiss = { viewModel.selectItem(null) },
+            onSoftDelete = { viewModel.softDeleteItem(item.id) },
+        )
+    }
+
     if (showFilterSheet) {
         FilterSheet(
+            uiState = uiState,
             current = uiState.filterState,
             onDismiss = { showFilterSheet = false },
             onApply = {
@@ -251,6 +290,30 @@ fun WardrobeRoute(appContainer: AppContainer) {
                 viewModel.clearFilters()
                 showFilterSheet = false
             },
+        )
+    }
+
+    if (showBatchImportSheet) {
+        BatchImportSheet(
+            viewModel = viewModel,
+            onDismiss = { showBatchImportSheet = false },
+        )
+    }
+
+    if (showRecycleBinSheet) {
+        RecycleBinSheet(
+            items = uiState.trashedItems,
+            onDismiss = { showRecycleBinSheet = false },
+            onRestore = viewModel::restoreItems,
+            onHardDelete = { ids -> pendingHardDeleteIds = ids },
+        )
+    }
+
+    if (showDepositReminderSheet) {
+        DepositReminderSheet(
+            uiState = uiState,
+            onDismiss = { showDepositReminderSheet = false },
+            onSave = viewModel::saveReminderSettings,
         )
     }
 
@@ -276,6 +339,29 @@ fun WardrobeRoute(appContainer: AppContainer) {
             },
         )
     }
+
+    if (pendingHardDeleteIds.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { pendingHardDeleteIds = emptyList() },
+            title = { Text("彻底删除") },
+            text = { Text("确定彻底删除 ${pendingHardDeleteIds.size} 件衣物吗？此操作不会进入回收站。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.permanentlyDeleteItems(pendingHardDeleteIds)
+                        pendingHardDeleteIds = emptyList()
+                    },
+                ) {
+                    Text("彻底删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingHardDeleteIds = emptyList() }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -296,7 +382,10 @@ private fun WardrobeTopControls(
     onFilterClick: () -> Unit,
     onSearchClick: () -> Unit,
     onEditClick: () -> Unit,
+    onRecycleBinClick: () -> Unit,
+    onDepositReminderClick: () -> Unit,
     onAddManualClick: () -> Unit,
+    onBatchImportClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -405,7 +494,7 @@ private fun WardrobeTopControls(
 
                 if (uiState.homeTab == WardrobeHomeTab.DepositPlan) {
                     ToolbarIconButton(Icons.Filled.Notifications, "通知") {
-                        onSearchClick()
+                        onDepositReminderClick()
                     }
                 }
 
@@ -435,6 +524,14 @@ private fun WardrobeTopControls(
                                 },
                             )
                         }
+                        DropdownMenuItem(
+                            text = { Text("回收站") },
+                            leadingIcon = { Icon(Icons.Filled.Restore, contentDescription = null) },
+                            onClick = {
+                                onRecycleBinClick()
+                                onShowMoreMenuChange(false)
+                            },
+                        )
                     }
                 }
 
@@ -458,7 +555,7 @@ private fun WardrobeTopControls(
                             text = { Text("批量导入") },
                             leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) },
                             onClick = {
-                                onAddManualClick()
+                                onBatchImportClick()
                                 onShowAddMenuChange(false)
                             },
                         )
@@ -649,7 +746,7 @@ private fun WardrobeContent(
     if (columns == null) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 96.dp else 24.dp),
+            contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 96.dp else 92.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(uiState.visibleItems, key = { it.id }) { item ->
@@ -667,7 +764,7 @@ private fun WardrobeContent(
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 96.dp else 24.dp),
+            contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 96.dp else 92.dp),
             horizontalArrangement = Arrangement.spacedBy(if (columns >= 6) 4.dp else 14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -740,20 +837,53 @@ private fun DepositContent(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(bottom = 92.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
                     Text(
-                        text = "最近月统计",
+                        text = if (uiState.depositDisplayMode == DepositDisplayMode.Detail) "最近月统计" else "按系列统计",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                items(uiState.visibleItems, key = { it.id }) { item ->
+                if (uiState.depositDisplayMode == DepositDisplayMode.Detail) {
+                    items(uiState.depositMonthSummaries, key = { it.month.toString() }) { summary ->
+                        DepositSummaryRow(title = "${summary.month}", subtitle = "${summary.itemCount} 件待付", amount = summary.totalBalance)
+                    }
+                } else {
+                    items(uiState.depositSeriesSummaries, key = { it.series }) { summary ->
+                        DepositSummaryRow(title = summary.series, subtitle = "${summary.itemCount} 件待付", amount = summary.totalBalance)
+                    }
+                }
+                item {
+                    Text("待付明细", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+                items(uiState.visibleItems, key = { "deposit-${it.id}" }) { item ->
                     DepositItemRow(item = item)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DepositSummaryRow(title: String, subtitle: String, amount: BigDecimal) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(title, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = SoftGrayText, style = MaterialTheme.typography.bodySmall)
+            }
+            Text(amount.moneyText(), color = PinkAccent, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -1026,12 +1156,13 @@ private fun BatchActionBar(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreateWardrobeItemSheet(
+private fun WardrobeItemEditorSheet(
     viewModel: WardrobeHomeViewModel,
+    existing: WardrobeItem?,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
-    var draft by remember { mutableStateOf(WardrobeEditorDraft()) }
+    var draft by remember(existing?.id) { mutableStateOf(existing?.toEditorDraft() ?: WardrobeEditorDraft()) }
     var showNameError by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -1054,11 +1185,11 @@ private fun CreateWardrobeItemSheet(
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onDismiss) { Text("取消") }
-                Text("手动创建", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (existing == null) "手动创建" else "编辑衣物", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 TextButton(
                     onClick = {
                         showNameError = draft.name.isBlank()
-                        if (!showNameError && viewModel.saveDraft(draft)) {
+                        if (!showNameError && viewModel.saveDraft(draft, existing)) {
                             onSaved()
                         }
                     },
@@ -1102,7 +1233,19 @@ private fun CreateWardrobeItemSheet(
                 DraftTextField("尺码（逗号分隔，如：S,M,L）", draft.sizes, "例如：S,M,L") { draft = draft.copy(sizes = it) }
                 DraftTextField("衣长（如：90cm,100cm）", draft.length, "例如：90cm") { draft = draft.copy(length = it) }
                 DraftTextField("状态（如：全新,95新）", draft.condition, "例如：全新") { draft = draft.copy(condition = it) }
+                DraftTextField("标签（逗号分隔，如：茶会,通勤）", draft.tags, "例如：茶会,通勤") { draft = draft.copy(tags = it) }
                 DraftTextField("小物（逗号分隔，如：BNT,发箍KC,发带）", draft.accessories, "例如：BNT,发箍KC") { draft = draft.copy(accessories = it) }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DraftTextField("小物明细", draft.accessoryItemName, "例如：KC", Modifier.weight(1f)) {
+                        draft = draft.copy(accessoryItemName = it)
+                    }
+                    DraftTextField("明细价", draft.accessoryItemPrice, "0", Modifier.weight(1f)) {
+                        draft = draft.copy(accessoryItemPrice = it)
+                    }
+                    DraftTextField("数量", draft.accessoryItemQuantity, "1", Modifier.weight(0.7f)) {
+                        draft = draft.copy(accessoryItemQuantity = it)
+                    }
+                }
             }
 
             FormSection(title = "价格信息") {
@@ -1149,6 +1292,94 @@ private fun CreateWardrobeItemSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WardrobeItemDetailSheet(
+    item: WardrobeItem,
+    viewModel: WardrobeHomeViewModel,
+    onDismiss: () -> Unit,
+    onSoftDelete: () -> Unit,
+) {
+    var showEditSheet by rememberSaveable(item.id) { mutableStateOf(false) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 720.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onDismiss) { Text("关闭") }
+                Text("衣物详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showEditSheet = true }) {
+                    Icon(Icons.Filled.Edit, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("编辑")
+                }
+            }
+
+            WardrobeImage(
+                imagePath = item.imagePaths.firstOrNull()?.let(viewModel::imageFilePath),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .clip(RoundedCornerShape(22.dp)),
+            )
+            Text(item.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            DetailLine("品牌", item.brand.orEmpty().ifBlank { "未填写" })
+            DetailLine("类型", item.category)
+            DetailLine("颜色", item.colors.ifBlank { item.color.orEmpty() }.ifBlank { "未填写" })
+            DetailLine("尺码/衣长", listOf(item.sizes, item.length).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "未填写" })
+            DetailLine("成色", item.condition)
+            DetailLine("标签", item.tags.joinToString("，").ifBlank { "未填写" })
+            DetailLine("小物", item.accessories.ifBlank { "未填写" })
+            if (item.accessoryItems.isNotEmpty()) {
+                item.accessoryItems.forEach { accessory ->
+                    DetailLine("小物明细", "${accessory.name} x${accessory.quantity} · ${accessory.totalPrice.moneyText()}")
+                }
+            }
+            DetailLine("总价", item.inventoryTotalPrice.moneyText())
+            DetailLine("库存", item.stock.toString())
+            if (item.isDepositPlan) {
+                DetailLine("心愿尾款", "定金 ${item.totalDeposit.moneyText()} · 尾款 ${item.totalBalance.moneyText()}")
+                DetailLine("尾款日期", listOfNotNull(item.finalPaymentStartDate, item.finalPaymentEndDate).joinToString(" ~ ").ifBlank { "未填写" })
+            }
+            DetailLine("备注", item.note.ifBlank { "未填写" })
+            OutlinedButton(onClick = onSoftDelete, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Delete, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("移入回收站")
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (showEditSheet) {
+        WardrobeItemEditorSheet(
+            viewModel = viewModel,
+            existing = item,
+            onDismiss = { showEditSheet = false },
+            onSaved = { showEditSheet = false },
+        )
+    }
+}
+
+@Composable
+private fun DetailLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = SoftGrayText)
+        Text(
+            value,
+            modifier = Modifier.weight(1f).padding(start = 16.dp),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 @Composable
 private fun FormSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
@@ -1189,6 +1420,7 @@ private fun DraftTextField(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterSheet(
+    uiState: WardrobeHomeUiState,
     current: WardrobeFilterState,
     onDismiss: () -> Unit,
     onApply: (WardrobeFilterState) -> Unit,
@@ -1210,8 +1442,25 @@ private fun FilterSheet(
             DraftTextField("类型", draft.type, "例如：JSK") { draft = draft.copy(type = it) }
             DraftTextField("颜色", draft.color, "例如：粉色") { draft = draft.copy(color = it) }
             DraftTextField("尺码", draft.size, "例如：M") { draft = draft.copy(size = it) }
+            DraftTextField("衣长", draft.length, "例如：90cm") { draft = draft.copy(length = it) }
             DraftTextField("状态", draft.condition, "例如：全新") { draft = draft.copy(condition = it) }
             DraftTextField("小物", draft.accessory, "例如：BNT") { draft = draft.copy(accessory = it) }
+            DraftTextField("标签", draft.tag, "例如：茶会") { draft = draft.copy(tag = it) }
+            Text("可输入：无标签、无品牌、无类型、无颜色、无尺码、无衣长、无成色、无小物", color = SoftGrayText, style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("无品牌", "无标签", "无小物").forEach { token ->
+                    AssistChip(onClick = {
+                        draft = when (token) {
+                            "无品牌" -> draft.copy(brand = token)
+                            "无标签" -> draft.copy(tag = token)
+                            else -> draft.copy(accessory = token)
+                        }
+                    }, label = { Text(token) })
+                }
+            }
+            if (uiState.allItems.isNotEmpty()) {
+                Text("当前可筛选 ${uiState.allItems.size} 件衣物", color = SoftGrayText, style = MaterialTheme.typography.bodySmall)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilterChip(
                     selected = draft.depositOnly,
@@ -1225,6 +1474,245 @@ private fun FilterSheet(
                 Button(onClick = { onApply(draft) }) {
                     Text("应用筛选")
                 }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BatchImportSheet(
+    viewModel: WardrobeHomeViewModel,
+    onDismiss: () -> Unit,
+) {
+    var seriesName by rememberSaveable { mutableStateOf("") }
+    var imageFileNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val coroutineScope = rememberCoroutineScope()
+    val multiPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(30)) { uris ->
+        if (uris.isNotEmpty()) {
+            coroutineScope.launch {
+                imageFileNames = imageFileNames + uris.map { uri -> viewModel.importImage(uri) }
+            }
+        }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 720.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onDismiss) { Text("取消") }
+                Text("批量导入", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                TextButton(
+                    enabled = imageFileNames.isNotEmpty(),
+                    onClick = {
+                        imageFileNames.forEachIndexed { index, fileName ->
+                            viewModel.saveDraft(
+                                WardrobeEditorDraft(
+                                    imageFileNames = listOf(fileName),
+                                    name = listOf(seriesName.ifBlank { "未命名裙装" }, (index + 1).toString()).joinToString(" "),
+                                    types = "裙装",
+                                    purchaseDate = LocalDate.now().toString(),
+                                ),
+                            )
+                        }
+                        onDismiss()
+                    },
+                ) {
+                    Text("导入")
+                }
+            }
+            DraftTextField("系列名/批量前缀", seriesName, "例如：梦幻下午茶") { seriesName = it }
+            OutlinedButton(
+                onClick = {
+                    multiPicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Filled.Image, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("选择多张图片")
+            }
+            if (imageFileNames.isEmpty()) {
+                EmptyState(
+                    title = "还没有选择图片",
+                    description = "会使用 Android Photo Picker，多选后先复制到 App 私有目录再建衣物。",
+                    onCreateClick = {
+                        multiPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                )
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.height(320.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(imageFileNames, key = { it }) { fileName ->
+                        Box {
+                            WardrobeImage(
+                                imagePath = viewModel.imageFilePath(fileName),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(14.dp)),
+                            )
+                            IconButton(
+                                onClick = { imageFileNames = imageFileNames - fileName },
+                                modifier = Modifier.align(Alignment.TopEnd),
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "移除", tint = PinkAccent)
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RecycleBinSheet(
+    items: List<WardrobeItem>,
+    onDismiss: () -> Unit,
+    onRestore: (List<Long>) -> Unit,
+    onHardDelete: (List<Long>) -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 720.dp)
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("回收站", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                TextButton(onClick = onDismiss) { Text("完成") }
+            }
+            if (items.isEmpty()) {
+                EmptyState(
+                    title = "回收站为空",
+                    description = "批量删除和详情删除会先进入这里，之后可恢复或彻底删除。",
+                    onCreateClick = onDismiss,
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { onRestore(items.map { it.id }) }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Restore, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("全部恢复")
+                    }
+                    OutlinedButton(onClick = { onHardDelete(items.map { it.id }) }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Delete, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("全部删除")
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier.height(460.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(items, key = { it.id }) { item ->
+                        Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = PinkSurface)) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(item.name, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "删除时间 ${item.trashedAtEpochMillis ?: "-"}",
+                                        color = SoftGrayText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                TextButton(onClick = { onRestore(listOf(item.id)) }) { Text("恢复") }
+                                TextButton(onClick = { onHardDelete(listOf(item.id)) }) { Text("删除") }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DepositReminderSheet(
+    uiState: WardrobeHomeUiState,
+    onDismiss: () -> Unit,
+    onSave: (Boolean, String, String, List<WardrobeItem>) -> Unit,
+) {
+    var enabled by rememberSaveable(uiState.depositReminderEnabled) { mutableStateOf(uiState.depositReminderEnabled) }
+    var daysBefore by rememberSaveable(uiState.depositReminderDaysBefore) { mutableStateOf(uiState.depositReminderDaysBefore) }
+    var reminderTime by rememberSaveable(uiState.depositReminderTime) { mutableStateOf(uiState.depositReminderTime) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 720.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("尾款提醒", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                TextButton(onClick = onDismiss) { Text("关闭") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("本地通知", fontWeight = FontWeight.Bold)
+                    Text("只在本机安排 AlarmManager 通知，不接云端推送。", color = SoftGrayText, style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = enabled, onCheckedChange = { enabled = it })
+            }
+            DraftTextField("提前天数", daysBefore, "例如：7,3,1") { daysBefore = it }
+            DraftTextField("提醒时间", reminderTime, "HH:mm") { reminderTime = it }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                OutlinedButton(
+                    onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Notifications, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("允许通知权限")
+                }
+            }
+            Text("当前有 ${uiState.allItems.count { it.isDepositPlan }} 个心愿尾款项目，最近已安排 ${uiState.scheduledReminderCount} 个提醒。", color = SoftGrayText)
+            if (uiState.depositMonthSummaries.isNotEmpty()) {
+                Text("最近月统计", fontWeight = FontWeight.Bold)
+                uiState.depositMonthSummaries.take(6).forEach { summary ->
+                    DetailLine("${summary.month}", "${summary.itemCount} 件 · ${summary.totalBalance.moneyText()}")
+                }
+            }
+            Button(
+                onClick = {
+                    onSave(enabled, daysBefore, reminderTime, uiState.allItems)
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Filled.Save, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("保存提醒设置")
             }
             Spacer(Modifier.height(24.dp))
         }

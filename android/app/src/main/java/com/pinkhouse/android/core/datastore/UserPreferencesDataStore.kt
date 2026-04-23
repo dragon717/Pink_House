@@ -20,6 +20,9 @@ class UserPreferencesDataStore(
             wardrobeSortOption = values[Keys.WardrobeSortOption] ?: "createdAtDesc",
             wardrobeHomeTab = values[Keys.WardrobeHomeTab] ?: "wardrobe",
             depositDisplayMode = values[Keys.DepositDisplayMode] ?: "detail",
+            depositReminderEnabled = values[Keys.DepositReminderEnabled] ?: false,
+            depositReminderDaysBefore = values[Keys.DepositReminderDaysBefore] ?: "7,3,1",
+            depositReminderTime = values[Keys.DepositReminderTime] ?: "09:00",
             soundEnabled = values[Keys.SoundEnabled] ?: true,
             hapticsEnabled = values[Keys.HapticsEnabled] ?: true,
             languageTag = values[Keys.LanguageTag] ?: "system",
@@ -50,12 +53,33 @@ class UserPreferencesDataStore(
         }
     }
 
+    suspend fun setDepositReminderEnabled(enabled: Boolean) {
+        context.userPreferencesStore.edit { values ->
+            values[Keys.DepositReminderEnabled] = enabled
+        }
+    }
+
+    suspend fun setDepositReminderDaysBefore(daysBefore: String) {
+        context.userPreferencesStore.edit { values ->
+            values[Keys.DepositReminderDaysBefore] = daysBefore
+        }
+    }
+
+    suspend fun setDepositReminderTime(time: String) {
+        context.userPreferencesStore.edit { values ->
+            values[Keys.DepositReminderTime] = time
+        }
+    }
+
     private object Keys {
         val DarkThemeMode = stringPreferencesKey("dark_theme_mode")
         val WardrobeViewMode = stringPreferencesKey("wardrobe_view_mode")
         val WardrobeSortOption = stringPreferencesKey("wardrobe_sort_option")
         val WardrobeHomeTab = stringPreferencesKey("wardrobe_home_tab")
         val DepositDisplayMode = stringPreferencesKey("deposit_display_mode")
+        val DepositReminderEnabled = booleanPreferencesKey("deposit_reminder_enabled")
+        val DepositReminderDaysBefore = stringPreferencesKey("deposit_reminder_days_before")
+        val DepositReminderTime = stringPreferencesKey("deposit_reminder_time")
         val SoundEnabled = booleanPreferencesKey("sound_enabled")
         val HapticsEnabled = booleanPreferencesKey("haptics_enabled")
         val LanguageTag = stringPreferencesKey("language_tag")

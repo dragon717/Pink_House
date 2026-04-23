@@ -126,19 +126,20 @@ keyPassword=your_key_password
 
 - `MainActivity` 使用 Compose 启动 `PinkHouseApp`。
 - `PinkHouseTheme` 提供 Material 3 浅色/深色基础配色。
-- 底部导航包含 `Wardrobe`、`Pet`、`World`、`Wealth`、`VIP`、`Settings` 六个入口。
-- `PinkHouseDatabase` 已建立 Room v1 数据库和 `wardrobe_item` 最小表。
+- 底部导航已对齐 iOS 为 `衣橱`、`House`、`我`、`萌宠对话` 四个入口。
+- `PinkHouseDatabase` 已升级到 Room v3，`wardrobe_item` 支持图片、标签、小物、心愿尾款、软删除、回收站和详情编辑所需字段。
 - `UserPreferencesDataStore` 已预留主题、衣橱视图模式、音效、震动、语言设置。
 
 ## 衣橱 MVP 状态
 
-当前衣橱页已经从占位页推进到本地 Room 驱动的 MVP 雏形：
+当前衣橱页已经从占位页推进到本地 Room 驱动的衣橱闭环雏形：
 
 - `WardrobeItemEntity` 与 `WardrobeItem` 已通过 mapper 转换，价格以 cents 存储、日期以 epoch day 存储、状态以枚举名存储。
-- `WardrobeItemDao` 支持观察未删除衣物、按名称模糊搜索、插入、批量插入、更新和软删除。
+- `WardrobeItemDao` 支持观察未删除衣物、详情读取、回收站读取、插入、批量插入、更新、软删除、恢复和彻底删除。
 - `WardrobeRepository` / `RoomWardrobeRepository` 已建立，业务入口通过 `GetWardrobeItems`、`AddSampleWardrobeItems` usecase 暴露。
 - 暂未引入 Hilt；`PinkHouseApplication` 持有简单 `AppContainer`，再传入 `PinkHouseApp` 和 `WardrobeRoute`。
-- `WardrobeRoute` 支持列表展示、空态、搜索输入框和“添加示例数据/衣物”按钮，可用于验证本地持久化链路。
+- `WardrobeRoute` 支持少女衣橱/心愿尾款切换、排序、筛选、布局切换、详情、编辑、手动创建、批量导入、批量软删除、回收站和本地尾款提醒设置。
+- 原项目开屏、Logo、猫咪探头、宠物头像、小世界/VIP/喵金币等资产已迁入 Android 资源目录，并由 `PinkHouseAssets` 统一引用。
 
 首次 Android Studio Sync 后重点关注：
 
@@ -153,3 +154,4 @@ keyPassword=your_key_password
 - 国内渠道合规需要补隐私政策/用户协议弹窗、个人信息收集清单、通知权限解释。
 - Weather 需求在 PRD 中存在“需要粗略定位”和“权限不申请位置”的冲突，正式实现前需要产品侧确认策略。
 - Room schema 输出目录为 `app/schemas/`，后续数据库变更要提交 schema 并补 migration。
+- 视觉/交互复刻要求使用 Computer Use 对照 iOS Simulator 与 Android Studio 模拟器，不能只凭代码完成验收。

@@ -1,0 +1,226 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "58c7b99aba845ba446476d442bdd4b56",
+    "entities": [
+      {
+        "tableName": "wardrobe_item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT NOT NULL, `brand` TEXT, `tagNamesJson` TEXT NOT NULL, `color` TEXT, `colors` TEXT NOT NULL, `sizes` TEXT NOT NULL, `length` TEXT NOT NULL, `condition` TEXT NOT NULL, `accessories` TEXT NOT NULL, `accessoryItemsJson` TEXT NOT NULL, `imagePathsJson` TEXT NOT NULL, `sizeChartImagePathsJson` TEXT NOT NULL, `priceChartImagePathsJson` TEXT NOT NULL, `originalPriceCents` INTEGER NOT NULL, `priceCents` INTEGER, `depositCents` INTEGER NOT NULL, `balanceCents` INTEGER NOT NULL, `accessoriesPriceCents` INTEGER NOT NULL, `stock` INTEGER NOT NULL, `purchaseDateEpochDay` INTEGER, `depositDateEpochDay` INTEGER, `isDepositPlan` INTEGER NOT NULL, `finalPaymentStartEpochDay` INTEGER, `finalPaymentEndEpochDay` INTEGER, `note` TEXT NOT NULL, `sortIndex` INTEGER NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `updatedAtEpochMillis` INTEGER NOT NULL, `trashedAtEpochMillis` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uuid",
+            "columnName": "uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brand",
+            "columnName": "brand",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tagNamesJson",
+            "columnName": "tagNamesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "colors",
+            "columnName": "colors",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sizes",
+            "columnName": "sizes",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "length",
+            "columnName": "length",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "condition",
+            "columnName": "condition",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accessories",
+            "columnName": "accessories",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accessoryItemsJson",
+            "columnName": "accessoryItemsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "imagePathsJson",
+            "columnName": "imagePathsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sizeChartImagePathsJson",
+            "columnName": "sizeChartImagePathsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceChartImagePathsJson",
+            "columnName": "priceChartImagePathsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalPriceCents",
+            "columnName": "originalPriceCents",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceCents",
+            "columnName": "priceCents",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "depositCents",
+            "columnName": "depositCents",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "balanceCents",
+            "columnName": "balanceCents",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accessoriesPriceCents",
+            "columnName": "accessoriesPriceCents",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stock",
+            "columnName": "stock",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "purchaseDateEpochDay",
+            "columnName": "purchaseDateEpochDay",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "depositDateEpochDay",
+            "columnName": "depositDateEpochDay",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isDepositPlan",
+            "columnName": "isDepositPlan",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finalPaymentStartEpochDay",
+            "columnName": "finalPaymentStartEpochDay",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "finalPaymentEndEpochDay",
+            "columnName": "finalPaymentEndEpochDay",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortIndex",
+            "columnName": "sortIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updatedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trashedAtEpochMillis",
+            "columnName": "trashedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '58c7b99aba845ba446476d442bdd4b56')"
+    ]
+  }
+}

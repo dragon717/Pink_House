@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pinkhouse.android.core.datastore.UserPreferencesDataStore
 import com.pinkhouse.android.core.media.WardrobeImageStore
+import com.pinkhouse.android.core.notification.DepositReminderScheduler
+import com.pinkhouse.android.domain.model.WardrobeAccessoryItem
 import com.pinkhouse.android.domain.model.WardrobeItem
 import com.pinkhouse.android.domain.model.WardrobeItemStatus
 import com.pinkhouse.android.domain.repository.WardrobeRepository
@@ -72,12 +74,14 @@ data class WardrobeFilterState(
     val type: String = "",
     val color: String = "",
     val size: String = "",
+    val length: String = "",
     val condition: String = "",
     val accessory: String = "",
+    val tag: String = "",
     val depositOnly: Boolean = false,
 ) {
     val activeCount: Int
-        get() = listOf(brand, type, color, size, condition, accessory).count { it.isNotBlank() } +
+        get() = listOf(brand, type, color, size, length, condition, accessory, tag).count { it.isNotBlank() } +
             if (depositOnly) 1 else 0
 }
 
@@ -91,6 +95,10 @@ data class WardrobeEditorDraft(
     val length: String = "",
     val condition: String = "全新",
     val accessories: String = "",
+    val tags: String = "",
+    val accessoryItemName: String = "",
+    val accessoryItemPrice: String = "",
+    val accessoryItemQuantity: String = "1",
     val originalPrice: String = "",
     val price: String = "",
     val deposit: String = "",
@@ -127,6 +135,14 @@ data class WardrobeHomeUiState(
     val isSelectionMode: Boolean = false,
     val selectedItemIds: Set<Long> = emptySet(),
     val message: String? = null,
+    val selectedItem: WardrobeItem? = null,
+    val trashedItems: List<WardrobeItem> = emptyList(),
+    val depositMonthSummaries: List<DepositMonthSummary> = emptyList(),
+    val depositSeriesSummaries: List<DepositSeriesSummary> = emptyList(),
+    val depositReminderEnabled: Boolean = false,
+    val depositReminderDaysBefore: String = "7,3,1",
+    val depositReminderTime: String = "09:00",
+    val scheduledReminderCount: Int = 0,
 ) {
     val allVisibleSelected: Boolean
         get() = visibleItems.isNotEmpty() && visibleItems.all { selectedItemIds.contains(it.id) }
@@ -139,6 +155,8 @@ private data class WardrobeRuntimeState(
     val isSelectionMode: Boolean = false,
     val selectedItemIds: Set<Long> = emptySet(),
     val message: String? = null,
+    val selectedItemId: Long? = null,
+    val scheduledReminderCount: Int = 0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -147,27 +165,43 @@ class WardrobeHomeViewModel(
     private val batchSoftDeleteWardrobeItems: BatchSoftDeleteWardrobeItems,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val wardrobeImageStore: WardrobeImageStore,
+    private val depositReminderScheduler: DepositReminderScheduler,
 ) : ViewModel() {
     private val runtimeState = MutableStateFlow(WardrobeRuntimeState())
 
     private val items = runtimeState
         .map { it.searchQuery }
         .distinctUntilChanged()
-        .flatMapLatest { query -> wardrobeRepository.observeItems(query) }
+        .flatMapLatest { wardrobeRepository.observeItems() }
+
+    private val selectedItem = runtimeState
+        .map { it.selectedItemId }
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            if (id == null) {
+                kotlinx.coroutines.flow.flowOf(null)
+            } else {
+                wardrobeRepository.observeItem(id)
+            }
+        }
+
+    private val trashedItems = wardrobeRepository.observeTrashedItems()
 
     val uiState = combine(
         items,
         userPreferencesDataStore.preferences,
         runtimeState,
-    ) { sourceItems, preferences, runtime ->
+        selectedItem,
+        trashedItems,
+    ) { sourceItems, preferences, runtime, selected, trashed ->
         val tab = WardrobeHomeTab.fromRaw(preferences.wardrobeHomeTab)
         val sort = WardrobeSortOption.fromRaw(preferences.wardrobeSortOption)
         val layout = WardrobeLayoutMode.fromRaw(preferences.wardrobeViewMode)
         val depositDisplay = DepositDisplayMode.fromRaw(preferences.depositDisplayMode)
-        val filtered = sourceItems
-            .filter { item -> item.matches(runtime.filterState) }
+        val searched = WardrobeBusinessLogic.searchItems(sourceItems, runtime.searchQuery)
+        val filtered = WardrobeBusinessLogic.filterItems(searched, runtime.filterState)
             .let { list -> if (tab == WardrobeHomeTab.DepositPlan) list.filter { it.isDepositPlan } else list }
-            .sortedWith(sort.comparator())
+            .let { list -> WardrobeBusinessLogic.sortItems(list, sort) }
         WardrobeHomeUiState(
             homeTab = tab,
             sortOption = sort,
@@ -182,6 +216,14 @@ class WardrobeHomeViewModel(
             isSelectionMode = runtime.isSelectionMode,
             selectedItemIds = runtime.selectedItemIds.intersect(filtered.map { it.id }.toSet()),
             message = runtime.message,
+            selectedItem = selected,
+            trashedItems = trashed,
+            depositMonthSummaries = WardrobeBusinessLogic.monthlyDepositSummaries(sourceItems),
+            depositSeriesSummaries = WardrobeBusinessLogic.seriesDepositSummaries(sourceItems),
+            depositReminderEnabled = preferences.depositReminderEnabled,
+            depositReminderDaysBefore = preferences.depositReminderDaysBefore,
+            depositReminderTime = preferences.depositReminderTime,
+            scheduledReminderCount = runtime.scheduledReminderCount,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -264,6 +306,53 @@ class WardrobeHomeViewModel(
         }
     }
 
+    fun selectItem(itemId: Long?) {
+        runtimeState.update { it.copy(selectedItemId = itemId) }
+    }
+
+    fun softDeleteItem(id: Long) {
+        viewModelScope.launch {
+            wardrobeRepository.softDeleteItem(id)
+            runtimeState.update { it.copy(selectedItemId = null, message = "已移入回收站") }
+        }
+    }
+
+    fun restoreItems(ids: List<Long>) {
+        viewModelScope.launch {
+            wardrobeRepository.restoreItems(ids)
+            runtimeState.update { it.copy(message = "已恢复 ${ids.size} 件衣物") }
+        }
+    }
+
+    fun permanentlyDeleteItems(ids: List<Long>) {
+        viewModelScope.launch {
+            wardrobeRepository.permanentlyDeleteItems(ids)
+            runtimeState.update { it.copy(message = "已彻底删除 ${ids.size} 件衣物") }
+        }
+    }
+
+    fun saveReminderSettings(enabled: Boolean, daysBefore: String, time: String, items: List<WardrobeItem>) {
+        viewModelScope.launch {
+            userPreferencesDataStore.setDepositReminderEnabled(enabled)
+            userPreferencesDataStore.setDepositReminderDaysBefore(daysBefore)
+            userPreferencesDataStore.setDepositReminderTime(time)
+            val days = daysBefore.toReminderDays()
+            val reminderTime = time.toReminderTime()
+            val scheduled = if (enabled) {
+                depositReminderScheduler.scheduleDepositReminders(items, days, reminderTime)
+            } else {
+                depositReminderScheduler.cancelDepositReminders(items, days)
+                0
+            }
+            runtimeState.update {
+                it.copy(
+                    scheduledReminderCount = scheduled,
+                    message = if (enabled) "已安排 $scheduled 个本地提醒" else "已关闭尾款提醒",
+                )
+            }
+        }
+    }
+
     suspend fun importImage(uri: Uri): String {
         return wardrobeImageStore.import(uri)
     }
@@ -273,6 +362,10 @@ class WardrobeHomeViewModel(
     }
 
     fun saveDraft(draft: WardrobeEditorDraft): Boolean {
+        return saveDraft(draft, existing = null)
+    }
+
+    fun saveDraft(draft: WardrobeEditorDraft, existing: WardrobeItem?): Boolean {
         val trimmedName = draft.name.trim()
         if (trimmedName.isBlank()) {
             runtimeState.update { it.copy(message = "请先填写裙装名称") }
@@ -280,17 +373,22 @@ class WardrobeHomeViewModel(
         }
 
         val item = WardrobeItem(
-            id = 0,
+            id = existing?.id ?: 0,
+            uuid = existing?.uuid.orEmpty(),
             name = trimmedName,
             category = draft.types.firstToken().ifBlank { "裙装" },
             brand = draft.brand.trim().ifBlank { null },
+            tags = draft.tags.splitTokens(),
             color = draft.colors.firstToken().ifBlank { null },
             colors = draft.colors.trim(),
             sizes = draft.sizes.trim(),
             length = draft.length.trim(),
             condition = draft.condition.trim().ifBlank { "全新" },
             accessories = draft.accessories.trim(),
+            accessoryItems = draft.toAccessoryItems(),
             imagePaths = draft.imageFileNames,
+            sizeChartImagePaths = existing?.sizeChartImagePaths.orEmpty(),
+            priceChartImagePaths = existing?.priceChartImagePaths.orEmpty(),
             originalPrice = draft.originalPrice.toMoney(),
             price = draft.price.toMoney(),
             deposit = draft.deposit.toMoney(),
@@ -303,13 +401,19 @@ class WardrobeHomeViewModel(
             finalPaymentStartDate = draft.finalPaymentStartDate.toLocalDateOrNull(),
             finalPaymentEndDate = draft.finalPaymentEndDate.toLocalDateOrNull(),
             note = draft.note.trim(),
-            sortIndex = System.currentTimeMillis(),
+            sortIndex = existing?.sortIndex ?: System.currentTimeMillis(),
             status = if (draft.isDepositPlan) WardrobeItemStatus.Reserved else WardrobeItemStatus.Owned,
+            createdAtEpochMillis = existing?.createdAtEpochMillis ?: 0,
+            updatedAtEpochMillis = existing?.updatedAtEpochMillis ?: 0,
         )
 
         viewModelScope.launch {
-            wardrobeRepository.addItem(item)
-            runtimeState.update { it.copy(message = "已保存到衣橱") }
+            if (existing == null) {
+                wardrobeRepository.addItem(item)
+            } else {
+                wardrobeRepository.updateItem(item)
+            }
+            runtimeState.update { it.copy(message = if (existing == null) "已保存到衣橱" else "已更新衣物") }
         }
         return true
     }
@@ -319,21 +423,7 @@ class WardrobeHomeViewModel(
     }
 }
 
-private fun WardrobeItem.matches(filter: WardrobeFilterState): Boolean {
-    return matchesText(brand.orEmpty(), filter.brand) &&
-        matchesText(category, filter.type) &&
-        matchesText(colors.ifBlank { color.orEmpty() }, filter.color) &&
-        matchesText(sizes, filter.size) &&
-        matchesText(condition, filter.condition) &&
-        matchesText(accessories, filter.accessory) &&
-        (!filter.depositOnly || isDepositPlan)
-}
-
-private fun matchesText(value: String, query: String): Boolean {
-    return query.isBlank() || value.contains(query.trim(), ignoreCase = true)
-}
-
-private fun WardrobeSortOption.comparator(): Comparator<WardrobeItem> {
+internal fun WardrobeSortOption.comparator(): Comparator<WardrobeItem> {
     return when (this) {
         WardrobeSortOption.CreatedAtDesc -> compareByDescending { it.sortIndex }
         WardrobeSortOption.PriceAsc -> compareBy { it.inventoryTotalPrice }
@@ -368,6 +458,26 @@ private fun String.firstToken(): String {
         .orEmpty()
 }
 
+private fun String.splitTokens(): List<String> {
+    return replace("，", ",")
+        .replace("、", ",")
+        .split(",")
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+}
+
+private fun WardrobeEditorDraft.toAccessoryItems(): List<WardrobeAccessoryItem> {
+    val itemName = accessoryItemName.trim()
+    if (itemName.isBlank()) return emptyList()
+    return listOf(
+        WardrobeAccessoryItem(
+            name = itemName,
+            price = accessoryItemPrice.toMoney(),
+            quantity = accessoryItemQuantity.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+        ),
+    )
+}
+
 private fun String.toMoney(): BigDecimal {
     return trim()
         .takeIf { it.isNotBlank() }
@@ -379,4 +489,47 @@ private fun String.toLocalDateOrNull(): LocalDate? {
     return trim()
         .takeIf { it.isNotBlank() }
         ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+}
+
+private fun String.toReminderDays(): List<Int> {
+    return splitTokens()
+        .mapNotNull { it.toIntOrNull() }
+        .filter { it >= 0 }
+        .ifEmpty { DepositReminderScheduler.DEFAULT_DAYS }
+}
+
+private fun String.toReminderTime(): java.time.LocalTime {
+    return runCatching { java.time.LocalTime.parse(trim()) }
+        .getOrDefault(java.time.LocalTime.of(9, 0))
+}
+
+fun WardrobeItem.toEditorDraft(): WardrobeEditorDraft {
+    val firstAccessory = accessoryItems.firstOrNull()
+    return WardrobeEditorDraft(
+        imageFileNames = imagePaths,
+        name = name,
+        brand = brand.orEmpty(),
+        types = category,
+        colors = colors.ifBlank { color.orEmpty() },
+        sizes = sizes,
+        length = length,
+        condition = condition,
+        accessories = accessories,
+        tags = tags.joinToString(","),
+        accessoryItemName = firstAccessory?.name.orEmpty(),
+        accessoryItemPrice = firstAccessory?.price?.stripTrailingZeros()?.toPlainString().orEmpty(),
+        accessoryItemQuantity = firstAccessory?.quantity?.toString() ?: "1",
+        originalPrice = originalPrice.stripTrailingZeros().toPlainString(),
+        price = price?.stripTrailingZeros()?.toPlainString().orEmpty(),
+        deposit = deposit.stripTrailingZeros().toPlainString(),
+        balance = balance.stripTrailingZeros().toPlainString(),
+        accessoriesPrice = accessoriesPrice.stripTrailingZeros().toPlainString(),
+        stock = stock.toString(),
+        purchaseDate = purchaseDate?.toString().orEmpty(),
+        depositDate = depositDate?.toString().orEmpty(),
+        isDepositPlan = isDepositPlan,
+        finalPaymentStartDate = finalPaymentStartDate?.toString().orEmpty(),
+        finalPaymentEndDate = finalPaymentEndDate?.toString().orEmpty(),
+        note = note,
+    )
 }
