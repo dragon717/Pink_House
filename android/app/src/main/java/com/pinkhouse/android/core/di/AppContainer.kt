@@ -1,13 +1,18 @@
 package com.pinkhouse.android.core.di
 
+import com.pinkhouse.android.core.datastore.UserPreferencesDataStore
+import com.pinkhouse.android.core.media.WardrobeImageStore
 import com.pinkhouse.android.data.local.PinkHouseDatabase
 import com.pinkhouse.android.data.repository.RoomWardrobeRepository
 import com.pinkhouse.android.domain.repository.WardrobeRepository
 import com.pinkhouse.android.domain.usecase.AddSampleWardrobeItems
+import com.pinkhouse.android.domain.usecase.BatchSoftDeleteWardrobeItems
 import com.pinkhouse.android.domain.usecase.GetWardrobeItems
 
 class AppContainer(
     database: PinkHouseDatabase,
+    val userPreferencesDataStore: UserPreferencesDataStore,
+    val wardrobeImageStore: WardrobeImageStore,
 ) {
     private val wardrobeRepository: WardrobeRepository by lazy {
         RoomWardrobeRepository(database.wardrobeItemDao())
@@ -20,4 +25,11 @@ class AppContainer(
     val addSampleWardrobeItems: AddSampleWardrobeItems by lazy {
         AddSampleWardrobeItems(wardrobeRepository)
     }
+
+    val batchSoftDeleteWardrobeItems: BatchSoftDeleteWardrobeItems by lazy {
+        BatchSoftDeleteWardrobeItems(wardrobeRepository)
+    }
+
+    val wardrobeRepositoryForViewModel: WardrobeRepository
+        get() = wardrobeRepository
 }

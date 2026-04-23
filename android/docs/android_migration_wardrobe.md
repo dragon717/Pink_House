@@ -2,7 +2,7 @@
 
 > 本文记录 `feature/wardrobe/**` 从 iOS SwiftUI 版本（`Pink_House/Pink_House/Views/Wardrobe/WardrobeView.swift` 等）迁移到 Android Jetpack Compose 的进度与差异。业务以 SwiftUI 为准；规范参考 Android 官方文档 / Material 3 / Compose Guidelines。与鸿蒙侧 `harmony_next/docs/harmony_migration_wardrobe.md` 对标，差异集中在无 GMS / Scoped Storage / Room schema 几类。
 
-> **当前状态**：M1 骨架已落（`WardrobeRoute.kt`、`WardrobeItemEntity`、`WardrobeItemDao`、`RoomWardrobeRepository`、`GetWardrobeItems` / `AddSampleWardrobeItems` UseCase）。下述表格为目标状态清单，真迁移推进后按"已迁移 / 差异"分段填写。
+> **当前状态**：M2 衣橱闭环已落。`WardrobeRoute.kt` 已替换为 `衣橱 / 心愿尾款` 双页 Compose 复刻；`WardrobeHomeViewModel` 负责 Room + DataStore + 单向 UI 状态；Room `wardrobe_item` 已升级到 v2 并保留 v1→v2 Migration；手动创建、图片导入、搜索、筛选、排序、布局切换、编辑选择态、批量软删除均已接入。
 
 ## 一、TopBar 顶栏
 
@@ -10,13 +10,13 @@
 
 | 功能 | iOS 原型 | Android 实现要点 |
 | --- | --- | --- |
-| 5 常驻圆按：排序 / 筛选 / 视图 / 更多 / 添加 | `WardrobeView.toolbar { .. }` 五按钮 | `TopAppBar` actions + 自定义 `RoundIconButton` Composable，40×40，Material Icons |
-| 排序 Sheet | `SortOptionsSheet` | `ModalBottomSheet` + `SheetValue.Expanded`，`wrapContentHeight` |
-| 筛选 Sheet | `FilterView` 多选 Chip | `ModalBottomSheet` + `FilterChip`（Material3） |
-| 视图切换 Sheet | 视图 ActionSheet | `ModalBottomSheet` + `RadioButton` 列表 |
-| 更多菜单：搜索 / 编辑 / 调整顺序 | 原 iOS 散落在工具栏+编辑模式切换 | `DropdownMenu` + `DropdownMenuItem` |
-| 添加菜单：手动创建 / 批量导入 | `AddSheet` ActionSheet | `DropdownMenu` 分别进入 `CreateSheet` / `BatchImportSheet` |
-| 编辑模式顶栏 | `isSelectionMode` 时切换 `完成 / 已选 n / 全选` | `TopAppBar` 内容根据 `uiState.isSelectionMode` 切换 Composable |
+| 5 常驻圆按：排序 / 筛选 / 视图 / 更多 / 添加 | `WardrobeView.toolbar { .. }` 五按钮 | 已迁移：圆角操作组 + Material Icons |
+| 排序 Sheet | `SortOptionsSheet` | 已迁移为 `DropdownMenu`，覆盖 iOS 排序项 |
+| 筛选 Sheet | `FilterView` 多选 Chip | 已迁移为 `ModalBottomSheet`，支持品牌/类型/颜色/尺码/状态/小物/心愿尾款 |
+| 视图切换 Sheet | 视图 ActionSheet | 已迁移为 `DropdownMenu`，支持双列/三列/六列/简略列表/详细列表 |
+| 更多菜单：搜索 / 编辑 / 调整顺序 | 原 iOS 散落在工具栏+编辑模式切换 | 已迁移搜索和编辑；调整顺序入口暂不做拖拽 |
+| 添加菜单：手动创建 / 批量导入 | `AddSheet` ActionSheet | 已迁移；批量导入当前复用手动创建入口占位 |
+| 编辑模式顶栏 | `isSelectionMode` 时切换 `完成 / 已选 n / 全选` | 已迁移：完成、已选 n/N、全选/取消全选 |
 
 ### 差异预期
 
@@ -27,7 +27,7 @@
 
 ### 目标
 
-- 卡片主视觉：`item.imageUri` 优先 Coil `AsyncImage(contentScale = ContentScale.Crop)`，缺图时回退到"分类首字 + 粉色渐变"占位。
+- 卡片主视觉：已实现本地私有目录图片异步缩略图解码；缺图时回退粉色渐变占位，避免在 Compose 主线程解码大图。
 - 编辑模式（`isSelectionMode`）右上角勾选圈：未选中=白色空圈，选中=粉色填充+白色 `Icons.Default.Check`，配合卡片 `border` 加粗变粉。
 - 点击路由：编辑模式下点击切换勾选；非编辑模式进 `WardrobeItemDetailRoute`。
 - 非编辑模式保留右上角"心愿尾款"小角标。
@@ -37,24 +37,24 @@
 
 - iOS `onDrag/onDrop` 的 `ItemProvider` 是系统级跨页面的；Android 拖拽目前只在 `LazyVerticalGrid` 内部生效，跨页拖动需要自实现浮层。
 - iOS 里"编辑"与"调整顺序"同一模式（`EditMode`）；Android 拆两个入口，`编辑` 保持当前排序，`调整顺序` 强制切 `Custom`。
-- 列表布局（`LazyColumn`）的拖拽**暂不实现**，只支持 Grid。
+- 列表布局（`LazyColumn`）和 Grid 拖拽排序本轮均暂不实现；保留 `sortIndex` 和自定义排序枚举，为下一轮接入拖拽留接口。
 
 ## 三、手动创建 Sheet
 
 ### 目标
 
-- 名称（必填）/ 分类 FilterChip / 价格（可选）/ 主图选择
-- 主图：`ActivityResultContracts.PickVisualMedia`（Android 13+）或 `PickVisualMedia` compat，单选；选中后 72×72 预览 + "换图"按钮
-- 保存：写 Room `wardrobe_item` 表，`sort_index` 默认 `System.currentTimeMillis()`，刷新列表
-- 取消：清空草稿 + dismiss Sheet
+- 已按 iOS Simulator 表单顺序迁移：图片、名称、品牌、类型、颜色、尺码、衣长、状态、小物、价格、库存、购买信息、心愿尾款、备注。
+- 主图：`ActivityResultContracts.PickVisualMedia` 单选，复制到 App 私有目录 `files/wardrobe_images`，表单内预览。
+- 保存：写 Room `wardrobe_item` 表，`sortIndex` 默认 `System.currentTimeMillis()`，列表自动刷新。
+- 取消：dismiss Sheet，不写入数据。
 
 ### 差异 / 降级
 
 | iOS 字段 | Android 状态 | 原因 |
 | --- | --- | --- |
-| 品牌 brand / 品牌系列 | **先不暴露** | MVP 预留 Room 字段 |
+| 品牌 brand / 品牌系列 | 品牌已暴露，系列暂不暴露 | 系列表后补 |
 | 标签 tag | **先不暴露** | 关系表后补 |
-| 定金/尾款/付款日 | **先不暴露** | 心愿尾款分支的字段 |
+| 定金/尾款/付款日 | 已暴露基础字段 | 系列/通知明细后补 |
 | 多图拍摄 + 预览 | **不支持** | 批量导入承担多图诉求 |
 
 ## 四、批量导入 Sheet
@@ -78,8 +78,8 @@
 - 入口：`更多 → 编辑`、`更多 → 调整顺序`（后者强制 `Custom` 排序）
 - 顶栏：`完成 / 已选 n/N / 全选 ⇄ 取消全选`
 - 卡片：勾选圈 + 选中描边
-- 底部批量操作栏：`批量删除 (n)`，`AlertDialog` 二次确认，命中 `BatchSoftDelete` UseCase
-- 自定义排序下支持 Grid 拖拽
+- 底部批量操作栏：已实现 `批量删除`，`AlertDialog` 二次确认，命中 `BatchSoftDeleteWardrobeItems`
+- 自定义排序下 Grid 拖拽暂不实现，只保留数据字段和排序项。
 
 ### 差异 / 降级
 
@@ -90,12 +90,12 @@
 
 ### 目标
 
-- `WardrobeItemEntity` + Room schema v1 `wardrobe_item`：已有基础字段
-- `sort_index`（Long）：**需补到 schema**（当前 v1 未含），升级走 `Migration(1, 2)` `ALTER TABLE wardrobe_item ADD COLUMN sort_index INTEGER NOT NULL DEFAULT 0`
-- DAO 新增：`reorderItems(ids: List<Long>)` / `softDeleteItems(ids: List<Long>)` / `observeItems(sort = Custom)` 分支 `ORDER BY sort_index ASC, created_at DESC`
-- Repository：`RoomWardrobeRepository` 代理 DAO 新方法
-- UseCase：`ReorderWardrobeItemsUseCase` / `BatchSoftDeleteWardrobeItemsUseCase`
-- Preferences：`UserPreferencesDataStore` 恢复上次排序/布局
+- `WardrobeItemEntity` + Room schema v2 `wardrobe_item`：已补齐衣橱闭环字段。
+- `sortIndex`（Long）：已补到 schema，升级走 `Migration(1, 2)`。
+- DAO 新增：`softDeleteItems(ids: List<Long>)`；查询覆盖名称/品牌/类型/颜色/尺码/状态/小物。
+- Repository：`RoomWardrobeRepository` 已代理批量软删除。
+- UseCase：已新增 `BatchSoftDeleteWardrobeItems`；拖拽排序 UseCase 暂缓。
+- Preferences：`UserPreferencesDataStore` 已保存上次子页、排序、布局、心愿尾款显示模式。
 
 ### 差异 / 降级
 
@@ -123,6 +123,10 @@
 - `WardrobeSelection` / `WardrobeItemCard` 批量勾选
 
 便于 `adb logcat -s Wardrobe*:V` 定位回归。
+
+### Debug 启动备注
+
+Pixel 10 Pro Emulator 在 Android Studio 使用 `am start -D --suspend` 调试启动时，曾出现一次 `System UI isn't responding` 弹窗。adb 普通启动未复现 app 侧 ANR，logcat 显示 SystemUI 资源查询错误且无 `com.pinkhouse` 崩溃记录。排查时优先用不带 `-D --suspend` 的普通启动确认 app 启动链路，再看 `/data/anr` 是否指向 app 进程。
 
 ## 九、与鸿蒙侧差异对照
 

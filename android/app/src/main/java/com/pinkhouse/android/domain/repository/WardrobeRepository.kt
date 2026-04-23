@@ -13,4 +13,6 @@ interface WardrobeRepository {
     suspend fun addItems(items: List<WardrobeItem>): List<Long>
 
     suspend fun softDeleteItem(id: Long)
+
+    suspend fun softDeleteItems(ids: List<Long>)
 }

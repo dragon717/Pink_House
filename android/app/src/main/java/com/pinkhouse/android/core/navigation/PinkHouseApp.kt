@@ -1,6 +1,7 @@
 package com.pinkhouse.android.core.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -14,12 +15,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.pinkhouse.android.core.di.AppContainer
-import com.pinkhouse.android.feature.pet.PetRoute
-import com.pinkhouse.android.feature.settings.SettingsRoute
-import com.pinkhouse.android.feature.smallworld.SmallWorldRoute
-import com.pinkhouse.android.feature.vip.VipRoute
+import com.pinkhouse.android.core.ui.FeaturePlaceholder
 import com.pinkhouse.android.feature.wardrobe.WardrobeRoute
-import com.pinkhouse.android.feature.wealth.WealthRoute
 
 @Composable
 fun PinkHouseApp(appContainer: AppContainer) {
@@ -46,7 +43,12 @@ fun PinkHouseApp(appContainer: AppContainer) {
                                 restoreState = true
                             }
                         },
-                        icon = { Text(destination.label.take(1)) },
+                        icon = {
+                            Icon(
+                                imageVector = destination.icon,
+                                contentDescription = destination.label,
+                            )
+                        },
                         label = { Text(destination.label) },
                     )
                 }
@@ -60,15 +62,27 @@ fun PinkHouseApp(appContainer: AppContainer) {
         ) {
             composable(AppDestination.Wardrobe.route) {
                 WardrobeRoute(
-                    getWardrobeItems = appContainer.getWardrobeItems,
-                    addSampleWardrobeItems = appContainer.addSampleWardrobeItems,
+                    appContainer = appContainer,
                 )
             }
-            composable(AppDestination.Pet.route) { PetRoute() }
-            composable(AppDestination.SmallWorld.route) { SmallWorldRoute() }
-            composable(AppDestination.Wealth.route) { WealthRoute() }
-            composable(AppDestination.Vip.route) { VipRoute() }
-            composable(AppDestination.Settings.route) { SettingsRoute() }
+            composable(AppDestination.House.route) {
+                FeaturePlaceholder(
+                    title = "House",
+                    description = "小世界热区、梦裙日历、穿搭手帐和来财入口会在后续版本接入。",
+                )
+            }
+            composable(AppDestination.Me.route) {
+                FeaturePlaceholder(
+                    title = "我",
+                    description = "主题、备份、VIP、魔法任务和本地设置入口保留占位。",
+                )
+            }
+            composable(AppDestination.PetChat.route) {
+                FeaturePlaceholder(
+                    title = "萌宠对话",
+                    description = "本地规则式气泡和聊天历史会在宠物闭环中实现，本轮不接 AI。",
+                )
+            }
         }
     }
 }

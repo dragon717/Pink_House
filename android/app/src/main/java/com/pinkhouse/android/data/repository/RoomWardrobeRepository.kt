@@ -17,7 +17,7 @@ class RoomWardrobeRepository(
         val items = if (trimmedQuery.isBlank()) {
             wardrobeItemDao.observeActiveItems()
         } else {
-            wardrobeItemDao.observeActiveItemsByName(trimmedQuery)
+            wardrobeItemDao.observeActiveItemsByQuery(trimmedQuery)
         }
 
         return items.map { entities -> entities.map { it.toDomain() } }
@@ -38,5 +38,11 @@ class RoomWardrobeRepository(
 
     override suspend fun softDeleteItem(id: Long) {
         wardrobeItemDao.softDelete(id = id, trashedAtEpochMillis = clock())
+    }
+
+    override suspend fun softDeleteItems(ids: List<Long>) {
+        if (ids.isNotEmpty()) {
+            wardrobeItemDao.softDeleteItems(ids = ids, trashedAtEpochMillis = clock())
+        }
     }
 }
