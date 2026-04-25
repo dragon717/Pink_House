@@ -25,7 +25,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.pinkhouse.android.core.assets.PinkHouseAssets
 import com.pinkhouse.android.core.di.AppContainer
-import com.pinkhouse.android.core.ui.PetChatFloatingButton
 import com.pinkhouse.android.core.ui.PinkBottomNavBar
 import com.pinkhouse.android.core.ui.PinkBottomNavItem
 import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
@@ -112,20 +111,6 @@ fun PinkHouseApp(appContainer: AppContainer) {
                     )
                     .size(width = 112.dp, height = 70.dp),
                 contentScale = ContentScale.Fit,
-            )
-            PetChatFloatingButton(
-                petImageRes = PinkHouseAssets.maomaoPeeking,
-                onClick = {
-                    navController.navigate(AppDestination.PetChat.route) {
-                        launchSingleTop = true
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = 18.dp,
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 14.dp,
-                    ),
             )
         }
 

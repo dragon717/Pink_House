@@ -196,33 +196,6 @@ fun RowScope.PinkBottomNavItem(
 }
 
 @Composable
-fun PetChatFloatingButton(
-    @DrawableRes petImageRes: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.size(PinkHouseDesignTokens.PetFloatingSize),
-        shape = CircleShape,
-        color = Color.White.copy(alpha = 0.9f),
-        tonalElevation = 8.dp,
-        shadowElevation = 6.dp,
-        onClick = onClick,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Image(
-                painter = painterResource(petImageRes),
-                contentDescription = "萌宠对话",
-                modifier = Modifier
-                    .size(width = 64.dp, height = 50.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Fit,
-            )
-        }
-    }
-}
-
-@Composable
 fun AssetImage(
     model: Any?,
     contentDescription: String?,
