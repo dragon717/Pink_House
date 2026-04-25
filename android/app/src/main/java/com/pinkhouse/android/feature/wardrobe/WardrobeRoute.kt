@@ -225,7 +225,10 @@ fun WardrobeRoute(
             if (uiState.isSearchVisible) {
                 SearchField(
                     query = uiState.searchQuery,
+                    filterState = uiState.filterState,
+                    shortcuts = remember(uiState.allItems) { WardrobeBusinessLogic.queryShortcuts(uiState.allItems) },
                     onQueryChange = viewModel::setSearchQuery,
+                    onShortcutSelected = { shortcut -> viewModel.setSearchQuery(shortcut.query) },
                     onClose = { viewModel.setSearchVisible(false) },
                 )
             }
@@ -664,23 +667,57 @@ private fun SelectionHeader(
 @Composable
 private fun SearchField(
     query: String,
+    filterState: WardrobeFilterState,
+    shortcuts: List<WardrobeQueryShortcut>,
     onQueryChange: (String) -> Unit,
+    onShortcutSelected: (WardrobeQueryShortcut) -> Unit,
     onClose: () -> Unit,
 ) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-        trailingIcon = {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = "关闭搜索")
+        shape = RoundedCornerShape(22.dp),
+        color = Color.White.copy(alpha = 0.82f),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Filled.Close, contentDescription = "关闭搜索")
+                    }
+                },
+                placeholder = { Text("名称 / 品牌:Baby / 类型:JSK / 备注:茶会 / 100-300") },
+                shape = RoundedCornerShape(18.dp),
+            )
+            Text(
+                text = "查询小抄：支持 字段:关键词、无品牌/无标签/无小物、尾款、价格区间 100-300。",
+                style = MaterialTheme.typography.bodySmall,
+                color = SoftGrayText,
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(shortcuts, key = { it.query }) { shortcut ->
+                    AssistChip(
+                        onClick = { onShortcutSelected(shortcut) },
+                        label = { Text(shortcut.label, maxLines = 1) },
+                    )
+                }
             }
-        },
-        placeholder = { Text("搜索名称、品牌、类型、颜色、尺码、备注或 100-300") },
-        shape = RoundedCornerShape(18.dp),
-    )
+            if (filterState.activeCount > 0) {
+                Text(
+                    text = "已叠加 ${filterState.activeCount} 项筛选；统计卡会按搜索 + 筛选共同更新。",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = PinkPrimary,
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -130,6 +130,37 @@
 - `BATCH-WARDROBE-DATA-03`：新增统计明细页 / Sheet，按品牌、类型、颜色、状态、心愿尾款等维度拆解。
 - `BATCH-WARDROBE-DATA-04`：沉淀最近搜索与常用筛选组合。
 
+### BATCH-WARDROBE-DATA-02 高级查询语法提示 + 快捷筛选 Chip
+
+**改动范围**
+
+- `WardrobeBusinessLogic.kt`
+  - 搜索能力从纯全文/价格区间扩展为 `字段:关键词`：
+    - `名称:name` / `品牌:brand` / `类型:type` / `颜色:color` / `尺码:size` / `衣长:length` / `状态:condition` / `小物:accessory` / `标签:tag` / `备注:note`。
+    - 同时兼容英文别名与中文全角冒号。
+  - 支持无值快捷查询：`无品牌`、`无标签`、`无小物` 等，也支持 `品牌:无品牌` 这种显式字段写法。
+  - 支持 `尾款` / `心愿尾款` / `定金` 查询，直达心愿尾款衣物。
+  - 新增 `queryShortcuts(items)`，按当前衣橱数据生成价格、无值、尾款与品牌/类型/颜色/状态 Top 维度快捷入口。
+- `WardrobeRoute.kt`
+  - 搜索框升级为查询小抄卡片，展示语法说明：字段查询、无值查询、尾款、价格区间。
+  - 搜索区展示横向快捷 Chip；点击后直接写入查询词，复用 `BATCH-WARDROBE-DATA-01` 的统计联动。
+  - 有筛选项叠加时提示「搜索 + 筛选共同更新」，避免用户误判统计口径。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：
+  - 打开 `更多 → 搜索` 后可见 `查询小抄`、`价格 100-300`、`无品牌`、`无标签`、`无小物`。
+  - 点击 `价格 100-300` 后查询词变为 `100-300`，统计卡切到 `当前结果统计`，显示 `命中 3/4 款`。
+  - 点击 `无品牌` 后查询词变为 `品牌:无品牌`，统计卡继续联动，显示 `命中 2/4 款`。
+- 截图记录：`/tmp/pinkhouse_wardrobe_data_02_shortcuts.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-03`：把「详细统计」从占位按钮升级为统计明细 Sheet，优先支持当前搜索/筛选结果口径。
+- `BATCH-WARDROBE-DATA-04`：沉淀最近搜索与常用筛选组合。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
