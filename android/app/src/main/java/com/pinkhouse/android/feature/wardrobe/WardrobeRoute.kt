@@ -34,8 +34,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -81,7 +79,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -1618,7 +1615,8 @@ private fun WardrobeItemEditorSheet(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .background(PinkBackground.copy(alpha = 0.38f)),
             contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -1632,49 +1630,47 @@ private fun WardrobeItemEditorSheet(
                                     imagePath = viewModel.imageFilePath(fileName),
                                     modifier = Modifier
                                         .size(84.dp)
-                                        .clip(RoundedCornerShape(12.dp)),
+                                        .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(18.dp))
+                                        .clip(RoundedCornerShape(18.dp)),
                                 )
                             }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(
+                        SoftFormActionButton(
+                            label = "相册",
+                            icon = Icons.Filled.Add,
                             onClick = {
                                 imagePicker.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                                 )
                             },
-                        ) {
-                            Icon(Icons.Filled.Add, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("相册")
-                        }
+                        )
                         if (availableTestMedia.isNotEmpty()) {
-                            OutlinedButton(
+                            SoftFormActionButton(
+                                label = "测试图片",
+                                icon = Icons.Filled.Image,
                                 onClick = {
                                     coroutineScope.launch {
                                         val fileName = viewModel.importTestMedia(availableTestMedia.first().assetPath)
                                         draft = draft.copy(imageFileNames = draft.imageFileNames + fileName)
                                     }
                                 },
-                            ) {
-                                Icon(Icons.Filled.Image, contentDescription = null)
-                                Spacer(Modifier.width(4.dp))
-                                Text("测试图片")
-                            }
+                            )
                         }
                     }
                     if (availableTestMedia.isNotEmpty()) {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(availableTestMedia, key = { it.assetPath }) { media ->
-                                AssistChip(
+                                SoftSearchPill(
+                                    label = media.displayName,
+                                    selected = false,
                                     onClick = {
                                         coroutineScope.launch {
                                             val fileName = viewModel.importTestMedia(media.assetPath)
                                             draft = draft.copy(imageFileNames = draft.imageFileNames + fileName)
                                         }
                                     },
-                                    label = { Text(media.displayName) },
                                 )
                             }
                         }
@@ -1725,15 +1721,28 @@ private fun WardrobeItemEditorSheet(
             item {
                 FormSection(title = "购买信息") {
                     DatePickerField("购买日期", draft.purchaseDate) { draft = draft.copy(purchaseDate = it) }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("加入心愿尾款", fontWeight = FontWeight.SemiBold)
-                            Text("勾选后，该裙装将显示在心愿尾款中", color = SoftGrayText, style = MaterialTheme.typography.bodySmall)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(22.dp),
+                        color = Color.White.copy(alpha = 0.50f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.74f)),
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text("加入心愿尾款", fontWeight = FontWeight.SemiBold, color = SoftGrayText)
+                                Text("勾选后，该裙装将显示在心愿尾款中", color = SoftGrayText.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
+                            }
+                            Switch(
+                                checked = draft.isDepositPlan,
+                                onCheckedChange = { draft = draft.copy(isDepositPlan = it) },
+                            )
                         }
-                        Switch(
-                            checked = draft.isDepositPlan,
-                            onCheckedChange = { draft = draft.copy(isDepositPlan = it) },
-                        )
                     }
                     if (draft.isDepositPlan) {
                         DatePickerField("定金日期", draft.depositDate) { draft = draft.copy(depositDate = it) }
@@ -1951,17 +1960,41 @@ private fun SoftDeleteAction(onClick: () -> Unit) {
 
 @Composable
 private fun FormSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = PinkSurface),
-    ) {
+    SoftGlassPanel {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SoftGrayText)
             content()
+        }
+    }
+}
+
+@Composable
+private fun SoftFormActionButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        color = PinkBackground.copy(alpha = 0.56f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.76f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = PinkPrimary)
+            Spacer(Modifier.width(5.dp))
+            Text(label, color = PinkPrimary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -1974,16 +2007,53 @@ private fun DraftTextField(
     modifier: Modifier = Modifier.fillMaxWidth(),
     onValueChange: (String) -> Unit,
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
+    val isNote = label == "备注"
+    Surface(
         modifier = modifier,
-        label = { Text(label) },
-        placeholder = { Text(placeholder) },
-        singleLine = label != "备注",
-        minLines = if (label == "备注") 3 else 1,
-        shape = RoundedCornerShape(14.dp),
-    )
+        shape = RoundedCornerShape(22.dp),
+        color = Color.White.copy(alpha = 0.50f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.74f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text(
+                text = label,
+                color = SoftGrayText.copy(alpha = 0.72f),
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = !isNote,
+                minLines = if (isNote) 3 else 1,
+                maxLines = if (isNote) 5 else 1,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = SoftGrayText,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                cursorBrush = SolidColor(PinkAccent),
+                decorationBox = { innerTextField ->
+                    if (value.isBlank()) {
+                        Text(
+                            text = placeholder,
+                            color = SoftGrayText.copy(alpha = 0.38f),
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = if (isNote) 3 else 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    innerTextField()
+                },
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1995,32 +2065,46 @@ private fun DatePickerField(
     onValueChange: (String) -> Unit,
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    val interactionSource = remember { MutableInteractionSource() }
 
-    LaunchedEffect(interactionSource) {
-        interactionSource.interactions.collect { interaction ->
-            if (interaction is PressInteraction.Press) {
-                showPicker = true
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(22.dp))
+            .clickable { showPicker = true },
+        shape = RoundedCornerShape(22.dp),
+        color = Color.White.copy(alpha = 0.50f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.74f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(label, color = SoftGrayText.copy(alpha = 0.72f), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = value.ifBlank { "YYYY-MM-DD" },
+                    color = if (value.isBlank()) SoftGrayText.copy(alpha = 0.38f) else SoftGrayText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (value.isBlank()) FontWeight.Normal else FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Surface(
+                shape = CircleShape,
+                color = PinkBackground.copy(alpha = 0.64f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.78f)),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+            ) {
+                Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.CalendarMonth, contentDescription = "选择日期", modifier = Modifier.size(18.dp), tint = PinkPrimary)
+                }
             }
         }
     }
-
-    OutlinedTextField(
-        value = value,
-        onValueChange = {},
-        modifier = modifier,
-        label = { Text(label) },
-        placeholder = { Text("YYYY-MM-DD") },
-        readOnly = true,
-        singleLine = true,
-        interactionSource = interactionSource,
-        trailingIcon = {
-            IconButton(onClick = { showPicker = true }) {
-                Icon(Icons.Filled.CalendarMonth, contentDescription = "选择日期")
-            }
-        },
-        shape = RoundedCornerShape(14.dp),
-    )
 
     if (showPicker) {
         val datePickerState = rememberDatePickerState(

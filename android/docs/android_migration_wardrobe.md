@@ -370,6 +370,38 @@
 
 - `BATCH-WARDROBE-UI-06`：继续处理新增/编辑衣物 Sheet 的表单分组、输入框、日期选择入口与心愿尾款开关。
 
+
+### BATCH-WARDROBE-UI-06 创建/编辑表单软圆还原
+
+**背景**
+
+- 新增/编辑衣物是衣橱核心录入链路；上一版表单仍大量使用 Material `OutlinedTextField`、`OutlinedButton` 与 `AssistChip`，视觉上偏硬、偏默认 Android。
+- 延续用户偏好：当原生组件太方正时，优先用自定义软圆容器/组件保持 Pink_House 的粉白玻璃感。
+
+**改动范围**
+
+- `WardrobeRoute.kt`
+  - `WardrobeItemEditorSheet` 内容区加入轻粉背景，和详情 Sheet / 统计 Sheet 的软圆体系统一。
+  - `FormSection` 从 Material `Card` 改为复用 `SoftGlassPanel`，表单分组统一大圆角、半透明白底、轻描边。
+  - 图片缩略图增加白色圆角描边；相册 / 测试图片入口改为 `SoftFormActionButton` 粉色软圆按钮。
+  - 测试素材列表从 Material `AssistChip` 改为 `SoftSearchPill`，减少硬边 Chip 感。
+  - `DraftTextField` 从 `OutlinedTextField` 改为自定义 `BasicTextField`：标签、占位与输入内容都放在半透明白色软圆块中，备注支持多行。
+  - `DatePickerField` 从只读 `OutlinedTextField` 改为自定义日期行，右侧圆形日历按钮保留选择语义。
+  - `加入心愿尾款` 开关外包入柔和白底容器，说明文字与 Switch 保持原有行为。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：点击顶部 `添加 → 手动创建`，可见软圆表单分组、`相册`、`测试图片`、`裙装名称 *`、`品牌名称`；继续滚动可见 `价格信息`、`购买信息`、`购买日期`、`加入心愿尾款` 与 `备注`。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_ui_06_editor_sheet.png`
+  - `/tmp/pinkhouse_wardrobe_ui_06_editor_sheet_purchase.png`
+
+**后续待办**
+
+- `BATCH-WARDROBE-UI-07`：继续处理筛选 Sheet / 查询条件面板软圆还原，优先服务数据查询体验。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
