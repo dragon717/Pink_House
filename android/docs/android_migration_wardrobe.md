@@ -339,6 +339,37 @@
 
 - `BATCH-WARDROBE-UI-05`：处理衣物详情 Sheet、信息行、编辑/删除入口的软圆还原，继续覆盖核心查看链路。
 
+
+### BATCH-WARDROBE-UI-05 衣物详情 Sheet / 信息行软圆还原
+
+**背景**
+
+- Computer Use 对照 iOS Simulator：iOS 衣橱详情页是粉色背景上的大图、名称品牌卡、分组信息卡与底部操作入口；信息行是低对比白色圆角块。
+- Android 详情仍是线性 `DetailLine` + 裸图 + `OutlinedButton`，和前两批软圆卡片气质不一致；本批只改查看链路 UI，不新增数据能力。
+
+**改动范围**
+
+- `WardrobeRoute.kt`
+  - `WardrobeItemDetailSheet` 内容区加入轻粉背景，并用 `SoftGlassPanel` 承载主图、摘要卡与分组信息卡。
+  - 主图区域增加白色圆角描边；心愿尾款物品在主图右上复用 `SoftDepositBadge`。
+  - 新增摘要卡：展示衣物名、品牌/暂无品牌信息、价格胶囊与库存，贴近 iOS 名称品牌卡结构。
+  - 新增 `SoftDetailSection`，将原本散落的详情行分组为 `裙装信息`、`价格信息`、`备注`。
+  - `DetailLine` 从裸 `Row` 改为半透明白色圆角信息行，统一文字层级与轻描边。
+  - 删除入口从 Material `OutlinedButton` 改为 `SoftDeleteAction`，使用粉色轻底 + 圆角描边，避免硬边表单按钮感。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：点击 `奶油白半身裙` 打开 `衣物详情`，首屏可见软圆主图框、摘要卡与 `裙装信息`；向下滚动后可见 `价格信息`、`备注` 与 `移入回收站`。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_ui_05_detail_sheet.png`
+  - `/tmp/pinkhouse_wardrobe_ui_05_detail_sheet_bottom.png`
+
+**后续待办**
+
+- `BATCH-WARDROBE-UI-06`：继续处理新增/编辑衣物 Sheet 的表单分组、输入框、日期选择入口与心愿尾款开关。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地

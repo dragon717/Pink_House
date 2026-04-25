@@ -1780,45 +1780,99 @@ private fun WardrobeItemDetailSheet(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .background(PinkBackground.copy(alpha = 0.38f)),
             contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                WardrobeImage(
-                    imagePath = selectedItem.imagePaths.firstOrNull()?.let(viewModel::imageFilePath),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp)
-                        .clip(RoundedCornerShape(22.dp)),
-                )
-            }
-            item { Text(selectedItem.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-            item { DetailLine("品牌", selectedItem.brand.orEmpty().ifBlank { "未填写" }) }
-            item { DetailLine("类型", selectedItem.category) }
-            item { DetailLine("颜色", selectedItem.colors.ifBlank { selectedItem.color.orEmpty() }.ifBlank { "未填写" }) }
-            item { DetailLine("尺码/衣长", listOf(selectedItem.sizes, selectedItem.length).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "未填写" }) }
-            item { DetailLine("成色", selectedItem.condition) }
-            item { DetailLine("标签", selectedItem.tags.joinToString("，").ifBlank { "未填写" }) }
-            item { DetailLine("小物", selectedItem.accessories.ifBlank { "未填写" }) }
-            if (selectedItem.accessoryItems.isNotEmpty()) {
-                items(selectedItem.accessoryItems) { accessory ->
-                    DetailLine("小物明细", "${accessory.name} x${accessory.quantity} · ${accessory.totalPrice.moneyText()}")
+                SoftGlassPanel {
+                    Box(modifier = Modifier.padding(12.dp)) {
+                        WardrobeImage(
+                            imagePath = selectedItem.imagePaths.firstOrNull()?.let(viewModel::imageFilePath),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp)
+                                .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(24.dp))
+                                .clip(RoundedCornerShape(24.dp)),
+                        )
+                        if (selectedItem.isDepositPlan) {
+                            SoftDepositBadge(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(12.dp),
+                            )
+                        }
+                    }
                 }
             }
-            item { DetailLine("总价", selectedItem.inventoryTotalPrice.moneyText()) }
-            item { DetailLine("库存", selectedItem.stock.toString()) }
-            if (selectedItem.isDepositPlan) {
-                item { DetailLine("心愿尾款", "定金 ${selectedItem.totalDeposit.moneyText()} · 尾款 ${selectedItem.totalBalance.moneyText()}") }
-                item { DetailLine("尾款日期", listOfNotNull(selectedItem.finalPaymentStartDate, selectedItem.finalPaymentEndDate).joinToString(" ~ ").ifBlank { "未填写" }) }
-            }
-            item { DetailLine("备注", selectedItem.note.ifBlank { "未填写" }) }
             item {
-                OutlinedButton(onClick = onSoftDelete, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Filled.Delete, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("移入回收站")
+                SoftGlassPanel {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            selectedItem.name,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = SoftGrayText,
+                        )
+                        Text(
+                            selectedItem.brand.orEmpty().ifBlank { "暂无品牌信息" },
+                            color = SoftGrayText.copy(alpha = 0.68f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SoftPricePill(selectedItem.inventoryTotalPrice.moneyText())
+                            Text(
+                                "库存 ${selectedItem.stock}",
+                                color = SoftGrayText.copy(alpha = 0.72f),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
                 }
+            }
+            item {
+                SoftDetailSection("裙装信息") {
+                    DetailLine("类型", selectedItem.category.ifBlank { "未填写" })
+                    DetailLine("颜色", selectedItem.colors.ifBlank { selectedItem.color.orEmpty() }.ifBlank { "未填写" })
+                    DetailLine("尺码/衣长", listOf(selectedItem.sizes, selectedItem.length).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "未填写" })
+                    DetailLine("成色", selectedItem.condition)
+                    DetailLine("标签", selectedItem.tags.joinToString("，").ifBlank { "未填写" })
+                    DetailLine("小物", selectedItem.accessories.ifBlank { "未填写" })
+                    selectedItem.accessoryItems.forEach { accessory ->
+                        DetailLine("小物明细", "${accessory.name} x${accessory.quantity} · ${accessory.totalPrice.moneyText()}")
+                    }
+                }
+            }
+            item {
+                SoftDetailSection("价格信息") {
+                    DetailLine("总价", selectedItem.inventoryTotalPrice.moneyText())
+                    DetailLine("库存", selectedItem.stock.toString())
+                    if (selectedItem.isDepositPlan) {
+                        DetailLine("心愿尾款", "定金 ${selectedItem.totalDeposit.moneyText()} · 尾款 ${selectedItem.totalBalance.moneyText()}")
+                        DetailLine("尾款日期", listOfNotNull(selectedItem.finalPaymentStartDate, selectedItem.finalPaymentEndDate).joinToString(" ~ ").ifBlank { "未填写" })
+                    }
+                }
+            }
+            item {
+                SoftDetailSection("备注") {
+                    Text(
+                        selectedItem.note.ifBlank { "未填写" },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.70f), RoundedCornerShape(18.dp))
+                            .padding(12.dp),
+                        color = SoftGrayText,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            item {
+                SoftDeleteAction(onClick = onSoftDelete)
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
@@ -1835,16 +1889,63 @@ private fun WardrobeItemDetailSheet(
 }
 
 @Composable
+private fun SoftDetailSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    SoftGlassPanel {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SoftGrayText)
+            content()
+        }
+    }
+}
+
+@Composable
 private fun DetailLine(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = SoftGrayText)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.70f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = SoftGrayText.copy(alpha = 0.72f), style = MaterialTheme.typography.bodyMedium)
         Text(
             value,
             modifier = Modifier.weight(1f).padding(start = 16.dp),
             fontWeight = FontWeight.SemiBold,
+            color = SoftGrayText,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun SoftDeleteAction(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        color = PinkBackground.copy(alpha = 0.62f),
+        border = BorderStroke(1.dp, PinkAccent.copy(alpha = 0.34f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.Delete, contentDescription = null, tint = PinkAccent)
+            Spacer(Modifier.width(6.dp))
+            Text("移入回收站", color = PinkAccent, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

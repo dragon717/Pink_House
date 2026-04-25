@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-UI-04 已验证；下一批建议继续衣物详情 Sheet / 信息行软圆还原。
+无 — BATCH-WARDROBE-UI-05 已验证；下一批建议继续创建/编辑表单软圆还原。
 
 ---
 
@@ -27,9 +27,9 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 ### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
 
-- [ ] **BATCH-WARDROBE-UI-05** 衣物详情 Sheet / 信息行软圆还原
+- [ ] **BATCH-WARDROBE-UI-06** 创建/编辑表单软圆还原
   - SCOPE: 2 文件 — `WardrobeRoute.kt` + `android_migration_wardrobe.md`
-  - 目标：处理点击衣物后的详情 Sheet、图片区域、属性信息行与编辑/删除入口，让核心查看链路也保持 iOS 粉白玻璃感；不新增数据能力。
+  - 目标：处理新增/编辑衣物 Sheet 的表单分组、输入框、日期选择入口与心愿尾款开关，让核心录入链路减少 Material 表单感。
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
@@ -93,6 +93,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-UI-05** 衣物详情 Sheet / 信息行软圆还原 — `WardrobeRoute.kt` 对照 iOS 详情页，把 Android 详情 Sheet 内容区改为轻粉底 + 软玻璃卡：图片外框、名称/品牌/价格摘要、`裙装信息`、`价格信息`、`备注` 与 `移入回收站` 均使用自定义圆角容器和轻描边。assembleDebug 通过；红线 grep 无命中；装机打开 `奶油白半身裙` 详情并滚动验证可见 `裙装信息`、`价格信息`、`备注`、`移入回收站`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-04** 衣橱顶部操作栏 / 分段控件软圆还原 — `WardrobeRoute.kt` 对照 iOS fashion 导航，把 `少女衣橱 / 心愿尾款` 分段改为图标+文字的紧凑软圆按钮，操作按钮组改为自定义圆形热区 `Surface`，排序/更多图标替换为更接近 iOS 的上下箭头与横向省略号，并移除本区新增硬编码色值。assembleDebug 通过；红线 grep 无命中；装机验证可见 `少女衣橱`、`心愿尾款`、`排序`、`筛选`、`布局`、`更多`、`添加`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-03** 衣橱列表/网格卡片软圆还原 — `WardrobeRoute.kt` 将网格卡与列表行从 Material `Card` 改为自定义软圆 `Surface`，统一 26–28dp 圆角、半透明白底、轻描边主图框、粉色尾款角标与价格胶囊；空图占位渐变改为现有 token 色系。assembleDebug 通过；红线 grep 无命中；装机验证可见 `奶油白半身裙`、`¥129.00`、`粉色针织开衫` 与 `心愿尾款`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-02** 衣橱统计卡 / 详细统计 Sheet 软圆还原 — `WardrobeRoute.kt` 将统计卡外层、指标块、功能入口、详细统计 Sheet 汇总块与分组行从 Material `ElevatedCard`/方正入口改为自定义软圆半透明面板、轻描边块和粉色内容底。assembleDebug 通过；红线 grep 无命中；装机验证可见 `衣橱总览`、软圆统计块、`详细统计` Sheet、`统计口径：全量衣橱`、`按品牌` 与 `按类型`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
