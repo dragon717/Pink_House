@@ -5,6 +5,8 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import java.net.URLDecoder
+import java.net.URLEncoder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -29,6 +31,15 @@ class UserPreferencesDataStore(
         )
     }
 
+    val wardrobeRecentSearches: Flow<List<String>> = context.userPreferencesStore.data.map { values ->
+        values[Keys.WardrobeRecentSearches]
+            .orEmpty()
+            .split("\n")
+            .mapNotNull { encoded -> encoded.decodeSearchTokenOrNull() }
+            .filter { it.isNotBlank() }
+            .take(8)
+    }
+
     suspend fun setWardrobeViewMode(viewMode: String) {
         context.userPreferencesStore.edit { values ->
             values[Keys.WardrobeViewMode] = viewMode
@@ -44,6 +55,17 @@ class UserPreferencesDataStore(
     suspend fun setWardrobeHomeTab(tab: String) {
         context.userPreferencesStore.edit { values ->
             values[Keys.WardrobeHomeTab] = tab
+        }
+    }
+
+    suspend fun setWardrobeRecentSearches(searches: List<String>) {
+        context.userPreferencesStore.edit { values ->
+            values[Keys.WardrobeRecentSearches] = searches
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinctBy { it.lowercase() }
+                .take(8)
+                .joinToString("\n") { it.encodeSearchToken() }
         }
     }
 
@@ -76,6 +98,7 @@ class UserPreferencesDataStore(
         val WardrobeViewMode = stringPreferencesKey("wardrobe_view_mode")
         val WardrobeSortOption = stringPreferencesKey("wardrobe_sort_option")
         val WardrobeHomeTab = stringPreferencesKey("wardrobe_home_tab")
+        val WardrobeRecentSearches = stringPreferencesKey("wardrobe_recent_searches")
         val DepositDisplayMode = stringPreferencesKey("deposit_display_mode")
         val DepositReminderEnabled = booleanPreferencesKey("deposit_reminder_enabled")
         val DepositReminderDaysBefore = stringPreferencesKey("deposit_reminder_days_before")
@@ -83,5 +106,17 @@ class UserPreferencesDataStore(
         val SoundEnabled = booleanPreferencesKey("sound_enabled")
         val HapticsEnabled = booleanPreferencesKey("haptics_enabled")
         val LanguageTag = stringPreferencesKey("language_tag")
+    }
+}
+
+private fun String.encodeSearchToken(): String {
+    return URLEncoder.encode(this, Charsets.UTF_8.name())
+}
+
+private fun String.decodeSearchTokenOrNull(): String? {
+    return takeIf { it.isNotBlank() }?.let { encoded ->
+        runCatching {
+            URLDecoder.decode(encoded, Charsets.UTF_8.name())
+        }.getOrNull()
     }
 }

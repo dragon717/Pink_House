@@ -175,7 +175,6 @@ data class WardrobeHomeUiState(
 private data class WardrobeRuntimeState(
     val searchQuery: String = "",
     val isSearchVisible: Boolean = false,
-    val recentSearches: List<String> = emptyList(),
     val filterState: WardrobeFilterState = WardrobeFilterState(),
     val isSelectionMode: Boolean = false,
     val selectedItemIds: Set<Long> = emptySet(),
@@ -212,14 +211,22 @@ class WardrobeHomeViewModel(
         }
 
     private val trashedItems = wardrobeRepository.observeTrashedItems()
+    private val preferenceState = combine(
+        userPreferencesDataStore.preferences,
+        userPreferencesDataStore.wardrobeRecentSearches,
+    ) { preferences, recentSearches ->
+        preferences to recentSearches
+    }
 
     val uiState = combine(
         items,
-        userPreferencesDataStore.preferences,
+        preferenceState,
         runtimeState,
         selectedItem,
         trashedItems,
-    ) { sourceItems, preferences, runtime, selected, trashed ->
+    ) { sourceItems, preferencePair, runtime, selected, trashed ->
+        val preferences = preferencePair.first
+        val recentSearches = preferencePair.second
         val tab = WardrobeHomeTab.fromRaw(preferences.wardrobeHomeTab)
         val sort = WardrobeSortOption.fromRaw(preferences.wardrobeSortOption)
         val layout = WardrobeLayoutMode.fromRaw(preferences.wardrobeViewMode)
@@ -240,7 +247,7 @@ class WardrobeHomeViewModel(
             depositDisplayMode = depositDisplay,
             searchQuery = runtime.searchQuery,
             isSearchVisible = runtime.isSearchVisible,
-            recentSearches = runtime.recentSearches,
+            recentSearches = recentSearches,
             filterState = runtime.filterState,
             allItems = sourceItems,
             visibleItems = filtered,
@@ -280,16 +287,13 @@ class WardrobeHomeViewModel(
 
     fun submitSearchQuery(query: String) {
         val trimmed = query.trim()
-        runtimeState.update { state ->
-            state.copy(
-                searchQuery = trimmed,
-                isSearchVisible = true,
-                recentSearches = if (trimmed.isBlank()) {
-                    state.recentSearches
-                } else {
-                    (listOf(trimmed) + state.recentSearches.filterNot { it.equals(trimmed, ignoreCase = true) }).take(8)
-                },
-            )
+        runtimeState.update { state -> state.copy(searchQuery = trimmed, isSearchVisible = true) }
+        if (trimmed.isNotBlank()) {
+            val recentSearches = uiState.value.recentSearches
+            val nextSearches = (listOf(trimmed) + recentSearches.filterNot { it.equals(trimmed, ignoreCase = true) }).take(8)
+            viewModelScope.launch {
+                userPreferencesDataStore.setWardrobeRecentSearches(nextSearches)
+            }
         }
     }
 

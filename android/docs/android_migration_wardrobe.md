@@ -225,6 +225,32 @@
 - `BATCH-WARDROBE-DATA-04B`：将最近搜索持久化到 DataStore。
 - `BATCH-WARDROBE-UI-02`：继续把统计卡、统计 Sheet 行项改成统一软圆玻璃容器，减少 Material 卡片感。
 
+### BATCH-WARDROBE-DATA-04B 最近搜索持久化
+
+**改动范围**
+
+- `UserPreferencesDataStore.kt`
+  - 新增 `wardrobe_recent_searches` preference key。
+  - 新增 `wardrobeRecentSearches: Flow<List<String>>`。
+  - 新增 `setWardrobeRecentSearches(searches)`，最多保存 8 条，大小写去重。
+  - 查询词使用 UTF-8 percent-encoding 存入单个字符串，避免中文、空格或换行破坏序列化。
+- `WardrobeHomeViewModel.kt`
+  - 将 04A 的会话内最近搜索切换为 DataStore 来源。
+  - `submitSearchQuery(query)` 在设置当前查询词后，把新查询合并进持久化最近搜索。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：
+  - 点击 `价格 100-300` 后出现 `最近搜索` 与 `100-300`。
+  - `am force-stop` 后重启 App，再打开 `更多 → 搜索`，仍可见 `最近搜索` 与 `100-300`。
+- 截图记录：`/tmp/pinkhouse_wardrobe_data_04b_persist_recent.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-UI-02`：按用户反馈继续提高 UI 还原度，优先统计卡与统计 Sheet 的自定义软圆容器。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
