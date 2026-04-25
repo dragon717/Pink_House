@@ -154,6 +154,7 @@ fun WardrobeRoute(
     var showRecycleBinSheet by rememberSaveable { mutableStateOf(false) }
     var showDepositReminderSheet by rememberSaveable { mutableStateOf(false) }
     var showBatchImportSheet by rememberSaveable { mutableStateOf(false) }
+    var showStatisticsSheet by rememberSaveable { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
     var pendingHardDeleteIds by rememberSaveable { mutableStateOf<List<Long>>(emptyList()) }
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
@@ -234,7 +235,10 @@ fun WardrobeRoute(
             }
 
             if (uiState.homeTab == WardrobeHomeTab.Wardrobe) {
-                WardrobeStatisticsCard(uiState = uiState)
+                WardrobeStatisticsCard(
+                    uiState = uiState,
+                    onStatisticsClick = { showStatisticsSheet = true },
+                )
                 WardrobeContent(
                     uiState = uiState,
                     viewModel = viewModel,
@@ -322,6 +326,13 @@ fun WardrobeRoute(
             uiState = uiState,
             onDismiss = { showDepositReminderSheet = false },
             onSave = viewModel::saveReminderSettings,
+        )
+    }
+
+    if (showStatisticsSheet) {
+        WardrobeDetailedStatisticsSheet(
+            uiState = uiState,
+            onDismiss = { showStatisticsSheet = false },
         )
     }
 
@@ -721,7 +732,10 @@ private fun SearchField(
 }
 
 @Composable
-private fun WardrobeStatisticsCard(uiState: WardrobeHomeUiState) {
+private fun WardrobeStatisticsCard(
+    uiState: WardrobeHomeUiState,
+    onStatisticsClick: () -> Unit,
+) {
     val statistics = if (uiState.hasActiveQuery) uiState.visibleStatistics else uiState.statistics
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -763,7 +777,7 @@ private fun WardrobeStatisticsCard(uiState: WardrobeHomeUiState) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FeaturePill(Icons.Filled.CheckCircle, "今日穿搭色", PinkPrimary)
                 FeaturePill(Icons.Filled.Menu, "穿搭手帐", PinkPrimary)
-                FeaturePill(Icons.Filled.BarChart, "详细统计", Color(0xFF8D868B))
+                FeaturePill(Icons.Filled.BarChart, "详细统计", SoftGrayText, onClick = onStatisticsClick)
             }
         }
     }
@@ -778,9 +792,16 @@ private fun StatColumn(title: String, value: String) {
 }
 
 @Composable
-private fun RowScope.FeaturePill(icon: ImageVector, label: String, tint: Color) {
+private fun RowScope.FeaturePill(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: (() -> Unit)? = null,
+) {
     Surface(
-        modifier = Modifier.weight(1f),
+        modifier = Modifier
+            .weight(1f)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(14.dp),
         color = Color(0xFFF6EEF1),
     ) {
@@ -791,6 +812,109 @@ private fun RowScope.FeaturePill(icon: ImageVector, label: String, tint: Color) 
         ) {
             Icon(icon, contentDescription = null, tint = tint)
             Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun WardrobeDetailedStatisticsSheet(
+    uiState: WardrobeHomeUiState,
+    onDismiss: () -> Unit,
+) {
+    val statistics = if (uiState.hasActiveQuery) uiState.visibleStatistics else uiState.statistics
+    val scopeLabel = if (uiState.hasActiveQuery) "当前搜索/筛选结果" else "全量衣橱"
+    PinkFullHeightSheet(onDismissRequest = onDismiss) {
+        PinkSheetHeader(
+            title = "详细统计",
+            leading = {
+                TextButton(onClick = onDismiss) { Text("关闭") }
+            },
+            trailing = {
+                Text(scopeLabel, color = SoftGrayText, style = MaterialTheme.typography.labelMedium)
+            },
+        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("统计口径：$scopeLabel", color = SoftGrayText, style = MaterialTheme.typography.bodyMedium)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            StatColumn("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
+                            StatColumn("总价值", statistics.totalValue.moneyText())
+                            StatColumn("尾款", statistics.depositBalance.moneyText())
+                        }
+                    }
+                }
+            }
+            item { StatisticsBreakdownSection("按品牌", uiState.statisticsBreakdown.byBrand) }
+            item { StatisticsBreakdownSection("按类型", uiState.statisticsBreakdown.byType) }
+            item { StatisticsBreakdownSection("按颜色", uiState.statisticsBreakdown.byColor) }
+            item { StatisticsBreakdownSection("按状态", uiState.statisticsBreakdown.byCondition) }
+            item { StatisticsBreakdownSection("按尾款状态", uiState.statisticsBreakdown.byDepositState) }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun StatisticsBreakdownSection(
+    title: String,
+    rows: List<WardrobeStatisticBucket>,
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = PinkPrimary)
+            if (rows.isEmpty()) {
+                Text("暂无可统计数据", color = SoftGrayText, style = MaterialTheme.typography.bodyMedium)
+            } else {
+                rows.forEach { row ->
+                    StatisticsBreakdownRow(row)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatisticsBreakdownRow(row: WardrobeStatisticBucket) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(row.label, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = "${row.totalPieces} 件 / ${row.totalStyles} 款",
+                color = SoftGrayText,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(row.totalValue.moneyText(), fontWeight = FontWeight.Bold)
+            if (row.depositBalance > BigDecimal.ZERO) {
+                Text("尾款 ${row.depositBalance.moneyText()}", color = PinkAccent, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

@@ -123,6 +123,22 @@ data class WardrobeStatistics(
     val depositBalance: BigDecimal = BigDecimal.ZERO,
 )
 
+data class WardrobeStatisticBucket(
+    val label: String,
+    val totalPieces: Int,
+    val totalStyles: Int,
+    val totalValue: BigDecimal,
+    val depositBalance: BigDecimal,
+)
+
+data class WardrobeStatisticsBreakdown(
+    val byBrand: List<WardrobeStatisticBucket> = emptyList(),
+    val byType: List<WardrobeStatisticBucket> = emptyList(),
+    val byColor: List<WardrobeStatisticBucket> = emptyList(),
+    val byCondition: List<WardrobeStatisticBucket> = emptyList(),
+    val byDepositState: List<WardrobeStatisticBucket> = emptyList(),
+)
+
 data class WardrobeHomeUiState(
     val homeTab: WardrobeHomeTab = WardrobeHomeTab.Wardrobe,
     val sortOption: WardrobeSortOption = WardrobeSortOption.CreatedAtDesc,
@@ -135,6 +151,7 @@ data class WardrobeHomeUiState(
     val visibleItems: List<WardrobeItem> = emptyList(),
     val statistics: WardrobeStatistics = WardrobeStatistics(),
     val visibleStatistics: WardrobeStatistics = WardrobeStatistics(),
+    val statisticsBreakdown: WardrobeStatisticsBreakdown = WardrobeStatisticsBreakdown(),
     val isSelectionMode: Boolean = false,
     val selectedItemIds: Set<Long> = emptySet(),
     val message: String? = null,
@@ -209,6 +226,11 @@ class WardrobeHomeViewModel(
         val filtered = WardrobeBusinessLogic.filterItems(searched, runtime.filterState)
             .let { list -> if (tab == WardrobeHomeTab.DepositPlan) list.filter { it.isDepositPlan } else list }
             .let { list -> WardrobeBusinessLogic.sortItems(list, sort) }
+        val statisticsSource = if (runtime.searchQuery.isNotBlank() || runtime.filterState.activeCount > 0) {
+            filtered
+        } else {
+            sourceItems
+        }
         WardrobeHomeUiState(
             homeTab = tab,
             sortOption = sort,
@@ -221,6 +243,7 @@ class WardrobeHomeViewModel(
             visibleItems = filtered,
             statistics = sourceItems.toStatistics(),
             visibleStatistics = filtered.toStatistics(),
+            statisticsBreakdown = statisticsSource.toStatisticsBreakdown(),
             isSelectionMode = runtime.isSelectionMode,
             selectedItemIds = runtime.selectedItemIds.intersect(filtered.map { it.id }.toSet()),
             message = runtime.message,
@@ -468,6 +491,40 @@ private fun List<WardrobeItem>.toStatistics(): WardrobeStatistics {
             acc + item.totalBalance
         },
     )
+}
+
+private fun List<WardrobeItem>.toStatisticsBreakdown(): WardrobeStatisticsBreakdown {
+    return WardrobeStatisticsBreakdown(
+        byBrand = groupByDimension(emptyLabel = "未填写品牌") { it.brand.orEmpty() },
+        byType = groupByDimension(emptyLabel = "未填写类型") { it.category },
+        byColor = groupByDimension(emptyLabel = "未填写颜色") { it.colors.ifBlank { it.color.orEmpty() }.firstToken() },
+        byCondition = groupByDimension(emptyLabel = "未填写状态") { it.condition },
+        byDepositState = groupByDimension(emptyLabel = "未填写尾款状态") {
+            if (it.isDepositPlan) "心愿尾款" else "现货/已拥有"
+        },
+    )
+}
+
+private fun List<WardrobeItem>.groupByDimension(
+    emptyLabel: String,
+    labelSelector: (WardrobeItem) -> String,
+): List<WardrobeStatisticBucket> {
+    return groupBy { item -> labelSelector(item).trim().ifBlank { emptyLabel } }
+        .map { (label, items) ->
+            WardrobeStatisticBucket(
+                label = label,
+                totalPieces = items.sumOf { it.stock.coerceAtLeast(1) },
+                totalStyles = items.size,
+                totalValue = items.fold(BigDecimal.ZERO) { acc, item -> acc + item.inventoryTotalPrice },
+                depositBalance = items.fold(BigDecimal.ZERO) { acc, item -> acc + item.totalBalance },
+            )
+        }
+        .sortedWith(
+            compareByDescending<WardrobeStatisticBucket> { it.totalValue }
+                .thenByDescending { it.totalPieces }
+                .thenBy { it.label },
+        )
+        .take(8)
 }
 
 private fun String.firstToken(): String {

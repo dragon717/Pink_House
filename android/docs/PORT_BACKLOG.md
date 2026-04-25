@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-DATA-02 已验证；下一批从 BATCH-WARDROBE-DATA-03 开始。
+无 — BATCH-WARDROBE-DATA-03 已验证；下一批从 BATCH-WARDROBE-DATA-04 开始。
 
 ---
 
@@ -26,11 +26,6 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
   - 把 `Color(0xFFF7F2F4)` / `Color(0xFFEFE8EC)` 提取到 token，遵循 R4 单一真源
 
 ### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
-
-- [ ] **BATCH-WARDROBE-DATA-03** 衣橱详细统计页 / Sheet
-  - SCOPE: 2 文件 — 优先 `WardrobeRoute.kt` + `WardrobeHomeViewModel.kt`
-  - 目标：按品牌/类型/颜色/状态/小物/心愿尾款拆分统计，补充数量、价值、均价、库存等决策指标。
-  - SUCCESS: 从统计卡进入明细；支持在当前搜索/筛选结果上看统计。
 
 - [ ] **BATCH-WARDROBE-DATA-04** 最近搜索 / 常用筛选
   - SCOPE: 2 文件 — 优先 `WardrobeHomeViewModel.kt` + `UserPreferencesDataStore.kt`
@@ -98,6 +93,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-DATA-03** 衣橱详细统计 Sheet — `WardrobeHomeViewModel.kt` 新增品牌/类型/颜色/状态/尾款状态分组统计，`WardrobeRoute.kt` 将统计卡「详细统计」改为可点击 Sheet；统计口径随搜索/筛选切换为全量或当前结果。assembleDebug 通过；红线 grep 无命中；装机验证可见 `详细统计`、`统计口径：全量衣橱`、`按品牌`、`按类型`、`按颜色`，滚动后可见 `按状态` 与 `按尾款状态`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-02** 高级查询语法提示 + 快捷筛选 Chip — `WardrobeBusinessLogic.kt` 支持 `字段:关键词`、无值查询、尾款查询与价格区间；`WardrobeRoute.kt` 将搜索框升级为查询小抄卡，展示价格、无品牌、无标签、无小物、心愿尾款与动态品牌/类型/颜色/状态快捷 Chip。assembleDebug 通过；红线 grep 无命中；装机验证点击 `价格 100-300` 与 `无品牌` 后统计卡联动为「当前结果统计」。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-01** 查询/筛选结果联动统计 — `WardrobeHomeViewModel.kt` 增加 `visibleStatistics` 与活跃查询判断，`WardrobeRoute.kt` 让统计卡在搜索/筛选时切换为「当前结果统计」，展示命中数、筛选数与当前关键词。assembleDebug 通过；红线 grep 无命中；装机验证搜索 `100-200` 后出现 `当前结果统计`、`命中`、`100-200`、`2/2`、`¥297.00`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-M3-03** PetRoute 完整化（F-11 ~ F-17 宠物 home）— 重做 `PetRoute.kt` + 新增 `PetViewModel.kt`，并按用户确认追加 `PinkHouseApp.kt` 挂载入口：`我 → 智能萌宠` 与底部奶茶浮层进入宠物 Home，`萌宠对话` Tab 保持聊天页。assembleDebug 8s 通过；红线 grep 无命中；装机截图确认 `萌宠小家`、双宠切换、状态条、货币、喂食/饮水/清洁/抚摸/打工与互动记录。详见 [android_migration_pet.md](android_migration_pet.md)。

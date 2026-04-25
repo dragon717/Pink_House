@@ -161,6 +161,36 @@
 - `BATCH-WARDROBE-DATA-03`：把「详细统计」从占位按钮升级为统计明细 Sheet，优先支持当前搜索/筛选结果口径。
 - `BATCH-WARDROBE-DATA-04`：沉淀最近搜索与常用筛选组合。
 
+### BATCH-WARDROBE-DATA-03 衣橱详细统计 Sheet
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - 新增 `WardrobeStatisticBucket` 与 `WardrobeStatisticsBreakdown`。
+  - UI 状态新增 `statisticsBreakdown`，按当前统计口径生成分组统计。
+  - 分组维度：品牌、类型、颜色、状态、尾款状态。
+  - 每个分组项包含件数、款数、总价值、尾款金额，默认按总价值排序。
+  - 若有搜索/筛选，统计明细使用当前结果；否则使用全量衣橱。
+- `WardrobeRoute.kt`
+  - 统计卡内「详细统计」从纯展示 Pill 改为可点击入口。
+  - 新增 `WardrobeDetailedStatisticsSheet`，展示统计口径、总件数/款、总价值、尾款，以及各维度明细。
+  - Sheet 复用 `PinkFullHeightSheet` / `PinkSheetHeader`，保持与现有衣橱 Sheet 交互一致。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：
+  - 点击统计卡 `详细统计` 后打开 Sheet。
+  - 首屏可见 `详细统计`、`统计口径：全量衣橱`、`按品牌`、`按类型`、`按颜色`。
+  - 向下滚动后可见 `按状态` 与 `按尾款状态`。
+- 截图记录：`/tmp/pinkhouse_wardrobe_data_03_stats_sheet.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-04`：最近搜索 / 常用筛选。
+- 统计增强：后续可追加均价、占比条、购买年份/月度维度，以及从统计项反向生成筛选。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
