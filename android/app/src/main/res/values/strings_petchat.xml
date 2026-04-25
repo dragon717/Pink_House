@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pet_chat_fallback_replies">
+        <item>听不懂呢…主人在说什么呀?</item>
+        <item>咦?这个词好像没听过耶~</item>
+        <item>(歪头) 主人再说一遍?</item>
+        <item>(摇尾巴) 我好像听不太明白…</item>
+        <item>喵呜…能换个说法吗?</item>
+        <item>主人想跟我说什么呀?</item>
+        <item>嗯嗯，毛毛在听呢~</item>
+        <item>(竖耳朵) 没听懂诶…</item>
+        <item>再说一次嘛 主人~</item>
+        <item>毛毛的小脑袋瓜转不过来啦~</item>
+    </string-array>
+</resources>

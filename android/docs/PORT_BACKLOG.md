@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-M3-01 已完成；下一批从 BATCH-M3-02 开始。
+无 — BATCH-M3-02 已完成；下一批从 BATCH-M3-03 开始。
 
 ---
 
@@ -24,12 +24,6 @@
   - 把 `Color(0xFFF7F2F4)` / `Color(0xFFEFE8EC)` 提取到 token，遵循 R4 单一真源
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
-
-- [ ] **BATCH-M3-02** PetChat 兜底文案池
-  - SCOPE: 2 文件
-    - `app/src/main/res/values/strings_petchat.xml`（新建）
-    - `feature/petchat/PetChatRoute.kt`（接 stringArrayResource）
-  - 至少 10 条兜底回复（PRD F-19 要求）
 
 - [ ] **BATCH-M3-03** PetRoute 完整化（F-11 ~ F-17 宠物 home）
   - SCOPE: 2 文件 — `feature/pet/PetRoute.kt` + `feature/pet/PetViewModel.kt`
@@ -96,6 +90,7 @@
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-M3-02** PetChat 兜底文案池 — 新增 `strings_petchat.xml` 的 `pet_chat_fallback_replies` string-array（10 条），`PetChatRoute.kt` 改为 `stringArrayResource` 随机抽取；行为保持意图/输入后立即本地兜底回复。assembleDebug 8s 通过；红线 grep 无命中；装机截图确认点击 `B. 看天气穿搭` 后出现资源数组回复。详见 [android_migration_petchat.md](android_migration_petchat.md)。
 - [x] **BATCH-M3-01** PetChatRoute 首屏 + 3 个意图按钮 — 新增 `feature/petchat/PetChatRoute.kt`，`PinkHouseApp.kt` 将底部 `萌宠对话` Tab 绑定到新聊天首屏；保留输入框与本地兜底回复降级，无 AI/TTS/VIP 智能入口。assembleDebug 4s 通过；红线 grep 无命中；装机截图确认欢迎气泡、3 个意图按钮、底部输入与意图点击回复。详见 [android_migration_petchat.md](android_migration_petchat.md)。
 - [x] **BATCH-ARCH-04** SmallWorld 默认页左上图标语义调整 — `SmallWorldRoute.kt` SmallWorldFeatureScreen 内：destination == SmallWorld 时显 ☰ Menu 图标（语义"打开菜单"），子页保留 ← ArrowBack（语义"返回"），onClick 行为不变。assembleDebug 5s 通过。装机截图确认 ☰ 图标显示。 BackHandler 行为保留（按返回先进 Menu 再退 Tab），后续可继续优化但不阻塞 M3。
 - [x] **BATCH-ARCH-03** 删除浮动 `PetChatFloatingButton` — 与底部 PetChat Tab 重复入口。改 2 文件：`PinkHouseApp.kt`（删 import + 删调用）+ `PinkHouseComponents.kt`（删函数定义）。naichaPeeking 装饰保留。assembleDebug 5s 通过。装机截图确认右下角浮动按钮消失，4 Tab 完整。

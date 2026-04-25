@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.pinkhouse.android.R
 import com.pinkhouse.android.core.assets.PinkHouseAssets
 import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
 import com.pinkhouse.android.core.ui.theme.PinkHouseTheme
@@ -82,19 +84,6 @@ private val intentChips = listOf(
     IntentChip("C", "帮我找裙子"),
 )
 
-private val fallbackPetReplies = listOf(
-    "听不懂呢…主人在说什么呀?",
-    "咦?这个词好像没听过耶~",
-    "(歪头) 主人再说一遍?",
-    "(摇尾巴) 我好像听不太明白…",
-    "喵呜…能换个说法吗?",
-    "主人想跟我说什么呀?",
-    "嗯嗯，毛毛在听呢~",
-    "(竖耳朵) 没听懂诶…",
-    "再说一次嘛 主人~",
-    "毛毛的小脑袋瓜转不过来啦~",
-)
-
 private const val WELCOME_TEXT = "午后时光慢，岁月静好处。喵~ 我是你的衣橱管家，有什么可以帮你的吗?\n你想先聊哪一类呢?"
 
 @Composable
@@ -109,6 +98,7 @@ fun PetChatRoute(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
+    val fallbackPetReplies = stringArrayResource(R.array.pet_chat_fallback_replies)
 
     LaunchedEffect(Unit) {
         if (messages.isEmpty()) {
