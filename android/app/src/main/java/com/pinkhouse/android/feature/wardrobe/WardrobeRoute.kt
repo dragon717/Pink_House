@@ -73,7 +73,6 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -2000,6 +1999,40 @@ private fun SoftFormActionButton(
 }
 
 @Composable
+private fun SoftSheetActionButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(22.dp),
+        color = if (primary) PinkAccent.copy(alpha = 0.82f) else PinkBackground.copy(alpha = 0.56f),
+        border = BorderStroke(
+            1.dp,
+            if (primary) Color.White.copy(alpha = 0.82f) else Color.White.copy(alpha = 0.76f),
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label,
+                color = if (primary) Color.White else PinkPrimary,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+@Composable
 private fun DraftTextField(
     label: String,
     value: String,
@@ -2146,61 +2179,100 @@ private fun FilterSheet(
     PinkFullHeightSheet(onDismissRequest = onDismiss) {
         PinkSheetHeader(
             title = "筛选",
-            leading = { },
+            leading = {
+                TextButton(onClick = onDismiss) { Text("关闭") }
+            },
             trailing = {
-                TextButton(onClick = onClear) { Text("清除") }
+                Text("${draft.activeCount} 项", color = SoftGrayText, style = MaterialTheme.typography.labelMedium)
             },
         )
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
-            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 12.dp),
+                .weight(1f)
+                .background(PinkBackground.copy(alpha = 0.38f)),
+            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item { DraftTextField("品牌", draft.brand, "例如：Baby") { draft = draft.copy(brand = it) } }
-            item { DraftTextField("类型", draft.type, "例如：JSK") { draft = draft.copy(type = it) } }
-            item { DraftTextField("颜色", draft.color, "例如：粉色") { draft = draft.copy(color = it) } }
-            item { DraftTextField("尺码", draft.size, "例如：M") { draft = draft.copy(size = it) } }
-            item { DraftTextField("衣长", draft.length, "例如：90cm") { draft = draft.copy(length = it) } }
-            item { DraftTextField("状态", draft.condition, "例如：全新") { draft = draft.copy(condition = it) } }
-            item { DraftTextField("小物", draft.accessory, "例如：BNT") { draft = draft.copy(accessory = it) } }
-            item { DraftTextField("标签", draft.tag, "例如：茶会") { draft = draft.copy(tag = it) } }
-            item { Text("可输入：无标签、无品牌、无类型、无颜色、无尺码、无衣长、无成色、无小物", color = SoftGrayText, style = MaterialTheme.typography.bodySmall) }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("无品牌", "无标签", "无小物").forEach { token ->
-                        AssistChip(onClick = {
-                            draft = when (token) {
-                                "无品牌" -> draft.copy(brand = token)
-                                "无标签" -> draft.copy(tag = token)
-                                else -> draft.copy(accessory = token)
+                FormSection(title = "筛选条件") {
+                    DraftTextField("品牌", draft.brand, "例如：Baby") { draft = draft.copy(brand = it) }
+                    DraftTextField("类型", draft.type, "例如：JSK") { draft = draft.copy(type = it) }
+                    DraftTextField("颜色", draft.color, "例如：粉色") { draft = draft.copy(color = it) }
+                    DraftTextField("尺码", draft.size, "例如：M") { draft = draft.copy(size = it) }
+                    DraftTextField("衣长", draft.length, "例如：90cm") { draft = draft.copy(length = it) }
+                    DraftTextField("状态", draft.condition, "例如：全新") { draft = draft.copy(condition = it) }
+                    DraftTextField("小物", draft.accessory, "例如：BNT") { draft = draft.copy(accessory = it) }
+                    DraftTextField("标签", draft.tag, "例如：茶会") { draft = draft.copy(tag = it) }
+                    Text(
+                        "支持输入：无标签、无品牌、无类型、无颜色、无尺码、无衣长、无成色、无小物",
+                        color = SoftGrayText.copy(alpha = 0.72f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            item {
+                FormSection(title = "快捷条件") {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(listOf("无品牌", "无标签", "无小物")) { token ->
+                            val selected = when (token) {
+                                "无品牌" -> draft.brand == token
+                                "无标签" -> draft.tag == token
+                                else -> draft.accessory == token
                             }
-                        }, label = { Text(token) })
+                            SoftSearchPill(
+                                label = token,
+                                selected = selected,
+                                onClick = {
+                                    draft = when (token) {
+                                        "无品牌" -> draft.copy(brand = token)
+                                        "无标签" -> draft.copy(tag = token)
+                                        else -> draft.copy(accessory = token)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    SoftSearchPill(
+                        label = "只看心愿尾款",
+                        selected = draft.depositOnly,
+                        onClick = { draft = draft.copy(depositOnly = !draft.depositOnly) },
+                    )
+                    if (uiState.allItems.isNotEmpty()) {
+                        Text(
+                            "当前可筛选 ${uiState.allItems.size} 件衣物；应用后统计卡会同步更新。",
+                            color = SoftGrayText.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }
-            if (uiState.allItems.isNotEmpty()) {
-                item { Text("当前可筛选 ${uiState.allItems.size} 件衣物", color = SoftGrayText, style = MaterialTheme.typography.bodySmall) }
-            }
-            item {
-                FilterChip(
-                    selected = draft.depositOnly,
-                    onClick = { draft = draft.copy(depositOnly = !draft.depositOnly) },
-                    label = { Text("只看心愿尾款") },
-                )
-            }
+            item { Spacer(Modifier.height(8.dp)) }
         }
-        Row(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 22.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+            shape = RoundedCornerShape(28.dp),
+            color = Color.White.copy(alpha = 0.84f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.86f)),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
         ) {
-            TextButton(onClick = onDismiss) { Text("取消") }
-            Spacer(Modifier.width(8.dp))
-            Button(onClick = { onApply(draft) }) { Text("应用筛选") }
+            Row(
+                modifier = Modifier.padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SoftSheetActionButton(label = "清空", onClick = onClear)
+                SoftSheetActionButton(label = "取消", onClick = onDismiss)
+                SoftSheetActionButton(
+                    label = "应用筛选",
+                    primary = true,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onApply(draft) },
+                )
+            }
         }
     }
 }

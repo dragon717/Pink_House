@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-UI-06 已验证；下一批建议继续筛选 Sheet / 查询条件面板软圆还原。
+无 — BATCH-WARDROBE-UI-07 已验证；下一批建议回到数据统计增强：统计明细项一键反向筛选。
 
 ---
 
@@ -27,9 +27,9 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 ### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
 
-- [ ] **BATCH-WARDROBE-UI-07** 筛选 Sheet / 查询条件面板软圆还原
-  - SCOPE: 2 文件 — `WardrobeRoute.kt` + `android_migration_wardrobe.md`
-  - 目标：处理多维筛选 Sheet、筛选 Chip/清空/应用入口与查询条件展示，继续服务核心数据查询体验。
+- [ ] **BATCH-WARDROBE-DATA-05** 统计明细项一键反向筛选
+  - SCOPE: 2 业务文件 — `WardrobeRoute.kt` + `WardrobeHomeViewModel.kt`；同步更新 `android_migration_wardrobe.md`
+  - 目标：在详细统计 Sheet 中点击品牌/类型/颜色/状态/尾款分组项，可直接生成对应筛选条件并回到当前结果统计，形成“统计 → 查询”的闭环。
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
@@ -93,6 +93,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-UI-07** 筛选 Sheet / 查询条件面板软圆还原 — `WardrobeRoute.kt` 将筛选 Sheet 内容区改为轻粉底，筛选字段归入 `筛选条件` 软玻璃分组，快捷无值条件与 `只看心愿尾款` 改为 `SoftSearchPill`，底部 `清空 / 取消 / 应用筛选` 改为固定软圆操作条；保留原筛选逻辑与统计联动。assembleDebug 通过；红线 grep 无命中；装机验证可见 `筛选条件`、`快捷条件`、`无品牌`、`无标签`、`无小物`、`只看心愿尾款` 与 `应用筛选`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-06** 创建/编辑表单软圆还原 — `WardrobeRoute.kt` 将新增/编辑衣物 Sheet 内容区改为轻粉底，`FormSection` 复用软玻璃面板，`DraftTextField` 从 Material `OutlinedTextField` 改为自定义 `BasicTextField` 软圆输入块，日期入口改为自定义圆角日期行，图片导入按钮与测试素材 Chip 改为粉色软圆组件，心愿尾款开关包入柔和白底容器。assembleDebug 通过；红线 grep 无命中；装机验证可见 `手动创建`、`裙装信息`、`相册`、`测试图片`、软圆输入框、`价格信息`、`购买日期`、`加入心愿尾款` 与 `备注`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-05** 衣物详情 Sheet / 信息行软圆还原 — `WardrobeRoute.kt` 对照 iOS 详情页，把 Android 详情 Sheet 内容区改为轻粉底 + 软玻璃卡：图片外框、名称/品牌/价格摘要、`裙装信息`、`价格信息`、`备注` 与 `移入回收站` 均使用自定义圆角容器和轻描边。assembleDebug 通过；红线 grep 无命中；装机打开 `奶油白半身裙` 详情并滚动验证可见 `裙装信息`、`价格信息`、`备注`、`移入回收站`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-04** 衣橱顶部操作栏 / 分段控件软圆还原 — `WardrobeRoute.kt` 对照 iOS fashion 导航，把 `少女衣橱 / 心愿尾款` 分段改为图标+文字的紧凑软圆按钮，操作按钮组改为自定义圆形热区 `Surface`，排序/更多图标替换为更接近 iOS 的上下箭头与横向省略号，并移除本区新增硬编码色值。assembleDebug 通过；红线 grep 无命中；装机验证可见 `少女衣橱`、`心愿尾款`、`排序`、`筛选`、`布局`、`更多`、`添加`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。

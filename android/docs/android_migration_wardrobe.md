@@ -402,6 +402,37 @@
 
 - `BATCH-WARDROBE-UI-07`：继续处理筛选 Sheet / 查询条件面板软圆还原，优先服务数据查询体验。
 
+
+### BATCH-WARDROBE-UI-07 筛选 Sheet / 查询条件面板软圆还原
+
+**背景**
+
+- 筛选是衣橱数据查询链路的核心入口；上一版功能可用，但 Sheet 内部仍是线性表单、Material `AssistChip` / `FilterChip` 与默认按钮组合，和近期软圆体系不一致。
+- 本批保持筛选逻辑不变，只把多维筛选面板、快捷条件和底部操作条统一到粉白玻璃风格。
+
+**改动范围**
+
+- `WardrobeRoute.kt`
+  - `FilterSheet` 内容区加入轻粉背景，顶部显示当前草稿筛选项数量。
+  - 筛选字段归入 `筛选条件` 软玻璃分组，继续复用 UI-06 的自定义 `DraftTextField`。
+  - `无品牌`、`无标签`、`无小物` 快捷条件从 Material `AssistChip` 改为 `SoftSearchPill`。
+  - `只看心愿尾款` 从 `FilterChip` 改为同体系 `SoftSearchPill`，选中状态更贴近 iOS 低对比粉色胶囊。
+  - 底部 `清空 / 取消 / 应用筛选` 改为固定软圆操作条，新增 `SoftSheetActionButton`，应用按钮使用粉色主操作样式。
+  - 保留原筛选字段、清空、应用与统计联动行为，不改数据层。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：点击顶部筛选按钮打开 Sheet，首屏可见 `筛选`、`筛选条件`、品牌/类型等软圆输入行与固定 `应用筛选`；向下滚动可见 `快捷条件`、`无品牌`、`无标签`、`无小物`、`只看心愿尾款`。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_ui_07_filter_sheet.png`
+  - `/tmp/pinkhouse_wardrobe_ui_07_filter_sheet_shortcuts.png`
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-05`：把详细统计 Sheet 的品牌/类型/颜色/状态/尾款分组项做成一键反向筛选，形成“统计发现 → 查询定位”的闭环。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
