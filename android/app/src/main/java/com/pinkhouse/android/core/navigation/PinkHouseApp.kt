@@ -2,15 +2,17 @@ package com.pinkhouse.android.core.navigation
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -23,25 +25,120 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.pinkhouse.android.core.assets.PinkHouseAssets
 import com.pinkhouse.android.core.di.AppContainer
-import com.pinkhouse.android.core.ui.FeaturePlaceholder
+import com.pinkhouse.android.core.ui.PetChatFloatingButton
+import com.pinkhouse.android.core.ui.PinkBottomNavBar
+import com.pinkhouse.android.core.ui.PinkBottomNavItem
+import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
+import com.pinkhouse.android.feature.me.MeRoute
+import com.pinkhouse.android.feature.pet.PetRoute
+import com.pinkhouse.android.feature.smallworld.SmallWorldRoute
+import com.pinkhouse.android.feature.wardrobe.WardrobeHomeTab
 import com.pinkhouse.android.feature.wardrobe.WardrobeRoute
 
 @Composable
 fun PinkHouseApp(appContainer: AppContainer) {
     val navController = rememberNavController()
-    val destinations = AppDestination.entries
+    var requestedWardrobeHomeTab by rememberSaveable { mutableStateOf<WardrobeHomeTab?>(null) }
+    val bottomDestinations = AppDestination.entries.filter { it.showInBottomBar }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val currentRoute = currentDestination?.route
+    val showPetFloatingEntry = currentRoute != AppDestination.House.route && currentRoute != AppDestination.PetChat.route
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                destinations.forEach { destination ->
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = AppDestination.Wardrobe.route,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            composable(AppDestination.Wardrobe.route) {
+                WardrobeRoute(
+                    appContainer = appContainer,
+                    requestedHomeTab = requestedWardrobeHomeTab,
+                    onRequestedHomeTabConsumed = { requestedWardrobeHomeTab = null },
+                )
+            }
+            composable(AppDestination.House.route) {
+                SmallWorldRoute(
+                    onNavigateWardrobeTab = { tab ->
+                        requestedWardrobeHomeTab = tab
+                        navController.navigate(AppDestination.Wardrobe.route) {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigatePetChat = {
+                        navController.navigate(AppDestination.PetChat.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(AppDestination.Me.route) {
+                MeRoute(
+                    onOpenWardrobeSettings = {
+                        navController.navigate(AppDestination.Wardrobe.route) {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onOpenPetSettings = {
+                        navController.navigate(AppDestination.PetChat.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(AppDestination.PetChat.route) {
+                PetRoute(onBackToWardrobe = {
+                    navController.navigate(AppDestination.Wardrobe.route) {
+                        popUpTo(AppDestination.Wardrobe.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                })
+            }
+        }
+
+        if (showPetFloatingEntry) {
+            Image(
+                painter = painterResource(PinkHouseAssets.naichaPeeking),
+                contentDescription = "naicha_peeking",
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        bottom = PinkHouseDesignTokens.BottomNavHeight +
+                            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                            2.dp,
+                    )
+                    .size(width = 112.dp, height = 70.dp),
+                contentScale = ContentScale.Fit,
+            )
+            PetChatFloatingButton(
+                petImageRes = PinkHouseAssets.maomaoPeeking,
+                onClick = {
+                    navController.navigate(AppDestination.PetChat.route) {
+                        launchSingleTop = true
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 18.dp,
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 14.dp,
+                    ),
+            )
+        }
+
+        if (currentRoute != AppDestination.PetChat.route) {
+            PinkBottomNavBar(modifier = Modifier.align(Alignment.BottomCenter)) {
+                bottomDestinations.forEach { destination ->
                     val selected = currentDestination
                         ?.hierarchy
                         ?.any { it.route == destination.route } == true
-                    NavigationBarItem(
+                    PinkBottomNavItem(
                         selected = selected,
+                        label = destination.label,
+                        icon = destination.icon,
                         onClick = {
                             navController.navigate(destination.route) {
                                 popUpTo(navController.graph.startDestinationId) {
@@ -51,60 +148,9 @@ fun PinkHouseApp(appContainer: AppContainer) {
                                 restoreState = true
                             }
                         },
-                        icon = {
-                            Icon(
-                                imageVector = destination.icon,
-                                contentDescription = destination.label,
-                            )
-                        },
-                        label = { Text(destination.label) },
+                        modifier = Modifier.weight(1f),
                     )
                 }
-            }
-        },
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            NavHost(
-                navController = navController,
-                startDestination = AppDestination.Wardrobe.route,
-            ) {
-                composable(AppDestination.Wardrobe.route) {
-                    WardrobeRoute(
-                        appContainer = appContainer,
-                    )
-                }
-                composable(AppDestination.House.route) {
-                    FeaturePlaceholder(
-                        title = "House",
-                        description = "小世界热区、梦裙日历、穿搭手帐和来财入口会在后续版本接入。",
-                        heroImageRes = PinkHouseAssets.naichaPortrait,
-                        backgroundImageRes = PinkHouseAssets.smallWorldNormal,
-                    )
-                }
-                composable(AppDestination.Me.route) {
-                    FeaturePlaceholder(
-                        title = "我",
-                        description = "主题、备份、VIP、魔法任务和本地设置入口保留占位。",
-                        heroImageRes = PinkHouseAssets.vipCardFront,
-                    )
-                }
-                composable(AppDestination.PetChat.route) {
-                    FeaturePlaceholder(
-                        title = "萌宠对话",
-                        description = "本地规则式气泡和聊天历史会在宠物闭环中实现，本轮不接 AI。",
-                        heroImageRes = PinkHouseAssets.maomaoPortrait,
-                    )
-                }
-            }
-            if (currentDestination?.route != AppDestination.Wardrobe.route) {
-                Image(
-                    painter = painterResource(PinkHouseAssets.naichaPeeking),
-                    contentDescription = "naicha_peeking",
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .size(width = 112.dp, height = 70.dp),
-                    contentScale = ContentScale.Fit,
-                )
             }
         }
     }

@@ -97,7 +97,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -106,7 +105,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pinkhouse.android.core.di.AppContainer
-import com.pinkhouse.android.core.assets.PinkHouseAssets
 import com.pinkhouse.android.core.ui.PinkFullHeightSheet
 import com.pinkhouse.android.core.ui.PinkSheetHeader
 import com.pinkhouse.android.domain.model.WardrobeItem
@@ -127,7 +125,11 @@ private val PinkAccent = Color(0xFFFF7BA6)
 private val SoftGrayText = Color(0xFF756B70)
 
 @Composable
-fun WardrobeRoute(appContainer: AppContainer) {
+fun WardrobeRoute(
+    appContainer: AppContainer,
+    requestedHomeTab: WardrobeHomeTab? = null,
+    onRequestedHomeTabConsumed: () -> Unit = {},
+) {
     val factory = remember(appContainer) {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -166,6 +168,13 @@ fun WardrobeRoute(appContainer: AppContainer) {
     LaunchedEffect(uiState.message) {
         if (uiState.message != null) {
             viewModel.consumeMessage()
+        }
+    }
+
+    LaunchedEffect(requestedHomeTab) {
+        if (requestedHomeTab != null) {
+            viewModel.selectHomeTab(requestedHomeTab)
+            onRequestedHomeTabConsumed()
         }
     }
 
@@ -251,16 +260,6 @@ fun WardrobeRoute(appContainer: AppContainer) {
             )
         }
 
-        if (!uiState.isSelectionMode) {
-            ComposeImage(
-                painter = painterResource(PinkHouseAssets.naichaPeeking),
-                contentDescription = "naicha_peeking",
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .size(width = 112.dp, height = 70.dp),
-                contentScale = ContentScale.Fit,
-            )
-        }
     }
 
     if (showCreateSheet) {
