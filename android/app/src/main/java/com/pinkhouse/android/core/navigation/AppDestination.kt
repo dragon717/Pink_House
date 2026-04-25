@@ -16,5 +16,5 @@ enum class AppDestination(
     Wardrobe("wardrobe", "衣橱", Icons.Filled.Inventory2),
     House("house", "House", Icons.Filled.Home),
     Me("me", "我", Icons.Filled.Face),
-    PetChat("petChat", "萌宠对话", Icons.Filled.ChatBubble, showInBottomBar = false),
+    PetChat("petChat", "萌宠对话", Icons.Filled.ChatBubble),
 }
