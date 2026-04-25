@@ -283,6 +283,34 @@
 
 - `BATCH-WARDROBE-UI-03`：继续处理衣物网格/列表卡片，包括空图占位、价格区、尾款角标与卡片边缘。
 
+
+### BATCH-WARDROBE-UI-03 衣橱列表/网格卡片软圆还原
+
+**背景**
+
+- 延续用户关于「原生组件太方正时使用自定义容器/组件」的反馈，本批集中处理最高频可见的衣物卡片区域。
+- 目标不是增加新功能，而是让网格卡、列表行、尾款角标、价格文本与空图占位更接近 iOS Pink_House 的柔和、低对比、粉白玻璃感。
+
+**改动范围**
+
+- `WardrobeRoute.kt`
+  - `WardrobeGridCard` 从 Material `Card` 改为自定义 `Surface`：28dp 大圆角、半透明白底、轻白描边，选中态使用粉色描边而不是硬边框。
+  - 网格主图容器加入 22dp 圆角白色描边，卡片内容区增加轻微内边距，名称颜色统一为柔和灰；价格从裸文本改为 `SoftPricePill` 胶囊。
+  - `WardrobeListRow` 同步改为 26dp 软圆 `Surface`，列表缩略图使用 20dp 圆角白描边，右侧价格复用 `SoftPricePill`。
+  - 心愿尾款角标从硬色矩形改为 `SoftDepositBadge`：粉色半透明圆角面、白描边、白字。
+  - 空图占位渐变从新增硬编码色值改为现有 `Color.White` / `PinkBackground` 半透明组合，避免新增 token 红线。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：衣橱首页可见软圆衣物网格卡、白色圆角主图框、价格胶囊；UI XML 确认 `奶油白半身裙`、`¥129.00`、`粉色针织开衫`、`心愿尾款` 均存在。
+- 截图记录：`/tmp/pinkhouse_wardrobe_ui_03_cards.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-UI-04`：继续处理顶部 `少女衣橱 / 心愿尾款` 分段、排序/筛选/网格/更多/新增按钮组与触控热区，让顶部操作区也脱离 Material IconButton 气质。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地

@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-UI-02 已验证；下一批建议继续衣橱卡片/列表软圆还原。
+无 — BATCH-WARDROBE-UI-03 已验证；下一批建议继续衣橱顶部操作栏 / 分段控件软圆还原。
 
 ---
 
@@ -27,9 +27,9 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 ### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
 
-- [ ] **BATCH-WARDROBE-UI-03** 衣橱列表/网格卡片软圆还原
+- [ ] **BATCH-WARDROBE-UI-04** 衣橱顶部操作栏 / 分段控件软圆还原
   - SCOPE: 2 文件 — `WardrobeRoute.kt` + `android_migration_wardrobe.md`
-  - 目标：继续减少衣物卡片的原生 Card 感，主图容器、价格区、尾款角标与空图占位统一贴近 iOS 的柔和圆角与低对比阴影。
+  - 目标：继续处理顶部 `少女衣橱 / 心愿尾款` 分段、排序/筛选/网格/更多/新增按钮组与触控热区，减少 Material IconButton 感，贴近 iOS 白色胶囊与低对比图标容器。
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
@@ -93,6 +93,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-UI-03** 衣橱列表/网格卡片软圆还原 — `WardrobeRoute.kt` 将网格卡与列表行从 Material `Card` 改为自定义软圆 `Surface`，统一 26–28dp 圆角、半透明白底、轻描边主图框、粉色尾款角标与价格胶囊；空图占位渐变改为现有 token 色系。assembleDebug 通过；红线 grep 无命中；装机验证可见 `奶油白半身裙`、`¥129.00`、`粉色针织开衫` 与 `心愿尾款`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-02** 衣橱统计卡 / 详细统计 Sheet 软圆还原 — `WardrobeRoute.kt` 将统计卡外层、指标块、功能入口、详细统计 Sheet 汇总块与分组行从 Material `ElevatedCard`/方正入口改为自定义软圆半透明面板、轻描边块和粉色内容底。assembleDebug 通过；红线 grep 无命中；装机验证可见 `衣橱总览`、软圆统计块、`详细统计` Sheet、`统计口径：全量衣橱`、`按品牌` 与 `按类型`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-04B** 最近搜索持久化 — `UserPreferencesDataStore.kt` 新增 `wardrobe_recent_searches` 持久化键与 UTF-8 percent-encoding 编解码；`WardrobeHomeViewModel.kt` 从 DataStore 读取最近搜索并在提交查询时写回。assembleDebug 通过；红线 grep 无命中；装机验证点击 `价格 100-300` 后 force-stop 重启，重新打开搜索仍可见 `最近搜索` 与 `100-300`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-04A** 最近搜索 UI + 搜索区软圆还原 — `WardrobeHomeViewModel.kt` 新增会话内 `recentSearches` 与 `submitSearchQuery`，`WardrobeRoute.kt` 将搜索区从 `OutlinedTextField` / Material `AssistChip` 改为自定义 `BasicTextField` 胶囊、圆形关闭按钮、软圆玻璃面板与自定义查询 Pill。assembleDebug 通过；红线 grep 无命中；装机验证打开搜索可见 `快捷查询`，点击 `价格 100-300` 后出现 `最近搜索`、`100-300`、`当前结果统计` 与 `命中 3/4 款`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。

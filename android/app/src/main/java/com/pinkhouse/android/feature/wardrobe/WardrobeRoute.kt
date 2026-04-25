@@ -1275,39 +1275,36 @@ private fun WardrobeGridCard(
     imagePath: String?,
     onClick: () -> Unit,
 ) {
-    Card(
+    val shape = RoundedCornerShape(28.dp)
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .then(
-                if (selected) {
-                    Modifier.border(2.dp, PinkAccent, RoundedCornerShape(18.dp))
-                } else {
-                    Modifier
-                },
-            ),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = PinkSurface),
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = Color.White.copy(alpha = 0.66f),
+        border = androidx.compose.foundation.BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) PinkAccent.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.78f),
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
-        Column(modifier = Modifier.padding(if (compact) 6.dp else 8.dp)) {
+        Column(modifier = Modifier.padding(if (compact) 7.dp else 9.dp)) {
             Box {
                 WardrobeImage(
                     imagePath = imagePath,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(14.dp)),
+                        .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(22.dp))
+                        .clip(RoundedCornerShape(22.dp)),
                 )
                 if (item.isDepositPlan) {
-                    Text(
+                    SoftDepositBadge(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .background(Color(0xFF6D4C41).copy(alpha = 0.86f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 6.dp, vertical = 3.dp),
-                        text = "心愿尾款",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
+                            .padding(8.dp),
                     )
                 }
                 if (isSelectionMode) {
@@ -1323,19 +1320,17 @@ private fun WardrobeGridCard(
             }
             if (!compact) {
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = item.name,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = item.inventoryTotalPrice.moneyText(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF5F545A),
-                )
+                Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        text = item.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = SoftGrayText,
+                    )
+                    SoftPricePill(item.inventoryTotalPrice.moneyText())
+                }
             }
         }
     }
@@ -1350,13 +1345,20 @@ private fun WardrobeListRow(
     imagePath: String?,
     onClick: () -> Unit,
 ) {
-    Card(
+    val shape = RoundedCornerShape(26.dp)
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .then(if (selected) Modifier.border(2.dp, PinkAccent, RoundedCornerShape(18.dp)) else Modifier),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = PinkSurface),
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = Color.White.copy(alpha = 0.66f),
+        border = androidx.compose.foundation.BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) PinkAccent.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.78f),
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -1368,7 +1370,8 @@ private fun WardrobeListRow(
                     imagePath = imagePath,
                     modifier = Modifier
                         .size(if (detailed) 92.dp else 64.dp)
-                        .clip(RoundedCornerShape(14.dp)),
+                        .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(20.dp)),
                 )
                 if (isSelectionMode) {
                     Icon(
@@ -1379,7 +1382,7 @@ private fun WardrobeListRow(
                 }
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(item.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = SoftGrayText)
                 Text(
                     listOfNotNull(item.brand, item.category, item.colors.ifBlank { item.color }).joinToString(" · "),
                     color = SoftGrayText,
@@ -1395,8 +1398,44 @@ private fun WardrobeListRow(
                     )
                 }
             }
-            Text(item.inventoryTotalPrice.moneyText(), fontWeight = FontWeight.Bold)
+            SoftPricePill(item.inventoryTotalPrice.moneyText())
         }
+    }
+}
+
+@Composable
+private fun SoftDepositBadge(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = PinkAccent.copy(alpha = 0.78f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.84f)),
+    ) {
+        Text(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            text = "心愿尾款",
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun SoftPricePill(text: String) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = PinkBackground.copy(alpha = 0.48f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)),
+    ) {
+        Text(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            text = text,
+            color = SoftGrayText,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
     }
 }
 
@@ -1449,7 +1488,7 @@ private fun WardrobeImage(imagePath: String?, modifier: Modifier) {
         Box(
             modifier = modifier.background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFFF7F2F4), Color(0xFFEFE8EC)),
+                    colors = listOf(Color.White.copy(alpha = 0.64f), PinkBackground.copy(alpha = 0.58f)),
                 ),
             ),
             contentAlignment = Alignment.Center,
