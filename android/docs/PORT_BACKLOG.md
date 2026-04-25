@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-M3-03 已完成；下一批从 BATCH-M3-04 开始。
+无 — BATCH-WARDROBE-DATA-01 已验证；下一批从 BATCH-WARDROBE-DATA-02 开始。
 
 ---
 
@@ -15,7 +15,7 @@
 
 按优先级倒序，下回合从顶端取。
 
-UX 优先路线：先把 `House → 小世界 → 宠物 Home / 萌宠对话` 的核心路径打通，再补每日留存入口（签到、日历、通知），最后推进财富/VIP/拼豆等低频模块。
+UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 做扎实（用户最高频、最高决策价值），再补每日留存入口（签到、日历、通知），随后继续 `House / 宠物 / 小世界` 体验，最后推进财富/VIP/拼豆/OOTD 等低频或商业模块。
 
 ### 阶段 ARCH 已收尾 ✅（4 批全过）
 
@@ -24,6 +24,22 @@ UX 优先路线：先把 `House → 小世界 → 宠物 Home / 萌宠对话` �
 - [ ] **BATCH-CLEANUP-01** AssetImage 占位渐变迁出硬编码
   - SCOPE: 2 文件 — `core/ui/PinkHouseDesignTokens.kt` + `core/ui/PinkHouseComponents.kt`
   - 把 `Color(0xFFF7F2F4)` / `Color(0xFFEFE8EC)` 提取到 token，遵循 R4 单一真源
+
+### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
+
+- [ ] **BATCH-WARDROBE-DATA-02** 高级查询语法提示 + 快捷筛选 Chip
+  - SCOPE: 2 文件 — `WardrobeRoute.kt` + `WardrobeBusinessLogic.kt`
+  - 目标：把已支持的价格区间、无品牌/无标签/无小物、品牌/类型/颜色/状态等查询能力显性化，减少用户记忆成本。
+  - SUCCESS: 搜索区域展示帮助/快捷 Chip；点击后能直接生成查询或筛选；统计卡继续联动命中结果。
+
+- [ ] **BATCH-WARDROBE-DATA-03** 衣橱详细统计页 / Sheet
+  - SCOPE: 2 文件 — 优先 `WardrobeRoute.kt` + `WardrobeHomeViewModel.kt`
+  - 目标：按品牌/类型/颜色/状态/小物/心愿尾款拆分统计，补充数量、价值、均价、库存等决策指标。
+  - SUCCESS: 从统计卡进入明细；支持在当前搜索/筛选结果上看统计。
+
+- [ ] **BATCH-WARDROBE-DATA-04** 最近搜索 / 常用筛选
+  - SCOPE: 2 文件 — 优先 `WardrobeHomeViewModel.kt` + `UserPreferencesDataStore.kt`
+  - 目标：保存最近查询与常用筛选组合，让高频查找可以一键复用。
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
@@ -87,6 +103,7 @@ UX 优先路线：先把 `House → 小世界 → 宠物 Home / 萌宠对话` �
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-DATA-01** 查询/筛选结果联动统计 — `WardrobeHomeViewModel.kt` 增加 `visibleStatistics` 与活跃查询判断，`WardrobeRoute.kt` 让统计卡在搜索/筛选时切换为「当前结果统计」，展示命中数、筛选数与当前关键词。assembleDebug 通过；红线 grep 无命中；装机验证搜索 `100-200` 后出现 `当前结果统计`、`命中`、`100-200`、`2/2`、`¥297.00`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-M3-03** PetRoute 完整化（F-11 ~ F-17 宠物 home）— 重做 `PetRoute.kt` + 新增 `PetViewModel.kt`，并按用户确认追加 `PinkHouseApp.kt` 挂载入口：`我 → 智能萌宠` 与底部奶茶浮层进入宠物 Home，`萌宠对话` Tab 保持聊天页。assembleDebug 8s 通过；红线 grep 无命中；装机截图确认 `萌宠小家`、双宠切换、状态条、货币、喂食/饮水/清洁/抚摸/打工与互动记录。详见 [android_migration_pet.md](android_migration_pet.md)。
 - [x] **BATCH-M3-02** PetChat 兜底文案池 — 新增 `strings_petchat.xml` 的 `pet_chat_fallback_replies` string-array（10 条），`PetChatRoute.kt` 改为 `stringArrayResource` 随机抽取；行为保持意图/输入后立即本地兜底回复。assembleDebug 8s 通过；红线 grep 无命中；装机截图确认点击 `B. 看天气穿搭` 后出现资源数组回复。详见 [android_migration_petchat.md](android_migration_petchat.md)。
 - [x] **BATCH-M3-01** PetChatRoute 首屏 + 3 个意图按钮 — 新增 `feature/petchat/PetChatRoute.kt`，`PinkHouseApp.kt` 将底部 `萌宠对话` Tab 绑定到新聊天首屏；保留输入框与本地兜底回复降级，无 AI/TTS/VIP 智能入口。assembleDebug 4s 通过；红线 grep 无命中；装机截图确认欢迎气泡、3 个意图按钮、底部输入与意图点击回复。详见 [android_migration_petchat.md](android_migration_petchat.md)。

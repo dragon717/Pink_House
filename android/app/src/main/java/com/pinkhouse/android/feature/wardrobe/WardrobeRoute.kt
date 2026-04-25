@@ -231,7 +231,7 @@ fun WardrobeRoute(
             }
 
             if (uiState.homeTab == WardrobeHomeTab.Wardrobe) {
-                WardrobeStatisticsCard(statistics = uiState.statistics)
+                WardrobeStatisticsCard(uiState = uiState)
                 WardrobeContent(
                     uiState = uiState,
                     viewModel = viewModel,
@@ -678,19 +678,46 @@ private fun SearchField(
                 Icon(Icons.Filled.Close, contentDescription = "关闭搜索")
             }
         },
-        placeholder = { Text("搜索名称、品牌、类型、颜色、尺码...") },
+        placeholder = { Text("搜索名称、品牌、类型、颜色、尺码、备注或 100-300") },
         shape = RoundedCornerShape(18.dp),
     )
 }
 
 @Composable
-private fun WardrobeStatisticsCard(statistics: WardrobeStatistics) {
+private fun WardrobeStatisticsCard(uiState: WardrobeHomeUiState) {
+    val statistics = if (uiState.hasActiveQuery) uiState.visibleStatistics else uiState.statistics
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = Color.White.copy(alpha = 0.9f)),
     ) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = if (uiState.hasActiveQuery) "当前结果统计" else "衣橱总览",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = PinkPrimary,
+                    )
+                    Text(
+                        text = if (uiState.hasActiveQuery) {
+                            "命中 ${uiState.visibleItems.size}/${uiState.allItems.size} 款 · 筛选 ${uiState.filterState.activeCount} 项"
+                        } else {
+                            "全量数据 · 搜索和筛选后会联动更新"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SoftGrayText,
+                    )
+                }
+                if (uiState.hasActiveQuery && uiState.searchQuery.isNotBlank()) {
+                    AssistChip(onClick = {}, label = { Text(uiState.searchQuery) })
+                }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 StatColumn("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
                 StatColumn("裙装价值", statistics.wardrobeValue.moneyText())

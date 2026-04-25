@@ -134,6 +134,7 @@ data class WardrobeHomeUiState(
     val allItems: List<WardrobeItem> = emptyList(),
     val visibleItems: List<WardrobeItem> = emptyList(),
     val statistics: WardrobeStatistics = WardrobeStatistics(),
+    val visibleStatistics: WardrobeStatistics = WardrobeStatistics(),
     val isSelectionMode: Boolean = false,
     val selectedItemIds: Set<Long> = emptySet(),
     val message: String? = null,
@@ -148,6 +149,9 @@ data class WardrobeHomeUiState(
 ) {
     val allVisibleSelected: Boolean
         get() = visibleItems.isNotEmpty() && visibleItems.all { selectedItemIds.contains(it.id) }
+
+    val hasActiveQuery: Boolean
+        get() = searchQuery.isNotBlank() || filterState.activeCount > 0
 }
 
 private data class WardrobeRuntimeState(
@@ -216,6 +220,7 @@ class WardrobeHomeViewModel(
             allItems = sourceItems,
             visibleItems = filtered,
             statistics = sourceItems.toStatistics(),
+            visibleStatistics = filtered.toStatistics(),
             isSelectionMode = runtime.isSelectionMode,
             selectedItemIds = runtime.selectedItemIds.intersect(filtered.map { it.id }.toSet()),
             message = runtime.message,

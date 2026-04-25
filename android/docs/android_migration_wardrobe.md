@@ -2,7 +2,7 @@
 
 > 本文记录 `feature/wardrobe/**` 从 iOS SwiftUI 版本（`Pink_House/Pink_House/Views/Wardrobe/WardrobeView.swift` 等）迁移到 Android Jetpack Compose 的进度与差异。业务以 SwiftUI 为准；规范参考 Android 官方文档 / Material 3 / Compose Guidelines。与鸿蒙侧 `harmony_next/docs/harmony_migration_wardrobe.md` 对标，差异集中在无 GMS / Scoped Storage / Room schema 几类。
 
-> **当前状态**：M2 衣橱闭环已落。`WardrobeRoute.kt` 已替换为 `衣橱 / 心愿尾款` 双页 Compose 复刻；`WardrobeHomeViewModel` 负责 Room + DataStore + 单向 UI 状态；Room `wardrobe_item` 已升级到 v2 并保留 v1→v2 Migration；手动创建、图片导入、搜索、筛选、排序、布局切换、编辑选择态、批量软删除均已接入。
+> **当前状态**：M2 衣橱闭环已落。`WardrobeRoute.kt` 已替换为 `衣橱 / 心愿尾款` 双页 Compose 复刻；`WardrobeHomeViewModel` 负责 Room + DataStore + 单向 UI 状态；Room `wardrobe_item` 已升级到 v2 并保留 v1→v2 Migration；手动创建、图片导入、搜索、筛选、排序、布局切换、编辑选择态、批量软删除均已接入。当前优先级已切到衣橱核心查询与统计：搜索/筛选结果会驱动统计卡联动显示当前命中数据。
 
 ## 一、TopBar 顶栏
 
@@ -102,7 +102,35 @@
 - 鸿蒙 MVP 用 DROP 重建丢数据；**Android 不准这么做**——必须写 `Migration`，老用户必须平滑升级。
 - 标签关系表 DAO 可提前建，UI 先不暴露。
 
-## 七、M3 推进记录（Computer Use 对照）
+## 七、WARDROBE-DATA 推进记录（查询 / 统计优先）
+
+### BATCH-WARDROBE-DATA-01 查询/筛选结果联动统计
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - `WardrobeHomeUiState` 新增 `visibleStatistics`，由当前搜索/筛选后的 `visibleItems` 计算。
+  - 新增 `hasActiveQuery`，统一判断搜索词或筛选项是否处于激活状态。
+- `WardrobeRoute.kt`
+  - 统计卡从固定全量数据改为根据 `hasActiveQuery` 自动切换：无查询时显示「衣橱总览」，有查询/筛选时显示「当前结果统计」。
+  - 增加命中说明：`命中 x/y 款 · 筛选 n 项`。
+  - 搜索词不为空时在统计卡右侧显示当前关键词 Chip，帮助用户确认统计口径。
+  - 搜索框占位补充 `备注或 100-300`，显性提示价格区间查询能力。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：进入衣橱搜索 `100-200`，UI 出现 `当前结果统计`、`命中`、`100-200`、`2/2`、`¥297.00`。
+- 截图记录：`/tmp/pinkhouse_wardrobe_data_01_query_stats.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-02`：把已支持但较隐藏的高级查询能力做成帮助说明与快捷 Chip。
+- `BATCH-WARDROBE-DATA-03`：新增统计明细页 / Sheet，按品牌、类型、颜色、状态、心愿尾款等维度拆解。
+- `BATCH-WARDROBE-DATA-04`：沉淀最近搜索与常用筛选组合。
+
+## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
 
@@ -123,7 +151,7 @@
 - `adb shell am start -W` 普通冷启动成功，记录 `TotalTime: 3070ms`。
 - Computer Use 验证 Android 模拟器：衣橱首页、底部猫咪覆盖、详情 Sheet 可见且未出现 System UI ANR。
 
-## 八、已知待办（非本迭代）
+## 九、已知待办（非本迭代）
 
 - 列表布局下的拖拽排序
 - 品牌 / 系列 / 标签 独立管理页
@@ -132,7 +160,7 @@
 - 心愿尾款分支的编辑模式
 - Sheet 切换时的 key 变更能否用 `remember(key)` 更优
 
-## 九、日志与可调试性
+## 十、日志与可调试性
 
 统一走 **Timber**（Application.onCreate 注册），tag 约定：
 
@@ -149,7 +177,7 @@
 
 Pixel 10 Pro Emulator 在 Android Studio 使用 `am start -D --suspend` 调试启动时，曾出现一次 `System UI isn't responding` 弹窗。adb 普通启动未复现 app 侧 ANR，logcat 显示 SystemUI 资源查询错误且无 `com.pinkhouse` 崩溃记录。排查时优先用不带 `-D --suspend` 的普通启动确认 app 启动链路，再看 `/data/anr` 是否指向 app 进程。
 
-## 十、与鸿蒙侧差异对照
+## 十一、与鸿蒙侧差异对照
 
 | 维度 | 鸿蒙 Next | Android | 差异根源 |
 | --- | --- | --- | --- |
