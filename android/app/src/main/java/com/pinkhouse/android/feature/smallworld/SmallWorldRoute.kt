@@ -102,7 +102,7 @@ fun SmallWorldRoute(
     onNavigatePetChat: () -> Unit,
 ) {
     var backgroundIndex by rememberSaveable { mutableStateOf(0) }
-    var currentDestination by rememberSaveable { mutableStateOf(SmallWorldDestination.Menu) }
+    var currentDestination by rememberSaveable { mutableStateOf(SmallWorldDestination.SmallWorld) }
     val backgroundRes = if (backgroundIndex == 0) PinkHouseAssets.smallWorldNormal else PinkHouseAssets.smallWorldRococo
 
     BackHandler(enabled = currentDestination != SmallWorldDestination.Menu) {
