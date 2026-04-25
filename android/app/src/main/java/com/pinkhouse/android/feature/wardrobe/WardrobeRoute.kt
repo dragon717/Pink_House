@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -36,6 +37,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -94,10 +98,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -227,9 +233,12 @@ fun WardrobeRoute(
                 SearchField(
                     query = uiState.searchQuery,
                     filterState = uiState.filterState,
+                    recentSearches = uiState.recentSearches,
                     shortcuts = remember(uiState.allItems) { WardrobeBusinessLogic.queryShortcuts(uiState.allItems) },
                     onQueryChange = viewModel::setSearchQuery,
-                    onShortcutSelected = { shortcut -> viewModel.setSearchQuery(shortcut.query) },
+                    onSearchSubmitted = viewModel::submitSearchQuery,
+                    onShortcutSelected = { shortcut -> viewModel.submitSearchQuery(shortcut.query) },
+                    onRecentSelected = viewModel::submitSearchQuery,
                     onClose = { viewModel.setSearchVisible(false) },
                 )
             }
@@ -679,44 +688,43 @@ private fun SelectionHeader(
 private fun SearchField(
     query: String,
     filterState: WardrobeFilterState,
+    recentSearches: List<String>,
     shortcuts: List<WardrobeQueryShortcut>,
     onQueryChange: (String) -> Unit,
+    onSearchSubmitted: (String) -> Unit,
     onShortcutSelected: (WardrobeQueryShortcut) -> Unit,
+    onRecentSelected: (String) -> Unit,
     onClose: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = Color.White.copy(alpha = 0.82f),
-    ) {
+    SoftGlassPanel {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.Close, contentDescription = "关闭搜索")
-                    }
-                },
-                placeholder = { Text("名称 / 品牌:Baby / 类型:JSK / 备注:茶会 / 100-300") },
-                shape = RoundedCornerShape(18.dp),
+            SoftSearchInput(
+                query = query,
+                onQueryChange = onQueryChange,
+                onSearchSubmitted = onSearchSubmitted,
+                onClose = onClose,
             )
             Text(
-                text = "查询小抄：支持 字段:关键词、无品牌/无标签/无小物、尾款、价格区间 100-300。",
-                style = MaterialTheme.typography.bodySmall,
+                text = "查询小抄：字段:关键词、无品牌/无标签/无小物、尾款、价格区间 100-300。",
+                style = MaterialTheme.typography.labelSmall,
                 color = SoftGrayText,
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (recentSearches.isNotEmpty()) {
+                SearchPillRow(title = "最近搜索") {
+                    items(recentSearches, key = { "recent-$it" }) { recent ->
+                        SoftSearchPill(label = recent, selected = recent == query, onClick = { onRecentSelected(recent) })
+                    }
+                }
+            }
+            SearchPillRow(title = "快捷查询") {
                 items(shortcuts, key = { it.query }) { shortcut ->
-                    AssistChip(
+                    SoftSearchPill(
+                        label = shortcut.label,
+                        selected = shortcut.query == query,
                         onClick = { onShortcutSelected(shortcut) },
-                        label = { Text(shortcut.label, maxLines = 1) },
                     )
                 }
             }
@@ -728,6 +736,113 @@ private fun SearchField(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SoftGlassPanel(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color.White.copy(alpha = 0.72f), RoundedCornerShape(30.dp)),
+        shape = RoundedCornerShape(30.dp),
+        color = Color.White.copy(alpha = 0.68f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        content = content,
+    )
+}
+
+@Composable
+private fun SoftSearchInput(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearchSubmitted: (String) -> Unit,
+    onClose: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.76f), RoundedCornerShape(28.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.92f), RoundedCornerShape(28.dp))
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Filled.Search, contentDescription = null, tint = SoftGrayText)
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.titleMedium.copy(color = SoftGrayText),
+            cursorBrush = SolidColor(PinkAccent),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearchSubmitted(query) }),
+            decorationBox = { innerTextField ->
+                if (query.isBlank()) {
+                    Text(
+                        text = "搜索名称、品牌、标签、类型、颜色...",
+                        color = SoftGrayText.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                innerTextField()
+            },
+        )
+        Surface(
+            modifier = Modifier
+                .size(42.dp)
+                .clickable(onClick = onClose),
+            shape = CircleShape,
+            color = PinkBackground.copy(alpha = 0.72f),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Close, contentDescription = "关闭搜索", tint = SoftGrayText)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchPillRow(
+    title: String,
+    content: LazyListScope.() -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = PinkPrimary, fontWeight = FontWeight.SemiBold)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    }
+}
+
+@Composable
+private fun SoftSearchPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Surface(
+        modifier = Modifier
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = if (selected) PinkPrimary.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.58f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (selected) PinkPrimary.copy(alpha = 0.46f) else Color.White.copy(alpha = 0.86f),
+        ),
+    ) {
+        Text(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+            text = label,
+            color = if (selected) PinkPrimary else SoftGrayText,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

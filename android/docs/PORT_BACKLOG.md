@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-DATA-03 已验证；下一批从 BATCH-WARDROBE-DATA-04 开始。
+无 — BATCH-WARDROBE-DATA-04A 已验证；下一批从 BATCH-WARDROBE-DATA-04B 开始。
 
 ---
 
@@ -27,9 +27,13 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 ### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
 
-- [ ] **BATCH-WARDROBE-DATA-04** 最近搜索 / 常用筛选
-  - SCOPE: 2 文件 — 优先 `WardrobeHomeViewModel.kt` + `UserPreferencesDataStore.kt`
-  - 目标：保存最近查询与常用筛选组合，让高频查找可以一键复用。
+- [ ] **BATCH-WARDROBE-DATA-04B** 最近搜索持久化
+  - SCOPE: 2 文件 — `WardrobeHomeViewModel.kt` + `UserPreferencesDataStore.kt`
+  - 目标：把 04A 的会话内最近搜索保存到 DataStore，让高频查询跨重启可复用。
+
+- [ ] **BATCH-WARDROBE-UI-02** 衣橱统计卡 / 详情统计 Sheet 软圆还原
+  - SCOPE: 2 文件 — `WardrobeRoute.kt` + `android_migration_wardrobe.md`
+  - 目标：继续减少原生 Material 卡片/按钮的方正感，统计卡、统计 Sheet 行项统一改为自定义软圆玻璃容器。
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
@@ -93,6 +97,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-DATA-04A** 最近搜索 UI + 搜索区软圆还原 — `WardrobeHomeViewModel.kt` 新增会话内 `recentSearches` 与 `submitSearchQuery`，`WardrobeRoute.kt` 将搜索区从 `OutlinedTextField` / Material `AssistChip` 改为自定义 `BasicTextField` 胶囊、圆形关闭按钮、软圆玻璃面板与自定义查询 Pill。assembleDebug 通过；红线 grep 无命中；装机验证打开搜索可见 `快捷查询`，点击 `价格 100-300` 后出现 `最近搜索`、`100-300`、`当前结果统计` 与 `命中 3/4 款`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-03** 衣橱详细统计 Sheet — `WardrobeHomeViewModel.kt` 新增品牌/类型/颜色/状态/尾款状态分组统计，`WardrobeRoute.kt` 将统计卡「详细统计」改为可点击 Sheet；统计口径随搜索/筛选切换为全量或当前结果。assembleDebug 通过；红线 grep 无命中；装机验证可见 `详细统计`、`统计口径：全量衣橱`、`按品牌`、`按类型`、`按颜色`，滚动后可见 `按状态` 与 `按尾款状态`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-02** 高级查询语法提示 + 快捷筛选 Chip — `WardrobeBusinessLogic.kt` 支持 `字段:关键词`、无值查询、尾款查询与价格区间；`WardrobeRoute.kt` 将搜索框升级为查询小抄卡，展示价格、无品牌、无标签、无小物、心愿尾款与动态品牌/类型/颜色/状态快捷 Chip。assembleDebug 通过；红线 grep 无命中；装机验证点击 `价格 100-300` 与 `无品牌` 后统计卡联动为「当前结果统计」。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-01** 查询/筛选结果联动统计 — `WardrobeHomeViewModel.kt` 增加 `visibleStatistics` 与活跃查询判断，`WardrobeRoute.kt` 让统计卡在搜索/筛选时切换为「当前结果统计」，展示命中数、筛选数与当前关键词。assembleDebug 通过；红线 grep 无命中；装机验证搜索 `100-200` 后出现 `当前结果统计`、`命中`、`100-200`、`2/2`、`¥297.00`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。

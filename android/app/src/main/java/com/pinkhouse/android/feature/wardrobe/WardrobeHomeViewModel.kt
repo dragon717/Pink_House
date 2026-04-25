@@ -146,6 +146,7 @@ data class WardrobeHomeUiState(
     val depositDisplayMode: DepositDisplayMode = DepositDisplayMode.Detail,
     val searchQuery: String = "",
     val isSearchVisible: Boolean = false,
+    val recentSearches: List<String> = emptyList(),
     val filterState: WardrobeFilterState = WardrobeFilterState(),
     val allItems: List<WardrobeItem> = emptyList(),
     val visibleItems: List<WardrobeItem> = emptyList(),
@@ -174,6 +175,7 @@ data class WardrobeHomeUiState(
 private data class WardrobeRuntimeState(
     val searchQuery: String = "",
     val isSearchVisible: Boolean = false,
+    val recentSearches: List<String> = emptyList(),
     val filterState: WardrobeFilterState = WardrobeFilterState(),
     val isSelectionMode: Boolean = false,
     val selectedItemIds: Set<Long> = emptySet(),
@@ -238,6 +240,7 @@ class WardrobeHomeViewModel(
             depositDisplayMode = depositDisplay,
             searchQuery = runtime.searchQuery,
             isSearchVisible = runtime.isSearchVisible,
+            recentSearches = runtime.recentSearches,
             filterState = runtime.filterState,
             allItems = sourceItems,
             visibleItems = filtered,
@@ -273,6 +276,21 @@ class WardrobeHomeViewModel(
 
     fun setSearchQuery(query: String) {
         runtimeState.update { it.copy(searchQuery = query) }
+    }
+
+    fun submitSearchQuery(query: String) {
+        val trimmed = query.trim()
+        runtimeState.update { state ->
+            state.copy(
+                searchQuery = trimmed,
+                isSearchVisible = true,
+                recentSearches = if (trimmed.isBlank()) {
+                    state.recentSearches
+                } else {
+                    (listOf(trimmed) + state.recentSearches.filterNot { it.equals(trimmed, ignoreCase = true) }).take(8)
+                },
+            )
+        }
     }
 
     fun setSortOption(option: WardrobeSortOption) {

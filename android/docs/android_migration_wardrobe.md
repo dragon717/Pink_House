@@ -191,6 +191,40 @@
 - `BATCH-WARDROBE-DATA-04`：最近搜索 / 常用筛选。
 - 统计增强：后续可追加均价、占比条、购买年份/月度维度，以及从统计项反向生成筛选。
 
+### BATCH-WARDROBE-DATA-04A 最近搜索 UI + 搜索区软圆还原
+
+**背景**
+
+- 用户反馈 Android 衣橱 UI 还原度不足，原生组件偏方正；后续衣橱复刻需优先用自定义软圆容器/组件贴近 iOS。
+- iOS Simulator 对照：搜索激活时顶部为白色胶囊输入框 + 右侧圆形关闭按钮，背景保持粉色柔和渐变，统计卡与功能入口均为大圆角浅色块。
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - `WardrobeHomeUiState` / `WardrobeRuntimeState` 新增会话内 `recentSearches`。
+  - 新增 `submitSearchQuery(query)`：提交快捷查询或键盘搜索时写入当前搜索词，并维护最近 8 条，大小写去重。
+- `WardrobeRoute.kt`
+  - 搜索输入由 Material `OutlinedTextField` 改为自定义 `BasicTextField` 胶囊，右侧使用圆形关闭按钮。
+  - 搜索面板改为自定义 `SoftGlassPanel`，使用高圆角、半透明白底和浅描边模拟 iOS 玻璃感，不使用 `Modifier.blur`。
+  - 快捷查询从 Material `AssistChip` 改为自定义 `SoftSearchPill`，减少方正感。
+  - 点击快捷查询后显示「最近搜索」横向软圆 Pill；本批只做会话内 UI，不做 DataStore 持久化。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：
+  - 打开 `更多 → 搜索` 后可见软圆搜索胶囊、圆形关闭按钮、`快捷查询` 与软圆查询 Pill。
+  - 点击 `价格 100-300` 后出现 `最近搜索`、`100-300`、`当前结果统计`、`命中 3/4 款`。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_data_04a_search_soft.png`
+  - `/tmp/pinkhouse_wardrobe_data_04a_recent_soft.png`
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-04B`：将最近搜索持久化到 DataStore。
+- `BATCH-WARDROBE-UI-02`：继续把统计卡、统计 Sheet 行项改成统一软圆玻璃容器，减少 Material 卡片感。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
