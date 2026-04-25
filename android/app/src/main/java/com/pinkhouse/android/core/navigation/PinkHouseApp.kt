@@ -1,6 +1,7 @@
 package com.pinkhouse.android.core.navigation
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -29,10 +30,13 @@ import com.pinkhouse.android.core.ui.PinkBottomNavBar
 import com.pinkhouse.android.core.ui.PinkBottomNavItem
 import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
 import com.pinkhouse.android.feature.me.MeRoute
+import com.pinkhouse.android.feature.pet.PetRoute
 import com.pinkhouse.android.feature.petchat.PetChatRoute
 import com.pinkhouse.android.feature.smallworld.SmallWorldRoute
 import com.pinkhouse.android.feature.wardrobe.WardrobeHomeTab
 import com.pinkhouse.android.feature.wardrobe.WardrobeRoute
+
+private const val PetHomeRoute = "petHome"
 
 @Composable
 fun PinkHouseApp(appContainer: AppContainer) {
@@ -42,7 +46,10 @@ fun PinkHouseApp(appContainer: AppContainer) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val currentRoute = currentDestination?.route
-    val showPetFloatingEntry = currentRoute != AppDestination.House.route && currentRoute != AppDestination.PetChat.route
+    val isPetHomeRoute = currentRoute == PetHomeRoute
+    val showPetFloatingEntry = currentRoute != AppDestination.House.route &&
+        currentRoute != AppDestination.PetChat.route &&
+        !isPetHomeRoute
 
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
@@ -82,7 +89,7 @@ fun PinkHouseApp(appContainer: AppContainer) {
                         }
                     },
                     onOpenPetSettings = {
-                        navController.navigate(AppDestination.PetChat.route) {
+                        navController.navigate(PetHomeRoute) {
                             launchSingleTop = true
                         }
                     },
@@ -96,12 +103,20 @@ fun PinkHouseApp(appContainer: AppContainer) {
                     }
                 })
             }
+            composable(PetHomeRoute) {
+                PetRoute(onBackToWardrobe = {
+                    navController.navigate(AppDestination.Wardrobe.route) {
+                        popUpTo(AppDestination.Wardrobe.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                })
+            }
         }
 
         if (showPetFloatingEntry) {
             Image(
                 painter = painterResource(PinkHouseAssets.naichaPeeking),
-                contentDescription = "naicha_peeking",
+                contentDescription = "进入萌宠小家",
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(
@@ -109,12 +124,17 @@ fun PinkHouseApp(appContainer: AppContainer) {
                             WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
                             2.dp,
                     )
-                    .size(width = 112.dp, height = 70.dp),
+                    .size(width = 112.dp, height = 70.dp)
+                    .clickable {
+                        navController.navigate(PetHomeRoute) {
+                            launchSingleTop = true
+                        }
+                    },
                 contentScale = ContentScale.Fit,
             )
         }
 
-        if (currentRoute != AppDestination.PetChat.route) {
+        if (currentRoute != AppDestination.PetChat.route && !isPetHomeRoute) {
             PinkBottomNavBar(modifier = Modifier.align(Alignment.BottomCenter)) {
                 bottomDestinations.forEach { destination ->
                     val selected = currentDestination

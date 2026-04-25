@@ -7,13 +7,15 @@
 
 ## In Progress
 
-无 — BATCH-M3-02 已完成；下一批从 BATCH-M3-03 开始。
+无 — BATCH-M3-03 已完成；下一批从 BATCH-M3-04 开始。
 
 ---
 
 ## Ready
 
 按优先级倒序，下回合从顶端取。
+
+UX 优先路线：先把 `House → 小世界 → 宠物 Home / 萌宠对话` 的核心路径打通，再补每日留存入口（签到、日历、通知），最后推进财富/VIP/拼豆等低频模块。
 
 ### 阶段 ARCH 已收尾 ✅（4 批全过）
 
@@ -24,11 +26,6 @@
   - 把 `Color(0xFFF7F2F4)` / `Color(0xFFEFE8EC)` 提取到 token，遵循 R4 单一真源
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
-
-- [ ] **BATCH-M3-03** PetRoute 完整化（F-11 ~ F-17 宠物 home）
-  - SCOPE: 2 文件 — `feature/pet/PetRoute.kt` + `feature/pet/PetViewModel.kt`
-  - UPSTREAM: `ItemManager/Views/Pet/PetHomeView.swift` (588 LOC)
-  - 缺资源：橘猫/奶茶犬多姿态（用粉色圆形占位）
 
 - [ ] **BATCH-M3-04** SmallWorld 主图 + 风格切换（日常/洛可可）
   - SCOPE: 2 文件 — `feature/smallworld/SmallWorldHomeRoute.kt` + assets 注册
@@ -90,6 +87,7 @@
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-M3-03** PetRoute 完整化（F-11 ~ F-17 宠物 home）— 重做 `PetRoute.kt` + 新增 `PetViewModel.kt`，并按用户确认追加 `PinkHouseApp.kt` 挂载入口：`我 → 智能萌宠` 与底部奶茶浮层进入宠物 Home，`萌宠对话` Tab 保持聊天页。assembleDebug 8s 通过；红线 grep 无命中；装机截图确认 `萌宠小家`、双宠切换、状态条、货币、喂食/饮水/清洁/抚摸/打工与互动记录。详见 [android_migration_pet.md](android_migration_pet.md)。
 - [x] **BATCH-M3-02** PetChat 兜底文案池 — 新增 `strings_petchat.xml` 的 `pet_chat_fallback_replies` string-array（10 条），`PetChatRoute.kt` 改为 `stringArrayResource` 随机抽取；行为保持意图/输入后立即本地兜底回复。assembleDebug 8s 通过；红线 grep 无命中；装机截图确认点击 `B. 看天气穿搭` 后出现资源数组回复。详见 [android_migration_petchat.md](android_migration_petchat.md)。
 - [x] **BATCH-M3-01** PetChatRoute 首屏 + 3 个意图按钮 — 新增 `feature/petchat/PetChatRoute.kt`，`PinkHouseApp.kt` 将底部 `萌宠对话` Tab 绑定到新聊天首屏；保留输入框与本地兜底回复降级，无 AI/TTS/VIP 智能入口。assembleDebug 4s 通过；红线 grep 无命中；装机截图确认欢迎气泡、3 个意图按钮、底部输入与意图点击回复。详见 [android_migration_petchat.md](android_migration_petchat.md)。
 - [x] **BATCH-ARCH-04** SmallWorld 默认页左上图标语义调整 — `SmallWorldRoute.kt` SmallWorldFeatureScreen 内：destination == SmallWorld 时显 ☰ Menu 图标（语义"打开菜单"），子页保留 ← ArrowBack（语义"返回"），onClick 行为不变。assembleDebug 5s 通过。装机截图确认 ☰ 图标显示。 BackHandler 行为保留（按返回先进 Menu 再退 Tab），后续可继续优化但不阻塞 M3。
