@@ -41,6 +41,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -53,6 +55,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
@@ -262,6 +266,10 @@ fun WardrobeRoute(
                 DepositContent(
                     uiState = uiState,
                     onCreateClick = { showCreateSheet = true },
+                    onViewModeSelected = viewModel::setDepositViewMode,
+                    onYearSelected = viewModel::setDepositYear,
+                    onMonthToggle = viewModel::toggleDepositMonth,
+                    onMonthSelectorExpandedChange = viewModel::setMonthSelectorExpanded,
                 )
             }
         }
@@ -1184,6 +1192,10 @@ private fun WardrobeContent(
 private fun DepositContent(
     uiState: WardrobeHomeUiState,
     onCreateClick: () -> Unit,
+    onViewModeSelected: (WardrobeDepositViewMode) -> Unit,
+    onYearSelected: (Int) -> Unit,
+    onMonthToggle: (Int) -> Unit,
+    onMonthSelectorExpandedChange: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         ElevatedCard(
@@ -1197,6 +1209,11 @@ private fun DepositContent(
                     FeaturePill(Icons.Filled.BarChart, "马上来财", Color(0xFFFF9B4A))
                     FeaturePill(Icons.Filled.BarChart, "裙装股市", Color(0xFF4BA3FF))
                 }
+                DepositYearSwitcher(
+                    selectedYear = uiState.selectedDepositYear,
+                    availableYears = uiState.availableDepositYears,
+                    onYearSelected = onYearSelected,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1217,13 +1234,27 @@ private fun DepositContent(
             Row(Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 DepositModeButton(
                     label = "按月视图",
-                    selected = uiState.depositDisplayMode == DepositDisplayMode.Detail,
+                    selected = uiState.depositViewMode == WardrobeDepositViewMode.Monthly,
+                    onClick = { onViewModeSelected(WardrobeDepositViewMode.Monthly) },
                 )
                 DepositModeButton(
                     label = "按系列视图",
-                    selected = uiState.depositDisplayMode == DepositDisplayMode.Simple,
+                    selected = uiState.depositViewMode == WardrobeDepositViewMode.Series,
+                    onClick = { onViewModeSelected(WardrobeDepositViewMode.Series) },
                 )
             }
+        }
+
+        if (uiState.depositViewMode == WardrobeDepositViewMode.Monthly) {
+            DepositMonthSelector(
+                isExpanded = uiState.isMonthSelectorExpanded,
+                selectedMonths = uiState.selectedDepositMonths,
+                recentMonth = uiState.recentDepositMonth,
+                monthCounts = uiState.depositMonthCounts,
+                monthAmounts = uiState.depositMonthAmounts,
+                onToggleExpanded = { onMonthSelectorExpandedChange(!uiState.isMonthSelectorExpanded) },
+                onMonthClick = onMonthToggle,
+            )
         }
 
         if (uiState.visibleItems.isEmpty()) {
@@ -1240,12 +1271,12 @@ private fun DepositContent(
             ) {
                 item {
                     Text(
-                        text = if (uiState.depositDisplayMode == DepositDisplayMode.Detail) "最近月统计" else "按系列统计",
+                        text = if (uiState.depositViewMode == WardrobeDepositViewMode.Monthly) "最近月统计" else "按系列统计",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                if (uiState.depositDisplayMode == DepositDisplayMode.Detail) {
+                if (uiState.depositViewMode == WardrobeDepositViewMode.Monthly) {
                     items(uiState.depositMonthSummaries, key = { it.month.toString() }) { summary ->
                         DepositSummaryRow(title = "${summary.month}", subtitle = "${summary.itemCount} 件待付", amount = summary.totalBalance)
                     }
@@ -1259,6 +1290,64 @@ private fun DepositContent(
                 }
                 items(uiState.visibleItems, key = { "deposit-${it.id}" }) { item ->
                     DepositItemRow(item = item)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DepositYearSwitcher(
+    selectedYear: Int,
+    availableYears: List<Int>,
+    onYearSelected: (Int) -> Unit,
+) {
+    val sorted = availableYears.takeIf { it.isNotEmpty() } ?: listOf(selectedYear)
+    val currentIndex = sorted.indexOf(selectedYear).takeIf { it >= 0 } ?: sorted.lastIndex
+    val previousYear = sorted.getOrNull(currentIndex - 1)
+    val nextYear = sorted.getOrNull(currentIndex + 1)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("年份", color = SoftGrayText, style = MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = CircleShape,
+                color = if (previousYear != null) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.3f),
+                modifier = Modifier
+                    .size(34.dp)
+                    .then(if (previousYear != null) Modifier.clickable { onYearSelected(previousYear) } else Modifier),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "上一年",
+                        tint = if (previousYear != null) PinkAccent else SoftGrayText.copy(alpha = 0.4f),
+                    )
+                }
+            }
+            Text(
+                text = "${selectedYear}年",
+                color = PinkAccent,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 14.dp),
+            )
+            Surface(
+                shape = CircleShape,
+                color = if (nextYear != null) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.3f),
+                modifier = Modifier
+                    .size(34.dp)
+                    .then(if (nextYear != null) Modifier.clickable { onYearSelected(nextYear) } else Modifier),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "下一年",
+                        tint = if (nextYear != null) PinkAccent else SoftGrayText.copy(alpha = 0.4f),
+                    )
                 }
             }
         }
@@ -1287,9 +1376,203 @@ private fun DepositSummaryRow(title: String, subtitle: String, amount: BigDecima
 }
 
 @Composable
-private fun RowScope.DepositModeButton(label: String, selected: Boolean) {
+private fun DepositMonthSelector(
+    isExpanded: Boolean,
+    selectedMonths: Set<Int>,
+    recentMonth: Int?,
+    monthCounts: Map<Int, Int>,
+    monthAmounts: Map<Int, BigDecimal>,
+    onToggleExpanded: () -> Unit,
+    onMonthClick: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleExpanded),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White.copy(alpha = 0.85f),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (isExpanded) "年度预估尾款 (点我折叠)" else "年度预估尾款 (点我展开)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = SoftGrayText,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (isExpanded) "折叠" else "展开",
+                    tint = SoftGrayText,
+                )
+            }
+        }
+        if (isExpanded) {
+            for (rowIdx in 0..2) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    for (colIdx in 0..3) {
+                        val month = rowIdx * 4 + colIdx + 1
+                        val count = monthCounts[month] ?: 0
+                        val amount = monthAmounts[month]
+                        val isSelected = month in selectedMonths
+                        DepositMonthChip(
+                            month = month,
+                            count = count,
+                            amount = amount,
+                            isSelected = isSelected,
+                            onClick = { onMonthClick(month) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        } else {
+            DepositRecentMonthCard(
+                recentMonth = recentMonth,
+                count = recentMonth?.let { monthCounts[it] } ?: 0,
+                amount = recentMonth?.let { monthAmounts[it] },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DepositMonthChip(
+    month: Int,
+    count: Int,
+    amount: BigDecimal?,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
-        modifier = Modifier.weight(1f),
+        modifier = modifier.clickable(onClick = onClick).height(56.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) PinkAccent else Color.White.copy(alpha = 0.9f),
+        border = if (isSelected) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(vertical = 6.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "${month}月",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Color.White else SoftGrayText,
+                )
+                if (count > 0) {
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isSelected) Color.White.copy(alpha = 0.3f) else PinkBackground.copy(alpha = 0.6f),
+                    ) {
+                        Text(
+                            text = "$count",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.White else PinkAccent,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                    }
+                }
+            }
+            if (count > 0 && amount != null) {
+                Text(
+                    text = amount.moneyText(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) Color.White.copy(alpha = 0.9f) else PinkAccent,
+                    maxLines = 1,
+                )
+            } else {
+                Text(
+                    text = "-",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isSelected) Color.White.copy(alpha = 0.6f) else SoftGrayText.copy(alpha = 0.5f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DepositRecentMonthCard(
+    recentMonth: Int?,
+    count: Int,
+    amount: BigDecimal?,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.9f),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    tint = PinkAccent,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "最近月统计",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = SoftGrayText,
+                    modifier = Modifier.weight(1f),
+                )
+                if (recentMonth != null && count > 0) {
+                    Surface(shape = CircleShape, color = PinkAccent) {
+                        Text(
+                            "${recentMonth}月",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+            if (recentMonth != null && count > 0 && amount != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    DepositRecentStatItem(title = "待付件数", value = "$count", color = SoftGrayText)
+                    DepositRecentStatItem(title = "待付尾款", value = amount.moneyText(), color = PinkAccent)
+                }
+            } else {
+                Text(
+                    "暂无尾款数据",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SoftGrayText.copy(alpha = 0.6f),
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DepositRecentStatItem(title: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
+        Spacer(Modifier.height(2.dp))
+        Text(title, style = MaterialTheme.typography.labelSmall, color = SoftGrayText)
+    }
+}
+
+@Composable
+private fun RowScope.DepositModeButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.weight(1f).clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         color = if (selected) Color.White else Color.Transparent,
     ) {

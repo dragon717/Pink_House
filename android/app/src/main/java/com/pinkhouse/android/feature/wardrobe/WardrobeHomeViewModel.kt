@@ -71,6 +71,11 @@ enum class DepositDisplayMode(val raw: String, val label: String) {
     }
 }
 
+enum class WardrobeDepositViewMode(val label: String) {
+    Monthly("按月视图"),
+    Series("按系列视图"),
+}
+
 data class WardrobeFilterState(
     val brand: String = "",
     val type: String = "",
@@ -169,6 +174,18 @@ data class WardrobeHomeUiState(
     val trashedItems: List<WardrobeItem> = emptyList(),
     val depositMonthSummaries: List<DepositMonthSummary> = emptyList(),
     val depositSeriesSummaries: List<DepositSeriesSummary> = emptyList(),
+    val depositViewMode: WardrobeDepositViewMode = WardrobeDepositViewMode.Monthly,
+    val selectedDepositYear: Int = LocalDate.now().year,
+    val availableDepositYears: List<Int> = emptyList(),
+    val selectedDepositMonths: Set<Int> = emptySet(),
+    val isMonthSelectorExpanded: Boolean = false,
+    val recentDepositMonth: Int? = null,
+    val depositMonthCounts: Map<Int, Int> = emptyMap(),
+    val depositMonthAmounts: Map<Int, BigDecimal> = emptyMap(),
+    val selectedDepositSeries: Set<String> = emptySet(),
+    val isSeriesSelectorExpanded: Boolean = true,
+    val recentAddedDepositCount: Int = 0,
+    val recentAddedDepositAmount: BigDecimal = BigDecimal.ZERO,
     val depositReminderEnabled: Boolean = false,
     val depositReminderDaysBefore: String = "7,3,1",
     val depositReminderTime: String = "09:00",
@@ -190,6 +207,12 @@ private data class WardrobeRuntimeState(
     val message: String? = null,
     val selectedItemId: Long? = null,
     val scheduledReminderCount: Int = 0,
+    val depositViewMode: WardrobeDepositViewMode = WardrobeDepositViewMode.Monthly,
+    val selectedDepositYear: Int = LocalDate.now().year,
+    val selectedDepositMonths: Set<Int> = emptySet(),
+    val isMonthSelectorExpanded: Boolean = false,
+    val selectedDepositSeries: Set<String> = emptySet(),
+    val isSeriesSelectorExpanded: Boolean = true,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -241,9 +264,62 @@ class WardrobeHomeViewModel(
         val layout = WardrobeLayoutMode.fromRaw(preferences.wardrobeViewMode)
         val depositDisplay = DepositDisplayMode.fromRaw(preferences.depositDisplayMode)
         val searched = WardrobeBusinessLogic.searchItems(sourceItems, runtime.searchQuery)
+        val depositYearsFromData = sourceItems
+            .asSequence()
+            .filter { it.isDepositPlan }
+            .mapNotNull { it.finalPaymentEndDate?.year }
+            .toSortedSet()
+        val currentYear = LocalDate.now().year
+        val availableDepositYears = (depositYearsFromData + currentYear).toSortedSet().toList()
+        val resolvedDepositYear = if (runtime.selectedDepositYear in availableDepositYears) {
+            runtime.selectedDepositYear
+        } else {
+            availableDepositYears.lastOrNull { it <= currentYear } ?: availableDepositYears.lastOrNull() ?: currentYear
+        }
+        val depositSourceForYear = sourceItems
+            .filter { it.isDepositPlan && it.finalPaymentEndDate?.year == resolvedDepositYear }
+        val depositMonthCounts = depositSourceForYear
+            .groupBy { it.finalPaymentEndDate?.monthValue ?: 0 }
+            .filterKeys { it in 1..12 }
+            .mapValues { entry -> entry.value.sumOf { it.stock } }
+        val depositMonthAmounts = depositSourceForYear
+            .groupBy { it.finalPaymentEndDate?.monthValue ?: 0 }
+            .filterKeys { it in 1..12 }
+            .mapValues { entry -> entry.value.fold(BigDecimal.ZERO) { acc, item -> acc + item.totalBalance } }
+        val recentDepositMonth = run {
+            val now = LocalDate.now()
+            val monthsWithData = depositMonthCounts.keys.sorted()
+            if (monthsWithData.isEmpty()) {
+                null
+            } else {
+                val refMonth = when {
+                    resolvedDepositYear < now.year -> 13
+                    resolvedDepositYear > now.year -> 1
+                    else -> now.monthValue
+                }
+                monthsWithData.firstOrNull { it >= refMonth } ?: monthsWithData.last()
+            }
+        }
         val filtered = WardrobeBusinessLogic.filterItems(searched, runtime.filterState)
             .let { list -> if (runtime.filterState.ownedOnly) list.filterNot { it.isDepositPlan } else list }
             .let { list -> if (tab == WardrobeHomeTab.DepositPlan) list.filter { it.isDepositPlan } else list }
+            .let { list ->
+                if (tab == WardrobeHomeTab.DepositPlan) {
+                    list.filter { it.finalPaymentEndDate?.year == resolvedDepositYear }
+                } else list
+            }
+            .let { list ->
+                if (tab == WardrobeHomeTab.DepositPlan && runtime.depositViewMode == WardrobeDepositViewMode.Monthly) {
+                    when {
+                        !runtime.isMonthSelectorExpanded -> {
+                            if (recentDepositMonth == null) list
+                            else list.filter { it.finalPaymentEndDate?.monthValue == recentDepositMonth }
+                        }
+                        runtime.selectedDepositMonths.isEmpty() -> list
+                        else -> list.filter { it.finalPaymentEndDate?.monthValue in runtime.selectedDepositMonths }
+                    }
+                } else list
+            }
             .let { list -> WardrobeBusinessLogic.sortItems(list, sort) }
         val statisticsSource = if (runtime.searchQuery.isNotBlank() || runtime.filterState.activeCount > 0) {
             filtered
@@ -269,8 +345,16 @@ class WardrobeHomeViewModel(
             message = runtime.message,
             selectedItem = selected,
             trashedItems = trashed,
-            depositMonthSummaries = WardrobeBusinessLogic.monthlyDepositSummaries(sourceItems),
-            depositSeriesSummaries = WardrobeBusinessLogic.seriesDepositSummaries(sourceItems),
+            depositMonthSummaries = WardrobeBusinessLogic.monthlyDepositSummaries(depositSourceForYear),
+            depositSeriesSummaries = WardrobeBusinessLogic.seriesDepositSummaries(depositSourceForYear),
+            depositViewMode = runtime.depositViewMode,
+            selectedDepositYear = resolvedDepositYear,
+            availableDepositYears = availableDepositYears,
+            selectedDepositMonths = runtime.selectedDepositMonths,
+            isMonthSelectorExpanded = runtime.isMonthSelectorExpanded,
+            recentDepositMonth = recentDepositMonth,
+            depositMonthCounts = depositMonthCounts,
+            depositMonthAmounts = depositMonthAmounts,
             depositReminderEnabled = preferences.depositReminderEnabled,
             depositReminderDaysBefore = preferences.depositReminderDaysBefore,
             depositReminderTime = preferences.depositReminderTime,
@@ -317,6 +401,25 @@ class WardrobeHomeViewModel(
 
     fun setDepositDisplayMode(mode: DepositDisplayMode) {
         viewModelScope.launch { userPreferencesDataStore.setDepositDisplayMode(mode.raw) }
+    }
+
+    fun setDepositViewMode(mode: WardrobeDepositViewMode) {
+        runtimeState.update { it.copy(depositViewMode = mode) }
+    }
+
+    fun setDepositYear(year: Int) {
+        runtimeState.update { it.copy(selectedDepositYear = year, selectedDepositMonths = emptySet()) }
+    }
+
+    fun toggleDepositMonth(month: Int) {
+        runtimeState.update { state ->
+            val next = if (month in state.selectedDepositMonths) emptySet() else setOf(month)
+            state.copy(selectedDepositMonths = next)
+        }
+    }
+
+    fun setMonthSelectorExpanded(expanded: Boolean) {
+        runtimeState.update { it.copy(isMonthSelectorExpanded = expanded) }
     }
 
     fun setFilterState(filterState: WardrobeFilterState) {

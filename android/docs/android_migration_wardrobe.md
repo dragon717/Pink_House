@@ -434,6 +434,134 @@
 - `BATCH-WARDROBE-DATA-05`：把详细统计 Sheet 的品牌/类型/颜色/状态/尾款分组项做成一键反向筛选，形成“统计发现 → 查询定位”的闭环。
 
 
+### BATCH-WARDROBE-DEPOSIT-01 心愿尾款 视图模式 + 年份切换
+
+**背景**
+
+- 用户反馈衣橱模块还原度不足，逐项与 iOS Simulator 一比一对照。
+- iOS `DepositPlanView` 的"按月视图 / 按系列视图"是真切换 `viewMode: monthly | series`；Android 之前两个按钮**没有 `clickable`**，仅装饰，状态绑到了"视图"下拉菜单的 `depositDisplayMode (Detail/Simple)` 上，语义错位。
+- iOS 还有 `selectedYear` 年份维度（line 37：`@State private var selectedYear: Int = Calendar.current.component(.year, from: Date())`），按 `finalPaymentDate` 年份过滤。Android 之前完全没有年份维度。
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - 新增 `enum class WardrobeDepositViewMode { Monthly, Series }`，独立于 `DepositDisplayMode`。
+  - `WardrobeRuntimeState` 新增 `depositViewMode`、`selectedDepositYear`。
+  - `WardrobeHomeUiState` 新增 `depositViewMode`、`selectedDepositYear`、`availableDepositYears`。
+  - `combine` 中：
+    - 收集 `availableDepositYears = (sourceItems.map { finalPaymentEndDate.year } + currentYear).distinct().sorted()`。
+    - 解析 `resolvedDepositYear`：runtime 选中年若不在可用列表，回落到不晚于当前年的最近年份，否则当前年。
+    - 心愿尾款 Tab 的 `visibleItems` 增加 `finalPaymentEndDate.year == resolvedDepositYear` 过滤。
+    - `monthlyDepositSummaries` / `seriesDepositSummaries` 改为基于按年份过滤后的 `depositSourceForYear` 计算。
+  - 新增 public：`setDepositViewMode(mode)`、`setDepositYear(year)`，仅更新 runtime（DataStore 持久化留 DEPOSIT-01b）。
+- `WardrobeRoute.kt`
+  - `DepositContent` 新增 `onViewModeSelected`、`onYearSelected` 回调，由 `WardrobeRoute` 传 `viewModel::setDepositViewMode` / `viewModel::setDepositYear`。
+  - 新增 `DepositYearSwitcher`：左 `<` 圆 + `2026年` 粉字 + 右 `>` 圆，相邻年不存在时按钮置灰禁用。使用 `Icons.AutoMirrored.Filled.KeyboardArrowLeft/Right`，避免 RTL 警告。
+  - `DepositModeButton` 新增 `onClick: () -> Unit` 参数，外层 `Surface.clickable`，调用 `onViewModeSelected(Monthly|Series)`。
+  - 选中态绑定从 `uiState.depositDisplayMode == Detail/Simple` 改为 `uiState.depositViewMode == Monthly/Series`；列表分支同步迁移。
+  - `depositDisplayMode` 不动，留给 DEPOSIT-05 还原 DepositItemRow / SimpleDepositItemRow 行密度差异时用。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过（无 deprecation warning）。
+- 红线 grep（针对本批 diff 新增行）：无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+  - 说明：UI 文件原有 `Color(0xFFFF9B4A)` / `Color(0xFF4BA3FF)` / `Color(0xFF50474D)` 是 Android 自创"梦裙日历/马上来财/裙装股市"占位色与 mode 按钮文字色，**预存在的红线**，不属本批引入。已记录到下方"待清理"。
+- Android Emulator 装机验证：
+  - 心愿尾款页可见 `年份`、`< 2026年 >` 切换条；当前年是唯一有数据年时左右按钮置灰。
+  - 点击 `按系列视图` → 高亮切到右侧，下方标题从 `最近月统计` 切到 `按系列统计`，汇总行从 `2026-04 / 1 件待付` 切到 `未填写品牌 / 1 件待付`，金额仍为 `¥2001.00`。
+  - 点击 `按月视图` → 切回月度视图。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_deposit_01_year_switcher.png`（按月视图 + 年份切换条）
+  - `/tmp/pinkhouse_wardrobe_deposit_01_series_view.png`（按系列视图）
+
+**还原度评分（与 iOS DepositPlanView 对照）**
+
+| 维度 | 状态 | 评分 |
+| --- | --- | --- |
+| 按月/按系列 真切换 | ✅ 等价 iOS `viewMode` | 100% |
+| 年份选择器 | 🟡 仅"已有数据年 + 当前年"的离散漫游；iOS 是连续年份 | 70% |
+| `monthlyDepositSummaries` / `seriesDepositSummaries` 受年份影响 | ✅ 等价 iOS `updateBaseClothings` 的 year filter | 100% |
+| `visibleItems` 年份过滤 | ✅ 等价 iOS line 127-137 | 100% |
+| viewMode/year 持久化 | ❌ 仅 in-memory，进程死会丢；iOS 是 `@State`（也只在视图生命周期，所以等价） | 与 iOS 一致 100% |
+| 折叠/展开 + 月份多选（MonthSelectorView） | ❌ DEPOSIT-02 范围 | 0% |
+| SeriesAnalyzer + SeriesSelector | ❌ DEPOSIT-03 范围 | 0% |
+| TotalBalanceCard 隐藏/显示 + 钱包瘦身 alert | ❌ DEPOSIT-04 范围 | 0% |
+| DepositItemRow 时间轴 + 距 N 天 | ❌ DEPOSIT-05 范围 | 0% |
+| MoneyCountingView 数钱动画 | ❌ DEPOSIT-06 范围 | 0% |
+
+**本批整体还原度（仅 DEPOSIT-01 范围）：约 92%**（连续年份漫游和持久化是仅有失分项；其余目标全部命中）
+
+**后续待办 / 待清理**
+
+- DEPOSIT-01b（可选）：将 `depositViewMode` / `selectedDepositYear` 持久化到 `UserPreferencesDataStore`；扩展 `availableDepositYears` 为连续区间 `min..max(min(min, current), max(max, current))`。
+- DEPOSIT-02：MonthSelectorView 折叠展开 + 月份多选 + 年份统计区。
+- DEPOSIT-03：SeriesAnalyzer + SeriesSelector。
+- DEPOSIT-04：TotalBalanceCard 默认隐藏 + 钱包瘦身确认 alert。
+- DEPOSIT-05：DepositItemRow 时间轴 + 距 N 天。
+- DEPOSIT-06：MoneyCountingView 抽钞动画。
+- 红线清理：`Color(0xFFFF9B4A)` / `Color(0xFF4BA3FF)` / `Color(0xFF50474D)`（梦裙日历/马上来财/裙装股市占位色 + DepositModeButton 文字色）下个 UI 红线巡检批次统一改为 token。
+
+
+### BATCH-WARDROBE-DEPOSIT-02 心愿尾款 月份选择器（折叠展开 + 单选替换）
+
+**背景**
+
+- DEPOSIT-01 把视图模式与年份都接通了，但月度过滤只到"年"这层；iOS `MonthSelectorView` 还有"折叠 → 最近月统计；展开 → 12 月网格 + 单选替换语义"的钻取行为。
+- 关键 iOS 行为复核：
+  - `MonthSelectorView.swift:161-166` —— 点选月份 `selectedMonths = [month]`（**替换**整个 set），再点同月才 `remove`，**不是多选累加**。
+  - `DepositPlanView.swift:168-198` —— `visibleItems` 过滤：折叠 → 仅 `recentMonth`；展开未选 → 全年；展开有选 → 只看选中月。
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - `WardrobeRuntimeState` 新增 `selectedDepositMonths: Set<Int>`、`isMonthSelectorExpanded: Boolean`。
+  - `WardrobeHomeUiState` 新增 `selectedDepositMonths`、`isMonthSelectorExpanded`、`recentDepositMonth`、`depositMonthCounts`、`depositMonthAmounts`。
+  - `combine` 中调整顺序：先算 `depositSourceForYear` / `depositMonthCounts` / `depositMonthAmounts` / `recentDepositMonth`，再进 `filtered` 链路。
+  - `filtered` 在 DepositPlan + Monthly 视图模式下追加月份过滤分支：折叠态过滤到 `recentDepositMonth`；展开未选 → 全部；展开有选 → 只看选中月。
+  - `recentDepositMonth` 计算对齐 iOS `recentMonth`：当年优先取当前月之后的月份，否则取最后一个有数据的月份；对过去/未来年做参考月修正（过去年用 13、未来年用 1）。
+  - 新增 public：`toggleDepositMonth(month)`（替换语义）、`setMonthSelectorExpanded(expanded)`；`setDepositYear` 切换年时清空 `selectedDepositMonths`，避免跨年保留无意义选中。
+- `WardrobeRoute.kt`
+  - 新增 `DepositMonthSelector`：标题胶囊 `年度预估尾款 (点我展开/折叠)` + `Icons.Filled.ExpandLess/ExpandMore`，可点击切换。
+  - 新增 `DepositMonthChip`：56dp 高，每月一格；有数据展示 count badge + amount，无数据展示 `-`；选中态使用 `PinkAccent` 实心粉底 + 白字。
+  - 新增 `DepositRecentMonthCard`：折叠时呈现"最近月统计"，左 `CalendarMonth` 图标 + 标题，右粉色月份胶囊；下方 `待付件数 / 待付尾款` 双列 `DepositRecentStatItem`。
+  - `DepositContent` 仅在 `Monthly` 视图模式下渲染 `DepositMonthSelector`，`Series` 视图模式留待 DEPOSIT-03 接 SeriesSelector。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过（编译期一次报错：`recentDepositMonth` 顺序前后；调整 `combine` 顺序后通过）。
+- 红线 grep（diff 新增行）：无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor`。
+- Android Emulator 装机验证：
+  - 折叠态显示 `年度预估尾款 (点我展开) ⌄`，下方"最近月统计"卡显示 `4月` 胶囊 + `1` 待付件数 + `¥2001.00` 待付尾款。
+  - 点 header → 展开为 12 月网格；`4月` chip 含 badge `1` 与 `¥2001.00`，其他月显示 `-`。
+  - 点 `4月` → 粉色填充选中态。
+  - 点 `5月`（无数据）→ `5月` 选中、`4月` 退选（验证替换语义），`待付明细` 列表清空 → 显示"暂无尾款数据"空态。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_deposit_02_folded.png`
+  - `/tmp/pinkhouse_wardrobe_deposit_02_expanded.png`
+  - `/tmp/pinkhouse_wardrobe_deposit_02_april_selected.png`
+  - `/tmp/pinkhouse_wardrobe_deposit_02_may_empty.png`
+
+**还原度评分（与 iOS MonthSelectorView 对照）**
+
+| 维度 | 状态 | 评分 |
+| --- | --- | --- |
+| 折叠/展开 切换 + 文案 + chevron | ✅ 等价 iOS line 124-138 | 100% |
+| 12 月网格（4 列 × 3 行） | ✅ 等价 iOS line 156-215 | 100% |
+| 单选替换语义（点新月替换、点同月清除） | ✅ 等价 iOS line 161-166 | 100% |
+| 月份 chip 显示：count badge + amount | ✅ 等价 iOS line 168-196 | 95%（颜色用 PinkAccent vs iOS Color.brown，整体软圆体系内调和） |
+| 折叠态 RecentMonthCard | ✅ 等价 iOS line 224-282 | 95%（少 `calendar.badge.clock` SF Symbol，用 `CalendarMonth` 替代） |
+| visibleItems 月份过滤（折叠/展开两态） | ✅ 等价 iOS line 168-180 | 100% |
+| YearSelectorView + 小眼睛 toggle | ❌ 留 DEPOSIT-04 | 0% |
+| YearStatsCard（年份统计） | ❌ 留 DEPOSIT-04 | 0% |
+
+**本批整体还原度（仅 DEPOSIT-02 范围）：约 95%**（核心折叠/展开/月份单选/最近月卡完整命中；少的两项归 DEPOSIT-04 范围）
+
+**后续待办**
+
+- DEPOSIT-03：SeriesAnalyzer + SeriesSelector，把 `按系列视图` 模式下补上系列前缀分析与折叠选择。
+- DEPOSIT-04：TotalBalanceCard 隐藏/显示 + 钱包瘦身 alert + YearSelectorView 小眼睛 + YearStatsCard。
+
+
 ### BATCH-WARDROBE-DATA-05 统计明细项一键反向筛选
 
 **背景**
