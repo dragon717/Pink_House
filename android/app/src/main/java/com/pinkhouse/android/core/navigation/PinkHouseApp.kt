@@ -29,7 +29,7 @@ import com.pinkhouse.android.core.ui.PinkBottomNavBar
 import com.pinkhouse.android.core.ui.PinkBottomNavItem
 import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
 import com.pinkhouse.android.feature.me.MeRoute
-import com.pinkhouse.android.feature.pet.PetRoute
+import com.pinkhouse.android.feature.petchat.PetChatRoute
 import com.pinkhouse.android.feature.smallworld.SmallWorldRoute
 import com.pinkhouse.android.feature.wardrobe.WardrobeHomeTab
 import com.pinkhouse.android.feature.wardrobe.WardrobeRoute
@@ -89,7 +89,7 @@ fun PinkHouseApp(appContainer: AppContainer) {
                 )
             }
             composable(AppDestination.PetChat.route) {
-                PetRoute(onBackToWardrobe = {
+                PetChatRoute(onNavigateBack = {
                     navController.navigate(AppDestination.Wardrobe.route) {
                         popUpTo(AppDestination.Wardrobe.route) { inclusive = false }
                         launchSingleTop = true
