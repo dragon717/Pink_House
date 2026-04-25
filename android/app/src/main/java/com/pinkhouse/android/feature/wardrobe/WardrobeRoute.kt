@@ -340,6 +340,10 @@ fun WardrobeRoute(
         WardrobeDetailedStatisticsSheet(
             uiState = uiState,
             onDismiss = { showStatisticsSheet = false },
+            onBucketClick = { kind, label ->
+                viewModel.applyStatisticsBucketFilter(kind, label)
+                showStatisticsSheet = false
+            },
         )
     }
 
@@ -996,6 +1000,7 @@ private fun RowScope.FeaturePill(
 private fun WardrobeDetailedStatisticsSheet(
     uiState: WardrobeHomeUiState,
     onDismiss: () -> Unit,
+    onBucketClick: (WardrobeStatisticsFilterKind, String) -> Unit,
 ) {
     val statistics = if (uiState.hasActiveQuery) uiState.visibleStatistics else uiState.statistics
     val scopeLabel = if (uiState.hasActiveQuery) "当前搜索/筛选结果" else "全量衣橱"
@@ -1029,14 +1034,19 @@ private fun WardrobeDetailedStatisticsSheet(
                             SoftStatTile("总价值", statistics.totalValue.moneyText())
                             SoftStatTile("尾款", statistics.depositBalance.moneyText(), accent = true)
                         }
+                        Text(
+                            "点按下方分组行，可直接生成筛选条件并回到当前结果统计。",
+                            color = SoftGrayText.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }
-            item { StatisticsBreakdownSection("按品牌", uiState.statisticsBreakdown.byBrand) }
-            item { StatisticsBreakdownSection("按类型", uiState.statisticsBreakdown.byType) }
-            item { StatisticsBreakdownSection("按颜色", uiState.statisticsBreakdown.byColor) }
-            item { StatisticsBreakdownSection("按状态", uiState.statisticsBreakdown.byCondition) }
-            item { StatisticsBreakdownSection("按尾款状态", uiState.statisticsBreakdown.byDepositState) }
+            item { StatisticsBreakdownSection("按品牌", uiState.statisticsBreakdown.byBrand, WardrobeStatisticsFilterKind.Brand, onBucketClick) }
+            item { StatisticsBreakdownSection("按类型", uiState.statisticsBreakdown.byType, WardrobeStatisticsFilterKind.Type, onBucketClick) }
+            item { StatisticsBreakdownSection("按颜色", uiState.statisticsBreakdown.byColor, WardrobeStatisticsFilterKind.Color, onBucketClick) }
+            item { StatisticsBreakdownSection("按状态", uiState.statisticsBreakdown.byCondition, WardrobeStatisticsFilterKind.Condition, onBucketClick) }
+            item { StatisticsBreakdownSection("按尾款状态", uiState.statisticsBreakdown.byDepositState, WardrobeStatisticsFilterKind.DepositState, onBucketClick) }
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
@@ -1046,6 +1056,8 @@ private fun WardrobeDetailedStatisticsSheet(
 private fun StatisticsBreakdownSection(
     title: String,
     rows: List<WardrobeStatisticBucket>,
+    filterKind: WardrobeStatisticsFilterKind,
+    onBucketClick: (WardrobeStatisticsFilterKind, String) -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -1065,7 +1077,10 @@ private fun StatisticsBreakdownSection(
                 Text("暂无可统计数据", color = SoftGrayText, style = MaterialTheme.typography.bodyMedium)
             } else {
                 rows.forEach { row ->
-                    StatisticsBreakdownRow(row)
+                    StatisticsBreakdownRow(
+                        row = row,
+                        onClick = { onBucketClick(filterKind, row.label) },
+                    )
                 }
             }
         }
@@ -1073,10 +1088,14 @@ private fun StatisticsBreakdownSection(
 }
 
 @Composable
-private fun StatisticsBreakdownRow(row: WardrobeStatisticBucket) {
+private fun StatisticsBreakdownRow(row: WardrobeStatisticBucket, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
         color = Color.White.copy(alpha = 0.48f),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)),
     ) {
@@ -1090,7 +1109,7 @@ private fun StatisticsBreakdownRow(row: WardrobeStatisticBucket) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(row.label, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    text = "${row.totalPieces} 件 / ${row.totalStyles} 款",
+                    text = "${row.totalPieces} 件 / ${row.totalStyles} 款 · 点按筛选",
                     color = SoftGrayText,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -2236,7 +2255,12 @@ private fun FilterSheet(
                     SoftSearchPill(
                         label = "只看心愿尾款",
                         selected = draft.depositOnly,
-                        onClick = { draft = draft.copy(depositOnly = !draft.depositOnly) },
+                        onClick = { draft = draft.copy(depositOnly = !draft.depositOnly, ownedOnly = false) },
+                    )
+                    SoftSearchPill(
+                        label = "只看现货/已拥有",
+                        selected = draft.ownedOnly,
+                        onClick = { draft = draft.copy(ownedOnly = !draft.ownedOnly, depositOnly = false) },
                     )
                     if (uiState.allItems.isNotEmpty()) {
                         Text(

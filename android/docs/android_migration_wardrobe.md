@@ -433,6 +433,38 @@
 
 - `BATCH-WARDROBE-DATA-05`：把详细统计 Sheet 的品牌/类型/颜色/状态/尾款分组项做成一键反向筛选，形成“统计发现 → 查询定位”的闭环。
 
+
+### BATCH-WARDROBE-DATA-05 统计明细项一键反向筛选
+
+**背景**
+
+- 衣橱详细统计已经能按品牌、类型、颜色、状态、尾款状态拆解数据，但用户发现某一类后还需要手动回到筛选面板输入条件。
+- 本批补齐“统计发现 → 查询定位”的闭环：点统计明细行，直接生成筛选条件并回到首页当前结果统计。
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - 新增 `WardrobeStatisticsFilterKind`，描述统计分组来源：品牌、类型、颜色、状态、尾款状态。
+  - 新增 `applyStatisticsBucketFilter(kind, label)`：把统计分组 label 映射为 `WardrobeFilterState`。
+  - 空值统计项自动映射到现有无值筛选语义：`未填写品牌 → 无品牌`、`未填写类型 → 无类型`、`未填写颜色 → 无颜色`、`未填写状态 → 无成色`。
+  - 尾款状态支持 `心愿尾款` 与 `现货/已拥有` 两种反向筛选；`WardrobeFilterState` 增加 `ownedOnly`，并在 ViewModel 组合链路中执行现货筛选，不改 repository / Room。
+- `WardrobeRoute.kt`
+  - `WardrobeDetailedStatisticsSheet` 新增分组行点击回调，点击后关闭 Sheet。
+  - 汇总区加入提示文案：点按下方分组行可直接生成筛选条件。
+  - 分组行增加 `点按筛选` 提示，保留软圆半透明样式。
+  - 筛选 Sheet 快捷条件补充 `只看现货/已拥有`，与尾款状态反向筛选保持一致。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：点击 `详细统计` 打开 Sheet，可见 `点按下方分组行`、`按品牌`、`点按筛选`；点击 `未填写品牌` 后 Sheet 关闭，首页统计卡切换为 `当前结果统计`，显示 `筛选 1 项` 与 `命中 2/4 款`。
+- 截图记录：`/tmp/pinkhouse_wardrobe_data_05_reverse_filter.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-06`：在统计明细分组中补充均价与价值占比条，继续增强数据统计可读性。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地

@@ -81,10 +81,19 @@ data class WardrobeFilterState(
     val accessory: String = "",
     val tag: String = "",
     val depositOnly: Boolean = false,
+    val ownedOnly: Boolean = false,
 ) {
     val activeCount: Int
         get() = listOf(brand, type, color, size, length, condition, accessory, tag).count { it.isNotBlank() } +
-            if (depositOnly) 1 else 0
+            if (depositOnly || ownedOnly) 1 else 0
+}
+
+enum class WardrobeStatisticsFilterKind {
+    Brand,
+    Type,
+    Color,
+    Condition,
+    DepositState,
 }
 
 data class WardrobeEditorDraft(
@@ -233,6 +242,7 @@ class WardrobeHomeViewModel(
         val depositDisplay = DepositDisplayMode.fromRaw(preferences.depositDisplayMode)
         val searched = WardrobeBusinessLogic.searchItems(sourceItems, runtime.searchQuery)
         val filtered = WardrobeBusinessLogic.filterItems(searched, runtime.filterState)
+            .let { list -> if (runtime.filterState.ownedOnly) list.filterNot { it.isDepositPlan } else list }
             .let { list -> if (tab == WardrobeHomeTab.DepositPlan) list.filter { it.isDepositPlan } else list }
             .let { list -> WardrobeBusinessLogic.sortItems(list, sort) }
         val statisticsSource = if (runtime.searchQuery.isNotBlank() || runtime.filterState.activeCount > 0) {
@@ -311,6 +321,23 @@ class WardrobeHomeViewModel(
 
     fun setFilterState(filterState: WardrobeFilterState) {
         runtimeState.update { it.copy(filterState = filterState) }
+    }
+
+    fun applyStatisticsBucketFilter(kind: WardrobeStatisticsFilterKind, label: String) {
+        runtimeState.update { state ->
+            val current = state.filterState
+            val nextFilter = when (kind) {
+                WardrobeStatisticsFilterKind.Brand -> current.copy(brand = label.toReverseFilterValue(kind))
+                WardrobeStatisticsFilterKind.Type -> current.copy(type = label.toReverseFilterValue(kind))
+                WardrobeStatisticsFilterKind.Color -> current.copy(color = label.toReverseFilterValue(kind))
+                WardrobeStatisticsFilterKind.Condition -> current.copy(condition = label.toReverseFilterValue(kind))
+                WardrobeStatisticsFilterKind.DepositState -> current.copy(
+                    depositOnly = label == "心愿尾款",
+                    ownedOnly = label == "现货/已拥有",
+                )
+            }
+            state.copy(filterState = nextFilter, isSearchVisible = false)
+        }
     }
 
     fun clearFilters() {
@@ -555,6 +582,16 @@ private fun String.firstToken(): String {
         .firstOrNull()
         ?.trim()
         .orEmpty()
+}
+
+private fun String.toReverseFilterValue(kind: WardrobeStatisticsFilterKind): String {
+    return when (kind) {
+        WardrobeStatisticsFilterKind.Brand -> if (this == "未填写品牌") "无品牌" else this
+        WardrobeStatisticsFilterKind.Type -> if (this == "未填写类型") "无类型" else this
+        WardrobeStatisticsFilterKind.Color -> if (this == "未填写颜色") "无颜色" else this
+        WardrobeStatisticsFilterKind.Condition -> if (this == "未填写状态") "无成色" else this
+        WardrobeStatisticsFilterKind.DepositState -> this
+    }
 }
 
 private fun String.splitTokens(): List<String> {
