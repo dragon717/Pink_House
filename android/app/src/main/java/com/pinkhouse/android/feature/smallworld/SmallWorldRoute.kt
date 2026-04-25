@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PieChart
@@ -347,8 +348,12 @@ private fun SmallWorldFeatureScreen(
                 shape = RoundedCornerShape(22.dp),
                 color = Color.White.copy(alpha = 0.82f),
             ) {
+                val isSmallWorldHome = destination == SmallWorldDestination.SmallWorld
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回 House 菜单")
+                    Icon(
+                        imageVector = if (isSmallWorldHome) Icons.Filled.Menu else Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = if (isSmallWorldHome) "打开 House 菜单" else "返回 House 菜单",
+                    )
                 }
             }
             Column(

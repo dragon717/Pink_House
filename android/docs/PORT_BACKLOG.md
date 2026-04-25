@@ -15,13 +15,7 @@
 
 按优先级倒序，下回合从顶端取。
 
-### 阶段 ARCH（架构对齐 iOS，剩下 1 批）
-
-- [ ] **BATCH-ARCH-04** SmallWorld 页右上角加浮层菜单按钮（替代左上"返回 Menu"）
-  - SCOPE: 1 文件 — `feature/smallworld/SmallWorldRoute.kt`
-  - 对齐 iOS 上 House 页右上角 ⛶ 形态
-  - 把 BackHandler 改成只在 BigWorld/Calendar/... 子页拦截，不再从 SmallWorld 拦
-  - DEFER 自 ARCH-02
+### 阶段 ARCH 已收尾 ✅（4 批全过）
 
 ### 阶段 CLEANUP（pre-existing tech debt，可在 ARCH 之后任意穿插）
 
@@ -109,6 +103,7 @@
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-ARCH-04** SmallWorld 默认页左上图标语义调整 — `SmallWorldRoute.kt` SmallWorldFeatureScreen 内：destination == SmallWorld 时显 ☰ Menu 图标（语义"打开菜单"），子页保留 ← ArrowBack（语义"返回"），onClick 行为不变。assembleDebug 5s 通过。装机截图确认 ☰ 图标显示。 BackHandler 行为保留（按返回先进 Menu 再退 Tab），后续可继续优化但不阻塞 M3。
 - [x] **BATCH-ARCH-03** 删除浮动 `PetChatFloatingButton` — 与底部 PetChat Tab 重复入口。改 2 文件：`PinkHouseApp.kt`（删 import + 删调用）+ `PinkHouseComponents.kt`（删函数定义）。naichaPeeking 装饰保留。assembleDebug 5s 通过。装机截图确认右下角浮动按钮消失，4 Tab 完整。
 - [x] **BATCH-ARCH-02** House Tab 默认入口从 `Menu` 改为 `SmallWorld` — 改 1 处：`SmallWorldRoute.kt` line 105。装机截图确认 House Tab 直接落小世界页。assembleDebug 6s 通过。遗留：浮层菜单按钮 → ARCH-04。
 - [x] **BATCH-ARCH-01** 启用第 4 底部 Tab `PetChat`（萌宠对话）— 改 1 处：`AppDestination.kt` `showInBottomBar` 默认走 true。  装机截图确认 4 Tab 对齐 iOS。assembleDebug 12s 通过。遗留：浮动猫与 Tab 重复入口 → ARCH-03。
