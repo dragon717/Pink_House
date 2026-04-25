@@ -251,6 +251,38 @@
 
 - `BATCH-WARDROBE-UI-02`：按用户反馈继续提高 UI 还原度，优先统计卡与统计 Sheet 的自定义软圆容器。
 
+### BATCH-WARDROBE-UI-02 衣橱统计卡 / 详细统计 Sheet 软圆还原
+
+**背景**
+
+- 用户反馈 Android UI 还原度仍不足，原生组件偏方正；后续若原生组件气质不贴 iOS，应优先用自定义容器/组件承接语义。
+- iOS 对照：衣橱统计区是大圆角浅色容器，内部三项统计与功能入口都是柔和、低对比、轻透的分块；详细统计页面也应避免硬边 Card 堆叠。
+
+**改动范围**
+
+- `WardrobeRoute.kt`
+  - 统计卡外层从 `ElevatedCard` 改为复用自定义 `SoftGlassPanel`。
+  - 查询词展示从 Material `AssistChip` 改为自定义 `SoftSearchPill`。
+  - 三项统计改为 `SoftStatTile`：半透明白底、18dp 圆角、轻描边，裙装价值/尾款使用粉色强调。
+  - 功能入口 `FeaturePill` 从默认卡片色块改为自定义软圆、轻描边、半透明白底。
+  - 详细统计 Sheet 内容区加入轻粉底，汇总卡复用 `SoftGlassPanel`，分组卡与分组行改为软圆半透明容器。
+  - 不使用 `Modifier.blur`，避免 API 兼容红线。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：
+  - 衣橱首页可见 `衣橱总览`、`总件数/款`、`裙装价值`、`详细统计`。
+  - 点击 `详细统计` 后可见 `统计口径：全量衣橱`、`按品牌`、`按类型`，内容区呈轻粉底 + 软圆分组块。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_ui_02_stats_card.png`
+  - `/tmp/pinkhouse_wardrobe_ui_02_stats_sheet.png`
+
+**后续待办**
+
+- `BATCH-WARDROBE-UI-03`：继续处理衣物网格/列表卡片，包括空图占位、价格区、尾款角标与卡片边缘。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地

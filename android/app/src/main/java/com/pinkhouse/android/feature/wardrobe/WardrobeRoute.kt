@@ -852,11 +852,7 @@ private fun WardrobeStatisticsCard(
     onStatisticsClick: () -> Unit,
 ) {
     val statistics = if (uiState.hasActiveQuery) uiState.visibleStatistics else uiState.statistics
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White.copy(alpha = 0.9f)),
-    ) {
+    SoftGlassPanel {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -881,13 +877,13 @@ private fun WardrobeStatisticsCard(
                     )
                 }
                 if (uiState.hasActiveQuery && uiState.searchQuery.isNotBlank()) {
-                    AssistChip(onClick = {}, label = { Text(uiState.searchQuery) })
+                    SoftSearchPill(label = uiState.searchQuery, selected = true, onClick = {})
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                StatColumn("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
-                StatColumn("裙装价值", statistics.wardrobeValue.moneyText())
-                StatColumn("总价值", statistics.totalValue.moneyText())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SoftStatTile("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
+                SoftStatTile("裙装价值", statistics.wardrobeValue.moneyText(), accent = true)
+                SoftStatTile("总价值", statistics.totalValue.moneyText())
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FeaturePill(Icons.Filled.CheckCircle, "今日穿搭色", PinkPrimary)
@@ -899,10 +895,30 @@ private fun WardrobeStatisticsCard(
 }
 
 @Composable
-private fun StatColumn(title: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, style = MaterialTheme.typography.labelMedium, color = SoftGrayText)
-        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+private fun RowScope.SoftStatTile(
+    title: String,
+    value: String,
+    accent: Boolean = false,
+) {
+    Surface(
+        modifier = Modifier.weight(1f),
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.52f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.8f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.labelMedium, color = SoftGrayText)
+            Text(
+                value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (accent) PinkAccent else SoftGrayText,
+            )
+        }
     }
 }
 
@@ -913,12 +929,15 @@ private fun RowScope.FeaturePill(
     tint: Color,
     onClick: (() -> Unit)? = null,
 ) {
+    val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .weight(1f)
+            .clip(shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = RoundedCornerShape(14.dp),
-        color = Color(0xFFF6EEF1),
+        shape = shape,
+        color = Color.White.copy(alpha = 0.48f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.74f)),
     ) {
         Column(
             modifier = Modifier.padding(vertical = 12.dp),
@@ -951,25 +970,22 @@ private fun WardrobeDetailedStatisticsSheet(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .background(PinkBackground.copy(alpha = 0.38f)),
             contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.elevatedCardColors(containerColor = Color.White.copy(alpha = 0.9f)),
-                ) {
+                SoftGlassPanel {
                     Column(
                         modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text("统计口径：$scopeLabel", color = SoftGrayText, style = MaterialTheme.typography.bodyMedium)
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            StatColumn("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
-                            StatColumn("总价值", statistics.totalValue.moneyText())
-                            StatColumn("尾款", statistics.depositBalance.moneyText())
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SoftStatTile("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
+                            SoftStatTile("总价值", statistics.totalValue.moneyText())
+                            SoftStatTile("尾款", statistics.depositBalance.moneyText(), accent = true)
                         }
                     }
                 }
@@ -989,10 +1005,14 @@ private fun StatisticsBreakdownSection(
     title: String,
     rows: List<WardrobeStatisticBucket>,
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(26.dp)),
+        shape = RoundedCornerShape(26.dp),
+        color = Color.White.copy(alpha = 0.66f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -1012,23 +1032,32 @@ private fun StatisticsBreakdownSection(
 
 @Composable
 private fun StatisticsBreakdownRow(row: WardrobeStatisticBucket) {
-    Row(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.48f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(row.label, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                text = "${row.totalPieces} 件 / ${row.totalStyles} 款",
-                color = SoftGrayText,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(row.totalValue.moneyText(), fontWeight = FontWeight.Bold)
-            if (row.depositBalance > BigDecimal.ZERO) {
-                Text("尾款 ${row.depositBalance.moneyText()}", color = PinkAccent, style = MaterialTheme.typography.bodySmall)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(row.label, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = "${row.totalPieces} 件 / ${row.totalStyles} 款",
+                    color = SoftGrayText,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(row.totalValue.moneyText(), fontWeight = FontWeight.Bold, color = SoftGrayText)
+                if (row.depositBalance > BigDecimal.ZERO) {
+                    Text("尾款 ${row.depositBalance.moneyText()}", color = PinkAccent, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }
