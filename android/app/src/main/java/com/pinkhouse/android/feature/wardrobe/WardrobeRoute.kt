@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,7 +43,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
@@ -58,10 +59,11 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -423,16 +425,23 @@ private fun WardrobeTopControls(
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = Color.White.copy(alpha = 0.72f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.86f)),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
         ) {
-            Row(modifier = Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(modifier = Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 WardrobeTabButton(
                     label = "少女衣橱",
+                    imageVector = Icons.Filled.Checkroom,
                     selected = uiState.homeTab == WardrobeHomeTab.Wardrobe,
+                    activeColor = PinkPrimary,
                     onClick = { onTabSelected(WardrobeHomeTab.Wardrobe) },
                 )
                 WardrobeTabButton(
                     label = "心愿尾款",
+                    imageVector = Icons.Filled.CalendarMonth,
                     selected = uiState.homeTab == WardrobeHomeTab.DepositPlan,
+                    activeColor = PinkAccent,
                     onClick = { onTabSelected(WardrobeHomeTab.DepositPlan) },
                 )
             }
@@ -441,9 +450,12 @@ private fun WardrobeTopControls(
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = Color.White.copy(alpha = 0.78f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.86f)),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
         ) {
-            Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-                ToolbarIconButton(Icons.AutoMirrored.Filled.Sort, "排序") {
+            Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                ToolbarIconButton(Icons.Filled.SwapVert, "排序") {
                     onShowSortMenuChange(true)
                 }
                 Box {
@@ -526,7 +538,7 @@ private fun WardrobeTopControls(
                     }
                 }
 
-                ToolbarIconButton(Icons.Filled.MoreVert, "更多") {
+                ToolbarIconButton(Icons.Filled.MoreHoriz, "更多") {
                     onShowMoreMenuChange(true)
                 }
                 Box {
@@ -597,21 +609,43 @@ private fun WardrobeTopControls(
 @Composable
 private fun WardrobeTabButton(
     label: String,
+    imageVector: ImageVector,
     selected: Boolean,
+    activeColor: Color,
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(22.dp),
-        color = if (selected) Color.White else Color.Transparent,
+        color = if (selected) Color.White.copy(alpha = 0.92f) else Color.Transparent,
+        border = if (selected) BorderStroke(1.dp, Color.White.copy(alpha = 0.88f)) else null,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
-        Text(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) PinkPrimary else SoftGrayText.copy(alpha = 0.65f),
-        )
+        Column(
+            modifier = Modifier
+                .width(80.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = if (selected) activeColor else SoftGrayText.copy(alpha = 0.58f),
+            )
+            Text(
+                text = label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) activeColor else SoftGrayText.copy(alpha = 0.62f),
+            )
+        }
     }
 }
 
@@ -623,27 +657,39 @@ private fun ToolbarIconButton(
     onClick: () -> Unit,
 ) {
     Box(contentAlignment = Alignment.TopEnd) {
-        IconButton(
-            modifier = Modifier.size(38.dp),
-            onClick = onClick,
+        Surface(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onClick),
+            shape = CircleShape,
+            color = if (badge != null) PinkBackground.copy(alpha = 0.56f) else Color.Transparent,
+            border = if (badge != null) BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)) else null,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
         ) {
-            Icon(
-                imageVector = imageVector,
-                contentDescription = contentDescription,
-                tint = Color(0xFF4F464B),
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = imageVector,
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(22.dp),
+                    tint = SoftGrayText,
+                )
+            }
         }
         if (badge != null) {
             Surface(
                 shape = CircleShape,
-                color = PinkAccent,
+                color = PinkAccent.copy(alpha = 0.86f),
                 modifier = Modifier.size(16.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.82f)),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = badge,
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }

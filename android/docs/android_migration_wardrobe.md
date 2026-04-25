@@ -311,6 +311,34 @@
 
 - `BATCH-WARDROBE-UI-04`：继续处理顶部 `少女衣橱 / 心愿尾款` 分段、排序/筛选/网格/更多/新增按钮组与触控热区，让顶部操作区也脱离 Material IconButton 气质。
 
+
+### BATCH-WARDROBE-UI-04 衣橱顶部操作栏 / 分段控件软圆还原
+
+**背景**
+
+- Computer Use 对照 iOS Simulator：iOS 衣橱顶部为 `少女衣橱 / 心愿尾款` 图标+文字分段，右侧是白色胶囊内的排序、筛选、网格、更多、添加按钮。
+- Android 上一版虽然已有胶囊外框，但页签仍偏大号纯文本，工具按钮仍使用 Material `IconButton` 视觉；本批继续按用户反馈改成自定义软圆组件。
+
+**改动范围**
+
+- `WardrobeRoute.kt`
+  - 顶部分段容器加入白色轻描边、零 elevation，页签改为图标 + 小字的紧凑纵向布局。
+  - iOS `cabinet.fill` 语义在 Android 侧映射为 Material `Checkroom`；心愿尾款使用 `CalendarMonth`，不引入 SF Symbols 资产。
+  - 操作按钮组保留白色胶囊，但内部按钮从 Material `IconButton` 改为自定义圆形 `Surface` + `clickable` 热区，降低原生按钮气质。
+  - 排序图标改为 `SwapVert`，更多图标改为横向 `MoreHoriz`，更贴近 iOS 顶栏的视觉语义。
+  - 筛选 badge 使用现有 `PinkBackground` / `PinkAccent` / `SoftGrayText`，不新增硬编码 `0xFF...` 色值。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中。
+- Android Emulator 装机验证：衣橱首页顶部左右胶囊之间留出间隔，分段显示图标 + `少女衣橱` / `心愿尾款`，工具栏可见 `排序`、`筛选`、`布局`、`更多`、`添加` 的可访问描述。
+- 截图记录：`/tmp/pinkhouse_wardrobe_ui_04_top_controls.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-UI-05`：处理衣物详情 Sheet、信息行、编辑/删除入口的软圆还原，继续覆盖核心查看链路。
+
 ## 八、M3 推进记录（Computer Use 对照）
 
 ### 已落地
