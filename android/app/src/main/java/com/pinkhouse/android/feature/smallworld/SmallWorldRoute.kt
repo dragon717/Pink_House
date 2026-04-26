@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.PieChart
@@ -70,6 +71,7 @@ import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
 import com.pinkhouse.android.core.ui.PinkSegmentedTabs
 import com.pinkhouse.android.feature.calendar.CalendarRoute
 import com.pinkhouse.android.feature.checkin.CheckInRoute
+import com.pinkhouse.android.feature.notice.NoticeCenterRoute
 import com.pinkhouse.android.feature.wardrobe.WardrobeHomeTab
 
 private val houseBackgroundOptions = listOf("日常", "洛可可")
@@ -85,6 +87,7 @@ enum class SmallWorldDestination(
     BigWorld("世界书", "旅行、徽章、航线与世界设定", Icons.Filled.Flight, "后续会把世界书主视觉、章节入口和旅行记录搬过来。"),
     CheckIn("每日打卡", "签到、问候语与今日穿搭色", Icons.Filled.CheckCircle, "这里会对齐 iOS 的每日打卡、七日签到和今日穿搭色。"),
     Calendar("梦裙日历", "尾款与穿搭日程", Icons.Filled.CalendarMonth, "这里会对齐 iOS 的梦裙日历排期和最近提醒入口。"),
+    NoticeCenter("通知中心", "公告、提醒与待确认消息", Icons.Filled.Notifications, "这里会对齐 iOS 的公告中心与通知阅读状态。"),
     Wealth("来财", "招财、数钱、储蓄", Icons.Filled.Paid, "来财页会先补入口切换，再逐步接上动画和数据统计。"),
     Ootd("穿搭手帐", "记录每日搭配", Icons.Filled.Book, "穿搭手帐会先复刻列表骨架，再补详情与编辑。"),
     Perler("拼豆工坊", "像素图纸与工坊", Icons.Filled.PieChart, "拼豆工坊先保留独立导航页，后续再接图纸和工坊状态。"),
@@ -98,6 +101,7 @@ private val houseMenuEntries = listOf(
     SmallWorldDestination.BigWorld,
     SmallWorldDestination.CheckIn,
     SmallWorldDestination.Calendar,
+    SmallWorldDestination.NoticeCenter,
     SmallWorldDestination.Wealth,
     SmallWorldDestination.Ootd,
     SmallWorldDestination.Perler,
@@ -363,7 +367,8 @@ private fun SmallWorldFeatureScreen(
     onOpenPetChat: () -> Unit,
 ) {
     val showsStandaloneContent = destination == SmallWorldDestination.CheckIn ||
-        destination == SmallWorldDestination.Calendar
+        destination == SmallWorldDestination.Calendar ||
+        destination == SmallWorldDestination.NoticeCenter
 
     Column(
         modifier = Modifier
@@ -429,6 +434,8 @@ private fun SmallWorldFeatureScreen(
                 CheckInRoute()
             } else if (destination == SmallWorldDestination.Calendar) {
                 CalendarRoute()
+            } else if (destination == SmallWorldDestination.NoticeCenter) {
+                NoticeCenterRoute()
             } else {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
