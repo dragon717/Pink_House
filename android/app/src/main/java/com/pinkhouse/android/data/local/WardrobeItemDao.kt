@@ -39,6 +39,19 @@ interface WardrobeItemDao {
     )
     fun observeActiveItemsByQuery(query: String): Flow<List<WardrobeItemEntity>>
 
+    @Query("SELECT * FROM wardrobe_item WHERE id = :id LIMIT 1")
+    fun observeItem(id: Long): Flow<WardrobeItemEntity?>
+
+    @Query(
+        """
+        SELECT * FROM wardrobe_item
+        WHERE status = 'Trashed'
+           OR trashedAtEpochMillis IS NOT NULL
+        ORDER BY IFNULL(trashedAtEpochMillis, updatedAtEpochMillis) DESC
+        """,
+    )
+    fun observeTrashedItems(): Flow<List<WardrobeItemEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: WardrobeItemEntity): Long
 
@@ -69,4 +82,27 @@ interface WardrobeItemDao {
         """,
     )
     suspend fun softDeleteItems(ids: List<Long>, trashedAtEpochMillis: Long)
+
+    @Query(
+        """
+        UPDATE wardrobe_item
+        SET status = 'Owned',
+            updatedAtEpochMillis = :restoredAtEpochMillis,
+            trashedAtEpochMillis = NULL
+        WHERE id IN (:ids)
+        """,
+    )
+    suspend fun restoreItems(ids: List<Long>, restoredAtEpochMillis: Long)
+
+    @Query("DELETE FROM wardrobe_item WHERE id IN (:ids)")
+    suspend fun permanentlyDeleteItems(ids: List<Long>)
+
+    @Query(
+        """
+        DELETE FROM wardrobe_item
+        WHERE trashedAtEpochMillis IS NOT NULL
+          AND trashedAtEpochMillis < :thresholdEpochMillis
+        """,
+    )
+    suspend fun purgeTrashedBefore(thresholdEpochMillis: Long)
 }

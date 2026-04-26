@@ -11,6 +11,7 @@ enum class AppDestination(
     val route: String,
     val label: String,
     val icon: ImageVector,
+    val showInBottomBar: Boolean = true,
 ) {
     Wardrobe("wardrobe", "衣橱", Icons.Filled.Inventory2),
     House("house", "House", Icons.Filled.Home),

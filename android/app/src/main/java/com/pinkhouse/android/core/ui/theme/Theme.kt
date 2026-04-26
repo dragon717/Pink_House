@@ -10,6 +10,8 @@ private val LightColors = lightColorScheme(
     primary = PinkHousePrimary,
     onPrimary = PinkHouseOnPrimary,
     primaryContainer = PinkHousePrimaryContainer,
+    secondary = PinkHouseSecondary,
+    background = PinkHouseBackground,
     surface = PinkHouseSurface,
 )
 

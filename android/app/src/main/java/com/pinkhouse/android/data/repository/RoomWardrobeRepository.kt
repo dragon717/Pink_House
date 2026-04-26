@@ -23,6 +23,14 @@ class RoomWardrobeRepository(
         return items.map { entities -> entities.map { it.toDomain() } }
     }
 
+    override fun observeItem(id: Long): Flow<WardrobeItem?> {
+        return wardrobeItemDao.observeItem(id).map { it?.toDomain() }
+    }
+
+    override fun observeTrashedItems(): Flow<List<WardrobeItem>> {
+        return wardrobeItemDao.observeTrashedItems().map { entities -> entities.map { it.toDomain() } }
+    }
+
     override suspend fun addItem(item: WardrobeItem): Long {
         return wardrobeItemDao.insert(item.toEntity(clock()))
     }
@@ -44,5 +52,21 @@ class RoomWardrobeRepository(
         if (ids.isNotEmpty()) {
             wardrobeItemDao.softDeleteItems(ids = ids, trashedAtEpochMillis = clock())
         }
+    }
+
+    override suspend fun restoreItems(ids: List<Long>) {
+        if (ids.isNotEmpty()) {
+            wardrobeItemDao.restoreItems(ids = ids, restoredAtEpochMillis = clock())
+        }
+    }
+
+    override suspend fun permanentlyDeleteItems(ids: List<Long>) {
+        if (ids.isNotEmpty()) {
+            wardrobeItemDao.permanentlyDeleteItems(ids)
+        }
+    }
+
+    override suspend fun purgeTrashedBefore(thresholdEpochMillis: Long) {
+        wardrobeItemDao.purgeTrashedBefore(thresholdEpochMillis)
     }
 }

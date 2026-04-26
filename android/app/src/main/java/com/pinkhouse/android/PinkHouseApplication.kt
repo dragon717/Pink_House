@@ -13,6 +13,7 @@ class PinkHouseApplication : Application() {
     }
     val appContainer: AppContainer by lazy {
         AppContainer(
+            context = applicationContext,
             database = database,
             userPreferencesDataStore = UserPreferencesDataStore(applicationContext),
             wardrobeImageStore = WardrobeImageStore(applicationContext),

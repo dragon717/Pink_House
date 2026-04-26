@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [WardrobeItemEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class PinkHouseDatabase : RoomDatabase() {
@@ -21,7 +21,7 @@ abstract class PinkHouseDatabase : RoomDatabase() {
                 context.applicationContext,
                 PinkHouseDatabase::class.java,
                 "pink_house.db",
-            ).addMigrations(Migration1To2).build()
+            ).addMigrations(Migration1To2, Migration2To3).build()
         }
 
         private val Migration1To2 = object : Migration(1, 2) {
@@ -43,6 +43,16 @@ abstract class PinkHouseDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN finalPaymentEndEpochDay INTEGER")
                 db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN note TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN sortIndex INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        private val Migration2To3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN uuid TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN tagNamesJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN accessoryItemsJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN sizeChartImagePathsJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE wardrobe_item ADD COLUMN priceChartImagePathsJson TEXT NOT NULL DEFAULT '[]'")
             }
         }
     }
