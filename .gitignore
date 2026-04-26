@@ -27,3 +27,6 @@ project.xcworkspace/
 *.dSYM.zip
 *.dSYM
 .build/
+android/.gradle/*
+android/app/build/*
+android/local.properties
