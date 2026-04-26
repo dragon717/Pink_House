@@ -1098,6 +1098,7 @@ private fun StatisticsBreakdownSection(
 @Composable
 private fun StatisticsBreakdownRow(row: WardrobeStatisticBucket, onClick: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
+    val barShape = RoundedCornerShape(999.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -1107,26 +1108,64 @@ private fun StatisticsBreakdownRow(row: WardrobeStatisticBucket, onClick: () -> 
         color = Color.White.copy(alpha = 0.48f),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.72f)),
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(row.label, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(row.label, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        text = "${row.totalPieces} 件 / ${row.totalStyles} 款 · 均价 ${row.averageValue.moneyText()} · 点按筛选",
+                        color = SoftGrayText,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(row.totalValue.moneyText(), fontWeight = FontWeight.Bold, color = SoftGrayText)
+                    if (row.depositBalance > BigDecimal.ZERO) {
+                        Text("尾款 ${row.depositBalance.moneyText()}", color = PinkAccent, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(8.dp)
+                        .clip(barShape)
+                        .background(PinkSurface.copy(alpha = 0.86f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(row.valueShare.coerceIn(0f, 1f))
+                            .height(8.dp)
+                            .clip(barShape)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        PinkPrimary.copy(alpha = 0.68f),
+                                        PinkAccent.copy(alpha = 0.82f),
+                                    )
+                                )
+                            ),
+                    )
+                }
                 Text(
-                    text = "${row.totalPieces} 件 / ${row.totalStyles} 款 · 点按筛选",
-                    color = SoftGrayText,
+                    text = "占比 ${row.valueShare.percentText()}",
+                    color = SoftGrayText.copy(alpha = 0.78f),
                     style = MaterialTheme.typography.bodySmall,
                 )
-            }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(row.totalValue.moneyText(), fontWeight = FontWeight.Bold, color = SoftGrayText)
-                if (row.depositBalance > BigDecimal.ZERO) {
-                    Text("尾款 ${row.depositBalance.moneyText()}", color = PinkAccent, style = MaterialTheme.typography.bodySmall)
-                }
             }
         }
     }
@@ -2862,6 +2901,11 @@ private fun DepositReminderSheet(
 
 private fun BigDecimal.moneyText(): String {
     return "¥" + setScale(2, RoundingMode.HALF_UP).toPlainString()
+}
+
+private fun Float.percentText(): String {
+    val percent = (coerceIn(0f, 1f) * 100f + 0.5f).toInt()
+    return "$percent%"
 }
 
 private fun decodeScaledBitmap(path: String, maxSize: Int): Bitmap? {

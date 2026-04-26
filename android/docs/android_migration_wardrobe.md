@@ -432,6 +432,7 @@
 **后续待办**
 
 - `BATCH-WARDROBE-DATA-05`：把详细统计 Sheet 的品牌/类型/颜色/状态/尾款分组项做成一键反向筛选，形成“统计发现 → 查询定位”的闭环。
+- `BATCH-WARDROBE-DATA-06`：统计明细分组补充均价与价值占比条，让用户在点击筛选前先看出价值集中度。
 
 
 ### BATCH-WARDROBE-DEPOSIT-01 心愿尾款 视图模式 + 年份切换
@@ -562,6 +563,38 @@
 - DEPOSIT-04：TotalBalanceCard 隐藏/显示 + 钱包瘦身 alert + YearSelectorView 小眼睛 + YearStatsCard。
 
 
+### BATCH-WARDROBE-DATA-06 统计明细均价 / 价值占比条
+
+**背景**
+
+- DATA-05 已经把统计明细行做成可点击筛选，但每行仍只展示件数/款数/总价值。
+- 对衣橱管理来说，用户更关心“哪类最贵、价值占比是否集中、平均价格是否异常”，因此本批补齐均价与价值占比条。
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - `WardrobeStatisticBucket` 新增 `averageValue: BigDecimal` 与 `valueShare: Float`。
+  - `groupByDimension` 先计算当前统计口径的 `sourceTotalValue`，再为每个分组计算：
+    - `averageValue = totalValue / totalPieces`，按件均价保留 2 位。
+    - `valueShare = totalValue / sourceTotalValue`，约束在 `0f..1f`，用于 UI 进度条。
+  - 新增 `BigDecimal.averageBy(count)` 与 `BigDecimal.shareOf(total)`，集中处理 0 值与舍入，避免 UI 层做金额计算。
+- `WardrobeRoute.kt`
+  - `StatisticsBreakdownRow` 从单行左右布局升级为纵向信息块：标题/总价值、件款 + 均价、底部价值占比条。
+  - 价值占比条使用软圆背景 + 粉色横向渐变填充，文本显示 `占比 XX%`。
+  - 保留 DATA-05 的 `点按筛选` 与整行点击反向筛选能力。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中；`git diff --check` 通过。
+- Android Emulator 装机验证：打开 `少女衣橱 → 详细统计`，可见 `按品牌` 分组行展示 `均价 ¥1314.50`、`占比 86%`，后续行展示 `均价 ¥259.00`、`占比 8%` 等，统计行仍保留 `点按筛选`。
+- 截图记录：`/tmp/pinkhouse_wardrobe_data_06_avg_share.png`。
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-07`：首页当前查询/筛选条件 Chips + 单项移除，提升筛选状态可见性与回退效率。
+
+
 ### BATCH-WARDROBE-DATA-05 统计明细项一键反向筛选
 
 **背景**
@@ -591,7 +624,7 @@
 
 **后续待办**
 
-- `BATCH-WARDROBE-DATA-06`：在统计明细分组中补充均价与价值占比条，继续增强数据统计可读性。
+- `BATCH-WARDROBE-DATA-06`：在统计明细分组中补充均价与价值占比条，继续增强数据统计可读性。（已完成）
 
 ## 八、M3 推进记录（Computer Use 对照）
 

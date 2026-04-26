@@ -14,6 +14,7 @@ import com.pinkhouse.android.domain.model.WardrobeItemStatus
 import com.pinkhouse.android.domain.repository.WardrobeRepository
 import com.pinkhouse.android.domain.usecase.BatchSoftDeleteWardrobeItems
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -143,6 +144,8 @@ data class WardrobeStatisticBucket(
     val totalStyles: Int,
     val totalValue: BigDecimal,
     val depositBalance: BigDecimal,
+    val averageValue: BigDecimal,
+    val valueShare: Float,
 )
 
 data class WardrobeStatisticsBreakdown(
@@ -661,14 +664,19 @@ private fun List<WardrobeItem>.groupByDimension(
     emptyLabel: String,
     labelSelector: (WardrobeItem) -> String,
 ): List<WardrobeStatisticBucket> {
+    val sourceTotalValue = fold(BigDecimal.ZERO) { acc, item -> acc + item.inventoryTotalPrice }
     return groupBy { item -> labelSelector(item).trim().ifBlank { emptyLabel } }
         .map { (label, items) ->
+            val totalPieces = items.sumOf { it.stock.coerceAtLeast(1) }
+            val totalValue = items.fold(BigDecimal.ZERO) { acc, item -> acc + item.inventoryTotalPrice }
             WardrobeStatisticBucket(
                 label = label,
-                totalPieces = items.sumOf { it.stock.coerceAtLeast(1) },
+                totalPieces = totalPieces,
                 totalStyles = items.size,
-                totalValue = items.fold(BigDecimal.ZERO) { acc, item -> acc + item.inventoryTotalPrice },
+                totalValue = totalValue,
                 depositBalance = items.fold(BigDecimal.ZERO) { acc, item -> acc + item.totalBalance },
+                averageValue = totalValue.averageBy(totalPieces),
+                valueShare = totalValue.shareOf(sourceTotalValue),
             )
         }
         .sortedWith(
@@ -677,6 +685,22 @@ private fun List<WardrobeItem>.groupByDimension(
                 .thenBy { it.label },
         )
         .take(8)
+}
+
+private fun BigDecimal.averageBy(count: Int): BigDecimal {
+    return if (count <= 0) {
+        BigDecimal.ZERO
+    } else {
+        divide(BigDecimal.valueOf(count.toLong()), 2, RoundingMode.HALF_UP)
+    }
+}
+
+private fun BigDecimal.shareOf(total: BigDecimal): Float {
+    return if (total <= BigDecimal.ZERO || this <= BigDecimal.ZERO) {
+        0f
+    } else {
+        divide(total, 4, RoundingMode.HALF_UP).toFloat().coerceIn(0f, 1f)
+    }
 }
 
 private fun String.firstToken(): String {
