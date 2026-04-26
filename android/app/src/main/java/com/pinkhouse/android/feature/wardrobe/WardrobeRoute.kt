@@ -361,7 +361,7 @@ fun WardrobeRoute(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("移入回收站") },
-            text = { Text("确定删除已选的 ${uiState.selectedItemIds.size} 件衣物吗？数据会软删除，后续可接回收站恢复。") },
+            text = { Text("确定将已选的 ${uiState.selectedItemIds.size} 件衣物移入回收站吗？需要时可以再恢复。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -917,7 +917,10 @@ private fun WardrobeStatisticsCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text(
                         text = if (uiState.hasActiveQuery) "当前结果统计" else "衣橱总览",
                         style = MaterialTheme.typography.titleMedium,
@@ -934,6 +937,7 @@ private fun WardrobeStatisticsCard(
                         color = SoftGrayText,
                     )
                 }
+                FeaturePill(Icons.Filled.BarChart, "详细统计", SoftGrayText, onClick = onStatisticsClick)
             }
             if (uiState.hasActiveQuery) {
                 ActiveQueryChipRow(
@@ -946,11 +950,6 @@ private fun WardrobeStatisticsCard(
                 SoftStatTile("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
                 SoftStatTile("裙装价值", statistics.wardrobeValue.moneyText(), accent = true)
                 SoftStatTile("总价值", statistics.totalValue.moneyText())
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeaturePill(Icons.Filled.CheckCircle, "今日穿搭色", PinkPrimary)
-                FeaturePill(Icons.Filled.Menu, "穿搭手帐", PinkPrimary)
-                FeaturePill(Icons.Filled.BarChart, "详细统计", SoftGrayText, onClick = onStatisticsClick)
             }
         }
     }
@@ -1367,11 +1366,6 @@ private fun DepositContent(
             colors = CardDefaults.elevatedCardColors(containerColor = Color.White.copy(alpha = 0.9f)),
         ) {
             Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    FeaturePill(Icons.Filled.CalendarMonth, "梦裙日历", PinkAccent)
-                    FeaturePill(Icons.Filled.BarChart, "马上来财", Color(0xFFFF9B4A))
-                    FeaturePill(Icons.Filled.BarChart, "裙装股市", Color(0xFF4BA3FF))
-                }
                 DepositYearSwitcher(
                     selectedYear = uiState.selectedDepositYear,
                     availableYears = uiState.availableDepositYears,
@@ -2112,7 +2106,7 @@ private fun WardrobeItemEditorSheet(
                         )
                         if (availableTestMedia.isNotEmpty()) {
                             SoftFormActionButton(
-                                label = "测试图片",
+                                label = "示例图片",
                                 icon = Icons.Filled.Image,
                                 onClick = {
                                     coroutineScope.launch {
@@ -2874,14 +2868,14 @@ private fun BatchImportSheet(
                     ) {
                         Icon(Icons.Filled.Image, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
-                        Text("全部测试图")
+                        Text("全部示例图")
                     }
                 }
             }
             if (imageFileNames.isEmpty()) {
                 EmptyState(
                     title = "还没有选择图片",
-                    description = "会使用 Android Photo Picker，多选后先复制到 App 私有目录再建衣物。",
+                    description = "会打开系统相册，多选后复制到 App 私有目录再创建衣物。",
                     onCreateClick = {
                         multiPicker.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
