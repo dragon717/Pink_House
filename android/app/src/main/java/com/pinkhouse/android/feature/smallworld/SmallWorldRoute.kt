@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.pinkhouse.android.core.assets.PinkHouseAssets
 import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
 import com.pinkhouse.android.core.ui.PinkSegmentedTabs
+import com.pinkhouse.android.feature.calendar.CalendarRoute
 import com.pinkhouse.android.feature.checkin.CheckInRoute
 import com.pinkhouse.android.feature.wardrobe.WardrobeHomeTab
 
@@ -361,6 +362,9 @@ private fun SmallWorldFeatureScreen(
     onOpenDepositPlan: () -> Unit,
     onOpenPetChat: () -> Unit,
 ) {
+    val showsStandaloneContent = destination == SmallWorldDestination.CheckIn ||
+        destination == SmallWorldDestination.Calendar
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -423,6 +427,8 @@ private fun SmallWorldFeatureScreen(
                 )
             } else if (destination == SmallWorldDestination.CheckIn) {
                 CheckInRoute()
+            } else if (destination == SmallWorldDestination.Calendar) {
+                CalendarRoute()
             } else {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -467,65 +473,67 @@ private fun SmallWorldFeatureScreen(
                 }
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.82f)),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+            if (!showsStandaloneContent) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.82f)),
                 ) {
-                    Text(
-                        text = "当前保留的复刻规则",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = PinkHouseDesignTokens.TextPrimary,
-                    )
-                    SmallWorldMilestoneChip(text = "底部主导航不扩张，House 内页自己管理返回")
-                    SmallWorldMilestoneChip(text = "背景风格切换继续沿用日常 / 洛可可两套素材")
-                    SmallWorldMilestoneChip(text = "后续页面直接在这个目的地壳层里替换具体 Compose 内容")
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.84f)),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text = "快速入口",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = PinkHouseDesignTokens.TextPrimary,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        OutlinedButton(
-                            onClick = onOpenWardrobe,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Filled.Inventory2, contentDescription = null)
-                            Spacer(Modifier.size(8.dp))
-                            Text("衣橱")
-                        }
-                        OutlinedButton(
-                            onClick = onOpenPetChat,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Filled.Pets, contentDescription = null)
-                            Spacer(Modifier.size(8.dp))
-                            Text("萌宠对话")
-                        }
+                        Text(
+                            text = "当前保留的复刻规则",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = PinkHouseDesignTokens.TextPrimary,
+                        )
+                        SmallWorldMilestoneChip(text = "底部主导航不扩张，House 内页自己管理返回")
+                        SmallWorldMilestoneChip(text = "背景风格切换继续沿用日常 / 洛可可两套素材")
+                        SmallWorldMilestoneChip(text = "后续页面直接在这个目的地壳层里替换具体 Compose 内容")
                     }
-                    TextButton(onClick = onBack) {
-                        Text("返回 House 菜单")
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.84f)),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = "快速入口",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = PinkHouseDesignTokens.TextPrimary,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = onOpenWardrobe,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Filled.Inventory2, contentDescription = null)
+                                Spacer(Modifier.size(8.dp))
+                                Text("衣橱")
+                            }
+                            OutlinedButton(
+                                onClick = onOpenPetChat,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Filled.Pets, contentDescription = null)
+                                Spacer(Modifier.size(8.dp))
+                                Text("萌宠对话")
+                            }
+                        }
+                        TextButton(onClick = onBack) {
+                            Text("返回 House 菜单")
+                        }
                     }
                 }
             }
