@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-DATA-07 已验证；下一批建议继续做筛选 Sheet 候选值 Chips，减少手动输入。
+无 — BATCH-WARDROBE-DATA-08 已验证；衣橱核心查询 / 统计本阶段闭环，下一批建议进入 M3-04 SmallWorld 主图 + 风格切换。
 
 ---
 
@@ -25,11 +25,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
   - SCOPE: 2 文件 — `core/ui/PinkHouseDesignTokens.kt` + `core/ui/PinkHouseComponents.kt`
   - 把 `Color(0xFFF7F2F4)` / `Color(0xFFEFE8EC)` 提取到 token，遵循 R4 单一真源
 
-### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
-
-- [ ] **BATCH-WARDROBE-DATA-08** 筛选 Sheet 候选值 Chips
-  - SCOPE: 2 业务文件 — `WardrobeRoute.kt` + `WardrobeHomeViewModel.kt`；同步更新 `android_migration_wardrobe.md`
-  - 目标：在筛选 Sheet 中为品牌/类型/颜色/状态等字段补充来自当前衣橱数据的候选值 Chips，点按即可填入/替换对应字段，减少手动输入并提升查询速度。
+### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）已阶段性收尾 ✅
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
@@ -93,6 +89,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-DATA-08** 筛选 Sheet 候选值 Chips — `WardrobeHomeViewModel.kt` 新增 `WardrobeFilterSuggestions`，从全量衣橱数据提取品牌/类型/颜色/状态候选并按频次取前 8；`WardrobeRoute.kt` 在筛选 Sheet 对应输入框下方展示候选 Chips，点按即可填入草稿字段并高亮。assembleDebug 通过；红线 grep 无命中；装机验证 `筛选 → 类型候选 → 裙装 → 应用筛选` 后首页显示 `当前结果统计` 与 `类型：裙装`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-07** 当前查询/筛选条件 Chips + 单项移除 — `WardrobeHomeViewModel.kt` 新增 `WardrobeFilterChipKind`、`clearSearchQuery()` 与 `clearFilterChip(kind)`；`WardrobeRoute.kt` 在 `当前结果统计` 下方展示活跃搜索/筛选条件 Chips，支持点单个 Chip 移除。assembleDebug 通过；红线 grep 无命中；装机验证品牌筛选 `Baby` 应用后显示 `当前条件（点按单项移除）` 与 `品牌：Baby`，点按 Chip 后回到 `衣橱总览`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-06** 统计明细均价 / 占比条 — `WardrobeHomeViewModel.kt` 为统计分组桶新增 `averageValue` 与 `valueShare`，按当前统计口径计算件均价与价值占比；`WardrobeRoute.kt` 将详细统计行升级为标题/金额、件款+均价、软圆粉色占比条三层结构，继续保留点击反向筛选。assembleDebug 通过；红线 grep 无命中；装机验证 `少女衣橱 → 详细统计` 中可见 `均价 ¥1314.50`、`占比 86%`、`均价 ¥259.00` 与 `占比 8%`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-05** 统计明细项一键反向筛选 — `WardrobeHomeViewModel.kt` 新增统计分组反向筛选映射，支持品牌/类型/颜色/状态与尾款状态生成对应 `WardrobeFilterState`；`WardrobeRoute.kt` 让详细统计分组行可点击，关闭 Sheet 后回到 `当前结果统计`，并补充现货/已拥有筛选状态。assembleDebug 通过；红线 grep 无命中；装机验证点击 `详细统计 → 未填写品牌` 后首页显示 `当前结果统计`、`筛选 1 项`、`命中 2/4 款`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。

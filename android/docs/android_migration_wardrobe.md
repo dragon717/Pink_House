@@ -434,6 +434,7 @@
 - `BATCH-WARDROBE-DATA-05`：把详细统计 Sheet 的品牌/类型/颜色/状态/尾款分组项做成一键反向筛选，形成“统计发现 → 查询定位”的闭环。
 - `BATCH-WARDROBE-DATA-06`：统计明细分组补充均价与价值占比条，让用户在点击筛选前先看出价值集中度。
 - `BATCH-WARDROBE-DATA-07`：首页当前查询/筛选条件 Chips + 单项移除，让用户能看清并快速撤销当前条件。
+- `BATCH-WARDROBE-DATA-08`：筛选 Sheet 补充数据候选 Chips，把高频字段从手输变为点选。
 
 
 ### BATCH-WARDROBE-DEPOSIT-01 心愿尾款 视图模式 + 年份切换
@@ -564,6 +565,41 @@
 - DEPOSIT-04：TotalBalanceCard 隐藏/显示 + 钱包瘦身 alert + YearSelectorView 小眼睛 + YearStatsCard。
 
 
+### BATCH-WARDROBE-DATA-08 筛选 Sheet 候选值 Chips
+
+**背景**
+
+- DATA-07 让用户能看清并撤销当前条件；下一步是减少输入成本。
+- 筛选 Sheet 已有软圆输入框，但品牌/类型/颜色/状态仍需要手动输入，容易输错或记不清已有值。
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - 新增 `WardrobeFilterSuggestions`，包含 `brands / types / colors / conditions` 四组候选。
+  - `WardrobeHomeUiState` 增加 `filterSuggestions`，由 `sourceItems.toFilterSuggestions()` 生成，始终基于全量衣橱数据。
+  - 新增 `toFilterSuggestions()`：从衣物品牌、分类、颜色 tokens、状态中提取非空值。
+  - 新增 `List<String>.toTopSuggestions()`：按出现次数降序、文本升序取前 8 个，保证候选稳定且不刷屏。
+- `WardrobeRoute.kt`
+  - `FilterSheet` 在品牌/类型/颜色/状态输入框下方插入对应 `FilterSuggestionRow`。
+  - 新增 `FilterSuggestionRow`：使用横向 `LazyRow` + 既有 `SoftSearchPill`，点按候选值立即写入对应草稿字段；已选值高亮。
+  - 保留原手动输入、无值快捷条件、心愿尾款/现货快捷条件与应用逻辑。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中；`git diff --check` 通过。
+- Android Emulator 装机验证：
+  - 打开 `筛选` Sheet，可见 `品牌候选`、`类型候选`、`颜色候选` 等候选区。
+  - 点 `类型候选 → 裙装` 后应用筛选，首页显示 `当前结果统计`、`筛选 1 项` 与当前条件 Chip `类型：裙装`。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_data_08_filter_sheet_candidates.png`
+  - `/tmp/pinkhouse_wardrobe_data_08_filter_suggestions.png`
+
+**后续待办**
+
+- 衣橱核心查询/统计链路已完成本阶段闭环；下一步可继续 M3 `SmallWorld 主图 + 风格切换（日常/洛可可）`。
+
+
 ### BATCH-WARDROBE-DATA-07 当前查询/筛选条件 Chips + 单项移除
 
 **背景**
@@ -596,7 +632,7 @@
 
 **后续待办**
 
-- `BATCH-WARDROBE-DATA-08`：筛选 Sheet 候选值 Chips（品牌/类型/颜色/状态），减少手动输入，继续强化查询效率。
+- `BATCH-WARDROBE-DATA-08`：筛选 Sheet 候选值 Chips（品牌/类型/颜色/状态），减少手动输入，继续强化查询效率。（已完成）
 
 
 ### BATCH-WARDROBE-DATA-06 统计明细均价 / 价值占比条

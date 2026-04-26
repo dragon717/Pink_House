@@ -2662,11 +2662,35 @@ private fun FilterSheet(
             item {
                 FormSection(title = "筛选条件") {
                     DraftTextField("品牌", draft.brand, "例如：Baby") { draft = draft.copy(brand = it) }
+                    FilterSuggestionRow(
+                        title = "品牌候选",
+                        values = uiState.filterSuggestions.brands,
+                        selected = draft.brand,
+                        onSelect = { draft = draft.copy(brand = it) },
+                    )
                     DraftTextField("类型", draft.type, "例如：JSK") { draft = draft.copy(type = it) }
+                    FilterSuggestionRow(
+                        title = "类型候选",
+                        values = uiState.filterSuggestions.types,
+                        selected = draft.type,
+                        onSelect = { draft = draft.copy(type = it) },
+                    )
                     DraftTextField("颜色", draft.color, "例如：粉色") { draft = draft.copy(color = it) }
+                    FilterSuggestionRow(
+                        title = "颜色候选",
+                        values = uiState.filterSuggestions.colors,
+                        selected = draft.color,
+                        onSelect = { draft = draft.copy(color = it) },
+                    )
                     DraftTextField("尺码", draft.size, "例如：M") { draft = draft.copy(size = it) }
                     DraftTextField("衣长", draft.length, "例如：90cm") { draft = draft.copy(length = it) }
                     DraftTextField("状态", draft.condition, "例如：全新") { draft = draft.copy(condition = it) }
+                    FilterSuggestionRow(
+                        title = "状态候选",
+                        values = uiState.filterSuggestions.conditions,
+                        selected = draft.condition,
+                        onSelect = { draft = draft.copy(condition = it) },
+                    )
                     DraftTextField("小物", draft.accessory, "例如：BNT") { draft = draft.copy(accessory = it) }
                     DraftTextField("标签", draft.tag, "例如：茶会") { draft = draft.copy(tag = it) }
                     Text(
@@ -2741,6 +2765,32 @@ private fun FilterSheet(
                     primary = true,
                     modifier = Modifier.weight(1f),
                     onClick = { onApply(draft) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterSuggestionRow(
+    title: String,
+    values: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    if (values.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            title,
+            color = SoftGrayText.copy(alpha = 0.66f),
+            style = MaterialTheme.typography.labelMedium,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(values, key = { "$title-$it" }) { value ->
+                SoftSearchPill(
+                    label = value,
+                    selected = selected == value,
+                    onClick = { onSelect(value) },
                 )
             }
         }

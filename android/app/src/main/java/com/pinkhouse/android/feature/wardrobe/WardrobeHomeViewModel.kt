@@ -114,6 +114,13 @@ enum class WardrobeFilterChipKind {
     DepositState,
 }
 
+data class WardrobeFilterSuggestions(
+    val brands: List<String> = emptyList(),
+    val types: List<String> = emptyList(),
+    val colors: List<String> = emptyList(),
+    val conditions: List<String> = emptyList(),
+)
+
 data class WardrobeEditorDraft(
     val imageFileNames: List<String> = emptyList(),
     val name: String = "",
@@ -177,6 +184,7 @@ data class WardrobeHomeUiState(
     val isSearchVisible: Boolean = false,
     val recentSearches: List<String> = emptyList(),
     val filterState: WardrobeFilterState = WardrobeFilterState(),
+    val filterSuggestions: WardrobeFilterSuggestions = WardrobeFilterSuggestions(),
     val allItems: List<WardrobeItem> = emptyList(),
     val visibleItems: List<WardrobeItem> = emptyList(),
     val statistics: WardrobeStatistics = WardrobeStatistics(),
@@ -350,6 +358,7 @@ class WardrobeHomeViewModel(
             isSearchVisible = runtime.isSearchVisible,
             recentSearches = recentSearches,
             filterState = runtime.filterState,
+            filterSuggestions = sourceItems.toFilterSuggestions(),
             allItems = sourceItems,
             visibleItems = filtered,
             statistics = sourceItems.toStatistics(),
@@ -694,6 +703,20 @@ private fun List<WardrobeItem>.toStatisticsBreakdown(): WardrobeStatisticsBreakd
     )
 }
 
+private fun List<WardrobeItem>.toFilterSuggestions(): WardrobeFilterSuggestions {
+    return WardrobeFilterSuggestions(
+        brands = mapNotNull { item -> item.brand?.trim()?.takeIf { it.isNotBlank() } }
+            .toTopSuggestions(),
+        types = map { it.category }
+            .toTopSuggestions(),
+        colors = flatMap { item ->
+            item.colors.ifBlank { item.color.orEmpty() }.splitTokens()
+        }.toTopSuggestions(),
+        conditions = map { it.condition }
+            .toTopSuggestions(),
+    )
+}
+
 private fun List<WardrobeItem>.groupByDimension(
     emptyLabel: String,
     labelSelector: (WardrobeItem) -> String,
@@ -719,6 +742,20 @@ private fun List<WardrobeItem>.groupByDimension(
                 .thenBy { it.label },
         )
         .take(8)
+}
+
+private fun List<String>.toTopSuggestions(limit: Int = 8): List<String> {
+    return map { it.trim() }
+        .filter { it.isNotBlank() }
+        .groupingBy { it }
+        .eachCount()
+        .entries
+        .sortedWith(
+            compareByDescending<Map.Entry<String, Int>> { it.value }
+                .thenBy { it.key },
+        )
+        .take(limit)
+        .map { it.key }
 }
 
 private fun BigDecimal.averageBy(count: Int): BigDecimal {
