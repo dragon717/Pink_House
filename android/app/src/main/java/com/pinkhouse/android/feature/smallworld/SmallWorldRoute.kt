@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -97,6 +99,22 @@ private val houseMenuEntries = listOf(
     SmallWorldDestination.DepositPlan,
 )
 
+private enum class SmallWorldHotspotAction {
+    Wardrobe,
+    DepositPlan,
+    PetChat,
+    Wealth,
+    Calendar,
+    Ootd,
+}
+
+private data class SmallWorldHotspotUi(
+    val label: String,
+    val x: Float,
+    val y: Float,
+    val action: SmallWorldHotspotAction,
+)
+
 @Composable
 fun SmallWorldRoute(
     onNavigateWardrobeTab: (WardrobeHomeTab) -> Unit,
@@ -149,7 +167,9 @@ fun SmallWorldRoute(
                     backgroundIndex = backgroundIndex,
                     onBackgroundSelected = { backgroundIndex = it },
                     onBack = { currentDestination = SmallWorldDestination.Menu },
+                    onOpenDestination = { destination -> currentDestination = destination },
                     onOpenWardrobe = { onNavigateWardrobeTab(WardrobeHomeTab.Wardrobe) },
+                    onOpenDepositPlan = { onNavigateWardrobeTab(WardrobeHomeTab.DepositPlan) },
                     onOpenPetChat = onNavigatePetChat,
                 )
             }
@@ -330,7 +350,9 @@ private fun SmallWorldFeatureScreen(
     backgroundIndex: Int,
     onBackgroundSelected: (Int) -> Unit,
     onBack: () -> Unit,
+    onOpenDestination: (SmallWorldDestination) -> Unit,
     onOpenWardrobe: () -> Unit,
+    onOpenDepositPlan: () -> Unit,
     onOpenPetChat: () -> Unit,
 ) {
     Column(
@@ -382,7 +404,9 @@ private fun SmallWorldFeatureScreen(
         if (destination == SmallWorldDestination.SmallWorld) {
             SmallWorldRoomStage(
                 backgroundIndex = backgroundIndex,
+                onOpenDestination = onOpenDestination,
                 onOpenWardrobe = onOpenWardrobe,
+                onOpenDepositPlan = onOpenDepositPlan,
                 onOpenPetChat = onOpenPetChat,
             )
         } else {
@@ -499,7 +523,9 @@ private fun SmallWorldFeatureScreen(
 @Composable
 private fun SmallWorldRoomStage(
     backgroundIndex: Int,
+    onOpenDestination: (SmallWorldDestination) -> Unit,
     onOpenWardrobe: () -> Unit,
+    onOpenDepositPlan: () -> Unit,
     onOpenPetChat: () -> Unit,
 ) {
     val isRococo = backgroundIndex == 1
@@ -508,7 +534,33 @@ private fun SmallWorldRoomStage(
     val helperText = if (isRococo) {
         "洛可可房间主图已接入；二层房间与热区点击会在下一批继续补。"
     } else {
-        "日常房间主图已接入；保持原图比例展示，后续接入可点热区。"
+        "日常房间主图已接入；少女衣橱、萌宠对话和心愿尾款热区可直接点按。"
+    }
+    val hotspots = if (isRococo) {
+        listOf(
+            SmallWorldHotspotUi("少女衣橱", 0.46f, 0.12f, SmallWorldHotspotAction.Wardrobe),
+            SmallWorldHotspotUi("心愿尾款", 0.08f, 0.55f, SmallWorldHotspotAction.DepositPlan),
+            SmallWorldHotspotUi("马上来财", 0.47f, 0.70f, SmallWorldHotspotAction.Wealth),
+            SmallWorldHotspotUi("梦裙日历", 0.42f, 0.83f, SmallWorldHotspotAction.Calendar),
+            SmallWorldHotspotUi("穿搭手帐", 0.35f, 0.63f, SmallWorldHotspotAction.Ootd),
+        )
+    } else {
+        listOf(
+            SmallWorldHotspotUi("少女衣橱", 0.12f, 0.28f, SmallWorldHotspotAction.Wardrobe),
+            SmallWorldHotspotUi("萌宠对话", 0.58f, 0.30f, SmallWorldHotspotAction.PetChat),
+            SmallWorldHotspotUi("心愿尾款", 0.42f, 0.68f, SmallWorldHotspotAction.DepositPlan),
+        )
+    }
+
+    fun openHotspot(action: SmallWorldHotspotAction) {
+        when (action) {
+            SmallWorldHotspotAction.Wardrobe -> onOpenWardrobe()
+            SmallWorldHotspotAction.DepositPlan -> onOpenDepositPlan()
+            SmallWorldHotspotAction.PetChat -> onOpenPetChat()
+            SmallWorldHotspotAction.Wealth -> onOpenDestination(SmallWorldDestination.Wealth)
+            SmallWorldHotspotAction.Calendar -> onOpenDestination(SmallWorldDestination.Calendar)
+            SmallWorldHotspotAction.Ootd -> onOpenDestination(SmallWorldDestination.Ootd)
+        }
     }
 
     Card(
@@ -520,7 +572,7 @@ private fun SmallWorldRoomStage(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(if (isRococo) 1.16f else 1.64f),
@@ -546,6 +598,16 @@ private fun SmallWorldRoomStage(
                         color = PinkHouseDesignTokens.Primary,
                     )
                 }
+                hotspots.forEach { hotspot ->
+                    SmallWorldHotspotPill(
+                        label = hotspot.label,
+                        modifier = Modifier.offset(
+                            x = maxWidth * hotspot.x,
+                            y = maxHeight * hotspot.y,
+                        ),
+                        onClick = { openHotspot(hotspot.action) },
+                    )
+                }
             }
 
             Text(
@@ -555,10 +617,35 @@ private fun SmallWorldRoomStage(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = onOpenWardrobe, label = { Text("少女衣橱") })
+                AssistChip(onClick = onOpenDepositPlan, label = { Text("心愿尾款") })
                 AssistChip(onClick = onOpenPetChat, label = { Text("萌宠对话") })
-                AssistChip(onClick = {}, label = { Text("热区待接入") })
+                AssistChip(onClick = {}, label = { Text("热区已接入") })
             }
         }
+    }
+}
+
+@Composable
+private fun SmallWorldHotspotPill(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = Color.White.copy(alpha = 0.84f),
+        shadowElevation = 2.dp,
+    ) {
+        Text(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = PinkHouseDesignTokens.Primary,
+            maxLines = 1,
+        )
     }
 }
 
