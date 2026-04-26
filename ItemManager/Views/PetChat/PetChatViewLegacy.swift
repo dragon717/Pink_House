@@ -404,11 +404,7 @@ struct PetChatViewLegacy: View {
             HStack(spacing: 12) {
                 // 左侧功能菜单按钮
                 Menu {
-                    PetChatMenuContent(
-                        callbacks: menuCallbacks,
-                        context: menuContext,
-                        useSectionLayout: false
-                    )
+                    petDialogueMenuContent
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 28))
@@ -498,6 +494,22 @@ struct PetChatViewLegacy: View {
         // 添加底部安全区域间距，避免与底部导航栏重叠
         .padding(.bottom, 80)
         .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    @ViewBuilder
+    private var petDialogueMenuContent: some View {
+        if #available(iOS 18.0, *) {
+            PetChatMenuContent(
+                callbacks: menuCallbacks,
+                context: menuContext,
+                useSectionLayout: false
+            )
+        } else {
+            LegacyPetChatMenuContent(
+                callbacks: menuCallbacks,
+                context: menuContext
+            )
+        }
     }
     
     
@@ -2620,6 +2632,149 @@ struct PetChatViewLegacy: View {
                     )
                     messages.append(message)
                 }
+            }
+        }
+    }
+}
+
+private struct LegacyPetChatMenuContent: View {
+    let callbacks: PetChatMenuCallbacks
+    let context: PetChatMenuContext
+
+    var body: some View {
+        Group {
+            Menu("AI搭配") {
+                aiOutfitButtons
+            }
+
+            Menu("快捷功能") {
+                shortcutFunctionButtons
+            }
+
+            searchButtons
+        }
+    }
+
+    private var aiOutfitButtons: some View {
+        Group {
+            Button {
+                callbacks.handleOutfitSuggestion("帮我搭配一套")
+            } label: {
+                Label("智能搭配", systemImage: "wand.and.stars")
+            }
+
+            quickOutfitButtons
+        }
+    }
+
+    private var quickOutfitButtons: some View {
+        Group {
+            Button {
+                callbacks.createQuickOutfit("甜美", "约会")
+            } label: {
+                Label("甜美约会", systemImage: "heart")
+            }
+
+            Button {
+                callbacks.createQuickOutfit("优雅", "茶会")
+            } label: {
+                Label("优雅茶会", systemImage: "cup.and.saucer")
+            }
+
+            Button {
+                callbacks.createQuickOutfit("日常", "出门")
+            } label: {
+                Label("日常出门", systemImage: "bag")
+            }
+        }
+    }
+
+    private var shortcutFunctionButtons: some View {
+        Group {
+            Button {
+                callbacks.handleWardrobeStatistics()
+            } label: {
+                Label("统计裙子", systemImage: "chart.pie")
+            }
+
+            Button {
+                callbacks.handlePetStatusOverview()
+            } label: {
+                Label("查看萌宠状态", systemImage: "heart.text.square.fill")
+            }
+
+            if context.quickMenuOwnedPets.count > 1 {
+                Button {
+                    callbacks.handleSwitchPetIntent()
+                } label: {
+                    Label("切换萌宠", systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
+
+            if let adoptionTitle = context.quickMenuAdoptionTitle {
+                Button {
+                    callbacks.handleSecondPetAdoptionIntent()
+                } label: {
+                    Label(adoptionTitle, systemImage: "plus.circle.fill")
+                }
+            }
+
+            Button {
+                callbacks.handleRenamePetIntent()
+            } label: {
+                Label("改名", systemImage: "pencil")
+            }
+
+            Button {
+                callbacks.handleInventoryPanel()
+            } label: {
+                Label("看看我的背包", systemImage: "shippingbox.fill")
+            }
+
+            Button {
+                callbacks.handleShopPanel()
+            } label: {
+                Label("带我逛逛商店", systemImage: "cart.fill")
+            }
+
+            Button {
+                callbacks.handleWeatherOutfitGuidance()
+            } label: {
+                Label("查看天气穿搭", systemImage: "cloud.sun.rain.fill")
+            }
+
+            Button {
+                callbacks.handleDepositPlanQuery()
+            } label: {
+                Label("尾款提醒", systemImage: "tag")
+            }
+
+            Button {
+                callbacks.handleMoneyCounterPanel()
+            } label: {
+                Label("去来财数钞票", systemImage: "yensign.circle.fill")
+            }
+
+            Button {
+                callbacks.handleDivinationPanel()
+            } label: {
+                Label("今日求签", systemImage: "wand.and.stars")
+            }
+        }
+    }
+
+    private var searchButtons: some View {
+        Group {
+            Button {
+                callbacks.onSearchWardrobe()
+            } label: {
+                Label("查找衣柜", systemImage: "magnifyingglass")
+            }
+
+            Button {
+                callbacks.onShowHistorySearch()
+            } label: {
+                Label("历史消息查询", systemImage: "clock.arrow.circlepath")
             }
         }
     }

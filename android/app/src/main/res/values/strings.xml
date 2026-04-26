@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">少女心愿</string>
+    <string name="home_title">少女心愿 Android</string>
+    <string name="home_subtitle">原生 Kotlin + Jetpack Compose 工程骨架</string>
+</resources>

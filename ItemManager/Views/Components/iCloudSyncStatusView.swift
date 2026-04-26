@@ -34,9 +34,13 @@ struct iCloudSyncStatusView: View {
                 .foregroundStyle(.blue)
                 .symbolEffect(.bounce)
         case .syncing:
-            Image(systemName: "arrow.clockwise.icloud")
-                .foregroundStyle(.blue)
-                .symbolEffect(.rotate)
+            if #available(iOS 18.0, *) {
+                Image(systemName: "arrow.clockwise.icloud")
+                    .foregroundStyle(.blue)
+                    .symbolEffect(.rotate)
+            } else {
+                LegacyRotatingSyncIcon()
+            }
         case .synced:
             Image(systemName: "checkmark.icloud")
                 .foregroundStyle(.green)
@@ -47,6 +51,25 @@ struct iCloudSyncStatusView: View {
             Image(systemName: "icloud.slash")
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct LegacyRotatingSyncIcon: View {
+    @State private var rotation = 0.0
+
+    var body: some View {
+        Image(systemName: "arrow.clockwise.icloud")
+            .foregroundStyle(.blue)
+            .rotationEffect(.degrees(rotation))
+            .onAppear {
+                rotation = 0
+                withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                    rotation = 360
+                }
+            }
+            .onDisappear {
+                rotation = 0
+            }
     }
 }
 

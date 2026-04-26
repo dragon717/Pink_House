@@ -4,6 +4,34 @@ import Foundation
 
 #if os(iOS)
 
+#if targetEnvironment(simulator)
+
+@available(iOS 18.0, *)
+struct ObjectCaptureScannerView: View {
+    var onComplete: (URL) -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "iphone.slash")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("模拟器不支持 Object Capture")
+                .font(.headline)
+            Text("请在真机 (iPhone 12 Pro 或更新) 上运行以测试扫描功能")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.opacity(0.9))
+        .foregroundStyle(.white)
+    }
+}
+
+#else
+
+@available(iOS 18.0, *)
 struct ObjectCaptureScannerView: View {
 
     @StateObject private var sessionManager = ObjectCaptureSessionManager.shared
@@ -23,7 +51,7 @@ struct ObjectCaptureScannerView: View {
         ZStack {
             if isLowPowerMode {
                 lowPowerWarningView
-            } else if !ObjectCaptureSession.isSupported {
+            } else if !sessionManager.isSupported {
                 notSupportedView
             } else if let session = session {
                 ObjectCaptureView(session: session)
@@ -92,7 +120,7 @@ struct ObjectCaptureScannerView: View {
     }
 
     private func setupSession() {
-        guard ObjectCaptureSession.isSupported else {
+        guard sessionManager.isSupported else {
             showNotSupportedAlert = true
             return
         }
@@ -613,4 +641,6 @@ struct ObjectCaptureScannerView: View {
     }
 }
 
-#endif
+#endif // targetEnvironment(simulator)
+
+#endif // os(iOS)

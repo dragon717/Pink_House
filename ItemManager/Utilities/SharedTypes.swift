@@ -25,7 +25,8 @@ enum LegalLinks {
     static let userAgreementURL = URL(string: "https://sangsang.online/user-agreement/")!
     static let vipAgreementURL = URL(string: "https://sangsang.online/vip-agreement/")!
     static let contactURL = URL(string: "https://sangsang.online/contact/")!
-    static let supportEmailURL = URL(string: "mailto:huangsangmuniao@126.com")!
+    static let supportEmailAddress = "huangsangmuniao@126.com"
+    static let supportEmailURL = URL(string: "mailto:\(supportEmailAddress)")!
 
     static let xiaohongshuHandle = "@少女心愿（衣橱管家）"
     static let xiaohongshuID = "3621744284"

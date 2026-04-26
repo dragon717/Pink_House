@@ -1,0 +1,16 @@
+{
+	"CommonInfo":{
+		"project.ide.version":"6.1.0.830",
+		"current.select.product":"default",
+		"current.select.buildMode":"",
+		"crossplatform.projectType":""
+	},
+	"BuildOptions":{
+		"SELECT_BUILD_PRODUCT":"default",
+		"BUNDLE_NAME":"com.pinkhouse.harmony",
+		"BUILD_PATH":{
+			"OUTPUT_PATH":"/Users/muniao/Downloads/Pink_House/harmony_next/build/outputs/default"
+		},
+		"SELECT_BUILD_MODE":""
+	}
+}

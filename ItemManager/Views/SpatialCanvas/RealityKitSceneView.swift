@@ -50,6 +50,81 @@ public struct SceneObject: Identifiable, Equatable {
 }
 
 public struct RealityKitSceneView: View {
+    @Binding var selectedObject: SceneObject?
+    @Binding var objects: [SceneObject]
+    @Binding var selectedTool: CanvasTool?
+    @Binding var transformMode: TransformMode
+    var onObjectTap: (SceneObject) -> Void
+    var onObjectTransform: (SceneObject) -> Void
+    var onCameraControllerReady: ((CameraController) -> Void)?
+    var onGizmoDismiss: (() -> Void)?
+
+    public func dismissGizmo() {
+        _selectedObject.wrappedValue = nil
+    }
+
+    public init(
+        selectedObject: Binding<SceneObject?>,
+        objects: Binding<[SceneObject]>,
+        selectedTool: Binding<CanvasTool?> = .constant(nil),
+        transformMode: Binding<TransformMode> = .constant(.move),
+        onObjectTap: @escaping (SceneObject) -> Void = { _ in },
+        onObjectTransform: @escaping (SceneObject) -> Void = { _ in },
+        onCameraControllerReady: ((CameraController) -> Void)? = nil,
+        onGizmoDismiss: (() -> Void)? = nil
+    ) {
+        self._selectedObject = selectedObject
+        self._objects = objects
+        self._selectedTool = selectedTool
+        self._transformMode = transformMode
+        self.onObjectTap = onObjectTap
+        self.onObjectTransform = onObjectTransform
+        self.onCameraControllerReady = onCameraControllerReady
+        self.onGizmoDismiss = onGizmoDismiss
+    }
+
+    public var body: some View {
+        Group {
+            if #available(iOS 18.0, *) {
+                RealityKitSceneContentView(
+                    selectedObject: $selectedObject,
+                    objects: $objects,
+                    selectedTool: $selectedTool,
+                    transformMode: $transformMode,
+                    onObjectTap: onObjectTap,
+                    onObjectTransform: onObjectTransform,
+                    onCameraControllerReady: onCameraControllerReady,
+                    onGizmoDismiss: onGizmoDismiss
+                )
+            } else {
+                SpatialCanvasUnsupportedSceneView()
+            }
+        }
+    }
+}
+
+private struct SpatialCanvasUnsupportedSceneView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "cube.transparent")
+                .font(.system(size: 48, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("空间画布 3D 场景需要 iOS 18 或更高版本")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text("当前系统可继续打开编辑器，但 3D 预览、选择和变换功能将在 iOS 18+ 启用。")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(red: 0.96, green: 0.95, blue: 0.93))
+    }
+}
+
+@available(iOS 18.0, *)
+public struct RealityKitSceneContentView: View {
     
     @Binding var selectedObject: SceneObject?
     @Binding var objects: [SceneObject]

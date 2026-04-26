@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "少女心愿"
+    },
+    {
+      "name": "entry_desc",
+      "value": "少女心愿 HarmonyOS Next 主模块"
+    },
+    {
+      "name": "permission_location_reason",
+      "value": "用于获取粗略位置并展示今日天气穿搭参考；拒绝后将使用降级定位方案。"
+    }
+  ]
+}

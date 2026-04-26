@@ -15,6 +15,7 @@ asserts/*.ttf
 asserts/*.mp3
 
 .codepilot-uploads/*
+
 xcuserdata/
 *.mode1v3
 *.mode2v3
@@ -27,3 +28,11 @@ project.xcworkspace/
 *.dSYM.zip
 *.dSYM
 .build/
+
+.DS_Store
+
+harmony_next/entry/.preview/*
+harmony_next/entry/build/*
+harmony_next/.hvigor/*
+
+android/.codex-ide-cache-backup-*/*

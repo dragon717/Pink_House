@@ -1,0 +1,50 @@
+{
+  "HVIGOR_OHOS_PLUGIN": {
+    "MODULES": [
+      {
+        "MODULE_NAME": "923fe53966c6cd9343e11af776cd4b05be315ea4b200b02e4d5dfb0f929b73bf",
+        "API_TYPE": "stageMode",
+        "INCLUDE_IN_BUILD": true,
+        "IS_COMMAND_LINE_ENTRY_MODULE": true,
+        "MODULE_TYPE": "entry",
+        "IS_INCREMENTAL_MODULE": true
+      }
+    ],
+    "NATIVE_COMPILER": "Default",
+    "IS_FULL_BUILD": false,
+    "BUILD_MODE": "debug"
+  },
+  "HVIGOR": {
+    "IS_INCREMENTAL": true,
+    "IS_DAEMON": true,
+    "IS_PARALLEL": true,
+    "IS_HVIGORFILE_TYPE_CHECK": false,
+    "TASK_TIME": {
+      "923fe53966c6cd9343e11af776cd4b05be315ea4b200b02e4d5dfb0f929b73bf": {
+        "CreateModuleInfo": 171041,
+        "PreCheckSyscap": 100792,
+        "GeneratePkgContextInfo": 1217542,
+        "ProcessStartupConfig": 280625,
+        "PreviewProcessResource": 253250,
+        "PreviewCompileResource": 103779250,
+        "PreviewHookCompileResource": 160875,
+        "CopyPreviewProfile": 1327833,
+        "ReplacePreviewerPage": 144958,
+        "buildPreviewerResource": 67125,
+        "PreviewUpdateAssets": 665208,
+        "PreviewArkTS": 3710015083,
+        "PreviewBuild": 95625
+      }
+    },
+    "APIS": [
+      "getProperty"
+    ],
+    "CONFIG_EXPERIMENT": {
+      "ENABLE_MODULE_SKIP": false,
+      "ENABLE_CPP_FUNCTION_LEVEL_INCREMENTAL": false
+    },
+    "CONFIG_PROPERTIES": {},
+    "TOTAL_TIME": 3917063292,
+    "BUILD_ID": "202604231335480770"
+  }
+}
