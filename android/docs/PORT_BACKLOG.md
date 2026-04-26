@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-DATA-08 已验证；衣橱核心查询 / 统计本阶段闭环，下一批建议进入 M3-04 SmallWorld 主图 + 风格切换。
+无 — BATCH-M3-04 已验证；下一批建议继续 M3-05 SmallWorld 热点交互。
 
 ---
 
@@ -29,13 +29,9 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
-- [ ] **BATCH-M3-04** SmallWorld 主图 + 风格切换（日常/洛可可）
-  - SCOPE: 2 文件 — `feature/smallworld/SmallWorldHomeRoute.kt` + assets 注册
-  - UPSTREAM: `ItemManager/Views/SmallWorldView.swift` + `RococoSmallWorldView.swift`
-  - 缺资源：等距 2D 房间图（用粉色渐变占位）
-
 - [ ] **BATCH-M3-05** SmallWorld 热点交互（点击场景元素）
-  - 待 ARCH-02 + M3-04 完成后再具体化
+  - SCOPE: 1 业务文件 — `feature/smallworld/SmallWorldRoute.kt`；同步更新 `android_migration_smallworld.md`
+  - 目标：在小世界主图上叠加可点热区，优先接 `少女衣橱`、`心愿尾款`、`萌宠对话` 与 House 内已有目的地；热区位置按当前 Android 资产比例做响应式定位。
 
 ### 阶段 M4（签到/日历/通知 F-26 ~ F-29、F-36 ~ F-38）
 
@@ -89,6 +85,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-M3-04** SmallWorld 主图 + 风格切换（日常/洛可可） — `SmallWorldRoute.kt` 为 `SmallWorldDestination.SmallWorld` 增加专用主图舞台，复用已有 `small_world_bg_normal.png` / `small_world_rococo_1.png` 资产，随顶部 `日常 / 洛可可` 分段切换主图与说明，保留 `少女衣橱`、`萌宠对话` 与 `热区待接入` 软圆入口。assembleDebug 通过；红线 grep 无命中；装机验证 House 小世界页可见 `日常小世界`，切到 `洛可可` 后可见 `洛可可小世界`。详见 [android_migration_smallworld.md](android_migration_smallworld.md)。
 - [x] **BATCH-WARDROBE-DATA-08** 筛选 Sheet 候选值 Chips — `WardrobeHomeViewModel.kt` 新增 `WardrobeFilterSuggestions`，从全量衣橱数据提取品牌/类型/颜色/状态候选并按频次取前 8；`WardrobeRoute.kt` 在筛选 Sheet 对应输入框下方展示候选 Chips，点按即可填入草稿字段并高亮。assembleDebug 通过；红线 grep 无命中；装机验证 `筛选 → 类型候选 → 裙装 → 应用筛选` 后首页显示 `当前结果统计` 与 `类型：裙装`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-07** 当前查询/筛选条件 Chips + 单项移除 — `WardrobeHomeViewModel.kt` 新增 `WardrobeFilterChipKind`、`clearSearchQuery()` 与 `clearFilterChip(kind)`；`WardrobeRoute.kt` 在 `当前结果统计` 下方展示活跃搜索/筛选条件 Chips，支持点单个 Chip 移除。assembleDebug 通过；红线 grep 无命中；装机验证品牌筛选 `Baby` 应用后显示 `当前条件（点按单项移除）` 与 `品牌：Baby`，点按 Chip 后回到 `衣橱总览`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-06** 统计明细均价 / 占比条 — `WardrobeHomeViewModel.kt` 为统计分组桶新增 `averageValue` 与 `valueShare`，按当前统计口径计算件均价与价值占比；`WardrobeRoute.kt` 将详细统计行升级为标题/金额、件款+均价、软圆粉色占比条三层结构，继续保留点击反向筛选。assembleDebug 通过；红线 grep 无命中；装机验证 `少女衣橱 → 详细统计` 中可见 `均价 ¥1314.50`、`占比 86%`、`均价 ¥259.00` 与 `占比 8%`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。

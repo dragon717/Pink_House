@@ -379,44 +379,52 @@ private fun SmallWorldFeatureScreen(
             )
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.76f)),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        if (destination == SmallWorldDestination.SmallWorld) {
+            SmallWorldRoomStage(
+                backgroundIndex = backgroundIndex,
+                onOpenWardrobe = onOpenWardrobe,
+                onOpenPetChat = onOpenPetChat,
+            )
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.76f)),
             ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = PinkHouseDesignTokens.Primary.copy(alpha = 0.12f),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = destination.icon,
-                        contentDescription = null,
-                        modifier = Modifier.padding(16.dp),
-                        tint = PinkHouseDesignTokens.Primary,
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = "已接通导航骨架",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = PinkHouseDesignTokens.TextPrimary,
-                    )
-                    Text(
-                        text = destination.supportingCopy,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = PinkHouseDesignTokens.TextSecondary,
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = PinkHouseDesignTokens.Primary.copy(alpha = 0.12f),
+                    ) {
+                        Icon(
+                            imageVector = destination.icon,
+                            contentDescription = null,
+                            modifier = Modifier.padding(16.dp),
+                            tint = PinkHouseDesignTokens.Primary,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = "已接通导航骨架",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = PinkHouseDesignTokens.TextPrimary,
+                        )
+                        Text(
+                            text = destination.supportingCopy,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = PinkHouseDesignTokens.TextSecondary,
+                        )
+                    }
                 }
             }
         }
@@ -485,6 +493,72 @@ private fun SmallWorldFeatureScreen(
         }
 
         Spacer(Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun SmallWorldRoomStage(
+    backgroundIndex: Int,
+    onOpenWardrobe: () -> Unit,
+    onOpenPetChat: () -> Unit,
+) {
+    val isRococo = backgroundIndex == 1
+    val imageRes = if (isRococo) PinkHouseAssets.smallWorldRococo else PinkHouseAssets.smallWorldNormal
+    val styleName = if (isRococo) "洛可可小世界" else "日常小世界"
+    val helperText = if (isRococo) {
+        "洛可可房间主图已接入；二层房间与热区点击会在下一批继续补。"
+    } else {
+        "日常房间主图已接入；保持原图比例展示，后续接入可点热区。"
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.78f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(if (isRococo) 1.16f else 1.64f),
+            ) {
+                Image(
+                    painter = painterResource(imageRes),
+                    contentDescription = styleName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp),
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color.White.copy(alpha = 0.82f),
+                ) {
+                    Text(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        text = styleName,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = PinkHouseDesignTokens.Primary,
+                    )
+                }
+            }
+
+            Text(
+                text = helperText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = PinkHouseDesignTokens.TextSecondary,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = onOpenWardrobe, label = { Text("少女衣橱") })
+                AssistChip(onClick = onOpenPetChat, label = { Text("萌宠对话") })
+                AssistChip(onClick = {}, label = { Text("热区待接入") })
+            }
+        }
     }
 }
 
