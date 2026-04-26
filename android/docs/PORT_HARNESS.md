@@ -8,7 +8,7 @@
 
 ---
 
-## 一、五条不可越过的红线
+## 一、六条不可越过的红线
 
 | # | 红线 | 落地约束 | 检查点 |
 |---|---|---|---|
@@ -17,6 +17,9 @@
 | R3 | **每批必过两道闸** | `./gradlew :app:assembleDebug` + 装机截图 | 失败即 `git revert` |
 | R4 | **token 单一真源** | 新增 Composable 内 grep `0xFF[0-9A-F]{6}` / `\d+\.sp` 必须 = 0 | 提交前自动检查 |
 | R5 | **不接 GMS / 不开 dynamicColor / API 31+ 必须降级** | grep `Firebase` / `dynamicColor` = 0；`Modifier.blur` 必须有 `Build.VERSION.SDK_INT >= 31` 包裹 | 同上 |
+| R6 | **用户可见文案 = 产品文案，无开发侧泄漏** | 新增 .kt / strings.xml 内 grep `BATCH-` / `阶段 [A-Z]` / `复刻` / `占位` / `待接入` / `下一批` / `后续` / `未完成` / `F-\d+` / `W-\d+` 必须 = 0；硬编码 sample 列表条目不得在生产路径 | 提交前 grep + 装机截图人工对照 iOS 文案 |
+
+> R6 的代价记录：[BATCH-UX-COPY-01A](PORT_BACKLOG.md) 因通知中心样例公告 + House 菜单 "复刻 / 已接入 / 下一批 / 后续" 等内部进度术语进了用户 UI，被迫单独拉一批清理。要在写第一行 Composable 之前就封掉。
 
 ---
 
@@ -45,10 +48,11 @@ DEPENDENCIES:
 
 SUCCESS_GATES:
   G1 ./gradlew :app:assembleDebug 通过
-  G2 装机截图: 进入 💬 Tab 看到欢迎气泡 + 3 个意图按钮 + 底部输入
+  G2 装机截图: 进入 💬 Tab 看到欢迎气泡 + 3 个意图按钮 + 底部输入；逐区对照 iOS 文案
   G3 grep "0xFF[0-9A-F]\{6\}" 在新增文件 = 0
   G4 grep "Modifier.blur\|Firebase\|dynamicColor" 在新增文件 = 0
   G5 @Preview 渲染通过
+  G6 grep "BATCH-\|阶段 [A-Z]\|复刻\|占位\|待接入\|下一批\|后续\|未完成\|F-[0-9]\+\|W-[0-9]\+" 在新增 .kt / strings.xml = 0；UI 字面量已对照 iOS
 
 ROLLBACK: git revert HEAD
 ```
@@ -137,9 +141,9 @@ ROLLBACK: git revert HEAD
 ├─ ④ 主线程: Edit/Write 业务文件 (≤ 2 个)
 ├─ ⑤ Bash: ./gradlew :app:assembleDebug
 │      ↓ 失败 → 修同回合 / 还失败 → revert → 报告
-├─ ⑥ Bash: grep 红线 (0xFF / Firebase / blur 无降级)
+├─ ⑥ Bash: grep 红线 (0xFF / Firebase / blur 无降级 / R6 文案泄漏)
 │      ↓ 命中 → 修同回合
-├─ ⑦ computer-use: 装机截图 → 双端对照
+├─ ⑦ computer-use: 装机截图 → 双端对照（视觉 + UI 文案逐区对照 iOS）
 │      ↓ 不一致 → 报告差异，等用户裁定
 ├─ ⑧ Edit: 追加一段到 android/docs/android_migration_<page>.md
 │      "本批改了什么 / 验证结果 / 待办"
@@ -177,7 +181,7 @@ ROLLBACK: git revert HEAD
 |---|---|---|
 | F1 | `assembleDebug` 非 0 | 同回合修；修不掉 → `git reset --hard HEAD~1` 后报告 |
 | F2 | 装机截图 vs iOS 偏差 > 30% | **不要猜**，报告差异，等用户裁定 |
-| F3 | 红线 grep 命中 | 同回合修，不允许下批继续 |
+| F3 | 红线 grep 命中（含 R6 文案泄漏） | 同回合修，不允许下批继续 |
 | F4 | 单批文件超 2 | 拆成两张卡，第二张进 backlog |
 | F5 | SwiftUI 源 > 1500 LOC | 让 Explore **只读首屏 + 用户指定的子区**，多张卡分次摘 |
 | F6 | 资源缺失 | **不找替代**，用粉色渐变占位 + `// TODO(asset): xxx`，向用户报清单 |
