@@ -83,17 +83,17 @@ enum class SmallWorldDestination(
     val supportingCopy: String,
 ) {
     Menu("House", "房间入口与功能总览", Icons.Filled.AutoAwesome, "入口汇总、背景切换和房间导航。"),
-    SmallWorld("小世界", "房间样式、宠物动画与天气入口", Icons.Filled.AutoAwesome, "这里会承接小世界样式切换、宠物停驻和天气入口。"),
-    BigWorld("世界书", "旅行、徽章、航线与世界设定", Icons.Filled.Flight, "后续会把世界书主视觉、章节入口和旅行记录搬过来。"),
-    CheckIn("每日打卡", "签到、问候语与今日穿搭色", Icons.Filled.CheckCircle, "这里会对齐 iOS 的每日打卡、七日签到和今日穿搭色。"),
-    Calendar("梦裙日历", "尾款与穿搭日程", Icons.Filled.CalendarMonth, "这里会对齐 iOS 的梦裙日历排期和最近提醒入口。"),
-    NoticeCenter("通知中心", "公告、提醒与待确认消息", Icons.Filled.Notifications, "这里会对齐 iOS 的公告中心与通知阅读状态。"),
-    Wealth("来财", "招财、数钱、储蓄", Icons.Filled.Paid, "来财页会先补入口切换，再逐步接上动画和数据统计。"),
-    Ootd("穿搭手帐", "记录每日搭配", Icons.Filled.Book, "穿搭手帐会先复刻列表骨架，再补详情与编辑。"),
-    Perler("拼豆工坊", "像素图纸与工坊", Icons.Filled.PieChart, "拼豆工坊先保留独立导航页，后续再接图纸和工坊状态。"),
-    DressStock("裙子股市", "监控裙装行情", Icons.AutoMirrored.Filled.TrendingUp, "裙子股市会先接列表与筛选，再补走势与详情。"),
-    RecycleBin("回收站", "恢复、清空与历史项", Icons.Filled.Delete, "回收站后面会统一和衣橱软删除链路打通。"),
-    DepositPlan("心愿尾款", "按月与按系列查看待付尾款", Icons.Filled.LocalOffer, "该入口会直接切到衣橱页里的心愿尾款子页。"),
+    SmallWorld("小世界", "房间样式、宠物动画与天气入口", Icons.Filled.AutoAwesome, "切换房间风格，点按场景里的入口。"),
+    BigWorld("世界书", "旅行、徽章、航线与世界设定", Icons.Filled.Flight, "旅行故事与徽章收藏正在准备中。"),
+    CheckIn("每日打卡", "签到、问候语与今日穿搭色", Icons.Filled.CheckCircle, "记录今天的心情和穿搭灵感。"),
+    Calendar("梦裙日历", "尾款与穿搭日程", Icons.Filled.CalendarMonth, "查看定金、尾款和入手日程。"),
+    NoticeCenter("通知中心", "公告、提醒与待确认消息", Icons.Filled.Notifications, "查看最新公告和需要确认的消息。"),
+    Wealth("来财", "招财、数钱、储蓄", Icons.Filled.Paid, "记录小金库和可爱财富目标。"),
+    Ootd("穿搭手帐", "记录每日搭配", Icons.Filled.Book, "保存每日穿搭灵感和搭配记录。"),
+    Perler("拼豆工坊", "像素图纸与工坊", Icons.Filled.PieChart, "整理拼豆图纸和制作计划。"),
+    DressStock("裙子股市", "监控裙装行情", Icons.AutoMirrored.Filled.TrendingUp, "关注心仪裙装的价格和热度。"),
+    RecycleBin("回收站", "恢复、清空与历史项", Icons.Filled.Delete, "找回最近移入回收站的衣物。"),
+    DepositPlan("心愿尾款", "按月与按系列查看待付尾款", Icons.Filled.LocalOffer, "查看待付尾款和付款安排。"),
 }
 
 private val houseMenuEntries = listOf(
@@ -252,13 +252,13 @@ private fun SmallWorldMenuScreen(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
-                        text = "入口导航已接通",
+                        text = "House 入口",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = PinkHouseDesignTokens.TextPrimary,
                     )
                     Text(
-                        text = "这一轮先把 House 内部层级和跳转状态固定下来，具体页面分批继续复刻。",
+                        text = "从这里进入小世界、日历、通知和更多工具。",
                         style = MaterialTheme.typography.bodySmall,
                         color = PinkHouseDesignTokens.TextSecondary,
                     )
@@ -465,7 +465,7 @@ private fun SmallWorldFeatureScreen(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                text = "已接通导航骨架",
+                                text = "功能准备中",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = PinkHouseDesignTokens.TextPrimary,
@@ -491,14 +491,14 @@ private fun SmallWorldFeatureScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            text = "当前保留的复刻规则",
+                            text = "你可能会用到",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = PinkHouseDesignTokens.TextPrimary,
                         )
-                        SmallWorldMilestoneChip(text = "底部主导航不扩张，House 内页自己管理返回")
-                        SmallWorldMilestoneChip(text = "背景风格切换继续沿用日常 / 洛可可两套素材")
-                        SmallWorldMilestoneChip(text = "后续页面直接在这个目的地壳层里替换具体 Compose 内容")
+                        SmallWorldMilestoneChip(text = "切换日常 / 洛可可房间风格")
+                        SmallWorldMilestoneChip(text = "从 House 返回主入口")
+                        SmallWorldMilestoneChip(text = "继续探索衣橱、萌宠和日程")
                     }
                 }
 
@@ -562,9 +562,9 @@ private fun SmallWorldRoomStage(
     val imageRes = if (isRococo) PinkHouseAssets.smallWorldRococo else PinkHouseAssets.smallWorldNormal
     val styleName = if (isRococo) "洛可可小世界" else "日常小世界"
     val helperText = if (isRococo) {
-        "洛可可房间主图已接入；二层房间与热区点击会在下一批继续补。"
+        "洛可可房间已经准备好，点按标签进入对应功能。"
     } else {
-        "日常房间主图已接入；少女衣橱、萌宠对话和心愿尾款热区可直接点按。"
+        "点按少女衣橱、萌宠对话和心愿尾款，快速进入常用功能。"
     }
     val hotspots = if (isRococo) {
         listOf(
@@ -649,7 +649,7 @@ private fun SmallWorldRoomStage(
                 AssistChip(onClick = onOpenWardrobe, label = { Text("少女衣橱") })
                 AssistChip(onClick = onOpenDepositPlan, label = { Text("心愿尾款") })
                 AssistChip(onClick = onOpenPetChat, label = { Text("萌宠对话") })
-                AssistChip(onClick = {}, label = { Text("热区已接入") })
+                AssistChip(onClick = {}, label = { Text("可点场景") })
             }
         }
     }

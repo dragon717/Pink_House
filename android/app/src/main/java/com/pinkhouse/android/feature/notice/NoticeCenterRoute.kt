@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -52,7 +51,7 @@ fun NoticeCenterRoute(modifier: Modifier = Modifier) {
     var readIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var acknowledgedIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var expandedNoticeId by rememberSaveable { mutableStateOf<String?>(null) }
-    val notices = remember { sampleNoticeItems() }
+    val notices = remember { emptyList<NoticeUiItem>() }
     val filteredNotices = remember(selectedFilterIndex, notices, readIds, acknowledgedIds) {
         when (NoticeFilter.entries[selectedFilterIndex]) {
             NoticeFilter.All -> notices
@@ -102,7 +101,11 @@ fun NoticeCenterRoute(modifier: Modifier = Modifier) {
 
 @Composable
 private fun NoticeHeroCard(notices: List<NoticeUiItem>, unreadCount: Int, pendingAckCount: Int) {
-    val latestDate = notices.maxByOrNull { it.publishDate }?.publishDate ?: LocalDate.now()
+    val latestLabel = notices
+        .maxByOrNull { it.publishDate }
+        ?.publishDate
+        ?.format(DateTimeFormatter.ofPattern("M/d", Locale.CHINA))
+        ?: "暂无"
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
@@ -136,11 +139,11 @@ private fun NoticeHeroCard(notices: List<NoticeUiItem>, unreadCount: Int, pendin
                         color = PinkHouseDesignTokens.TextSecondary,
                     )
                 }
-                NoticeBadge(text = latestDate.format(DateTimeFormatter.ofPattern("M/d", Locale.CHINA)), color = PinkHouseDesignTokens.Primary)
+                NoticeBadge(text = latestLabel, color = PinkHouseDesignTokens.Primary)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 NoticeMetric(label = "未读", value = "$unreadCount", helper = "条", modifier = Modifier.weight(1f))
-                NoticeMetric(label = "需确认", value = "$pendingAckCount", helper = "ACK", modifier = Modifier.weight(1f))
+                NoticeMetric(label = "需确认", value = "$pendingAckCount", helper = "消息", modifier = Modifier.weight(1f))
                 NoticeMetric(label = "全部", value = "${notices.size}", helper = "公告", modifier = Modifier.weight(1f))
             }
         }
@@ -197,8 +200,7 @@ private fun NoticeCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     NoticeBadge(text = notice.severity.label, color = notice.severity.color)
                     NoticeBadge(text = notice.channel.label, color = PinkHouseDesignTokens.Info)
-                    if (notice.requiresAck) NoticeBadge(text = if (isAcknowledged) "ACK OK" else "ACK", color = PinkHouseDesignTokens.WarmAccent)
-                    if (notice.isPinned) Icon(Icons.Filled.PushPin, contentDescription = "置顶", tint = PinkHouseDesignTokens.Primary, modifier = Modifier.size(16.dp))
+                    if (notice.requiresAck) NoticeBadge(text = if (isAcknowledged) "已确认" else "需确认", color = PinkHouseDesignTokens.WarmAccent)
                 }
                 Text(
                     text = notice.title,
@@ -317,57 +319,29 @@ private fun EmptyNoticeState(filter: NoticeFilter) {
         ) {
             Icon(Icons.Filled.NotificationsOff, contentDescription = null, tint = PinkHouseDesignTokens.Primary.copy(alpha = 0.55f), modifier = Modifier.size(58.dp))
             Spacer(Modifier.height(14.dp))
-            Text("暂无${filter.label}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = PinkHouseDesignTokens.TextSecondary)
-            Text("稍后再来看看吧~", style = MaterialTheme.typography.bodyMedium, color = PinkHouseDesignTokens.TextMuted)
+            Text(filter.emptyTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = PinkHouseDesignTokens.TextSecondary)
+            Text("有新消息时会显示在这里", style = MaterialTheme.typography.bodyMedium, color = PinkHouseDesignTokens.TextMuted)
         }
     }
-}
-
-private fun sampleNoticeItems(): List<NoticeUiItem> {
-    val today = LocalDate.now()
-    return listOf(
-        NoticeUiItem(
-            id = "calendar-online",
-            title = "梦裙日历已接入",
-            summary = "近期、月视图与年视图已能读取真实心愿尾款数据。",
-            content = "你可以在 House 里查看定金、尾款开始和尾款截止日期。后续会继续补公告本地表、已读状态和弹窗展示规则。",
-            severity = NoticeSeverity.Important,
-            channel = NoticeChannel.Inbox,
-            publishDate = today,
-            isPinned = true,
-        ),
-        NoticeUiItem(
-            id = "deposit-reminder",
-            title = "本地尾款提醒说明",
-            summary = "Android 当前使用本机 AlarmManager 安排提醒，不接云端推送。",
-            content = "尾款提醒权限仍从衣橱的提醒入口触发。本通知中心先作为公告和提醒汇总入口，下一批会接本地通知表。",
-            severity = NoticeSeverity.Info,
-            channel = NoticeChannel.Banner,
-            publishDate = today.minusDays(1),
-        ),
-        NoticeUiItem(
-            id = "ack-polish",
-            title = "UI 还原度优化进行中",
-            summary = "独立页已移除通用占位卡，保留更软圆的玻璃容器。",
-            content = "后续复刻会继续优先使用自定义软圆容器，减少原生组件的方正感。请在看到偏差时继续指出，我会按用户体验优先级调整。",
-            severity = NoticeSeverity.Critical,
-            channel = NoticeChannel.Modal,
-            publishDate = today.minusDays(2),
-            requiresAck = true,
-        ),
-    )
 }
 
 private enum class NoticeFilter(val label: String) {
     All("全部"),
     Unread("未读"),
-    Ack("需确认"),
+    Ack("需确认");
+
+    val emptyTitle: String
+        get() = when (this) {
+            All -> "暂无公告"
+            Unread -> "没有未读消息"
+            Ack -> "没有需要确认的消息"
+        }
 }
 
 private enum class NoticeSeverity(val label: String, val color: Color) {
-    Info("INFO", PinkHouseDesignTokens.Info),
-    Important("IMPORTANT", PinkHouseDesignTokens.WarmAccent),
-    Critical("CRITICAL", PinkHouseDesignTokens.Primary),
+    Info("普通", PinkHouseDesignTokens.Info),
+    Important("重要", PinkHouseDesignTokens.WarmAccent),
+    Critical("紧急", PinkHouseDesignTokens.Primary),
 }
 
 private enum class NoticeChannel(val label: String) {
@@ -384,6 +358,5 @@ private data class NoticeUiItem(
     val severity: NoticeSeverity,
     val channel: NoticeChannel,
     val publishDate: LocalDate,
-    val isPinned: Boolean = false,
     val requiresAck: Boolean = false,
 )

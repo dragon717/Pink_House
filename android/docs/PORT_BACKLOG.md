@@ -79,6 +79,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-UX-COPY-01A** 用户侧文案清理（通知中心 / House）— `NoticeCenterRoute.kt` 移除开发侧样例公告、置顶标识和英文严重级别，无真实公告时显示用户侧空状态；`SmallWorldRoute.kt` 清理 House 菜单/未完成页/小世界说明中的“复刻、已接入、下一批、后续”等内部文案。assembleDebug 通过；红线 grep 无命中；装机检查通知中心不再出现开发侧内容。详见 [android_migration_notice.md](android_migration_notice.md)。
 - [x] **BATCH-M4-03A** NoticeCenterRoute UI 入口 + 已读/确认交互 — 新增 `NoticeCenterRoute.kt`，复刻 iOS 公告中心卡片结构：媒体占位、严重级别/渠道/ACK/置顶 badge、标题摘要正文、发布时间，并提供 `全部 / 未读 / 需确认` 筛选和会话内 `标记已读 / 我已知晓`；`SmallWorldRoute.kt` 在 House 菜单新增 `通知中心` 入口并接入真实页面。本批未改 Room schema，后续 M4-03B 单独处理 `local_notification` 表。assembleDebug 通过；红线 grep 无命中；装机验证通知中心首屏与需确认筛选。详见 [android_migration_notice.md](android_migration_notice.md)。
 - [x] **BATCH-M4-02** CalendarRoute 梦裙日历首屏 + 近期/月/年视图 — 新增 `CalendarRoute.kt`，读取真实衣橱数据并将心愿尾款转换为 `定金`、`尾款开始`、`尾款截止` 日历事件；提供未来 30 天统计、只看心愿尾款筛选、`近期 / 月视图 / 年视图` 三段视图、双月日历和年度热力概览。`SmallWorldRoute.kt` 将 House `梦裙日历` 入口接入真实页面，并隐藏已复刻独立页的通用占位卡。assembleDebug 通过；红线 grep 无命中；装机验证可见统计、月视图、年视图与近期真实事件。详见 [android_migration_calendar.md](android_migration_calendar.md)。
 - [x] **BATCH-M4-01** CheckInRoute 每日打卡首屏 — 新增 `CheckInRoute.kt`，复刻 iOS 每日签到首屏的日期问候、本周签到、今日穿搭色、立即打卡/今日已打卡与分享入口；`SmallWorldRoute.kt` 在 House 菜单新增 `每日打卡` 目的地，并让 House 内页内容区可滚动以适配签到卡片。assembleDebug 通过；红线 grep 无命中；装机验证 `House → 菜单 → 每日打卡` 可见核心区块，点 `立即打卡` 后出现 `今日已打卡` 与 `分享今日穿搭`。详见 [android_migration_checkin.md](android_migration_checkin.md)。

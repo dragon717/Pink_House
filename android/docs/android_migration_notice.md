@@ -37,3 +37,26 @@
 - `BATCH-M4-03B`：单独 Room schema 批，新增 `local_notification` 表与 v4 migration。
 - `BATCH-M4-03C`：NoticeCenterRoute 改读本地表，并持久化已读 / ACK 状态。
 - 弹窗治理：后续如做自动弹窗，必须按每日入口治理规则限制自动展示频率。
+
+
+## BATCH-UX-COPY-01A 用户侧文案清理（通知中心 / House）
+
+**触发原因**
+
+- 用户指出：用户能看到的界面不能出现迁移进度、内部实现、后续批次等开发侧内容，也不需要置顶标识。
+
+**改动范围**
+
+- `NoticeCenterRoute.kt`
+  - 移除所有样例公告，当前无真实公告数据时只展示用户侧空状态：`暂无公告`、`有新消息时会显示在这里`。
+  - 移除置顶图标展示，不再出现 `PIN`/置顶语义。
+  - 将严重级别从英文 `INFO / IMPORTANT / CRITICAL` 改为中文 `普通 / 重要 / 紧急`；确认状态显示 `需确认 / 已确认`。
+- `SmallWorldRoute.kt`
+  - 清理 House 菜单和未完成页里的开发侧文案，替换成用户侧说明，例如 `功能准备中`、`从这里进入小世界、日历、通知和更多工具`。
+  - 小世界主图说明不再出现“已接入 / 下一批 / 复刻”等内部词。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：本批业务文件无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中；`git diff --check` 通过。
+- 装机检查：通知中心页面不再出现 `Android`、`后续`、`复刻`、`已接入`、`schema`、`local_notification`、`置顶`、`梦裙日历已接入`、`UI 还原度` 等开发侧可见文案。
