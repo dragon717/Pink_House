@@ -67,6 +67,32 @@
 - `BlurStyle.BACKGROUND_THIN` 系列做玻璃卡
 - 兼容鸿蒙 5：新能力用 `if (canIUse('SystemCapability.ArkUI.ArkUI.Full'))` 降级
 
+## 用户侧文案卫生（与安卓 R6 对齐）
+
+复刻 SwiftUI 时要做的不只是搬布局/取色，**所有用户可见 string 必须复刻成 iOS 用户实际看到的产品文案**。开发侧术语任何一种漏到 ArkUI `Text({...})` / `$r('app.string.xxx')` / `string.json` 都算脏 PR：
+
+| 禁出现在 user-visible string | 改用 |
+|---|---|
+| `BATCH-`、`阶段 ARCH/M3` 等开发标识 | （删；只在文档/commit/PR title 出现） |
+| `复刻`、`复刻中`、`已接入`、`待接入`、`下一批`、`后续`、`未完成`、`占位` | 写产品级标题/空状态文案，例如 "暂无公告"、"建设中"、"敬请期待" |
+| 英文级别码（`WARNING` / `ERROR`）直接渲染 | 中文等价文案，由资源 string.json 提供 |
+| PRD 编号 `F-19` / `W-03` | （删；只在文档出现） |
+| 文件路径、`@Component` 名字 | （删） |
+| 硬编码 sample 数据残留生产路径 | 走真实 RDB / Repository；空时显示产品级空状态 |
+
+**Why**：安卓侧 BATCH-UX-COPY-01A 已经因为通知中心样例公告 + House 内部进度术语进了用户 UI 而单独拉了一批清理。鸿蒙侧虽然现阶段只复刻了衣橱页，要在扩面之前就封死同类问题。
+
+**How to apply**：
+
+1. 写 ArkUI `Text({...})` 字面量前先定位 iOS 上同位置的 SwiftUI `Text("...")`，原文搬运；找不到对应位置（鸿蒙独有的中间态/Toast）→ 写产品级降级文案，绝不写"开发进度"。
+2. 用户可见字符串集中放 `entry/src/main/resources/base/element/string.json`（或 zh/en 子目录），禁止把 batch ID / 阶段编号 / file path 写入 string.json。
+3. DevEco 预览器跑通后，**必须再走一次模拟器或真机**看真实 UI；预览器与真机在中文排版、`Text` 自适应换行上差异比 Compose Preview 还大。
+4. 提交前在新增/修改文件作用域内 grep：`BATCH-` / `阶段 [A-Z]` / `复刻` / `占位` / `待接入` / `下一批` / `后续` / `F-\d+` / `W-\d+` 必须 0 命中。
+
+## 与安卓 harness 的关系
+
+鸿蒙工程目前**没有** `PORT_HARNESS.md` / `PORT_BACKLOG.md`（首批衣橱页之后未再扩展）。如果要推进多页面复刻，建议参照 `android/docs/PORT_HARNESS.md` 同构建立一份 `harmony_next/docs/PORT_HARNESS.md`：六条红线表（R1~R6）、Task Card 模板、跑批回合、跨 session 协议都可以原样照搬，只需把 `assembleDebug` 换成 `hvigor build`、`@Preview` 换成 `DevEco Previewer`、Room schema 换成 RDB schema、Material 3 token 换成 `AppTheme.ets` token。
+
 ## 下次改进清单
 
 1. 写代码前先把鸿蒙布局用注释 tree 画出来（对齐 SwiftUI body 顺序），让用户先 review 布局再开写

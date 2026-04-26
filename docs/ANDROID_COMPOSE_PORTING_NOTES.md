@@ -160,6 +160,38 @@ items.add(x)   // SnapshotStateList 会触发
 
 ---
 
+## 六点五、用户侧文案卫生（R6 配套）
+
+复刻 SwiftUI 时要做的不只是搬布局/取色，**所有用户可见 string 必须复刻成 iOS 用户实际看到的产品文案**。开发侧术语任何一种漏到 UI 都算脏 PR：
+
+| 禁出现在 user-visible string | 改用 |
+|---|---|
+| `BATCH-M3-04`、`BATCH-` 标识 | （删；只在文档/commit/PR title 出现） |
+| `阶段 ARCH`、`阶段 M3` 等开发阶段 | （删） |
+| `复刻`、`复刻中`、`已接入`、`待接入`、`下一批`、`后续`、`未完成`、`占位` | 写产品级标题/空状态文案，例如 "暂无公告" / "建设中" / "敬请期待" |
+| 英文级别码（`WARNING` / `ERROR` / `CRITICAL`）直接渲染 | 中文等价文案，由本地化 string 资源提供 |
+| PRD / 产品文档编号（`F-19` / `W-03`） | （删；只在 Task Card / 文档出现） |
+| 文件路径、Composable 名字、Tab key | （删） |
+| 硬编码 sample 公告 / 占位列表条目残留生产路径 | 真实数据源 + 产品级空状态 |
+
+**Why**：[BATCH-UX-COPY-01A](../android/docs/PORT_BACKLOG.md) 已经因为通知中心样例公告 + House 菜单"复刻、已接入、下一批、后续"等内部文案进了用户 UI 而单独拉了一批清理——这是真实代价。要在写第一行 Composable 之前就避开。
+
+**How to apply**：
+
+1. 写 Composable 字面量前先定位 iOS 上同位置的 `Text("...")` / `LocalizedStringKey`，原文搬运。找不到对应文案的位置（比如新增的中间态、Android 独有的 Snackbar），用产品级降级文案，**绝不写"开发进度"**。
+2. 凡是 `stringResource` / `pluralStringResource` / `string-array` 都要 round-trip 走 `res/values*/strings.xml`，不要在 Composable 里 inline 中文字面量。inline 字面量在 UX-COPY 清理时漏检率最高。
+3. 提交前 grep（在新增/修改文件作用域内）：
+   ```bash
+   rg -n '"(.*?)(BATCH-|阶段 [A-Z]|复刻|占位|待接入|下一批|后续|未完成)' \
+     android/app/src/main/java/com/pinkhouse/android/feature/<本批新文件>
+   rg -n 'F-\d+|W-\d+' android/app/src/main/res/values*/<本批新 strings.xml>
+   ```
+   命中即同回合修，不允许带进 commit。
+4. 装机截图（PORT_HARNESS G2）必须人工对照 iOS：进入同一页，逐区核对标题/按钮/空态/错误提示/通知/确认弹窗，发现夹带开发侧文字立即报告。
+5. `@Preview` 内的占位字面量绝不复制到非 Preview 的 Composable；Preview 用 `@PreviewParameter` 或局部 `val previewData = ...`。
+
+---
+
 ## 七、Android 专属坑（鸿蒙侧没有的）
 
 1. **Min SDK 26 的底线**：PRD 要求兼容 HarmonyOS 3/4（AOSP 兼容层）。这意味着：
