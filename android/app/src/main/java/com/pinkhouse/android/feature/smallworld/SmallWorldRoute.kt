@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
@@ -65,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.pinkhouse.android.core.assets.PinkHouseAssets
 import com.pinkhouse.android.core.ui.PinkHouseDesignTokens
 import com.pinkhouse.android.core.ui.PinkSegmentedTabs
+import com.pinkhouse.android.feature.checkin.CheckInRoute
 import com.pinkhouse.android.feature.wardrobe.WardrobeHomeTab
 
 private val houseBackgroundOptions = listOf("日常", "洛可可")
@@ -78,6 +82,7 @@ enum class SmallWorldDestination(
     Menu("House", "房间入口与功能总览", Icons.Filled.AutoAwesome, "入口汇总、背景切换和房间导航。"),
     SmallWorld("小世界", "房间样式、宠物动画与天气入口", Icons.Filled.AutoAwesome, "这里会承接小世界样式切换、宠物停驻和天气入口。"),
     BigWorld("世界书", "旅行、徽章、航线与世界设定", Icons.Filled.Flight, "后续会把世界书主视觉、章节入口和旅行记录搬过来。"),
+    CheckIn("每日打卡", "签到、问候语与今日穿搭色", Icons.Filled.CheckCircle, "这里会对齐 iOS 的每日打卡、七日签到和今日穿搭色。"),
     Calendar("梦裙日历", "尾款与穿搭日程", Icons.Filled.CalendarMonth, "这里会对齐 iOS 的梦裙日历排期和最近提醒入口。"),
     Wealth("来财", "招财、数钱、储蓄", Icons.Filled.Paid, "来财页会先补入口切换，再逐步接上动画和数据统计。"),
     Ootd("穿搭手帐", "记录每日搭配", Icons.Filled.Book, "穿搭手帐会先复刻列表骨架，再补详情与编辑。"),
@@ -90,6 +95,7 @@ enum class SmallWorldDestination(
 private val houseMenuEntries = listOf(
     SmallWorldDestination.SmallWorld,
     SmallWorldDestination.BigWorld,
+    SmallWorldDestination.CheckIn,
     SmallWorldDestination.Calendar,
     SmallWorldDestination.Wealth,
     SmallWorldDestination.Ootd,
@@ -401,122 +407,131 @@ private fun SmallWorldFeatureScreen(
             )
         }
 
-        if (destination == SmallWorldDestination.SmallWorld) {
-            SmallWorldRoomStage(
-                backgroundIndex = backgroundIndex,
-                onOpenDestination = onOpenDestination,
-                onOpenWardrobe = onOpenWardrobe,
-                onOpenDepositPlan = onOpenDepositPlan,
-                onOpenPetChat = onOpenPetChat,
-            )
-        } else {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            if (destination == SmallWorldDestination.SmallWorld) {
+                SmallWorldRoomStage(
+                    backgroundIndex = backgroundIndex,
+                    onOpenDestination = onOpenDestination,
+                    onOpenWardrobe = onOpenWardrobe,
+                    onOpenDepositPlan = onOpenDepositPlan,
+                    onOpenPetChat = onOpenPetChat,
+                )
+            } else if (destination == SmallWorldDestination.CheckIn) {
+                CheckInRoute()
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.76f)),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = PinkHouseDesignTokens.Primary.copy(alpha = 0.12f),
+                        ) {
+                            Icon(
+                                imageVector = destination.icon,
+                                contentDescription = null,
+                                modifier = Modifier.padding(16.dp),
+                                tint = PinkHouseDesignTokens.Primary,
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = "已接通导航骨架",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = PinkHouseDesignTokens.TextPrimary,
+                            )
+                            Text(
+                                text = destination.supportingCopy,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = PinkHouseDesignTokens.TextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.76f)),
+                shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.82f)),
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = PinkHouseDesignTokens.Primary.copy(alpha = 0.12f),
-                    ) {
-                        Icon(
-                            imageVector = destination.icon,
-                            contentDescription = null,
-                            modifier = Modifier.padding(16.dp),
-                            tint = PinkHouseDesignTokens.Primary,
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            text = "已接通导航骨架",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = PinkHouseDesignTokens.TextPrimary,
-                        )
-                        Text(
-                            text = destination.supportingCopy,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = PinkHouseDesignTokens.TextSecondary,
-                        )
-                    }
+                    Text(
+                        text = "当前保留的复刻规则",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = PinkHouseDesignTokens.TextPrimary,
+                    )
+                    SmallWorldMilestoneChip(text = "底部主导航不扩张，House 内页自己管理返回")
+                    SmallWorldMilestoneChip(text = "背景风格切换继续沿用日常 / 洛可可两套素材")
+                    SmallWorldMilestoneChip(text = "后续页面直接在这个目的地壳层里替换具体 Compose 内容")
                 }
             }
-        }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
-            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.82f)),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.84f)),
             ) {
-                Text(
-                    text = "当前保留的复刻规则",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = PinkHouseDesignTokens.TextPrimary,
-                )
-                SmallWorldMilestoneChip(text = "底部主导航不扩张，House 内页自己管理返回")
-                SmallWorldMilestoneChip(text = "背景风格切换继续沿用日常 / 洛可可两套素材")
-                SmallWorldMilestoneChip(text = "后续页面直接在这个目的地壳层里替换具体 Compose 内容")
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(PinkHouseDesignTokens.CardRadius),
-            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.84f)),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = "快速入口",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = PinkHouseDesignTokens.TextPrimary,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    OutlinedButton(
-                        onClick = onOpenWardrobe,
-                        modifier = Modifier.weight(1f),
+                    Text(
+                        text = "快速入口",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = PinkHouseDesignTokens.TextPrimary,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Icon(Icons.Filled.Inventory2, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("衣橱")
+                        OutlinedButton(
+                            onClick = onOpenWardrobe,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.Inventory2, contentDescription = null)
+                            Spacer(Modifier.size(8.dp))
+                            Text("衣橱")
+                        }
+                        OutlinedButton(
+                            onClick = onOpenPetChat,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.Pets, contentDescription = null)
+                            Spacer(Modifier.size(8.dp))
+                            Text("萌宠对话")
+                        }
                     }
-                    OutlinedButton(
-                        onClick = onOpenPetChat,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Icon(Icons.Filled.Pets, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text("萌宠对话")
+                    TextButton(onClick = onBack) {
+                        Text("返回 House 菜单")
                     }
-                }
-                TextButton(onClick = onBack) {
-                    Text("返回 House 菜单")
                 }
             }
-        }
 
-        Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(2.dp))
+        }
     }
 }
 

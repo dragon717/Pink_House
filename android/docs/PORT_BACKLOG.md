@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-M3-05 已验证；下一批建议进入 M4-01 Daily CheckIn 首屏。
+无 — BATCH-M4-01 已验证；下一批建议进入 M4-02 CalendarRoute（梦裙日历）。
 
 ---
 
@@ -32,10 +32,6 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 阶段 M3 当前 Ready 已清空；后续热区坐标精调可作为 polish 批次再加入。
 
 ### 阶段 M4（签到/日历/通知 F-26 ~ F-29、F-36 ~ F-38）
-
-- [ ] **BATCH-M4-01** CheckInRoute（每日签到 F-26）
-  - UPSTREAM: `ItemManager/Views/CheckIn/DailyCheckInView.swift` (1205 LOC)
-  - F5 触发：超 1500 LOC 的话拆首屏 + 子区两批
 
 - [ ] **BATCH-M4-02** CalendarRoute（梦裙日历 F-28）
   - UPSTREAM: `ItemManager/Views/Calendar/DreamDressCalendarView.swift` (918 LOC)
@@ -83,6 +79,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-M4-01** CheckInRoute 每日打卡首屏 — 新增 `CheckInRoute.kt`，复刻 iOS 每日签到首屏的日期问候、本周签到、今日穿搭色、立即打卡/今日已打卡与分享入口；`SmallWorldRoute.kt` 在 House 菜单新增 `每日打卡` 目的地，并让 House 内页内容区可滚动以适配签到卡片。assembleDebug 通过；红线 grep 无命中；装机验证 `House → 菜单 → 每日打卡` 可见核心区块，点 `立即打卡` 后出现 `今日已打卡` 与 `分享今日穿搭`。详见 [android_migration_checkin.md](android_migration_checkin.md)。
 - [x] **BATCH-M3-05** SmallWorld 热点交互（点击场景元素） — `SmallWorldRoute.kt` 在小世界主图上叠加响应式热区标签，按 `日常 / 洛可可` 风格分别提供 `少女衣橱`、`萌宠对话`、`心愿尾款`、`马上来财`、`梦裙日历`、`穿搭手帐` 等入口；热区可跳衣橱、心愿尾款、萌宠对话或 House 内已有目的地。assembleDebug 通过；红线 grep 无命中；装机验证可见热区标签，点主图 `心愿尾款` 可进入心愿尾款页。详见 [android_migration_smallworld.md](android_migration_smallworld.md)。
 - [x] **BATCH-M3-04** SmallWorld 主图 + 风格切换（日常/洛可可） — `SmallWorldRoute.kt` 为 `SmallWorldDestination.SmallWorld` 增加专用主图舞台，复用已有 `small_world_bg_normal.png` / `small_world_rococo_1.png` 资产，随顶部 `日常 / 洛可可` 分段切换主图与说明，保留 `少女衣橱`、`萌宠对话` 与 `热区待接入` 软圆入口。assembleDebug 通过；红线 grep 无命中；装机验证 House 小世界页可见 `日常小世界`，切到 `洛可可` 后可见 `洛可可小世界`。详见 [android_migration_smallworld.md](android_migration_smallworld.md)。
 - [x] **BATCH-WARDROBE-DATA-08** 筛选 Sheet 候选值 Chips — `WardrobeHomeViewModel.kt` 新增 `WardrobeFilterSuggestions`，从全量衣橱数据提取品牌/类型/颜色/状态候选并按频次取前 8；`WardrobeRoute.kt` 在筛选 Sheet 对应输入框下方展示候选 Chips，点按即可填入草稿字段并高亮。assembleDebug 通过；红线 grep 无命中；装机验证 `筛选 → 类型候选 → 裙装 → 应用筛选` 后首页显示 `当前结果统计` 与 `类型：裙装`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
