@@ -7,7 +7,7 @@
 
 ## In Progress
 
-无 — BATCH-WARDROBE-DATA-06 已验证；下一批建议继续优化当前查询/筛选条件 Chips 与单项移除。
+无 — BATCH-WARDROBE-DATA-07 已验证；下一批建议继续做筛选 Sheet 候选值 Chips，减少手动输入。
 
 ---
 
@@ -27,9 +27,9 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 ### 阶段 WARDROBE-DATA（衣橱核心查询 / 统计优先）
 
-- [ ] **BATCH-WARDROBE-DATA-07** 当前查询/筛选条件 Chips + 单项移除
+- [ ] **BATCH-WARDROBE-DATA-08** 筛选 Sheet 候选值 Chips
   - SCOPE: 2 业务文件 — `WardrobeRoute.kt` + `WardrobeHomeViewModel.kt`；同步更新 `android_migration_wardrobe.md`
-  - 目标：在衣橱首页 `当前结果统计` 附近展示搜索词、品牌/类型/颜色/状态、无值条件、尾款/现货等活跃条件 Chips，并支持点单个 Chip 快速移除，提升查询状态可见性与回退效率。
+  - 目标：在筛选 Sheet 中为品牌/类型/颜色/状态等字段补充来自当前衣橱数据的候选值 Chips，点按即可填入/替换对应字段，减少手动输入并提升查询速度。
 
 ### 阶段 M3（宠物 + 小世界 F-11 ~ F-25）
 
@@ -93,6 +93,7 @@ UX 优先路线：先把 `衣橱核心功能 → 数据查询 → 数据统计` 
 
 最近完成的在顶。每条带 commit hash + 链接到详细记录。
 
+- [x] **BATCH-WARDROBE-DATA-07** 当前查询/筛选条件 Chips + 单项移除 — `WardrobeHomeViewModel.kt` 新增 `WardrobeFilterChipKind`、`clearSearchQuery()` 与 `clearFilterChip(kind)`；`WardrobeRoute.kt` 在 `当前结果统计` 下方展示活跃搜索/筛选条件 Chips，支持点单个 Chip 移除。assembleDebug 通过；红线 grep 无命中；装机验证品牌筛选 `Baby` 应用后显示 `当前条件（点按单项移除）` 与 `品牌：Baby`，点按 Chip 后回到 `衣橱总览`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-06** 统计明细均价 / 占比条 — `WardrobeHomeViewModel.kt` 为统计分组桶新增 `averageValue` 与 `valueShare`，按当前统计口径计算件均价与价值占比；`WardrobeRoute.kt` 将详细统计行升级为标题/金额、件款+均价、软圆粉色占比条三层结构，继续保留点击反向筛选。assembleDebug 通过；红线 grep 无命中；装机验证 `少女衣橱 → 详细统计` 中可见 `均价 ¥1314.50`、`占比 86%`、`均价 ¥259.00` 与 `占比 8%`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-DATA-05** 统计明细项一键反向筛选 — `WardrobeHomeViewModel.kt` 新增统计分组反向筛选映射，支持品牌/类型/颜色/状态与尾款状态生成对应 `WardrobeFilterState`；`WardrobeRoute.kt` 让详细统计分组行可点击，关闭 Sheet 后回到 `当前结果统计`，并补充现货/已拥有筛选状态。assembleDebug 通过；红线 grep 无命中；装机验证点击 `详细统计 → 未填写品牌` 后首页显示 `当前结果统计`、`筛选 1 项`、`命中 2/4 款`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。
 - [x] **BATCH-WARDROBE-UI-07** 筛选 Sheet / 查询条件面板软圆还原 — `WardrobeRoute.kt` 将筛选 Sheet 内容区改为轻粉底，筛选字段归入 `筛选条件` 软玻璃分组，快捷无值条件与 `只看心愿尾款` 改为 `SoftSearchPill`，底部 `清空 / 取消 / 应用筛选` 改为固定软圆操作条；保留原筛选逻辑与统计联动。assembleDebug 通过；红线 grep 无命中；装机验证可见 `筛选条件`、`快捷条件`、`无品牌`、`无标签`、`无小物`、`只看心愿尾款` 与 `应用筛选`。详见 [android_migration_wardrobe.md](android_migration_wardrobe.md)。

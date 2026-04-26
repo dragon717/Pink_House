@@ -433,6 +433,7 @@
 
 - `BATCH-WARDROBE-DATA-05`：把详细统计 Sheet 的品牌/类型/颜色/状态/尾款分组项做成一键反向筛选，形成“统计发现 → 查询定位”的闭环。
 - `BATCH-WARDROBE-DATA-06`：统计明细分组补充均价与价值占比条，让用户在点击筛选前先看出价值集中度。
+- `BATCH-WARDROBE-DATA-07`：首页当前查询/筛选条件 Chips + 单项移除，让用户能看清并快速撤销当前条件。
 
 
 ### BATCH-WARDROBE-DEPOSIT-01 心愿尾款 视图模式 + 年份切换
@@ -563,6 +564,41 @@
 - DEPOSIT-04：TotalBalanceCard 隐藏/显示 + 钱包瘦身 alert + YearSelectorView 小眼睛 + YearStatsCard。
 
 
+### BATCH-WARDROBE-DATA-07 当前查询/筛选条件 Chips + 单项移除
+
+**背景**
+
+- DATA-05 / DATA-06 已经把统计发现链路打通，但首页只显示 `筛选 N 项`，用户需要回忆自己究竟输入了哪些条件。
+- 本批把活跃搜索词和筛选条件直接露出在 `当前结果统计` 下方，并支持点单个 Chip 撤销，降低查询回退成本。
+
+**改动范围**
+
+- `WardrobeHomeViewModel.kt`
+  - 新增 `WardrobeFilterChipKind`，覆盖品牌、类型、颜色、尺码、衣长、状态、小物、标签、尾款状态。
+  - 新增 `clearSearchQuery()`：清空搜索词并关闭搜索框。
+  - 新增 `clearFilterChip(kind)`：按单个筛选维度清空对应字段；尾款状态一次清空 `depositOnly / ownedOnly`，保持互斥语义。
+- `WardrobeRoute.kt`
+  - `WardrobeStatisticsCard` 新增清除搜索/筛选回调；当 `uiState.hasActiveQuery` 时在统计卡内展示 `当前条件（点按单项移除）`。
+  - 新增 `ActiveQueryChipRow` / `ActiveConditionPill`：横向滚动的粉色软圆 Chip，右侧带圆形关闭图标。
+  - 新增 `WardrobeHomeUiState.activeQueryChips()`：把搜索词与所有活跃筛选字段映射成 UI Chip；无值条件如 `无品牌` 直接展示语义词，普通字段展示 `品牌：Baby` 这种标题和值。
+  - 保留统计卡原有命中数、筛选项数、详细统计入口与软圆玻璃风格。
+
+**验证结果**
+
+- `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug` 通过。
+- 红线 grep：新增 diff 无 `0xFF...`、`.sp`、`Modifier.blur`、`Firebase`、`dynamicColor` 命中；`git diff --check` 通过。
+- Android Emulator 装机验证：
+  - 打开筛选 Sheet，在品牌输入 `Baby` 并应用后，首页统计卡切换为 `当前结果统计`，显示 `当前条件（点按单项移除）` 与 Chip `品牌：Baby`。
+  - 点按 `品牌：Baby` Chip 后，品牌筛选被移除，统计卡回到 `衣橱总览` 与 `全量数据 · 搜索和筛选后会联动更新`。
+- 截图记录：
+  - `/tmp/pinkhouse_wardrobe_data_07_active_chips.png`
+  - `/tmp/pinkhouse_wardrobe_data_07_chip_removed.png`
+
+**后续待办**
+
+- `BATCH-WARDROBE-DATA-08`：筛选 Sheet 候选值 Chips（品牌/类型/颜色/状态），减少手动输入，继续强化查询效率。
+
+
 ### BATCH-WARDROBE-DATA-06 统计明细均价 / 价值占比条
 
 **背景**
@@ -592,7 +628,7 @@
 
 **后续待办**
 
-- `BATCH-WARDROBE-DATA-07`：首页当前查询/筛选条件 Chips + 单项移除，提升筛选状态可见性与回退效率。
+- `BATCH-WARDROBE-DATA-07`：首页当前查询/筛选条件 Chips + 单项移除，提升筛选状态可见性与回退效率。（已完成）
 
 
 ### BATCH-WARDROBE-DATA-05 统计明细项一键反向筛选

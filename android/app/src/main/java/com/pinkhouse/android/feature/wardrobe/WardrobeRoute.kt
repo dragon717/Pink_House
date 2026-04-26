@@ -249,6 +249,8 @@ fun WardrobeRoute(
                 WardrobeStatisticsCard(
                     uiState = uiState,
                     onStatisticsClick = { showStatisticsSheet = true },
+                    onClearSearch = viewModel::clearSearchQuery,
+                    onClearFilter = viewModel::clearFilterChip,
                 )
                 WardrobeContent(
                     uiState = uiState,
@@ -904,6 +906,8 @@ private fun SoftSearchPill(
 private fun WardrobeStatisticsCard(
     uiState: WardrobeHomeUiState,
     onStatisticsClick: () -> Unit,
+    onClearSearch: () -> Unit,
+    onClearFilter: (WardrobeFilterChipKind) -> Unit,
 ) {
     val statistics = if (uiState.hasActiveQuery) uiState.visibleStatistics else uiState.statistics
     SoftGlassPanel {
@@ -930,9 +934,13 @@ private fun WardrobeStatisticsCard(
                         color = SoftGrayText,
                     )
                 }
-                if (uiState.hasActiveQuery && uiState.searchQuery.isNotBlank()) {
-                    SoftSearchPill(label = uiState.searchQuery, selected = true, onClick = {})
-                }
+            }
+            if (uiState.hasActiveQuery) {
+                ActiveQueryChipRow(
+                    uiState = uiState,
+                    onClearSearch = onClearSearch,
+                    onClearFilter = onClearFilter,
+                )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SoftStatTile("总件数/款", "${statistics.totalPieces}/${statistics.totalStyles}")
@@ -946,6 +954,122 @@ private fun WardrobeStatisticsCard(
             }
         }
     }
+}
+
+private data class ActiveQueryChip(
+    val key: String,
+    val label: String,
+    val filterKind: WardrobeFilterChipKind?,
+)
+
+@Composable
+private fun ActiveQueryChipRow(
+    uiState: WardrobeHomeUiState,
+    onClearSearch: () -> Unit,
+    onClearFilter: (WardrobeFilterChipKind) -> Unit,
+) {
+    val chips = remember(uiState.searchQuery, uiState.filterState) { uiState.activeQueryChips() }
+    if (chips.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "当前条件（点按单项移除）",
+            style = MaterialTheme.typography.labelMedium,
+            color = SoftGrayText.copy(alpha = 0.72f),
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(chips, key = { it.key }) { chip ->
+                ActiveConditionPill(
+                    label = chip.label,
+                    onClick = {
+                        val kind = chip.filterKind
+                        if (kind == null) {
+                            onClearSearch()
+                        } else {
+                            onClearFilter(kind)
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveConditionPill(
+    label: String,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Surface(
+        modifier = Modifier
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = PinkPrimary.copy(alpha = 0.14f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, PinkPrimary.copy(alpha = 0.32f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, top = 7.dp, end = 8.dp, bottom = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                color = PinkPrimary,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.72f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "移除条件",
+                    tint = SoftGrayText.copy(alpha = 0.78f),
+                    modifier = Modifier.size(13.dp),
+                )
+            }
+        }
+    }
+}
+
+private fun WardrobeHomeUiState.activeQueryChips(): List<ActiveQueryChip> {
+    val result = mutableListOf<ActiveQueryChip>()
+    if (searchQuery.isNotBlank()) {
+        result += ActiveQueryChip("search", "搜索：$searchQuery", null)
+    }
+    fun addFilter(
+        key: String,
+        title: String,
+        value: String,
+        kind: WardrobeFilterChipKind,
+    ) {
+        val trimmed = value.trim()
+        if (trimmed.isNotEmpty()) {
+            val label = if (trimmed.startsWith("无")) trimmed else "$title：$trimmed"
+            result += ActiveQueryChip(key, label, kind)
+        }
+    }
+    addFilter("brand", "品牌", filterState.brand, WardrobeFilterChipKind.Brand)
+    addFilter("type", "类型", filterState.type, WardrobeFilterChipKind.Type)
+    addFilter("color", "颜色", filterState.color, WardrobeFilterChipKind.Color)
+    addFilter("size", "尺码", filterState.size, WardrobeFilterChipKind.Size)
+    addFilter("length", "衣长", filterState.length, WardrobeFilterChipKind.Length)
+    addFilter("condition", "状态", filterState.condition, WardrobeFilterChipKind.Condition)
+    addFilter("accessory", "小物", filterState.accessory, WardrobeFilterChipKind.Accessory)
+    addFilter("tag", "标签", filterState.tag, WardrobeFilterChipKind.Tag)
+    if (filterState.depositOnly) {
+        result += ActiveQueryChip("deposit", "只看心愿尾款", WardrobeFilterChipKind.DepositState)
+    } else if (filterState.ownedOnly) {
+        result += ActiveQueryChip("deposit", "只看现货/已拥有", WardrobeFilterChipKind.DepositState)
+    }
+    return result
 }
 
 @Composable

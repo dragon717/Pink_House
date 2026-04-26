@@ -102,6 +102,18 @@ enum class WardrobeStatisticsFilterKind {
     DepositState,
 }
 
+enum class WardrobeFilterChipKind {
+    Brand,
+    Type,
+    Color,
+    Size,
+    Length,
+    Condition,
+    Accessory,
+    Tag,
+    DepositState,
+}
+
 data class WardrobeEditorDraft(
     val imageFileNames: List<String> = emptyList(),
     val name: String = "",
@@ -394,6 +406,10 @@ class WardrobeHomeViewModel(
         }
     }
 
+    fun clearSearchQuery() {
+        runtimeState.update { it.copy(searchQuery = "", isSearchVisible = false) }
+    }
+
     fun setSortOption(option: WardrobeSortOption) {
         viewModelScope.launch { userPreferencesDataStore.setWardrobeSortOption(option.raw) }
     }
@@ -448,6 +464,24 @@ class WardrobeHomeViewModel(
 
     fun clearFilters() {
         runtimeState.update { it.copy(filterState = WardrobeFilterState()) }
+    }
+
+    fun clearFilterChip(kind: WardrobeFilterChipKind) {
+        runtimeState.update { state ->
+            val current = state.filterState
+            val next = when (kind) {
+                WardrobeFilterChipKind.Brand -> current.copy(brand = "")
+                WardrobeFilterChipKind.Type -> current.copy(type = "")
+                WardrobeFilterChipKind.Color -> current.copy(color = "")
+                WardrobeFilterChipKind.Size -> current.copy(size = "")
+                WardrobeFilterChipKind.Length -> current.copy(length = "")
+                WardrobeFilterChipKind.Condition -> current.copy(condition = "")
+                WardrobeFilterChipKind.Accessory -> current.copy(accessory = "")
+                WardrobeFilterChipKind.Tag -> current.copy(tag = "")
+                WardrobeFilterChipKind.DepositState -> current.copy(depositOnly = false, ownedOnly = false)
+            }
+            state.copy(filterState = next)
+        }
     }
 
     fun enterSelectionMode() {
