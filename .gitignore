@@ -37,3 +37,4 @@ android/build/*
 .env
 .env.*
 !.env.example
+code/*
