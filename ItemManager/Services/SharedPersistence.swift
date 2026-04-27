@@ -76,6 +76,7 @@ class SharedContainer {
                 // 小组件扩展使用简化的 schema
                 let schema = Schema([
                     Clothing.self,
+                    WealthSavingEntry.self,
                     Item.self,
                     Tag.self,
                     Brand.self,
@@ -91,6 +92,7 @@ class SharedContainer {
                 // 主应用使用完整的 schema
                 let schema = Schema([
                     Clothing.self,
+                    WealthSavingEntry.self,
                     Item.self,
                     Tag.self,
                     Brand.self,
@@ -125,6 +127,7 @@ class SharedContainer {
     private static func createWidgetModelContainer() throws -> ModelContainer {
         let schema = Schema([
             Clothing.self,
+            WealthSavingEntry.self,
             Item.self,
             Tag.self,
             Brand.self,

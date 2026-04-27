@@ -38,9 +38,9 @@ temp/<theme-dir>/_artifacts/
 
 | THEME_ID | 目录 | 设计稿 | source_type | 状态 |
 |---|---|---|---|---|
-| `theme_skin.girl_closet` | `temp/主题-旋转木马/` | 主题参考图.jpg + 少女衣橱.png | jpg | manifest ✅ / 代码 ✅ / 素材 ⏳ |
-| `theme_skin.sky_concert` | `temp/主题1/` | 天空音乐会.psd（2480×3319） | psd | manifest ✅（layer_map TBD） |
-| `theme_skin.swan_dream` | `temp/主题2/` | 天鹅入梦.psd（4000×4000） | psd | manifest ✅（layer_map TBD） |
+| `theme_skin.girl_closet` | `temp/主题-旋转木马/` | 主题参考图.jpg + 少女衣橱.png | jpg | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待重跑 |
+| `theme_skin.sky_concert` | `temp/主题1/` | 天空音乐会.psd（2480×3319） | psd | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待跑 |
+| `theme_skin.swan_dream` | `temp/主题2/` | 天鹅入梦.psd（4000×4000） | psd | manifest ✅ / 代码 ✅ / 素材 dry-run ✅ / 验收待跑 |
 
 ### 复刻顺序
 

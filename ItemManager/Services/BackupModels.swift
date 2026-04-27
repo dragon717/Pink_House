@@ -45,6 +45,7 @@ struct BackupManifest: Codable {
     let brands: [BrandDTO]
     let tags: [TagDTO]
     let clothings: [ClothingDTO]
+    let wealthSavingEntries: [WealthSavingEntryDTO]? // v1.12+ 小金库隐藏存款记录，老版本备份可能不存在
     let storedImages: [StoredImageDTO]
     let cutouts: [CutoutItemDTO]
     // Deprecated: outfits are now handled as snapshots
@@ -119,6 +120,7 @@ struct BackupManifest: Codable {
         case brands
         case tags
         case clothings
+        case wealthSavingEntries
         case storedImages
         case cutouts
         case outfits
@@ -163,6 +165,7 @@ struct BackupManifest: Codable {
         brands: [BrandDTO],
         tags: [TagDTO],
         clothings: [ClothingDTO],
+        wealthSavingEntries: [WealthSavingEntryDTO]?,
         storedImages: [StoredImageDTO],
         cutouts: [CutoutItemDTO],
         outfits: [OutfitDTO]?,
@@ -205,6 +208,7 @@ struct BackupManifest: Codable {
         self.brands = brands
         self.tags = tags
         self.clothings = clothings
+        self.wealthSavingEntries = wealthSavingEntries
         self.storedImages = storedImages
         self.cutouts = cutouts
         self.outfits = outfits
@@ -260,6 +264,7 @@ struct BackupManifest: Codable {
         self.brands = try container.decode([BrandDTO].self, forKey: .brands)
         self.tags = try container.decode([TagDTO].self, forKey: .tags)
         self.clothings = try container.decode([ClothingDTO].self, forKey: .clothings)
+        self.wealthSavingEntries = try container.decodeIfPresent([WealthSavingEntryDTO].self, forKey: .wealthSavingEntries)
         self.storedImages = try container.decode([StoredImageDTO].self, forKey: .storedImages)
         self.cutouts = try container.decode([CutoutItemDTO].self, forKey: .cutouts)
         self.outfits = try container.decodeIfPresent([OutfitDTO].self, forKey: .outfits)
@@ -305,6 +310,7 @@ struct BackupManifest: Codable {
         try container.encode(brands, forKey: .brands)
         try container.encode(tags, forKey: .tags)
         try container.encode(clothings, forKey: .clothings)
+        try container.encodeIfPresent(wealthSavingEntries, forKey: .wealthSavingEntries)
         try container.encode(storedImages, forKey: .storedImages)
         try container.encode(cutouts, forKey: .cutouts)
         try container.encodeIfPresent(outfits, forKey: .outfits)
@@ -437,6 +443,19 @@ struct AccessoryItemDTO: Codable {
     let sortIndex: Int
     // v1.5+ 小物图片路径支持
     let imagePaths: [String]?
+}
+
+struct WealthSavingEntryDTO: Codable {
+    let id: UUID
+    let amount: Decimal
+    let clothingID: UUID?
+    let note: String?
+    let migrationSource: String?
+    let createdAt: Date
+    let updatedAt: Date?
+    let usedAt: Date?
+    let voidedAt: Date?
+    let lastModified: Date?
 }
 
 

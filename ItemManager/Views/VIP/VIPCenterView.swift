@@ -91,10 +91,10 @@ struct VIPCenterView: View {
                 preferredGlassStyle: .apricotCream
             ),
             VIPBenefit(
-                id: "weekly",
-                title: "会员周报",
-                subtitle: "每周总结 · 待做",
-                icon: "doc.text.fill",
+                id: "wealthPersonalization",
+                title: "来财个性化",
+                subtitle: "小金库形象 · 纸币背景",
+                icon: "cat.fill",
                 preferredGlassStyle: .sageMint
             ),
             VIPBenefit(
@@ -940,6 +940,13 @@ struct VIPCenterView: View {
             presentInfoAlert(
                 title: benefit.title,
                 message: "VIP 期间可直接使用魔法配色；若你已经单独花喵币解锁，就算 VIP 到期也不会关闭。"
+            )
+        case "wealthPersonalization":
+            presentInfoAlert(
+                title: benefit.title,
+                message: vipManager.isVIP
+                    ? "你已拥有来财个性化权益。可在「我 → 马上来财设置」中切换尾款小金库形象，并继续自定义纸币与背景样式。"
+                    : "开通 VIP 后即可解锁尾款小金库形象切换，支持小金库、招财猫、存钱罐、金币猪，并享受更多来财个性化装扮能力。"
             )
         case "icons":
             if vipManager.isVIP {

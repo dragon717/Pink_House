@@ -286,6 +286,175 @@ final class AccessoryItem {
     }
 }
 
+@Model
+final class WealthSavingEntry {
+    var id: UUID = UUID()
+    var amount: Decimal = 0.0
+    var clothingID: UUID? = nil
+    var note: String = ""
+    var migrationSource: String? = nil
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+    var usedAt: Date? = nil
+    var voidedAt: Date? = nil
+    var lastModified: Date = Date()
+
+    init(
+        amount: Decimal,
+        clothingID: UUID? = nil,
+        note: String = "",
+        migrationSource: String? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = UUID()
+        self.amount = amount
+        self.clothingID = clothingID
+        self.note = note
+        self.migrationSource = migrationSource
+        self.createdAt = createdAt
+        self.updatedAt = createdAt
+        self.lastModified = createdAt
+    }
+}
+
+enum WealthSavingLedger {
+    static let legacyFinalPaymentMigrationSource = "legacy.finalPaymentSavedToWealth"
+
+    static func isActive(_ entry: WealthSavingEntry) -> Bool {
+        entry.amount > 0 && entry.usedAt == nil && entry.voidedAt == nil
+    }
+
+    static func activeTotal(in entries: [WealthSavingEntry]) -> Decimal {
+        entries.reduce(Decimal(0)) { partial, entry in
+            isActive(entry) ? partial + entry.amount : partial
+        }
+    }
+
+    static func activeTotal(for clothingID: UUID, in entries: [WealthSavingEntry]) -> Decimal {
+        entries.reduce(Decimal(0)) { partial, entry in
+            isActive(entry) && entry.clothingID == clothingID ? partial + entry.amount : partial
+        }
+    }
+
+    static func activeUnassignedTotal(in entries: [WealthSavingEntry]) -> Decimal {
+        entries.reduce(Decimal(0)) { partial, entry in
+            isActive(entry) && entry.clothingID == nil ? partial + entry.amount : partial
+        }
+    }
+
+    static func purchaseTarget(for clothing: Clothing) -> Decimal {
+        let target: Decimal
+        if clothing.isDepositPlan {
+            target = clothing.totalDeposit + clothing.totalBalance + clothing.resolvedShippingFee
+        } else {
+            target = clothing.inventoryTotalPrice
+        }
+
+        if target > 0 {
+            return target
+        }
+
+        let fallback = clothing.price + clothing.resolvedAccessoriesPrice + clothing.resolvedShippingFee
+        return max(fallback, clothing.totalBalance)
+    }
+
+    static func progressNumerator(for clothing: Clothing, entries: [WealthSavingEntry]) -> Decimal {
+        let saved = activeTotal(for: clothing.id, in: entries)
+        if clothing.isDepositPlan {
+            return clothing.totalDeposit + saved
+        } else {
+            return saved
+        }
+    }
+
+    static func progressRatio(for clothing: Clothing, entries: [WealthSavingEntry]) -> Double {
+        let target = purchaseTarget(for: clothing)
+        guard target > 0 else { return 0 }
+        let numerator = progressNumerator(for: clothing, entries: entries)
+        return NSDecimalNumber(decimal: numerator / target).doubleValue
+    }
+
+    @discardableResult
+    @MainActor
+    static func addSaving(
+        amount: Decimal,
+        clothingID: UUID?,
+        note: String = "",
+        context: ModelContext
+    ) throws -> WealthSavingEntry? {
+        guard amount > 0 else { return nil }
+        let now = Date()
+        let entry = WealthSavingEntry(
+            amount: amount,
+            clothingID: clothingID,
+            note: note,
+            createdAt: now
+        )
+        context.insert(entry)
+        try context.save()
+        return entry
+    }
+
+    @MainActor
+    static func markActiveSavingsUsed(for clothingID: UUID, context: ModelContext, usedAt: Date = Date()) throws {
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        markActiveSavingsUsed(for: clothingID, entries: entries, usedAt: usedAt)
+        try context.save()
+    }
+
+    @MainActor
+    static func markActiveSavingsUsed(
+        for clothingID: UUID,
+        entries: [WealthSavingEntry],
+        usedAt: Date = Date()
+    ) {
+        for entry in entries where isActive(entry) && entry.clothingID == clothingID {
+            entry.usedAt = usedAt
+            entry.updatedAt = usedAt
+            entry.lastModified = usedAt
+        }
+    }
+
+    @MainActor
+    static func migrateLegacySavedFinalPayments(
+        clothings: [Clothing],
+        entries: [WealthSavingEntry],
+        context: ModelContext
+    ) {
+        var didInsert = false
+        for clothing in clothings {
+            guard clothing.isDepositPlan,
+                  !clothing.isDeleted,
+                  clothing.deletedAt == nil,
+                  clothing.isFinalPaymentSavedToWealth,
+                  clothing.totalBalance > 0 else {
+                continue
+            }
+
+            let alreadyMigrated = entries.contains { entry in
+                entry.clothingID == clothing.id &&
+                entry.migrationSource == legacyFinalPaymentMigrationSource
+            }
+            guard !alreadyMigrated else { continue }
+
+            let date = clothing.finalPaymentSavedAt ?? Date()
+            let entry = WealthSavingEntry(
+                amount: clothing.totalBalance,
+                clothingID: clothing.id,
+                note: "旧版整笔尾款小金库迁移",
+                migrationSource: legacyFinalPaymentMigrationSource,
+                createdAt: date
+            )
+            context.insert(entry)
+            didInsert = true
+        }
+
+        if didInsert {
+            try? context.save()
+        }
+    }
+}
+
 // MARK: - OOTD Models
 // Moved here to ensure availability in all targets (e.g., Widget Extension)
 

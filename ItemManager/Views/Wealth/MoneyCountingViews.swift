@@ -79,7 +79,7 @@ struct MoneyCountingHeaderView: View {
             .minimumScaleFactor(0.5)
             
             VStack(spacing: 4) {
-                Text("已购入小裙装总价 + 心愿尾款已付总定金")
+                Text("已购入小裙装总价 + 心愿尾款定金 + 小金库存款")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

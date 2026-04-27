@@ -115,7 +115,7 @@ struct WealthHapticsSettingsView: View {
                             .foregroundStyle(.yellow)
                     }
                 }
-                Text(showLock ? "VIP 专属 · 当前默认招财猫" : "当前：\(appearanceManager.finalPaymentVaultMascot.displayName)")
+                Text(showLock ? "VIP 专属 · 当前：\(appearanceManager.finalPaymentVaultMascot.displayName)" : "当前：\(appearanceManager.finalPaymentVaultMascot.displayName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -160,7 +160,7 @@ struct FinalPaymentVaultMascotSettingsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .adaptiveRow(showDivider: mascot != FinalPaymentVaultMascot.allCases.last)
+                    .adaptiveRow(showDivider: mascot != .goldPig)
                 }
             }
         }
@@ -183,33 +183,28 @@ private struct FinalPaymentVaultMascotPreview: View {
 
             switch mascot {
             case .miniVault:
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.orange)
+                mascotImageOrFallback(systemName: "lock.shield.fill", color: .orange)
             case .fortuneCat:
-                if let uiImage = UIImage(named: "wealth_fortune_cat") {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(5)
-                } else {
-                    Image(systemName: "cat.fill")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(.orange)
-                }
+                mascotImageOrFallback(systemName: "cat.fill", color: .orange)
             case .piggyBank:
-                Image(systemName: "banknote.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.pink)
+                mascotImageOrFallback(systemName: "banknote.fill", color: .pink)
             case .goldPig:
-                Text("🐷")
-                    .font(.system(size: 28))
-                    .overlay(alignment: .bottomTrailing) {
-                        Image(systemName: "yensign.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.yellow)
-                    }
+                mascotImageOrFallback(systemName: "yensign.circle.fill", color: .yellow)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func mascotImageOrFallback(systemName: String, color: Color) -> some View {
+        if let uiImage = UIImage(named: mascot.assetName) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFit()
+                .padding(5)
+        } else {
+            Image(systemName: systemName)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(color)
         }
     }
 }

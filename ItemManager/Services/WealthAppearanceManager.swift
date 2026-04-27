@@ -35,6 +35,15 @@ enum FinalPaymentVaultMascot: String, CaseIterable, Identifiable {
         case .goldPig: return "yensign.circle.fill"
         }
     }
+
+    var assetName: String {
+        switch self {
+        case .miniVault: return "wealth_mini_vault"
+        case .fortuneCat: return "wealth_fortune_cat"
+        case .piggyBank: return "wealth_piggy_bank"
+        case .goldPig: return "wealth_gold_pig"
+        }
+    }
 }
 
 @Observable

@@ -75,6 +75,7 @@ class BackupService {
         "UserPreference_DepositDisplayMode",
         "UserPreference_WardrobeNavigationStyle",
         "shouldShowWealthContainerBackground",
+        "wealth.finalPaymentVaultMascot",
         "visualModelPriority",
         "textModelPriority",
         "voiceModelId",
@@ -297,6 +298,25 @@ class BackupService {
                     lastModified: c.lastModified,
                     replacedCutoutID: c.replacedCutoutID,
                     accessoryItems: accItems
+                )
+            }
+
+            let wealthSavingEntryDTOs: [WealthSavingEntryDTO] = try self.processByIDs(
+                context: context,
+                descriptor: FetchDescriptor<WealthSavingEntry>(),
+                entityName: "WealthSavingEntries"
+            ) { entry in
+                WealthSavingEntryDTO(
+                    id: entry.id,
+                    amount: entry.amount,
+                    clothingID: entry.clothingID,
+                    note: entry.note,
+                    migrationSource: entry.migrationSource,
+                    createdAt: entry.createdAt,
+                    updatedAt: entry.updatedAt,
+                    usedAt: entry.usedAt,
+                    voidedAt: entry.voidedAt,
+                    lastModified: entry.lastModified
                 )
             }
             
@@ -832,6 +852,7 @@ class BackupService {
                 brands: brandDTOs,
                 tags: tagDTOs,
                 clothings: clothingDTOs,
+                wealthSavingEntries: wealthSavingEntryDTOs,
                 storedImages: storedImageDTOs,
                 cutouts: cutoutDTOs,
                 outfits: nil,
@@ -1670,6 +1691,8 @@ class BackupService {
             }
             clothingBack.tags = dto.tagIDs.compactMap { tagMap[$0] }
         }
+
+        try restoreWealthSavingEntries(context: modelContext, manifest: manifest, restoredClothings: Array(clothingMap.values))
         
         // Cutouts
         let existingCutouts = try modelContext.fetch(FetchDescriptor<CutoutItem>())
@@ -2480,6 +2503,57 @@ class BackupService {
             
             // 保存映射表到上下文
             context.perlerBeadPatternMap = patternMap
+        }
+    }
+
+    private func restoreWealthSavingEntries(
+        context modelContext: ModelContext,
+        manifest: BackupManifest,
+        restoredClothings: [Clothing]
+    ) throws {
+        let existingEntries = try modelContext.fetch(FetchDescriptor<WealthSavingEntry>())
+        var entryMap: [UUID: WealthSavingEntry] = [:]
+        var duplicates: [WealthSavingEntry] = []
+
+        for entry in existingEntries {
+            if entryMap[entry.id] != nil {
+                duplicates.append(entry)
+            } else {
+                entryMap[entry.id] = entry
+            }
+        }
+
+        for duplicate in duplicates {
+            modelContext.delete(duplicate)
+            print("### Restore: Deleted duplicate WealthSavingEntry with ID: \(duplicate.id)")
+        }
+
+        if let dtoEntries = manifest.wealthSavingEntries, !dtoEntries.isEmpty {
+            for dto in dtoEntries {
+                let entry = entryMap[dto.id] ?? {
+                    let newEntry = WealthSavingEntry(amount: dto.amount, clothingID: dto.clothingID, createdAt: dto.createdAt)
+                    newEntry.id = dto.id
+                    modelContext.insert(newEntry)
+                    entryMap[dto.id] = newEntry
+                    return newEntry
+                }()
+
+                entry.amount = dto.amount
+                entry.clothingID = dto.clothingID
+                entry.note = dto.note ?? ""
+                entry.migrationSource = dto.migrationSource
+                entry.createdAt = dto.createdAt
+                entry.updatedAt = dto.updatedAt ?? dto.createdAt
+                entry.usedAt = dto.usedAt
+                entry.voidedAt = dto.voidedAt
+                entry.lastModified = dto.lastModified ?? entry.updatedAt
+            }
+        } else {
+            WealthSavingLedger.migrateLegacySavedFinalPayments(
+                clothings: restoredClothings,
+                entries: Array(entryMap.values),
+                context: modelContext
+            )
         }
     }
     

@@ -10,6 +10,7 @@ import SwiftData
 
 struct ClothingDetailView: View {
     @Bindable var clothing: Clothing
+    @Query private var wealthSavingEntries: [WealthSavingEntry]
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
@@ -21,6 +22,8 @@ struct ClothingDetailView: View {
     @State private var showCelebration = false
     @State private var currentImageIndex = 0
     @State private var showingShareSheet = false
+    @State private var showingWealthSavingSheet = false
+    @State private var wealthSavingCelebrationAmount: Decimal?
     
     // 表图大图查看状态
     @State private var showingChartImageViewer = false
@@ -74,11 +77,9 @@ struct ClothingDetailView: View {
                             .padding(.horizontal)
                             .offset(y: -40)
 
-                        if clothing.isDepositPlan {
-                            finalPaymentWealthCard
-                                .padding(.horizontal)
-                                .offset(y: -40)
-                        }
+                        finalPaymentWealthCard
+                            .padding(.horizontal)
+                            .offset(y: -40)
                         
                         // MARK: - Pay Balance Button
                         if clothing.isDepositPlan {
@@ -147,6 +148,16 @@ struct ClothingDetailView: View {
                         .ignoresSafeArea()
                         .zIndex(100)
                 }
+
+                if let wealthSavingCelebrationAmount {
+                    VaultSavingCelebrationOverlay(
+                        amount: wealthSavingCelebrationAmount,
+                        onComplete: { self.wealthSavingCelebrationAmount = nil }
+                    )
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .zIndex(101)
+                }
             }
         }
         .navigationTitle("衣橱详情")
@@ -211,6 +222,13 @@ struct ClothingDetailView: View {
                 .presentationBackground(.black)
                 .ignoresSafeArea()
         }
+        .sheet(isPresented: $showingWealthSavingSheet) {
+            VaultSavingSheet(
+                targetClothing: clothing,
+                currentSavedAmount: WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries),
+                onSave: saveWealthSavingAmount
+            )
+        }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
@@ -250,6 +268,11 @@ struct ClothingDetailView: View {
             Text("确认后将移除心愿尾款，并清空定金和预估尾款时间信息。")
         }
         .onAppear {
+            WealthSavingLedger.migrateLegacySavedFinalPayments(
+                clothings: [clothing],
+                entries: wealthSavingEntries,
+                context: modelContext
+            )
             // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
             if clothing.deposit > 0 || clothing.balance > 0 {
                 let newTotal = clothing.deposit + clothing.balance
@@ -283,6 +306,11 @@ struct ClothingDetailView: View {
         if clothing.price == 0 {
             clothing.price = clothing.deposit + clothing.balance
         }
+
+        WealthSavingLedger.markActiveSavingsUsed(
+            for: clothing.id,
+            entries: wealthSavingEntries
+        )
         
         clothing.isDepositPlan = false
         clothing.isFinalPaymentSavedToWealth = false
@@ -452,7 +480,7 @@ struct ClothingDetailView: View {
     
     /// 主信息卡片 - 使用统一配色
     private var mainInfoCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 // 裙装名称支持长按拷贝
                 CopyableText(
@@ -805,13 +833,18 @@ struct ClothingDetailView: View {
     }
 
     private var finalPaymentWealthCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("招财猫尾款小金库", systemImage: "cat.fill")
+        let saved = WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
+        let numerator = WealthSavingLedger.progressNumerator(for: clothing, entries: wealthSavingEntries)
+        let target = WealthSavingLedger.purchaseTarget(for: clothing)
+        let ratio = WealthSavingLedger.progressRatio(for: clothing, entries: wealthSavingEntries)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Label("小金库存钱进度", systemImage: "tray.and.arrow.down.fill")
                 .font(.headline)
                 .unifiedPrimary()
 
             HStack(spacing: 10) {
-                Image(systemName: clothing.isFinalPaymentSavedToWealth ? "checkmark.seal.fill" : "yensign.circle.fill")
+                Image(systemName: saved > 0 ? "checkmark.seal.fill" : "yensign.circle.fill")
                     .font(.title2)
                     .foregroundStyle(.orange)
                     .frame(width: 42, height: 42)
@@ -819,38 +852,42 @@ struct ClothingDetailView: View {
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(clothing.isFinalPaymentSavedToWealth ? "已存入招财猫" : "整笔存入尾款")
+                    Text(saved > 0 ? "已存 ¥\(NSDecimalNumber(decimal: saved).stringValue)" : "为这条裙装存一笔")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(themeManager.primaryTextColor)
-                    Text(clothing.isFinalPaymentSavedToWealth ? finalPaymentSavedText : "存入后计入马上来财统计")
+                    Text(clothing.isDepositPlan ? "进度包含已付定金，可超过目标金额" : "普通裙装只统计小金库存款进度")
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
                 }
 
                 Spacer()
 
-                Text("¥\(NSDecimalNumber(decimal: clothing.totalBalance).stringValue)")
+                Text("\(Int((ratio * 100).rounded()))%")
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Color(hex: "C94C72"))
+                    .foregroundStyle(ratio > 1 ? Color(hex: "C94C72") : .orange)
                     .monospacedDigit()
             }
 
-            if !clothing.isFinalPaymentSavedToWealth {
-                Button {
-                    saveFinalPaymentToWealth()
-                } label: {
-                    Label("存入招财猫", systemImage: "cat")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(Color.orange)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
-                .buttonStyle(.plain)
-                .disabled(clothing.totalBalance <= 0)
-                .opacity(clothing.totalBalance > 0 ? 1 : 0.55)
+            VStack(alignment: .leading, spacing: 6) {
+                ProgressView(value: min(ratio, 1.0))
+                    .tint(ratio > 1 ? Color(hex: "C94C72") : .orange)
+                Text("进度 ¥\(NSDecimalNumber(decimal: numerator).stringValue) / ¥\(NSDecimalNumber(decimal: target).stringValue)")
+                    .font(.caption2)
+                    .foregroundStyle(themeManager.tertiaryTextColor)
             }
+
+            Button {
+                showingWealthSavingSheet = true
+            } label: {
+                Label("存一笔到小金库", systemImage: "tray.and.arrow.down")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(Color.orange)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
         }
         .padding()
         .unifiedCardBackground(style: .current(from: themeManager), colorScheme: colorScheme)
@@ -864,19 +901,18 @@ struct ClothingDetailView: View {
         return "存入于 \(date.formatted(date: .numeric, time: .omitted))，付款后会自动转为已用"
     }
 
-    private func saveFinalPaymentToWealth() {
-        guard clothing.isDepositPlan, clothing.totalBalance > 0, !clothing.isFinalPaymentSavedToWealth else { return }
-        let now = Date()
-        clothing.isFinalPaymentSavedToWealth = true
-        clothing.finalPaymentSavedAt = now
-        clothing.updatedAt = now
-        clothing.lastModified = now
-
+    private func saveWealthSavingAmount(_ amount: Decimal) {
         do {
-            try modelContext.save()
+            _ = try WealthSavingLedger.addSaving(
+                amount: amount,
+                clothingID: clothing.id,
+                note: "为「\(clothing.name)」存钱",
+                context: modelContext
+            )
             Task { await SharedPersistence.shared.syncWidgetData() }
+            wealthSavingCelebrationAmount = amount
         } catch {
-            print("ClothingDetailView: Failed to save final payment to wealth: \(error)")
+            print("ClothingDetailView: Failed to save wealth saving entry: \(error)")
         }
     }
     

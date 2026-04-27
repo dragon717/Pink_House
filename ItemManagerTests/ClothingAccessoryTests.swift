@@ -11,7 +11,7 @@ final class ClothingAccessoryTests: XCTestCase {
     override func setUpWithError() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(for: Schema([
-            Clothing.self, Brand.self, Tag.self, StoredImage.self, CutoutItem.self, Outfit.self, OutfitItem.self, AccessoryItem.self
+            Clothing.self, WealthSavingEntry.self, Brand.self, Tag.self, StoredImage.self, CutoutItem.self, Outfit.self, OutfitItem.self, AccessoryItem.self
         ]), configurations: config)
         context = container.mainContext
     }
@@ -90,6 +90,67 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(clothing.originalPriceCurrency, .jpy)
         XCTAssertEqual(clothing.originalPrice, 100.0)
         XCTAssertEqual(clothing.originalPriceJPY, 2100.0)
+    }
+
+    func testWealthSavingMultipleEntriesAccumulateForClothing() throws {
+        let clothing = Clothing(name: "Saving JSK", price: 1000, stock: 1)
+        context.insert(clothing)
+
+        try WealthSavingLedger.addSaving(amount: 120, clothingID: clothing.id, context: context)
+        try WealthSavingLedger.addSaving(amount: 80, clothingID: clothing.id, context: context)
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 200)
+        XCTAssertEqual(WealthSavingLedger.activeUnassignedTotal(in: entries), 0)
+    }
+
+    func testUnassignedWealthSavingDoesNotAffectClothingProgress() throws {
+        let clothing = Clothing(name: "Target OP", price: 1000)
+        context.insert(clothing)
+
+        try WealthSavingLedger.addSaving(amount: 300, clothingID: nil, context: context)
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(WealthSavingLedger.activeTotal(in: entries), 300)
+        XCTAssertEqual(WealthSavingLedger.progressNumerator(for: clothing, entries: entries), 0)
+    }
+
+    func testDepositPlanProgressIncludesDepositAndCanExceedTarget() throws {
+        let clothing = Clothing(name: "Deposit OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+
+        try WealthSavingLedger.addSaving(amount: 900, clothingID: clothing.id, context: context)
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(WealthSavingLedger.progressNumerator(for: clothing, entries: entries), 1100)
+        XCTAssertGreaterThan(WealthSavingLedger.progressRatio(for: clothing, entries: entries), 1.0)
+    }
+
+    func testMarkSavingsUsedRemovesFromActiveTotals() throws {
+        let clothing = Clothing(name: "Paid OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        context.insert(clothing)
+        try WealthSavingLedger.addSaving(amount: 500, clothingID: clothing.id, context: context)
+
+        try WealthSavingLedger.markActiveSavingsUsed(for: clothing.id, context: context)
+
+        let entries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: entries), 0)
+        XCTAssertNotNil(entries.first?.usedAt)
+    }
+
+    func testLegacyFinalPaymentSavedMigratesOnce() throws {
+        let clothing = Clothing(name: "Legacy OP", price: 1000, deposit: 200, balance: 800, isDepositPlan: true)
+        clothing.isFinalPaymentSavedToWealth = true
+        clothing.finalPaymentSavedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        context.insert(clothing)
+
+        WealthSavingLedger.migrateLegacySavedFinalPayments(clothings: [clothing], entries: [], context: context)
+        let firstEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+        WealthSavingLedger.migrateLegacySavedFinalPayments(clothings: [clothing], entries: firstEntries, context: context)
+        let secondEntries = try context.fetch(FetchDescriptor<WealthSavingEntry>())
+
+        XCTAssertEqual(secondEntries.count, 1)
+        XCTAssertEqual(WealthSavingLedger.activeTotal(for: clothing.id, in: secondEntries), clothing.totalBalance)
     }
 
 }

@@ -372,39 +372,44 @@ struct SimpleDepositItemRow: View {
 struct FinalPaymentWealthButton: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ThemeManager.self) private var themeManager
+    @Query private var wealthSavingEntries: [WealthSavingEntry]
+    @State private var showingSavingSheet = false
+    @State private var celebrationAmount: Decimal?
 
     let clothing: Clothing
     var compact: Bool = false
 
-    private var canSave: Bool {
-        clothing.isDepositPlan && clothing.totalBalance > 0 && !clothing.isFinalPaymentSavedToWealth
+    private var savedAmount: Decimal {
+        WealthSavingLedger.activeTotal(for: clothing.id, in: wealthSavingEntries)
     }
 
     var body: some View {
-        Group {
-            if clothing.isFinalPaymentSavedToWealth {
-                statusLabel(
-                    icon: "cat.fill",
-                    title: "已存入招财猫",
-                    detail: savedDateText,
-                    foreground: .orange,
-                    background: Color.orange.opacity(0.12)
+        Button {
+            showingSavingSheet = true
+        } label: {
+            statusLabel(
+                icon: savedAmount > 0 ? "tray.full.fill" : "tray.and.arrow.down",
+                title: savedAmount > 0 ? "小金库进度" : "存一笔到小金库",
+                detail: savedAmount > 0 ? "已存¥\(NSDecimalNumber(decimal: savedAmount).stringValue)" : "可多次存钱",
+                foreground: .orange,
+                background: Color.orange.opacity(0.10)
+            )
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showingSavingSheet) {
+            VaultSavingSheet(
+                targetClothing: clothing,
+                currentSavedAmount: savedAmount,
+                onSave: saveWealthSavingAmount
+            )
+        }
+        .overlay {
+            if let celebrationAmount {
+                VaultSavingCelebrationOverlay(
+                    amount: celebrationAmount,
+                    onComplete: { self.celebrationAmount = nil }
                 )
-            } else {
-                Button {
-                    saveFinalPaymentToWealth()
-                } label: {
-                    statusLabel(
-                        icon: "cat",
-                        title: "存入招财猫",
-                        detail: "¥\(NSDecimalNumber(decimal: clothing.totalBalance).stringValue)",
-                        foreground: .orange,
-                        background: Color.orange.opacity(0.10)
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(!canSave)
-                .opacity(canSave ? 1 : 0.55)
+                .allowsHitTesting(false)
             }
         }
     }
@@ -444,19 +449,18 @@ struct FinalPaymentWealthButton: View {
         .clipShape(Capsule())
     }
 
-    private func saveFinalPaymentToWealth() {
-        guard canSave else { return }
-        let now = Date()
-        clothing.isFinalPaymentSavedToWealth = true
-        clothing.finalPaymentSavedAt = now
-        clothing.updatedAt = now
-        clothing.lastModified = now
-
+    private func saveWealthSavingAmount(_ amount: Decimal) {
         do {
-            try modelContext.save()
+            _ = try WealthSavingLedger.addSaving(
+                amount: amount,
+                clothingID: clothing.id,
+                note: "为「\(clothing.name)」存钱",
+                context: modelContext
+            )
             Task { await SharedPersistence.shared.syncWidgetData() }
+            celebrationAmount = amount
         } catch {
-            print("FinalPaymentWealthButton: Failed to save final payment to wealth: \(error)")
+            print("FinalPaymentWealthButton: Failed to save wealth saving entry: \(error)")
         }
     }
 }

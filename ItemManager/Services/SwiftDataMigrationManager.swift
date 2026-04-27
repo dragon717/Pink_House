@@ -70,6 +70,7 @@ class SwiftDataMigrationManager: ObservableObject {
         // 小组件扩展使用简化 Schema
         return Schema([
             Clothing.self,
+            WealthSavingEntry.self,
             Item.self,
             Tag.self,
             Brand.self,
@@ -85,6 +86,7 @@ class SwiftDataMigrationManager: ObservableObject {
         // 主应用使用完整 Schema
         return Schema([
             Clothing.self,
+            WealthSavingEntry.self,
             Item.self,
             Tag.self,
             Brand.self,
@@ -290,6 +292,10 @@ class SwiftDataMigrationManager: ObservableObject {
             
             // 1. 迁移 Clothing
             try await migrateClothing(from: localContext, to: cloudContext)
+            migrationProgress = 0.12
+
+            // 1b. 迁移小金库隐藏存款记录
+            try await migrateWealthSavingEntries(from: localContext, to: cloudContext)
             migrationProgress = 0.15
             
             // 2. 迁移 Tag
@@ -371,6 +377,25 @@ class SwiftDataMigrationManager: ObservableObject {
         
         try cloudContext.save()
         print("  - 迁移了 \(items.count) 条 Clothing 记录")
+    }
+
+    private func migrateWealthSavingEntries(from localContext: ModelContext, to cloudContext: ModelContext) throws {
+        let descriptor = FetchDescriptor<WealthSavingEntry>()
+        let items = try localContext.fetch(descriptor)
+
+        for item in items {
+            let id = item.id
+            let fetchDescriptor = FetchDescriptor<WealthSavingEntry>(predicate: #Predicate { $0.id == id })
+            let existing = try? cloudContext.fetch(fetchDescriptor).first
+
+            if existing == nil {
+                let newItem = createWealthSavingEntryCopy(from: item)
+                cloudContext.insert(newItem)
+            }
+        }
+
+        try cloudContext.save()
+        print("  - 迁移了 \(items.count) 条 WealthSavingEntry 记录")
     }
     
     private func migrateTags(from localContext: ModelContext, to cloudContext: ModelContext) throws {
@@ -643,6 +668,22 @@ class SwiftDataMigrationManager: ObservableObject {
         new.model3DType = source.model3DType
         new.model3DThumbnailPath = source.model3DThumbnailPath
         new.replacedCutoutID = source.replacedCutoutID
+        return new
+    }
+
+    private func createWealthSavingEntryCopy(from source: WealthSavingEntry) -> WealthSavingEntry {
+        let new = WealthSavingEntry(
+            amount: source.amount,
+            clothingID: source.clothingID,
+            note: source.note,
+            migrationSource: source.migrationSource,
+            createdAt: source.createdAt
+        )
+        new.id = source.id
+        new.updatedAt = source.updatedAt
+        new.usedAt = source.usedAt
+        new.voidedAt = source.voidedAt
+        new.lastModified = source.lastModified
         return new
     }
     
